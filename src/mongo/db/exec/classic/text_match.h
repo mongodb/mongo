@@ -43,6 +43,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -104,7 +105,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "TEXT_MATCH"_sd;
+    static constexpr std::string_view kStageType = "TEXT_MATCH"_sd;
 
 private:
     // Text-specific phrase and negated term matcher.

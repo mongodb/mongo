@@ -31,10 +31,10 @@
 
 #if defined(_WIN32) && defined(_MSC_VER)
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <fstream>  // IWYU pragma: keep
+#include <string_view>
 
 namespace mongo {
 // Helper class to open a FILE* with shared access. Used by the stream classes below.
@@ -56,7 +56,9 @@ protected:
     static FILE* _open(const wchar_t* filename,
                        std::ios_base::openmode mode,
                        bool sharedWriteAccess);
-    static FILE* _open(StringData filename, std::ios_base::openmode mode, bool sharedWriteAccess);
+    static FILE* _open(std::string_view filename,
+                       std::ios_base::openmode mode,
+                       bool sharedWriteAccess);
 
     FILE* _file = nullptr;
 };

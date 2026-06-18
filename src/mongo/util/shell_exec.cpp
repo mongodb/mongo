@@ -31,11 +31,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
+#include <string_view>
 #include <system_error>
 
 #include <boost/move/utility_core.hpp>
@@ -190,7 +190,7 @@ public:
             CloseHandle(_stdout);
             _stdout = nullptr;
         } else {
-            sb << StringData(buf, read);
+            sb << std::string_view(buf, read);
         }
     }
 
@@ -273,7 +273,7 @@ public:
     void read(StringBuilder& sb, size_t len) {
         char buf[kExecBufferSizeBytes];
         len = fread(buf, 1, std::min<size_t>(sizeof(buf), len), _fp);
-        sb << StringData(buf, len);
+        sb << std::string_view(buf, len);
     }
 
     ~ProcessStream() {

@@ -94,6 +94,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -376,7 +377,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
     const MatchExpression* conjunct,
     const CollatorInterface* queryCollator,
     const CollatorInterface* ccCollator,
-    StringData clusterKeyFieldName,
+    std::string_view clusterKeyFieldName,
     RecordIdRange& recordRange,
     const std::function<void(const MatchExpression*)>& redundant) {
     if (conjunct == nullptr) {

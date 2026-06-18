@@ -54,6 +54,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -65,7 +66,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinatorService final
       public DDLLockManager::Recoverable,
       public ActiveMigrationsRegistry::Recoverable {
 public:
-    static constexpr StringData kServiceName = "ShardingCoordinator"_sd;
+    static constexpr std::string_view kServiceName = "ShardingCoordinator"_sd;
 
     explicit ShardingCoordinatorService(
         ServiceContext* serviceContext,
@@ -82,7 +83,7 @@ public:
     using repl::PrimaryOnlyService::getAllInstances;
     using FCV = multiversion::FeatureCompatibilityVersion;
 
-    StringData getServiceName() const override {
+    std::string_view getServiceName() const override {
         return kServiceName;
     }
 

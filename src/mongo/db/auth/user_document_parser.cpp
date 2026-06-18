@@ -34,7 +34,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/address_restriction.h"
@@ -56,6 +55,7 @@
 #include <array>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -64,21 +64,22 @@
 namespace mongo {
 
 namespace {
-constexpr StringData ADMIN_DBNAME = "admin"_sd;
+using namespace std::literals::string_view_literals;
+constexpr std::string_view ADMIN_DBNAME = "admin"sv;
 
-constexpr StringData ROLES_FIELD_NAME = "roles"_sd;
-constexpr StringData PRIVILEGES_FIELD_NAME = "inheritedPrivileges"_sd;
-constexpr StringData INHERITED_ROLES_FIELD_NAME = "inheritedRoles"_sd;
-constexpr StringData OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles"_sd;
-constexpr StringData READONLY_FIELD_NAME = "readOnly"_sd;
-constexpr StringData CREDENTIALS_FIELD_NAME = "credentials"_sd;
-constexpr StringData ROLE_NAME_FIELD_NAME = "role"_sd;
-constexpr StringData ROLE_DB_FIELD_NAME = "db"_sd;
+constexpr std::string_view ROLES_FIELD_NAME = "roles"sv;
+constexpr std::string_view PRIVILEGES_FIELD_NAME = "inheritedPrivileges"sv;
+constexpr std::string_view INHERITED_ROLES_FIELD_NAME = "inheritedRoles"sv;
+constexpr std::string_view OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles"sv;
+constexpr std::string_view READONLY_FIELD_NAME = "readOnly"sv;
+constexpr std::string_view CREDENTIALS_FIELD_NAME = "credentials"sv;
+constexpr std::string_view ROLE_NAME_FIELD_NAME = "role"sv;
+constexpr std::string_view ROLE_DB_FIELD_NAME = "db"sv;
 
-constexpr StringData MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external"_sd;
-constexpr StringData AUTHENTICATION_RESTRICTIONS_FIELD_NAME = "authenticationRestrictions"_sd;
-constexpr StringData INHERITED_AUTHENTICATION_RESTRICTIONS_FIELD_NAME =
-    "inheritedAuthenticationRestrictions"_sd;
+constexpr std::string_view MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external"sv;
+constexpr std::string_view AUTHENTICATION_RESTRICTIONS_FIELD_NAME = "authenticationRestrictions"sv;
+constexpr std::string_view INHERITED_AUTHENTICATION_RESTRICTIONS_FIELD_NAME =
+    "inheritedAuthenticationRestrictions"sv;
 
 inline Status _badValue(const char* reason) {
     return Status(ErrorCodes::BadValue, reason);
@@ -91,7 +92,7 @@ inline Status _badValue(const std::string& reason) {
 template <typename Credentials>
 bool parseSCRAMCredentials(const BSONElement& credentialsElement,
                            Credentials& scram,
-                           StringData fieldName) {
+                           std::string_view fieldName) {
     const auto scramElement = credentialsElement[fieldName];
     if (scramElement.eoo()) {
         return false;
@@ -177,7 +178,7 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
     if (userDBElement.type() != BSONType::string || userDBElement.valueStringData().empty()) {
         return _badValue("User document needs 'db' field to be a non-empty string");
     }
-    StringData userDBStr = userDBElement.valueStringData();
+    std::string_view userDBStr = userDBElement.valueStringData();
     if (!DatabaseName::validDBName(userDBStr, DatabaseName::DollarInDbNameBehavior::Allow) &&
         userDBStr != "$external") {
         return _badValue(str::stream()

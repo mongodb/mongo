@@ -29,7 +29,6 @@
 
 #include "mongo/client/streamable_replica_set_monitor_discovery_time_processor.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_test_base.h"

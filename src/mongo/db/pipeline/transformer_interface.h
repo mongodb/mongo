@@ -37,6 +37,8 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -100,12 +102,14 @@ public:
      * become empty after the extraction and can be deleted by the caller.
      */
     virtual std::pair<BSONObj, bool> extractComputedProjections(
-        StringData oldName, StringData newName, const std::set<StringData>& reservedNames) {
+        std::string_view oldName,
+        std::string_view newName,
+        const std::set<std::string_view>& reservedNames) {
         return {BSONObj{}, false};
     }
 
-    virtual std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName,
-                                                                    StringData newName) {
+    virtual std::pair<BSONObj, bool> extractProjectOnFieldAndRename(std::string_view oldName,
+                                                                    std::string_view newName) {
         return {BSONObj{}, false};
     }
 };

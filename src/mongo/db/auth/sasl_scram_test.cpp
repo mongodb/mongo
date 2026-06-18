@@ -31,7 +31,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -75,6 +74,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -86,15 +86,16 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-BSONObj generateSCRAMUserDocument(StringData username, StringData password) {
-    const auto database = "test"_sd;
+BSONObj generateSCRAMUserDocument(std::string_view username, std::string_view password) {
+    const auto database = "test"sv;
 
     const auto digested = createPasswordDigest(username, password);
     const auto sha1Cred = scram::Secrets<SHA1Block>::generateCredentials(digested, 10000);
     const auto sha256Cred =
         scram::Secrets<SHA256Block>::generateCredentials(std::string{password}, 15000);
-    return BSON("_id" << (str::stream() << database << "." << username).operator StringData()
+    return BSON("_id" << (str::stream() << database << "." << username).operator std::string_view()
                       << AuthorizationManager::USER_NAME_FIELD_NAME << username
                       << AuthorizationManager::USER_DB_FIELD_NAME << database << "credentials"
                       << BSON("SCRAM-SHA-1" << sha1Cred << "SCRAM-SHA-256" << sha256Cred) << "roles"
@@ -266,7 +267,7 @@ protected:
         saslServerSession.reset();
     }
 
-    std::string createPasswordDigest(StringData username, StringData password) {
+    std::string createPasswordDigest(std::string_view username, std::string_view password) {
         if (_digestPassword()) {
             return mongo::createPasswordDigest(username, password);
         } else {

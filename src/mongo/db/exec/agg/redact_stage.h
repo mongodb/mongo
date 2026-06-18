@@ -29,19 +29,19 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/redact_processor.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo::exec::agg {
 
 class RedactStage final : public Stage {
 public:
-    RedactStage(StringData stageName,
+    RedactStage(std::string_view stageName,
                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const std::shared_ptr<RedactProcessor>& redactProcessor);
 

@@ -37,8 +37,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+
+using namespace std::literals::string_view_literals;
 
 /**
  * Fixture with a transport session so isFromUserConnection() returns true.
@@ -70,7 +74,7 @@ TEST_F(ServiceLatencyTrackerOtelTest, ReadRecordsWithReadOpType) {
     increment(Microseconds(500), Command::ReadWriteType::kRead);
 
     auto data = _capturer.readInt64Histogram(otel::metrics::MetricNames::kOperationLatency,
-                                             std::tuple{"read"_sd});
+                                             std::tuple{"read"sv});
     ASSERT_EQ(data.sum, 500);
     ASSERT_EQ(data.count, 1UL);
 }
@@ -79,7 +83,7 @@ TEST_F(ServiceLatencyTrackerOtelTest, WriteRecordsWithWriteOpType) {
     increment(Microseconds(1000), Command::ReadWriteType::kWrite);
 
     auto data = _capturer.readInt64Histogram(otel::metrics::MetricNames::kOperationLatency,
-                                             std::tuple{"write"_sd});
+                                             std::tuple{"write"sv});
     ASSERT_EQ(data.sum, 1000);
     ASSERT_EQ(data.count, 1UL);
 }
@@ -88,7 +92,7 @@ TEST_F(ServiceLatencyTrackerOtelTest, CommandRecordsWithCommandOpType) {
     increment(Microseconds(250), Command::ReadWriteType::kCommand);
 
     auto data = _capturer.readInt64Histogram(otel::metrics::MetricNames::kOperationLatency,
-                                             std::tuple{"command"_sd});
+                                             std::tuple{"command"sv});
     ASSERT_EQ(data.sum, 250);
     ASSERT_EQ(data.count, 1UL);
 }
@@ -97,7 +101,7 @@ TEST_F(ServiceLatencyTrackerOtelTest, TransactionDoesNotRecord) {
     // kTransaction is tracked separately via incrementForTransaction; not in this histogram.
     increment(Microseconds(999), Command::ReadWriteType::kTransaction);
 
-    for (StringData opType : {"read"_sd, "write"_sd, "command"_sd}) {
+    for (auto opType : {"read"sv, "write"sv, "command"sv}) {
         ASSERT_THROWS_CODE(_capturer.readInt64Histogram(
                                otel::metrics::MetricNames::kOperationLatency, std::tuple{opType}),
                            DBException,
@@ -110,7 +114,7 @@ TEST_F(ServiceLatencyTrackerOtelTest, ShouldIncrementLatencyStatsFalseSkipsRecor
     increment(Microseconds(500), Command::ReadWriteType::kRead);
 
     ASSERT_THROWS_CODE(_capturer.readInt64Histogram(otel::metrics::MetricNames::kOperationLatency,
-                                                    std::tuple{"read"_sd}),
+                                                    std::tuple{"read"sv}),
                        DBException,
                        ErrorCodes::KeyNotFound);
 }
@@ -123,7 +127,7 @@ TEST_F(ServiceLatencyTrackerOtelTest, QESuppressionSkipsRecord) {
     increment(Microseconds(500), Command::ReadWriteType::kRead);
 
     ASSERT_THROWS_CODE(_capturer.readInt64Histogram(otel::metrics::MetricNames::kOperationLatency,
-                                                    std::tuple{"read"_sd}),
+                                                    std::tuple{"read"sv}),
                        DBException,
                        ErrorCodes::KeyNotFound);
 }
@@ -134,7 +138,7 @@ TEST_F(ServiceLatencyTrackerOtelTest, RecordsLatencyNotWorkingTime) {
         _opCtx.get(), Microseconds(1000), Microseconds(200), Command::ReadWriteType::kRead);
 
     auto data = _capturer.readInt64Histogram(otel::metrics::MetricNames::kOperationLatency,
-                                             std::tuple{"read"_sd});
+                                             std::tuple{"read"sv});
     ASSERT_EQ(data.sum, 1000);
     ASSERT_EQ(data.count, 1UL);
 }
@@ -144,7 +148,7 @@ TEST_F(ServiceLatencyTrackerOtelTest, DirectClientSkipsRecord) {
     increment(Microseconds(500), Command::ReadWriteType::kRead);
 
     ASSERT_THROWS_CODE(_capturer.readInt64Histogram(otel::metrics::MetricNames::kOperationLatency,
-                                                    std::tuple{"read"_sd}),
+                                                    std::tuple{"read"sv}),
                        DBException,
                        ErrorCodes::KeyNotFound);
 }
@@ -173,7 +177,7 @@ TEST_F(ServiceLatencyTrackerOtelNonUserTest, NonUserConnectionSkipsRecord) {
         _opCtx.get(), Microseconds(500), Microseconds(500), Command::ReadWriteType::kRead);
 
     ASSERT_THROWS_CODE(_capturer.readInt64Histogram(otel::metrics::MetricNames::kOperationLatency,
-                                                    std::tuple{"read"_sd}),
+                                                    std::tuple{"read"sv}),
                        DBException,
                        ErrorCodes::KeyNotFound);
 }

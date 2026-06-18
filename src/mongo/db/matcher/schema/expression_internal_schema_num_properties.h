@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
@@ -41,6 +40,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -96,7 +96,7 @@ public:
         return _numProperties;
     }
 
-    StringData getName() const {
+    std::string_view getName() const {
         return _name;
     }
 

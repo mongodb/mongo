@@ -34,6 +34,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 
+#include <string_view>
+
 namespace mongo {
 
 BSONKey BSONKey::parseFromBSON(const BSONElement& element) {
@@ -55,7 +57,7 @@ BSONKey BSONKey::max() {
 /**
  * Serialize this class as a field in a document.
  */
-void BSONKey::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+void BSONKey::serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
     builder->appendAs(_obj.firstElement(), fieldName);
 }
 

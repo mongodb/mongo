@@ -44,6 +44,7 @@
 #include <array>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/hash/hash.h>
@@ -168,7 +169,7 @@ public:
         return HashBlock(newHash);
     }
 
-    static StatusWith<HashBlock> fromHexStringNoThrow(StringData hex) {
+    static StatusWith<HashBlock> fromHexStringNoThrow(std::string_view hex) {
         if (!hexblob::validate(hex)) {
             return {ErrorCodes::BadValue, "Hash input is not a hex string"};
         }
@@ -178,7 +179,7 @@ public:
         return fromBuffer(reinterpret_cast<const uint8_t*>(buf.buf()), buf.len());
     }
 
-    static HashBlock fromHexString(StringData hex) {
+    static HashBlock fromHexString(std::string_view hex) {
         return uassertStatusOK(fromHexStringNoThrow(hex));
     }
 
@@ -306,7 +307,7 @@ public:
     /**
      * Append this to a builder using the given name as a BSON BinData type value.
      */
-    void appendAsBinData(BSONObjBuilder& builder, StringData fieldName) const {
+    void appendAsBinData(BSONObjBuilder& builder, std::string_view fieldName) const {
         builder.appendBinData(fieldName, _hash.size(), BinDataGeneral, _hash.data());
     }
 
@@ -325,7 +326,7 @@ public:
      */
     std::string toString() const {
         return base64::encode(
-            StringData(reinterpret_cast<const char*>(_hash.data()), _hash.size()));
+            std::string_view(reinterpret_cast<const char*>(_hash.data()), _hash.size()));
     }
 
     /**

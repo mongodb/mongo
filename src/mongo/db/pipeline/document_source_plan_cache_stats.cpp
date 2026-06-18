@@ -43,6 +43,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(planCacheStats,
                                      DocumentSourcePlanCacheStats::LiteParsed::parse,
@@ -100,10 +101,10 @@ void DocumentSourcePlanCacheStats::serializeToArray(
                 opts.isDefaultSerialization());
         array.push_back(Value{Document{
             {kStageName,
-             Document{{"match"_sd, _absorbedMatch ? Value{_absorbedMatch->getQuery()} : Value{}},
-                      {"allHosts"_sd, _allHosts}}}}});
+             Document{{"match"sv, _absorbedMatch ? Value{_absorbedMatch->getQuery()} : Value{}},
+                      {"allHosts"sv, _allHosts}}}}});
     } else {
-        array.push_back(Value{Document{{kStageName, Document{{"allHosts"_sd, _allHosts}}}}});
+        array.push_back(Value{Document{{kStageName, Document{{"allHosts"sv, _allHosts}}}}});
         if (_absorbedMatch) {
             _absorbedMatch->serializeToArray(array, opts);
         }

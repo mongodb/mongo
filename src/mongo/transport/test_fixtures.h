@@ -43,6 +43,7 @@
 #include <functional>
 #include <memory>
 #include <queue>
+#include <string_view>
 
 #include <boost/filesystem.hpp>
 
@@ -260,15 +261,15 @@ public:
         _filePathClientPEM = boost::filesystem::path(directoryPath / "client.pem").string();
     }
 
-    StringData getCAFile() const {
+    std::string_view getCAFile() const {
         return _filePathCA;
     }
 
-    StringData getPEMKeyFile() const {
+    std::string_view getPEMKeyFile() const {
         return _filePathPEM;
     }
 
-    StringData getClientPEMKeyFile() const {
+    std::string_view getClientPEMKeyFile() const {
         return _filePathClientPEM;
     }
 

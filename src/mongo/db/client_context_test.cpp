@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"

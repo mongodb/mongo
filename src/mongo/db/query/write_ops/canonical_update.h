@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/extensions_callback.h"
@@ -47,6 +46,7 @@
 
 #include <map>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -170,7 +170,8 @@ private:
     const UpdateRequest* const _request;
 
     // The array filters for the parsed update. Owned here.
-    std::unique_ptr<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>> _arrayFilters;
+    std::unique_ptr<std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>>
+        _arrayFilters;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 

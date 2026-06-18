@@ -35,6 +35,7 @@
 
 #include <array>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -148,7 +149,7 @@ ReshardingCumulativeMetrics::registerInstanceMetrics(const ReshardingMetricsObse
     return std::make_unique<ReshardingCumulativeMetrics::ScopedObserver>(this, role, std::move(it));
 }
 
-boost::optional<StringData> ReshardingCumulativeMetrics::fieldNameFor(AnyState state) {
+boost::optional<std::string_view> ReshardingCumulativeMetrics::fieldNameFor(AnyState state) {
     return StateTracker::getNameFor(state, kReportedStateFieldNamesMap);
 }
 

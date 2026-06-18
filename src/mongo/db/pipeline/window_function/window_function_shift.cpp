@@ -38,6 +38,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -45,7 +47,7 @@ namespace mongo::window_function {
 REGISTER_STABLE_WINDOW_FUNCTION(shift, ExpressionShift::parse);
 
 boost::intrusive_ptr<Expression> ExpressionShift::parseShiftArgs(BSONObj obj,
-                                                                 mongo::StringData accName,
+                                                                 std::string_view accName,
                                                                  ExpressionContext* expCtx) {
     // 'obj' is something like '{output: EXPR, by: INT, default: CONSTEXPR}'.
     // only default is optional.
@@ -99,7 +101,7 @@ boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,
                                                         const boost::optional<SortPattern>& sortBy,
                                                         ExpressionContext* expCtx) {
     // 'obj' is something like '{$shift: {<args>}}'.
-    boost::optional<StringData> accumulatorName;
+    boost::optional<std::string_view> accumulatorName;
     boost::intrusive_ptr<Expression> shiftExpr;
 
     for (const auto& arg : obj) {

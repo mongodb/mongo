@@ -51,6 +51,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class ConfigsvrCoordinatorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 
@@ -88,7 +89,7 @@ TEST_F(ConfigsvrCoordinatorServiceTest, CoordinatorsOfSameTypeCanExist) {
 
         SetClusterParameterCoordinatorDocument coordinatorDoc;
         ConfigsvrCoordinatorId cid(ConfigsvrCoordinatorTypeEnum::kSetClusterParameter);
-        cid.setSubId("0"_sd);
+        cid.setSubId("0"sv);
         coordinatorDoc.setConfigsvrCoordinatorMetadata({cid});
         coordinatorDoc.setParameter(BSON("a" << 1));
         coordinatorDoc.setCompatibleWithTopologyChange(true);
@@ -100,14 +101,14 @@ TEST_F(ConfigsvrCoordinatorServiceTest, CoordinatorsOfSameTypeCanExist) {
 
         SetClusterParameterCoordinatorDocument coordinatorDocDiffSubId;
         ConfigsvrCoordinatorId cid1(ConfigsvrCoordinatorTypeEnum::kSetClusterParameter);
-        cid1.setSubId("1"_sd);
+        cid1.setSubId("1"sv);
         coordinatorDocDiffSubId.setConfigsvrCoordinatorMetadata({cid1});
         coordinatorDocDiffSubId.setParameter(BSON("a" << 1));
         coordinatorDocDiffSubId.setCompatibleWithTopologyChange(true);
 
         SetUserWriteBlockModeCoordinatorDocument coordinatorDocDiffType;
         ConfigsvrCoordinatorId cid2(ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode);
-        cid2.setSubId("0"_sd);
+        cid2.setSubId("0"sv);
         coordinatorDocDiffType.setConfigsvrCoordinatorMetadata({cid2});
         coordinatorDocDiffType.setBlock(true);
 

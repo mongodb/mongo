@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -45,9 +46,9 @@ namespace mongo {
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Fill);
 
 namespace document_source_fill {
-constexpr StringData kStageName = "$fill"_sd;
-constexpr StringData kLocfMethod = "locf"_sd;
-constexpr StringData kLinearInterpolateMethod = "linear"_sd;
+constexpr std::string_view kStageName = "$fill"_sd;
+constexpr std::string_view kLocfMethod = "locf"_sd;
+constexpr std::string_view kLinearInterpolateMethod = "linear"_sd;
 
 /*
  * '$fill' is sugar for '$setWindowFields' and $addFields'. This method delegates to the appropriate

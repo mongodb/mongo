@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -43,6 +42,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -50,6 +50,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 class WindowFunctionMinMaxNTest : public AggregationContextFixture {
 public:
     static constexpr auto kNarg = 3LL;
@@ -195,8 +196,8 @@ TEST_F(WindowFunctionMinMaxNTest, Ties) {
     // because that would break the invariant that 'add(x); add(y); remove(x)' is equivalent to
     // 'add(y)'.
 
-    auto x = Value{"foo"_sd};
-    auto y = Value{"FOO"_sd};
+    auto x = Value{"foo"sv};
+    auto y = Value{"FOO"sv};
     // x and y are distinguishable,
     ASSERT_VALUE_NE(x, y);
     // but they compare equal according to the ordering.
@@ -220,7 +221,7 @@ TEST_F(WindowFunctionMinMaxNTest, TracksMemoryUsageOnAddAndRemove) {
     size_t trackingSize = sizeof(WindowFunctionMinN);
     ASSERT_EQ(minThree.getApproximateSize(), trackingSize);
 
-    auto largeStr = Value{"$minN/maxN are great window functions"_sd};
+    auto largeStr = Value{"$minN/maxN are great window functions"sv};
     minThree.add(largeStr);
     trackingSize += largeStr.getApproximateSize();
     ASSERT_EQ(minThree.getApproximateSize(), trackingSize);
@@ -398,8 +399,8 @@ TEST_F(WindowFunctionFirstLastNTest, Ties) {
     // because that would break the invariant that 'add(x); add(y); remove(x)' is equivalent to
     // 'add(y)'.
 
-    auto x = Value{"foo"_sd};
-    auto y = Value{"FOO"_sd};
+    auto x = Value{"foo"sv};
+    auto y = Value{"FOO"sv};
     // x and y are distinguishable,
     ASSERT_VALUE_NE(x, y);
     // but they compare equal according to the ordering.
@@ -423,7 +424,7 @@ TEST_F(WindowFunctionFirstLastNTest, TracksMemoryUsageOnAddAndRemove) {
     size_t trackingSize = sizeof(WindowFunctionFirstLastN<FirstLastSense::kFirst>);
     ASSERT_EQ(firstThree.getApproximateSize(), trackingSize);
 
-    auto largeStr = Value{"$firstN/lastN are suberb window functions"_sd};
+    auto largeStr = Value{"$firstN/lastN are suberb window functions"sv};
     firstThree.add(largeStr);
     trackingSize += largeStr.getApproximateSize();
     ASSERT_EQ(firstThree.getApproximateSize(), trackingSize);

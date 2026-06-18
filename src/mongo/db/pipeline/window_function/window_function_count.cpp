@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/window_function/window_function_count.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -53,7 +53,7 @@ namespace mongo::window_function {
 boost::intrusive_ptr<window_function::Expression> parseCountWindowFunction(
     BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
     // 'obj' should be something like '{$count: {}}, window: {...}}'.
-    boost::optional<StringData> accumulatorName;
+    boost::optional<std::string_view> accumulatorName;
     WindowBounds bounds = WindowBounds::defaultBounds();
 
     for (const auto& arg : obj) {

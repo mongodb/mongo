@@ -33,7 +33,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
@@ -68,11 +67,13 @@
 #include <map>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 
 namespace mongo::stage_builder {
+using namespace std::literals::string_view_literals;
 namespace {
 
 
@@ -241,7 +242,7 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* context,
 
     auto totalCaseConversionExpr = b.buildMultiBranchConditionalFromCaseValuePairs(
         SbExpr::makeExprPairVector(
-            SbExprPair{b.generateNullMissingOrUndefined(var), b.makeStrConstant(""_sd)},
+            SbExprPair{b.generateNullMissingOrUndefined(var), b.makeStrConstant(""sv)},
             SbExprPair{b.makeFunction(sbe::EFn::kTypeMatch, var, b.makeInt32Constant(typeMask)),
                        b.makeFunction(caseConversionFunction,
                                       b.makeFunction(sbe::EFn::kCoerceToString, var))}),
@@ -979,7 +980,7 @@ public:
 
         // Concatenation of no strings is an empty string.
         if (arity == 0) {
-            pushExpr(_b.makeStrConstant(""_sd));
+            pushExpr(_b.makeStrConstant(""sv));
             return;
         }
 
@@ -1090,7 +1091,7 @@ public:
         }
 
         auto timezoneExpression =
-            expr->isTimezoneSpecified() ? popExpr() : _b.makeStrConstant("UTC"_sd);
+            expr->isTimezoneSpecified() ? popExpr() : _b.makeStrConstant("UTC"sv);
         auto unitExpression = popExpr();
         auto endDateExpression = popExpr();
         auto startDateExpression = popExpr();
@@ -1121,7 +1122,7 @@ public:
             bindings.push_back(std::move(startOfWeekExpression));
 
             unitIsWeekVar = SbVar{frameId, numLocalVars++};
-            bindings.push_back(generateIsEqualToStringCheck(unitVar, "week"_sd));
+            bindings.push_back(generateIsEqualToStringCheck(unitVar, "week"sv));
         }
 
         // Set parameters for an invocation of built-in "dateDiff" function.
@@ -1138,7 +1139,7 @@ public:
             // "dateDiff" built-in function does not accept non-string type values for this
             // parameter.
             arguments.emplace_back(
-                _b.makeIf(*unitIsWeekVar, *startOfWeekVar, _b.makeStrConstant("sun"_sd)));
+                _b.makeIf(*unitIsWeekVar, *startOfWeekVar, _b.makeStrConstant("sun"sv)));
         }
 
         // Create an expression to invoke built-in "dateDiff" function.
@@ -1174,11 +1175,11 @@ public:
 
         // "startDate" parameter validation.
         inputValidationCases.emplace_back(generateFailIfNotCoercibleToDate(
-            startDateVar, ErrorCodes::Error{7157921}, "$dateDiff"_sd, "startDate"_sd));
+            startDateVar, ErrorCodes::Error{7157921}, "$dateDiff"sv, "startDate"sv));
 
         // "endDate" parameter validation.
         inputValidationCases.emplace_back(generateFailIfNotCoercibleToDate(
-            endDateVar, ErrorCodes::Error{7157922}, "$dateDiff"_sd, "endDate"_sd));
+            endDateVar, ErrorCodes::Error{7157922}, "$dateDiff"sv, "endDate"sv));
 
         // "unit" parameter validation.
         inputValidationCases.emplace_back(
@@ -1230,7 +1231,7 @@ public:
         auto formatExpression = expr->isFormatSpecified() ? popExpr() : _b.makeNullConstant();
 
         auto timezoneExpression =
-            expr->isTimezoneSpecified() ? popExpr() : _b.makeStrConstant("UTC"_sd);
+            expr->isTimezoneSpecified() ? popExpr() : _b.makeStrConstant("UTC"sv);
 
         auto dateStringExpression = popExpr();
 
@@ -1681,7 +1682,7 @@ public:
         SbExpr onNullExpression = expr->isOnNullSpecified() ? popExpr() : _b.makeNullConstant();
 
         SbExpr timezoneExpression =
-            expr->isTimezoneSpecified() ? popExpr() : _b.makeStrConstant("UTC"_sd);
+            expr->isTimezoneSpecified() ? popExpr() : _b.makeStrConstant("UTC"sv);
 
         SbExpr dateExpression = popExpr();
 
@@ -1721,7 +1722,7 @@ public:
 
         // "date" parameter validation.
         inputValidationCases.emplace_back(generateFailIfNotCoercibleToDate(
-            dateVar, ErrorCodes::Error{4997901}, "$dateToString"_sd, "date"_sd));
+            dateVar, ErrorCodes::Error{4997901}, "$dateToString"sv, "date"sv));
 
         // "timezone" parameter validation.
         if (timezoneExpression.isConstantExpr()) {
@@ -1804,9 +1805,9 @@ public:
 
         // Get child expressions.
         auto startOfWeekExpression =
-            expr->isStartOfWeekSpecified() ? popExpr() : _b.makeStrConstant("sun"_sd);
+            expr->isStartOfWeekSpecified() ? popExpr() : _b.makeStrConstant("sun"sv);
         auto timezoneExpression =
-            expr->isTimezoneSpecified() ? popExpr() : _b.makeStrConstant("UTC"_sd);
+            expr->isTimezoneSpecified() ? popExpr() : _b.makeStrConstant("UTC"sv);
         auto binSizeExpression = expr->isBinSizeSpecified() ? popExpr() : _b.makeInt64Constant(1);
         auto unitExpression = popExpr();
         auto dateExpression = popExpr();
@@ -1844,7 +1845,7 @@ public:
         // Local bind to hold the unitIsWeek common subexpression
         auto innerFrameId = _context->state.frameId();
         SbVar unitIsWeekVar{innerFrameId, 0};
-        auto unitIsWeekExpression = generateIsEqualToStringCheck(unitVar, "week"_sd);
+        auto unitIsWeekExpression = generateIsEqualToStringCheck(unitVar, "week"sv);
 
         // Create expressions to check that each argument to "dateTrunc" function exists, is not
         // null, and is of the correct type.
@@ -1883,7 +1884,7 @@ public:
 
         // "date" parameter validation.
         inputValidationCases.emplace_back(generateFailIfNotCoercibleToDate(
-            dateVar, ErrorCodes::Error{7157932}, "$dateTrunc"_sd, "date"_sd));
+            dateVar, ErrorCodes::Error{7157932}, "$dateTrunc"sv, "date"sv));
 
         // "unit" parameter validation.
         if (unitExpression.isConstantExpr()) {
@@ -2564,10 +2565,10 @@ public:
         // Check if find string is empty, and if so return the the concatenation of the replacement
         // string and the input string, otherwise replace the first occurrence of the find string.
         auto isEmptyFindStr =
-            _b.makeBinaryOp(abt::Operations::Eq, findArgVar, _b.makeStrConstant(""_sd));
+            _b.makeBinaryOp(abt::Operations::Eq, findArgVar, _b.makeStrConstant(""sv));
 
         auto generateTypeCheckCaseValuePair =
-            [&](SbVar paramVar, SbVar paramIsNullVar, StringData param) {
+            [&](SbVar paramVar, SbVar paramIsNullVar, std::string_view param) {
                 return SbExprPair{
                     _b.makeNot(_b.makeBinaryOp(abt::Operations::Or,
                                                paramIsNullVar,
@@ -2772,11 +2773,11 @@ public:
                     _b.makeNot(_b.makeFunction(sbe::EFn::kIsString, varDelimiter)),
                     _b.makeFail(ErrorCodes::Error{7158203}, "$split delimiter must be a string")},
                 SbExprPair{
-                    _b.makeBinaryOp(abt::Operations::Eq, varDelimiter, _b.makeStrConstant(""_sd)),
+                    _b.makeBinaryOp(abt::Operations::Eq, varDelimiter, _b.makeStrConstant(""sv)),
                     _b.makeFail(ErrorCodes::Error{7158204},
                                 "$split delimiter must not be an empty string")},
                 SbExprPair{
-                    _b.makeBinaryOp(abt::Operations::Eq, varString, _b.makeStrConstant(""_sd)),
+                    _b.makeBinaryOp(abt::Operations::Eq, varString, _b.makeStrConstant(""sv)),
                     std::move(emptyResult)}),
             _b.makeFunction(sbe::EFn::kSplit, varString, varDelimiter));
 
@@ -2834,7 +2835,7 @@ public:
         SbExpr validStringExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
                 SbExprPair{_b.generateNullMissingOrUndefined(stringExprVar),
-                           _b.makeStrConstant(""_sd)},
+                           _b.makeStrConstant(""sv)},
                 SbExprPair{
                     _b.makeFillEmptyTrue(_b.makeFunction(sbe::EFn::kCoerceToString, stringExprVar)),
                     _b.makeFail(
@@ -2895,7 +2896,7 @@ public:
         SbExpr validStringExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
                 SbExprPair{_b.generateNullMissingOrUndefined(stringExprVar),
-                           _b.makeStrConstant(""_sd)},
+                           _b.makeStrConstant(""sv)},
                 SbExprPair{
                     _b.makeFillEmptyTrue(_b.makeFunction(sbe::EFn::kCoerceToString, stringExprVar)),
                     _b.makeFail(ErrorCodes::Error(5155708),
@@ -3645,7 +3646,7 @@ private:
                               << " expression to have 2 children nodes",
                 children.size() == 2);
 
-        auto timezoneExpression = children[1] ? popExpr() : _b.makeStrConstant("UTC"_sd);
+        auto timezoneExpression = children[1] ? popExpr() : _b.makeStrConstant("UTC"sv);
         auto dateExpression = popExpr();
 
         auto frameId = _context->state.frameId();
@@ -3709,7 +3710,7 @@ private:
 
         // "date" parameter validation.
         inputValidationCases.emplace_back(generateFailIfNotCoercibleToDate(
-            dateVar, ErrorCodes::Error{5157904}, sbe::toString(exprName), "date"_sd));
+            dateVar, ErrorCodes::Error{5157904}, sbe::toString(exprName), "date"sv));
 
         pushExpr(_b.makeLet(frameId,
                             SbExpr::makeSeq(std::move(dateExpression),
@@ -3730,8 +3731,8 @@ private:
      */
     SbExprPair generateFailIfNotCoercibleToDate(SbVar dateVar,
                                                 ErrorCodes::Error errorCode,
-                                                StringData expressionName,
-                                                StringData parameterName) {
+                                                std::string_view expressionName,
+                                                std::string_view parameterName) {
         return {_b.makeNot(_b.makeFunction(
                     sbe::EFn::kTypeMatch, dateVar, _b.makeInt32Constant(dateTypeMask()))),
                 _b.makeFail(errorCode,
@@ -3754,7 +3755,7 @@ private:
     /**
      * Creates a boolean expression to check if 'variable' is equal to string 'string'.
      */
-    SbExpr generateIsEqualToStringCheck(SbVar var, StringData string) {
+    SbExpr generateIsEqualToStringCheck(SbVar var, std::string_view string) {
         return _b.makeBinaryOp(
             abt::Operations::And,
             _b.makeFunction(sbe::EFn::kIsString, var),
@@ -4088,7 +4089,7 @@ private:
             }
         };
 
-        auto makeError = [&](int errorCode, StringData message) {
+        auto makeError = [&](int errorCode, std::string_view message) {
             return _b.makeFail(ErrorCodes::Error{errorCode},
                                str::stream() << "$" << sbe::toString(exprName) << ": " << message);
         };
@@ -4153,7 +4154,7 @@ private:
                                     patternVar,
                                     _b.makeInt32Constant(getBSONTypeMask(BSONType::regEx))),
                     _b.makeFunction(sbe::EFn::kGetRegexFlags, patternVar),
-                    _b.makeStrConstant(""_sd));
+                    _b.makeStrConstant(""sv));
                 auto compiledRegex = _b.makeFunction(sbe::EFn::kRegexCompile,
                                                      std::move(patternArgument),
                                                      std::move(optionsArgument));
@@ -4204,11 +4205,11 @@ private:
                               userOptionsVar),
                     _b.makeIf(
                         _b.makeFunction(sbe::EFn::kIsNull, userOptionsVar),
-                        _b.makeStrConstant(""_sd),
+                        _b.makeStrConstant(""sv),
                         makeError(5126603, "regex flags must have either string or null type")));
 
                 auto generateIsEmptyString = [&](const SbVar& var) {
-                    return _b.makeBinaryOp(abt::Operations::Eq, var, _b.makeStrConstant(""_sd));
+                    return _b.makeBinaryOp(abt::Operations::Eq, var, _b.makeStrConstant(""sv));
                 };
 
                 auto stringFrameId = _context->state.frameId();
@@ -4267,7 +4268,7 @@ private:
         auto arity = children.size();
         tassert(
             11051806, "Expecting DateArithmetics expression to have 4 children nodes", arity == 4);
-        auto timezoneExpr = children[3] ? popExpr() : _b.makeStrConstant("UTC"_sd);
+        auto timezoneExpr = children[3] ? popExpr() : _b.makeStrConstant("UTC"sv);
         auto amountExpr = popExpr();
         auto unitExpr = popExpr();
         auto startDateExpr = popExpr();
@@ -4350,7 +4351,7 @@ private:
                             std::move(dateAddExpr)));
     }
 
-    void unsupportedExpression(StringData op) const {
+    void unsupportedExpression(std::string_view op) const {
         // We're guaranteed to not fire this assertion by implementing a mechanism in the upper
         // layer which directs the query to the classic engine when an unsupported expression
         // appears.
@@ -4407,7 +4408,7 @@ SbExpr generateExpressionFieldPath(StageBuilderState& state,
 
         if (it != Variables::kBuiltinVarNameToId.end()) {
             variableId.emplace(it->second);
-        } else if (fieldPath.front() == "CURRENT"_sd) {
+        } else if (fieldPath.front() == "CURRENT"sv) {
             variableId.emplace(Variables::kRootId);
         } else {
             tasserted(8859700,

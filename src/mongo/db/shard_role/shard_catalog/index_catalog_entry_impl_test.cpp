@@ -33,7 +33,10 @@
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 
+#include <string_view>
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -158,7 +161,7 @@ private:
     IndexDescriptor* _descriptor;
 };
 
-std::unique_ptr<IndexDescriptor> makeIndexDescriptor(StringData indexName,
+std::unique_ptr<IndexDescriptor> makeIndexDescriptor(std::string_view indexName,
                                                      BSONObj keyPattern,
                                                      BSONObj wildcardProjection) {
     auto indexSpec = BSON(IndexDescriptor::kIndexVersionFieldName
@@ -175,7 +178,7 @@ std::unique_ptr<IndexDescriptor> makeIndexDescriptor(StringData indexName,
 }  // namespace
 
 TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"sv);
     auto uuid = UUID::gen();
     DevNullKVEngine engine{};
     RecoveryUnitNoop ru{};
@@ -200,18 +203,18 @@ TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex) {
     index_catalog_helpers::computeUpdateIndexData(&indexCatalogEntry, &accessMethod, &outData);
 
     // Asserting that expected fields are included.
-    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"a"_sd}));
-    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"b"_sd}));
-    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"c"_sd}));
-    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"_id"_sd}));
+    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"a"sv}));
+    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"b"sv}));
+    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"c"sv}));
+    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"_id"sv}));
 
     // Asserting that unexpected fields are not included.
-    ASSERT_FALSE(outData.mightBeIndexed(FieldRef{"d"_sd}));
-    ASSERT_FALSE(outData.mightBeIndexed(FieldRef{"$**"_sd}));
+    ASSERT_FALSE(outData.mightBeIndexed(FieldRef{"d"sv}));
+    ASSERT_FALSE(outData.mightBeIndexed(FieldRef{"$**"sv}));
 }
 
 TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex_ExcludeCase) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"sv);
     auto uuid = UUID::gen();
     DevNullKVEngine engine{};
     RecoveryUnitNoop ru{};
@@ -237,11 +240,11 @@ TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex_Exclu
 
     // When wildcardProjection has exclusion, everything is "indexed", since we don't know for sure,
     // which fields are indexed.
-    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"a"_sd}));
-    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"b"_sd}));
-    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"c"_sd}));
-    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"d"_sd}));
-    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"_id"_sd}));
+    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"a"sv}));
+    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"b"sv}));
+    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"c"sv}));
+    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"d"sv}));
+    ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"_id"sv}));
 }
 
 }  // namespace mongo

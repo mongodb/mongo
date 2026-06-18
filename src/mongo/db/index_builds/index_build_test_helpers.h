@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/operation_context.h"
@@ -38,19 +37,21 @@
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUBLIC mongo {
 /**
  * Creates an index if it does not already exist.
  */
 Status createIndex(OperationContext* opCtx,
-                   StringData ns,
+                   std::string_view ns,
                    const BSONObj& keys,
                    bool unique = false);
 
 /**
  * Creates an index from a BSON spec, if it does not already exist.
  */
-Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec);
+Status createIndexFromSpec(OperationContext* opCtx, std::string_view ns, const BSONObj& spec);
 
 /**
  * Creates an index from a BSON spec, if it does not already exist. If `clock` is non-null, writes
@@ -59,7 +60,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
  */
 Status createIndexFromSpec(OperationContext* opCtx,
                            VectorClockMutable* clock,
-                           StringData ns,
+                           std::string_view ns,
                            const BSONObj& spec);
 
 Status initializeMultiIndexBlock(OperationContext* opCtx,

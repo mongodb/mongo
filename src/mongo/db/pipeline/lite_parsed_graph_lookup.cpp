@@ -44,6 +44,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(graphLookup,
@@ -69,7 +71,7 @@ NamespaceString parseFromAndResolveNamespace(const BSONElement& elem,
  * Extracts a string-typed field from the parsed IDL spec. 'elem' must be present (empty BSONElement
  * is not accepted).
  */
-std::string requireString(StringData fieldName, BSONElement elem) {
+std::string requireString(std::string_view fieldName, BSONElement elem) {
     uassert(12109311,
             str::stream() << "$graphLookup '" << fieldName << "' field must be a string, but found "
                           << typeName(elem.type()),

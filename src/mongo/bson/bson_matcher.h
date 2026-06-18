@@ -38,6 +38,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <fmt/format.h>
@@ -51,7 +52,7 @@ using ::testing::Matcher;
 // TODO(SERVER-120602): Replace when we have a safer bin data API.
 struct BSONBinDataView {
     BinDataType type;
-    StringData data;
+    std::string_view data;
 
     friend bool operator==(const BSONBinDataView&, const BSONBinDataView&) = default;
 };
@@ -100,7 +101,7 @@ inline BSONBinDataView makeBinDataView(BSONElement el) {
     auto data = el.binData(size);
     return {
         .type = el.binDataType(),
-        .data = StringData{data, static_cast<size_t>(size)},
+        .data = std::string_view{data, static_cast<size_t>(size)},
     };
 }
 
@@ -137,7 +138,7 @@ MATCHER_P3(
     value,
     fmt::format("is a BSONElement which {}has name which {} and type which {} and value which {}{}",
                 negation ? "not (" : "",
-                DescribeMatcher<StringData>(name),
+                DescribeMatcher<std::string_view>(name),
                 DescribeMatcher<BSONType>(type),
                 match_details::describeTypeErasedMatcher(value),
                 negation ? ")" : "")) {

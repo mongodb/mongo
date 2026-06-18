@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
@@ -47,6 +46,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -211,7 +211,7 @@ public:
         const MatchExpression* conjunct,
         const CollatorInterface* queryCollator,
         const CollatorInterface* ccCollator,
-        StringData clusterKeyFieldName,
+        std::string_view clusterKeyFieldName,
         RecordIdRange& recordRange,
         const std::function<void(const MatchExpression*)>& redundant = [](auto) {});
 

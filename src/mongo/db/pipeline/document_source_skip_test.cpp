@@ -42,13 +42,14 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceSkipTest = AggregationContextFixture;
 
 boost::intrusive_ptr<mongo::exec::agg::SkipStage> createForTests(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long nToSkip) {
-    return make_intrusive<mongo::exec::agg::SkipStage>("$skip"_sd, pExpCtx, nToSkip);
+    return make_intrusive<mongo::exec::agg::SkipStage>("$skip"sv, pExpCtx, nToSkip);
 }
 
 TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {

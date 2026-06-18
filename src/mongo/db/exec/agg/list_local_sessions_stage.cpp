@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceListLocalSessionsToStageFn(
@@ -51,7 +53,7 @@ REGISTER_AGG_STAGE_MAPPING(listLocalSessions,
                            documentSourceListLocalSessionsToStageFn);
 
 ListLocalSessionsStage::ListLocalSessionsStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const ListSessionsSpec& spec)
     : Stage(stageName, pExpCtx), _spec{spec} {

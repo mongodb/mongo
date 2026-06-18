@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
@@ -43,8 +42,10 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 class SBEBlockExpressionTest : public EExpressionTestFixture {
 public:
@@ -290,7 +291,7 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchInvalidMaskTest) {
     block.push_back(makeInt32(42));
     block.push_back(makeDouble(42.5));
     block.push_back(makeNothing());
-    block.push_back(value::makeNewString("45"_sd));
+    block.push_back(value::makeNewString("45"sv));
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
@@ -320,7 +321,7 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHeterogeneousTest) {
     block.push_back(makeInt64(43));
     block.push_back(makeInt32(44));
     block.push_back(makeNothing());
-    block.push_back(value::makeNewString("45"_sd));
+    block.push_back(value::makeNewString("45"sv));
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
@@ -421,7 +422,7 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
     }
 
     {
-        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"sv);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -460,9 +461,9 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneNoTimezoneDBTest) {
     value::HeterogeneousBlock block;
     block.push_back(makeInt32(42));
     block.push_back(makeDouble(42.5));
-    block.push_back(value::makeNewString("UTC"_sd));
+    block.push_back(value::makeNewString("UTC"sv));
     block.push_back(makeNothing());
-    block.push_back(value::makeNewString("45"_sd));
+    block.push_back(value::makeNewString("45"sv));
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
@@ -490,10 +491,10 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHeterogeneousTest) {
     value::HeterogeneousBlock block;
     block.push_back(makeInt32(42));
     block.push_back(makeDouble(42.5));
-    block.push_back(value::makeNewString("UTC"_sd));
+    block.push_back(value::makeNewString("UTC"sv));
     block.push_back(makeInt32(44));
     block.push_back(makeNothing());
-    block.push_back(value::makeNewString("45"_sd));
+    block.push_back(value::makeNewString("45"sv));
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
@@ -517,7 +518,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
     auto compiledExpr = compileExpression(*isTimezoneExpr);
 
     {
-        auto [blockTag, blockVal] = value::makeNewString("GMT"_sd);
+        auto [blockTag, blockVal] = value::makeNewString("GMT"sv);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -541,7 +542,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
     }
 
     {
-        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"sv);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -615,7 +616,7 @@ TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
     }
 
     {
-        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"sv);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -680,15 +681,15 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyDeepTest) {
     auto compiledExpr = compileExpression(*fillEmptyExpr);
 
     fillAccessor.reset(
-        value::TagValueOwned::fromRaw(value::makeNewString("Replacement for missing value"_sd)));
+        value::TagValueOwned::fromRaw(value::makeNewString("Replacement for missing value"sv)));
     auto [fillTag, fillVal] = fillAccessor.getViewOfValue();
 
     value::HeterogeneousBlock block;
-    block.push_back(value::makeNewString("First string"_sd));
+    block.push_back(value::makeNewString("First string"sv));
     block.push_back(makeNothing());
-    block.push_back(value::makeNewString("Second string"_sd));
-    block.push_back(value::makeNewString("Third string"_sd));
-    block.push_back(value::makeNewString("tinystr"_sd));  // Stored as shallow StringSmall type
+    block.push_back(value::makeNewString("Second string"sv));
+    block.push_back(value::makeNewString("Third string"sv));
+    block.push_back(value::makeNewString("tinystr"sv));  // Stored as shallow StringSmall type
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
@@ -799,7 +800,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
 
     {
         // Deep replacement value of a different type.
-        auto [fillTag, fillVal] = value::makeNewString("Replacement for missing value"_sd);
+        auto [fillTag, fillVal] = value::makeNewString("Replacement for missing value"sv);
         fillAccessor.reset(fillTag, fillVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -815,7 +816,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
     }
 
     {
-        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"sv);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         auto fill = value::TagValueOwned::fromRaw(makeInt32(0));
@@ -837,7 +838,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
         value::MonoBlock monoBlock(2, value::TypeTags::Nothing, value::Value{0u});
 
         fillAccessor.reset(
-            value::TagValueOwned::fromRaw(value::makeNewString("MonoBlock string"_sd)));
+            value::TagValueOwned::fromRaw(value::makeNewString("MonoBlock string"sv)));
         auto [fillTag, fillVal] = fillAccessor.getViewOfValue();
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
@@ -855,13 +856,13 @@ TEST_F(SBEBlockExpressionTest, BlockFillTypeTest) {
     value::ValueGuard fillGuard{fill.first, fill.second};
 
     value::HeterogeneousBlock block;
-    block.push_back(value::makeNewString("First string"_sd));
+    block.push_back(value::makeNewString("First string"sv));
     block.push_back(makeNothing());
-    block.push_back(value::makeNewString("Second string"_sd));
+    block.push_back(value::makeNewString("Second string"sv));
     block.push_back(makeArray(BSON_ARRAY(1 << 2 << 3)));
-    block.push_back(value::makeNewString("Third string"_sd));
+    block.push_back(value::makeNewString("Third string"sv));
     block.push_back(makeArray(BSON_ARRAY(4 << 5 << 6)));
-    block.push_back(value::makeNewString("tinystr"_sd));  // Stored as shallow StringSmall type
+    block.push_back(value::makeNewString("tinystr"sv));  // Stored as shallow StringSmall type
 
     auto extracted = block.extract();
 
@@ -973,7 +974,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillTypeMonoHomogeneousTest) {
     }
 
     {
-        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"sv);
         value::MonoBlock monoBlock(2, blockTag, blockVal);
         auto extracted = monoBlock.extract();
 
@@ -1272,13 +1273,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
     auto bitsetSlot = bindAccessor(&bitsetAccessor);
 
     value::HeterogeneousBlock block;
-    block.push_back(value::makeNewString("zoom"_sd));  // TypeTags::StringSmall
+    block.push_back(value::makeNewString("zoom"sv));  // TypeTags::StringSmall
     block.push_back(makeInt32(42));
     block.push_back(makeInt32(41));
     block.push_back(makeInt32(40));
-    block.push_back(value::makeNewString("abcdefg"_sd));    // TypeTags::StringSmall
-    block.push_back(value::makeNewString("abcdefgh"_sd));   // TypeTags::StringBig
-    block.push_back(value::makeNewString("abcdefghi"_sd));  // TypeTags::StringBig
+    block.push_back(value::makeNewString("abcdefg"sv));    // TypeTags::StringSmall
+    block.push_back(value::makeNewString("abcdefgh"sv));   // TypeTags::StringBig
+    block.push_back(value::makeNewString("abcdefghi"sv));  // TypeTags::StringBig
     block.push_back(makeNothing());
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
@@ -1318,7 +1319,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
         value::ValueGuard guard(runTag, runVal);
 
         ASSERT_EQ(runTag, value::TypeTags::StringBig);
-        auto [maxTag, maxVal] = value::makeNewString("abcdefgh"_sd);
+        auto [maxTag, maxVal] = value::makeNewString("abcdefgh"sv);
         value::ValueGuard maxGuard(maxTag, maxVal);
         auto [t, v] = value::compareValue(runTag, runVal, maxTag, maxVal);
 
@@ -2617,7 +2618,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockAddHeterogeneousTest) {
     leftBlock.push_back(makeNothing());
     rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
     // 5 : String + Number -> Nothing
-    leftBlock.push_back(value::makeNewString("45"_sd));
+    leftBlock.push_back(value::makeNewString("45"sv));
     rightBlock.push_back(makeDouble(12.5));
     // 6 : Overflow -> Double
     leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
@@ -2753,11 +2754,11 @@ TEST_F(SBEBlockExpressionTest, ValueBlockSubHeterogeneousTest) {
     leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
     rightBlock.push_back(makeNothing());
     // 6 : String - Number -> Nothing
-    leftBlock.push_back(value::makeNewString("45"_sd));
+    leftBlock.push_back(value::makeNewString("45"sv));
     rightBlock.push_back(makeDouble(12.5));
     // 7 : Number - String -> Nothing
     leftBlock.push_back(makeDouble(12.5));
-    rightBlock.push_back(value::makeNewString("45"_sd));
+    rightBlock.push_back(value::makeNewString("45"sv));
     // 8 : Underflow -> promote to Double
     leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::min()));
     rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
@@ -2888,7 +2889,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockMultHeterogeneousTest) {
     leftBlock.push_back(makeNothing());
     rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
     // 5 : String * Number -> Nothing
-    leftBlock.push_back(value::makeNewString("45"_sd));
+    leftBlock.push_back(value::makeNewString("45"sv));
     rightBlock.push_back(makeDouble(12.5));
     // 6 : Overflow -> Double
     leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
@@ -3024,11 +3025,11 @@ TEST_F(SBEBlockExpressionTest, ValueBlockDivHeterogeneousTest) {
     leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
     rightBlock.push_back(makeNothing());
     // 6 : String / Number -> Nothing
-    leftBlock.push_back(value::makeNewString("45"_sd));
+    leftBlock.push_back(value::makeNewString("45"sv));
     rightBlock.push_back(makeDouble(12.5));
     // 7 : Number / String -> Nothing
     leftBlock.push_back(makeDouble(12.5));
-    rightBlock.push_back(value::makeNewString("45"_sd));
+    rightBlock.push_back(value::makeNewString("45"sv));
     // 8 : Underflow -> promote to Double -1
     leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::min()));
     rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
@@ -3277,11 +3278,11 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
                             value::bitcastFrom<value::ValueBlock*>(&leftBlock));
 
     value::HeterogeneousBlock rightBlock;
-    rightBlock.push_back(value::makeNewString("This is item #1"_sd));
+    rightBlock.push_back(value::makeNewString("This is item #1"sv));
     rightBlock.push_back(makeNothing());
-    rightBlock.push_back(value::makeNewString("This is item #3"_sd));
-    rightBlock.push_back(value::makeNewString("This is item #4"_sd));
-    rightBlock.push_back(value::makeNewString("This is item #5"_sd));
+    rightBlock.push_back(value::makeNewString("This is item #3"sv));
+    rightBlock.push_back(value::makeNewString("This is item #4"sv));
+    rightBlock.push_back(value::makeNewString("This is item #5"sv));
     blockAccessorRight.reset(sbe::value::TypeTags::valueBlock,
                              value::bitcastFrom<value::ValueBlock*>(&rightBlock));
 
@@ -3298,7 +3299,7 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
 
         auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guardRun(runTag, runVal);
-        auto [strTag, strVal] = value::makeNewString("This is item #4"_sd);
+        auto [strTag, strVal] = value::makeNewString("This is item #4"sv);
         value::ValueGuard guardStr(strTag, strVal);
 
         assertBlockEq(
@@ -3329,7 +3330,7 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
 
         auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guardRun(runTag, runVal);
-        auto [strTag, strVal] = value::makeNewString("This is item #4"_sd);
+        auto [strTag, strVal] = value::makeNewString("This is item #4"sv);
         value::ValueGuard guardStr(strTag, strVal);
 
         assertBlockEq(
@@ -3387,16 +3388,16 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
         auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guardRun(runTag, runVal);
 
-        auto str1 = value::makeNewString("This is item #1"_sd);
+        auto str1 = value::makeNewString("This is item #1"sv);
         value::ValueGuard guardStr1(str1);
 
-        auto str3 = value::makeNewString("This is item #3"_sd);
+        auto str3 = value::makeNewString("This is item #3"sv);
         value::ValueGuard guardStr3(str3);
 
-        auto str4 = value::makeNewString("This is item #4"_sd);
+        auto str4 = value::makeNewString("This is item #4"sv);
         value::ValueGuard guardStr4(str4);
 
-        auto str5 = value::makeNewString("This is item #5"_sd);
+        auto str5 = value::makeNewString("This is item #5"sv);
         value::ValueGuard guardStr5(str5);
 
         assertBlockEq(runTag,
@@ -4165,7 +4166,7 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
     {
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&block));
-        auto md = value::makeSmallString("abc"_sd);
+        auto md = value::makeSmallString("abc"sv);
         value::ValueGuard mdGuard(md.first, md.second);
         scalarAccessor.reset(md.first, md.second);
 
@@ -4242,9 +4243,9 @@ TEST_F(SBEBlockExpressionTest, BlockDateAdd) {
                     makeE<EVariable>(blockSlot),
                     makeE<EConstant>(value::TypeTags::timeZoneDB,
                                      value::bitcastFrom<TimeZoneDatabase*>(tzdb.get())),
-                    makeE<EConstant>("millisecond"_sd),
+                    makeE<EConstant>("millisecond"sv),
                     makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int>(1)),
-                    makeE<EConstant>("UTC"_sd)));
+                    makeE<EConstant>("UTC"sv)));
 
     auto compiledExpr = compileExpression(*expr);
 
@@ -4499,7 +4500,7 @@ TEST_F(SBEBlockExpressionTest, CellBlockGetFlatValuesBlockTest) {
     auto block = std::make_unique<value::HeterogeneousBlock>();
     block->push_back(makeInt32(42));
     block->push_back(makeDouble(42.5));
-    block->push_back(value::makeNewString("45"_sd));
+    block->push_back(value::makeNewString("45"sv));
     block->push_back(makeDecimal("1234.5678"));
     block->push_back(makeInt64(100));
     materializedCellBlock->_deblocked = std::move(block);

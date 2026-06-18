@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -91,6 +90,7 @@
 #include <mutex>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -118,6 +118,7 @@ std::ostream& operator<<(std::ostream& out, const NetworkInterface::Counters& co
 }
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 BSONObj makeEchoCmdObj() {
     return BSON("echo" << 1 << "foo"
@@ -1028,8 +1029,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, StartCommand) {
     // { echo: { echo: 1, foo: "bar", clientOperationKey: uuid, $db: "admin" }, ok: 1.0 }
     auto cmdObj = res.data.getObjectField("echo");
     ASSERT_EQ(1, cmdObj.getIntField("echo"));
-    ASSERT_EQ("bar"_sd, cmdObj.getStringField("foo"));
-    ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
+    ASSERT_EQ("bar"sv, cmdObj.getStringField("foo"));
+    ASSERT_EQ("admin"sv, cmdObj.getStringField("$db"));
     ASSERT_FALSE(cmdObj["clientOperationKey"].eoo());
     ASSERT_EQ(1, res.data.getIntField("ok"));
     assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 0u, .succeeded = 1u});
@@ -1323,8 +1324,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, RunCommandOnLeasedStream) {
     // { echo: { echo: 1, foo: "bar", $db: "admin" }, ok: 1.0 }
     auto cmdObj = res.data.getObjectField("echo");
     ASSERT_EQ(1, cmdObj.getIntField("echo"));
-    ASSERT_EQ("bar"_sd, cmdObj.getStringField("foo"));
-    ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
+    ASSERT_EQ("bar"sv, cmdObj.getStringField("foo"));
+    ASSERT_EQ("admin"sv, cmdObj.getStringField("$db"));
     ASSERT_EQ(1, res.data.getIntField("ok"));
 }
 

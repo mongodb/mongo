@@ -43,7 +43,10 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 class TsSbeValueTest : public SbeStageBuilderTestFixture {};
 
@@ -70,7 +73,8 @@ int getBucketVersion(const BSONObj& bucket) {
         timeseries::kBucketControlVersionFieldName);
 }
 
-std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket, StringData fieldName) {
+std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket,
+                                                      std::string_view fieldName) {
     auto bucketElem = bucket["data"][fieldName];
     const auto nFields = [&bucket]() -> size_t {
         // Use a dense field.
@@ -269,7 +273,7 @@ TEST_F(TsSbeValueTest, TsBlockMinMaxV1Schema) {
 
 TEST_F(TsSbeValueTest, TsBlockMinMaxV2Schema) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxV1, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(kBucketWithMinMaxV1, "time"sv, {}, false).compressedBucket;
     ASSERT(compressedBucketOpt) << "Should have been able to create compressed v2 bucket";
     auto compressedBucket = *compressedBucketOpt;
 
@@ -351,7 +355,7 @@ TEST_F(TsSbeValueTest, TsBlockMinMaxV2Schema) {
 
 TEST_F(TsSbeValueTest, TsBlockMinMaxV3Schema) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxV1, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(kBucketWithMinMaxV1, "time"sv, {}, false).compressedBucket;
     ASSERT(compressedBucketOpt) << "Should have been able to create compressed v2 bucket";
 
     auto compressedBucket = *compressedBucketOpt;
@@ -574,7 +578,7 @@ TEST_F(TsSbeValueTest, TsBlockFillEmpty) {
 
     {
         auto compressedBucketOpt =
-            timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
                 .compressedBucket;
         ASSERT(compressedBucketOpt);
         auto compressedBucket = *compressedBucketOpt;
@@ -794,7 +798,7 @@ TEST_F(TsSbeValueTest, VerifyDecompressedBlockType) {
     }
 
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithBigScalars, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(kBucketWithBigScalars, "time"sv, {}, false).compressedBucket;
     ASSERT(compressedBucketOpt) << "Should have been able to create compressed v2 bucket";
     auto compressedBucket = *compressedBucketOpt;
 
@@ -824,7 +828,7 @@ TEST_F(TsSbeValueTest, VerifyDecompressedBlockType) {
 TEST_F(TsSbeValueTest, TsBlockTryDenseFastPath) {
     // --- v2 (compressed) bucket cases ---
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt) << "Should have been able to create compressed v2 bucket";
     auto compressedBucket = *compressedBucketOpt;
@@ -878,7 +882,7 @@ TEST_F(TsSbeValueTest, TsBlockTryDenseFastPath) {
 
 TEST_F(TsSbeValueTest, TsBlockArgMinMaxBSONColumnFastPath) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;
@@ -913,7 +917,7 @@ TEST_F(TsSbeValueTest, TsBlockArgMinMaxBSONColumnFastPath) {
 
 TEST_F(TsSbeValueTest, TsBlockArgMinMaxSparseColumn) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;
@@ -928,7 +932,7 @@ TEST_F(TsSbeValueTest, TsBlockArgMinMaxSparseColumn) {
 
 TEST_F(TsSbeValueTest, TsBlockArgMinTimeSortedShortcut) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;
@@ -943,7 +947,7 @@ TEST_F(TsSbeValueTest, TsBlockArgMinTimeSortedShortcut) {
 // argMin/argMax must delegate to it rather than re-running the BSONColumn fast path.
 TEST_F(TsSbeValueTest, TsBlockArgMinDelegatesToDecompressedBlock) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;
@@ -981,7 +985,7 @@ TEST_F(TsSbeValueTest, TsBlockArgMinDelegatesToDecompressedBlock) {
 
 TEST_F(TsSbeValueTest, TsBlockAtBoundaryFastPathDense) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;
@@ -1013,7 +1017,7 @@ TEST_F(TsSbeValueTest, TsBlockAtBoundaryFastPathDense) {
 
 TEST_F(TsSbeValueTest, TsBlockAtSparseFallsThroughToDeblock) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;
@@ -1027,7 +1031,7 @@ TEST_F(TsSbeValueTest, TsBlockAtSparseFallsThroughToDeblock) {
 
 TEST_F(TsSbeValueTest, TsBlockAtSparseCorrectValues) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;
@@ -1053,7 +1057,7 @@ TEST_F(TsSbeValueTest, TsBlockAtSparseCorrectValues) {
 
 TEST_F(TsSbeValueTest, TsBlockAtInteriorIndexDeblocks) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;
@@ -1069,7 +1073,7 @@ TEST_F(TsSbeValueTest, TsBlockAtInteriorIndexDeblocks) {
 
 TEST_F(TsSbeValueTest, TsBlockArgMinThenAtHitsCache) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;
@@ -1124,7 +1128,7 @@ const BSONObj kBucketWithDeepStrings = fromjson(R"(
 
 TEST_F(TsSbeValueTest, TsBlockArgMinMaxAtCacheStoresDeepString) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithDeepStrings, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(kBucketWithDeepStrings, "time"sv, {}, false).compressedBucket;
     ASSERT(compressedBucketOpt);
 
     auto tsBlock = makeTsBlockFromBucket(*compressedBucketOpt, "name");
@@ -1135,7 +1139,7 @@ TEST_F(TsSbeValueTest, TsBlockArgMinMaxAtCacheStoresDeepString) {
     ASSERT_EQ(maxIdx, boost::optional<size_t>(2u)) << "argMax must point to the interior max slot";
     ASSERT_FALSE(tsBlock->decompressed()) << "argMin/argMax must not deblock";
 
-    auto check = [&](size_t idx, StringData expected) {
+    auto check = [&](size_t idx, std::string_view expected) {
         auto [tag, val] = tsBlock->at(idx);
         ASSERT_FALSE(tsBlock->decompressed())
             << "at(idx) on an interior index must hit _atCache, not deblock or use boundary path";
@@ -1144,13 +1148,13 @@ TEST_F(TsSbeValueTest, TsBlockArgMinMaxAtCacheStoresDeepString) {
         ASSERT_EQ(value::getStringView(tag, val), expected)
             << "Cached string contents must be intact (allocator kept it alive)";
     };
-    check(*minIdx, "alpha-001"_sd);
-    check(*maxIdx, "delta-004"_sd);
+    check(*minIdx, "alpha-001"sv);
+    check(*maxIdx, "delta-004"sv);
 }
 
 TEST_F(TsSbeValueTest, TsBlockCloneStartsWithEmptyCache) {
     auto compressedBucketOpt =
-        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"sv, {}, false)
             .compressedBucket;
     ASSERT(compressedBucketOpt);
     auto compressedBucket = *compressedBucketOpt;

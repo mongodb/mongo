@@ -30,7 +30,6 @@
 #include "mongo/db/exec/classic/timeseries_upsert.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/plan_stats.h"

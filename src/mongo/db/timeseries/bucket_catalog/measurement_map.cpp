@@ -35,6 +35,8 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::timeseries::bucket_catalog {
@@ -80,19 +82,20 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
                     10402,
                     logv2::LogTruncation::Disabled,
                     "Detected incorrect internal state when reopening from following binary: ",
-                    "binary"_attr = base64::encode(StringData(binData, binLength)));
+                    "binary"_attr = base64::encode(std::string_view(binData, binLength)));
             }
             invariant(isInternalStateCorrect);
         }
     }
 }
 
-std::vector<std::pair<StringData, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>
+std::vector<std::pair<std::string_view, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>
 MeasurementMap::intermediate(int32_t& compressedSizeDelta) {
     int32_t previousCompressedSize = _compressedSize;
     _compressedSize = 0;
 
-    std::vector<std::pair<StringData, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>
+    std::vector<
+        std::pair<std::string_view, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>
         intermediates;
     for (auto& entry : _builders) {
         auto& builder = entry.second.builder;
@@ -100,14 +103,14 @@ MeasurementMap::intermediate(int32_t& compressedSizeDelta) {
 
         _compressedSize += (diff.offset() + diff.size());
         intermediates.push_back(
-            {StringData(entry.first.c_str(), entry.first.size()), std::move(diff)});
+            {std::string_view(entry.first.c_str(), entry.first.size()), std::move(diff)});
     }
 
     compressedSizeDelta = _compressedSize - previousCompressedSize;
     return intermediates;
 }
 
-void MeasurementMap::_insertNewKey(StringData key, const BSONElement& elem, size_t count) {
+void MeasurementMap::_insertNewKey(std::string_view key, const BSONElement& elem, size_t count) {
     BSONColumnBuilder<tracking::Allocator<void>> columnBuilder(
         count, _trackingContext.get().makeAllocator<void>());
     columnBuilder.append(elem);
@@ -116,10 +119,11 @@ void MeasurementMap::_insertNewKey(StringData key, const BSONElement& elem, size
                           count + 1 /* account for the append above */);
 }
 
-void MeasurementMap::insertOne(const BSONObj& measurement, boost::optional<StringData> metaField) {
+void MeasurementMap::insertOne(const BSONObj& measurement,
+                               boost::optional<std::string_view> metaField) {
     // First pass to append all elements present in this measurement.
     for (const auto& elem : measurement) {
-        StringData key = elem.fieldNameStringData();
+        std::string_view key = elem.fieldNameStringData();
         // Skip the meta field values because they aren't stored in a BSONColumn.
         if (key == metaField) {
             continue;
@@ -152,7 +156,7 @@ void MeasurementMap::insertOne(const BSONObj& measurement, boost::optional<Strin
     }
 }
 
-Date_t MeasurementMap::timeOfLastMeasurement(StringData key) const {
+Date_t MeasurementMap::timeOfLastMeasurement(std::string_view key) const {
     const auto it = _builders.find(key);
     invariant(it != _builders.end());
     return it->second.builder.last().date();

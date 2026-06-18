@@ -30,7 +30,6 @@
 
 #include "mongo/db/s/auto_split_vector.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbdirectclient.h"

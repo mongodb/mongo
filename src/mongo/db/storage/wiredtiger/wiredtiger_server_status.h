@@ -35,6 +35,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class WiredTigerKVEngine;
@@ -44,7 +46,7 @@ class WiredTigerKVEngine;
  */
 class WiredTigerServerStatusSection : public ServerStatusSection {
 public:
-    static constexpr StringData kServerStatusSectionName = "wiredTiger"_sd;
+    static constexpr std::string_view kServerStatusSectionName = "wiredTiger"_sd;
 
     using ServerStatusSection::ServerStatusSection;
     bool includeByDefault() const override;

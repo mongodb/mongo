@@ -34,12 +34,15 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData DocumentSourceChangeStreamAddPostImage::kStageName;
-constexpr StringData DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName;
+constexpr std::string_view DocumentSourceChangeStreamAddPostImage::kStageName;
+constexpr std::string_view DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName;
 
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamAddPostImage,
@@ -67,7 +70,7 @@ Value DocumentSourceChangeStreamAddPostImage::doSerialize(
     const query_shape::SerializationOptions& opts) const {
     return opts.isSerializingForExplain()
         ? Value(Document{{DocumentSourceChangeStream::kStageName,
-                          Document{{"stage"_sd, kStageName},
+                          Document{{"stage"sv, kStageName},
                                    {kFullDocumentFieldName, idl::serialize(_fullDocumentMode)}}}})
         : Value(Document{{kStageName,
                           DocumentSourceChangeStreamAddPostImageSpec(_fullDocumentMode).toBSON()}});

@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -96,6 +95,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -105,6 +105,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class DatabaseTest : public ServiceContextMongoDTest {
 private:
@@ -535,7 +536,7 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
 
-        auto model = "tmp%%%%"_sd;
+        auto model = "tmp%%%%"sv;
         pcre::Regex re(std::string(_nss.db_forTest()) +
                            "\\.tmp[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]",
                        pcre::ANCHORED | pcre::ENDANCHORED);
@@ -579,13 +580,13 @@ TEST_F(
         auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
 
-        auto model = "tmp%"_sd;
+        auto model = "tmp%"sv;
 
         // Create all possible collections matching model with single percent sign.
         const auto charsToChooseFrom =
             "0123456789"
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "abcdefghijklmnopqrstuvwxyz"_sd;
+            "abcdefghijklmnopqrstuvwxyz"sv;
         for (const auto c : charsToChooseFrom) {
             NamespaceString nss = NamespaceString::createNamespaceString_forTest(
                 _nss.dbName(), std::string(model.substr(0, model.find('%'))) + std::string(1U, c));
@@ -720,7 +721,7 @@ TEST_F(DatabaseTest, OpenDbRejectsCaseConflict) {
     auto opCtx = _opCtx.get();
     auto holder = DatabaseHolder::get(opCtx);
 
-    auto testConflict = [&](StringData lowerStr, StringData upperStr) {
+    auto testConflict = [&](std::string_view lowerStr, std::string_view upperStr) {
         DatabaseName lower = DatabaseName::createDatabaseName_forTest(boost::none, lowerStr);
         DatabaseName upper = DatabaseName::createDatabaseName_forTest(boost::none, upperStr);
 

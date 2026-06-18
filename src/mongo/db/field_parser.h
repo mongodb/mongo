@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,6 +44,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <fmt/format.h>
@@ -59,7 +59,7 @@ private:
     template <typename T>
     static void _genFieldErrMsg(const BSONElement& elem,
                                 const BSONField<T>& field,
-                                StringData expected,
+                                std::string_view expected,
                                 std::string* errMsg) {
         if (!errMsg)
             return;
@@ -317,7 +317,7 @@ public:
 
     /**
      * The following extract methods are templatized to handle extraction of vectors and
-     * maps of sub-objects.  Keys in the map should be StringData compatible.
+     * maps of sub-objects.  Keys in the map should be std::string_view compatible.
      *
      * It's possible to nest extraction of vectors and maps to any depth, i.e:
      *

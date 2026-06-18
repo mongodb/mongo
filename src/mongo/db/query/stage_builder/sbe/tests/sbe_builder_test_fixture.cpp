@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
@@ -44,10 +43,13 @@
 #include "mongo/db/shard_role/shard_role_mock.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 unittest::GoldenTestConfig goldenTestConfigSbe{"src/mongo/db/test_output/query/stage_builder/sbe"};
 
@@ -97,7 +99,7 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
     auto [stage, data] = builder.build(querySolution->root());
 
     // Reset "shardFilterer".
-    if (auto shardFiltererSlot = data.env->getSlotIfExists("shardFilterer"_sd);
+    if (auto shardFiltererSlot = data.env->getSlotIfExists("shardFilterer"sv);
         shardFiltererSlot && param.shardFilterInterface) {
         auto shardFilterer = param.shardFilterInterface->makeShardFilterer(operationContext());
         data.env->resetSlot(*shardFiltererSlot,
@@ -267,7 +269,7 @@ void GoldenSbeExprBuilderTestFixture::setUp() {
 void GoldenSbeExprBuilderTestFixture::runTest(stage_builder::SbExpr sbExpr,
                                               sbe::value::TypeTags expectedTag,
                                               sbe::value::Value expectedVal,
-                                              StringData test) {
+                                              std::string_view test) {
     auto sbeEExpr = sbExpr.lower(*_state);
     // Print the stage explain output and verify.
     _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);

@@ -45,6 +45,7 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 /**
@@ -111,7 +112,7 @@ void TransactionOperations::packTransactionStatementsForApplyOps(
             operations.size() == static_cast<size_t>(stmtEnd - stmtBegin));
 
     auto operationsIter = operations.begin();
-    BSONArrayBuilder opsArray(applyOpsBuilder->subarrayStart("applyOps"_sd));
+    BSONArrayBuilder opsArray(applyOpsBuilder->subarrayStart("applyOps"sv));
     for (auto stmtIter = stmtBegin; stmtIter != stmtEnd; stmtIter++) {
         const auto& stmt = *stmtIter;
         opsArray.append(*operationsIter++);

@@ -29,7 +29,6 @@
 
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"

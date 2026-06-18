@@ -43,6 +43,7 @@
 #include <cmath>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -52,15 +53,16 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Strings for MarkerCreationMethods.
-static constexpr StringData kEmptyCollectionString = "emptyCollection"_sd;
-static constexpr StringData kScanningString = "scanning"_sd;
-static constexpr StringData kSamplingString = "sampling"_sd;
-static constexpr StringData kInProgressString = "inProgress"_sd;
+static constexpr std::string_view kEmptyCollectionString = "emptyCollection"sv;
+static constexpr std::string_view kScanningString = "scanning"sv;
+static constexpr std::string_view kSamplingString = "sampling"sv;
+static constexpr std::string_view kInProgressString = "inProgress"sv;
 }  // namespace
 
-StringData CollectionTruncateMarkers::toString(
+std::string_view CollectionTruncateMarkers::toString(
     CollectionTruncateMarkers::MarkersCreationMethod creationMethod) {
     switch (creationMethod) {
         case CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection:

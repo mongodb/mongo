@@ -29,12 +29,12 @@
 
 #include "mongo/executor/connection_pool_stats.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/duration.h"
 
 #include <algorithm>
 #include <iosfwd>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -47,7 +47,8 @@ namespace mongo {
 namespace executor {
 
 namespace {
-constexpr auto kAcquisitionWaitTimesKey = "acquisitionWaitTimes"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kAcquisitionWaitTimesKey = "acquisitionWaitTimes"sv;
 }  // namespace
 
 ConnectionStatsPer::ConnectionStatsPer(size_t nInUse,

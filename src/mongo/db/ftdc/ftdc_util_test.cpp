@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/ftdc/util.h"

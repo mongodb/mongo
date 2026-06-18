@@ -35,6 +35,8 @@
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 
 namespace {
@@ -61,7 +63,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalSetWindowFields,
                            documentSourceInternalSetWindowFieldsToStageFn);
 
 InternalSetWindowFieldsStage::InternalSetWindowFieldsStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::optional<boost::intrusive_ptr<Expression>>& partitionBy,
     const boost::optional<SortPattern>& sortBy,

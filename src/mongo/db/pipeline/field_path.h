@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/document_value/document_internal.h"
 #include "mongo/platform/compiler.h"
@@ -42,6 +41,7 @@
 #include <cstddef>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -55,18 +55,18 @@ public:
     /**
      * Throws a AssertionException if a field name does not pass validation.
      */
-    static Status validateFieldName(StringData fieldName);
+    static Status validateFieldName(std::string_view fieldName);
 
     /**
      * Concatenates 'prefix' and 'suffix' using dotted path notation. 'prefix' is allowed to be
      * empty.
      */
-    static std::string getFullyQualifiedPath(StringData prefix, StringData suffix);
+    static std::string getFullyQualifiedPath(std::string_view prefix, std::string_view suffix);
 
     /**
      * Returns the substring of 'path' until the first '.', or the entire string if there is no '.'.
      */
-    static StringData extractFirstFieldFromDottedPath(StringData path) {
+    static std::string_view extractFirstFieldFromDottedPath(std::string_view path) {
         return path.substr(0, path.find('.'));
     }
 
@@ -79,7 +79,7 @@ public:
     /* implicit */ FieldPath(std::string inputPath,
                              bool precomputeHashes = false,
                              bool validateFieldNames = true);
-    /* implicit */ FieldPath(StringData inputPath,
+    /* implicit */ FieldPath(std::string_view inputPath,
                              bool precomputeHashes = false,
                              bool validateFieldNames = true)
         : FieldPath(std::string{inputPath}, precomputeHashes, validateFieldNames) {}
@@ -107,29 +107,29 @@ public:
     /**
      * Get the subpath including path elements [0, n].
      */
-    StringData getSubpath(size_t n) const MONGO_COMPILER_LIFETIME_BOUND {
+    std::string_view getSubpath(size_t n) const MONGO_COMPILER_LIFETIME_BOUND {
         invariant(n + 1 < _fieldPathDotPosition.size());
-        return StringData(_fieldPath.c_str(), _fieldPathDotPosition[n + 1]);
+        return std::string_view(_fieldPath.c_str(), _fieldPathDotPosition[n + 1]);
     }
 
     /**
      * Return the first path component.
      */
-    StringData front() const MONGO_COMPILER_LIFETIME_BOUND {
+    std::string_view front() const MONGO_COMPILER_LIFETIME_BOUND {
         return getFieldName(0);
     }
 
     /**
      * Return the last path component.
      */
-    StringData back() const MONGO_COMPILER_LIFETIME_BOUND {
+    std::string_view back() const MONGO_COMPILER_LIFETIME_BOUND {
         return getFieldName(getPathLength() - 1);
     }
 
     /**
      * Return the ith field name from this path using zero-based indexes.
      */
-    StringData getFieldName(size_t i) const MONGO_COMPILER_LIFETIME_BOUND {
+    std::string_view getFieldName(size_t i) const MONGO_COMPILER_LIFETIME_BOUND {
         return getFieldName(i, _fieldPathDotPosition, _fieldPath);
     }
 
@@ -164,10 +164,10 @@ public:
      * Use instead of tail().fullPath() to avoid a copy.
      * Precondition getPathLength() > 1.
      */
-    StringData tailPath() const {
+    std::string_view tailPath() const {
         tassert(
             12194301, "FieldPath::tailPath() called on single element path", getPathLength() > 1);
-        return StringData(_fieldPath).substr(_fieldPathDotPosition[1] + 1);
+        return std::string_view(_fieldPath).substr(_fieldPathDotPosition[1] + 1);
     }
 
     /**
@@ -236,18 +236,18 @@ private:
      * indexes.
      * ONLY FOR USE IN FACTORY FUNCTION. Otherwise use non-static member function of same name.
      */
-    static StringData getFieldName(size_t i,
-                                   const std::vector<size_t>& dotPositions,
-                                   const std::string& fieldPath) {
+    static std::string_view getFieldName(size_t i,
+                                         const std::vector<size_t>& dotPositions,
+                                         const std::string& fieldPath) {
         tassert(11631401,
                 "Index i must not be greater than the path length",
                 i < getPathLength(dotPositions));
         const auto begin = dotPositions[i] + 1;
         const auto end = dotPositions[i + 1];
         tassert(11631402,
-                "StringData cannot be taken from range past end of string fieldPath",
+                "std::string_view cannot be taken from range past end of string fieldPath",
                 begin < fieldPath.length() && end <= fieldPath.length());
-        return StringData(&fieldPath[begin], end - begin);
+        return std::string_view(&fieldPath[begin], end - begin);
     }
 
     static constexpr char prefix = '$';

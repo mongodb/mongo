@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -44,6 +43,7 @@
 #include <new>
 #include <ostream>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -60,11 +60,10 @@ public:
     }
 
     /**
-     * Parse a tenantId from a StringData. This method asserts if the tenantId is empty or not in an
-     * OID format.
-     * Returns a TenantId object from the parsed string.
+     * Parse a tenantId from a std::string_view. This method asserts if the tenantId is empty or not
+     * in an OID format. Returns a TenantId object from the parsed string.
      */
-    static TenantId parseFromString(StringData tenantId);
+    static TenantId parseFromString(std::string_view tenantId);
 
     explicit TenantId(const OID& oid) : _oid(oid) {}
 
@@ -122,10 +121,12 @@ public:
     /**
      * Serialize tenant id to BSON. These functions are used by IDL parsers.
      */
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const;
     void serializeToBSON(BSONArrayBuilder* builder) const;
 
-    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, const TenantId& value) {
+    friend void appendToBson(BSONObjBuilder& bob,
+                             std::string_view fieldName,
+                             const TenantId& value) {
         value.serializeToBSON(fieldName, &bob);
     }
 

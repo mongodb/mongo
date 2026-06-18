@@ -32,9 +32,10 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
+
+#include <string_view>
 
 namespace mongo {
 /**
@@ -54,34 +55,34 @@ struct MONGO_MOD_PUB FeatureCompatibilityVersionParser {
      * UpgradingFromLastContinuousToLatest, DowngradingFromLatestToLastContinuous,
      * UpgradingFromLastLTSToLastContinuous}
      */
-    static FCV parseVersionForOfcvString(StringData versionString);
+    static FCV parseVersionForOfcvString(std::string_view versionString);
 
     /**
      * Deserializer for "fcv_string" idl type. Throws an exception with the error code 4926900,
      * when the FCV value provided is not equal to one of {LastLTS, LastContinuous, Latest}
      */
-    static FCV parseVersionForFcvString(StringData versionString);
+    static FCV parseVersionForFcvString(std::string_view versionString);
 
     // Used to parse FCV values for feature flags. It is acceptable to have feature flag versions
     // that are not one of { lastLTS, lastContinuous, latest } while the server code is
     // transitioning to the next LTS release. This is to avoid having the upgrade of FCV constants
     // be blocked on old code removal.
-    static FCV parseVersionForFeatureFlags(StringData versionString);
+    static FCV parseVersionForFeatureFlags(std::string_view versionString);
 
     /**
      * Serializer for "ofcv_string" idl type. Asserts through an invariant that
      * the FCV value provided is equal to one of {LastLTS, LastContinuous, Latest,
      * Upgrading*, Downgrading*}
      */
-    static StringData serializeVersionForOfcvString(FCV version);
+    static std::string_view serializeVersionForOfcvString(FCV version);
 
     /**
      * Serializer for "fcv_string" idl type. Asserts through an invariant that
      * the FCV value provided is equal to one of {LastLTS, LastContinuous, Latest}
      */
-    static StringData serializeVersionForFcvString(FCV version);
+    static std::string_view serializeVersionForFcvString(FCV version);
 
-    static StringData serializeVersionForFeatureFlags(FCV version);
+    static std::string_view serializeVersionForFeatureFlags(FCV version);
 
     static Status validatePreviousVersionField(FCV version);
 

@@ -57,6 +57,7 @@
 #include <fstream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -493,6 +494,7 @@ std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
 }
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 StatusWith<std::vector<std::string>> getSubjectAlternativeNames(PCCERT_CONTEXT cert);
 
@@ -749,7 +751,7 @@ int SSLManagerWindows::SSL_shutdown(SSLConnectionInterface* conn) {
 }
 
 // Decode a base-64 PEM blob with headers into a binary blob
-StatusWith<std::vector<BYTE>> decodePEMBlob(StringData blob) {
+StatusWith<std::vector<BYTE>> decodePEMBlob(std::string_view blob) {
     DWORD decodeLen{0};
 
     if (!CryptStringToBinaryA(
@@ -816,7 +818,7 @@ StatusWith<std::vector<BYTE>> decodeObject(const char* structType,
     return std::move(binaryBlobBuf);
 }
 
-StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(StringData buffer) {
+StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(std::string_view buffer) {
     std::vector<UniqueCertificate> certs;
 
     // Search the buffer for the various strings that make up a PEM file
@@ -824,7 +826,7 @@ StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(StringData buffer) {
     bool found_one = false;
 
     while (pos < buffer.size()) {
-        auto swBlob = ssl_util::findPEMBlob(buffer, "CERTIFICATE"_sd, pos, pos != 0);
+        auto swBlob = ssl_util::findPEMBlob(buffer, "CERTIFICATE"sv, pos, pos != 0);
 
         // We expect to find at least one certificate
         if (!swBlob.isOK()) {
@@ -926,8 +928,8 @@ Status addCertificatesToStore(HCERTSTORE certStore, std::vector<UniqueCertificat
 }
 
 // Read a Certificate PEM file with a private key from disk
-StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
-                                                            StringData password) {
+StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(std::string_view fileName,
+                                                            std::string_view password) {
     auto swBuf = ssl_util::readPEMFile(fileName);
     if (!swBuf.isOK()) {
         return swBuf.getStatus();
@@ -944,7 +946,7 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     }
 
     // Search the buffer for the various strings that make up a PEM file
-    auto swPublicKeyBlob = ssl_util::findPEMBlob(buf, "CERTIFICATE"_sd);
+    auto swPublicKeyBlob = ssl_util::findPEMBlob(buf, "CERTIFICATE"sv);
     if (!swPublicKeyBlob.isOK()) {
         return swPublicKeyBlob.getStatus();
     }
@@ -958,8 +960,8 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     std::vector<UniqueCertificate> extraCertificates;
     if (secondPublicKeyBlobPosition != std::string::npos) {
         // Read in extra certificates
-        StringData extraCertificatesBuffer =
-            StringData(buf).substr(secondPublicKeyBlobPosition - ("-----BEGIN "_sd).size());
+        std::string_view extraCertificatesBuffer =
+            std::string_view(buf).substr(secondPublicKeyBlobPosition - ("-----BEGIN "sv).size());
 
         auto swExtraCertificates = readCAPEMBuffer(extraCertificatesBuffer);
         if (!swExtraCertificates.isOK()) {
@@ -995,11 +997,11 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
 
     // PEM files can have either private key format
     // Also the private key can either come before or after the certificate
-    auto swPrivateKeyBlob = ssl_util::findPEMBlob(buf, "RSA PRIVATE KEY"_sd);
+    auto swPrivateKeyBlob = ssl_util::findPEMBlob(buf, "RSA PRIVATE KEY"sv);
     // We expect to find at least one certificate
     if (!swPrivateKeyBlob.isOK()) {
         // A "PRIVATE KEY" is actually a PKCS #8 PrivateKeyInfo ASN.1 type.
-        swPrivateKeyBlob = ssl_util::findPEMBlob(buf, "PRIVATE KEY"_sd);
+        swPrivateKeyBlob = ssl_util::findPEMBlob(buf, "PRIVATE KEY"sv);
         if (!swPrivateKeyBlob.isOK()) {
             return swPrivateKeyBlob.getStatus();
         }
@@ -1165,7 +1167,7 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     return CertificateWithKey{std::move(certHolder), std::move(keyGuard)};
 }
 
-Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
+Status readCAPEMFile(HCERTSTORE certStore, std::string_view fileName) {
 
     auto swBuf = ssl_util::readPEMFile(fileName);
     if (!swBuf.isOK()) {
@@ -1185,7 +1187,7 @@ Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
     return addCertificatesToStore(certStore, certs);
 }
 
-Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
+Status readCRLPEMFile(HCERTSTORE certStore, std::string_view fileName) {
 
     auto swBuf = ssl_util::readPEMFile(fileName);
     if (!swBuf.isOK()) {
@@ -1199,7 +1201,7 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
     bool found_one = false;
 
     while (pos < buf.size()) {
-        auto swBlob = ssl_util::findPEMBlob(buf, "X509 CRL"_sd, pos, pos != 0);
+        auto swBlob = ssl_util::findPEMBlob(buf, "X509 CRL"sv, pos, pos != 0);
 
         // We expect to find at least one CRL
         if (!swBlob.isOK()) {
@@ -1247,7 +1249,7 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
     return Status::OK();
 }
 
-StatusWith<UniqueCertStore> readCertChains(StringData caFile, StringData crlFile) {
+StatusWith<UniqueCertStore> readCertChains(std::string_view caFile, std::string_view crlFile) {
     UniqueCertStore certStore = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, NULL, 0, NULL);
     if (!certStore) {
         auto ec = lastSystemError();
@@ -1275,7 +1277,7 @@ bool hasCertificateSelector(const SSLParams::CertificateSelector selector) {
 }
 
 StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
-    SSLParams::CertificateSelector selector, DWORD storeType, StringData storeName) {
+    SSLParams::CertificateSelector selector, DWORD storeType, std::string_view storeName) {
 
     HCERTSTORE store = CertOpenStore(CERT_STORE_PROV_SYSTEM,
                                      0,
@@ -1569,7 +1571,7 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     // Read ALL certs from each PEM key file directly so that any intermediate CA embedded in the
     // key file (after the leaf cert) is also installed into the system "CA" store.  Schannel TLS
     // 1.3 needs the intermediate CA in the system store to include it in the Certificate message.
-    auto addIntermediateCAFromPEMFile = [&](StringData pemFile) {
+    auto addIntermediateCAFromPEMFile = [&](std::string_view pemFile) {
         if (pemFile.empty()) {
             return;
         }

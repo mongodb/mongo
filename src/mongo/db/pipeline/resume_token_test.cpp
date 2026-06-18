@@ -50,12 +50,12 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(ResumeToken, EncodesFullTokenFromData) {
     Timestamp ts(1000, 2);
     UUID testUuid = UUID::gen();
-    Document eventIdentifier{{"_id"_sd, "stuff"_sd},
-                             {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
+    Document eventIdentifier{{"_id"sv, "stuff"sv}, {"otherkey"sv, Document{{"otherstuff"sv, 2}}}};
 
     ResumeTokenData resumeTokenDataIn(ts, 0, 0, testUuid, Value(eventIdentifier));
     ResumeToken token(resumeTokenDataIn);
@@ -69,7 +69,7 @@ TEST(ResumeToken, EncodesTimestampOnlyTokenFromData) {
         ResumeTokenData::kDefaultTokenVersion,
         /* txnOpindex */ 0,
         /* uuid */ boost::none,
-        /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
+        /* eventIdentifier */ Value(Document{{"operationType", "drop"sv}})};
     ResumeToken token(resumeTokenDataIn);
     ResumeTokenData tokenData = token.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
@@ -78,8 +78,7 @@ TEST(ResumeToken, EncodesTimestampOnlyTokenFromData) {
 TEST(ResumeToken, ShouldRoundTripThroughHexEncoding) {
     Timestamp ts(1000, 2);
     UUID testUuid = UUID::gen();
-    Document eventIdentifier{{"_id"_sd, "stuff"_sd},
-                             {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
+    Document eventIdentifier{{"_id"sv, "stuff"sv}, {"otherkey"sv, Document{{"otherstuff"sv, 2}}}};
 
     ResumeTokenData resumeTokenDataIn(ts, 0, 0, testUuid, Value(eventIdentifier));
 
@@ -100,7 +99,7 @@ TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughHexEncoding) {
         ResumeTokenData::kDefaultTokenVersion,
         /* txnOpIndex */ 0,
         /* uuid */ boost::none,
-        /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
+        /* eventIdentifier */ Value(Document{{"operationType", "drop"sv}})};
 
     // Test serialization/parsing through Document.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
@@ -238,13 +237,13 @@ TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {
     // Missing document.
     ASSERT_THROWS(ResumeToken::parse(Document()), AssertionException);
     // Missing data field.
-    ASSERT_THROWS(ResumeToken::parse(Document{{"somefield"_sd, "stuff"_sd}}), AssertionException);
+    ASSERT_THROWS(ResumeToken::parse(Document{{"somefield"sv, "stuff"sv}}), AssertionException);
     // Wrong type data field
-    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, BSONNULL}}), AssertionException);
-    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, 0}}), AssertionException);
+    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"sv, BSONNULL}}), AssertionException);
+    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"sv, 0}}), AssertionException);
 
     ASSERT_THROWS(
-        ResumeToken::parse(Document{{"_data"_sd, BSONBinData("\xde\xad", 2, BinDataGeneral)}}),
+        ResumeToken::parse(Document{{"_data"sv, BSONBinData("\xde\xad", 2, BinDataGeneral)}}),
         AssertionException);
 
     // Valid data field, but wrong type typeBits.
@@ -252,14 +251,14 @@ TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {
                               ResumeTokenData::kDefaultTokenVersion,
                               /* version */ 0,
                               /* uuid */ boost::none,
-                              /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
+                              /* eventIdentifier */ Value(Document{{"operationType", "drop"sv}})};
     auto goodTokenDocBinData = ResumeToken(tokenData).toDocument();
     auto goodData = goodTokenDocBinData["_data"].getStringData();
-    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, goodData}, {"_typeBits", "string"_sd}}),
+    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"sv, goodData}, {"_typeBits", "string"sv}}),
                   AssertionException);
 
     // Valid data, wrong typeBits bindata type.
-    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, goodData},
+    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"sv, goodData},
                                               {"_typeBits", BSONBinData("\0", 0, newUUID)}}),
                   AssertionException);
 }
@@ -269,7 +268,7 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyString) {
                               ResumeTokenData::kDefaultTokenVersion,
                               /* txnOpIndex */ 0,
                               /* uuid */ boost::none,
-                              /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
+                              /* eventIdentifier */ Value(Document{{"operationType", "drop"sv}})};
 
     auto goodTokenDocBinData = ResumeToken(tokenData).toDocument();
     auto goodData = goodTokenDocBinData["_data"].getStringData();
@@ -277,22 +276,22 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyString) {
     const unsigned char nonsense[] = {165, 85, 77, 86, 255};
 
     // Data of correct type, but empty.
-    const auto emptyToken = ResumeToken::parse(Document{{"_data"_sd, hexblob::encode(zeroes, 0)}});
+    const auto emptyToken = ResumeToken::parse(Document{{"_data"sv, hexblob::encode(zeroes, 0)}});
     ASSERT_THROWS_CODE(emptyToken.getData(), AssertionException, 40649);
 
     // Data of correct type with a bunch of zeros.
     const auto zeroesToken =
-        ResumeToken::parse(Document{{"_data"_sd, hexblob::encode(zeroes, sizeof(zeroes))}});
+        ResumeToken::parse(Document{{"_data"sv, hexblob::encode(zeroes, sizeof(zeroes))}});
     ASSERT_THROWS_CODE(zeroesToken.getData(), AssertionException, 50811);
 
     // Data of correct type with a bunch of nonsense.
     const auto nonsenseToken =
-        ResumeToken::parse(Document{{"_data"_sd, hexblob::encode(nonsense, sizeof(nonsense))}});
+        ResumeToken::parse(Document{{"_data"sv, hexblob::encode(nonsense, sizeof(nonsense))}});
     ASSERT_THROWS_CODE(nonsenseToken.getData(), AssertionException, 50811);
 
     // Valid data, bad typeBits; note that an all-zeros typebits is valid so it is not tested here.
     auto badTypeBitsToken = ResumeToken::parse(
-        Document{{"_data"_sd, goodData},
+        Document{{"_data"sv, goodData},
                  {"_typeBits", BSONBinData(nonsense, sizeof(nonsense), BinDataGeneral)}});
     ASSERT_THROWS_CODE(badTypeBitsToken.getData(), AssertionException, ErrorCodes::Overflow);
 
@@ -301,7 +300,7 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyString) {
         55,  // Non-null terminated
     };
     auto invalidStringToken = ResumeToken::parse(
-        Document{{"_data"_sd, hexblob::encode(invalidString, sizeof(invalidString))}});
+        Document{{"_data"sv, hexblob::encode(invalidString, sizeof(invalidString))}});
     // invalidStringToken.getData();
     ASSERT_THROWS_WITH_CHECK(
         invalidStringToken.getData(), AssertionException, [](const AssertionException& exception) {
@@ -309,7 +308,7 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyString) {
             ASSERT_STRING_CONTAINS(exception.reason(), "Failed to find null terminator in string");
         });
 
-    auto invalidHexString = ResumeToken::parse(Document{{"_data"_sd, "nonsense"_sd}});
+    auto invalidHexString = ResumeToken::parse(Document{{"_data"sv, "nonsense"sv}});
     ASSERT_THROWS_WITH_CHECK(
         invalidHexString.getData(), AssertionException, [](const AssertionException& exception) {
             ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
@@ -320,7 +319,7 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyString) {
 TEST(ResumeToken, WrongVersionToken) {
     Timestamp ts(1001, 3);
     auto eventIdentifier =
-        Value(Document{{"operationType", "insert"_sd}, {"documentKey", Document{{"_id", 1}}}});
+        Value(Document{{"operationType", "insert"sv}, {"documentKey", Document{{"_id", 1}}}});
     ResumeTokenData resumeTokenDataIn{ts,
                                       /* version */ 0,
                                       /* txnOpIndex */ 0,
@@ -395,7 +394,7 @@ TEST(ResumeToken, InvalidTxnOpIndex) {
         ResumeTokenData::kDefaultTokenVersion,
         /* txnOpIndex */ 1234,
         /* uuid */ boost::none,
-        /* eventIdentifier */ Value(Document{{"operationType", "drop"_sd}})};
+        /* eventIdentifier */ Value(Document{{"operationType", "drop"sv}})};
 
     // Should round trip with a non-negative txnOpIndex.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
@@ -426,9 +425,9 @@ TEST(ResumeToken, StringEncodingSortsCorrectly) {
     }
 
     const auto lowerEventIdentifer =
-        Value(Document{{"operationType", "insert"_sd}, {"documentKey", Document{{"_id", 0}}}});
+        Value(Document{{"operationType", "insert"sv}, {"documentKey", Document{{"_id", 0}}}});
     const auto higherEventIdentifer =
-        Value(Document{{"operationType", "insert"_sd}, {"documentKey", Document{{"_id", 1}}}});
+        Value(Document{{"operationType", "insert"sv}, {"documentKey", Document{{"_id", 1}}}});
 
     auto assertLt = [](const ResumeTokenData& lower, const ResumeTokenData& higher) {
         auto lowerString = ResumeToken(lower).toDocument()["_data"].getString();
@@ -496,7 +495,7 @@ TEST(ResumeToken, StringEncodingSortsCorrectly) {
     assertLt({ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", 0}})},
              {ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", 1}})});
     assertLt({ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", 1}})},
-             {ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", "string"_sd}})});
+             {ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", "string"sv}})});
     assertLt({ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", BSONNULL}})},
              {ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", 0}})});
 

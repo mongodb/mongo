@@ -54,6 +54,8 @@
 #include <exception>
 #include <list>
 #include <memory>
+#include <queue>
+#include <string_view>
 
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
@@ -404,7 +406,7 @@ ClientLock Service::LockedClientsCursor::next() {
 }
 
 void ServiceContext::setKillAllOperations(
-    std::function<bool(const StringData)> excludedClientPredicate) {
+    std::function<bool(const std::string_view)> excludedClientPredicate) {
     ServiceContextLock svcCtxLock(this);
 
     // Ensure that all newly created operation contexts will immediately be in the interrupted state

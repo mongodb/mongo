@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
@@ -46,6 +45,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -69,7 +69,7 @@ static constexpr auto kNaturalSortField = "$natural";
 /**
  * Assert that collectionName is valid.
  */
-Status validateGetMoreCollectionName(StringData collectionName);
+Status validateGetMoreCollectionName(std::string_view collectionName);
 
 /**
  * Returns a non-OK status if '$_resumeAfter' or '$_startAt' is set to an unexpected value, or the

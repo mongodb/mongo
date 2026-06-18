@@ -49,11 +49,13 @@
 
 #include <memory>
 #include <queue>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace mongo;
 
@@ -188,7 +190,8 @@ BSONObj getSpeculativeAuthenticate(const BSONObj& helloRequest) {
 // Asserts that a saslStart payload produced by the speculative SASL path requests the
 // skipEmptyExchange option. This is the behavior added in SERVER-126148 and is what allows
 // speculative SCRAM auth to complete in two steps rather than three.
-void assertSaslStartSkipsEmptyExchange(const BSONObj& specAuth, StringData expectedMechanism) {
+void assertSaslStartSkipsEmptyExchange(const BSONObj& specAuth,
+                                       std::string_view expectedMechanism) {
     ASSERT_EQ(specAuth["saslStart"].numberInt(), 1) << specAuth;
     ASSERT_EQ(specAuth["mechanism"].str(), expectedMechanism) << specAuth;
 
@@ -259,7 +262,7 @@ public:
     void setUp() override {
         // speculateInternalAuth() reads the __system user's name to build SASL parameters.
         std::unique_ptr<UserRequest> systemLocal =
-            std::make_unique<UserRequestGeneral>(UserName("__system"_sd, "local"_sd), boost::none);
+            std::make_unique<UserRequestGeneral>(UserName("__system"sv, "local"sv), boost::none);
         internalSecurity.setUser(std::make_shared<UserHandle>(User(std::move(systemLocal))));
     }
 };

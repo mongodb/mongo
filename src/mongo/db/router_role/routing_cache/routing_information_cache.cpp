@@ -33,6 +33,7 @@
 #include "mongo/util/decorable.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -55,7 +56,7 @@ const auto decorationActionRegisterer = ServiceContext::ConstructorActionRegiste
 RoutingInformationCache::RoutingInformationCache(ServiceContext* serviceCtx)
     : CatalogCache(serviceCtx,
                    std::make_shared<ConfigServerCatalogCacheLoaderImpl>(),
-                   "ConfigServerRoutingInfo"_sd /*kind*/) {}
+                   "ConfigServerRoutingInfo"sv /*kind*/) {}
 
 void RoutingInformationCache::set(ServiceContext* serviceCtx) {
     auto& decoration = getDecoration(serviceCtx);

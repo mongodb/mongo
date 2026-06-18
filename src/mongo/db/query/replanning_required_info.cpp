@@ -31,10 +31,12 @@
 
 #include "mongo/base/init.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
-constexpr StringData kCacheModeFieldName = "cacheMode";
-constexpr StringData kOldPlanHashFieldName = "oldPlanHash";
+constexpr std::string_view kCacheModeFieldName = "cacheMode";
+constexpr std::string_view kOldPlanHashFieldName = "oldPlanHash";
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ReplanningRequiredInfo);
 

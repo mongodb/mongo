@@ -30,7 +30,6 @@
 #include "mongo/client/server_discovery_monitor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
@@ -53,6 +52,7 @@
 #include <iterator>
 #include <ratio>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -67,6 +67,7 @@
 
 
 namespace mongo::sdam {
+using namespace std::literals::string_view_literals;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(overrideMaxAwaitTimeMS);
@@ -480,7 +481,7 @@ void SingleServerDiscoveryMonitor::_onHelloFailure(const Status& status, const B
 
 Milliseconds SingleServerDiscoveryMonitor::_overrideRefreshPeriod(Milliseconds original) {
     Milliseconds r = original;
-    static constexpr auto kPeriodField = "period"_sd;
+    static constexpr auto kPeriodField = "period"sv;
     if (auto modifyReplicaSetMonitorDefaultRefreshPeriod =
             globalFailPointRegistry().find("modifyReplicaSetMonitorDefaultRefreshPeriod")) {
         modifyReplicaSetMonitorDefaultRefreshPeriod->executeIf(

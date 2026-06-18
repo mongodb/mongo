@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/client/async_client.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/db/service_context.h"
@@ -55,6 +54,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -73,7 +73,7 @@ public:
                   std::unique_ptr<NetworkConnectionHook> onConnectHook,
                   const ConnectionPool::Options& connPoolOptions,
                   std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext,
-                  StringData instanceName)
+                  std::string_view instanceName)
         : _executor(std::move(reactor)),
           _tl(tl),
           _onConnectHook(std::move(onConnectHook)),
@@ -81,7 +81,7 @@ public:
           _transientSSLContext(transientSSLContext),
           _instanceName(instanceName) {
         ObservableMutexRegistry::get().add(
-            "TLTypeFactory::_mutex", _mutex, StringData(_instanceName));
+            "TLTypeFactory::_mutex", _mutex, std::string_view(_instanceName));
     }
 
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
@@ -106,7 +106,7 @@ public:
     void fasten(Type* type);
     void release(Type* type);
 
-    StringData instanceName() const {
+    std::string_view instanceName() const {
         return _instanceName;
     }
 
@@ -141,7 +141,7 @@ public:
         return _factory->inShutdown();
     }
 
-    StringData instanceName() const {
+    std::string_view instanceName() const {
         return _factory->instanceName();
     }
 

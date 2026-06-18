@@ -60,6 +60,7 @@
 #include "mongo/util/fail_point.h"
 
 #include <span>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -129,7 +130,7 @@ protected:
     /**
      * Returns table from ident. Requires that the table exists.
      */
-    std::unique_ptr<RecordStore> getTable(StringData ident) {
+    std::unique_ptr<RecordStore> getTable(std::string_view ident) {
         auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
         return operationContext()
             ->getServiceContext()
@@ -138,7 +139,7 @@ protected:
             ->getInternalRecordStore(ru, ident, KeyFormat::Long);
     }
 
-    bool hasTable(StringData ident) {
+    bool hasTable(std::string_view ident) {
         return operationContext()->getServiceContext()->getStorageEngine()->getEngine()->hasIdent(
             *shard_role_details::getRecoveryUnit(operationContext()), ident);
     }
@@ -962,28 +963,30 @@ TEST_F(IndexBuilderInterceptorTest, GetTableAfterDropReturnsNull) {
 class ContainerOpCountingObserver : public OpObserverNoop {
 public:
     void onContainerInsert(OperationContext*,
-                           StringData ident,
+                           std::string_view ident,
                            std::span<const char>,
                            std::span<const char>) override {
         inserts.emplace_back(ident);
     }
     void onContainerInsert(OperationContext*,
-                           StringData ident,
+                           std::string_view ident,
                            int64_t,
                            std::span<const char>) override {
         inserts.emplace_back(ident);
     }
-    void onContainerDelete(OperationContext*, StringData ident, int64_t) override {
+    void onContainerDelete(OperationContext*, std::string_view ident, int64_t) override {
         deletes.emplace_back(ident);
     }
-    void onContainerDelete(OperationContext*, StringData ident, std::span<const char>) override {
+    void onContainerDelete(OperationContext*,
+                           std::string_view ident,
+                           std::span<const char>) override {
         deletes.emplace_back(ident);
     }
 
-    size_t countInsertsFor(StringData ident, size_t from = 0) const {
+    size_t countInsertsFor(std::string_view ident, size_t from = 0) const {
         return std::count(inserts.begin() + from, inserts.end(), ident);
     }
-    size_t countDeletesFor(StringData ident, size_t from = 0) const {
+    size_t countDeletesFor(std::string_view ident, size_t from = 0) const {
         return std::count(deletes.begin() + from, deletes.end(), ident);
     }
 

@@ -48,6 +48,7 @@
 #include <limits>
 #include <new>
 #include <random>
+#include <string_view>
 #include <thread>
 
 #include <absl/container/flat_hash_map.h>
@@ -59,6 +60,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(dummy);  // used by tests in jstests/fail_point
@@ -290,13 +292,14 @@ auto setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
     return timesEntered;
 }
 
-FailPointEnableBlock::FailPointEnableBlock(StringData failPointName)
+FailPointEnableBlock::FailPointEnableBlock(std::string_view failPointName)
     : FailPointEnableBlock(failPointName, BSONObj{}) {}
 
-FailPointEnableBlock::FailPointEnableBlock(StringData failPointName, BSONObj data)
+FailPointEnableBlock::FailPointEnableBlock(std::string_view failPointName, BSONObj data)
     : FailPointEnableBlock(globalFailPointRegistry().find(failPointName), std::move(data)) {}
 
-FailPointEnableBlock::FailPointEnableBlock(StringData failPointName, FailPoint::ModeOptions mode)
+FailPointEnableBlock::FailPointEnableBlock(std::string_view failPointName,
+                                           FailPoint::ModeOptions mode)
     : FailPointEnableBlock(globalFailPointRegistry().find(failPointName), std::move(mode)) {}
 
 FailPointEnableBlock::FailPointEnableBlock(FailPoint* failPoint)
@@ -341,7 +344,7 @@ Status FailPointRegistry::add(FailPoint* failPoint) {
     return Status::OK();
 }
 
-FailPoint* FailPointRegistry::find(StringData name) const {
+FailPoint* FailPointRegistry::find(std::string_view name) const {
     auto iter = _fpMap.find(name);
     return (iter == _fpMap.end()) ? nullptr : iter->second;
 }
@@ -363,9 +366,9 @@ void FailPointRegistry::disableAllFailpoints() {
     }
 }
 
-static constexpr auto kFailPointServerParameterPrefix = "failpoint."_sd;
+static constexpr auto kFailPointServerParameterPrefix = "failpoint."sv;
 
-FailPointServerParameter::FailPointServerParameter(StringData name, ServerParameterType spt)
+FailPointServerParameter::FailPointServerParameter(std::string_view name, ServerParameterType spt)
     : ServerParameter(fmt::format("{}{}", kFailPointServerParameterPrefix, name), spt),
       _data(globalFailPointRegistry().find(std::string{name})) {
     invariant(name != "failpoint.*", "Failpoint prototype was auto-registered from IDL");
@@ -374,12 +377,13 @@ FailPointServerParameter::FailPointServerParameter(StringData name, ServerParame
 
 void FailPointServerParameter::append(OperationContext* opCtx,
                                       BSONObjBuilder* b,
-                                      StringData name,
+                                      std::string_view name,
                                       const boost::optional<TenantId>&) {
     *b << name << _data->toBSON();
 }
 
-Status FailPointServerParameter::setFromString(StringData str, const boost::optional<TenantId>&) {
+Status FailPointServerParameter::setFromString(std::string_view str,
+                                               const boost::optional<TenantId>&) {
     BSONObj failPointOptions;
     try {
         failPointOptions = fromjson(str);

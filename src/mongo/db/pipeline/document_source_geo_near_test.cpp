@@ -42,6 +42,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceGeoNearTest = AggregationContextFixture;
@@ -121,9 +122,9 @@ TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeKeyField) {
     ASSERT_EQ(serialized.size(), 1u);
     auto expectedSerialization =
         Value{Document{{"$geoNear",
-                        Value{Document{{"key", "a.b"_sd},
+                        Value{Document{{"key", "a.b"sv},
                                        {"near", std::vector<Value>{Value{0}, Value{0}}},
-                                       {"distanceField", "dist"_sd},
+                                       {"distanceField", "dist"sv},
                                        {"query", BSONObj{}},
                                        {"spherical", false}}}}}};
     ASSERT_VALUE_EQ(expectedSerialization, serialized[0]);

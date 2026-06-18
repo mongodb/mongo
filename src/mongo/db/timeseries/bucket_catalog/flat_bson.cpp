@@ -38,6 +38,7 @@
 #include "mongo/util/str.h"
 
 #include <cstring>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -47,9 +48,10 @@
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
+using namespace std::literals::string_view_literals;
 constexpr int32_t kMaxLinearSearchLength = 12;
-constexpr StringData kArrayFieldName =
-    "\0"_sd;  // Use a string that is illegal to represent fields in BSON
+constexpr std::string_view kArrayFieldName =
+    "\0"sv;  // Use a string that is illegal to represent fields in BSON
 
 int typeComp(const BSONElement& elem, BSONType type) {
     return elem.canonicalType() - canonicalizeBSONType(type);
@@ -236,7 +238,7 @@ template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::Obj::search(
     FlatBSONStore<Element, Value>::Iterator first,
     FlatBSONStore<Element, Value>::Iterator last,
-    StringData fieldName) {
+    std::string_view fieldName) {
     // Use fast lookup if available.
     if (_pos->_fieldNameToIndex) {
         auto it = _pos->_fieldNameToIndex->find(fieldName);
@@ -289,7 +291,7 @@ typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::
 
 template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::Obj::search(
-    FlatBSONStore<Element, Value>::Iterator first, StringData fieldName) {
+    FlatBSONStore<Element, Value>::Iterator first, std::string_view fieldName) {
     return search(first, end(), fieldName);
 }
 
@@ -394,10 +396,10 @@ typename std::string FlatBSON<Derived, Element, Value>::updateStatusString(
 template <class Derived, class Element, class Value>
 typename FlatBSON<Derived, Element, Value>::UpdateStatus FlatBSON<Derived, Element, Value>::update(
     const BSONObj& doc,
-    boost::optional<StringData> omitField,
+    boost::optional<std::string_view> omitField,
     const StringDataComparator* stringComparator) {
     auto obj = _store.root();
-    return _updateObj(obj, doc, {}, stringComparator, [&omitField](StringData fieldName) {
+    return _updateObj(obj, doc, {}, stringComparator, [&omitField](std::string_view fieldName) {
         return omitField && fieldName == omitField;
     });
 }
@@ -417,7 +419,7 @@ FlatBSON<Derived, Element, Value>::_update(typename FlatBSONStore<Element, Value
         // Compare objects element-wise if the stored data may need to be updated.
         if (status == UpdateStatus::Updated) {
             status = _updateObj(
-                obj, elem.Obj(), updateValues, stringComparator, [](StringData fieldName) {
+                obj, elem.Obj(), updateValues, stringComparator, [](std::string_view fieldName) {
                     return false;
                 });
         }
@@ -463,7 +465,7 @@ FlatBSON<Derived, Element, Value>::_updateObj(typename FlatBSONStore<Element, Va
                                               const BSONObj& doc,
                                               typename Element::UpdateContext updateContext,
                                               const StringDataComparator* stringComparator,
-                                              std::function<bool(StringData)> skipFieldFn) {
+                                              std::function<bool(std::string_view)> skipFieldFn) {
     auto it = obj.begin();
     auto end = obj.end();
     int allHandledOffset = 0;
@@ -472,7 +474,7 @@ FlatBSON<Derived, Element, Value>::_updateObj(typename FlatBSONStore<Element, Va
     UpdateStatus status{UpdateStatus::NoChange};
 
     for (auto&& elem : doc) {
-        StringData fieldName = elem.fieldNameStringData();
+        std::string_view fieldName = elem.fieldNameStringData();
         if (skipFieldFn(fieldName)) {
             continue;
         }
@@ -650,7 +652,7 @@ bool FlatBSON<Derived, Element, Value>::_appendUpdates(
             const auto& subdata = getData(*it);
             if (subdata.updated()) {
                 std::string updateFieldName = str::stream()
-                    << doc_diff::kUpdateSectionFieldName << StringData(count);
+                    << doc_diff::kUpdateSectionFieldName << std::string_view(count);
                 if (subdata.type() == FlatBSONStore<Element, Value>::Type::kObject) {
                     BSONObjBuilder subObj(builder->subobjStart(updateFieldName));
                     _append(obj.object(it), &subObj, getData);
@@ -668,7 +670,7 @@ bool FlatBSON<Derived, Element, Value>::_appendUpdates(
                 if (_appendUpdates(obj.object(it), &subDiff, getData)) {
                     // An update occurred at a lower level, so append the sub diff.
                     builder->append(str::stream() << doc_diff::kSubDiffSectionFieldPrefix
-                                                  << StringData(count),
+                                                  << std::string_view(count),
                                     subDiff.done());
                     appended = true;
                 }
@@ -768,7 +770,7 @@ int64_t BSONTypeValue::size() const {
 Element::Element(tracking::Context& trackingContext)
     : _fieldName(tracking::make_string(trackingContext)) {}
 
-StringData Element::fieldName() const {
+std::string_view Element::fieldName() const {
     return {_fieldName.data(), _fieldName.size()};
 }
 

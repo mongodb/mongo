@@ -34,6 +34,8 @@
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(SearchMeta);
@@ -44,7 +46,7 @@ DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(SearchMeta);
  */
 class DocumentSourceSearchMeta final : public DocumentSourceInternalSearchMongotRemote {
 public:
-    static constexpr StringData kStageName = "$searchMeta"_sd;
+    static constexpr std::string_view kStageName = "$searchMeta"_sd;
 
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -52,7 +54,7 @@ public:
     // Same construction API as the parent class.
     using DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemote;
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     }
 

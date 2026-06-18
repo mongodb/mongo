@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"
 
+#include <string_view>
 #include <variant>
 
 namespace mongo::docs_needed_bounds {
@@ -53,7 +54,7 @@ using DocsNeededConstraint = std::variant<long long, NeedAll, Unknown>;
 
 DocsNeededConstraint parseDocsNeededConstraintFromBSON(const BSONElement& elem);
 void serializeDocsNeededConstraint(const DocsNeededConstraint& bounds,
-                                   StringData fieldName,
+                                   std::string_view fieldName,
                                    BSONObjBuilder* builder);
 
 /**

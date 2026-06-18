@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -45,6 +44,7 @@
 #include <cstddef>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/none.hpp>
@@ -68,7 +68,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceTeeConsumer> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         size_t facetId,
-        StringData stageName);
+        std::string_view stageName);
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints{StreamType::kStreaming,
@@ -97,7 +97,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    StringData getSourceName() const override;
+    std::string_view getSourceName() const override;
 
     static const Id& id;
 
@@ -114,7 +114,7 @@ private:
 
     DocumentSourceTeeConsumer(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               size_t facetId,
-                              StringData stageName);
+                              std::string_view stageName);
 
     size_t _facetId;
 

@@ -41,6 +41,7 @@
 #include <iostream>
 #include <random>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -52,20 +53,22 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 /**
  * If certain args are present, we cannot print anything.
  */
 bool mustRunSilently(const auto& args) {
     static constexpr std::array q{
-        "--quiet"_sd,
-        "--list"_sd,  // Avoid crosstalk with unit test names
-        "--version"_sd,
-        "--sysInfo"_sd,
-        "--help"_sd,
-        "-h"_sd,
+        "--quiet"sv,
+        "--list"sv,  // Avoid crosstalk with unit test names
+        "--version"sv,
+        "--sysInfo"sv,
+        "--help"sv,
+        "-h"sv,
     };
-    return std::any_of(args.begin(), args.end(), [&](StringData a) {
-        return std::any_of(q.begin(), q.end(), [&](StringData s) { return a.starts_with(s); });
+    return std::any_of(args.begin(), args.end(), [&](std::string_view a) {
+        return std::any_of(
+            q.begin(), q.end(), [&](std::string_view s) { return a.starts_with(s); });
     });
 }
 }  // namespace
@@ -222,7 +225,7 @@ unsigned extractRandomSeedFromOptions(const std::vector<std::string>& args) {
     const auto errMsg = fmt::format("Value must be specified for {}", targetArg);
 
     for (size_t i = 0; i < args.size(); i++) {
-        StringData arg = args[i];
+        std::string_view arg = args[i];
         std::string val;
         if (!arg.starts_with(targetArg))
             continue;

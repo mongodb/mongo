@@ -38,6 +38,8 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 
+#include <string_view>
+
 #include <absl/container/flat_hash_map.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
@@ -285,7 +287,7 @@ bool isSargableExpr(const MatchExpression* node) {
     return false;
 }
 
-StringData CardinalityEstimator::getPath(const MatchExpression* node) {
+std::string_view CardinalityEstimator::getPath(const MatchExpression* node) {
     if (node->matchType() == MatchExpression::NOT) {
         return getPath(node->getChild(0));
     } else if (!_elemMatchPathStack.empty()) {
@@ -916,7 +918,7 @@ CEResult CardinalityEstimator::indexUnionCard(const T* node) {
 // hypothetical index on 'path' for the conjunction of expressions in 'nodes' and then invoking
 // histogram estimation for the resulting OIL.
 CEResult CardinalityEstimator::estimateConjWithHistogram(
-    StringData path, const std::vector<const MatchExpression*>& nodes) {
+    std::string_view path, const std::vector<const MatchExpression*>& nodes) {
     // Bail out of using a histogram for estimation if 'path' is multikey.
     if (_multikeyPaths.contains(path) && nodes.size() > 1) {
         return Status(ErrorCodes::HistogramCEFailure,
@@ -959,9 +961,11 @@ CEResult CardinalityEstimator::tryHistogramAnd(const AndMatchExpression* node) {
     // Set of unique paths references under 'node'
     StringDataSet paths;
     // Map from path to set of MatchExpression* referencing that path
-    absl::
-        flat_hash_map<StringData, std::vector<const MatchExpression*>, StringMapHasher, StringMapEq>
-            exprsByPath;
+    absl::flat_hash_map<std::string_view,
+                        std::vector<const MatchExpression*>,
+                        StringMapHasher,
+                        StringMapEq>
+        exprsByPath;
     size_t selOffset = _conjSels.size();
 
     // Iterate over the children of this AndMatchExpression and perform the following:
@@ -972,7 +976,7 @@ CEResult CardinalityEstimator::tryHistogramAnd(const AndMatchExpression* node) {
     // 3. Group all nodes that reference the same path.
     for (size_t i = 0; i < node->numChildren(); ++i) {
         const auto child = node->getChild(i);
-        StringData path;
+        std::string_view path;
         if (isSargableExpr(child)) {
             // This node may be estimated via a histogram by converting it to an interval.
             path = getPath(child);

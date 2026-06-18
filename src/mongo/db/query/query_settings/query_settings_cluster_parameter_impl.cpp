@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -42,12 +41,14 @@
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
 
+#include <string_view>
+
 
 namespace mongo::query_settings {
 
 void QuerySettingsClusterParameter::append(OperationContext* opCtx,
                                            BSONObjBuilder* bob,
-                                           StringData name,
+                                           std::string_view name,
                                            const boost::optional<TenantId>& tenantId) {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
     auto config = querySettingsService.getAllQueryShapeConfigurations(tenantId);

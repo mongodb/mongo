@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -65,12 +64,14 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 Document::FieldPair getNthField(Document doc, size_t index) {
     FieldIterator it(doc);
@@ -122,7 +123,7 @@ TEST(DocumentConstruction, FromNonEmptyBson) {
 }
 
 TEST(DocumentConstruction, FromInitializerList) {
-    auto document = Document{{"a", 1}, {"b", "q"_sd}};
+    auto document = Document{{"a", 1}, {"b", "q"sv}};
     ASSERT_EQUALS(2ULL, document.computeSize());
     ASSERT_EQUALS("a", getNthField(document, 0).first);
     ASSERT_EQUALS(1, getNthField(document, 0).second.getInt());
@@ -147,7 +148,7 @@ TEST(DocumentConstruction, FromEmptyDocumentClone) {
 }
 
 TEST(DocumentConstruction, FromBsonReset) {
-    auto document = Document{{"a", 1}, {"b", "q"_sd}};
+    auto document = Document{{"a", 1}, {"b", "q"sv}};
     auto bson = toBson(document);
 
     MutableDocument md;
@@ -329,7 +330,7 @@ TEST(DocumentGetFieldNonCaching, NonArrayDottedPaths) {
                                                 << "foo"));
     Document document = fromBson(bson);
 
-    auto isFieldCached = [&](StringData field) {
+    auto isFieldCached = [&](std::string_view field) {
         const DocumentStorage* storage = static_cast<const DocumentStorage*>(document.getPtr());
         auto pos = storage->findFieldInCache(field);
         return pos.found();
@@ -644,7 +645,7 @@ TEST(DocumentPeek, ValueFromPeekIsNotAffectedByMutableDocumentChanges) {
     // Create a MutableDocument with initial fields
     MutableDocument md;
     md.addField("a", Value(1));
-    md.addField("b", Value("test"_sd));
+    md.addField("b", Value("test"sv));
     md.addField("c", Value(3.14));
 
     // Save Value created from peek()
@@ -652,27 +653,27 @@ TEST(DocumentPeek, ValueFromPeekIsNotAffectedByMutableDocumentChanges) {
 
     // Verify the initial state
     ASSERT_VALUE_EQ(peekedValue.getDocument()["a"], Value(1));
-    ASSERT_VALUE_EQ(peekedValue.getDocument()["b"], Value("test"_sd));
+    ASSERT_VALUE_EQ(peekedValue.getDocument()["b"], Value("test"sv));
     ASSERT_VALUE_EQ(peekedValue.getDocument()["c"], Value(3.14));
     ASSERT_EQUALS(3ULL, peekedValue.getDocument().computeSize());
 
     // Modify the MutableDocument
     md.setField("a", Value(999));
-    md.setField("b", Value("modified"_sd));
-    md.addField("d", Value("new"_sd));
+    md.setField("b", Value("modified"sv));
+    md.addField("d", Value("new"sv));
     md.remove("c");
 
     // Verify the peeked Value is unchanged
     ASSERT_VALUE_EQ(peekedValue.getDocument()["a"], Value(1));
-    ASSERT_VALUE_EQ(peekedValue.getDocument()["b"], Value("test"_sd));
+    ASSERT_VALUE_EQ(peekedValue.getDocument()["b"], Value("test"sv));
     ASSERT_VALUE_EQ(peekedValue.getDocument()["c"], Value(3.14));
     ASSERT_EQUALS(3ULL, peekedValue.getDocument().computeSize());
     ASSERT(peekedValue.getDocument()["d"].missing());
 
     // Verify the MutableDocument itself has changed
     ASSERT_VALUE_EQ(md.peek()["a"], Value(999));
-    ASSERT_VALUE_EQ(md.peek()["b"], Value("modified"_sd));
-    ASSERT_VALUE_EQ(md.peek()["d"], Value("new"_sd));
+    ASSERT_VALUE_EQ(md.peek()["b"], Value("modified"sv));
+    ASSERT_VALUE_EQ(md.peek()["d"], Value("new"sv));
     ASSERT(md.peek()["c"].missing());
     ASSERT_EQUALS(3ULL, md.peek().computeSize());
 
@@ -727,7 +728,7 @@ public:
 
         // Set nested field to the document as an lvalue.
         FieldPath xxyyzz("xx.yy.zz");
-        Value v3("nested"_sd);
+        Value v3("nested"sv);
         md1.setNestedField(xxyyzz, v3);
         ASSERT_VALUE_EQ(md1.peek().getNestedField(xxyyzz), v3);
     }
@@ -763,13 +764,13 @@ public:
         MutableDocument md(original);
 
         // Set the first field.
-        md.setField("a", Value("foo"_sd));
+        md.setField("a", Value("foo"sv));
         ASSERT_EQUALS(3ULL, md.peek().computeSize());
         ASSERT_EQUALS("foo", md.peek()["a"].getString());
         ASSERT_EQUALS("foo", getNthField(md.peek(), 0).second.getString());
         assertRoundTrips(md.peek());
         // Set the second field.
-        md["b"] = Value("bar"_sd);
+        md["b"] = Value("bar"sv);
         ASSERT_EQUALS(3ULL, md.peek().computeSize());
         ASSERT_EQUALS("bar", md.peek()["b"].getString());
         ASSERT_EQUALS("bar", getNthField(md.peek(), 1).second.getString());
@@ -803,20 +804,20 @@ public:
         assertRoundTrips(md.peek());
 
         // Set a nested field using []
-        md["x"]["y"]["z"] = Value("nested"_sd);
-        ASSERT_VALUE_EQ(md.peek()["x"]["y"]["z"], Value("nested"_sd));
+        md["x"]["y"]["z"] = Value("nested"sv);
+        ASSERT_VALUE_EQ(md.peek()["x"]["y"]["z"], Value("nested"sv));
 
         // Set a nested field using setNestedField
         FieldPath xxyyzz("xx.yy.zz");
-        md.setNestedField(xxyyzz, Value("nested"_sd));
-        ASSERT_VALUE_EQ(md.peek().getNestedField(xxyyzz), Value("nested"_sd));
+        md.setNestedField(xxyyzz, Value("nested"sv));
+        ASSERT_VALUE_EQ(md.peek().getNestedField(xxyyzz), Value("nested"sv));
 
         // Set a nested fields through an existing empty document
         md["xxx"] = Value(Document());
         md["xxx"]["yyy"] = Value(Document());
         FieldPath xxxyyyzzz("xxx.yyy.zzz");
-        md.setNestedField(xxxyyyzzz, Value("nested"_sd));
-        ASSERT_VALUE_EQ(md.peek().getNestedField(xxxyyyzzz), Value("nested"_sd));
+        md.setNestedField(xxxyyyzzz, Value("nested"sv));
+        ASSERT_VALUE_EQ(md.peek().getNestedField(xxxyyyzzz), Value("nested"sv));
 
         // Make sure nothing moved
         ASSERT_EQUALS(apos, md.peek().positionOf("a"));
@@ -885,7 +886,7 @@ public:
 
 
         // Change field in clone and ensure the original document's field is unchanged.
-        cloneOnDemand.setField(StringData("a"), Value(2));
+        cloneOnDemand.setField(std::string_view("a"), Value(2));
         ASSERT_VALUE_EQ(Value(1), document.getNestedField(FieldPath("a.b")));
 
 
@@ -967,8 +968,8 @@ public:
         append("minkey", MINKEY);
         // EOO not valid in middle of BSONObj
         append("double", 1.0);
-        append("c++", "string\0after NUL"_sd);
-        append("StringData", "string\0after NUL"_sd);
+        append("c++", "string\0after NUL"sv);
+        append("std::string_view", "string\0after NUL"sv);
         append("emptyObj", BSONObj());
         append("filledObj", BSON("a" << 1));
         append("emptyArray", BSON("" << BSONArray()).firstElement());
@@ -987,9 +988,9 @@ public:
         append("regexEmpty", BSONRegEx("", ""));
         append("dbref", BSONDBRef("foo", OID()));
         append("code", BSONCode("function() {}"));
-        append("codeNul", BSONCode("var nul = '\0'"_sd));
+        append("codeNul", BSONCode("var nul = '\0'"sv));
         append("symbol", BSONSymbol("foo"));
-        append("symbolNul", BSONSymbol("f\0o"_sd));
+        append("symbolNul", BSONSymbol("f\0o"sv));
         append("codeWScope", BSONCodeWScope("asdf", BSONObj()));
         append("codeWScopeWScope", BSONCodeWScope("asdf", BSON("one" << 1)));
         append("int", 1);
@@ -1071,22 +1072,22 @@ TEST(IsMetadataFieldName, AllMetadataFieldsRecognised) {
 
 TEST(IsMetadataFieldName, UserFieldsRejected) {
     // Non-'$' fields must never be considered metadata.
-    for (StringData field : {"a"_sd, "foo"_sd, "sortKey"_sd, ""_sd}) {
+    for (auto field : {"a"sv, "foo"sv, "sortKey"sv, ""sv}) {
         ASSERT_FALSE(Document::isMetadataFieldName(field)) << field;
     }
 }
 
 TEST(IsMetadataFieldName, DollarMissesRejected) {
     // '$'-prefixed fields that are not in the set must return false.
-    ASSERT_FALSE(Document::isMetadataFieldName("$notAMetadataField"_sd));
-    ASSERT_FALSE(Document::isMetadataFieldName("$sortkey"_sd));  // wrong case, same length
-    ASSERT_FALSE(Document::isMetadataFieldName("$"_sd));         // just a dollar sign
+    ASSERT_FALSE(Document::isMetadataFieldName("$notAMetadataField"sv));
+    ASSERT_FALSE(Document::isMetadataFieldName("$sortkey"sv));  // wrong case, same length
+    ASSERT_FALSE(Document::isMetadataFieldName("$"sv));         // just a dollar sign
 }
 
 TEST(IsMetadataFieldName, LongerThanLongestMetadataField) {
     // A '$'-prefixed field longer than any metadata field must be rejected quickly.
     ASSERT_FALSE(
-        Document::isMetadataFieldName("$thisFieldNameIsDefinitelyLongerThanAnyMetadataField"_sd));
+        Document::isMetadataFieldName("$thisFieldNameIsDefinitelyLongerThanAnyMetadataField"sv));
 }
 
 TEST(MetaFields, ChangeStreamControlDocument) {
@@ -1197,7 +1198,7 @@ TEST(MetaFields, SearchHighlightsBasic) {
 
     // Setting the search highlights field should work as expected.
     MutableDocument docBuilder;
-    Value highlights = DOC_ARRAY("a"_sd << "b"_sd);
+    Value highlights = DOC_ARRAY("a"sv << "b"sv);
     docBuilder.metadata().setSearchHighlights(highlights);
     Document doc = docBuilder.freeze();
     ASSERT_TRUE(doc.metadata().hasSearchHighlights());
@@ -1205,8 +1206,8 @@ TEST(MetaFields, SearchHighlightsBasic) {
 
     // Setting the searchHighlights twice should keep the second value.
     MutableDocument docBuilder2;
-    Value otherHighlights = DOC_ARRAY("snippet1"_sd << "snippet2"_sd
-                                                    << "snippet3"_sd);
+    Value otherHighlights = DOC_ARRAY("snippet1"sv << "snippet2"sv
+                                                   << "snippet3"sv);
     docBuilder2.metadata().setSearchHighlights(highlights);
     docBuilder2.metadata().setSearchHighlights(otherHighlights);
     Document doc2 = docBuilder2.freeze();
@@ -1289,7 +1290,7 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
     ASSERT_EQ(result.metadata().getGeoNearDistance(), 3.2);
     ASSERT_VALUE_EQ(result.metadata().getGeoNearPoint(), Value{BSON_ARRAY(1 << 2)});
     ASSERT_EQ(result.metadata().getSearchScore(), 5.4);
-    ASSERT_VALUE_EQ(result.metadata().getSearchHighlights(), Value{"foo"_sd});
+    ASSERT_VALUE_EQ(result.metadata().getSearchHighlights(), Value{"foo"sv});
     ASSERT_BSONOBJ_EQ(result.metadata().getIndexKey(), BSON("y" << 1));
     ASSERT_BSONOBJ_EQ(result.metadata().getSearchScoreDetails(), BSON("scoreDetails" << "foo"));
     ASSERT_BSONOBJ_EQ(result.metadata().getSearchSortValues(), BSON("a" << 1));
@@ -1300,7 +1301,7 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
 
 TEST(DocumentTest, ValidateToBsonWithMetadataOnlyAllFields) {
     MutableDocument mutableDocument;
-    mutableDocument.addField("field1", Value("value1"_sd));
+    mutableDocument.addField("field1", Value("value1"sv));
     mutableDocument.metadata().setTextScore(5.0);
     mutableDocument.metadata().setSearchScore(3.5);
     mutableDocument.metadata().setRandVal(0.42);
@@ -1318,7 +1319,7 @@ TEST(DocumentTest, ValidateToBsonWithMetadataOnlyAllFields) {
 
 TEST(DocumentTest, ValidateToBsonWithEmptyMetadataOnly) {
     MutableDocument mutableDocument;
-    mutableDocument.addField("field1", Value("value1"_sd));
+    mutableDocument.addField("field1", Value("value1"sv));
 
     Document document = mutableDocument.freeze();
     BSONObj metadataOnly = document.toBsonWithMetaDataOnly();
@@ -1328,7 +1329,7 @@ TEST(DocumentTest, ValidateToBsonWithEmptyMetadataOnly) {
 
 TEST(DocumentTest, ValidateToBsonWithMetadataOnlySerializationSucceeds) {
     MutableDocument mutableDocument;
-    mutableDocument.addField("name", Value("test"_sd));
+    mutableDocument.addField("name", Value("test"sv));
     mutableDocument.addField("count", Value(42));
     mutableDocument.metadata().setTextScore(2.5);
     mutableDocument.metadata().setSearchScore(1.8);
@@ -1362,8 +1363,8 @@ TEST(DocumentTest, ToBsonWithMetaDataStripsUserMetadataNamedFields) {
     // while real textScore metadata (double) should be preserved.
     MutableDocument md;
     md.addField("_id", Value(1));
-    md.addField("$textScore", Value("user_value"_sd));
-    md.addField("regular", Value("kept"_sd));
+    md.addField("$textScore", Value("user_value"sv));
+    md.addField("regular", Value("kept"sv));
     md.metadata().setTextScore(42.0);
 
     Document doc = md.freeze();
@@ -1391,8 +1392,8 @@ TEST(DocumentTest, ToBsonWithMetaDataStripsUserFieldWhenMetadataSetFirst) {
     MutableDocument md;
     md.addField("_id", Value(1));
     md.metadata().setTextScore(42.0);
-    md.addField("regular", Value("kept"_sd));
-    md.addField("$textScore", Value("user_value"_sd));
+    md.addField("regular", Value("kept"sv));
+    md.addField("$textScore", Value("user_value"sv));
 
     Document doc = md.freeze();
     BSONObj bsonWithMeta = doc.toBsonWithMetaData();
@@ -1415,23 +1416,23 @@ TEST(DocumentTest, ToBsonWithMetaDataStripsAllMetadataNamedUserFields) {
     // Verify that all 17 metadata field names are stripped when present as user fields.
     MutableDocument md;
     md.addField("_id", Value(1));
-    md.addField("$textScore", Value("a"_sd));
-    md.addField("$randVal", Value("b"_sd));
-    md.addField("$sortKey", Value("c"_sd));
-    md.addField("$dis", Value("d"_sd));
-    md.addField("$pt", Value("e"_sd));
-    md.addField("$searchScore", Value("f"_sd));
-    md.addField("$searchHighlights", Value("g"_sd));
-    md.addField("$searchSortValues", Value("h"_sd));
-    md.addField("$indexKey", Value("i"_sd));
-    md.addField("$searchScoreDetails", Value("j"_sd));
-    md.addField("$searchRootDocumentId", Value("k"_sd));
-    md.addField("$vectorSearchScore", Value("l"_sd));
-    md.addField("$searchSequenceToken", Value("m"_sd));
-    md.addField("$score", Value("n"_sd));
-    md.addField("$scoreDetails", Value("o"_sd));
-    md.addField("$stream", Value("p"_sd));
-    md.addField("$changeStreamControlEvent", Value("q"_sd));
+    md.addField("$textScore", Value("a"sv));
+    md.addField("$randVal", Value("b"sv));
+    md.addField("$sortKey", Value("c"sv));
+    md.addField("$dis", Value("d"sv));
+    md.addField("$pt", Value("e"sv));
+    md.addField("$searchScore", Value("f"sv));
+    md.addField("$searchHighlights", Value("g"sv));
+    md.addField("$searchSortValues", Value("h"sv));
+    md.addField("$indexKey", Value("i"sv));
+    md.addField("$searchScoreDetails", Value("j"sv));
+    md.addField("$searchRootDocumentId", Value("k"sv));
+    md.addField("$vectorSearchScore", Value("l"sv));
+    md.addField("$searchSequenceToken", Value("m"sv));
+    md.addField("$score", Value("n"sv));
+    md.addField("$scoreDetails", Value("o"sv));
+    md.addField("$stream", Value("p"sv));
+    md.addField("$changeStreamControlEvent", Value("q"sv));
 
     Document doc = md.freeze();
     BSONObj bsonWithMeta = doc.toBsonWithMetaData();
@@ -1448,7 +1449,7 @@ TEST(DocumentTest, ToBsonWithMetaDataLogsWarningWhenStrippingUserField) {
                                                        logv2::LogSeverity::Debug(2)};
     MutableDocument md;
     md.addField("_id", Value(1));
-    md.addField("$sortKey", Value("user_value"_sd));
+    md.addField("$sortKey", Value("user_value"sv));
 
     Document doc = md.freeze();
 
@@ -1465,7 +1466,7 @@ TEST(DocumentTest, ToBsonWithMetaDataRedactsFieldNameWhenRedactionEnabled) {
                                                        logv2::LogSeverity::Debug(2)};
     MutableDocument md;
     md.addField("_id", Value(1));
-    md.addField("$sortKey", Value("user_value"_sd));
+    md.addField("$sortKey", Value("user_value"sv));
 
     Document doc = md.freeze();
 
@@ -1484,7 +1485,7 @@ TEST(DocumentTest, ToBsonWithMetaDataRedactsFieldNameWhenRedactionEnabled) {
 TEST(DocumentTest, ToBsonWithMetaDataDoesNotLogWhenNothingStripped) {
     MutableDocument md;
     md.addField("_id", Value(1));
-    md.addField("regular", Value("kept"_sd));
+    md.addField("regular", Value("kept"sv));
     md.metadata().setTextScore(42.0);
 
     Document doc = md.freeze();
@@ -1592,7 +1593,7 @@ TEST_F(SerializationTest, MetaSerializationNoVals) {
     docBuilder.metadata().setTextScore(10.0);
     docBuilder.metadata().setRandVal(20.0);
     docBuilder.metadata().setSearchScore(30.0);
-    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd));
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"sv << "def"sv));
     docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     docBuilder.metadata().setVectorSearchScore(40.0);
     docBuilder.metadata().setScore(60.0);
@@ -1605,7 +1606,7 @@ TEST_F(SerializationTest, MetaSerializationWithVals) {
     docBuilder.metadata().setTextScore(10.0);
     docBuilder.metadata().setRandVal(20.0);
     docBuilder.metadata().setSearchScore(30.0);
-    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd));
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"sv << "def"sv));
     docBuilder.metadata().setIndexKey(BSON("key" << 42));
     docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     docBuilder.metadata().setVectorSearchScore(40.0);
@@ -1631,7 +1632,7 @@ TEST(MetaFields, ToAndFromBson) {
     docBuilder.metadata().setTextScore(10.0);
     docBuilder.metadata().setRandVal(20.0);
     docBuilder.metadata().setSearchScore(30.0);
-    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd));
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"sv << "def"sv));
     docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     docBuilder.metadata().setSearchSortValues(BSON("a" << 42));
     docBuilder.metadata().setVectorSearchScore(40.0);
@@ -1643,7 +1644,7 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_EQ(20, obj[Document::metaFieldRandVal].numberLong());
     ASSERT_EQ(30.0, obj[Document::metaFieldSearchScore].Double());
     ASSERT_BSONOBJ_EQ(obj[Document::metaFieldSearchHighlights].embeddedObject(),
-                      BSON_ARRAY("abc"_sd << "def"_sd));
+                      BSON_ARRAY("abc"sv << "def"sv));
     ASSERT_BSONOBJ_EQ(obj[Document::metaFieldSearchScoreDetails].Obj(),
                       BSON("scoreDetails" << "foo"));
     ASSERT_BSONOBJ_EQ(BSON("a" << 42), obj[Document::metaFieldSearchSortValues].Obj());
@@ -1663,7 +1664,7 @@ TEST(MetaFields, ToAndFromBson) {
 }
 
 TEST(MetaFields, ToAndFromBsonTrivialConvertibility) {
-    Value sortKey{Document{{"token"_sd, "SOMENCODEDATA"_sd}}};
+    Value sortKey{Document{{"token"sv, "SOMENCODEDATA"sv}}};
     // Create a document with a backing BSONObj and separate metadata.
     auto origObjNoMetadata = BSON("a" << 42);
     ASSERT_FALSE(origObjNoMetadata.hasField(Document::metaFieldSortKey));
@@ -1769,13 +1770,13 @@ TEST(MetaFields, TrivialConvertibilityMetadataModified) {
 
 TEST(MetaFields, MetaFieldsIncludedInDocumentApproximateSize) {
     MutableDocument docBuilder;
-    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd));
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"sv << "def"sv));
     const size_t smallMetadataDocSize = docBuilder.freeze().getApproximateSize();
 
     // The second document has a larger "search highlights" object.
     MutableDocument docBuilder2;
-    docBuilder2.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd << "def"_sd
-                                                                  << "ghijklmnop"_sd));
+    docBuilder2.metadata().setSearchHighlights(DOC_ARRAY("abc"sv << "def"sv
+                                                                 << "ghijklmnop"sv));
     Document doc2 = docBuilder2.freeze();
     const size_t bigMetadataDocSize = doc2.getApproximateSize();
     ASSERT_GT(bigMetadataDocSize, smallMetadataDocSize);
@@ -1882,7 +1883,7 @@ public:
 class String {
 public:
     void run() {
-        Value value = Value("foo"_sd);
+        Value value = Value("foo"sv);
         ASSERT_EQUALS("foo", value.getString());
         ASSERT_EQUALS(BSONType::string, value.getType());
         assertRoundTrips(value);
@@ -1966,7 +1967,7 @@ public:
     void run() {
         mongo::MutableDocument md;
         md.addField("a", Value(5));
-        md.addField("apple", Value("rrr"_sd));
+        md.addField("apple", Value("rrr"sv));
         md.addField("banana", Value(-.3));
         mongo::Document document = md.freeze();
 
@@ -2014,7 +2015,7 @@ public:
     void run() {
         std::vector<Value> array;
         array.push_back(Value(5));
-        array.push_back(Value("lala"_sd));
+        array.push_back(Value("lala"sv));
         array.push_back(Value(3.14));
         Value value = Value(array);
         const std::vector<Value>& array2 = value.getArray();
@@ -2090,7 +2091,7 @@ public:
 class DBRef {
 public:
     void run() {
-        Value value(BSONDBRef("FOO"_sd, OID("abcdefabcdefabcdefabcdef")));
+        Value value(BSONDBRef("FOO"sv, OID("abcdefabcdefabcdefabcdef")));
         ASSERT_EQUALS("FOO", value.getDBRef().ns);
         ASSERT_EQUALS(OID("abcdefabcdefabcdefabcdef"), value.getDBRef().oid);
         ASSERT_EQUALS(BSONType::dbRef, value.getType());
@@ -2244,7 +2245,7 @@ class NonZeroDoubleToBool : public ToBoolTrue {
 /** Coerce "" to bool. */
 class StringToBool : public ToBoolTrue {
     Value value() override {
-        return Value(StringData());
+        return Value(std::string_view());
     }
 };
 
@@ -2378,7 +2379,7 @@ class UndefinedToInt : public ToIntBase {
 class StringToInt {
 public:
     void run() {
-        ASSERT_THROWS(Value(StringData()).coerceToInt(), AssertionException);
+        ASSERT_THROWS(Value(std::string_view()).coerceToInt(), AssertionException);
     }
 };
 
@@ -2547,7 +2548,7 @@ class UndefinedToLong : public ToLongBase {
 class StringToLong {
 public:
     void run() {
-        ASSERT_THROWS(Value(StringData()).coerceToLong(), AssertionException);
+        ASSERT_THROWS(Value(std::string_view()).coerceToLong(), AssertionException);
     }
 };
 
@@ -2626,7 +2627,7 @@ class UndefinedToDouble : public ToDoubleBase {
 class StringToDouble {
 public:
     void run() {
-        ASSERT_THROWS(Value(StringData()).coerceToDouble(), AssertionException);
+        ASSERT_THROWS(Value(std::string_view()).coerceToDouble(), AssertionException);
     }
 };
 
@@ -2669,7 +2670,7 @@ class TimestampToDate : public ToDateBase {
 class StringToDate {
 public:
     void run() {
-        ASSERT_THROWS(Value(StringData()).coerceToDate(), AssertionException);
+        ASSERT_THROWS(Value(std::string_view()).coerceToDate(), AssertionException);
     }
 };
 
@@ -2720,7 +2721,7 @@ class LongToString : public ToStringBase {
 /** Coerce string to string. */
 class StringToString : public ToStringBase {
     Value value() override {
-        return Value("fO_o"_sd);
+        return Value("fO_o"sv);
     }
     std::string expected() override {
         return "fO_o";
@@ -2833,7 +2834,7 @@ public:
         BSONObjBuilder bob;
         Value(4.4).addToBsonObj(&bob, "a");
         Value(22).addToBsonObj(&bob, "b");
-        Value("astring"_sd).addToBsonObj(&bob, "c");
+        Value("astring"sv).addToBsonObj(&bob, "c");
         ASSERT_BSONOBJ_EQ(BSON("a" << 4.4 << "b" << 22 << "c"
                                    << "astring"),
                           bob.obj());
@@ -2847,7 +2848,7 @@ public:
         BSONArrayBuilder bab;
         Value(4.4).addToBsonArray(&bab);
         Value(22).addToBsonArray(&bab);
-        Value("astring"_sd).addToBsonArray(&bab);
+        Value("astring"sv).addToBsonArray(&bab);
         ASSERT_BSONOBJ_EQ(BSON_ARRAY(4.4 << 22 << "astring"), bab.arr());
     }
 };
@@ -2947,9 +2948,9 @@ public:
         assertComparison(-1, Value(BSONNULL), Value(1));
         assertComparison(0, Value(1), Value(1LL));
         assertComparison(0, Value(1), Value(1.0));
-        assertComparison(-1, Value(1), Value("string"_sd));
-        assertComparison(0, Value("string"_sd), Value(BSONSymbol("string")));
-        assertComparison(-1, Value("string"_sd), Value(mongo::Document()));
+        assertComparison(-1, Value(1), Value("string"sv));
+        assertComparison(0, Value("string"sv), Value(BSONSymbol("string")));
+        assertComparison(-1, Value("string"sv), Value(mongo::Document()));
         assertComparison(-1, Value(mongo::Document()), Value(std::vector<Value>()));
         assertComparison(-1, Value(std::vector<Value>()), Value(BSONBinData("", 0, MD5Type)));
         assertComparison(-1, Value(BSONBinData("", 0, MD5Type)), Value(mongo::OID()));

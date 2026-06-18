@@ -40,6 +40,8 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::collection_validation {
 namespace {
 
@@ -129,7 +131,8 @@ TEST_F(ValidateStateWithoutSizeStorerTest, GetExpectedFastCountTypeReturnsReplic
 // enforceCountAndSize, expectedResult), where enforceCountAndSize represents whether the
 // enforceFastCount and enforceFastSize parameters were passed in to the validate command with a
 // value of true or false.
-using ShouldEnforceFastSizeAndCountTestCase = std::tuple<StringData, StringData, bool, bool>;
+using ShouldEnforceFastSizeAndCountTestCase =
+    std::tuple<std::string_view, std::string_view, bool, bool>;
 
 auto runShouldEnforceTestCases =
     [](OperationContext* opCtx,

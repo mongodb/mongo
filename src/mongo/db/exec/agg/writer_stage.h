@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -71,7 +71,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT WriterStage : public Stage {
 public:
     using BatchObject = B;
     using BatchedObjects = std::vector<BatchObject>;
-    WriterStage(StringData stageName,
+    WriterStage(std::string_view stageName,
                 const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                 NamespaceString outputNs)
         : Stage(stageName, pExpCtx),

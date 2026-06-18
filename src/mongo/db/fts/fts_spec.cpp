@@ -43,6 +43,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -194,7 +195,7 @@ void FTSSpec::scoreDocument(const BSONObj& obj, TermFrequencyMap* term_freqs) co
 }
 
 void FTSSpec::_scoreStringV2(FTSTokenizer* tokenizer,
-                             StringData raw,
+                             std::string_view raw,
                              TermFrequencyMap* docScores,
                              double weight) const {
     ScoreHelperMap terms;
@@ -204,7 +205,7 @@ void FTSSpec::_scoreStringV2(FTSTokenizer* tokenizer,
     tokenizer->reset(raw, FTSTokenizer::kFilterStopWords);
 
     while (tokenizer->moveNext()) {
-        StringData term = tokenizer->get();
+        std::string_view term = tokenizer->get();
 
         ScoreHelperStruct& data = terms[term];
 
@@ -271,7 +272,7 @@ void _addFTSStuff(BSONObjBuilder* b) {
     b->append("_ftsx", 1);
 }
 
-Status verifyFieldNameNotReserved(StringData s) {
+Status verifyFieldNameNotReserved(std::string_view s) {
     if (s == "_fts" || s == "_ftsx") {
         return {ErrorCodes::CannotCreateIndex,
                 "text index with reserved fields _fts/_ftsx not allowed"};
@@ -425,7 +426,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
                 }
 
                 for (size_t partNum = 0; partNum < keyField.numParts(); partNum++) {
-                    StringData part = keyField.getPart(partNum);
+                    std::string_view part = keyField.getPart(partNum);
                     if (part.empty()) {
                         return {ErrorCodes::CannotCreateIndex,
                                 "weight cannot have empty path component"};
@@ -474,7 +475,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
     BSONObjIterator i(spec);
     while (i.more()) {
         BSONElement e = i.next();
-        StringData fieldName = e.fieldNameStringData();
+        std::string_view fieldName = e.fieldNameStringData();
         if (fieldName == "key") {
             b.append("key", keyPattern);
         } else if (fieldName == "weights") {

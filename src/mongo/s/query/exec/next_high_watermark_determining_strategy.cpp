@@ -36,11 +36,13 @@
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 
 
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * High watermarks are only useful in tailable, awaitData mode. In all other modes, the function
@@ -54,8 +56,8 @@ public:
         tasserted(10359107, "cannot determine high watermark in this configuration");
     }
 
-    StringData getName() const override {
-        return "invalid"_sd;
+    std::string_view getName() const override {
+        return "invalid"sv;
     }
 };
 
@@ -72,8 +74,8 @@ public:
         return AsyncResultsMerger::extractSortKey(nextEvent, _compareWholeSortKey).getOwned();
     }
 
-    StringData getName() const override {
-        return "changeStreamV1"_sd;
+    std::string_view getName() const override {
+        return "changeStreamV1"sv;
     }
 
 private:
@@ -120,8 +122,8 @@ public:
         return currentHighWaterMark;
     }
 
-    StringData getName() const override {
-        return "recognizeControlEvents"_sd;
+    std::string_view getName() const override {
+        return "recognizeControlEvents"sv;
     }
 
 private:

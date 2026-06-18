@@ -37,6 +37,7 @@
 #include <string>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ExpressionHasherTest : public mongo::unittest::Test {
 public:
@@ -75,8 +76,8 @@ public:
         std::vector<boost::intrusive_ptr<Expression>> expressions{
             // Test different constants.
             constE(1),
-            constE("abc"_sd),
-            constE(""_sd),
+            constE("abc"sv),
+            constE(""sv),
             // Test arithmetic expressions.
             makeExpr<ExpressionAbs>(1),
             makeExpr<ExpressionAbs>(10),
@@ -86,7 +87,7 @@ public:
             // Test boolean function expressions
             makeExpr<ExpressionAllElementsTrue>(1),
             makeExpr<ExpressionAllElementsTrue>(200),
-            makeExpr<ExpressionAllElementsTrue>("hi"_sd),
+            makeExpr<ExpressionAllElementsTrue>("hi"sv),
             makeExpr<ExpressionAnd>(1),
             makeExpr<ExpressionAnd>(300),
             makeExpr<ExpressionAnyElementTrue>(1),
@@ -108,13 +109,13 @@ public:
             makeExpr<ExpressionBitOr>(1),
             makeExpr<ExpressionBitOr>(0),
             makeExpr<ExpressionBitXor>(1),
-            makeExpr<ExpressionBitXor>(""_sd),
+            makeExpr<ExpressionBitXor>(""sv),
             makeExpr<ExpressionBitNot>(1),
-            makeExpr<ExpressionBitNot>("o-o"_sd),
+            makeExpr<ExpressionBitNot>("o-o"sv),
             // Test comparator expressions.
-            ExpressionCompare::create(&ctx, ExpressionCompare::EQ, constE(1), constE("abc"_sd)),
-            ExpressionCompare::create(&ctx, ExpressionCompare::NE, constE(1), constE("abc"_sd)),
-            ExpressionCompare::create(&ctx, ExpressionCompare::EQ, constE("abc"_sd), constE(1)),
+            ExpressionCompare::create(&ctx, ExpressionCompare::EQ, constE(1), constE("abc"sv)),
+            ExpressionCompare::create(&ctx, ExpressionCompare::NE, constE(1), constE("abc"sv)),
+            ExpressionCompare::create(&ctx, ExpressionCompare::EQ, constE("abc"sv), constE(1)),
             ExpressionCompare::create(&ctx,
                                       ExpressionCompare::EQ,
                                       makeExprWithIterable<ExpressionAdd>(std::vector<int>{1, 5}),
@@ -151,8 +152,8 @@ public:
             // Test first expressions.
             makeExpr<ExpressionFirst>(1),
             makeExpr<ExpressionFirst>(0),
-            makeExpr<ExpressionFirst>(""_sd),
-            makeExpr<ExpressionFirst>("Hello"_sd),
+            makeExpr<ExpressionFirst>(""sv),
+            makeExpr<ExpressionFirst>("Hello"sv),
         };
         return expressions;
     }

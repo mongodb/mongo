@@ -117,6 +117,7 @@
 #include <algorithm>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
@@ -130,6 +131,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(removeRecipientDocFailpoint);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeCloning);
@@ -271,7 +273,7 @@ unsigned getMaxReplicationLagSecondsBeforeBuildingIndexes() {
 bool containsNonIdIndex(const std::vector<BSONObj>& indexSpecs) {
     for (const auto& indexSpec : indexSpecs) {
         BSONObj key = indexSpec.getObjectField("key");
-        if (key.nFields() > 1 || key.firstElementFieldName() != "_id"_sd) {
+        if (key.nFields() > 1 || key.firstElementFieldName() != "_id"sv) {
             return true;
         }
     }
@@ -896,7 +898,7 @@ void ReshardingRecipientService::RecipientStateMachine::
             _externalState->route(
                 opCtx.get(),
                 _metadata.getSourceNss(),
-                "validating shard key index for reshardCollection"_sd,
+                "validating shard key index for reshardCollection"sv,
                 [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                     shardkeyutil::validateShardKeyIsNotEncrypted(
                         opCtx,
@@ -914,7 +916,7 @@ void ReshardingRecipientService::RecipientStateMachine::
                         _metadata.getSourceNss(),
                         _metadata.getSourceUUID(),
                         *_cloneTimestamp,
-                        "loading collection options to validate shard key index for resharding."_sd);
+                        "loading collection options to validate shard key index for resharding."sv);
 
                     CollectionOptions collectionOptions = uassertStatusOK(
                         CollectionOptions::parse(collOptions, CollectionOptions::parseForStorage));
@@ -1234,7 +1236,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                     _metadata.getSourceNss(),
                     _metadata.getSourceUUID(),
                     *_cloneTimestamp,
-                    "loading collection options to build shard key index for resharding."_sd);
+                    "loading collection options to build shard key index for resharding."sv);
                 CollectionOptions collectionOptions = uassertStatusOK(
                     CollectionOptions::parse(collOptions, CollectionOptions::parseForStorage));
 
@@ -1255,7 +1257,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                 _metadata.getSourceNss(),
                 _metadata.getSourceUUID(),
                 *_cloneTimestamp,
-                "loading indexes to create indexes on temporary resharding collection"_sd);
+                "loading indexes to create indexes on temporary resharding collection"sv);
             bool shardKeyIndexAdded = false;
             auto shardKeyIndexSpec = behaviors.getShardKeyIndexSpec();
             if (shardKeyIndexSpec) {

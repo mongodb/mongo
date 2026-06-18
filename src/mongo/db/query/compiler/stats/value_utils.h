@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/modules.h"
@@ -37,6 +36,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -142,7 +142,7 @@ void sortValueVector(std::vector<SBEValue>& sortVector);
 /**
  * Convert a prefix of the input string (up to 8 characters) to a double.
  */
-double stringToDouble(StringData sd);
+double stringToDouble(std::string_view sd);
 
 /**
  * Treats the entire ObjectId as a string of 12 unsigned characters and applies the string-to-double

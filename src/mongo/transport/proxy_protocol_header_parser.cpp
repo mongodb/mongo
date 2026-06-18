@@ -34,6 +34,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -46,7 +47,6 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
 
@@ -54,14 +54,15 @@
 
 
 namespace mongo::transport {
+using namespace std::literals::string_view_literals;
 
 namespace {
-StringData parseToken(StringData& s, const char c) {
+std::string_view parseToken(std::string_view& s, const char c) {
     size_t pos = s.find(c);
     uassert(ErrorCodes::FailedToParse,
             fmt::format("Proxy Protocol Version 1 address string malformed: {}", s),
             pos != std::string::npos);
-    StringData result = s.substr(0, pos);
+    std::string_view result = s.substr(0, pos);
     s = s.substr(pos + 1);
     return result;
 }
@@ -76,8 +77,8 @@ bool isValidTLVType(uint8_t type) {
 
 namespace proxy_protocol_details {
 
-void validateIpv4Address(StringData addr) {
-    StringData buffer = addr;
+void validateIpv4Address(std::string_view addr) {
+    std::string_view buffer = addr;
     const NumberParser octetParser =
         NumberParser().skipWhitespace(false).base(10).allowTrailingText(false);
     try {
@@ -104,11 +105,11 @@ void validateIpv4Address(StringData addr) {
     }
 }
 
-void validateIpv6Address(StringData addr) {
-    static constexpr StringData doubleColon = "::"_sd;
+void validateIpv6Address(std::string_view addr) {
+    static constexpr std::string_view doubleColon = "::"sv;
 
-    auto validateHexadectets = [](StringData buffer) -> size_t {
-        auto validateHexadectet = [](StringData hexadectet) {
+    auto validateHexadectets = [](std::string_view buffer) -> size_t {
+        auto validateHexadectet = [](std::string_view hexadectet) {
             const NumberParser hexadectetParser =
                 NumberParser().skipWhitespace(false).base(16).allowTrailingText(false);
             unsigned value = 0;
@@ -182,15 +183,15 @@ void validateIpv6Address(StringData addr) {
 
 namespace {
 
-void parseTLVVectors(StringData buffer,
+void parseTLVVectors(std::string_view buffer,
                      std::vector<ProxiedSupplementaryDataEntry>& data,
                      boost::optional<ProxiedSSLData>& sslTlvs);
-void parseSubTLVVectors(StringData buffer, boost::optional<ProxiedSSLData>& sslTlvs);
+void parseSubTLVVectors(std::string_view buffer, boost::optional<ProxiedSSLData>& sslTlvs);
 
 // Interprets the first sizeof(T) bytes of data as a T and returns it, advancing the data cursor
 // by the same amount. Does not account for endianness of the data buffer.
 template <typename T>
-T extract(StringData& data) {
+T extract(std::string_view& data) {
     MONGO_STATIC_ASSERT(std::is_trivially_copyable_v<T>);
     static constexpr size_t numBytes = sizeof(T);
     if (data.size() < numBytes) {
@@ -204,7 +205,7 @@ T extract(StringData& data) {
     return result;
 }
 
-void parseSubTLVVectors(StringData buffer, boost::optional<ProxiedSSLData>& sslTlvs) {
+void parseSubTLVVectors(std::string_view buffer, boost::optional<ProxiedSSLData>& sslTlvs) {
     static constexpr size_t kSubTLVHeaderSize = 5;
     uassert(ErrorCodes::FailedToParse,
             "Proxy Protocol Version 2 sub-TLV header size too small",
@@ -219,7 +220,7 @@ void parseSubTLVVectors(StringData buffer, boost::optional<ProxiedSSLData>& sslT
 
 // Parses buffer to extract TLV vectors into tlvs and sslTlvs. This function assumes that buffer
 // only contains TLV vectors.
-void parseTLVVectors(StringData buffer,
+void parseTLVVectors(std::string_view buffer,
                      std::vector<ProxiedSupplementaryDataEntry>& tlvs,
                      boost::optional<ProxiedSSLData>& sslTlvs) {
     while (buffer.size()) {
@@ -259,15 +260,14 @@ void parseTLVVectors(StringData buffer,
     }
 }
 
-
-bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoints) {
+bool parseV1Buffer(std::string_view& buffer, boost::optional<ProxiedEndpoints>& endpoints) {
     buffer = buffer.substr(kProxyV1Signature.size());
     if (buffer.empty())
         return false;
 
     // Scan the buffer for a newline and prepare an output buffer which begins just past
     // the line.
-    static constexpr StringData crlf = "\x0D\x0A"_sd;
+    static constexpr std::string_view crlf = "\x0D\x0A"sv;
     const auto crlfPos = buffer.find(crlf);
 
     static constexpr size_t kMaximumV1HeaderSize = 107;
@@ -290,8 +290,8 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
     // Prepare a result buffer pointing to just after the crlf sequence.
     const auto resultBuffer = buffer.substr(crlfPos + crlf.size());
 
-    static constexpr StringData kTcp4Prefix = " TCP4 "_sd;
-    static constexpr StringData kTcp6Prefix = " TCP6 "_sd;
+    static constexpr std::string_view kTcp4Prefix = " TCP4 "sv;
+    static constexpr std::string_view kTcp6Prefix = " TCP6 "sv;
     int aFamily = AF_UNSPEC;
     if (buffer.starts_with(kTcp4Prefix)) {
         aFamily = AF_INET;
@@ -299,7 +299,7 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
     } else if (buffer.starts_with(kTcp6Prefix)) {
         aFamily = AF_INET6;
         buffer = buffer.substr(kTcp6Prefix.size());
-    } else if (buffer.starts_with(" UNKNOWN"_sd)) {
+    } else if (buffer.starts_with(" UNKNOWN"sv)) {
         buffer = resultBuffer;
         endpoints = {};
         return true;
@@ -310,8 +310,8 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
 
     // The remainder of the string should now tokenize into four substrings:
     // srcAddr dstAddr srcPort dstPort
-    const StringData srcAddr = parseToken(buffer, ' ');
-    const StringData dstAddr = parseToken(buffer, ' ');
+    const std::string_view srcAddr = parseToken(buffer, ' ');
+    const std::string_view dstAddr = parseToken(buffer, ' ');
 
     invariant(aFamily == AF_INET || aFamily == AF_INET6);
     if (aFamily == AF_INET) {
@@ -322,8 +322,8 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
         proxy_protocol_details::validateIpv6Address(dstAddr);
     }
 
-    const StringData srcPortStr = parseToken(buffer, ' ');
-    const StringData dstPortStr = parseToken(buffer, '\r');
+    const std::string_view srcPortStr = parseToken(buffer, ' ');
+    const std::string_view dstPortStr = parseToken(buffer, '\r');
 
     const NumberParser portParser =
         NumberParser().skipWhitespace(false).base(10).allowTrailingText(false);
@@ -354,8 +354,7 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
     }
 }
 
-
-bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isProxyUnixSock) {
+bool parseV2Buffer(std::string_view& buffer, ParserResults& results, bool isProxyUnixSock) {
     auto& endpoints = results.endpoints;
     buffer = buffer.substr(kProxyV2Signature.size());
     if (buffer.empty())
@@ -524,7 +523,8 @@ bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isProxyUnixS
 
 }  // namespace
 
-boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool isProxyUnixSock) {
+boost::optional<ParserResults> parseProxyProtocolHeader(std::string_view buffer,
+                                                        bool isProxyUnixSock) {
     // Check if the buffer presented is V1, V2, or neither.
     const size_t originalBufferSize = buffer.size();
 
@@ -553,7 +553,7 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool 
     }
 }
 
-bool maybeProxyProtocolHeader(StringData buffer) {
+bool maybeProxyProtocolHeader(std::string_view buffer) {
     return buffer.starts_with(kProxyV1Signature) || buffer.starts_with(kProxyV2Signature);
 }
 

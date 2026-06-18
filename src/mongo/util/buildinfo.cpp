@@ -35,6 +35,7 @@
 #include "mongo/util/version.h"
 
 #include <climits>
+#include <string_view>
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
@@ -47,23 +48,24 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 BuildInfoOpenSSL generateOpenSSLInfo(const VersionInfoInterface& info) {
     BuildInfoOpenSSL ssl;
 #ifdef MONGO_CONFIG_SSL
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
     ssl.setRunning(info.openSSLVersion());
-    ssl.setCompiled(StringData{OPENSSL_VERSION_TEXT});
+    ssl.setCompiled(std::string_view{OPENSSL_VERSION_TEXT});
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
-    ssl.setRunning("Windows SChannel"_sd);
+    ssl.setRunning("Windows SChannel"sv);
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
-    ssl.setRunning("Apple Secure Transport"_sd);
+    ssl.setRunning("Apple Secure Transport"sv);
 #else
 #error "Unknown SSL Provider"
 #endif  // MONGO_CONFIG_SSL_PROVIDER
 #else
-    ssl.setRunning("disabled"_sd);
-    ssl.setCompiled("disabled"_sd);
+    ssl.setRunning("disabled"sv);
+    ssl.setCompiled("disabled"sv);
 #endif
     return ssl;
 }
@@ -140,7 +142,7 @@ BuildInfo getBuildInfo() {
     reply.setModules(info.modules());
     reply.setAllocator(info.allocator());
     reply.setJavascriptEngine(info.jsEngine());
-    reply.setSysinfo("deprecated"_sd);
+    reply.setSysinfo("deprecated"sv);
     reply.setOpenssl(generateOpenSSLInfo(info));
     reply.setBuildEnvironment(generateBuildEnvironment(info));
     reply.setBits(static_cast<int>(sizeof(void*)) * CHAR_BIT);

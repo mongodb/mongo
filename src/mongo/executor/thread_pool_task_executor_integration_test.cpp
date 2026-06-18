@@ -30,7 +30,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -76,6 +75,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -85,9 +85,10 @@
 namespace mongo {
 namespace executor {
 namespace {
-constexpr auto kNetworkInterfaceInstanceName = "TaskExecutorTest"_sd;
-constexpr auto kNetworkInterfaceTestInstanceName = "TaskExecutorTestSetup"_sd;
-constexpr auto kNetworkInterfaceGRPCInstanceName = "FixtureNet"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kNetworkInterfaceInstanceName = "TaskExecutorTest"sv;
+constexpr auto kNetworkInterfaceTestInstanceName = "TaskExecutorTestSetup"sv;
+constexpr auto kNetworkInterfaceGRPCInstanceName = "FixtureNet"sv;
 
 class TaskExecutorFixture : public ExecutorIntegrationTestFixture {
 public:
@@ -101,7 +102,7 @@ public:
         _testExecutor->startup();
     };
 
-    std::shared_ptr<ThreadPoolTaskExecutor> makeExecutor(StringData name) {
+    std::shared_ptr<ThreadPoolTaskExecutor> makeExecutor(std::string_view name) {
         std::shared_ptr<NetworkInterface> net;
         if (!unittest::shouldUseGRPCEgress()) {
             ConnectionPool::Options cpOptions{};

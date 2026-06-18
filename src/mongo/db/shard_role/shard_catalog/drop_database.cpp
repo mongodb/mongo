@@ -31,7 +31,6 @@
 #include "mongo/db/shard_role/shard_catalog/drop_database.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"

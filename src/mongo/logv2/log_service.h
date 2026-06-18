@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC logv2 {
@@ -68,7 +69,7 @@ void setLogService(LogService logService);
 LogService getLogService();
 
 /** Returns full name. */
-inline StringData toStringData(LogService logService) {
+inline std::string_view toStringData(LogService logService) {
     switch (logService) {
         case LogService::unknown:
             return "unknown";
@@ -87,7 +88,7 @@ inline StringData toStringData(LogService logService) {
 /**
  * Returns short name suitable for inclusion in formatted log message (just the first character).
  */
-inline StringData getNameForLog(LogService logService) {
+inline std::string_view getNameForLog(LogService logService) {
     switch (logService) {
         // whenever we don't have a logService, emit "-"
         case LogService::unknown:

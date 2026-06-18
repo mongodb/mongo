@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/stats/stats_cache_loader.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/namespace_string.h"

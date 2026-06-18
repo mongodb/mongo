@@ -47,6 +47,7 @@
 
 #include <iterator>
 #include <memory>
+#include <string_view>
 
 #include <benchmark/benchmark.h>
 #include <boost/optional/optional.hpp>
@@ -66,7 +67,7 @@
 namespace mongo {
 namespace {
 
-IndexBounds makeFullScanIndexBound(StringData fieldName) {
+IndexBounds makeFullScanIndexBound(std::string_view fieldName) {
     IndexBounds bounds;
     bounds.isSimpleRange = true;
     OrderedIntervalList oil(std::string{fieldName});
@@ -272,7 +273,7 @@ public:
     }
 
     static auto generateUniformChunkMap(const std::vector<BSONObj>& dataSet,
-                                        StringData fieldName,
+                                        std::string_view fieldName,
                                         int chunkSize,
                                         bool onCurrentShard) {
         BSONObjSet sortedValues = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
@@ -299,7 +300,7 @@ public:
      * Returns the smallest possible chunk map, [MinKey, MaxKey], such that the ownership of the
      * current chunk is as specified by 'onCurrentShard'.
      */
-    static auto generateMinimalChunkMap(StringData fieldName, bool onCurrentShard) {
+    static auto generateMinimalChunkMap(std::string_view fieldName, bool onCurrentShard) {
         return generateUniformChunkMap(
             std::vector<BSONObj>(), fieldName, 1 /* doesn't matter */, onCurrentShard);
     }
@@ -331,7 +332,7 @@ public:
         }
     }
 
-    void runBenchmark(StringData fieldName,
+    void runBenchmark(std::string_view fieldName,
                       const std::vector<BSONObj>& dataSet,
                       OrphanDistribution dist,
                       ShardFilteringStrategy strategy,

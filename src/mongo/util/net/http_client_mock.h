@@ -34,6 +34,7 @@
 #include "mongo/util/net/http_client.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace mongo {
 
@@ -48,7 +49,7 @@ public:
     void setHeaders(const std::vector<std::string>& headers) final {}
 
     HttpReply request(HttpMethod method,
-                      StringData url,
+                      std::string_view url,
                       ConstDataRange data = {nullptr, 0}) const final;
 
     struct Request {

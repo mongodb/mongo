@@ -52,8 +52,11 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
 
+#include <string_view>
+
 namespace mongo::replicated_fast_count {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class ReadAndIncrementSizeCountsTest : public CatalogTestFixture {};
 
@@ -1046,19 +1049,19 @@ protected:
                 innerOpsArray.append(opBuilder.obj());
                 continue;
             }
-            StringData opStr;
+            std::string_view opStr;
             switch (spec.opType) {
                 case repl::OpTypeEnum::kInsert:
-                    opStr = "i"_sd;
+                    opStr = "i"sv;
                     break;
                 case repl::OpTypeEnum::kUpdate:
-                    opStr = "u"_sd;
+                    opStr = "u"sv;
                     break;
                 case repl::OpTypeEnum::kDelete:
-                    opStr = "d"_sd;
+                    opStr = "d"sv;
                     break;
                 default:
-                    opStr = "n"_sd;
+                    opStr = "n"sv;
                     break;
             }
             BSONObjBuilder opBuilder;

@@ -50,6 +50,7 @@
 
 #include <cstdlib>
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -87,9 +88,9 @@ void DDLLockManager::setRecoverable(Recoverable* recoverable) {
 
 void DDLLockManager::_lock(OperationContext* opCtx,
                            Locker* locker,
-                           StringData ns,
+                           std::string_view ns,
                            const ResourceId& resId,
-                           StringData reason,
+                           std::string_view reason,
                            LockMode mode,
                            Date_t deadline,
                            bool waitForRecovery) {
@@ -173,8 +174,11 @@ void DDLLockManager::_lock(OperationContext* opCtx,
     LOGV2(6855301, "Acquired DDL lock", attrs);
 }
 
-void DDLLockManager::_unlock(
-    Locker* locker, StringData ns, const ResourceId& resId, StringData reason, LockMode mode) {
+void DDLLockManager::_unlock(Locker* locker,
+                             std::string_view ns,
+                             const ResourceId& resId,
+                             std::string_view reason,
+                             LockMode mode) {
     dassert(locker);
     locker->unlock(resId);
 
@@ -187,7 +191,7 @@ void DDLLockManager::_unlock(
           "mode"_attr = modeName(mode));
 }
 
-void DDLLockManager::_registerResourceName(ResourceId resId, StringData resName) {
+void DDLLockManager::_registerResourceName(ResourceId resId, std::string_view resName) {
     std::lock_guard<std::mutex> guard{_mutex};
     const auto currentNumHolders = _numHoldersPerResource[resId]++;
     if (currentNumHolders == 0) {
@@ -195,7 +199,8 @@ void DDLLockManager::_registerResourceName(ResourceId resId, StringData resName)
     }
 }
 
-void DDLLockManager::_unregisterResourceNameIfNoLongerNeeded(ResourceId resId, StringData resName) {
+void DDLLockManager::_unregisterResourceNameIfNoLongerNeeded(ResourceId resId,
+                                                             std::string_view resName) {
     std::lock_guard<std::mutex> guard{_mutex};
     const auto currentNumHolders = --_numHoldersPerResource[resId];
     if (currentNumHolders <= 0) {
@@ -208,7 +213,7 @@ void DDLLockManager::_unregisterResourceNameIfNoLongerNeeded(ResourceId resId, S
 DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(
     OperationContext* opCtx,
     const DatabaseName& db,
-    StringData reason,
+    std::string_view reason,
     LockMode mode,
     boost::optional<BackoffStrategy&> backoffStrategy) {
     if (backoffStrategy) {
@@ -221,7 +226,7 @@ DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(
 
 bool DDLLockManager::ScopedDatabaseDDLLock::_tryLock(OperationContext* opCtx,
                                                      const DatabaseName& db,
-                                                     StringData reason,
+                                                     std::string_view reason,
                                                      LockMode mode,
                                                      BackoffStrategy& backoffStrategy) {
     return backoffStrategy.execute(
@@ -241,7 +246,7 @@ bool DDLLockManager::ScopedDatabaseDDLLock::_tryLock(OperationContext* opCtx,
 
 void DDLLockManager::ScopedDatabaseDDLLock::_lock(OperationContext* opCtx,
                                                   const DatabaseName& db,
-                                                  StringData reason,
+                                                  std::string_view reason,
                                                   LockMode mode,
                                                   boost::optional<Milliseconds> timeout) {
     try {
@@ -265,7 +270,7 @@ void DDLLockManager::ScopedDatabaseDDLLock::_lock(OperationContext* opCtx,
 DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(
     OperationContext* opCtx,
     const NamespaceString& ns,
-    StringData reason,
+    std::string_view reason,
     LockMode mode,
     boost::optional<BackoffStrategy&> backoffStrategy) {
     if (backoffStrategy) {
@@ -278,7 +283,7 @@ DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(
 
 bool DDLLockManager::ScopedCollectionDDLLock::_tryLock(OperationContext* opCtx,
                                                        const NamespaceString& ns,
-                                                       StringData reason,
+                                                       std::string_view reason,
                                                        LockMode mode,
                                                        BackoffStrategy& backoffStrategy) {
     return backoffStrategy.execute(
@@ -298,7 +303,7 @@ bool DDLLockManager::ScopedCollectionDDLLock::_tryLock(OperationContext* opCtx,
 
 void DDLLockManager::ScopedCollectionDDLLock::_lock(OperationContext* opCtx,
                                                     const NamespaceString& ns,
-                                                    StringData reason,
+                                                    std::string_view reason,
                                                     LockMode mode,
                                                     boost::optional<Milliseconds> timeout) {
     try {
@@ -335,9 +340,9 @@ void DDLLockManager::ScopedCollectionDDLLock::_lock(OperationContext* opCtx,
 
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      Locker* locker,
-                                                     StringData resName,
+                                                     std::string_view resName,
                                                      const ResourceId& resId,
-                                                     StringData reason,
+                                                     std::string_view reason,
                                                      LockMode mode,
                                                      bool waitForRecovery,
                                                      Milliseconds timeout)
@@ -364,7 +369,7 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      Locker* locker,
                                                      const NamespaceString& nss,
-                                                     StringData reason,
+                                                     std::string_view reason,
                                                      LockMode mode,
                                                      bool waitForRecovery,
                                                      boost::optional<Milliseconds> timeout)
@@ -380,7 +385,7 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      Locker* locker,
                                                      const DatabaseName& db,
-                                                     StringData reason,
+                                                     std::string_view reason,
                                                      LockMode mode,
                                                      bool waitForRecovery,
                                                      boost::optional<Milliseconds> timeout)

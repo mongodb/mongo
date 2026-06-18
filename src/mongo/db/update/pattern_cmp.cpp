@@ -30,7 +30,6 @@
 #include "mongo/db/update/pattern_cmp.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/exec/document_value/document.h"

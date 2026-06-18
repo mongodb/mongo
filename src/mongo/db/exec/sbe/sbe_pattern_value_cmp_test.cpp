@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/sbe_pattern_value_cmp.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
@@ -41,10 +40,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 namespace mongo::sbe::value {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class ObjectArray : public mongo::unittest::Test {
 public:
@@ -208,9 +209,9 @@ TEST_F(ObjectArray, SortRespectsCollation) {
 
 TEST_F(ObjectArray, SortSingleRespectsCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    addValue(mongo::Value("abg"_sd));
-    addValue(mongo::Value("aca"_sd));
-    addValue(mongo::Value("adc"_sd));
+    addValue(mongo::Value("abg"sv));
+    addValue(mongo::Value("aca"sv));
+    addValue(mongo::Value("adc"sv));
 
     sortArray(fromjson("{'': 1}"), &collator);
 

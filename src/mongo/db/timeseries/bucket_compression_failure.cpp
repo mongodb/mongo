@@ -32,13 +32,16 @@
 #include "mongo/base/init.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
+
 namespace mongo::timeseries {
 namespace {
+using namespace std::literals::string_view_literals;
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(BucketCompressionFailure);
 
-static constexpr StringData kUUIDFieldName = "collectionUUID"_sd;
-static constexpr StringData kBucketIdFieldName = "bucketId"_sd;
-static constexpr StringData kKeySignatureFieldName = "keySignature"_sd;
+static constexpr std::string_view kUUIDFieldName = "collectionUUID"sv;
+static constexpr std::string_view kBucketIdFieldName = "bucketId"sv;
+static constexpr std::string_view kKeySignatureFieldName = "keySignature"sv;
 }  // namespace
 
 BucketCompressionFailure::BucketCompressionFailure(const UUID& collectionUUID,

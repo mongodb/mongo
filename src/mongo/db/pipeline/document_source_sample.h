@@ -44,6 +44,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -74,9 +75,9 @@ public:
 
 class DocumentSourceSample final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$sample"_sd;
+    static constexpr std::string_view kStageName = "$sample"_sd;
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

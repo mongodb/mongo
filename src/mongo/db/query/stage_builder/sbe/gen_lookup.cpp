@@ -28,7 +28,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/curop.h"

@@ -50,7 +50,10 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::ce {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -615,7 +618,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
 
     {  // All documents in the collection satisfy the predicate.
         auto operand = BSON("$lt" << 100);
-        LTMatchExpression lt("a"_sd, operand["$lt"]);
+        LTMatchExpression lt("a"sv, operand["$lt"]);
         auto cardinalityEstimate = samplingEstimator.estimateCardinality(&lt);
 
         CardinalityEstimate expectedEstimate = samplingEstimator.getCollCard();
@@ -624,7 +627,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
 
     {  // Predicate with 50% selectivity.
         auto operand = BSON("$lt" << 50);
-        LTMatchExpression lt("a"_sd, operand["$lt"]);
+        LTMatchExpression lt("a"sv, operand["$lt"]);
         auto cardinalityEstimate = samplingEstimator.estimateCardinality(&lt);
 
         samplingEstimator.assertEstimateInConfidenceInterval(cardinalityEstimate, 0.5 * card);
@@ -632,7 +635,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
 
     {  // Predicate with 20% selectivity.
         auto operand = BSON("$gte" << 80);
-        GTEMatchExpression gte("a"_sd, operand["$gte"]);
+        GTEMatchExpression gte("a"sv, operand["$gte"]);
         auto cardinalityEstimate = samplingEstimator.estimateCardinality(&gte);
 
         samplingEstimator.assertEstimateInConfidenceInterval(cardinalityEstimate, 0.2 * card);
@@ -640,7 +643,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
 
     {  // Equality predicate with 10% selectivity.
         auto operand = BSON("$eq" << 5);
-        EqualityMatchExpression eq("b"_sd, operand["$eq"]);
+        EqualityMatchExpression eq("b"sv, operand["$eq"]);
         auto cardinalityEstimate = samplingEstimator.estimateCardinality(&eq);
 
         samplingEstimator.assertEstimateInConfidenceInterval(cardinalityEstimate, 0.1 * card);
@@ -681,7 +684,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
 
     {  // All documents in the collection satisfy the predicate.
         auto operand = BSON("$lt" << 100);
-        LTMatchExpression lt("a"_sd, operand["$lt"]);
+        LTMatchExpression lt("a"sv, operand["$lt"]);
         auto cardinalityEstimate = samplingEstimator.estimateCardinality(&lt);
         auto cardinalityEstimateWithProjection =
             samplingEstimatorWithProjection.estimateCardinality(&lt);
@@ -693,7 +696,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
 
     {  // Predicate with 50% selectivity.
         auto operand = BSON("$lt" << 50);
-        LTMatchExpression lt("a"_sd, operand["$lt"]);
+        LTMatchExpression lt("a"sv, operand["$lt"]);
         auto cardinalityEstimate = samplingEstimator.estimateCardinality(&lt);
         auto cardinalityEstimateWithProjection =
             samplingEstimatorWithProjection.estimateCardinality(&lt);
@@ -705,7 +708,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
 
     {  // Predicate with 20% selectivity.
         auto operand = BSON("$gte" << 80);
-        GTEMatchExpression gte("a"_sd, operand["$gte"]);
+        GTEMatchExpression gte("a"sv, operand["$gte"]);
         auto cardinalityEstimate = samplingEstimator.estimateCardinality(&gte);
         auto cardinalityEstimateWithProjection =
             samplingEstimatorWithProjection.estimateCardinality(&gte);
@@ -717,7 +720,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
 
     {  // Equality predicate with 10% selectivity.
         auto operand = BSON("$eq" << 5);
-        EqualityMatchExpression eq("b"_sd, operand["$eq"]);
+        EqualityMatchExpression eq("b"sv, operand["$eq"]);
         auto cardinalityEstimate = samplingEstimator.estimateCardinality(&eq);
         auto cardinalityEstimateWithProjection =
             samplingEstimatorWithProjection.estimateCardinality(&eq);
@@ -752,8 +755,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
         auto operand1 = BSON("$gte" << 40);
         auto operand2 = BSON("$lt" << 60);
 
-        auto pred1 = std::make_unique<GTEMatchExpression>("a"_sd, operand1["$gte"]);
-        auto pred2 = std::make_unique<LTMatchExpression>("a"_sd, operand2["$lt"]);
+        auto pred1 = std::make_unique<GTEMatchExpression>("a"sv, operand1["$gte"]);
+        auto pred2 = std::make_unique<LTMatchExpression>("a"sv, operand2["$lt"]);
 
         auto andExpr = AndMatchExpression{};
         andExpr.add(std::move(pred1));
@@ -767,8 +770,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
         auto operand1 = BSON("$lt" << 40);
         auto operand2 = BSON("$eq" << 5);
 
-        auto pred1 = std::make_unique<LTMatchExpression>("a"_sd, operand1["$lt"]);
-        auto pred2 = std::make_unique<EqualityMatchExpression>("b"_sd, operand2["$eq"]);
+        auto pred1 = std::make_unique<LTMatchExpression>("a"sv, operand1["$lt"]);
+        auto pred2 = std::make_unique<EqualityMatchExpression>("b"sv, operand2["$eq"]);
 
         auto andExpr = AndMatchExpression{};
         andExpr.add(std::move(pred1));
@@ -782,8 +785,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
         auto operand1 = BSON("$lt" << 20);
         auto operand2 = BSON("$eq" << 5);
 
-        auto pred1 = std::make_unique<LTMatchExpression>("a"_sd, operand1["$lt"]);
-        auto pred2 = std::make_unique<EqualityMatchExpression>("b"_sd, operand2["$eq"]);
+        auto pred1 = std::make_unique<LTMatchExpression>("a"sv, operand1["$lt"]);
+        auto pred2 = std::make_unique<EqualityMatchExpression>("b"sv, operand2["$eq"]);
 
         auto orExpr = OrMatchExpression{};
         orExpr.add(std::move(pred1));
@@ -797,8 +800,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
         auto operand1 = BSON("$eq" << 3);
         auto operand2 = BSON("$eq" << 5);
 
-        auto pred1 = std::make_unique<EqualityMatchExpression>("b"_sd, operand1["$eq"]);
-        auto pred2 = std::make_unique<EqualityMatchExpression>("b"_sd, operand2["$eq"]);
+        auto pred1 = std::make_unique<EqualityMatchExpression>("b"sv, operand1["$eq"]);
+        auto pred2 = std::make_unique<EqualityMatchExpression>("b"sv, operand2["$eq"]);
 
         auto orExpr = OrMatchExpression{};
         orExpr.add(std::move(pred1));
@@ -830,14 +833,14 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto operand1 = BSON("$lt" << 30);
-    LTMatchExpression lt("a"_sd, operand1["$lt"]);
+    LTMatchExpression lt("a"sv, operand1["$lt"]);
     auto operand2 = BSON("$gt" << 8);
-    GTMatchExpression gt("b"_sd, operand2["$gt"]);
+    GTMatchExpression gt("b"sv, operand2["$gt"]);
 
     auto operand3 = BSON("$lte" << 12);
     auto operand4 = BSON("$eq" << 99);
-    auto pred1 = std::make_unique<LTEMatchExpression>("a"_sd, operand3["$lte"]);
-    auto pred2 = std::make_unique<EqualityMatchExpression>("a"_sd, operand4["$eq"]);
+    auto pred1 = std::make_unique<LTEMatchExpression>("a"sv, operand3["$lte"]);
+    auto pred2 = std::make_unique<EqualityMatchExpression>("a"sv, operand4["$eq"]);
     auto orExpr = OrMatchExpression{};
     orExpr.add(std::move(pred1));
     orExpr.add(std::move(pred2));
@@ -895,7 +898,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
     // 1 doc that does not have field "nil".
     auto expectedEstimate = samplingEstimator.getCollCard() - cost_based_ranker::oneCE;
 
-    ExistsMatchExpression exists("nil"_sd);
+    ExistsMatchExpression exists("nil"sv);
 
     ASSERT_TRUE(samplingEstimator.estimateCardinality(&exists) == expectedEstimate);
     ASSERT_TRUE(samplingEstimatorWithProjection.estimateCardinality(&exists) == expectedEstimate);
@@ -1138,7 +1141,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto operand1 = BSON("$lt" << 20);
-    LTMatchExpression lt("a"_sd, operand1["$lt"]);
+    LTMatchExpression lt("a"sv, operand1["$lt"]);
 
     OrderedIntervalList list("b");
     list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
@@ -1229,7 +1232,7 @@ TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionDuplicateF
 
     // Duplicate field names should not be included.
     ASSERT_EQUALS(topLevelFields.size(), 1);
-    ASSERT_EQUALS(*topLevelFields.begin(), "a"_sd);
+    ASSERT_EQUALS(*topLevelFields.begin(), "a"sv);
 }
 
 TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionNestedAndOr) {
@@ -1340,7 +1343,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     samplingEstimator.generateSample(StringSet{"a"});
 
     auto operand = BSON("$eq" << 5);
-    EqualityMatchExpression eq("b"_sd, operand["$eq"]);
+    EqualityMatchExpression eq("b"sv, operand["$eq"]);
     samplingEstimator.estimateCardinality(&eq);
 }
 
@@ -1365,7 +1368,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     samplingEstimator.generateSample(StringSet{"a"});
 
     auto operand = BSON("$eq" << 5);
-    EqualityMatchExpression eq("b"_sd, operand["$eq"]);
+    EqualityMatchExpression eq("b"sv, operand["$eq"]);
     samplingEstimator.estimateCardinality(std::vector<const MatchExpression*>{&eq});
 }
 
@@ -1389,7 +1392,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(StringSet{"a"});
     auto operand = BSON("$eq" << 5);
-    EqualityMatchExpression eq("b"_sd, operand["$eq"]);
+    EqualityMatchExpression eq("b"sv, operand["$eq"]);
     OrderedIntervalList list("b");
     list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 0 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
@@ -1881,7 +1884,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityAndOfEqualitiesFastPath) {
 
     // Helper: build AND(EQ(path, v0), EQ(path, v1), ...) and return the CE.
     // We keep the operand BSONObjs alive for the duration of the estimate call.
-    auto estimateAll = [&](StringData path, std::vector<int> vals) -> double {
+    auto estimateAll = [&](std::string_view path, std::vector<int> vals) -> double {
         std::vector<BSONObj> operands;
         std::vector<std::unique_ptr<EqualityMatchExpression>> eqs;
         std::vector<std::unique_ptr<MatchExpression>> children;
@@ -1895,19 +1898,19 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityAndOfEqualitiesFastPath) {
     };
 
     // $all:[1,2] -> only docs 0..49 match (50 docs).
-    ASSERT_EQ(estimateAll("f0"_sd, {1, 2}), 50.0);
+    ASSERT_EQ(estimateAll("f0"sv, {1, 2}), 50.0);
 
     // $all:[1,2,3] -> only docs 0..49 match (50 docs).
-    ASSERT_EQ(estimateAll("f0"_sd, {1, 2, 3}), 50.0);
+    ASSERT_EQ(estimateAll("f0"sv, {1, 2, 3}), 50.0);
 
     // $all:[1,3] -> docs 0..74 match (75 docs: both [1,2,3] and [1,3,5] contain 1 and 3).
-    ASSERT_EQ(estimateAll("f0"_sd, {1, 3}), 75.0);
+    ASSERT_EQ(estimateAll("f0"sv, {1, 3}), 75.0);
 
     // $all:[2] -> docs 0..49 and 75..99 match (75 docs: [1,2,3] and [2,4,6] contain 2).
-    ASSERT_EQ(estimateAll("f0"_sd, {2}), 75.0);
+    ASSERT_EQ(estimateAll("f0"sv, {2}), 75.0);
 
     // $all:[1,2,4] -> no docs match (0 docs).
-    ASSERT_EQ(estimateAll("f0"_sd, {1, 2, 4}), 0.0);
+    ASSERT_EQ(estimateAll("f0"sv, {1, 2, 4}), 0.0);
 }
 
 TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
@@ -1938,8 +1941,8 @@ TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
     {
         auto op1 = BSON("$eq" << 10);
         auto op2 = BSON("$eq" << 20);
-        auto eq1 = std::make_unique<EqualityMatchExpression>("arr"_sd, op1["$eq"]);
-        auto eq2 = std::make_unique<EqualityMatchExpression>("arr"_sd, op2["$eq"]);
+        auto eq1 = std::make_unique<EqualityMatchExpression>("arr"sv, op1["$eq"]);
+        auto eq2 = std::make_unique<EqualityMatchExpression>("arr"sv, op2["$eq"]);
         AndMatchExpression andExpr;
         andExpr.add(std::move(eq1));
         andExpr.add(std::move(eq2));
@@ -1959,8 +1962,8 @@ TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
     {
         auto op1 = BSON("$eq" << 10);
         auto op2 = BSON("$eq" << 60);
-        auto eq1 = std::make_unique<EqualityMatchExpression>("arr"_sd, op1["$eq"]);
-        auto eq2 = std::make_unique<EqualityMatchExpression>("arr"_sd, op2["$eq"]);
+        auto eq1 = std::make_unique<EqualityMatchExpression>("arr"sv, op1["$eq"]);
+        auto eq2 = std::make_unique<EqualityMatchExpression>("arr"sv, op2["$eq"]);
         AndMatchExpression andExpr;
         andExpr.add(std::move(eq1));
         andExpr.add(std::move(eq2));
@@ -2017,9 +2020,9 @@ TEST_F(SamplingEstimatorTest, FastPathBailsOutWithNonEqChildInMiddle) {
     auto opGt = BSON("x" << 0);
     auto opEq2 = BSON("x" << 2);
     AndMatchExpression andExpr;
-    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq1["x"]));
-    andExpr.add(std::make_unique<GTMatchExpression>("f0"_sd, opGt["x"]));
-    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq2["x"]));
+    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"sv, opEq1["x"]));
+    andExpr.add(std::make_unique<GTMatchExpression>("f0"sv, opGt["x"]));
+    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"sv, opEq2["x"]));
 
     // Expected: 50 docs (f0=[1,2,3] satisfies both equalities and the GT predicate).
     auto ce = samplingEstimator.estimateCardinality(&andExpr).toDouble();
@@ -2066,9 +2069,9 @@ TEST_F(SamplingEstimatorTest, FastPathBailsOutWithDifferentPathEqChildInMiddle) 
     auto opOther = BSON("x" << 5);
     auto opEq2 = BSON("x" << 2);
     AndMatchExpression andExpr;
-    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq1["x"]));
-    andExpr.add(std::make_unique<EqualityMatchExpression>("other"_sd, opOther["x"]));
-    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq2["x"]));
+    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"sv, opEq1["x"]));
+    andExpr.add(std::make_unique<EqualityMatchExpression>("other"sv, opOther["x"]));
+    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"sv, opEq2["x"]));
 
     // Expected: 50 docs (f0=[1,2,3] and other=5 for docs 0..49).
     auto ce = samplingEstimator.estimateCardinality(&andExpr).toDouble();

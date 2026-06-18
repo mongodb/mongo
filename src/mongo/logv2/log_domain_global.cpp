@@ -31,6 +31,7 @@
 
 #include <cstdint>
 #include <iosfwd>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -112,7 +113,9 @@ struct LogDomainGlobal::Impl {
 
     Impl(LogDomainGlobal& parent);
     Status configure(LogDomainGlobal::ConfigurationOptions const& options);
-    Status rotate(bool rename, StringData renameSuffix, std::function<void(Status)> onMinorError);
+    Status rotate(bool rename,
+                  std::string_view renameSuffix,
+                  std::function<void(Status)> onMinorError);
 
     const ConfigurationOptions& config() const;
 
@@ -294,7 +297,7 @@ const LogDomainGlobal::ConfigurationOptions& LogDomainGlobal::Impl::config() con
 }
 
 Status LogDomainGlobal::Impl::rotate(bool rename,
-                                     StringData renameSuffix,
+                                     std::string_view renameSuffix,
                                      std::function<void(Status)> onMinorError) {
     if (!_rotatableFileSink)
         return Status::OK();
@@ -360,7 +363,7 @@ const LogDomainGlobal::ConfigurationOptions& LogDomainGlobal::config() const {
 }
 
 Status LogDomainGlobal::rotate(bool rename,
-                               StringData renameSuffix,
+                               std::string_view renameSuffix,
                                std::function<void(Status)> onMinorError) {
     return _impl->rotate(rename, renameSuffix, onMinorError);
 }

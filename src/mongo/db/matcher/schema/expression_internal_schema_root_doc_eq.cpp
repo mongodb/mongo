@@ -31,9 +31,11 @@
 
 #include "mongo/bson/util/builder.h"
 
+#include <string_view>
+
 namespace mongo {
 
-constexpr StringData InternalSchemaRootDocEqMatchExpression::kName;
+constexpr std::string_view InternalSchemaRootDocEqMatchExpression::kName;
 
 void InternalSchemaRootDocEqMatchExpression::debugString(StringBuilder& debug,
                                                          int indentationLevel) const {

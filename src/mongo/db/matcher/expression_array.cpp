@@ -36,6 +36,8 @@
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -64,7 +66,7 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
 // -------
 
 ElemMatchObjectMatchExpression::ElemMatchObjectMatchExpression(
-    boost::optional<StringData> path,
+    boost::optional<std::string_view> path,
     std::unique_ptr<MatchExpression> sub,
     clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_OBJECT, path, std::move(annotation)),
@@ -88,14 +90,14 @@ void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(
 // -------
 
 ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
-    boost::optional<StringData> path,
+    boost::optional<std::string_view> path,
     std::unique_ptr<MatchExpression> sub,
     clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)),
       _subs(makeVector(std::move(sub))) {}
 
 ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
-    boost::optional<StringData> path, clonable_ptr<ErrorAnnotation> annotation)
+    boost::optional<std::string_view> path, clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)) {}
 
 void ElemMatchValueMatchExpression::add(std::unique_ptr<MatchExpression> sub) {
@@ -125,7 +127,7 @@ void ElemMatchValueMatchExpression::appendSerializedRightHandSide(
 
 // ---------
 
-SizeMatchExpression::SizeMatchExpression(boost::optional<StringData> path,
+SizeMatchExpression::SizeMatchExpression(boost::optional<std::string_view> path,
                                          int size,
                                          clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(SIZE, path, std::move(annotation)), _size(size) {}

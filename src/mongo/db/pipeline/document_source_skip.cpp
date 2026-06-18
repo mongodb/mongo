@@ -42,6 +42,7 @@
 #include <iterator>
 #include <limits>
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -59,7 +60,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(skip, DocumentSourceSkip, Ski
 
 ALLOCATE_DOCUMENT_SOURCE_ID(skip, DocumentSourceSkip::id)
 
-constexpr StringData DocumentSourceSkip::kStageName;
+constexpr std::string_view DocumentSourceSkip::kStageName;
 
 Value DocumentSourceSkip::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << opts.serializeLiteral(_nToSkip)));

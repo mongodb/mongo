@@ -40,7 +40,10 @@
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamUnwindTransactionToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
@@ -70,8 +73,7 @@ std::unique_ptr<MatchExpression> buildEndOfTransactionFilter(
     }
 
     auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
-    return std::make_unique<RegexMatchExpression>(
-        "o2.endOfTransaction"_sd, nsRegex, "" /*options*/);
+    return std::make_unique<RegexMatchExpression>("o2.endOfTransaction"sv, nsRegex, "" /*options*/);
 }
 }  // namespace change_stream_filter
 
@@ -82,7 +84,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamUnwindTransaction,
                            documentSourceChangeStreamUnwindTransactionToStageFn)
 
 ChangeStreamUnwindTransactionStage::ChangeStreamUnwindTransactionStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     BSONObj filter,
     std::shared_ptr<MatchExpression> expression)
@@ -143,12 +145,12 @@ bool ChangeStreamUnwindTransactionStage::_isTransactionOplogEntry(const Document
         return false;
     }
 
-    auto commandVal = doc["o"_sd];
-    if (commandVal["applyOps"_sd].missing() && commandVal["commitTransaction"_sd].missing()) {
+    auto commandVal = doc["o"sv];
+    if (commandVal["applyOps"sv].missing() && commandVal["commitTransaction"sv].missing()) {
         // We should never see an "abortTransaction" command at this point.
         tassert(5543802,
-                str::stream() << "Unexpected op at " << doc["ts"_sd].getTimestamp().toString(),
-                commandVal["abortTransaction"_sd].missing());
+                str::stream() << "Unexpected op at " << doc["ts"sv].getTimestamp().toString(),
+                commandVal["abortTransaction"sv].missing());
         return false;
     }
 
@@ -203,8 +205,8 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
         wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::date);
     _wallTime = wallTime.getDate();
 
-    auto commandObj = input["o"_sd].getDocument();
-    Value applyOps = commandObj["applyOps"_sd];
+    auto commandObj = input["o"sv].getDocument();
+    Value applyOps = commandObj["applyOps"sv];
 
     if (!applyOps.missing()) {
         // We found an applyOps that implicitly commits a transaction. We include it in the
@@ -221,7 +223,7 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
         // the transaction, but this entry does not have any updates in it, so we do not include
         // it in the '_txnOplogEntries' stack.
         tassert(5543803,
-                str::stream() << "Unexpected op at " << input["ts"_sd].getTimestamp().toString(),
+                str::stream() << "Unexpected op at " << input["ts"sv].getTimestamp().toString(),
                 !commandObj["commitTransaction"].missing());
 
         if (auto commitTimestamp = commandObj["commitTimestamp"]; !commitTimestamp.missing()) {
@@ -332,7 +334,7 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::getNextTransactionOp(
 
 void ChangeStreamUnwindTransactionStage::TransactionOpIterator::
     _assertExpectedTransactionEventFormat(const Document& doc) const {
-    Value op = doc["op"_sd];
+    Value op = doc["op"sv];
     tassert(5543808,
             str::stream() << "Unexpected format for entry within a transaction oplog entry: "
                              "'op' field was type "
@@ -340,7 +342,7 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::
             op.getType() == BSONType::string);
     tassert(5543809,
             str::stream() << "Unexpected noop entry within a transaction " << redact(op.toString()),
-            op.getStringData() != "n"_sd);
+            op.getStringData() != "n"sv);
 }
 
 Document ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addRequiredTransactionFields(
@@ -413,15 +415,15 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_collectAllOpTim
 void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addAffectedNamespaces(
     const Document& doc) {
     const auto dbCmdNs = NamespaceStringUtil::deserialize(boost::none /* tenantId */,
-                                                          doc["ns"_sd].getStringData(),
+                                                          doc["ns"sv].getStringData(),
                                                           SerializationContext::stateDefault());
-    if (doc["op"_sd].getStringData() != "c"_sd) {
+    if (doc["op"sv].getStringData() != "c"sv) {
         _affectedNamespaces.insert(dbCmdNs);
         return;
     }
 
-    constexpr std::array<StringData, 2> kCollectionField = {"create"_sd, "createIndexes"_sd};
-    const Document& object = doc["o"_sd].getDocument();
+    constexpr std::array<std::string_view, 2> kCollectionField = {"create"sv, "createIndexes"sv};
+    const Document& object = doc["o"sv].getDocument();
     for (const auto& fieldName : kCollectionField) {
         const auto field = object[fieldName];
         if (field.getType() == BSONType::string) {

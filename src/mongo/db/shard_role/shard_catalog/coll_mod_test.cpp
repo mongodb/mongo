@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"

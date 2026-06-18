@@ -33,6 +33,8 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace projection_executor {
@@ -67,7 +69,7 @@ bool isIndexSuitableForDistinct(const BSONObj& keyPattern,
                                 const MultikeyPaths& multikeyPaths,
                                 bool sparse,
                                 projection_executor::ProjectionExecutor* wildcardProj,
-                                StringData field,
+                                std::string_view field,
                                 const BSONObj& filter,
                                 bool flipDistinctScanDirection,
                                 bool strictDistinctOnly,
@@ -88,7 +90,7 @@ bool isIndexSuitableForDistinct(const BSONObj& keyPattern,
 bool isAnyComponentOfPathOrProjectionMultikey(const BSONObj& indexKeyPattern,
                                               bool isMultikey,
                                               const MultikeyPaths& indexMultikeyInfo,
-                                              StringData path,
+                                              std::string_view path,
                                               const OrderedPathSet& projFields = {},
                                               bool hasSort = true);
 

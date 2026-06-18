@@ -29,6 +29,8 @@
 
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
 
+#include <string_view>
+
 namespace mongo::extension::sdk {
 
 ExtensionGenericStatus QueryExecutionContextAPI::checkForInterrupt() const {

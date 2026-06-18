@@ -32,7 +32,6 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
@@ -43,6 +42,7 @@
 
 #include <deque>
 #include <new>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -54,6 +54,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 class BasicTracerFactory final : public Tracer::Factory {
 public:
@@ -64,17 +65,17 @@ public:
     public:
         BasicSpan(BSONObjBuilder bob, TickSource::Tick tracerStart, std::shared_ptr<Tracer> tracer)
             : _bob(std::move(bob)), _tracerStart(tracerStart), _tracer(std::move(tracer)) {
-            _bob.append("startedMicros"_sd, durationCount<Microseconds>(_now()));
+            _bob.append("startedMicros"sv, durationCount<Microseconds>(_now()));
         }
 
         ~BasicSpan() override {
             _spans = boost::none;
-            _bob.append("stoppedMicros"_sd, durationCount<Microseconds>(_now()));
+            _bob.append("stoppedMicros"sv, durationCount<Microseconds>(_now()));
         }
 
         BSONObjBuilder makeSubSpan(std::string name) {
             if (!_spans) {
-                _spans.emplace(_bob.subobjStart("spans"_sd));
+                _spans.emplace(_bob.subobjStart("spans"sv));
             }
             return _spans->subobjStart(name);
         }
@@ -123,7 +124,7 @@ private:
         if (_spans.empty()) {
             // This is the root span.
             _builder.emplace();
-            _builder->append("tracer"_sd, _name);
+            _builder->append("tracer"sv, _name);
             return _builder->subobjStart(spanName);
         } else {
             // This is a child for the currently active span.
@@ -155,7 +156,9 @@ public:
 
     class BasicSpan final : public Tracer::Span {
     public:
-        BasicSpan(TraceEventTracerFactory* factory, StringData name, std::shared_ptr<Tracer> tracer)
+        BasicSpan(TraceEventTracerFactory* factory,
+                  std::string_view name,
+                  std::shared_ptr<Tracer> tracer)
             : _factory(factory), _tracer(std::move(tracer)) {
 
             _factory->_arrayBuilder->append(BSON("name" << name << "ph"

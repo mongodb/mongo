@@ -34,7 +34,6 @@
 // IWYU pragma: no_include "bits/types/siginfo_t.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"

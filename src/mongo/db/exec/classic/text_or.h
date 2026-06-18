@@ -46,6 +46,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -107,7 +108,7 @@ public:
         return _memoryTracker;
     }
 
-    static constexpr StringData kStageType = "TEXT_OR"_sd;
+    static constexpr std::string_view kStageType = "TEXT_OR"_sd;
 
     class Comparator {
     public:

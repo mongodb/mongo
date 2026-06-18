@@ -43,6 +43,7 @@
 #include <cstddef>
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -51,7 +52,7 @@ namespace mongo {
 
 class DocumentSourceExchange final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalExchange"_sd;
+    static constexpr std::string_view kStageName = "$_internalExchange"_sd;
 
     /**
      * Create an Exchange consumer. 'resourceYielder' is so the exchange may temporarily yield
@@ -89,7 +90,7 @@ public:
         return boost::none;
     }
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

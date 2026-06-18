@@ -44,11 +44,10 @@
 
 #include <memory>
 
-#include "gtest/gtest.h"
-
 namespace mongo::query_stats {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WriteCmdQueryStatsRegistrarTest : public ServiceContextTest {
 public:
@@ -111,7 +110,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
             { q: { x: {$eq: 3} }, u: [ {$set: { number: 42 }} ], multi: false, upsert: false }
         ],
         "$db": "testDB"
-        })"_sd);
+        })"sv);
     auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -178,7 +177,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
             { q: { x: {$eq: 3} }, u: { foo: [ "beep", "boop" ] }, multi: false, upsert: false }
         ],
         "$db": "testDB"
-        })"_sd);
+        })"sv);
     auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -236,7 +235,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
             { q: { x: {$eq: 3} }, u: { $push: { 'foo.bar' : 12 } }, multi: false, upsert: false }
         ],
         "$db": "testDB"
-        })"_sd);
+        })"sv);
     auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -300,7 +299,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
             { q: { x: {$eq: 3} }, u: [ { $set: { baz : 15 } } ], multi: false, upsert: false }
         ],
         "$db": "testDB"
-        })"_sd);
+        })"sv);
     auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -360,7 +359,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
         insert: "testColl",
         documents: [{ _id: 1, name: "Alice" }, { _id: 2, score: 42 }],
         "$db": "testDB"
-        })"_sd);
+        })"sv);
     auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
     BatchedCommandRequest batchRequest(insertCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -419,7 +418,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
             { q: { x: {$eq: 3} }, u: [ {$set: { number: 42 }} ], multi: false, upsert: false }
         ],
         "$db": "testDB"
-        })"_sd);
+        })"sv);
     auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -452,7 +451,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, RegisterRequestForShar
         documents: [{ _id: 1 }],
         includeQueryStatsMetrics: true,
         "$db": "testDB"
-        })"_sd);
+        })"sv);
     auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
     BatchedCommandRequest batchRequest(insertCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -482,7 +481,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
         documents: [{ _id: 1 }],
         includeQueryStatsMetrics: false,
         "$db": "testDB"
-        })"_sd);
+        })"sv);
     auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
     BatchedCommandRequest batchRequest(insertCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -503,7 +502,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
             { q: { y: {$gt: 10} }, limit: 1 }
         ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
     BatchedCommandRequest batchRequest(deleteCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -537,7 +536,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
             { q: { x: {$eq: 3} }, limit: 0 }
         ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
     BatchedCommandRequest batchRequest(deleteCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -593,7 +592,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
             { q: { z: {$lt: 0} }, limit: 0 }
         ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
     BatchedCommandRequest batchRequest(deleteCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -623,7 +622,7 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, DoesNotRegisterInsertRequestWhenFeatureF
         insert: "testColl",
         documents: [{ _id: 1 }],
         "$db": "testDB"
-        })"_sd);
+        })"sv);
     auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
     BatchedCommandRequest batchRequest(insertCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -645,7 +644,7 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, ParseAndRegisterRequestDeleteSkipsWhenFl
         delete: "testColl",
         deletes: [ { q: { x: {$eq: 3} }, limit: 0 } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
     BatchedCommandRequest batchRequest(deleteCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -662,7 +661,7 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, ParseAndRegisterRequestDeleteSkipsWhenEn
         deletes: [ { q: { x: {$eq: 3} }, limit: 0 } ],
         encryptionInformation: { type: 1, schema: {} },
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
     BatchedCommandRequest batchRequest(deleteCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -679,7 +678,7 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, ParseAndRegisterRequestInsertSkipsWhenEn
         documents: [{ _id: 1 }],
         encryptionInformation: { type: 1, schema: {} },
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
     BatchedCommandRequest batchRequest(insertCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
@@ -933,7 +932,7 @@ TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
                     { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false }
                 ],
                 "$db": "testDB"
-                })"_sd);
+                })"sv);
             auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
             BatchedCommandRequest batchRequest(updateCommandRequest);
             WriteCommandRef cmdRef{batchRequest};
@@ -965,7 +964,7 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, RegisterRequestInsertNotSampledWhenWrite
                 insert: "testColl",
                 documents: [{ _id: 1 }],
                 "$db": "testDB"
-                })"_sd);
+                })"sv);
             auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
             BatchedCommandRequest batchRequest(insertCommandRequest);
             WriteCommandRef cmdRef{batchRequest};

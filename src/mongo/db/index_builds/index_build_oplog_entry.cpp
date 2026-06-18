@@ -30,7 +30,6 @@
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -50,6 +49,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -206,7 +206,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                             indexes.size())};
         }
 
-        const auto validateInternalIdent = [](StringData ident) -> Status {
+        const auto validateInternalIdent = [](std::string_view ident) -> Status {
             if (mongo::ident::isValidIdent(ident)) {
                 return Status::OK();
             }

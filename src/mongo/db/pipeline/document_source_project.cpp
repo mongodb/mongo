@@ -43,6 +43,7 @@
 #include <algorithm>
 #include <bitset>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -76,7 +77,7 @@ BSONObj buildExclusionProjectionSpecification(const std::vector<BSONElement>& un
 intrusive_ptr<DocumentSource> DocumentSourceProject::create(
     projection_ast::Projection projection,
     const intrusive_ptr<ExpressionContext>& expCtx,
-    StringData specifiedName) {
+    std::string_view specifiedName) {
     const bool isIndependentOfAnyCollection = false;
     intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
         expCtx,

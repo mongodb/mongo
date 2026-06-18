@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
@@ -59,6 +58,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/intrusive_ptr.hpp>
@@ -286,7 +286,7 @@ private:
 
     static bool sortAndKeyPatternPartAgreeAndOnMeta(
         const timeseries::BucketUnpacker& bucketUnpacker,
-        StringData keyPatternFieldName,
+        std::string_view keyPatternFieldName,
         const FieldPath& sortFieldPath);
 };
 

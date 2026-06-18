@@ -29,7 +29,6 @@
 #include "mongo/db/pipeline/expression_test_api_version.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/api_parameters.h"

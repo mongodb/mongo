@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -55,6 +54,7 @@
 #include <limits>
 #include <list>
 #include <set>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -71,7 +71,7 @@ namespace bsonobjbuilder_details {
 /** Detects that a value can be appended via `builder.append("foo", val)`. */
 template <typename Appendee, typename Builder = BSONObjBuilder>
 concept HasBuilderAppendMemberFunction =
-    requires(Builder& b, StringData name, Appendee val) { b.append(name, val); };
+    requires(Builder& b, std::string_view name, Appendee val) { b.append(name, val); };
 
 /**
  * Detects that a value can be appended via `appendToBson(builder, "foo", val)`.
@@ -79,7 +79,7 @@ concept HasBuilderAppendMemberFunction =
  */
 template <typename Appendee, typename Builder = BSONObjBuilder>
 concept HasAdlAppendToBson =
-    requires(Builder& b, StringData name, Appendee val) { appendToBson(b, name, val); };
+    requires(Builder& b, std::string_view name, Appendee val) { appendToBson(b, name, val); };
 }  // namespace bsonobjbuilder_details
 
 /**
@@ -183,7 +183,7 @@ public:
     }
 
     /** append an element but with a new name */
-    Derived& appendAs(const BSONElement& e, StringData fieldName) {
+    Derived& appendAs(const BSONElement& e, std::string_view fieldName) {
         // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
         MONGO_verify(!e.eoo());
         _b.appendNum((char)e.type());
@@ -193,7 +193,7 @@ public:
     }
 
     /** add a subobject as a member */
-    Derived& append(StringData fieldName, BSONObj subObj) {
+    Derived& append(std::string_view fieldName, BSONObj subObj) {
         _b.appendNum((char)BSONType::object);
         _b.appendCStr(fieldName);
         _b.appendBuf((void*)subObj.objdata(), subObj.objsize());
@@ -201,7 +201,7 @@ public:
     }
 
     /** add a subobject as a member */
-    Derived& appendObject(StringData fieldName, const char* objdata, int size = 0) {
+    Derived& appendObject(std::string_view fieldName, const char* objdata, int size = 0) {
         MONGO_verify(objdata);
         if (size == 0) {
             size = ConstDataView(objdata).read<LittleEndian<int>>();
@@ -226,7 +226,7 @@ public:
      *  sub.done()
      *  // use b and convert to object
      */
-    B& subobjStart(StringData fieldName) {
+    B& subobjStart(std::string_view fieldName) {
         _b.appendNum((char)BSONType::object);
         _b.appendCStr(fieldName);
         return _b;
@@ -235,26 +235,26 @@ public:
     /** add a subobject as a member with type Array.  Thus arr object should have "0", "1", ...
         style fields in it.
     */
-    Derived& appendArray(StringData fieldName, const BSONObj& subObj) {
+    Derived& appendArray(std::string_view fieldName, const BSONObj& subObj) {
         _b.appendNum((char)BSONType::array);
         _b.appendCStr(fieldName);
         _b.appendBuf((void*)subObj.objdata(), subObj.objsize());
         return asDerived();
     }
-    Derived& append(StringData fieldName, BSONArray arr) {
+    Derived& append(std::string_view fieldName, BSONArray arr) {
         return appendArray(fieldName, arr);
     }
 
     /** add header for a new subarray and return bufbuilder for writing to
         the subarray's body */
-    B& subarrayStart(StringData fieldName) {
+    B& subarrayStart(std::string_view fieldName) {
         _b.appendNum((char)BSONType::array);
         _b.appendCStr(fieldName);
         return _b;
     }
 
     /** Append a boolean element */
-    Derived& appendBool(StringData fieldName, bool val) {
+    Derived& appendBool(std::string_view fieldName, bool val) {
         _b.appendNum((char)BSONType::boolean);
         _b.appendCStr(fieldName);
         _b.appendNum(char(val));
@@ -263,7 +263,7 @@ public:
 
     /** Append elements that have the BSONObjAppendFormat trait */
     template <typename T, typename = std::enable_if_t<IsBSONObjAppendable<T>::value>>
-    Derived& append(StringData fieldName, const T& n) {
+    Derived& append(std::string_view fieldName, const T& n) {
         constexpr BSONType type = BSONObjAppendFormat<T>::value;
         _b.appendNum(static_cast<char>(type));
         _b.appendCStr(fieldName);
@@ -280,25 +280,25 @@ public:
     template <typename T,
               typename = std::enable_if_t<!IsBSONObjAppendable<T>::value && std::is_integral_v<T>>,
               typename = void>
-    Derived& append(StringData fieldName, const T& n) = delete;
+    Derived& append(std::string_view fieldName, const T& n) = delete;
 
     /**
      * appendNumber is a series of method for appending the smallest sensible type
      * mostly for JS
      */
-    Derived& appendNumber(StringData fieldName, int n) {
+    Derived& appendNumber(std::string_view fieldName, int n) {
         return append(fieldName, n);
     }
 
-    Derived& appendNumber(StringData fieldName, double d) {
+    Derived& appendNumber(std::string_view fieldName, double d) {
         return append(fieldName, d);
     }
 
-    Derived& appendNumber(StringData fieldName, Decimal128 decNumber) {
+    Derived& appendNumber(std::string_view fieldName, Decimal128 decNumber) {
         return append(fieldName, decNumber);
     }
 
-    Derived& appendNumber(StringData fieldName, long long llNumber) {
+    Derived& appendNumber(std::string_view fieldName, long long llNumber) {
         static const long long maxInt = std::numeric_limits<int>::max();
         static const long long minInt = std::numeric_limits<int>::min();
 
@@ -314,7 +314,9 @@ public:
         @deprecated Generally, it is preferred to use the append append(name, oid)
         method for this.
     */
-    Derived& appendOID(StringData fieldName, OID* oid = nullptr, bool generateIfBlank = false) {
+    Derived& appendOID(std::string_view fieldName,
+                       OID* oid = nullptr,
+                       bool generateIfBlank = false) {
         _b.appendNum((char)BSONType::oid);
         _b.appendCStr(fieldName);
         if (oid)
@@ -335,7 +337,7 @@ public:
     @param fieldName Field name, e.g., "_id".
     @returns the builder object
     */
-    Derived& append(StringData fieldName, OID oid) {
+    Derived& append(std::string_view fieldName, OID oid) {
         _b.appendNum((char)BSONType::oid);
         _b.appendCStr(fieldName);
         _b.appendBuf(oid.view().view(), OID::kOIDSize);
@@ -354,7 +356,7 @@ public:
         @param dt a C-style 32 bit date value, that is
         the number of seconds since January 1, 1970, 00:00:00 GMT
     */
-    Derived& appendTimeT(StringData fieldName, time_t dt) {
+    Derived& appendTimeT(std::string_view fieldName, time_t dt) {
         _b.appendNum((char)BSONType::date);
         _b.appendCStr(fieldName);
         _b.appendNum(static_cast<unsigned long long>(dt) * 1000);
@@ -364,8 +366,8 @@ public:
         @param dt a Java-style 64 bit date value, that is
         the number of milliseconds since January 1, 1970, 00:00:00 GMT
     */
-    Derived& appendDate(StringData fieldName, Date_t dt);
-    Derived& append(StringData fieldName, Date_t dt) {
+    Derived& appendDate(std::string_view fieldName, Date_t dt);
+    Derived& append(std::string_view fieldName, Date_t dt) {
         return appendDate(fieldName, dt);
     }
 
@@ -373,7 +375,9 @@ public:
         @param regex the regular expression pattern
         @param regex options such as "i" or "g"
     */
-    Derived& appendRegex(StringData fieldName, StringData regex, StringData options = "") {
+    Derived& appendRegex(std::string_view fieldName,
+                         std::string_view regex,
+                         std::string_view options = "") {
         _b.appendNum((char)BSONType::regEx);
         _b.appendCStr(fieldName);
         _b.appendCStr(regex);
@@ -381,11 +385,11 @@ public:
         return asDerived();
     }
 
-    Derived& append(StringData fieldName, const BSONRegEx& regex) {
+    Derived& append(std::string_view fieldName, const BSONRegEx& regex) {
         return appendRegex(fieldName, regex.pattern, regex.flags);
     }
 
-    Derived& appendCode(StringData fieldName, StringData code) {
+    Derived& appendCode(std::string_view fieldName, std::string_view code) {
         _b.appendNum((char)BSONType::code);
         _b.appendCStr(fieldName);
         _b.appendNum((int)code.size() + 1);
@@ -393,13 +397,13 @@ public:
         return asDerived();
     }
 
-    Derived& append(StringData fieldName, const BSONCode& code) {
+    Derived& append(std::string_view fieldName, const BSONCode& code) {
         return appendCode(fieldName, code.code);
     }
 
     /** Append a string element.
         @param sz size includes terminating null character */
-    Derived& append(StringData fieldName, const char* str, int sz) {
+    Derived& append(std::string_view fieldName, const char* str, int sz) {
         _b.appendNum((char)BSONType::string);
         _b.appendCStr(fieldName);
         _b.appendNum((int)sz);
@@ -407,11 +411,11 @@ public:
         return asDerived();
     }
     /** Append a string element */
-    Derived& append(StringData fieldName, const char* str) {
+    Derived& append(std::string_view fieldName, const char* str) {
         return append(fieldName, str, (int)strlen(str) + 1);
     }
     /** Append a string element */
-    Derived& append(StringData fieldName, StringData str) {
+    Derived& append(std::string_view fieldName, std::string_view str) {
         _b.appendNum((char)BSONType::string);
         _b.appendCStr(fieldName);
         _b.appendNum((int)str.size() + 1);
@@ -419,7 +423,7 @@ public:
         return asDerived();
     }
 
-    Derived& appendSymbol(StringData fieldName, StringData symbol) {
+    Derived& appendSymbol(std::string_view fieldName, std::string_view symbol) {
         _b.appendNum((char)BSONType::symbol);
         _b.appendCStr(fieldName);
         _b.appendNum((int)symbol.size() + 1);
@@ -427,36 +431,36 @@ public:
         return asDerived();
     }
 
-    Derived& append(StringData fieldName, const BSONSymbol& symbol) {
+    Derived& append(std::string_view fieldName, const BSONSymbol& symbol) {
         return appendSymbol(fieldName, symbol.symbol);
     }
 
     /** Append a Null element to the object */
-    Derived& appendNull(StringData fieldName) {
+    Derived& appendNull(std::string_view fieldName) {
         _b.appendNum((char)BSONType::null);
         _b.appendCStr(fieldName);
         return asDerived();
     }
 
     // Append an element that is less than all other keys.
-    Derived& appendMinKey(StringData fieldName) {
+    Derived& appendMinKey(std::string_view fieldName) {
         _b.appendNum((char)BSONType::minKey);
         _b.appendCStr(fieldName);
         return asDerived();
     }
     // Append an element that is greater than all other keys.
-    Derived& appendMaxKey(StringData fieldName) {
+    Derived& appendMaxKey(std::string_view fieldName) {
         _b.appendNum((char)BSONType::maxKey);
         _b.appendCStr(fieldName);
         return asDerived();
     }
 
     // Append a Timestamp field -- will be updated to next server Timestamp
-    Derived& appendTimestamp(StringData fieldName) {
+    Derived& appendTimestamp(std::string_view fieldName) {
         return append(fieldName, Timestamp());
     }
 
-    Derived& appendTimestamp(StringData fieldName, unsigned long long val) {
+    Derived& appendTimestamp(std::string_view fieldName, unsigned long long val) {
         return append(fieldName, Timestamp(val));
     }
 
@@ -464,7 +468,7 @@ public:
      * To store a Timestamp in BSON, use this function.
      * This captures both the secs and inc fields.
      */
-    Derived& append(StringData fieldName, Timestamp timestamp) {
+    Derived& append(std::string_view fieldName, Timestamp timestamp) {
         timestamp.append<B>(_b, fieldName);
         return asDerived();
     }
@@ -473,7 +477,7 @@ public:
     Append an element of the deprecated DBRef type.
     @deprecated
     */
-    Derived& appendDBRef(StringData fieldName, StringData ns, const OID& oid) {
+    Derived& appendDBRef(std::string_view fieldName, std::string_view ns, const OID& oid) {
         _b.appendNum((char)BSONType::dbRef);
         _b.appendCStr(fieldName);
         _b.appendNum((int)ns.size() + 1);
@@ -483,7 +487,7 @@ public:
         return asDerived();
     }
 
-    Derived& append(StringData fieldName, const BSONDBRef& dbref) {
+    Derived& append(std::string_view fieldName, const BSONDBRef& dbref) {
         return appendDBRef(fieldName, dbref.ns, dbref.oid);
     }
 
@@ -494,7 +498,10 @@ public:
                Use BinDataGeneral if you don't care about the type.
         @param data the byte array
     */
-    Derived& appendBinData(StringData fieldName, int len, BinDataType type, const void* data) {
+    Derived& appendBinData(std::string_view fieldName,
+                           int len,
+                           BinDataType type,
+                           const void* data) {
         _b.appendNum((char)BSONType::binData);
         _b.appendCStr(fieldName);
         _b.appendNum(len);
@@ -504,7 +511,7 @@ public:
         return asDerived();
     }
 
-    Derived& append(StringData fieldName, const BSONBinData& bd) {
+    Derived& append(std::string_view fieldName, const BSONBinData& bd) {
         return appendBinData(fieldName, bd.length, bd.type, bd.data);
     }
 
@@ -528,7 +535,9 @@ public:
     /** Append to the BSON object a field of type CodeWScope.  This is a javascript code
         fragment accompanied by some scope that goes with it.
     */
-    Derived& appendCodeWScope(StringData fieldName, StringData code, const BSONObj& scope) {
+    Derived& appendCodeWScope(std::string_view fieldName,
+                              std::string_view code,
+                              const BSONObj& scope) {
         _b.appendNum((char)BSONType::codeWScope);
         _b.appendCStr(fieldName);
         _b.appendNum((int)(4 + 4 + code.size() + 1 + scope.objsize()));
@@ -539,45 +548,45 @@ public:
         return asDerived();
     }
 
-    Derived& append(StringData fieldName, const BSONCodeWScope& cws) {
+    Derived& append(std::string_view fieldName, const BSONCodeWScope& cws) {
         return appendCodeWScope(fieldName, cws.code, cws.scope);
     }
 
-    Derived& appendUndefined(StringData fieldName) {
+    Derived& appendUndefined(std::string_view fieldName) {
         _b.appendNum((char)BSONType::undefined);
         _b.appendCStr(fieldName);
         return asDerived();
     }
 
     /* helper function -- see Query::where() for primary way to do this. */
-    Derived& appendWhere(StringData code, const BSONObj& scope) {
+    Derived& appendWhere(std::string_view code, const BSONObj& scope) {
         return appendCodeWScope("$where", code, scope);
     }
 
     /**
        these are the min/max when comparing, not strict min/max elements for a given type
     */
-    Derived& appendMinForType(StringData fieldName, int type);
-    Derived& appendMaxForType(StringData fieldName, int type);
+    Derived& appendMinForType(std::string_view fieldName, int type);
+    Derived& appendMaxForType(std::string_view fieldName, int type);
 
     /** Append an array of values. */
     template <class T>
-    Derived& append(StringData fieldName, const std::vector<T>& vals);
+    Derived& append(std::string_view fieldName, const std::vector<T>& vals);
 
     template <class T>
-    Derived& append(StringData fieldName, const std::list<T>& vals);
+    Derived& append(std::string_view fieldName, const std::list<T>& vals);
 
     /** Append a set of values. */
     template <class T>
-    Derived& append(StringData fieldName, const std::set<T>& vals);
+    Derived& append(std::string_view fieldName, const std::set<T>& vals);
 
     /**
      * Append a map of values as a sub-object.
-     * Note: the keys of the map should be StringData-compatible (i.e. strings).
+     * Note: the keys of the map should be std::string_view-compatible (i.e. strings).
      */
     template <typename Map>
-    requires std::is_convertible_v<decltype(std::declval<Map>().begin()->first), StringData>
-    Derived& append(StringData fieldName, const Map& map) {
+    requires std::is_convertible_v<decltype(std::declval<Map>().begin()->first), std::string_view>
+    Derived& append(std::string_view fieldName, const Map& map) {
         typename std::remove_reference<Derived>::type bob;
         for (auto&& [k, v] : map) {
             bob.append(k, v);
@@ -589,7 +598,7 @@ public:
 
     /** Append a range of values between two iterators. */
     template <class It>
-    Derived& append(StringData fieldName, It begin, It end);
+    Derived& append(std::string_view fieldName, It begin, It end);
 
     /**
      * Resets this BSONObjBulder to an empty state. All previously added fields are lost.  If this
@@ -663,7 +672,7 @@ public:
 
     BSONObjIterator iterator() const;
 
-    bool hasField(StringData name) const;
+    bool hasField(std::string_view name) const;
 
     int len() const {
         return _b.len();
@@ -762,7 +771,7 @@ public:
 
     class ValueStream {
     public:
-        ValueStream(StringData fieldName, BSONObjBuilder* builder)
+        ValueStream(std::string_view fieldName, BSONObjBuilder* builder)
             : _fieldName{fieldName}, _builder{builder} {}
 
         ValueStream(const ValueStream&&) = delete;
@@ -784,7 +793,7 @@ public:
             return *_builder;
         }
 
-        StringData fieldName() const {
+        std::string_view fieldName() const {
             return _fieldName;
         }
 
@@ -799,7 +808,7 @@ public:
         }
 
     private:
-        StringData _fieldName;
+        std::string_view _fieldName;
         BSONObjBuilder* _builder;
     };
 
@@ -862,7 +871,7 @@ public:
         return *this;
     }
 
-    ValueStream operator<<(StringData name) {
+    ValueStream operator<<(std::string_view name) {
         return BSONObjBuilder::ValueStream{name, this};
     }
 
@@ -880,7 +889,7 @@ public:
      */
     friend void appendToBson(
         BSONObjBuilder& bob,
-        StringData fieldName,
+        std::string_view fieldName,
         const bsonobjbuilder_details::HasBuilderAppendMemberFunction auto& value) {
         bob.append(fieldName, value);
     }
@@ -1068,7 +1077,7 @@ public:
         return ret;
     }
 
-    Derived& appendRegex(StringData regex, StringData options = "") {
+    Derived& appendRegex(std::string_view regex, std::string_view options = "") {
         _b.appendRegex(_fieldCount, regex, options);
         ++_fieldCount;
         return asDerived();
@@ -1080,13 +1089,13 @@ public:
         return asDerived();
     }
 
-    Derived& appendCode(StringData code) {
+    Derived& appendCode(std::string_view code) {
         _b.appendCode(_fieldCount, code);
         ++_fieldCount;
         return asDerived();
     }
 
-    Derived& appendCodeWScope(StringData code, const BSONObj& scope) {
+    Derived& appendCodeWScope(std::string_view code, const BSONObj& scope) {
         _b.appendCodeWScope(_fieldCount, code, scope);
         ++_fieldCount;
         return asDerived();
@@ -1239,32 +1248,34 @@ public:
 
 template <class Derived, class B>
 template <class T>
-inline Derived& BSONObjBuilderBase<Derived, B>::append(StringData fieldName,
+inline Derived& BSONObjBuilderBase<Derived, B>::append(std::string_view fieldName,
                                                        const std::vector<T>& vals) {
     return append(fieldName, vals.begin(), vals.end());
 }
 
 template <class Derived, class B>
 template <class T>
-inline Derived& BSONObjBuilderBase<Derived, B>::append(StringData fieldName,
+inline Derived& BSONObjBuilderBase<Derived, B>::append(std::string_view fieldName,
                                                        const std::list<T>& vals) {
     return append(fieldName, vals.begin(), vals.end());
 }
 
 template <class Derived, class B>
 template <class T>
-inline Derived& BSONObjBuilderBase<Derived, B>::append(StringData fieldName,
+inline Derived& BSONObjBuilderBase<Derived, B>::append(std::string_view fieldName,
                                                        const std::set<T>& vals) {
     return append(fieldName, vals.begin(), vals.end());
 }
 
 template <class Derived, class B>
 template <class It>
-inline Derived& BSONObjBuilderBase<Derived, B>::append(StringData fieldName, It begin, It end) {
+inline Derived& BSONObjBuilderBase<Derived, B>::append(std::string_view fieldName,
+                                                       It begin,
+                                                       It end) {
     Derived arrBuilder(subarrayStart(fieldName));
     DecimalCounter<size_t> n;
     for (; begin != end; ++begin) {
-        arrBuilder.append(StringData{n}, *begin);
+        arrBuilder.append(std::string_view{n}, *begin);
         ++n;
     }
     return asDerived();
@@ -1305,7 +1316,7 @@ inline BSONFieldValue<BSONObj> BSONField<T>::query(const char* q, const T& t) co
      std::cout << BSON( "created" << DATENOW ); // { created : "2009-10-09 11:41:42" }
 */
 struct DateNowLabeler {
-    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, DateNowLabeler) {
+    friend void appendToBson(BSONObjBuilder& bob, std::string_view fieldName, DateNowLabeler) {
         bob.appendDate(fieldName, Date_t::now());
     }
 };
@@ -1316,7 +1327,7 @@ constexpr inline DateNowLabeler DATENOW;
      std::cout << BSON( "a" << BSONNULL ); // { a : null }
 */
 struct NullLabeler {
-    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, NullLabeler) {
+    friend void appendToBson(BSONObjBuilder& bob, std::string_view fieldName, NullLabeler) {
         bob.appendNull(fieldName);
     }
 };
@@ -1327,7 +1338,7 @@ constexpr inline NullLabeler BSONNULL;
      std::cout << BSON( "a" << BSONUndefined ); // { a : undefined }
 */
 struct UndefinedLabeler {
-    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, UndefinedLabeler) {
+    friend void appendToBson(BSONObjBuilder& bob, std::string_view fieldName, UndefinedLabeler) {
         bob.appendUndefined(fieldName);
     }
 };
@@ -1339,7 +1350,7 @@ constexpr inline UndefinedLabeler BSONUndefined;
  *   std::cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } }
  */
 struct MinKeyLabeler {
-    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, MinKeyLabeler) {
+    friend void appendToBson(BSONObjBuilder& bob, std::string_view fieldName, MinKeyLabeler) {
         bob.appendMinKey(fieldName);
     }
 };
@@ -1351,7 +1362,7 @@ constexpr inline MinKeyLabeler MINKEY;
  *   std::cout << BSON( "a" << MAXKEY ); // { "a" : { "$maxKey" : 1 } }
  */
 struct MaxKeyLabeler {
-    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, MaxKeyLabeler) {
+    friend void appendToBson(BSONObjBuilder& bob, std::string_view fieldName, MaxKeyLabeler) {
         bob.appendMaxKey(fieldName);
     }
 };
@@ -1382,7 +1393,7 @@ public:
         class AfterArgument;
 
     public:
-        ArgumentAcceptor(StringData label, BSONObjBuilder::ValueStream* stream)
+        ArgumentAcceptor(std::string_view label, BSONObjBuilder::ValueStream* stream)
             : _label{label}, _stream{stream}, _subObjBuilder{_stream->subobjStart()} {}
 
         AfterArgument& operator<<(const bsonobjbuilder_details::HasAdlAppendToBson auto& value) {
@@ -1424,15 +1435,15 @@ public:
             ArgumentAcceptor* _stream;
         };
 
-        StringData _label;
+        std::string_view _label;
         BSONObjBuilder::ValueStream* _stream;
         AfterArgument _after{this};
         BSONObjBuilder _subObjBuilder;
     };
 
-    constexpr explicit QueryConstraintLabel(StringData l) : _label(l) {}
+    constexpr explicit QueryConstraintLabel(std::string_view l) : _label(l) {}
 
-    StringData label() const {
+    std::string_view label() const {
         return _label;
     }
 
@@ -1447,7 +1458,7 @@ public:
     }
 
 private:
-    StringData _label;
+    std::string_view _label;
 };
 
 constexpr inline QueryConstraintLabel GT{"$gt"};

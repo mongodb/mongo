@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/member_config_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -43,6 +42,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -103,7 +103,8 @@ public:
      * Gets the canonical name of this member, by which other members and clients
      * will contact it.
      */
-    const HostAndPort& getHostAndPort(StringData horizon = SplitHorizon::kDefaultHorizon) const {
+    const HostAndPort& getHostAndPort(
+        std::string_view horizon = SplitHorizon::kDefaultHorizon) const {
         return _splitHorizon.getHostAndPort(horizon);
     }
 

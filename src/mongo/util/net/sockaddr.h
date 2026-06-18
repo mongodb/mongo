@@ -32,6 +32,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #ifndef _WIN32
@@ -48,7 +49,6 @@
 
 #endif  // not _WIN32
 
-#include "mongo/base/string_data.h"
 
 namespace MONGO_MOD_PUBLIC mongo {
 class BSONObjBuilder;
@@ -74,7 +74,7 @@ struct SockAddr {
 
     explicit SockAddr(int sourcePort); /* listener side */
     explicit SockAddr(const sockaddr* other, socklen_t size);
-    explicit SockAddr(const sockaddr* other, socklen_t size, StringData hostOrIp);
+    explicit SockAddr(const sockaddr* other, socklen_t size, std::string_view hostOrIp);
 
 
     /**
@@ -89,19 +89,21 @@ struct SockAddr {
      * If target resolves to more than one address, only the first address will be used. Others will
      * be discarded. SockAddr::createAll() is recommended for capturing all addresses.
      */
-    static SockAddr create(StringData target, int port, sa_family_t familyHint);
+    static SockAddr create(std::string_view target, int port, sa_family_t familyHint);
 
     /**
      * Resolve an ip or hostname to a vector of SockAddr objects.
      *
-     * Works similar to SockAddr(StringData, int, sa_family_t) above,
+     * Works similar to SockAddr(std::string_view, int, sa_family_t) above,
      * however all addresses returned from ::getaddrinfo() are used,
      * it never falls-open to SockAddr(port),
      * and isInvalid() SockAddrs are excluded.
      *
      * May return an empty vector.
      */
-    static std::vector<SockAddr> createAll(StringData target, int port, sa_family_t familyHint);
+    static std::vector<SockAddr> createAll(std::string_view target,
+                                           int port,
+                                           sa_family_t familyHint);
 
     template <typename T>
     T& as() {
@@ -151,10 +153,10 @@ struct SockAddr {
 
     socklen_t addressSize;
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const;
 
 private:
-    void initUnixDomainSocket(StringData path, int port);
+    void initUnixDomainSocket(std::string_view path, int port);
 
     std::string _hostOrIp;
     struct sockaddr_storage sa;

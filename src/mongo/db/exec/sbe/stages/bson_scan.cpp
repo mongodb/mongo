@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/bson_scan.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -39,20 +38,21 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 BSONScanStage::BSONScanStage(std::vector<BSONObj> bsons,
                              boost::optional<value::SlotId> recordSlot,
                              PlanNodeId planNodeId,
                              std::vector<std::string> scanFieldNames,
                              value::SlotVector scanFieldSlots,
                              bool participateInTrialRunTracking)
-    : PlanStage(
-          "bsonscan"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("bsonscan"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _bsons(std::move(bsons)),
       _recordSlot(recordSlot),
       _scanFieldNames(std::move(scanFieldNames)),

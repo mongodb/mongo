@@ -52,6 +52,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // YCSB findOne query
 BSONObj getFindDocWithDb() {
@@ -229,7 +230,7 @@ BENCHMARK(BM_UPDATE_ONE_OP_MSG)->Arg(10)->Arg(100)->Unit(benchmark::kNanosecond)
 
 void BM_IS_GENERIC_ARG(benchmark::State& state) {
     // Perform setup here
-    auto arg = "lsid"_sd;
+    auto arg = "lsid"sv;
     [[maybe_unused]] int i = 0;
 
     for (auto _ : state) {

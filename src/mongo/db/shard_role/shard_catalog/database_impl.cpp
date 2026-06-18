@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/shard_catalog/database_impl.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
@@ -106,6 +105,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -119,6 +119,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(throwWCEDuringTxnCollCreate);
@@ -139,7 +140,7 @@ MONGO_FAIL_POINT_DEFINE(skipCreateTimeseriesBucketsWithoutOptionsCheck);
 MONGO_FAIL_POINT_DEFINE(skipCreateTimeseriesVersionMismatchCheck);
 
 
-Status validateDBNameForWindows(StringData dbname) {
+Status validateDBNameForWindows(std::string_view dbname) {
     const std::vector<std::string> windowsReservedNames = {
         "con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4", "com5", "com6", "com7",
         "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"};
@@ -829,7 +830,7 @@ Collection* DatabaseImpl::_createCollection(
             uasserted(51267, "hangAndFailAfterCreateCollectionReservesOpTime fail point enabled");
         },
         [&](const BSONObj& data) {
-            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"sv);
             return fpNss.isEmpty() || fpNss == nss;
         });
 
@@ -871,7 +872,7 @@ Collection* DatabaseImpl::_createCollection(
     openCreateCollectionWindowFp.executeIf(
         [&](const BSONObj& data) { sleepsecs(3); },
         [&](const BSONObj& data) {
-            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS"_sd);
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS"sv);
             return fpNss.isEmpty() || nss == fpNss;
         });
 

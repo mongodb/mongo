@@ -49,6 +49,7 @@
 #include <iterator>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -72,7 +73,7 @@ const auto waitForMajorityServiceDecoration =
 constexpr static auto kWaitClientName = "WaitForMajorityServiceWaiter";
 constexpr static auto kCancelClientName = "WaitForMajorityServiceCanceler";
 
-std::unique_ptr<ThreadPool> makeThreadPool(StringData readOrWrite) {
+std::unique_ptr<ThreadPool> makeThreadPool(std::string_view readOrWrite) {
     return ThreadPool::make({
         .poolName = fmt::format("WaitForMajorityService{}ThreadPool", readOrWrite),
         .minThreads = 0,

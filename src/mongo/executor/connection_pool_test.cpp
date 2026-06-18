@@ -50,6 +50,7 @@
 #include <ratio>
 #include <set>
 #include <stack>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 
@@ -60,6 +61,7 @@
 namespace mongo {
 namespace executor {
 namespace connection_pool_test_details {
+using namespace std::literals::string_view_literals;
 
 class ConnectionPoolTest : public unittest::Test {
 public:
@@ -307,7 +309,7 @@ protected:
         size_t min = 1,
         size_t max = 10,
         ConnectionPool::Options opts = {},
-        StringData name = "dynamic limit controller") {
+        std::string_view name = "dynamic limit controller") {
         return makeDynamicController(
             [min] { return min; }, [max] { return max; }, std::move(opts), std::move(name));
     }
@@ -316,7 +318,7 @@ protected:
         std::function<size_t()> minLoader,
         std::function<size_t()> maxLoader,
         ConnectionPool::Options opts = {},
-        StringData name = "dynamic limit controller") {
+        std::string_view name = "dynamic limit controller") {
         auto controller = std::make_shared<DynamicLimitController>(
             std::move(minLoader), std::move(maxLoader), std::move(name));
         auto pool = makePool(opts);
@@ -4023,8 +4025,8 @@ public:
     size_t maxConnections() const override {
         return getPoolOptions().maxConnections;
     }
-    StringData name() const override {
-        return "NeverShutdownLimitController"_sd;
+    std::string_view name() const override {
+        return "NeverShutdownLimitController"sv;
     }
     void updateConnectionPoolStats(ConnectionPoolStats*) const override {}
 
@@ -4254,8 +4256,8 @@ public:
     size_t maxConnections() const override {
         return getPoolOptions().maxConnections;
     }
-    StringData name() const override {
-        return "HostGroupLimitController"_sd;
+    std::string_view name() const override {
+        return "HostGroupLimitController"sv;
     }
     void updateConnectionPoolStats(ConnectionPoolStats*) const override {}
 

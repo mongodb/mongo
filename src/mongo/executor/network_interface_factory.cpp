@@ -41,6 +41,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
@@ -52,16 +53,16 @@
 namespace mongo {
 namespace executor {
 
-std::string makeInstanceName(StringData name) {
+std::string makeInstanceName(std::string_view name) {
     return fmt::format("NetworkInterfaceTL-{}", name);
 }
 
-std::unique_ptr<NetworkInterface> makeNetworkInterface(StringData instanceName) {
+std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string_view instanceName) {
     return makeNetworkInterface(instanceName, nullptr, nullptr);
 }
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
-    StringData instanceName,
+    std::string_view instanceName,
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
     ConnectionPool::Options connPoolOptions,
@@ -88,7 +89,7 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
 
 #ifdef MONGO_CONFIG_GRPC
 std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
-    StringData instanceName, std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+    std::string_view instanceName, std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
     return makeNetworkInterfaceWithClientFactory(
         instanceName,
         std::make_shared<transport::grpc::GRPCAsyncClientFactory>(makeInstanceName(instanceName)),
@@ -97,7 +98,7 @@ std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
 #endif
 
 std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
-    StringData instanceName,
+    std::string_view instanceName,
     std::shared_ptr<AsyncClientFactory> clientFactory,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
     bool trackRequestCounts) {

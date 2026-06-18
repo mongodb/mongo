@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace otel {
@@ -99,7 +100,7 @@ public:
      * Adds an integer attribute with `key` and `value` to this Span. This attribute MUST NOT
      * contain PII.
      */
-    void setAttribute(StringData key, int value);
+    void setAttribute(std::string_view key, int value);
 
     /**
      * Caller should use `TRACING_SPAN_ATTR` instead of calling `setAttribute` directly.
@@ -107,7 +108,7 @@ public:
      * Adds a string attribute with `key` and `value` to this Span. This attribute MUST NOT
      * contain PII.
      */
-    void setAttribute(StringData key, StringData value);
+    void setAttribute(std::string_view key, std::string_view value);
 
     /**
      * Set the status associated with this Span. If the status's code is non-zero the OpenTelemetry
@@ -120,14 +121,14 @@ private:
      * Starts a new Span assuming we are in an environment where this is possible. `telemetryCtx`
      * will be populated if it is currently nullptr.
      */
-    static Span startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, StringData name);
+    static Span startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, std::string_view name);
 
     /**
      * Starts a new Span assuming we are in an environment where this is possible. When there is no
      * TelemetryContext on `opCtx`, `createIfMissing` determines whether one is created or a noop
      * span is returned.
      */
-    static Span startImpl(OperationContext* opCtx, StringData name, bool createIfMissing);
+    static Span startImpl(OperationContext* opCtx, std::string_view name, bool createIfMissing);
 
     std::unique_ptr<SpanImpl> _impl;
     /**
@@ -166,8 +167,8 @@ public:
 
     ~Span() {}
 
-    void setAttribute(StringData, int) {}
-    void setAttribute(StringData, StringData) {}
+    void setAttribute(std::string_view, int) {}
+    void setAttribute(std::string_view, std::string_view) {}
     void setStatus(const Status&) {}
 };
 

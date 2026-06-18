@@ -35,7 +35,6 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
@@ -48,6 +47,7 @@
 #include <algorithm>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -57,6 +57,7 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 namespace dps = ::mongo::bson;
 
 namespace {
+using namespace std::literals::string_view_literals;
 const BSONObj nullObj = BSON("" << BSONNULL);
 const BSONElement nullElt = nullObj.firstElement();
 const BSONObj undefinedObj = BSON("" << BSONUndefined);
@@ -73,14 +74,15 @@ const BSONElement undefinedElt = undefinedObj.firstElement();
  * This function must only be used when there is no an array element along the 'path'. Otherwise,
  * an exception will be thrown if encounters any array.
  */
-std::pair<BSONElement, bool> extractNonArrayElementAtPath(const BSONObj& obj, StringData path) {
+std::pair<BSONElement, bool> extractNonArrayElementAtPath(const BSONObj& obj,
+                                                          std::string_view path) {
     static const auto kEmptyElt = BSONElement{};
 
-    auto&& [elt, tail] = [&]() -> std::pair<BSONElement, StringData> {
+    auto&& [elt, tail] = [&]() -> std::pair<BSONElement, std::string_view> {
         if (auto dotOffset = path.find('.'); dotOffset != std::string::npos) {
             return {obj.getField(path.substr(0, dotOffset)), path.substr(dotOffset + 1)};
         }
-        return {obj.getField(path), ""_sd};
+        return {obj.getField(path), ""sv};
     }();
     uassert(7246301,
             str::stream() << "field " << path << " cannot be indexed as an array (multikey)",
@@ -133,7 +135,7 @@ BSONElement BtreeKeyGenerator::_extractNextElement(const BSONObj& obj,
                                                    const PositionalPathInfo& positionalInfo,
                                                    const char** field,
                                                    bool* arrayNestedArray) const {
-    StringData firstField = str::before(*field, '.');
+    std::string_view firstField = str::before(*field, '.');
     bool haveObjField = !obj.getField(firstField).eoo();
     BSONElement arrField = positionalInfo.positionallyIndexedElt;
 
@@ -233,7 +235,7 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
             key_string::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
 
             if (collator) {
-                keyString.appendBSONElement(e, [&](StringData stringData) {
+                keyString.appendBSONElement(e, [&](std::string_view stringData) {
                     return collator->getComparisonString(stringData);
                 });
             } else {
@@ -337,7 +339,7 @@ void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooled
         }
 
         if (collator) {
-            keyString.appendBSONElement(elem, [&](StringData stringData) {
+            keyString.appendBSONElement(elem, [&](std::string_view stringData) {
                 return collator->getComparisonString(stringData);
             });
         } else {
@@ -448,7 +450,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
         key_string::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
         for (const auto& elem : *fixed) {
             if (collator) {
-                keyString.appendBSONElement(elem, [&](StringData stringData) {
+                keyString.appendBSONElement(elem, [&](std::string_view stringData) {
                     return collator->getComparisonString(stringData);
                 });
             } else {
@@ -523,7 +525,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
             // we must have traversed through 'arrElt'.
             invariant(fieldIsArray);
 
-            StringData part = (*fieldNames)[i];
+            std::string_view part = (*fieldNames)[i];
             part = part.substr(0, part.find('.'));
             subPositionalInfo[i].positionallyIndexedElt = arrObj[part];
             if (subPositionalInfo[i].positionallyIndexedElt.eoo()) {

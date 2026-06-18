@@ -31,6 +31,7 @@
 
 namespace mongo::ce {
 namespace {
+using namespace std::literals::string_view_literals;
 namespace value = sbe::value;
 
 using stats::CEHistogram;
@@ -77,9 +78,9 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
         TypeCounts{{value::TypeTags::NumberInt64, 515}, {value::TypeTags::StringSmall, 485}},
         collCard);
 
-    const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
+    const auto [tagLowStr, valLowStr] = value::makeNewString(""sv);
     value::ValueGuard vgLowStr(tagLowStr, valLowStr);
-    const auto [tagAbc, valAbc] = value::makeNewString("abc"_sd);
+    const auto [tagAbc, valAbc] = value::makeNewString("abc"sv);
     value::ValueGuard vg(tagAbc, valAbc);
     auto [tagObj, valObj] = value::makeNewObject();
     value::ValueGuard vgObj(tagObj, valObj);
@@ -232,7 +233,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     const auto [tagLowDbl, valLowDbl] =
         std::make_pair(value::TypeTags::NumberDouble,
                        value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
-    const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
+    const auto [tagLowStr, valLowStr] = value::makeNewString(""sv);
     value::ValueGuard vgLowStr(tagLowStr, valLowStr);
 
     // Actual cardinality {$lt: 100} = 115.
@@ -277,7 +278,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     ASSERT_APPROX_EQUAL(6.69, expectedCard.card, 0.001);
 
     // Actual cardinality {$eq: 'DD2'} = 2.
-    auto [tagStr, valStr] = value::makeNewString("DD2"_sd);
+    auto [tagStr, valStr] = value::makeNewString("DD2"sv);
     value::ValueGuard vg(tagStr, valStr);
     expectedCard = estimateCardinalityEq(*ceHist, tagStr, valStr, true /* includeScalar */);
     ASSERT_APPROX_EQUAL(5.27, expectedCard.card, kErrorBound);
@@ -341,7 +342,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     ASSERT_APPROX_EQUAL(250.8, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$match: {a: {$elemMatch: {$eq: 'cu'}}}} = 7.
-    std::tie(tagStr, valStr) = value::makeNewString("cu"_sd);
+    std::tie(tagStr, valStr) = value::makeNewString("cu"sv);
     expectedCard = estimateCardinalityEq(*ceHist, tagStr, valStr, false /* includeScalar */);
     ASSERT_APPROX_EQUAL(3.8, expectedCard.card, kErrorBound);
 

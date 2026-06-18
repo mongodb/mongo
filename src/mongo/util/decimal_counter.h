@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/itoa.h"
 #include "mongo/util/modules.h"
@@ -37,6 +36,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <string_view>
 #include <type_traits>
 
 namespace MONGO_MOD_PUB mongo {
@@ -52,7 +52,7 @@ public:
 
     DecimalCounter(T start = 0) : _lastDigitIndex(_getLastDigitIndex(start)), _counter(start) {}
 
-    constexpr operator StringData() const {
+    constexpr operator std::string_view() const {
         return {_digits, static_cast<size_t>(_lastDigitIndex + 1)};
     }
     constexpr operator uint32_t() const {
@@ -98,7 +98,7 @@ private:
             return 0;
         }
         ItoA startItoA(start);
-        StringData startStr(startItoA);
+        std::string_view startStr(startItoA);
         std::memcpy(_digits, startStr.data(), startStr.size());
         return startStr.size() - 1;
     }

@@ -31,7 +31,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -65,6 +64,7 @@
 
 #include <ostream>
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -74,7 +74,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangInAppendOplogNote);
 
 namespace {
-Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData note) {
+Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, std::string_view note) {
     ScopedAdmissionPriority<ExecutionAdmissionContext> priority{
         opCtx, AdmissionContext::Priority::kExempt};
 

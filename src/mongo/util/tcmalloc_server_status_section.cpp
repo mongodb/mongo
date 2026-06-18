@@ -28,7 +28,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -39,6 +38,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -54,6 +54,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 template <typename E>
 auto getUnderlyingType(E e) {
@@ -71,15 +72,15 @@ auto getUnderlyingType(E e) {
  */
 class TCMallocMetrics {
 public:
-    virtual std::vector<StringData> getGenericStatNames() const {
+    virtual std::vector<std::string_view> getGenericStatNames() const {
         return {};
     }
 
-    virtual std::vector<StringData> getTCMallocStatNames() const {
+    virtual std::vector<std::string_view> getTCMallocStatNames() const {
         return {};
     }
 
-    virtual boost::optional<long long> getNumericProperty(StringData propertyName) const {
+    virtual boost::optional<long long> getNumericProperty(std::string_view propertyName) const {
         return boost::none;
     }
 
@@ -117,39 +118,39 @@ public:
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 class GoogleTCMallocMetrics : public TCMallocMetrics {
 public:
-    std::vector<StringData> getGenericStatNames() const override {
+    std::vector<std::string_view> getGenericStatNames() const override {
         return {
-            "bytes_in_use_by_app"_sd,
-            "current_allocated_bytes"_sd,
-            "heap_size"_sd,
-            "peak_memory_usage"_sd,
-            "physical_memory_used"_sd,
-            "virtual_memory_used"_sd,
+            "bytes_in_use_by_app"sv,
+            "current_allocated_bytes"sv,
+            "heap_size"sv,
+            "peak_memory_usage"sv,
+            "physical_memory_used"sv,
+            "virtual_memory_used"sv,
         };
     }
 
-    std::vector<StringData> getTCMallocStatNames() const override {
+    std::vector<std::string_view> getTCMallocStatNames() const override {
         return {
-            "central_cache_free"_sd,
-            "cpu_free"_sd,
-            "current_total_thread_cache_bytes"_sd,
-            "desired_usage_limit_bytes"_sd,
-            "hard_usage_limit_bytes"_sd,
-            "local_bytes"_sd,
-            "max_total_thread_cache_bytes"_sd,
-            "metadata_bytes"_sd,
-            "page_algorithm"_sd,
-            "pageheap_free_bytes"_sd,
-            "pageheap_unmapped_bytes"_sd,
-            "required_bytes"_sd,
-            "sharded_transfer_cache_free"_sd,
-            "thread_cache_count"_sd,
-            "thread_cache_free"_sd,
-            "transfer_cache_free"_sd,
+            "central_cache_free"sv,
+            "cpu_free"sv,
+            "current_total_thread_cache_bytes"sv,
+            "desired_usage_limit_bytes"sv,
+            "hard_usage_limit_bytes"sv,
+            "local_bytes"sv,
+            "max_total_thread_cache_bytes"sv,
+            "metadata_bytes"sv,
+            "page_algorithm"sv,
+            "pageheap_free_bytes"sv,
+            "pageheap_unmapped_bytes"sv,
+            "required_bytes"sv,
+            "sharded_transfer_cache_free"sv,
+            "thread_cache_count"sv,
+            "thread_cache_free"sv,
+            "transfer_cache_free"sv,
         };
     }
 
-    boost::optional<long long> getNumericProperty(StringData propertyName) const override {
+    boost::optional<long long> getNumericProperty(std::string_view propertyName) const override {
         if (auto res = tcmalloc::MallocExtension::GetNumericProperty(std::string{propertyName});
             res.has_value()) {
             return static_cast<long long>(res.value());
@@ -166,7 +167,7 @@ public:
     }
 
     void appendRenamedMetrics(BSONObjBuilder& bob) const override {
-        auto tryAppendRename = [&](StringData statName, StringData newName) {
+        auto tryAppendRename = [&](std::string_view statName, std::string_view newName) {
             if (auto val = getNumericProperty(statName); !!val) {
                 bob.appendNumber(newName, *val);
             }
@@ -228,36 +229,36 @@ private:
 #elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 class GperfTCMallocMetrics : public TCMallocMetrics {
 public:
-    std::vector<StringData> getGenericStatNames() const override {
+    std::vector<std::string_view> getGenericStatNames() const override {
         return {
-            "current_allocated_bytes"_sd,
-            "heap_size"_sd,
+            "current_allocated_bytes"sv,
+            "heap_size"sv,
         };
     }
 
-    std::vector<StringData> getTCMallocStatNames() const override {
+    std::vector<std::string_view> getTCMallocStatNames() const override {
         return {
-            "pageheap_free_bytes"_sd,
-            "pageheap_unmapped_bytes"_sd,
-            "max_total_thread_cache_bytes"_sd,
-            "current_total_thread_cache_bytes"_sd,
-            "central_cache_free_bytes"_sd,
-            "transfer_cache_free_bytes"_sd,
-            "thread_cache_free_bytes"_sd,
-            "aggressive_memory_decommit"_sd,
-            "pageheap_committed_bytes"_sd,
-            "pageheap_scavenge_count"_sd,
-            "pageheap_commit_count"_sd,
-            "pageheap_total_commit_bytes"_sd,
-            "pageheap_decommit_count"_sd,
-            "pageheap_total_decommit_bytes"_sd,
-            "pageheap_reserve_count"_sd,
-            "pageheap_total_reserve_bytes"_sd,
-            "spinlock_total_delay_ns"_sd,
+            "pageheap_free_bytes"sv,
+            "pageheap_unmapped_bytes"sv,
+            "max_total_thread_cache_bytes"sv,
+            "current_total_thread_cache_bytes"sv,
+            "central_cache_free_bytes"sv,
+            "transfer_cache_free_bytes"sv,
+            "thread_cache_free_bytes"sv,
+            "aggressive_memory_decommit"sv,
+            "pageheap_committed_bytes"sv,
+            "pageheap_scavenge_count"sv,
+            "pageheap_commit_count"sv,
+            "pageheap_total_commit_bytes"sv,
+            "pageheap_decommit_count"sv,
+            "pageheap_total_decommit_bytes"sv,
+            "pageheap_reserve_count"sv,
+            "pageheap_total_reserve_bytes"sv,
+            "spinlock_total_delay_ns"sv,
         };
     }
 
-    boost::optional<long long> getNumericProperty(StringData propertyName) const override {
+    boost::optional<long long> getNumericProperty(std::string_view propertyName) const override {
         size_t value;
         if (MallocExtension::instance()->GetNumericProperty(propertyName.data(), &value)) {
             return static_cast<long long>(value);
@@ -353,13 +354,14 @@ public:
 
         BSONObjBuilder builder;
 
-        auto tryAppend = [&](BSONObjBuilder& builder, StringData bsonName, StringData property) {
-            if (auto value = _metrics.getNumericProperty(property); !!value) {
-                builder.appendNumber(bsonName, *value);
-            }
-        };
+        auto tryAppend =
+            [&](BSONObjBuilder& builder, std::string_view bsonName, std::string_view property) {
+                if (auto value = _metrics.getNumericProperty(property); !!value) {
+                    builder.appendNumber(bsonName, *value);
+                }
+            };
 
-        auto tryStat = [&](BSONObjBuilder& builder, StringData topic, StringData base) {
+        auto tryStat = [&](BSONObjBuilder& builder, std::string_view topic, std::string_view base) {
             tryAppend(builder, base, fmt::format("{}.{}", topic, base));
         };
 
@@ -387,11 +389,11 @@ public:
             _metrics.appendCustomDerivedMetrics(sub);
 
             static constexpr std::array totalFreeBytesParts{
-                "tcmalloc.pageheap_free_bytes"_sd,
-                "tcmalloc.central_cache_free"_sd,
-                "tcmalloc.transfer_cache_free"_sd,
-                "tcmalloc.thread_cache_free"_sd,
-                "tcmalloc.cpu_free"_sd,  // Will be 0 for gperf tcmalloc
+                "tcmalloc.pageheap_free_bytes"sv,
+                "tcmalloc.central_cache_free"sv,
+                "tcmalloc.transfer_cache_free"sv,
+                "tcmalloc.thread_cache_free"sv,
+                "tcmalloc.cpu_free"sv,  // Will be 0 for gperf tcmalloc
             };
             long long total = 0;
             for (auto& stat : totalFreeBytesParts) {

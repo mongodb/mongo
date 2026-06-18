@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/fts/unicode/codepoints.h"
@@ -39,6 +38,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace unicode {
@@ -59,27 +59,27 @@ public:
      * Construct a String with UTF-8 source data (supports standard C++ string literals, and
      * std::strings).
      */
-    explicit String(StringData utf8_src);
+    explicit String(std::string_view utf8_src);
 
     /**
      * Reset the String with the new UTF-8 source data, reusing the underlying buffer when possible.
      */
-    void resetData(StringData utf8_src);
+    void resetData(std::string_view utf8_src);
 
     /**
      * Takes a substring of the current String and puts it in another String.
      * Overwrites buffer's previous contents rather than appending.
      */
-    StringData substrToBuf(StackBufBuilder* buffer, size_t pos, size_t len) const;
+    std::string_view substrToBuf(StackBufBuilder* buffer, size_t pos, size_t len) const;
 
     /**
      * Lowercases a substring of the current String and stores the UTF8 result in buffer.
      * Overwrites buffer's previous contents rather than appending.
      */
-    StringData toLowerToBuf(StackBufBuilder* buffer,
-                            CaseFoldMode mode,
-                            size_t offset = 0,
-                            size_t len = std::string::npos) const;
+    std::string_view toLowerToBuf(StackBufBuilder* buffer,
+                                  CaseFoldMode mode,
+                                  size_t offset = 0,
+                                  size_t len = std::string::npos) const;
 
     /**
      * Returns a UTF-8 encoded std::string version of the String instance. Uses the conversion
@@ -127,8 +127,8 @@ public:
      * the search is case insensitive, non-Turkish case folding is used unless the
      * CaseFoldMode::Turkish is passed to mode.
      */
-    static bool substrMatch(StringData str,
-                            StringData find,
+    static bool substrMatch(std::string_view str,
+                            std::string_view find,
                             SubstrMatchOptions options,
                             CaseFoldMode mode = CaseFoldMode::kNormal);
 
@@ -137,32 +137,33 @@ public:
      *
      * The options field specifies what operations to *skip*, so kCaseSensitive means to skip case
      * folding and kDiacriticSensitive means to skip diacritic striping. If both flags are
-     * specified, the input utf8 StringData is returned directly without any processing or copying.
+     * specified, the input utf8 std::string_view is returned directly without any processing or
+     * copying.
      *
-     * If processing is performed, the returned StringData will be placed in buffer. buffer's
+     * If processing is performed, the returned std::string_view will be placed in buffer. buffer's
      * contents (if any) will be replaced. Since we may return the input unmodified the returned
-     * StringData's lifetime is the shorter of the input utf8 and the next modification to buffer.
-     * The input utf8 must not point into buffer.
+     * std::string_view's lifetime is the shorter of the input utf8 and the next modification to
+     * buffer. The input utf8 must not point into buffer.
      */
-    static StringData caseFoldAndStripDiacritics(StackBufBuilder* buffer,
-                                                 StringData utf8,
-                                                 SubstrMatchOptions options,
-                                                 CaseFoldMode mode);
+    static std::string_view caseFoldAndStripDiacritics(StackBufBuilder* buffer,
+                                                       std::string_view utf8,
+                                                       SubstrMatchOptions options,
+                                                       CaseFoldMode mode);
 
 private:
     /**
      * Helper method for converting a UTF-8 string to a UTF-32 string.
      */
-    void setData(StringData utf8_src);
+    void setData(std::string_view utf8_src);
 
     /**
      * Unified implementation of substrToBuf and toLowerToBuf.
      */
     template <typename Func>
-    StringData substrToBufWithTransform(StackBufBuilder* buffer,
-                                        size_t pos,
-                                        size_t len,
-                                        Func transform) const;
+    std::string_view substrToBufWithTransform(StackBufBuilder* buffer,
+                                              size_t pos,
+                                              size_t len,
+                                              Func transform) const;
 
     /**
      * The underlying UTF-32 data.

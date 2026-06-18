@@ -34,6 +34,8 @@
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <absl/base/nullability.h>
 
 namespace mongo::extension {

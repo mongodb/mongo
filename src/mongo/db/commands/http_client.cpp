@@ -32,7 +32,6 @@
 #include "mongo/base/data_builder.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/http_client_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -47,14 +46,15 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
 
-bool isLocalhostURI(StringData uri) {
-    StringData host;
+bool isLocalhostURI(std::string_view uri) {
+    std::string_view host;
 
     if (uri.starts_with("http://")) {
         host = uri.substr(strlen("http://"));

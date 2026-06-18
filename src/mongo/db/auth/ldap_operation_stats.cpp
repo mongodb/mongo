@@ -35,23 +35,25 @@
 
 #include <cstdint>
 #include <ratio>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 /**
  * LDAPOperationStats members
  */
-constexpr auto kNumberOfReferrals = "LDAPNumberOfReferrals"_sd;
-constexpr auto kNumberOfSuccessfulReferrals = "LDAPNumberOfSuccessfulReferrals"_sd;
-constexpr auto kNumberOfFailedReferrals = "LDAPNumberOfFailedReferrals"_sd;
-constexpr auto kBindStats = "bindStats"_sd;
-constexpr auto kSearchStats = "searchStats"_sd;
+constexpr auto kNumberOfReferrals = "LDAPNumberOfReferrals"sv;
+constexpr auto kNumberOfSuccessfulReferrals = "LDAPNumberOfSuccessfulReferrals"sv;
+constexpr auto kNumberOfFailedReferrals = "LDAPNumberOfFailedReferrals"sv;
+constexpr auto kBindStats = "bindStats"sv;
+constexpr auto kSearchStats = "searchStats"sv;
 
 /**
  * Fields of the Stats struct
  */
-constexpr auto kLDAPMetricNumOp = "numOp"_sd;
-constexpr auto kLDAPMetricDuration = "opDurationMicros"_sd;
+constexpr auto kLDAPMetricNumOp = "numOp"sv;
+constexpr auto kLDAPMetricDuration = "opDurationMicros"sv;
 
 }  // namespace
 
@@ -66,7 +68,7 @@ void LDAPOperationStats::report(BSONObjBuilder* builder, TickSource* tickSource)
 
 void LDAPOperationStats::Stats::report(BSONObjBuilder* builder,
                                        TickSource* tickSource,
-                                       StringData statsName) const {
+                                       std::string_view statsName) const {
     BSONObjBuilder subObjBuildr(builder->subobjStart(statsName));
     subObjBuildr.append(kLDAPMetricNumOp, numOps);
     subObjBuildr.append(kLDAPMetricDuration, durationCount<Microseconds>(timeElapsed(tickSource)));
@@ -84,7 +86,7 @@ void LDAPOperationStats::toString(StringBuilder* sb, TickSource* tickSource) con
 
 void LDAPOperationStats::Stats::toString(StringBuilder* sb,
                                          TickSource* tickSource,
-                                         StringData statsName) const {
+                                         std::string_view statsName) const {
     *sb << statsName << ": { " << kLDAPMetricNumOp << ": " << numOps << ", " << kLDAPMetricDuration
         << ": " << durationCount<Microseconds>(timeElapsed(tickSource)) << " }";
 }

@@ -31,7 +31,6 @@
 #include "mongo/db/repl/task_runner.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/task_runner_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"

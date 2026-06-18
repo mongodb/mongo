@@ -63,6 +63,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
@@ -423,7 +424,8 @@ public:
         };
     }
 
-    static Stub makeStub(StringData uri, boost::optional<Stub::Options> options = boost::none) {
+    static Stub makeStub(std::string_view uri,
+                         boost::optional<Stub::Options> options = boost::none) {
         if (!options) {
             options.emplace();
             options->tlsCAFile = kCAFile;
@@ -487,7 +489,7 @@ inline void assertEchoSucceeds(Session& session) {
     ASSERT_EQ_MSG(swResponse.getValue(), msg);
 }
 
-inline std::string makeGRPCUnixSockPath(int port, StringData label = "grpc") {
+inline std::string makeGRPCUnixSockPath(int port, std::string_view label = "grpc") {
     if (port == 0) {
         port = SecureRandom().nextUInt64();
     }

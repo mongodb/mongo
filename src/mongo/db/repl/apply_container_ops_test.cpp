@@ -44,6 +44,8 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::repl {
 namespace {
 
@@ -52,14 +54,14 @@ namespace {
  * necessary inputs.
  */
 StatusWith<UniqueBuffer> _get(OperationContext* opCtx,
-                              StringData ident,
+                              std::string_view ident,
                               std::span<const char> key) {
     auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto* ru = shard_role_details::getRecoveryUnit(opCtx);
     return storage_engine_direct_crud::get(*storageEngine, *ru, ident, key);
 }
 
-StatusWith<UniqueBuffer> _get(OperationContext* opCtx, StringData ident, int64_t key) {
+StatusWith<UniqueBuffer> _get(OperationContext* opCtx, std::string_view ident, int64_t key) {
     auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto* ru = shard_role_details::getRecoveryUnit(opCtx);
     return storage_engine_direct_crud::get(*storageEngine, *ru, ident, key);
@@ -75,7 +77,7 @@ Status applyContainerOpHelper(OperationContext* opCtx, const OplogEntry& e) {
 }
 
 DurableOplogEntryParams makeBaseParams(const NamespaceString& nss,
-                                       StringData ident,
+                                       std::string_view ident,
                                        OpTypeEnum type,
                                        const BSONObj& o) {
     return DurableOplogEntryParams{

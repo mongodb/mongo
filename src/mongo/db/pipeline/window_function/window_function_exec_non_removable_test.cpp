@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/mock_stage.h"
@@ -51,6 +50,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -59,6 +59,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WindowFunctionExecNonRemovableTest : public AggregationContextFixture {
 public:
@@ -341,10 +342,10 @@ TEST_F(RankTest, CorrectlyRespectsCollation) {
     getExpCtx()->setCollator(
         std::make_shared<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
     setSort(BSON("x" << 1));
-    addMockedInput(Document{{"_id", 0}, {"x", "ba"_sd}});
-    addMockedInput(Document{{"_id", 1}, {"x", "cba"_sd}});
-    addMockedInput(Document{{"_id", 2}, {"x", "cba"_sd}});
-    addMockedInput(Document{{"_id", 3}, {"x", "abcd"_sd}});
+    addMockedInput(Document{{"_id", 0}, {"x", "ba"sv}});
+    addMockedInput(Document{{"_id", 1}, {"x", "cba"sv}});
+    addMockedInput(Document{{"_id", 2}, {"x", "cba"sv}});
+    addMockedInput(Document{{"_id", 3}, {"x", "abcd"sv}});
     auto&& [partitionIter, rank] = makeRank();
     ASSERT_VALUE_EQ(Value(1), rank.getNext());
     partitionIter->advance();

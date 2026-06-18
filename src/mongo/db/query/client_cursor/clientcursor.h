@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
@@ -67,6 +66,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>
@@ -292,8 +292,8 @@ public:
         _planSummary = std::move(ps);
     }
 
-    StringData getPlanSummary() const {
-        return StringData(_planSummary);
+    std::string_view getPlanSummary() const {
+        return std::string_view(_planSummary);
     }
 
     /**
@@ -691,7 +691,7 @@ public:
         _makeStat("lifespan.greaterThanOrEqual10Minutes")};
 
 private:
-    static Counter64& _makeStat(StringData name);
+    static Counter64& _makeStat(std::string_view name);
 };
 
 /*

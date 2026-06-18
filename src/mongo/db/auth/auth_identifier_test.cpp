@@ -33,7 +33,6 @@
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -49,6 +48,7 @@
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -59,6 +59,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const std::string& getName(const UserName& obj) {
     return obj.getUser();
@@ -80,7 +81,8 @@ void checkValueAssertions(const T& obj,
                           Name name,
                           Db db,
                           const boost::optional<TenantId>& tenant = boost::none) {
-    const bool expectEmpty = StringData(name).empty() && StringData(db).empty() && !tenant;
+    const bool expectEmpty =
+        std::string_view(name).empty() && std::string_view(db).empty() && !tenant;
     ASSERT_EQ(obj.empty(), expectEmpty);
 
     ASSERT_EQ(obj.getDB(), db);
@@ -111,8 +113,8 @@ void doConstructorTest() {
 
     checkValueAssertions(T("", ""), "", "");
     checkValueAssertions(T(std::string(), std::string()), "", "");
-    checkValueAssertions(T(StringData(), StringData()), "", "");
-    checkValueAssertions(T(std::string(), StringData()), "", "");
+    checkValueAssertions(T(std::string_view(), std::string_view()), "", "");
+    checkValueAssertions(T(std::string(), std::string_view()), "", "");
 
     checkValueAssertions(T("name1", "db1"), "name1", "db1");
     checkValueAssertions(T("name1", ""), "name1", "");
@@ -184,8 +186,8 @@ TEST(AuthName, StringParseTests) {
 
 TEST(AuthName, UserName) {
     const std::vector<UserName> userNames = {
-        UserName(std::string("alice"), "db1"_sd),
-        UserName("bob"_sd, std::string("db2")),
+        UserName(std::string("alice"), "db1"sv),
+        UserName("bob"sv, std::string("db2")),
         uassertStatusOK(UserName::parse("db3.claire")),
     };
 
@@ -224,8 +226,8 @@ TEST(AuthName, UserName) {
 
 TEST(AuthName, RoleName) {
     const std::vector<RoleName> roleNames = {
-        RoleName(std::string("alice"), "db1"_sd),
-        RoleName("bob"_sd, std::string("db2")),
+        RoleName(std::string("alice"), "db1"sv),
+        RoleName("bob"sv, std::string("db2")),
         uassertStatusOK(RoleName::parse("db3.claire")),
     };
 

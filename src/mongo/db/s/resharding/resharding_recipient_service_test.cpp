@@ -96,6 +96,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
@@ -257,7 +258,7 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
-        StringData reason) {
+        std::string_view reason) {
         _maybeThrowErrorForFunction(opCtx, ExternalFunction::kGetCollectionOptions);
         if (nss == _sourceNss) {
             return {sourceCollectionOptions, uuid};
@@ -275,7 +276,7 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
-        StringData reason,
+        std::string_view reason,
         const ShardId& fromShardId) {
         _maybeThrowErrorForFunction(opCtx, ExternalFunction::kGetCollectionOptions);
         return getCollectionOptions(opCtx, nss, uuid, afterClusterTime, reason);
@@ -286,7 +287,7 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         Timestamp afterClusterTime,
-        StringData reason,
+        std::string_view reason,
         bool expandSimpleCollation) {
         invariant(nss == _sourceNss);
         _maybeThrowErrorForFunction(opCtx, ExternalFunction::kGetCollectionIndexes);
@@ -300,7 +301,7 @@ public:
     void route(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        StringData reason,
+        std::string_view reason,
         unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)> callback) {
         callback(opCtx, getTrackedCollectionRoutingInfo(opCtx, nss));
     }
@@ -393,7 +394,7 @@ private:
         bool dataReplicationRunning = false;
     };
 
-    const StringData _currentShardKey = "oldKey";
+    const std::string_view _currentShardKey = "oldKey";
 
     const NamespaceString _sourceNss =
         NamespaceString::createNamespaceString_forTest("sourcedb", "sourcecollection");
@@ -447,7 +448,7 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
-        StringData reason) override {
+        std::string_view reason) override {
         return _impl->getCollectionOptions(opCtx, nss, uuid, afterClusterTime, reason);
     }
 
@@ -456,7 +457,7 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
-        StringData reason,
+        std::string_view reason,
         const ShardId& fromShardId) override {
         return _impl->getCollectionOptions(opCtx, nss, uuid, afterClusterTime, reason, fromShardId);
     }
@@ -466,7 +467,7 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         Timestamp afterClusterTime,
-        StringData reason,
+        std::string_view reason,
         bool expandSimpleCollation) override {
         return _impl->getCollectionIndexes(
             opCtx, nss, uuid, afterClusterTime, reason, expandSimpleCollation);
@@ -474,7 +475,7 @@ public:
 
     void route(OperationContext* opCtx,
                const NamespaceString& nss,
-               StringData reason,
+               std::string_view reason,
                unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)>
                    callback) override {
         _impl->route(opCtx, nss, reason, std::move(callback));

@@ -53,9 +53,12 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future_util.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 MONGO_FAIL_POINT_DEFINE(pauseDuringMultiUpdateCoordinatorPhaseTransition);
 MONGO_FAIL_POINT_DEFINE(pauseDuringMultiUpdateCoordinatorPhaseTransitionAlternate);
@@ -70,7 +73,7 @@ primary_only_service_helpers::PauseDuringPhaseTransitionFailPoint<MultiUpdateCoo
     pauseDuringPhaseTransitions{
         {pauseDuringMultiUpdateCoordinatorPhaseTransition,
          pauseDuringMultiUpdateCoordinatorPhaseTransitionAlternate},
-        [](StringData phase) {
+        [](std::string_view phase) {
             IDLParserContext ectx(
                 "pauseDuringMultiUpdateCoordinatorPhaseTransition::readPhaseArgument");
             return idl::deserialize<MultiUpdateCoordinatorPhaseEnum>(phase, ectx);
@@ -138,7 +141,7 @@ MultiUpdateCoordinatorService::MultiUpdateCoordinatorService(
     std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> factory)
     : PrimaryOnlyService{serviceContext}, _externalStateFactory{std::move(factory)} {}
 
-StringData MultiUpdateCoordinatorService::getServiceName() const {
+std::string_view MultiUpdateCoordinatorService::getServiceName() const {
     return kServiceName;
 }
 
@@ -289,7 +292,7 @@ Message MultiUpdateCoordinatorInstance::getUpdateAsClusterCommand() const {
     auto cmdName = updateCmdObj.firstElement().fieldNameStringData();
     uassert(8126601,
             str::stream() << "Unsupported cmd specified for multi update: " << cmdName,
-            (cmdName == "update"_sd) || (cmdName == "delete"_sd) || (cmdName == "bulkWrite"_sd));
+            (cmdName == "update"sv) || (cmdName == "delete"sv) || (cmdName == "bulkWrite"sv));
 
     auto modifiedCmdObj =
         cluster::cmd::translations::replaceCommandNameWithClusterCommandName(updateCmdObj);

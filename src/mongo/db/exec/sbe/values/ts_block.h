@@ -38,6 +38,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -60,7 +61,7 @@ public:
         std::vector<std::unique_ptr<CellBlock>> cellBlocks;
     };
 
-    TsBucketPathExtractor(std::vector<PathRequest> reqs, StringData timeField);
+    TsBucketPathExtractor(std::vector<PathRequest> reqs, std::string_view timeField);
 
     /*
      * Returns one CellBlock per path given in the constructor. A CellBlock represents all of the
@@ -92,7 +93,7 @@ private:
     stdx::unordered_set<size_t> _nonTopLevelGetPathIdxes;
 
 
-    StringData _timeField;
+    std::string_view _timeField;
 
     // This maps [top-level field -> [index into '_paths' which start with this field]]
     //

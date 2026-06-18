@@ -74,6 +74,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 
@@ -215,7 +216,8 @@ SemiFuture<AbortResult> Transaction::abort() {
         .semi();
 }
 
-SemiFuture<BSONObj> Transaction::_commitOrAbort(const DatabaseName& dbName, StringData cmdName) {
+SemiFuture<BSONObj> Transaction::_commitOrAbort(const DatabaseName& dbName,
+                                                std::string_view cmdName) {
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(cmdName, 1);
 
@@ -415,7 +417,7 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
                 << redact(cmdBuilder->asTempObj()));
     }
 
-    auto assertDoesNotHaveField = [&cmdBuilder](StringData fieldName) {
+    auto assertDoesNotHaveField = [&cmdBuilder](std::string_view fieldName) {
         iassert(8579100,
                 fmt::format("Command object passed to the internal transaction API should not "
                             "contain the '{}' field",

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -47,6 +46,7 @@
 #include <cstdint>
 #include <iterator>
 #include <span>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -185,7 +185,7 @@ public:
 
                 BSONElement materialize(BSONElementStorage& allocator,
                                         BSONElement last,
-                                        StringData fieldName) const;
+                                        std::string_view fieldName) const;
 
                 Simple8b<uint64_t>::Iterator pos;
                 int64_t lastEncodedValue = 0;
@@ -200,7 +200,7 @@ public:
             struct MONGO_MOD_PRIVATE Decoder128 {
                 BSONElement materialize(BSONElementStorage& allocator,
                                         BSONElement last,
-                                        StringData fieldName) const;
+                                        std::string_view fieldName) const;
 
 
                 Simple8b<uint128_t>::Iterator pos;
@@ -273,7 +273,7 @@ public:
 
         // Process a single scalar field: advance its decoder, load delta or control byte,
         // copy into allocator if needed. Returns false if EOO encountered (exit interleaved).
-        bool _processScalar(DecodingState& state, StringData fieldName);
+        bool _processScalar(DecodingState& state, std::string_view fieldName);
 
         std::variant<Regular, Interleaved> _mode = Regular{};
     };
@@ -423,7 +423,7 @@ public:
         _collection.push_back(_last);
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void append(StringData val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(std::string_view val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }

@@ -30,7 +30,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,6 +51,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -153,7 +153,7 @@ private:
 
 namespace {
 // Builds an IndexEntry whose indexCatalogEntryStorage has the given ident.
-IndexEntry buildIndexEntryWithIdent(const BSONObj& kp, StringData ident) {
+IndexEntry buildIndexEntryWithIdent(const BSONObj& kp, std::string_view ident) {
     IndexSpec spec;
     spec.version(1).name("a_1").addKeys(kp);
     auto mockEntry =

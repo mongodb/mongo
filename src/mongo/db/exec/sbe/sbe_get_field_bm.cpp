@@ -31,6 +31,8 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 
+#include <string_view>
+
 #include <benchmark/benchmark.h>
 
 namespace mongo::sbe {
@@ -55,7 +57,7 @@ public:
 
         size_t i = 0;
         for (auto _ : state) {
-            StringData fieldName = PresencePolicy::template selectField<FieldNamePolicy>(i++);
+            std::string_view fieldName = PresencePolicy::template selectField<FieldNamePolicy>(i++);
             benchmark::DoNotOptimize(byteCode.getField_test({type, val}, fieldName));
         }
     }
@@ -89,17 +91,17 @@ template <int N, char HitChar, char MissChar, char MissCommonPrefixFill>
 struct FieldNamePolicy {
     static_assert(HitChar != MissChar, "miss must differ in first character");
 
-    static StringData hit() {
+    static std::string_view hit() {
         static const std::string s(N, HitChar);
-        return StringData(s);
+        return std::string_view(s);
     }
 
-    static StringData miss() {
+    static std::string_view miss() {
         static const std::string s(N, MissChar);
-        return StringData(s);
+        return std::string_view(s);
     }
 
-    static StringData missCommonPrefix() {
+    static std::string_view missCommonPrefix() {
         // Same first character as hit(), rest differs.
         // For N == 1, a common-prefix miss is impossible (the single character must differ
         // to guarantee a miss), so we fall back to the regular miss.
@@ -112,7 +114,7 @@ struct FieldNamePolicy {
                 return r;
             }
         }();
-        return StringData(s);
+        return std::string_view(s);
     }
 
     static std::string pad(int i) {
@@ -168,13 +170,13 @@ using Fields100TargetFirst = FieldsShape<100, true>;
  */
 
 struct Int32Small {
-    static void append(BSONObjBuilder& bob, StringData fieldName) {
+    static void append(BSONObjBuilder& bob, std::string_view fieldName) {
         bob.append(fieldName, 42);
     }
 };
 
 struct String1KB {
-    static void append(BSONObjBuilder& bob, StringData fieldName) {
+    static void append(BSONObjBuilder& bob, std::string_view fieldName) {
         static const std::string kBuf(1024, 'x');  // 1 KB
         bob.append(fieldName, kBuf);
     }
@@ -186,21 +188,21 @@ struct String1KB {
 
 struct AlwaysHit {
     template <class FieldNamePolicy>
-    static StringData selectField(size_t /*i*/) {
+    static std::string_view selectField(size_t /*i*/) {
         return FieldNamePolicy::hit();
     }
 };
 
 struct AlwaysMiss {
     template <class FieldNamePolicy>
-    static StringData selectField(size_t /*i*/) {
+    static std::string_view selectField(size_t /*i*/) {
         return FieldNamePolicy::miss();
     }
 };
 
 struct Hit90Miss10 {
     template <class FieldNamePolicy>
-    static StringData selectField(size_t i) {
+    static std::string_view selectField(size_t i) {
         // Every 10th lookup is a miss.
         return (i % 10 == 0) ? FieldNamePolicy::miss() : FieldNamePolicy::hit();
     }
@@ -209,14 +211,14 @@ struct Hit90Miss10 {
 // Miss with a common first character — bypasses the first-char skip optimization.
 struct AlwaysMissCommonPrefix {
     template <class FieldNamePolicy>
-    static StringData selectField(size_t /*i*/) {
+    static std::string_view selectField(size_t /*i*/) {
         return FieldNamePolicy::missCommonPrefix();
     }
 };
 
 struct Hit90MissCommonPrefix10 {
     template <class FieldNamePolicy>
-    static StringData selectField(size_t i) {
+    static std::string_view selectField(size_t i) {
         // Every 10th lookup is a common-prefix miss.
         return (i % 10 == 0) ? FieldNamePolicy::missCommonPrefix() : FieldNamePolicy::hit();
     }

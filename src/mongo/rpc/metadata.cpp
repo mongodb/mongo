@@ -61,6 +61,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -190,15 +191,16 @@ void readRequestMetadata(OperationContext* opCtx,
 }
 
 namespace {
-boost::optional<StringData> commandNameToDocumentSequenceName(StringData commandName) {
-    if (commandName == "insert"_sd) {
-        return "documents"_sd;
+using namespace std::literals::string_view_literals;
+boost::optional<std::string_view> commandNameToDocumentSequenceName(std::string_view commandName) {
+    if (commandName == "insert"sv) {
+        return "documents"sv;
     }
-    if (commandName == "update"_sd) {
-        return "updates"_sd;
+    if (commandName == "update"sv) {
+        return "updates"sv;
     }
-    if (commandName == "delete"_sd) {
-        return "deletes"_sd;
+    if (commandName == "delete"sv) {
+        return "deletes"sv;
     }
     return boost::none;
 }
@@ -259,10 +261,10 @@ BSONObj upconvertCommandObj(BSONObj cmdObj,
                             const boost::optional<OpMsgRequest::DocumentSequence>& docSeq,
                             const boost::optional<BSONObj>& readPref) {
     StringDataSet fieldsToRemove;
-    if (cmdObj.hasField("$queryOptions"_sd)) {
+    if (cmdObj.hasField("$queryOptions"sv)) {
         // TODO SERVER-29091: The use of $queryOptions is a holdover related to the
         // no-longer-supported OP_QUERY format. We should remove it from the code base.
-        fieldsToRemove.insert("$queryOptions"_sd);
+        fieldsToRemove.insert("$queryOptions"sv);
     }
 
     if (docSeq.has_value()) {

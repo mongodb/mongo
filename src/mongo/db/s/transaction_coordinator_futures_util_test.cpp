@@ -30,7 +30,6 @@
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,6 +55,7 @@
 #include <numeric>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -300,7 +300,7 @@ protected:
         }
     }
 
-    void assertCommandSentAndRespondWith(StringData commandName,
+    void assertCommandSentAndRespondWith(std::string_view commandName,
                                          const StatusWith<BSONObj>& response,
                                          boost::optional<BSONObj> expectedWriteConcern) {
         onCommand([&](const executor::RemoteCommandRequest& request) {

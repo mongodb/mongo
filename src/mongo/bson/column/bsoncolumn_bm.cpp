@@ -29,7 +29,6 @@
 
 #include "mongo/bson/column/bsoncolumn.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -47,6 +46,7 @@
 #include <cstdint>
 #include <random>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <benchmark/benchmark.h>
@@ -54,6 +54,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 enum DecompressMode { kIterator, kBlockBSON, kBlockSBE };
 
@@ -155,7 +156,7 @@ std::vector<BSONObj> generateIntegers(int num, int skipPercentage) {
         } else {
             BSONObjBuilder builder;
             int32_t value = std::lround(d(gen));
-            builder.append(""_sd, value);
+            builder.append(""sv, value);
             ints.push_back(builder.obj());
         }
     }
@@ -182,7 +183,7 @@ std::vector<BSONObj> generateTableTargets(int num, int tableBits) {
         if (neg(gen) == 1)
             diff *= -1;
         lastValue += diff;
-        builder.append(""_sd, lastValue);
+        builder.append(""sv, lastValue);
         ints.push_back(builder.obj());
     }
 
@@ -206,7 +207,7 @@ std::vector<BSONObj> generateDoubles(int num, int skipPercentage, int decimals) 
 
 
             double generated = std::llround(d(gen) * factors[decimals]) / factors[decimals];
-            builder.append(""_sd, generated);
+            builder.append(""sv, generated);
             doubles.push_back(builder.obj());
         }
     }
@@ -228,7 +229,7 @@ std::vector<BSONObj> generateTimestamps(int num, int skipPercentage, double mean
             timestamps.push_back(BSONObj());
         } else {
             BSONObjBuilder builder;
-            builder.append(""_sd, Timestamp(std::llround(now + d(gen))));
+            builder.append(""sv, Timestamp(std::llround(now + d(gen))));
             timestamps.push_back(builder.obj());
         }
     }
@@ -247,7 +248,7 @@ std::vector<BSONObj> generateObjectIds(int num, int skipPercentage) {
             timestamps.push_back(BSONObj());
         } else {
             BSONObjBuilder builder;
-            builder.append(""_sd, OID::gen());
+            builder.append(""sv, OID::gen());
             timestamps.push_back(builder.obj());
         }
     }
@@ -288,12 +289,12 @@ std::vector<BSONObj> generateBinary(
                     buf[i] = std::lround(strDist(gen));
                 }
                 buf[size] = 0;
-                builder.append(""_sd, buf, size + 1);  // string requires room for null character
+                builder.append(""sv, buf, size + 1);  // string requires room for null character
             } else {
                 for (int i = 0; i < size; ++i) {
                     buf[i] = std::lround(byteDist(gen));
                 }
-                builder.appendBinData(""_sd, size, BinDataType::BinDataGeneral, buf);
+                builder.appendBinData(""sv, size, BinDataType::BinDataGeneral, buf);
             }
 
             last = builder.obj();
@@ -321,7 +322,7 @@ std::vector<BSONObj> generateUUIDs(int num, int skipPercentage, int size = 16) {
             for (int i = 0; i < size; ++i) {
                 buf[i] = std::lround(byteDist(gen));
             }
-            builder.appendBinData(""_sd, size, BinDataType::newUUID, buf);
+            builder.appendBinData(""sv, size, BinDataType::newUUID, buf);
             uuids.push_back(builder.obj());
         }
     }
@@ -340,7 +341,7 @@ BSONObj buildCompressed(const std::vector<BSONObj>& elems) {
     }
     auto binData = col.finalize();
     BSONObjBuilder objBuilder;
-    objBuilder.append(""_sd, binData);
+    objBuilder.append(""sv, binData);
     return objBuilder.obj();
 }
 
@@ -355,7 +356,7 @@ BSONObj buildCompressedWithObjs(const std::vector<BSONObj>& elems) {
     }
     auto binData = col.finalize();
     BSONObjBuilder objBuilder;
-    objBuilder.append(""_sd, binData);
+    objBuilder.append(""sv, binData);
     return objBuilder.obj();
 }
 

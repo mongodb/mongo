@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
@@ -49,6 +48,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -112,7 +112,7 @@ public:
     Status voteAbortIndexBuild(OperationContext* opCtx,
                                const UUID& buildUUID,
                                const HostAndPort& hostAndPort,
-                               StringData reason) override;
+                               std::string_view reason) override;
 
     Status voteCommitIndexBuild(OperationContext* opCtx,
                                 const UUID& buildUUID,
@@ -120,7 +120,7 @@ public:
 
     Status setCommitQuorum(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           const std::vector<StringData>& indexNames,
+                           const std::vector<std::string_view>& indexNames,
                            const CommitQuorumOptions& newCommitQuorum) override;
 
 private:

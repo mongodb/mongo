@@ -34,7 +34,10 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
+using namespace std::literals::string_view_literals;
 
 class PredicateExtractorTest : public unittest::Test {
 public:
@@ -441,7 +444,7 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
         letVars.emplace_back("a", def, idA);
     }
 
-    auto parseMatch = [&](StringData json) {
+    auto parseMatch = [&](std::string_view json) {
         auto bson = fromjson(json);
         return uassertStatusOK(
             MatchExpressionParser::parse(bson,
@@ -509,7 +512,7 @@ public:
                                          MatchExpressionParser::kAllowAllSpecialFeatures));
     }
 
-    ExprPredicatesResult extract(StringData json) {
+    ExprPredicatesResult extract(std::string_view json) {
         auto bson = fromjson(json);
         auto matchExpr = createMatcher(bson);
         return extractExprPredicates(_pathResolver, matchExpr.get());
@@ -529,7 +532,7 @@ protected:
  * A join predicate extracted from a single $expr equality expression.
  */
 TEST_F(ExtractExprPredicatesTest, SimpleEquality) {
-    static constexpr StringData json = "{$expr: {$eq: ['$first.a', '$second.b']}}";
+    static constexpr std::string_view json = "{$expr: {$eq: ['$first.a', '$second.b']}}";
     auto result = extract(json);
     ASSERT_TRUE(result.expressionIsFullyAbsorbed);
     ASSERT_EQ(1, result.predicates.size());
@@ -539,7 +542,7 @@ TEST_F(ExtractExprPredicatesTest, SimpleEquality) {
  * A join predicate cannot be extracted from an equality of the same collection fields.
  */
 TEST_F(ExtractExprPredicatesTest, SameCollectionEquality) {
-    static constexpr StringData json = "{$expr: {$eq: ['$first.a', '$first.b']}}";
+    static constexpr std::string_view json = "{$expr: {$eq: ['$first.a', '$first.b']}}";
     auto result = extract(json);
     ASSERT_FALSE(result.expressionIsFullyAbsorbed);
     ASSERT_EQ(0, result.predicates.size());
@@ -549,7 +552,7 @@ TEST_F(ExtractExprPredicatesTest, SameCollectionEquality) {
  * Join predicates extracted from conjuction of $expr equalities.
  */
 TEST_F(ExtractExprPredicatesTest, ExpressionAnd) {
-    static constexpr StringData json =
+    static constexpr std::string_view json =
         "{$expr: {$and: [{$eq: ['$a', '$second.a']}, {$eq: ['$first.b', '$second.b']}]}}";
     auto result = extract(json);
     ASSERT_TRUE(result.expressionIsFullyAbsorbed);
@@ -560,7 +563,7 @@ TEST_F(ExtractExprPredicatesTest, ExpressionAnd) {
  * No join predicates can be extracted from rooted $or.
  */
 TEST_F(ExtractExprPredicatesTest, RootedOr) {
-    static constexpr StringData json = R"(
+    static constexpr std::string_view json = R"(
         {
             $or: [
                 { $expr: { $eq: ["$second.b", "$first.a"] } },
@@ -579,7 +582,7 @@ TEST_F(ExtractExprPredicatesTest, RootedOr) {
  * No join predicates can be extracted from rooted $or expression.
  */
 TEST_F(ExtractExprPredicatesTest, ExpressionOr) {
-    static constexpr StringData json =
+    static constexpr std::string_view json =
         "{$expr: {$or: [{$eq: ['$a', '$second.a']}, {$eq: ['$first.b', '$second.b']}]}}";
     auto result = extract(json);
     ASSERT_FALSE(result.expressionIsFullyAbsorbed);
@@ -591,7 +594,7 @@ TEST_F(ExtractExprPredicatesTest, ExpressionOr) {
  * The whole expression cannot be fully absorbed though.
  */
 TEST_F(ExtractExprPredicatesTest, NestedOr) {
-    static constexpr StringData json = R"(
+    static constexpr std::string_view json = R"(
         {
             $and: [
                 { $expr: { $eq: ["$second.b", "$first.a"] } },
@@ -611,7 +614,7 @@ TEST_F(ExtractExprPredicatesTest, NestedOr) {
  * This case is possible in a fuzzer with optimization off.
  */
 TEST_F(ExtractExprPredicatesTest, NestedAnd) {
-    static constexpr StringData json = R"(
+    static constexpr std::string_view json = R"(
         {
             $and: [
                 { $expr: { $eq: ["$second.b", "$first.a"] } },
@@ -630,7 +633,7 @@ TEST_F(ExtractExprPredicatesTest, NestedAnd) {
  * An expressions constains non-equality predicate cannot be fully absorbed.
  */
 TEST_F(ExtractExprPredicatesTest, ExpressionAndWithGt) {
-    static constexpr StringData json = R"(
+    static constexpr std::string_view json = R"(
         {
             $expr: {
                 $and: [
@@ -651,13 +654,13 @@ TEST_F(ExtractExprPredicatesTest, ExpressionAndWithGt) {
  * paths have a single component, so attempting to strip the variable prefix would tassert 16409.
  */
 TEST_F(ExtractExprPredicatesTest, EqualityAgainstBareSystemVariable) {
-    for (StringData json : {"{$expr: {$eq: ['$$NOW', '$first.a']}}"_sd,
-                            "{$expr: {$eq: ['$first.a', '$$NOW']}}"_sd,
-                            "{$expr: {$eq: ['$$ROOT', '$first.a']}}"_sd,
-                            "{$expr: {$eq: ['$first.a', '$$ROOT']}}"_sd,
-                            "{$expr: {$eq: ['$$CURRENT', '$first.a']}}"_sd,
-                            "{$expr: {$eq: ['$first.a', '$$CURRENT']}}"_sd,
-                            "{$expr: {$eq: ['$$NOW', '$$ROOT']}}"_sd}) {
+    for (std::string_view json : {"{$expr: {$eq: ['$$NOW', '$first.a']}}"sv,
+                                  "{$expr: {$eq: ['$first.a', '$$NOW']}}"sv,
+                                  "{$expr: {$eq: ['$$ROOT', '$first.a']}}"sv,
+                                  "{$expr: {$eq: ['$first.a', '$$ROOT']}}"sv,
+                                  "{$expr: {$eq: ['$$CURRENT', '$first.a']}}"sv,
+                                  "{$expr: {$eq: ['$first.a', '$$CURRENT']}}"sv,
+                                  "{$expr: {$eq: ['$$NOW', '$$ROOT']}}"sv}) {
         auto result = extract(json);
         ASSERT_FALSE(result.expressionIsFullyAbsorbed) << json;
         ASSERT_EQ(0, result.predicates.size()) << json;
@@ -670,11 +673,11 @@ TEST_F(ExtractExprPredicatesTest, EqualityAgainstBareSystemVariable) {
  * isVariableReference() is true and stripping the variable name would yield a spurious field path.
  */
 TEST_F(ExtractExprPredicatesTest, EqualityAgainstSystemVariableWithSubfield) {
-    for (StringData json : {"{$expr: {$eq: ['$$NOW.x', '$first.a']}}"_sd,
-                            "{$expr: {$eq: ['$first.a', '$$NOW.x']}}"_sd,
-                            "{$expr: {$eq: ['$$CLUSTER_TIME.foo', '$first.a']}}"_sd,
-                            "{$expr: {$eq: ['$first.a', '$$CLUSTER_TIME.foo']}}"_sd,
-                            "{$expr: {$eq: ['$$NOW.x', '$$CLUSTER_TIME.foo']}}"_sd}) {
+    for (std::string_view json : {"{$expr: {$eq: ['$$NOW.x', '$first.a']}}"sv,
+                                  "{$expr: {$eq: ['$first.a', '$$NOW.x']}}"sv,
+                                  "{$expr: {$eq: ['$$CLUSTER_TIME.foo', '$first.a']}}"sv,
+                                  "{$expr: {$eq: ['$first.a', '$$CLUSTER_TIME.foo']}}"sv,
+                                  "{$expr: {$eq: ['$$NOW.x', '$$CLUSTER_TIME.foo']}}"sv}) {
         auto result = extract(json);
         ASSERT_FALSE(result.expressionIsFullyAbsorbed) << json;
         ASSERT_EQ(0, result.predicates.size()) << json;
@@ -685,7 +688,7 @@ TEST_F(ExtractExprPredicatesTest, EqualityAgainstSystemVariableWithSubfield) {
  * An expression that constains non-expr $eq predicate cannot be fully absorbed.
  */
 TEST_F(ExtractExprPredicatesTest, MatchNonExprEquality) {
-    static constexpr StringData json = R"(
+    static constexpr std::string_view json = R"(
         {
             $and: [
                 { $expr: { $eq: ["$second.b", "$first.a"] } },

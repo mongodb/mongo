@@ -34,7 +34,6 @@
 #include "mongo/db/exec/classic/text_or.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/classic/mock_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -54,6 +53,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -63,7 +63,7 @@ namespace {
 
 static const NamespaceString kNss =
     NamespaceString::createNamespaceString_forTest("db.text_or_test");
-static const StringData kIndexName = "x_test";
+static const std::string_view kIndexName = "x_test";
 static const std::vector<BSONObj> kMovieDocs = {
     BSON(
         "_id"
@@ -142,9 +142,9 @@ public:
      */
     void createTextOrChild(TextOrStage& textOr,
                            RecordId recordId,
-                           StringData term,
+                           std::string_view term,
                            double score,
-                           StringData indexName = kIndexName) {
+                           std::string_view indexName = kIndexName) {
         auto childStage = std::make_unique<MockStage>(_expCtx.get(), &_ws);
 
         // Keep raw pointer before transferring ownership to the TextOrStage.
@@ -172,7 +172,7 @@ public:
         stagePtr.enqueueAdvanced(wsid);
     }
 
-    const IndexCatalogEntry* getIndexEntry(StringData name) {
+    const IndexCatalogEntry* getIndexEntry(std::string_view name) {
         return acquireCollForRead(kNss).getCollectionPtr()->getIndexCatalog()->findIndexByName(
             _opCtx.get(), name);
     }
@@ -199,7 +199,7 @@ private:
     /*
      * TextOr requires a collection and an index to do work on.
      */
-    void _setUpCollectionAndIdx(StringData indexName,
+    void _setUpCollectionAndIdx(std::string_view indexName,
                                 const BSONObj& indexKeys,
                                 const std::vector<BSONObj>& docsToInsert) {
         // We need to be a primary to create a new collection.

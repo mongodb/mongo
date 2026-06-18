@@ -37,14 +37,16 @@
 
 #include <list>
 #include <set>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 ALLOCATE_DOCUMENT_SOURCE_ID(sequentialCache, DocumentSourceSequentialDocumentCache::id)
 
-constexpr StringData DocumentSourceSequentialDocumentCache::kStageName;
+constexpr std::string_view DocumentSourceSequentialDocumentCache::kStageName;
 
 DocumentSourceSequentialDocumentCache::DocumentSourceSequentialDocumentCache(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, SequentialDocumentCachePtr cache)
@@ -149,12 +151,12 @@ Value DocumentSourceSequentialDocumentCache::serialize(
     if (opts.isSerializingForExplain()) {
         return Value(Document{
             {kStageName,
-             Document{{"maxSizeBytes"_sd,
+             Document{{"maxSizeBytes"sv,
                        opts.serializeLiteral(static_cast<long long>(_cache->maxSizeBytes()))},
-                      {"status"_sd,
-                       _cache->isBuilding()      ? "kBuilding"_sd
-                           : _cache->isServing() ? "kServing"_sd
-                                                 : "kAbandoned"_sd}}}});
+                      {"status"sv,
+                       _cache->isBuilding()      ? "kBuilding"sv
+                           : _cache->isServing() ? "kServing"sv
+                                                 : "kAbandoned"sv}}}});
     }
 
     return Value();

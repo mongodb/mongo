@@ -36,6 +36,8 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -88,11 +90,11 @@ class ReadWriteConcernProvenance : public ReadWriteConcernProvenanceBase {
 public:
     using Source = ReadWriteConcernProvenanceSourceEnum;
 
-    static constexpr StringData kClientSupplied = "clientSupplied"_sd;
-    static constexpr StringData kImplicitDefault = "implicitDefault"_sd;
-    static constexpr StringData kCustomDefault = "customDefault"_sd;
-    static constexpr StringData kGetLastErrorDefaults = "getLastErrorDefaults"_sd;
-    static constexpr StringData kInternalWriteDefault = "internalWriteDefault"_sd;
+    static constexpr std::string_view kClientSupplied = "clientSupplied"_sd;
+    static constexpr std::string_view kImplicitDefault = "implicitDefault"_sd;
+    static constexpr std::string_view kCustomDefault = "customDefault"_sd;
+    static constexpr std::string_view kGetLastErrorDefaults = "getLastErrorDefaults"_sd;
+    static constexpr std::string_view kInternalWriteDefault = "internalWriteDefault"_sd;
 
     ReadWriteConcernProvenance() = default;
 
@@ -154,7 +156,7 @@ public:
     /**
      * Convenience functions.
      */
-    static StringData sourceToString(boost::optional<Source> source);
+    static std::string_view sourceToString(boost::optional<Source> source);
 
     bool operator==(const ReadWriteConcernProvenance& other) const {
         return getSource() == other.getSource();

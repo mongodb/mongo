@@ -33,7 +33,6 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonelement.h"
@@ -55,6 +54,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -66,6 +66,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // The values of the kSkipXX styles are used to compute the size, the remaining ones are arbitrary.
 // NOTE: The kSkipXX values directly encode the amount of 4-byte words to skip: don't change them!
@@ -307,10 +308,10 @@ private:
     struct ObjectFrame {
         BSONType type;
         DecimalCounter<uint32_t> indexCounter;
-        std::vector<StringData> fieldNames;
+        std::vector<std::string_view> fieldNames;
     };
 
-    void _checkUTF8Char(StringData str) {
+    void _checkUTF8Char(std::string_view str) {
         uassert(NonConformantBSON,
                 "Found string that doesn't follow UTF-8 encoding.",
                 str::validUTF8(str));
@@ -327,15 +328,15 @@ private:
     void _checkFieldName(const char* ptr) {
         if (_inArr()) {
             // Checks the actual index field value, starting after the type byte
-            const StringData actualIndex(ptr + sizeof(char));
+            const std::string_view actualIndex(ptr + sizeof(char));
             uassert(NonConformantBSON,
                     fmt::format("Indices of BSON Array are invalid. Expected {}, but got {}.",
-                                StringData(_objFrames.back().indexCounter),
+                                std::string_view(_objFrames.back().indexCounter),
                                 actualIndex),
                     _objFrames.back().indexCounter == actualIndex);
             ++_objFrames.back().indexCounter;
         } else if (_inObj()) {
-            const StringData fieldName(ptr + sizeof(char));
+            const std::string_view fieldName(ptr + sizeof(char));
             _checkUTF8Char(fieldName);
             _objFrames.back().fieldNames.push_back(fieldName);
         } else {
@@ -346,8 +347,8 @@ private:
     void _checkRegexOptions(const BSONElementValue& regex) {
         // Checks that the options are in ascending alphabetical order and that they're all
         // valid.
-        static constexpr StringData validRegexOptions("ilmsux");
-        const StringData opt = regex.RegexFlags();
+        static constexpr std::string_view validRegexOptions("ilmsux");
+        const std::string_view opt = regex.RegexFlags();
         uassert(NonConformantBSON,
                 fmt::format("Bad regex options {:?}: Only {:?} allowed", opt, validRegexOptions),
                 opt.find_first_not_of(validRegexOptions) == std::string::npos);
@@ -661,7 +662,7 @@ private:
                 if constexpr (precise) {
                     // See if the _id field was just validated. If so, set the global scope
                     // element.
-                    if (_currFrame == _frames.begin() && StringData(_currElem + 1) == "_id"_sd)
+                    if (_currFrame == _frames.begin() && std::string_view(_currElem + 1) == "_id"sv)
                         _currFrame->elem = BSONElement(_currElem);  // This is fully validated now.
                 }
                 dassert(cursor.ptr < cursor.end);

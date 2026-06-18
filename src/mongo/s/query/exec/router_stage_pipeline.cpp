@@ -30,7 +30,6 @@
 #include "mongo/s/query/exec/router_stage_pipeline.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"

@@ -40,6 +40,7 @@
 #include <cmath>
 #include <compare>
 #include <limits>
+#include <string_view>
 
 #include <boost/functional/hash.hpp>
 #include <boost/optional/optional.hpp>
@@ -113,7 +114,7 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(EstimationSource, ESTIMATION_SOURCE_NAMES);
 template <FixedString nameArg, EstimationUnit unitArg, typename numType, typename paramType>
 struct StrongDoubleTag {
     // the name of the property quantified by this type
-    static constexpr StringData kName = nameArg;
+    static constexpr std::string_view kName = nameArg;
     // the units used to measure this quantity
     static constexpr EstimationUnit kUnit = unitArg;
     // the minimum value of this data type, inclusive
@@ -233,7 +234,7 @@ public:
 
     // The name of this strong type. It is possible to extract it via typeid, but it is
     // unnecessarily complex. This approach is simpler and more flexible.
-    static constexpr StringData name() {
+    static constexpr std::string_view name() {
         return TypeTag::kName;
     }
 

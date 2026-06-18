@@ -42,12 +42,15 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_ACCUMULATOR(_internalJsReduce, AccumulatorInternalJsReduce::parseInternalJsReduce);
 
@@ -213,7 +216,7 @@ REGISTER_ACCUMULATOR(accumulator, AccumulatorJs::parse);
 
 namespace {
 // Parses a constant expression of type String or Code.
-std::string parseFunction(StringData fieldName,
+std::string parseFunction(std::string_view fieldName,
                           ExpressionContext* const expCtx,
                           BSONElement elem,
                           VariablesParseState vps) {
@@ -245,7 +248,7 @@ Document AccumulatorJs::serialize(boost::intrusive_ptr<Expression> initializer,
     if (_finalize) {
         args.addField("finalize", options.serializeLiteral(*_finalize));
     }
-    args.addField("lang", Value("js"_sd));
+    args.addField("lang", Value("js"sv));
     return DOC(kName << args.freeze());
 }
 

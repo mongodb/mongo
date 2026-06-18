@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/inlined_storage.h"
@@ -37,6 +36,7 @@
 
 #include <bit>
 #include <iterator>
+#include <string_view>
 #include <type_traits>
 
 namespace MONGO_MOD_PUB mongo {
@@ -146,7 +146,7 @@ public:
     /**
      * Create a bitset from a binary strings containing only '0's and '1's.
      */
-    explicit DynamicBitset(StringData binaryString)
+    explicit DynamicBitset(std::string_view binaryString)
         : _storage(getRequiredNumberOfBlocks(binaryString.size())) {
         const size_t offset = binaryString.size() - 1;
         for (size_t i = 0; i < binaryString.size(); ++i) {

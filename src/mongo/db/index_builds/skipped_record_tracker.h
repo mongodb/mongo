@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -63,7 +63,7 @@ public:
     };
 
     SkippedRecordTracker(OperationContext* opCtx,
-                         StringData skippedRecordsIdent,
+                         std::string_view skippedRecordsIdent,
                          LazyRecordStore::CreateMode createMode);
 
     /**

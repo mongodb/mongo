@@ -30,7 +30,6 @@
 #include "mongo/db/repl/dbcheck/dbcheck.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -67,6 +66,7 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -354,7 +354,7 @@ DbCheckHasher::DbCheckHasher(
     const BSONObj& end,
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
     DataThrottle* dataThrottle,
-    boost::optional<StringData> indexName,
+    boost::optional<std::string_view> indexName,
     int64_t maxCount,
     int64_t maxBytes,
     Date_t deadlineOnSecondary)
@@ -454,7 +454,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                                                  const BSONObj& lastKeyCheckedBson) {
     // hashForExtraIndexKeysCheck must only be called if the hasher was created with indexName.
     invariant(_indexName);
-    StringData indexName = _indexName.get();
+    std::string_view indexName = _indexName.get();
     // We should have already checked for if the index exists at this timestamp.
     const auto indexCatalogEntry = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     const auto indexDescriptor = indexCatalogEntry->descriptor();
@@ -1033,7 +1033,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                 secondaryIndexCheckParameters.get().getValidateMode();
             switch (validateMode) {
                 case mongo::DbCheckValidationModeEnum::extraIndexKeysCheck: {
-                    StringData indexName = secondaryIndexCheckParameters.get().getSecondaryIndex();
+                    std::string_view indexName =
+                        secondaryIndexCheckParameters.get().getSecondaryIndex();
                     indexEntry =
                         collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
 

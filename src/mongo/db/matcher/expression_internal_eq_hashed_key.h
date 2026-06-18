@@ -33,6 +33,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -44,9 +46,9 @@ namespace mongo {
  */
 class InternalEqHashedKey : public ComparisonMatchExpressionBase {
 public:
-    static constexpr StringData kName = "$_internalEqHash"_sd;
+    static constexpr std::string_view kName = "$_internalEqHash"_sd;
 
-    InternalEqHashedKey(boost::optional<StringData> path, long long hashVal)
+    InternalEqHashedKey(boost::optional<std::string_view> path, long long hashVal)
         : ComparisonMatchExpressionBase(MatchType::INTERNAL_EQ_HASHED_KEY,
                                         path,
                                         Value(hashVal),
@@ -55,9 +57,9 @@ public:
                                         ElementPath::NonLeafArrayBehavior::kMatchSubpath) {}
 
     InternalEqHashedKey(std::string path, long long hashVal)
-        : InternalEqHashedKey(boost::optional<StringData>(path), hashVal) {}
+        : InternalEqHashedKey(boost::optional<std::string_view>(path), hashVal) {}
 
-    InternalEqHashedKey(boost::optional<StringData> path, BSONElement value)
+    InternalEqHashedKey(boost::optional<std::string_view> path, BSONElement value)
         // Checking the type should happen earlier during parsing.
         : InternalEqHashedKey(path, value.numberLong()) {}
 
@@ -70,7 +72,7 @@ public:
         return clone;
     }
 
-    StringData name() const final {
+    std::string_view name() const final {
         return kName;
     }
 

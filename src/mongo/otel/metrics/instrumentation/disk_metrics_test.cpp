@@ -33,33 +33,36 @@
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using otel::metrics::DynamicMetricNameMaker;
 using otel::metrics::DynamicMetricNameTestPasskeyMaker;
 using otel::metrics::OtelMetricsCapturer;
 
-constexpr StringData kSda = "sda"_sd;
-constexpr StringData kSdb = "sdb"_sd;
-constexpr StringData kSdc = "sdc"_sd;
+constexpr std::string_view kSda = "sda"sv;
+constexpr std::string_view kSdb = "sdb"sv;
+constexpr std::string_view kSdc = "sdc"sv;
 
 // All tests register DiskMetrics with this fixed device set. The global MetricsService retains
 // registrations across tests within the same binary, so every test must use the same device set.
 const std::vector<std::string> kTestDevices = {std::string(kSda), std::string(kSdb)};
 
-constexpr StringData kSdaReads = "systemMetrics.disks.sda.reads"_sd;
-constexpr StringData kSdaReadSectors = "systemMetrics.disks.sda.read_sectors"_sd;
-constexpr StringData kSdaReadTimeMs = "systemMetrics.disks.sda.read_time_ms"_sd;
-constexpr StringData kSdaWrites = "systemMetrics.disks.sda.writes"_sd;
-constexpr StringData kSdaWriteSectors = "systemMetrics.disks.sda.write_sectors"_sd;
-constexpr StringData kSdaWriteTimeMs = "systemMetrics.disks.sda.write_time_ms"_sd;
-constexpr StringData kSdaIoTimeMs = "systemMetrics.disks.sda.io_time_ms"_sd;
-constexpr StringData kSdaIoQueuedMs = "systemMetrics.disks.sda.io_queued_ms"_sd;
-constexpr StringData kSdbWrites = "systemMetrics.disks.sdb.writes"_sd;
-constexpr StringData kSdcWrites = "systemMetrics.disks.sdc.writes"_sd;
+constexpr std::string_view kSdaReads = "systemMetrics.disks.sda.reads"sv;
+constexpr std::string_view kSdaReadSectors = "systemMetrics.disks.sda.read_sectors"sv;
+constexpr std::string_view kSdaReadTimeMs = "systemMetrics.disks.sda.read_time_ms"sv;
+constexpr std::string_view kSdaWrites = "systemMetrics.disks.sda.writes"sv;
+constexpr std::string_view kSdaWriteSectors = "systemMetrics.disks.sda.write_sectors"sv;
+constexpr std::string_view kSdaWriteTimeMs = "systemMetrics.disks.sda.write_time_ms"sv;
+constexpr std::string_view kSdaIoTimeMs = "systemMetrics.disks.sda.io_time_ms"sv;
+constexpr std::string_view kSdaIoQueuedMs = "systemMetrics.disks.sda.io_queued_ms"sv;
+constexpr std::string_view kSdbWrites = "systemMetrics.disks.sdb.writes"sv;
+constexpr std::string_view kSdcWrites = "systemMetrics.disks.sdc.writes"sv;
 
-BSONObj makeDiskBson(StringData device,
+BSONObj makeDiskBson(std::string_view device,
                      long long reads,
                      long long readSectors,
                      long long readTimeMs,

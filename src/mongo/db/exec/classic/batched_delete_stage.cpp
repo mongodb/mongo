@@ -73,6 +73,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInBatchedDeleteStage);
 MONGO_FAIL_POINT_DEFINE(batchedDeleteStageSleepAfterNDocuments);
@@ -378,7 +379,7 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
                 // Determine whether the document being deleted is owned by this shard, and the
                 // action to undertake if it isn't.
                 return _preWriteFilter.computeActionAndLogSpecialCases(
-                    member->doc.value(), "batched delete"_sd, collectionPtr()->ns());
+                    member->doc.value(), "batched delete"sv, collectionPtr()->ns());
             }();
 
             // Skip the document, as it either no longer exists, or has been filtered by the
@@ -438,7 +439,7 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
                 // committed + the number of documents deleted in the current unit of work.
 
                 // Assume nDocs is positive.
-                const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"sv);
                 return data.hasField("sleepMs") && !fpNss.isEmpty() &&
                     collectionPtr()->ns() == fpNss && data.hasField("nDocs") &&
                     _specificStats.docsDeleted + *docsDeleted >=

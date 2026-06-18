@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <jsapi.h>
 
@@ -45,7 +45,7 @@ namespace mongo {
 namespace mozjs {
 
 /**
- * Wraps JSStrings to simplify coercing them to and from C++ style StringData
+ * Wraps JSStrings to simplify coercing them to and from C++ style std::string_view
  * and std::strings.
  */
 class JSStringWrapper {
@@ -58,7 +58,7 @@ public:
 
     JSStringWrapper& operator=(JSStringWrapper&&) = default;
 
-    StringData toStringData() const;
+    std::string_view toStringData() const;
     std::string toString() const;
 
     explicit operator bool() const;

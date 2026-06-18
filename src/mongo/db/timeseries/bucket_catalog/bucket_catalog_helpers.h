@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -43,6 +42,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -76,7 +76,7 @@ StatusWith<Schema> generateSchemaFromBucketDoc(tracking::Context&,
  *
  * Returns a bad status if the document is malformed.
  */
-StatusWith<Date_t> extractTime(const BSONObj& doc, StringData timeFieldName);
+StatusWith<Date_t> extractTime(const BSONObj& doc, std::string_view timeFieldName);
 
 /**
  * Extracts the time field of a measurement document and its meta field.
@@ -84,13 +84,13 @@ StatusWith<Date_t> extractTime(const BSONObj& doc, StringData timeFieldName);
  * Returns a bad status if the document is malformed.
  */
 StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc,
-                                                              StringData timeFieldName,
-                                                              StringData metaFieldName);
+                                                              std::string_view timeFieldName,
+                                                              std::string_view metaFieldName);
 
 /**
  * Constructs a singleton BSONObj with the minimum timestamp.
  */
-BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime);
+BSONObj buildControlMinTimestampDoc(std::string_view timeField, Date_t roundedTime);
 
 /**
  * Generates an aggregation pipeline to identify a bucket eligible to receive a new measurement

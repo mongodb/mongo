@@ -46,6 +46,7 @@
 #include "mongo/util/uuid.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -62,13 +63,13 @@ using RemoteExplainVector = std::vector<BSONObj>;
 extern FailPoint searchReturnEofImmediately;
 namespace search_helpers {
 
-static constexpr StringData kViewFieldName = "view"_sd;
-static constexpr StringData kProtocolStoredFieldsName = "storedSource"_sd;
+static constexpr std::string_view kViewFieldName = "view"_sd;
+static constexpr std::string_view kProtocolStoredFieldsName = "storedSource"_sd;
 // The stage name of the extension's executable agg stage. IMPORTANT - if this changes in any of the
 // search extensions, we must change it here or else the metrics will not be reported correctly.
-static constexpr StringData kExtensionVectorSearchStageName = "$_extensionVectorSearch"_sd;
-static constexpr StringData kExtensionSearchStageName = "$_extensionSearch"_sd;
-static constexpr StringData kExtensionSearchMetaStageName = "$_extensionSearchMeta"_sd;
+static constexpr std::string_view kExtensionVectorSearchStageName = "$_extensionVectorSearch"_sd;
+static constexpr std::string_view kExtensionSearchStageName = "$_extensionSearch"_sd;
+static constexpr std::string_view kExtensionSearchMetaStageName = "$_extensionSearchMeta"_sd;
 
 /**
  * Consult mongot to get planning information for sharded search queries, used to configure the
@@ -147,14 +148,14 @@ bool isMongotStage(DocumentSource* stage);
  * TODO SERVER-121094 Remove this function when the extension can do this through
  * bindResolvedNamespace().
  */
-bool isExtensionVectorSearchStage(StringData stageName);
+bool isExtensionVectorSearchStage(std::string_view stageName);
 
 /**
  * Check if this is a $search or $searchMeta extension stage.
  * TODO SERVER-121094 Remove this function when the extension can do this through
  * bindResolvedNamespace().
  */
-bool isExtensionSearchStage(StringData stageName);
+bool isExtensionSearchStage(std::string_view stageName);
 
 /**
  * Check if the pipeline contains any extension-implemented mongot stage ($vectorSearch,
@@ -170,7 +171,7 @@ bool isExtensionMongotPipeline(const Pipeline* pipeline);
 void throwIfrKickbackIfNecessary(bool kickbackCondition,
                                  const IncrementalRolloutFeatureFlag& flag,
                                  Counter64& metric,
-                                 StringData errorMsg);
+                                 std::string_view errorMsg);
 
 // TODO SERVER-40900 Can remove this when all meta validation is done in run_aggregate.
 bool shouldPreValidateMetaDependencies(const Pipeline* pipeline);

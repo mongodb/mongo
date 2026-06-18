@@ -34,6 +34,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 class SBEFillTypeTest : public EExpressionTestFixture {};
 
@@ -51,7 +52,7 @@ TEST_F(SBEFillTypeTest, FillType) {
                                                                makeE<EVariable>(fillSlot)));
     auto compiledExpr = compileExpression(*fillTypeExpr);
 
-    auto [fillTag, fillVal] = value::makeNewString("hello world!"_sd);
+    auto [fillTag, fillVal] = value::makeNewString("hello world!"sv);
     value::ValueGuard fillGuard{fillTag, fillVal};
 
     {

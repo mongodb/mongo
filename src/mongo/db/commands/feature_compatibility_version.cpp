@@ -34,7 +34,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/database_name.h"
@@ -79,6 +79,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -90,6 +91,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using repl::UnreplicatedWritesBlock;
 using GenericFCV = multiversion::GenericFCV;
@@ -672,7 +674,7 @@ Timestamp FeatureCompatibilityVersion::setIfCleanStartup(
         }();
         fcvDoc.setVersion(implicitStartupFCV);
     } else {
-        StringData versionString = StringData(defaultStartupFCVSnapshot);
+        std::string_view versionString = std::string_view(defaultStartupFCVSnapshot);
         FCV parsedVersion;
 
         if (versionString == multiversion::toString(GenericFCV::kLastLTS)) {
@@ -807,8 +809,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
         if (status != ErrorCodes::NamespaceNotFound && status != ErrorCodes::NoSuchKey) {
             LOGV2_FATAL(11379202, "FCV initialization failed", "status"_attr = status);
         }
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
-            "startup"_sd);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext("startup"sv);
         return;
     }
 
@@ -837,7 +838,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     FeatureCompatibilityVersion::updateMinWireVersion(opCtx);
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
 
-    fcvSnapshot.logFCVWithContext("startup"_sd);
+    fcvSnapshot.logFCVWithContext("startup"sv);
 
     // On startup, if the version is in an upgrading or downgrading state, print a warning.
     if (fcvSnapshot.isUpgradingOrDowngrading()) {
@@ -918,7 +919,7 @@ void FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp() {
 
 void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
                                                   BSONObjBuilder* b,
-                                                  StringData name,
+                                                  std::string_view name,
                                                   const boost::optional<TenantId>&) {
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
@@ -955,7 +956,7 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
     }
 }
 
-Status FeatureCompatibilityVersionParameter::setFromString(StringData,
+Status FeatureCompatibilityVersionParameter::setFromString(std::string_view,
                                                            const boost::optional<TenantId>&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter. See "

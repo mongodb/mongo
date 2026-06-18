@@ -37,7 +37,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
@@ -85,16 +84,18 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterAbortingIndexes);
 
 // Field name in dropIndexes command for indexes to drop.
-constexpr auto kIndexFieldName = "index"_sd;
+constexpr auto kIndexFieldName = "index"sv;
 
 Status checkCollExists(const NamespaceString& nss, const CollectionAcquisition& collAcq) {
     if (!collAcq.exists()) {
@@ -361,7 +362,7 @@ void dropReadyIndexes(OperationContext* opCtx,
                                                                              desc->infoObj());
                 });
 
-            reply->setMsg("non-_id indexes and non-shard key indexes dropped for collection"_sd);
+            reply->setMsg("non-_id indexes and non-shard key indexes dropped for collection"sv);
         } else {
             indexCatalog->dropAllIndexes(
                 opCtx, collection, false, [opCtx, collection](const IndexCatalogEntry* entry) {
@@ -373,7 +374,7 @@ void dropReadyIndexes(OperationContext* opCtx,
                         entry->descriptor()->infoObj());
                 });
 
-            reply->setMsg("non-_id indexes dropped for collection"_sd);
+            reply->setMsg("non-_id indexes dropped for collection"sv);
         }
         return;
     }
@@ -774,9 +775,9 @@ DropIndexesReply dropIndexesDryRun(OperationContext* opCtx,
     if (isWildcard) {
         if (shardKeyPattern) {
             reply.setMsg(
-                "non-_id indexes and non-shard key indexes would be dropped for collection"_sd);
+                "non-_id indexes and non-shard key indexes would be dropped for collection"sv);
         } else {
-            reply.setMsg("non-_id indexes would be dropped for collection"_sd);
+            reply.setMsg("non-_id indexes would be dropped for collection"sv);
         }
     } else {
         if (indexNames.size() == 1) {

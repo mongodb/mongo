@@ -46,12 +46,13 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEATH_TEST_REGEX(NotMatchExpressionDeathTest,
                  GetChildFailsIndexLargerThanOne,
                  "Tripwire assertion.*6400210") {
     auto baseOperand = BSON("$lt" << 5);
-    auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
+    auto lt = std::make_unique<LTMatchExpression>("a"sv, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
 
     ASSERT_EQ(notOp.numChildren(), 1);
@@ -65,9 +66,9 @@ DEATH_TEST_REGEX(AndOpDeathTest,
     auto baseOperand2 = BSON("$lt" << 10);
     auto baseOperand3 = BSON("$lt" << 100);
 
-    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<LTMatchExpression>("b"_sd, baseOperand3["$lt"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"sv, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"sv, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<LTMatchExpression>("b"sv, baseOperand3["$lt"]);
 
     auto andOp = AndMatchExpression{};
     andOp.add(std::move(sub1));
@@ -85,9 +86,9 @@ DEATH_TEST_REGEX(OrOpDeathTest,
     auto baseOperand1 = BSON("$gt" << 10);
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);
-    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand3["b"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"sv, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"sv, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand3["b"]);
 
     auto orOp = OrMatchExpression{};
     orOp.add(std::move(sub1));
@@ -102,8 +103,8 @@ DEATH_TEST_REGEX(OrOpDeathTest,
 TEST(NorOp, Equivalent) {
     auto baseOperand1 = BSON("a" << 1);
     auto baseOperand2 = BSON("b" << 2);
-    auto sub1 = EqualityMatchExpression{"a"_sd, baseOperand1["a"]};
-    auto sub2 = EqualityMatchExpression{"b"_sd, baseOperand2["b"]};
+    auto sub1 = EqualityMatchExpression{"a"sv, baseOperand1["a"]};
+    auto sub2 = EqualityMatchExpression{"b"sv, baseOperand2["b"]};
 
     auto e1 = NorMatchExpression{};
     e1.add(sub1.clone());
@@ -123,9 +124,9 @@ DEATH_TEST_REGEX(NorOpDeathTest,
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);
 
-    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand3["b"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"sv, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"sv, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand3["b"]);
 
     auto norOp = NorMatchExpression{};
     norOp.add(std::move(sub1));

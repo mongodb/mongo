@@ -67,6 +67,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 /**
@@ -105,7 +106,7 @@ struct ThreadInfo {
 }  // namespace
 
 const NamespaceString kTestNss =
-    NamespaceString::createNamespaceString_forTest("test.docSourceExchange"_sd);
+    NamespaceString::createNamespaceString_forTest("test.docSourceExchange"sv);
 
 class DocumentSourceExchangeTest : service_context_test::WithSetupTransportLayer,
                                    public AggregationContextFixture {

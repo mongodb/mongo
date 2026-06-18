@@ -36,6 +36,7 @@
 #include "mongo/util/str.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -53,7 +54,7 @@ Status BitNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionC
     }
 
     for (const auto& curOp : modExpr.embeddedObject()) {
-        const StringData payloadFieldName = curOp.fieldNameStringData();
+        const std::string_view payloadFieldName = curOp.fieldNameStringData();
 
         BitwiseOp parsedOp;
         if (payloadFieldName == "and") {

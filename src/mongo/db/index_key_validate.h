@@ -45,6 +45,7 @@
 #include <cstdint>
 #include <limits>
 #include <set>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -62,15 +63,15 @@ constexpr auto kExpireAfterSecondsForInactiveTTLIndex =
  * associated with the field name is empty, the option is always valid, otherwise it will be allowed
  * only when creating the set of index types listed in the set.
  */
-extern const std::map<StringData, std::set<IndexType>> kAllowedFieldNames;
+extern const std::map<std::string_view, std::set<IndexType>> kAllowedFieldNames;
 
-const constexpr StringData kDeprecatedFieldNames[] = {
+const constexpr std::string_view kDeprecatedFieldNames[] = {
     "_id"_sd, "bucketSize"_sd, IndexDescriptor::kNamespaceFieldName};
 
 /**
  * Like 'allowedFieldNames', but removes deprecated fields specified in kDeprecatedFieldNames.
  */
-extern const std::map<StringData, std::set<IndexType>> kNonDeprecatedAllowedFieldNames;
+extern const std::map<std::string_view, std::set<IndexType>> kNonDeprecatedAllowedFieldNames;
 
 /**
  * Checks if the key is valid for building an index according to the validation rules for the given
@@ -95,7 +96,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
 StatusWith<BSONObj> validateIndexSpec(
     OperationContext* opCtx,
     const BSONObj& indexSpec,
-    const std::map<StringData, std::set<IndexType>>& allowedFieldNames =
+    const std::map<std::string_view, std::set<IndexType>>& allowedFieldNames =
         index_key_validate::kAllowedFieldNames,
     bool isUpgradeRepair = false);
 
@@ -110,7 +111,7 @@ BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec)
  */
 BSONObj repairIndexSpec(const NamespaceString& ns,
                         const BSONObj& indexSpec,
-                        const std::map<StringData, std::set<IndexType>>& allowedFieldNames =
+                        const std::map<std::string_view, std::set<IndexType>>& allowedFieldNames =
                             index_key_validate::kAllowedFieldNames);
 
 /**
@@ -124,7 +125,7 @@ Status validateIdIndexSpec(const BSONObj& indexSpec);
  * field name is found.
  */
 Status validateIndexSpecFieldNames(const BSONObj& indexSpec,
-                                   const std::map<StringData, std::set<IndexType>>&
+                                   const std::map<std::string_view, std::set<IndexType>>&
                                        allowedFieldNames = index_key_validate::kAllowedFieldNames);
 
 /**

@@ -35,6 +35,8 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 
+#include <string_view>
+
 namespace mongo::cost_based_ranker {
 
 namespace {
@@ -157,7 +159,7 @@ const BSONElement nullElem = constantHolder["1"];
  * logically redundant terms such as the comparison to inf as in this logically equivalent
  * expression: {$and: [{a: {$gt: 42}}, {a: {$lt: inf}}]}
  */
-std::unique_ptr<MatchExpression> getMatchExpressionFromInterval(StringData path,
+std::unique_ptr<MatchExpression> getMatchExpressionFromInterval(std::string_view path,
                                                                 const Interval& interval) {
     if (interval.isFullyOpen()) {
         // Intervals containing all values of a field can be estimated as True match expression.
@@ -285,7 +287,7 @@ std::unique_ptr<MatchExpression> getMatchExpressionFromOIL(const OrderedInterval
         return std::make_unique<AlwaysFalseMatchExpression>();
     }
 
-    const auto path = StringData(oil->name);
+    const auto path = std::string_view(oil->name);
     std::vector<std::unique_ptr<MatchExpression>> expressions;
     for (const auto& interval : oil->intervals) {
         auto expr = getMatchExpressionFromInterval(path, interval);

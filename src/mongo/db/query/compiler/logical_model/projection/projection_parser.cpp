@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/exact_cast.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -45,6 +44,7 @@
 #include "mongo/util/str.h"
 
 #include <cstddef>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -210,11 +210,11 @@ void addNodeAtPathHelper(ProjectionPathASTNode* root,
     addNodeAtPathHelper(childPathNode, path, componentIndex + 1, std::move(newChild));
 }
 
-bool hasPositionalOperator(StringData path) {
+bool hasPositionalOperator(std::string_view path) {
     return path.ends_with(".$");
 }
 
-bool isPrefixOf(StringData first, StringData second) {
+bool isPrefixOf(std::string_view first, std::string_view second) {
     if (first.size() >= second.size()) {
         return false;
     }
@@ -412,7 +412,7 @@ void parseInclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* 
         }
     } else {
         verifyComputedFieldsAllowed(ctx->policies);
-        StringData elemFieldName = elem.fieldNameStringData();
+        std::string_view elemFieldName = elem.fieldNameStringData();
 
         uassert(31276,
                 "Cannot specify more than one positional projection per query.",
@@ -430,7 +430,7 @@ void parseInclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* 
         tassert(5392901,
                 "Expected element field name size to be greater than 2",
                 elemFieldName.size() > 2);
-        StringData pathWithoutPositionalOperator =
+        std::string_view pathWithoutPositionalOperator =
             elemFieldName.substr(0, elemFieldName.size() - 2);
 
         FieldPath path(pathWithoutPositionalOperator);
@@ -520,7 +520,7 @@ void parseElement(ParseContext* ctx,
  * expression or subprojection.
  */
 void parseSubObject(ParseContext* ctx,
-                    StringData objFieldName,
+                    std::string_view objFieldName,
                     const boost::optional<FieldPath>& fullPathToParent,
                     const BSONObj& obj,
                     ProjectionPathASTNode* parent) {
@@ -546,7 +546,7 @@ void parseSubObject(ParseContext* ctx,
             } else {
                 // The 'FieldPath' parser doesn't take positional operators into account, but those
                 // are valid path projections so trim it off for this validation.
-                StringData pathWithoutPositionalOperator =
+                std::string_view pathWithoutPositionalOperator =
                     elementFieldName.substr(0, elementFieldName.size() - 2);
                 FieldPath fp(pathWithoutPositionalOperator);
             }

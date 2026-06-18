@@ -43,11 +43,12 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(InternalSchemaMinLengthMatchExpression, SameMinLengthTreatedEquivalent) {
-    InternalSchemaMinLengthMatchExpression minLength1("a"_sd, 2);
-    InternalSchemaMinLengthMatchExpression minLength2("a"_sd, 2);
-    InternalSchemaMinLengthMatchExpression minLength3("a"_sd, 3);
+    InternalSchemaMinLengthMatchExpression minLength1("a"sv, 2);
+    InternalSchemaMinLengthMatchExpression minLength2("a"sv, 2);
+    InternalSchemaMinLengthMatchExpression minLength3("a"sv, 3);
 
     ASSERT_TRUE(minLength1.equivalent(&minLength2));
     ASSERT_FALSE(minLength1.equivalent(&minLength3));

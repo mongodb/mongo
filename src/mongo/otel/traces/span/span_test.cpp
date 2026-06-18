@@ -35,6 +35,8 @@
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/unittest/server_parameter_guard.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace otel {
 namespace traces {

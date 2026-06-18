@@ -32,10 +32,12 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
-static constexpr StringData kReturnStoredSourceFieldName = "returnStoredSource"_sd;
-static constexpr StringData kScoreDetailsFieldName = "scoreDetails"_sd;
+static constexpr std::string_view kReturnStoredSourceFieldName = "returnStoredSource"_sd;
+static constexpr std::string_view kScoreDetailsFieldName = "scoreDetails"_sd;
 
 /**
  * A 'LiteParsed' representation of a search stage. This is the parent class for the

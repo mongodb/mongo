@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/basic_types_gen.h"
@@ -52,6 +51,7 @@
 
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -66,6 +66,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 long long adjustCappedMaxDocs(long long cappedMaxDocs) {
     if (cappedMaxDocs <= 0 || cappedMaxDocs == std::numeric_limits<long long>::max()) {
@@ -84,11 +85,11 @@ void setEncryptedDefaultEncryptedCollectionNames(const NamespaceString& ns,
     auto prefix = std::string("enxcol_.") + std::string{ns.coll()};
 
     if (!config->getEscCollection()) {
-        config->setEscCollection(StringData(prefix + ".esc"));
+        config->setEscCollection(std::string_view(prefix + ".esc"));
     }
 
     if (!config->getEcocCollection()) {
-        config->setEcocCollection(StringData(prefix + ".ecoc"));
+        config->setEcocCollection(std::string_view(prefix + ".ecoc"));
     }
 }
 
@@ -125,7 +126,7 @@ Status CollectionOptions::validateForStorage() const {
     return CollectionOptions::parse(toBSON(), ParseKind::parseForStorage).getStatus();
 }
 
-static constexpr auto kAutoIndexIdFieldName = "autoIndexId"_sd;
+static constexpr auto kAutoIndexIdFieldName = "autoIndexId"sv;
 
 StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
     CollectionOptions collectionOptions;
@@ -146,7 +147,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
 
     while (i.more()) {
         BSONElement e = i.next();
-        StringData fieldName = e.fieldName();
+        std::string_view fieldName = e.fieldName();
 
         if (fieldName == "uuid" && kind == parseForStorage) {
             auto res = UUID::parse(e);
@@ -459,7 +460,7 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
         builder->appendElements(uuid->toBSON());
     }
 
-    auto shouldAppend = [&](StringData option) {
+    auto shouldAppend = [&](std::string_view option) {
         return includeFields.empty() || includeFields.contains(option);
     };
 
@@ -646,7 +647,7 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
 namespace {
 Status validateIsNotInDbs(const NamespaceString& ns,
                           const std::vector<DatabaseName>& disallowedDbs,
-                          StringData optionName) {
+                          std::string_view optionName) {
     if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.dbName()) != disallowedDbs.end()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << optionName << " collection option is not supported on the "

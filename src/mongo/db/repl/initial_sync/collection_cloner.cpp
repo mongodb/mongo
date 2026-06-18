@@ -30,7 +30,6 @@
 
 #include "mongo/db/repl/initial_sync/collection_cloner.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/client/dbclient_base.h"
@@ -70,6 +69,7 @@
 #include <cstdint>
 #include <list>
 #include <mutex>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
@@ -82,6 +82,7 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 // Failpoint which causes initial sync to hang when it has cloned 'numDocsToClone' documents to
 // collection 'namespace'.
@@ -107,7 +108,7 @@ void waitWhileFailPointEnabled(FailPoint* failPoint,
             }
         },
         [&](const BSONObj& data) {
-            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"sv);
             // Only hang when cloning the specified collection, or if no collection was specified.
             return fpNss.isEmpty() || fpNss == sourceNss;
         });
@@ -124,7 +125,7 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                                    bool recordIdsReplicated,
                                    std::shared_ptr<InitialSyncSummaryStats> summaryStats)
     : InitialSyncBaseCloner(
-          "CollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+          "CollectionCloner"sv, sharedData, source, client, storageInterface, dbPool),
       _sourceNss(sourceNss),
       _collectionOptions(collectionOptions),
       _recordIdsReplicated(recordIdsReplicated),
@@ -590,7 +591,7 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
 }
 
 bool CollectionCloner::isMyFailPoint(const BSONObj& data) const {
-    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"sv);
     return (fpNss.isEmpty() || fpNss == _sourceNss) && BaseCloner::isMyFailPoint(data);
 }
 

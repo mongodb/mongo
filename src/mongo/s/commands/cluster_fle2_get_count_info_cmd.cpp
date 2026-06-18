@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -57,11 +56,13 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Retrieve a set of tags from ESC. Returns a count suitable for either insert or query.
@@ -87,7 +88,7 @@ public:
         return true;
     }
 
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {GetQueryableEncryptionCountInfo::kTokensFieldName};
     }
 
@@ -155,8 +156,7 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
 
             auto reply = CommandHelpers::filterCommandReplyForPassthrough(response.data);
             uassertStatusOK(getStatusFromCommandResult(reply));
-            return Reply::parse(reply.removeField("ok"_sd),
-                                IDLParserContext{Request::kCommandName});
+            return Reply::parse(reply.removeField("ok"sv), IDLParserContext{Request::kCommandName});
         });
 }
 

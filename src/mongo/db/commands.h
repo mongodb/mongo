@@ -83,6 +83,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -188,8 +189,8 @@ struct CommandHelpers {
      */
     static ResourcePattern resourcePatternForNamespace(const NamespaceString& ns);
 
-    static Command* findCommand(Service* service, StringData name);
-    static Command* findCommand(OperationContext* opCtx, StringData name);
+    static Command* findCommand(Service* service, std::string_view name);
+    static Command* findCommand(OperationContext* opCtx, std::string_view name);
 
     /**
      * Helper for setting errmsg and ok field in command result object.
@@ -319,7 +320,8 @@ struct CommandHelpers {
                                   const OpMsgRequest& request,
                                   ErrorCodes::Error err);
 
-    static void uassertNoDocumentSequences(StringData commandName, const OpMsgRequest& request);
+    static void uassertNoDocumentSequences(std::string_view commandName,
+                                           const OpMsgRequest& request);
 
     /**
      * Should be called before trying to Command::parse a request. Throws 'Unauthorized',
@@ -333,7 +335,7 @@ struct CommandHelpers {
     /**
      * Asserts that a majority write concern was used for a command.
      */
-    static void uassertCommandRunWithMajority(StringData commandName,
+    static void uassertCommandRunWithMajority(std::string_view commandName,
                                               const WriteConcernOptions& wc);
 
     /**
@@ -344,7 +346,7 @@ struct CommandHelpers {
                                    Command* command,
                                    bool allowTransactionsOnConfigDatabase);
 
-    static constexpr StringData kHelpFieldName = "help"_sd;
+    static constexpr std::string_view kHelpFieldName = "help"_sd;
 
     /**
      * Checks if the command passed in is in the list of failCommands defined in the fail point.
@@ -393,7 +395,7 @@ struct CommandHelpers {
  */
 class CommandNameAtom {
 public:
-    explicit CommandNameAtom(StringData s);
+    explicit CommandNameAtom(std::string_view s);
 
     auto operator<=>(const CommandNameAtom&) const = default;
     bool operator==(const CommandNameAtom&) const = default;
@@ -416,13 +418,13 @@ public:
      *
      * @param oldName an old, deprecated name for the command
      */
-    Command(StringData name, StringData oldName)
-        : Command(name, std::vector<StringData>({oldName})) {}
+    Command(std::string_view name, std::string_view oldName)
+        : Command(name, std::vector<std::string_view>({oldName})) {}
 
     /**
      * @param aliases the optional list of aliases (e.g., old names) for the command
      */
-    Command(StringData name, std::vector<StringData> aliases = {});
+    Command(std::string_view name, std::vector<std::string_view> aliases = {});
 
     Command(const Command&) = delete;
     Command& operator=(const Command&) = delete;
@@ -461,7 +463,7 @@ public:
     }
 
     /** Returns the command's aliases if any. Constant. */
-    const std::vector<StringData>& getAliases() const {
+    const std::vector<std::string_view>& getAliases() const {
         return _aliases;
     }
 
@@ -618,7 +620,7 @@ public:
      * The default snipForLogging shall remove these field names. Auditing shall not
      * include these fields in audit outputs.
      */
-    virtual std::set<StringData> sensitiveFieldNames() const {
+    virtual std::set<std::string_view> sensitiveFieldNames() const {
         return {};
     }
 
@@ -704,7 +706,7 @@ public:
     /**
      * Checks if the command is also known by the provided alias.
      */
-    bool hasAlias(StringData alias) const;
+    bool hasAlias(std::string_view alias) const;
 
     /**
      * Audit when this command fails authz check.
@@ -781,7 +783,7 @@ protected:
 private:
     const std::string _name;
     const CommandNameAtom _atom{_name};
-    const std::vector<StringData> _aliases;
+    const std::vector<std::string_view> _aliases;
     const otel::traces::SpanName _traceSpanName = otel::traces::registerCommandSpanName(_name);
 
     // Counters for how many times this command has been executed and failed
@@ -1203,8 +1205,8 @@ public:
  *
  *      which enables it to be parsed as an IDL command.
  *
- *      - a 'static constexpr StringData kCommandName' member.
- *      - (optional) a 'static constexpr StringData kCommandAlias' member.
+ *      - a 'static constexpr std::string_view kCommandName' member.
+ *      - (optional) a 'static constexpr std::string_view kCommandAlias' member.
  *
  *   - validateResult: that has a custom logic to validate the result BSON object
  *     to enforce API versioning.
@@ -1213,7 +1215,7 @@ public:
 template <typename Derived>
 class MONGO_MOD_OPEN BasicCommandWithRequestParser : public BasicCommandWithReplyBuilderInterface {
 private:
-    static constexpr StringData _commandAlias() {
+    static constexpr std::string_view _commandAlias() {
         using T = typename Derived::Request;
         if constexpr (requires { T::kCommandAlias; }) {
             return T::kCommandAlias;
@@ -1226,7 +1228,8 @@ protected:
     BasicCommandWithRequestParser()
         : BasicCommandWithReplyBuilderInterface(Derived::Request::kCommandName, _commandAlias()) {}
 
-    BasicCommandWithRequestParser(StringData name) : BasicCommandWithReplyBuilderInterface(name) {}
+    BasicCommandWithRequestParser(std::string_view name)
+        : BasicCommandWithReplyBuilderInterface(name) {}
 
     bool runWithReplyBuilder(OperationContext* opCtx,
                              const DatabaseName& dbName,
@@ -1353,7 +1356,7 @@ class MONGO_MOD_OPEN ErrmsgCommandDeprecated : public BasicCommand {
  *
  *      which enables it to be parsed as an IDL command.
  *
- *      - a 'constexpr StringData kCommandName' member.
+ *      - a 'constexpr std::string_view kCommandName' member.
  *
  *     Any type generated by the "commands:" section in the IDL syntax meets these
  *     requirements.  Note that IDL "structs:" will not. This is the recommended way to
@@ -1376,8 +1379,8 @@ protected:
 
     // Commands that only have a single name don't need to define any constructors.
     TypedCommand() : TypedCommand(Derived::Request::kCommandName) {}
-    explicit TypedCommand(StringData name) : TypedCommand(name, {}) {}
-    TypedCommand(StringData name, StringData altName) : Command(name, altName) {}
+    explicit TypedCommand(std::string_view name) : TypedCommand(name, {}) {}
+    TypedCommand(std::string_view name, std::string_view altName) : Command(name, altName) {}
 
 private:
     class InvocationBaseInternal;
@@ -1584,7 +1587,7 @@ public:
     /** Add `command` to the registry. */
     void registerCommand(Command* command);
 
-    Command* findCommand(StringData name) const;
+    Command* findCommand(std::string_view name) const;
 
     void incrementUnknownCommands() {
         if (_onUnknown)
@@ -1626,11 +1629,11 @@ inline CommandRegistry* getCommandRegistry(OperationContext* opCtx) {
     return getCommandRegistry(opCtx->getService());
 }
 
-inline Command* CommandHelpers::findCommand(Service* service, StringData name) {
+inline Command* CommandHelpers::findCommand(Service* service, std::string_view name) {
     return getCommandRegistry(service)->findCommand(name);
 }
 
-inline Command* CommandHelpers::findCommand(OperationContext* opCtx, StringData name) {
+inline Command* CommandHelpers::findCommand(OperationContext* opCtx, std::string_view name) {
     return getCommandRegistry(opCtx)->findCommand(name);
 }
 

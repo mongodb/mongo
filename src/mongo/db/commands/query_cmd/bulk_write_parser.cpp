@@ -37,19 +37,21 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData BulkWriteReplyItem::kCodeFieldName;
-constexpr StringData BulkWriteReplyItem::kErrmsgFieldName;
-constexpr StringData BulkWriteReplyItem::kIdxFieldName;
-constexpr StringData BulkWriteReplyItem::kNFieldName;
-constexpr StringData BulkWriteReplyItem::kNModifiedFieldName;
-constexpr StringData BulkWriteReplyItem::kOkFieldName;
-constexpr StringData BulkWriteReplyItem::kUpsertedFieldName;
+constexpr std::string_view BulkWriteReplyItem::kCodeFieldName;
+constexpr std::string_view BulkWriteReplyItem::kErrmsgFieldName;
+constexpr std::string_view BulkWriteReplyItem::kIdxFieldName;
+constexpr std::string_view BulkWriteReplyItem::kNFieldName;
+constexpr std::string_view BulkWriteReplyItem::kNModifiedFieldName;
+constexpr std::string_view BulkWriteReplyItem::kOkFieldName;
+constexpr std::string_view BulkWriteReplyItem::kUpsertedFieldName;
 
 
 BulkWriteReplyItem::BulkWriteReplyItem()
@@ -66,16 +68,16 @@ BulkWriteReplyItem::BulkWriteReplyItem(std::int32_t idx, Status status)
 
 void BulkWriteReplyItem::validateOk(const double value) {
     if (!(value >= 0.0)) {
-        throwComparisonError<double>("ok", ">="_sd, value, 0.0);
+        throwComparisonError<double>("ok", ">="sv, value, 0.0);
     }
     if (!(value <= 1.0)) {
-        throwComparisonError<double>("ok", "<="_sd, value, 1.0);
+        throwComparisonError<double>("ok", "<="sv, value, 1.0);
     }
 }
 
 void BulkWriteReplyItem::validateIdx(const std::int32_t value) {
     if (!(value >= 0)) {
-        throwComparisonError<std::int32_t>("idx", ">="_sd, value, 0);
+        throwComparisonError<std::int32_t>("idx", ">="sv, value, 0);
     }
 }
 

@@ -75,6 +75,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -314,7 +315,7 @@ SemiFuture<void> RenameParticipantInstance::run(
                 LOGV2_WARNING(5515108,
                               "Failed to remove rename participant state document",
                               "error"_attr = redact(ex));
-                ex.addContext("Failed to remove rename participant state document"_sd);
+                ex.addContext("Failed to remove rename participant state document"sv);
                 std::lock_guard<std::mutex> lg(_stateMutex);
                 if (!_unblockCRUDPromise.getFuture().isReady()) {
                     _unblockCRUDPromise.setError(ex.toStatus());

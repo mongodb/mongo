@@ -32,10 +32,13 @@
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
-static StringData longString = {"long_string_1"_sd};
+static std::string_view longString = {"long_string_1"sv};
 
 template <typename SlotType>
 class SlotTestBase {
@@ -95,7 +98,7 @@ public:
         };
 
         SlotType slot;
-        setValue(slot, true, value::makeNewString("other_long_string"_sd));
+        setValue(slot, true, value::makeNewString("other_long_string"sv));
 
         slot = mkSlot();
         verifyLargeString(slot);

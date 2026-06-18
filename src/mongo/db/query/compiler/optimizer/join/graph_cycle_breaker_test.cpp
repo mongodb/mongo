@@ -33,6 +33,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
 namespace {
 /**
@@ -86,7 +88,7 @@ public:
         }
     }
 
-    NodeId addNode(StringData collName) {
+    NodeId addNode(std::string_view collName) {
         return *graph.addNode(makeNSS(collName), nullptr, {});
     }
 

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -57,6 +56,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/inlined_vector.h>
@@ -218,7 +218,7 @@ protected:
     };
 
     MONGO_COMPILER_ALWAYS_INLINE
-    value::OwnedValueAccessor* getFieldAccessor(StringData name) {
+    value::OwnedValueAccessor* getFieldAccessor(std::string_view name) {
         if (size_t pos = _state->scanFieldNames.findPos(name); pos != StringListSet::npos) {
             return &_scanFieldAccessors[pos];
         }

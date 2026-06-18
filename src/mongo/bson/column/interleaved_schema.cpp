@@ -29,7 +29,10 @@
 
 #include "mongo/bson/column/interleaved_schema.h"
 
+#include <string_view>
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 InterleavedSchema::InterleavedSchema(const BSONObj& referenceObj, BSONType rootType, bool arrays)
     : _arrays(arrays) {

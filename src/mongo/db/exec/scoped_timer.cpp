@@ -35,6 +35,7 @@
 #include <array>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 namespace mongo {
@@ -83,13 +84,14 @@ ScopedTimer& ScopedTimer::operator=(ScopedTimer&&) noexcept = default;
 ScopedTimer::~ScopedTimer() = default;
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 /** C++23's `std::to_underlying`. */
 constexpr auto toUnderlying(auto e) {
     return static_cast<std::underlying_type_t<decltype(e)>>(e);
 }
 
-#define X(e) #e ""_sd,
+#define X(e) #e ""sv,
 constexpr std::array sectionNames{MONGO_EXPAND_TIMED_SECTION_IDS(X)};
 #undef X
 
@@ -97,20 +99,21 @@ template <typename Dur>
 const auto sectionNamesWithDurationSuffix = [] {
     std::string suffix{Dur::mongoUnitSuffix()};
     std::array<std::string, sectionNames.size()> arr{};
-    std::transform(sectionNames.begin(), sectionNames.end(), arr.begin(), [&](StringData sec) {
-        return std::string{sec} + suffix;
-    });
+    std::transform(sectionNames.begin(),
+                   sectionNames.end(),
+                   arr.begin(),
+                   [&](std::string_view sec) { return std::string{sec} + suffix; });
     return arr;
 }();
 
 template <typename Dur>
-StringData toStringWithDurationSuffix(TimedSectionId id) {
+std::string_view toStringWithDurationSuffix(TimedSectionId id) {
     return sectionNamesWithDurationSuffix<Dur>[toUnderlying(id)];
 }
 
 }  // namespace
 
-StringData toString(TimedSectionId id) {
+std::string_view toString(TimedSectionId id) {
     return sectionNames[toUnderlying(id)];
 }
 

@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -39,6 +38,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -77,7 +77,7 @@ public:
      * over HTTP with only a host, optional port, and optionally a slash and trailing
      * content are considered secure.
      */
-    static Status endpointIsSecure(StringData url);
+    static Status endpointIsSecure(std::string_view url);
 
     /**
      * Assign a set of headers for this request.
@@ -105,27 +105,27 @@ public:
      * Note that some methods (GET, HEAD) prohibit context bodies.
      */
     virtual HttpReply request(HttpMethod method,
-                              StringData url,
+                              std::string_view url,
                               ConstDataRange data = {nullptr, 0}) const = 0;
 
     /**
      * Convenience wrapper to perform a POST and require a 200 response.
      */
-    DataBuilder post(StringData url, ConstDataRange data) {
+    DataBuilder post(std::string_view url, ConstDataRange data) {
         return requestSuccess(HttpMethod::kPOST, url, data);
     }
 
     /**
      * Convenience wrapper to perform a PUT and require a 200 response.
      */
-    DataBuilder put(StringData url, ConstDataRange data) {
+    DataBuilder put(std::string_view url, ConstDataRange data) {
         return requestSuccess(HttpMethod::kPUT, url, data);
     }
 
     /**
      * Convenience wrapper to perform a GET and require a 200 response.
      */
-    DataBuilder get(StringData url) {
+    DataBuilder get(std::string_view url) {
         return requestSuccess(HttpMethod::kGET, url, {nullptr, 0});
     }
 
@@ -160,7 +160,7 @@ protected:
     Seconds _connectTimeout = kConnectionTimeout;
 
 private:
-    DataBuilder requestSuccess(HttpMethod method, StringData url, ConstDataRange data) const {
+    DataBuilder requestSuccess(HttpMethod method, std::string_view url, ConstDataRange data) const {
         auto reply = request(method, url, data);
         uassert(ErrorCodes::OperationFailed,
                 str::stream() << "Unexpected http status code from server: " << reply.code,

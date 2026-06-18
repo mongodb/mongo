@@ -38,8 +38,13 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/server_parameter_guard.h"
 
+#include <algorithm>
+#include <string_view>
+
 namespace mongo {
 namespace {
+
+using namespace std::literals::string_view_literals;
 
 template <typename T>
 const QueryKnobRegistry::Entry& entryFor(const QueryKnob<T>& knob) {
@@ -47,11 +52,11 @@ const QueryKnobRegistry::Entry& entryFor(const QueryKnob<T>& knob) {
 }
 
 TEST(QueryKnobTest, SyntheticKnobsRegisteredAgainstServerParameters) {
-    ASSERT_EQ(entryFor(test_knobs::testIntKnob).param->name(), "testIntKnob"_sd);
-    ASSERT_EQ(entryFor(test_knobs::testDoubleKnob).param->name(), "testDoubleKnob"_sd);
-    ASSERT_EQ(entryFor(test_knobs::testBoolKnob).param->name(), "testBoolKnob"_sd);
-    ASSERT_EQ(entryFor(test_knobs::testLLKnob).param->name(), "testLLKnob"_sd);
-    ASSERT_EQ(entryFor(test_knobs::testEnumKnob).param->name(), "testEnumKnob"_sd);
+    ASSERT_EQ(entryFor(test_knobs::testIntKnob).param->name(), "testIntKnob"sv);
+    ASSERT_EQ(entryFor(test_knobs::testDoubleKnob).param->name(), "testDoubleKnob"sv);
+    ASSERT_EQ(entryFor(test_knobs::testBoolKnob).param->name(), "testBoolKnob"sv);
+    ASSERT_EQ(entryFor(test_knobs::testLLKnob).param->name(), "testLLKnob"sv);
+    ASSERT_EQ(entryFor(test_knobs::testEnumKnob).param->name(), "testEnumKnob"sv);
 }
 
 TEST(QueryKnobTest, ReadGlobalInt) {
@@ -119,7 +124,7 @@ TEST(QueryKnobTest, EnumKnobFromBSONRoundTrip) {
     auto enumAsInt = static_cast<int>(TestKnobModeEnum::kBeta);
     QueryKnobValue original{enumAsInt};
     BSONObjBuilder b;
-    e.toBSON(b, "v"_sd, original);
+    e.toBSON(b, "v"sv, original);
     auto obj = b.obj();
     ASSERT_EQ(obj.firstElement().type(), BSONType::string);
     auto roundTripped = e.fromBSON(obj.firstElement());
@@ -155,7 +160,7 @@ TEST(QueryKnobTest, ToBSONRoundTripInt) {
     const auto& e = entryFor(test_knobs::testIntKnob);
     QueryKnobValue original{42};
     BSONObjBuilder b;
-    e.toBSON(b, "v"_sd, original);
+    e.toBSON(b, "v"sv, original);
     auto roundTripped = e.fromBSON(b.obj().firstElement());
     ASSERT_EQ(std::get<int>(roundTripped), 42);
 }
@@ -164,7 +169,7 @@ TEST(QueryKnobTest, ToBSONRoundTripDouble) {
     const auto& e = entryFor(test_knobs::testDoubleKnob);
     QueryKnobValue original{2.718};
     BSONObjBuilder b;
-    e.toBSON(b, "v"_sd, original);
+    e.toBSON(b, "v"sv, original);
     auto roundTripped = e.fromBSON(b.obj().firstElement());
     ASSERT_APPROX_EQUAL(std::get<double>(roundTripped), 2.718, 1e-9);
 }
@@ -173,7 +178,7 @@ TEST(QueryKnobTest, ToBSONRoundTripBool) {
     const auto& e = entryFor(test_knobs::testBoolKnob);
     QueryKnobValue original{false};
     BSONObjBuilder b;
-    e.toBSON(b, "v"_sd, original);
+    e.toBSON(b, "v"sv, original);
     auto roundTripped = e.fromBSON(b.obj().firstElement());
     ASSERT_EQ(std::get<bool>(roundTripped), false);
 }
@@ -182,7 +187,7 @@ TEST(QueryKnobTest, ToBSONRoundTripLongLong) {
     const auto& e = entryFor(test_knobs::testLLKnob);
     QueryKnobValue original{777LL};
     BSONObjBuilder b;
-    e.toBSON(b, "v"_sd, original);
+    e.toBSON(b, "v"sv, original);
     auto roundTripped = e.fromBSON(b.obj().firstElement());
     ASSERT_EQ(std::get<long long>(roundTripped), 777LL);
 }

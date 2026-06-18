@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamTransformToStageFn(
@@ -56,7 +58,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamTransform,
                            documentSourceChangeStreamTransformToStageFn)
 
 ChangeStreamTransformStage::ChangeStreamTransformStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     std::shared_ptr<ChangeStreamEventTransformer> transformer)
     : Stage(stageName, pExpCtx), _transformer(std::move(transformer)) {

@@ -49,6 +49,7 @@
 #include "mongo/util/uuid.h"
 
 #include <mutex>
+#include <string_view>
 
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
@@ -781,9 +782,9 @@ private:
                 auto certificateKeyFileContents =
                     uassertStatusOK(ssl_util::readPEMFile(_options.tlsCertificateKeyFile.get()));
                 sslPair.cert_chain = certificateKeyFileContents;
-                auto swDecrypted =
-                    manager.decryptPEMKey(certificateKeyFileContents,
-                                          _options.tlsCertificatePassword.value_or(StringData{}));
+                auto swDecrypted = manager.decryptPEMKey(
+                    certificateKeyFileContents,
+                    _options.tlsCertificatePassword.value_or(std::string_view{}));
                 if (swDecrypted == ErrorCodes::NotImplemented) {
                     sslPair.private_key = certificateKeyFileContents;
                 } else {

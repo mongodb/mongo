@@ -31,13 +31,13 @@
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -267,13 +267,13 @@ public:
     /**
      * Finds or allocates a tag with the given "key" and "value" strings.
      */
-    ReplSetTag makeTag(StringData key, StringData value);
+    ReplSetTag makeTag(std::string_view key, std::string_view value);
 
     /**
      * Finds a tag with the given key and value strings, or returns a tag whose isValid() method
      * returns false if the configuration has never allocated such a tag via makeTag().
      */
-    ReplSetTag findTag(StringData key, StringData value) const;
+    ReplSetTag findTag(std::string_view key, std::string_view value) const;
 
     /**
      * Makes a new, empty pattern object.
@@ -287,7 +287,7 @@ public:
      * means that we must see at least "minCount" tags with the specified "tagKey".
      */
     Status addTagCountConstraintToPattern(ReplSetTagPattern* pattern,
-                                          StringData tagKey,
+                                          std::string_view tagKey,
                                           int32_t minCount) const;
 
     /**
@@ -329,7 +329,7 @@ private:
      * Returns the index corresponding to "key", or _tagData.size() if there is no
      * such index.
      */
-    int32_t _findKeyIndex(StringData key) const;
+    int32_t _findKeyIndex(std::string_view key) const;
 
     /**
      * Helper that writes a "tagKey" field for the given "keyIndex" to "builder".

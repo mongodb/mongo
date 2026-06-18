@@ -38,6 +38,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/serialization_context.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -49,7 +51,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(cursor, DocumentSourceCursor::id);
 using boost::intrusive_ptr;
 using std::string;
 
-StringData DocumentSourceCursor::getSourceName() const {
+std::string_view DocumentSourceCursor::getSourceName() const {
     return kStageName;
 }
 

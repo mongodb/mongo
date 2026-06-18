@@ -54,6 +54,7 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -84,7 +85,7 @@ namespace {
 // X-509
 //
 
-StatusWith<OpMsgRequest> createX509AuthCmd(const Credential& cred, StringData clientName) {
+StatusWith<OpMsgRequest> createX509AuthCmd(const Credential& cred, std::string_view clientName) {
     if (clientName.empty()) {
         return {ErrorCodes::AuthenticationFailed,
                 "Please enable SSL on the client-side to use the MONGODB-X509 authentication "
@@ -111,7 +112,7 @@ StatusWith<OpMsgRequest> createX509AuthCmd(const Credential& cred, StringData cl
 Future<void> authX509(RunCommandHook runCommand,
                       const HostAndPort& hostname,
                       const Credential& cred,
-                      StringData clientName) {
+                      std::string_view clientName) {
     invariant(runCommand);
 
     auto swAuthRequest = createX509AuthCmd(cred, clientName);
@@ -171,7 +172,7 @@ class DefaultInternalAuthParametersProvider : public InternalAuthParametersProvi
 public:
     ~DefaultInternalAuthParametersProvider() override = default;
 
-    boost::optional<Credential> get(size_t index, StringData mechanism) final {
+    boost::optional<Credential> get(size_t index, std::string_view mechanism) final {
         return getInternalAuthParams(index, mechanism);
     }
 };
@@ -292,9 +293,9 @@ Future<void> authenticateInternalClient(
 }
 
 BSONObj buildAuthParams(const DatabaseName& dbname,
-                        StringData username,
-                        StringData passwordText,
-                        StringData mechanism) {
+                        std::string_view username,
+                        std::string_view passwordText,
+                        std::string_view mechanism) {
     // Direct authentication expects no tenantId to be present.
     fassert(8032000, dbname.tenantId() == boost::none);
     // Because we assert above there is no TenantId, serialiazing the `dbname` will never include
@@ -306,11 +307,11 @@ BSONObj buildAuthParams(const DatabaseName& dbname,
                                               << saslCommandPasswordFieldName << passwordText);
 }
 
-StringData getSaslCommandUserDBFieldName() {
+std::string_view getSaslCommandUserDBFieldName() {
     return saslCommandUserDBFieldName;
 }
 
-StringData getSaslCommandUserFieldName() {
+std::string_view getSaslCommandUserFieldName() {
     return saslCommandUserFieldName;
 }
 

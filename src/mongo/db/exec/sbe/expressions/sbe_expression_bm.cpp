@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -60,6 +59,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <benchmark/benchmark.h>
@@ -69,6 +69,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 template <typename T>
 std::string debugPrintStage(const T* stage) {
     sbe::DebugPrintInfo debugPrintInfo{};
@@ -86,9 +87,9 @@ class SbeExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
 public:
     SbeExpressionBenchmarkFixture() : _env(std::make_unique<sbe::RuntimeEnvironment>()) {
         _inputSlotId = _env->registerSlot(
-            "input"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
+            "input"sv, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
         _timeZoneDB = std::make_unique<TimeZoneDatabase>();
-        _env->registerSlot("timeZoneDB"_sd,
+        _env->registerSlot("timeZoneDB"sv,
                            sbe::value::TypeTags::timeZoneDB,
                            sbe::value::bitcastFrom<TimeZoneDatabase*>(_timeZoneDB.get()),
                            false,

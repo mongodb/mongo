@@ -31,7 +31,6 @@
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_refresher.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -73,6 +72,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -91,6 +91,7 @@ MONGO_FAIL_POINT_DEFINE(blockAndSucceedClusterParameterRefresh);
 MONGO_FAIL_POINT_DEFINE(countPromiseWaitersClusterParameterRefresh);
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 const auto getClusterServerParameterRefresher =
@@ -399,7 +400,7 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
                                                    tenantId);
             if (it != tenantParamDocs.end()) {
                 updatedParameters.emplace_back(
-                    updatedClusterParameterBSON.removeField("clusterParameterTime"_sd));
+                    updatedClusterParameterBSON.removeField("clusterParameterTime"sv));
             }
         }
         auto tenantIdStr = tenantId ? tenantId->toString() : "none";

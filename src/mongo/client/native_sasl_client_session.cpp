@@ -50,6 +50,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <tuple>
 
 #include <absl/container/node_hash_map.h>
@@ -59,6 +60,7 @@
 #endif
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 SaslClientSession* createNativeSaslClientSession(const std::string mech) {
@@ -74,7 +76,9 @@ auto* scramsha1ClientCache = new SCRAMClientCache<SHA1Block>;
 auto* scramsha256ClientCache = new SCRAMClientCache<SHA256Block>;
 
 template <typename HashBlock>
-void cacheToBSON(SCRAMClientCache<HashBlock>* cache, StringData name, BSONObjBuilder* builder) {
+void cacheToBSON(SCRAMClientCache<HashBlock>* cache,
+                 std::string_view name,
+                 BSONObjBuilder* builder) {
     auto stats = cache->getStats();
 
     BSONObjBuilder sub(builder->subobjStart(name));
@@ -137,10 +141,10 @@ Status NativeSaslClientSession::initialize() {
     } else if (mechanism == auth::kMechanismMongoOIDC) {
         auto userName = hasParameter(SaslClientSession::parameterUser)
             ? getParameter(SaslClientSession::parameterUser)
-            : ""_sd;
+            : ""sv;
         auto accessToken = hasParameter(SaslClientSession::parameterOIDCAccessToken)
             ? getParameter(SaslClientSession::parameterOIDCAccessToken)
-            : ""_sd;
+            : ""sv;
 
         _saslConversation =
             std::make_unique<SaslOIDCClientConversation>(this, userName, accessToken);
@@ -152,7 +156,7 @@ Status NativeSaslClientSession::initialize() {
     return Status::OK();
 }
 
-Status NativeSaslClientSession::step(StringData inputData, std::string* outputData) {
+Status NativeSaslClientSession::step(std::string_view inputData, std::string* outputData) {
     if (!_saslConversation) {
         return Status(ErrorCodes::BadValue,
                       str::stream()

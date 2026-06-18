@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::extension::host {
 
 /**
@@ -56,7 +58,7 @@ public:
             new DocumentSourceExtensionForQueryShape(expCtx, std::move(parseNode)));
     }
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return _stageName;
     }
 

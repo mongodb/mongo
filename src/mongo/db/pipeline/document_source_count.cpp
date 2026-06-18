@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_count.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -65,7 +65,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
             str::stream() << "the count field must be a non-empty string",
             elem.type() == BSONType::string);
 
-    StringData elemString = elem.valueStringData();
+    std::string_view elemString = elem.valueStringData();
     uassert(
         40157, str::stream() << "the count field must be a non-empty string", !elemString.empty());
 

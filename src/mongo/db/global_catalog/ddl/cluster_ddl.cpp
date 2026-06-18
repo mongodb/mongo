@@ -67,6 +67,7 @@
 
 namespace mongo {
 namespace cluster {
+using namespace std::literals::string_view_literals;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(createUnshardedCollectionRandomizeDataShard);
@@ -271,7 +272,7 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
         sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
         router.createDbImplicitlyOnRoute();
         router.route(
-            "createCollection"_sd, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+            "createCollection"sv, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                 const auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                     opCtx,
                     nss.dbName(),

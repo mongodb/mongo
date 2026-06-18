@@ -45,6 +45,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -58,7 +59,7 @@ namespace mongo::query_stats {
  * query stats key.
  */
 struct AggCmdComponents : public SpecificKeyComponents {
-    static constexpr StringData kOtherNssFieldName = "otherNss"_sd;
+    static constexpr std::string_view kOtherNssFieldName = "otherNss"_sd;
 
     AggCmdComponents(const AggregateCommandRequest&,
                      stdx::unordered_set<NamespaceString> involvedNamespaces,

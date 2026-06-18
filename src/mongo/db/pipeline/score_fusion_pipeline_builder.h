@@ -36,6 +36,7 @@
 #include "mongo/util/modules.h"
 
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -54,14 +55,14 @@ public:
     // intermediate to the desugar.
     // One field object that holds all internal intermediate variables during desugar,
     // like each input pipeline's individual score or scoreDetails.
-    static constexpr StringData kScoreFusionInternalFieldsName =
+    static constexpr std::string_view kScoreFusionInternalFieldsName =
         "_internal_scoreFusion_internal_fields"_sd;
 
     // One field object to encapsulate the unmodified user's doc from the queried collection.
-    static constexpr StringData kScoreFusionDocsFieldName = "_internal_scoreFusion_docs"_sd;
+    static constexpr std::string_view kScoreFusionDocsFieldName = "_internal_scoreFusion_docs"_sd;
 
     // Description that gets set as part of $scoreFusion's scoreDetails metadata.
-    static constexpr StringData kScoreFusionScoreDetailsDescription =
+    static constexpr std::string_view kScoreFusionScoreDetailsDescription =
         "the value calculated by combining the scores (either normalized or raw) across "
         "input pipelines from which this document is output from:";
 
@@ -69,7 +70,7 @@ private:
     ScoreFusionSpec _spec;
 
     std::list<boost::intrusive_ptr<DocumentSource>> buildInputPipelineDesugaringStages(
-        StringData firstInputPipelineName,
+        std::string_view firstInputPipelineName,
         double weight,
         const std::unique_ptr<Pipeline>& pipeline,
         bool inputGeneratesScoreDetails,
@@ -80,11 +81,10 @@ private:
         const StringMap<double>& weights,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) override;
 
-    std::string getScoreDetailsScalarFieldName(StringData pipelineName) const override;
+    std::string getScoreDetailsScalarFieldName(std::string_view pipelineName) const override;
 
-    void constructCalculatedFinalScoreDetailsStageSpecificScoreDetails(BSONObjBuilder& bob,
-                                                                       StringData pipelineName,
-                                                                       double weight) override;
+    void constructCalculatedFinalScoreDetailsStageSpecificScoreDetails(
+        BSONObjBuilder& bob, std::string_view pipelineName, double weight) override;
 
     ScoreFusionSpec getSpec() const {
         return _spec;

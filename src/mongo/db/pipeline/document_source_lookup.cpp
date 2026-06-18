@@ -29,6 +29,8 @@
 
 #include "mongo/db/pipeline/document_source_lookup.h"
 
+#include <string_view>
+
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -74,6 +76,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 // Parses $lookup 'from' field. The 'from' field must be a string or one of the following
 // exceptions:
@@ -304,7 +307,7 @@ std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
     // When we first create a $lookup stage, the input 'pipeline' is unparsed, so we
     // check for the $documents stage itself.
     if (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
-        pipeline[0].hasField("$search"_sd) ||
+        pipeline[0].hasField("$search"sv) ||
         pipeline[0].hasField(DocumentSourceQueue::kStageName)) {
         return {pipeline[0]};
     }
@@ -456,7 +459,7 @@ void DocumentSourceLookUp::relocateFieldMatchPlaceholder(
     auto oldIdx = *lookupStage->_fieldMatchPipelineIdx;
     tassert(12761200,
             "Expected empty $match placeholder at old _fieldMatchPipelineIdx",
-            oldIdx < resolvedPipeline.size() && resolvedPipeline[oldIdx].hasField("$match"_sd) &&
+            oldIdx < resolvedPipeline.size() && resolvedPipeline[oldIdx].hasField("$match") &&
                 resolvedPipeline[oldIdx]["$match"].Obj().isEmpty());
     tassert(12761201,
             "internalFieldMatchPipelineIdx out of range of resolvedPipeline",
@@ -621,7 +624,7 @@ void DocumentSourceLookUp::copyLetVariablesWithNewExpCtx(const std::vector<LetVa
 
 ALLOCATE_DOCUMENT_SOURCE_ID(lookup, DocumentSourceLookUp::id)
 
-StringData DocumentSourceLookUp::getSourceName() const {
+std::string_view DocumentSourceLookUp::getSourceName() const {
     return kStageName;
 }
 

@@ -31,7 +31,6 @@
 #include "mongo/db/index/expression_keys_private.h"
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
@@ -50,6 +49,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -72,8 +72,8 @@ void ExpressionKeysPrivate::validateDocumentCommon(const CollectionPtr& collecti
 
         for (const auto& keyElem : keyPattern) {
             if (keyElem.isNumber()) {
-                StringData field = keyElem.fieldName();
-                StringData userField;
+                std::string_view field = keyElem.fieldName();
+                std::string_view userField;
 
                 if (field.starts_with(timeseries::kControlMaxFieldNamePrefix)) {
                     userField = field.substr(timeseries::kControlMaxFieldNamePrefix.size());
@@ -146,7 +146,7 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
         // If we hit an array while traversing the path, 'cstr' will point to the path component
         // immediately following the array, or the null termination byte if the terminal path
         // component was an array. In the latter case, 'remainingPath' will be empty.
-        auto remainingPath = StringData(cstr);
+        auto remainingPath = std::string_view(cstr);
 
         // If 'ignoreArraysAlongPath' is set, we want to use the behaviour prior to SERVER-44050,
         // which is to allow arrays along the field path (except the terminal path). This is done so

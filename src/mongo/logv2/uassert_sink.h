@@ -34,6 +34,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/log/attributes/attribute_value_set.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/core/record_view.hpp>
@@ -53,7 +55,7 @@ public:
             uasserted(code == constants::kUserAssertWithLogID
                           ? extract<int32_t>(attributes::id(), rec).get()
                           : code,
-                      StringData(buffer.data(), buffer.size()));
+                      std::string_view(buffer.data(), buffer.size()));
         }
     }
 };

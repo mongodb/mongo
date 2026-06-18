@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"

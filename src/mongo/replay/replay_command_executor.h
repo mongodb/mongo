@@ -34,6 +34,7 @@
 
 #include <chrono>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -51,7 +52,7 @@ public:
      * Connect the executor to the server instance passed in the constructor. The connection status
      * is checked and if successful a new client instance is created.
      */
-    void connect(StringData uri);
+    void connect(std::string_view uri);
     /*
      * Reset the connection, this method is particularly useful if a new connection needs to be
      * established without creating a new instance of this class.

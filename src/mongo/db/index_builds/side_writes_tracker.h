@@ -48,6 +48,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -62,7 +64,7 @@ public:
     enum class DrainYieldPolicy { kNoYield, kYield };
 
     SideWritesTracker(OperationContext* opCtx,
-                      StringData ident,
+                      std::string_view ident,
                       LazyRecordStore::CreateMode createMode)
         : _table(opCtx, ident, createMode) {
         _table.getOrCreateTable(opCtx);

@@ -29,7 +29,6 @@
 
 #include "mongo/db/op_observer/batched_write_context.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_entry.h"

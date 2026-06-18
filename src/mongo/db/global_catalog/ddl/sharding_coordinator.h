@@ -70,6 +70,7 @@
 #include <set>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -363,7 +364,7 @@ protected:
     /**
      * Serialize a CoordinatorGenericPhase using the implementation's Phase.
      */
-    virtual StringData serializeGenericPhase(CoordinatorGenericPhase phase) const = 0;
+    virtual std::string_view serializeGenericPhase(CoordinatorGenericPhase phase) const = 0;
 
     /**
      * Advances and persists the txnNumber to ensure causality between requests, then returns the
@@ -624,11 +625,11 @@ protected:
             opCtx, std::make_unique<CoordinatorStateDocImpl<StateDoc>>(std::move(newDoc)));
     }
 
-    StringData serializePhase(Phase phase) const {
+    std::string_view serializePhase(Phase phase) const {
         return idl::serialize(phase);
     }
 
-    StringData serializePhase(CoordinatorGenericPhase phase) const {
+    std::string_view serializePhase(CoordinatorGenericPhase phase) const {
         return serializePhase(CoordinatorStateDocImpl<StateDoc>::castToCoordinatorPhase(phase));
     }
 

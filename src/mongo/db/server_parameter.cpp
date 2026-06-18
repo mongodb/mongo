@@ -36,6 +36,7 @@
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -52,7 +53,7 @@ MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
                         ("BeginServerParameterRegistration"),
                         ("BeginStartupOptionHandling"))
 
-ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
+ServerParameter::ServerParameter(std::string_view name, ServerParameterType spt)
     : _name{name}, _type(spt) {}
 
 ServerParameter::ServerParameter(const ServerParameter& other) {
@@ -94,7 +95,7 @@ ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
     return &*obj;
 }
 
-void ServerParameter::warnIfDeprecated(StringData action) {
+void ServerParameter::warnIfDeprecated(std::string_view action) {
     if (_isDeprecated) {
         std::call_once(_warnDeprecatedOnce, [&] {
             LOGV2_WARNING(9260800, "Use of deprecated server parameter", "parameter"_attr = _name);
@@ -176,7 +177,7 @@ void ServerParameterSet::remove(const std::string& name) {
     invariant(1 == _map.erase(name), fmt::format("Failed to erase key \"{}\"", name));
 }
 
-IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,
+IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(std::string_view name,
                                                                      ServerParameter* sp)
     : ServerParameter(name, sp->getServerParameterType()), _sp(sp) {
     if (_sp->isTestOnly()) {
@@ -184,7 +185,7 @@ IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData 
     }
 }
 
-void IDLServerParameterDeprecatedAlias::warnIfDeprecated(StringData action) {
+void IDLServerParameterDeprecatedAlias::warnIfDeprecated(std::string_view action) {
     std::call_once(_warnOnce, [&] {
         LOGV2_WARNING(636300,
                       "Use of deprecated server parameter name",
@@ -196,7 +197,7 @@ void IDLServerParameterDeprecatedAlias::warnIfDeprecated(StringData action) {
 
 void IDLServerParameterDeprecatedAlias::append(OperationContext* opCtx,
                                                BSONObjBuilder* b,
-                                               StringData fieldName,
+                                               std::string_view fieldName,
                                                const boost::optional<TenantId>& tenantId) {
     _sp->append(opCtx, b, fieldName, tenantId);
 }
@@ -210,7 +211,7 @@ Status IDLServerParameterDeprecatedAlias::set(const BSONElement& newValueElement
     return _sp->set(newValueElement, tenantId);
 }
 
-Status IDLServerParameterDeprecatedAlias::setFromString(StringData str,
+Status IDLServerParameterDeprecatedAlias::setFromString(std::string_view str,
                                                         const boost::optional<TenantId>& tenantId) {
     return _sp->setFromString(str, tenantId);
 }

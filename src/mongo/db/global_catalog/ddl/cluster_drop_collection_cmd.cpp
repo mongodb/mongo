@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -54,6 +53,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -63,6 +63,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class DropCmd : public DropCmdVersion1Gen<DropCmd> {
 public:
@@ -148,7 +149,7 @@ public:
                 // If the namespace isn't found, treat the drop as a success but inform about the
                 // failure.
                 DropReply reply;
-                reply.setInfo("database does not exist"_sd);
+                reply.setInfo("database does not exist"sv);
                 return reply;
             }
         }

@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 
 #include "mongo/base/shim.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"

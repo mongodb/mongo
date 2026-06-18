@@ -37,13 +37,15 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(ActionSetTest, ParseActionSetFromStringVector) {
-    const std::vector<StringData> actions1 = {"find"_sd, "insert"_sd, "update"_sd, "remove"_sd};
-    const std::vector<StringData> actions2 = {"update"_sd, "find"_sd, "remove"_sd, "insert"_sd};
+    const std::vector<std::string_view> actions1 = {"find"sv, "insert"sv, "update"sv, "remove"sv};
+    const std::vector<std::string_view> actions2 = {"update"sv, "find"sv, "remove"sv, "insert"sv};
     std::vector<std::string> unrecognized;
 
     auto set1 = ActionSet::parseFromStringVector(actions1, &unrecognized);
@@ -183,7 +185,7 @@ TEST(ActionSetTest, constructor) {
 }
 
 TEST(ActionSetTest, DuplicateActions) {
-    auto fromString = ActionSet::parseFromStringVector({"find"_sd, "find"_sd, "insert"_sd});
+    auto fromString = ActionSet::parseFromStringVector({"find"sv, "find"sv, "insert"sv});
     ASSERT_TRUE(fromString.contains(ActionType::find));
     ASSERT_TRUE(fromString.contains(ActionType::insert));
 

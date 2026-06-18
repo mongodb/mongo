@@ -54,6 +54,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::replicated_fast_count::test_helpers {
+using namespace std::literals::string_view_literals;
 
 namespace {
 bool findPersistedDocInCollection(OperationContext* opCtx, const UUID& uuid, BSONObj& outDoc) {
@@ -569,7 +570,7 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
                                     const std::vector<ExpectedFastCountOp>& expectedOps) {
     EXPECT_EQ(repl::OpTypeEnum::kCommand, applyOpsEntry.getOpType());
     EXPECT_EQ(repl::OplogEntry::CommandType::kApplyOps, applyOpsEntry.getCommandType());
-    EXPECT_EQ("admin.$cmd"_sd, applyOpsEntry.getNss().ns_forTest());
+    EXPECT_EQ("admin.$cmd"sv, applyOpsEntry.getNss().ns_forTest());
 
     std::map<UUID, ExpectedFastCountOp> expectedByUuid;
     for (const auto& e : expectedOps) {

@@ -40,6 +40,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -224,7 +225,7 @@ public:
     MOCK_METHOD(Status,
                 dropIdent,
                 (RecoveryUnit & ru,
-                 StringData ident,
+                 std::string_view ident,
                  bool identHasSizeInfo,
                  const StorageEngine::DropIdentCallback& onDrop,
                  boost::optional<uint64_t> schemaEpoch),
@@ -287,11 +288,11 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
 
     EXPECT_CALL(*_mockKVEngine, dropIdent)
         .WillOnce([&](RecoveryUnit& calledRu,
-                      StringData calledIdent,
+                      std::string_view calledIdent,
                       bool identHasSizeInfo,
                       const StorageEngine::DropIdentCallback& onDrop,
                       boost::optional<uint64_t> schemaEpoch) {
-            ASSERT_EQ(calledIdent, StringData{ident});
+            ASSERT_EQ(calledIdent, std::string_view{ident});
             ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
             ASSERT_FALSE(static_cast<bool>(onDrop));
             ASSERT_EQ(schemaEpoch, expectedSchemaEpoch);
@@ -305,11 +306,11 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
                                         std::make_shared<Ident>(ident));
     EXPECT_CALL(*_mockKVEngine, dropIdent)
         .WillOnce([&](RecoveryUnit& calledRu,
-                      StringData calledIdent,
+                      std::string_view calledIdent,
                       bool identHasSizeInfo,
                       const StorageEngine::DropIdentCallback& onDrop,
                       boost::optional<uint64_t> schemaEpoch) {
-            ASSERT_EQ(calledIdent, StringData{ident});
+            ASSERT_EQ(calledIdent, std::string_view{ident});
             ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
             ASSERT_FALSE(static_cast<bool>(onDrop));
             ASSERT_EQ(schemaEpoch, expectedSchemaEpoch);

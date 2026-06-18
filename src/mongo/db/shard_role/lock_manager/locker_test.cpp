@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/lock_manager/locker.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ticketing/admission_context.h"

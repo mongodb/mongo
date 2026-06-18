@@ -32,6 +32,8 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -61,12 +63,12 @@ namespace mongo {
  *     range: [-3, -1], unit: 'day'
  */
 struct WindowBounds {
-    static constexpr StringData kArgDocuments = "documents"_sd;
-    static constexpr StringData kArgRange = "range"_sd;
-    static constexpr StringData kArgUnit = "unit"_sd;
+    static constexpr std::string_view kArgDocuments = "documents"_sd;
+    static constexpr std::string_view kArgRange = "range"_sd;
+    static constexpr std::string_view kArgUnit = "unit"_sd;
 
-    static constexpr StringData kValUnbounded = "unbounded"_sd;
-    static constexpr StringData kValCurrent = "current"_sd;
+    static constexpr std::string_view kValUnbounded = "unbounded"_sd;
+    static constexpr std::string_view kValCurrent = "current"_sd;
 
     struct Unbounded {};
     struct Current {};

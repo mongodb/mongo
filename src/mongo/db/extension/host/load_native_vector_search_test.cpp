@@ -44,6 +44,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <filesystem>
+#include <string_view>
 
 namespace mongo::extension::host {
 
@@ -116,7 +117,7 @@ protected:
 
     static void expectLiteParsedNames(const NamespaceString& nss,
                                       const BSONObj& stageSpec,
-                                      std::initializer_list<const StringData> names) {
+                                      std::initializer_list<const std::string_view> names) {
         auto liteParsed = LiteParsedDocumentSource::parse(nss, stageSpec);
         auto* lpExpanded = dynamic_cast<DocumentSourceExtensionOptimizable::LiteParsedExpandable*>(
             liteParsed.get());

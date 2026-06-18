@@ -35,6 +35,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(EmptySet, Normal) {
     // insert "b"
@@ -149,7 +150,7 @@ TEST(FieldRefSetWithStorageTest, ManagesFieldRefLifetime) {
     ASSERT_EQUALS("{a.b}", fieldRefSet.toString());
 
     // Re-use 'ref', and verify that the set still contains the previous FieldRef.
-    ref.parse("b.c"_sd);
+    ref.parse("b.c"sv);
     fieldRefSet.keepShortest(ref);
     ASSERT_EQUALS("{a.b, b.c}", fieldRefSet.toString());
 }
@@ -161,7 +162,7 @@ TEST(FieldRefSetWithStorageTest, InsertRemovesConflictsByKeepingShortest) {
     fieldRefSet.keepShortest(ref);
     ASSERT_EQUALS("{a.b}", fieldRefSet.toString());
 
-    ref.parse("a"_sd);
+    ref.parse("a"sv);
     fieldRefSet.keepShortest(ref);
     ASSERT_EQUALS("{a}", fieldRefSet.toString());
 }
@@ -173,12 +174,12 @@ TEST(FieldRefSetWithStorageTest, InsertRemovesMultipleConflicts) {
     fieldRefSet.keepShortest(ref);
     ASSERT_EQUALS("{a.b}", fieldRefSet.toString());
 
-    ref.parse("a.c"_sd);
+    ref.parse("a.c"sv);
     fieldRefSet.keepShortest(ref);
     ASSERT_EQUALS("{a.b, a.c}", fieldRefSet.toString());
 
     // Inserting 'a' should remove both conflicts with longer paths.
-    ref.parse("a"_sd);
+    ref.parse("a"sv);
     fieldRefSet.keepShortest(ref);
     ASSERT_EQUALS("{a}", fieldRefSet.toString());
 }

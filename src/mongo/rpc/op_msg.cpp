@@ -60,6 +60,8 @@
 #include <fmt/format.h>
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
+#include <string_view>
+
 #include <wiredtiger.h>
 #endif
 
@@ -173,7 +175,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     // with comments.
     bool haveBody = false;
     OpMsg msg;
-    StringData securityToken;
+    std::string_view securityToken;
     while (!sectionsBuf.atEof()) {
         const auto sectionKind = sectionsBuf.read<Section>();
         switch (sectionKind) {
@@ -401,13 +403,13 @@ void OpMsg::shareOwnershipWith(const ConstSharedBuffer& buffer) {
     }
 }
 
-void OpMsgBuilder::setSecurityToken(StringData token) {
+void OpMsgBuilder::setSecurityToken(std::string_view token) {
     invariant(_state == kEmpty);
     _buf.appendStruct(Section::kSecurityToken);
     _buf.appendCStr(token);
 }
 
-auto OpMsgBuilder::beginDocSequence(StringData name) -> DocSequenceBuilder {
+auto OpMsgBuilder::beginDocSequence(std::string_view name) -> DocSequenceBuilder {
     invariant((_state == kEmpty) || (_state == kDocSequence));
     invariant(!_openBuilder);
     _openBuilder = true;
@@ -458,7 +460,7 @@ Message OpMsgBuilder::finish() {
 
 Message OpMsgBuilder::finishWithoutSizeChecking() {
     if (kDebugBuild && !disableDupeFieldCheck_forTest.load()) {
-        std::set<StringData> seenFields;
+        std::set<std::string_view> seenFields;
         for (auto elem : resumeBody().asTempObj()) {
             if (!(seenFields.insert(elem.fieldNameStringData()).second)) {
                 LOGV2_FATAL(40474,

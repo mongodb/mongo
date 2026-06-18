@@ -48,6 +48,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <thread>
 
 #if defined(_WIN32)
@@ -309,7 +310,7 @@ class QuickAndDirtyRegex {
 public:
     class Match {
     public:
-        Match(const pcre2_code* code, StringData input)
+        Match(const pcre2_code* code, std::string_view input)
             : _m{pcre2_match_data_create_from_pattern(code, nullptr)},
               _input{input},
               _rc{pcre2_match(code,
@@ -331,19 +332,19 @@ public:
             return _rc;
         }
 
-        StringData operator[](size_t i) const {
+        std::string_view operator[](size_t i) const {
             iassert(ErrorCodes::NoSuchKey, "Match capture", i < pcre2_get_ovector_count(&*_m));
             size_t* p = pcre2_get_ovector_pointer(&*_m) + 2 * i;
-            return p[0] == PCRE2_UNSET ? StringData{} : _input.substr(p[0], p[1] - p[0]);
+            return p[0] == PCRE2_UNSET ? std::string_view{} : _input.substr(p[0], p[1] - p[0]);
         }
 
     private:
         pcre2_match_data* _m;
-        StringData _input;
+        std::string_view _input;
         int _rc;
     };
 
-    explicit QuickAndDirtyRegex(StringData pattern)
+    explicit QuickAndDirtyRegex(std::string_view pattern)
         : _code{[&] {
               int err;
               size_t errPos;
@@ -364,7 +365,7 @@ public:
         pcre2_code_free(_code);
     }
 
-    Match match(StringData input) const {
+    Match match(std::string_view input) const {
         return Match{_code, input};
     }
 
@@ -378,7 +379,7 @@ struct ParsedTm {
     Seconds tzAdj;
 };
 
-ParsedTm parseTm(StringData dateString) {
+ParsedTm parseTm(std::string_view dateString) {
     static const auto& re = *new QuickAndDirtyRegex{R"re((?x)
         ^
         (\d{4})-(\d{2})-(\d{2})        # mandatory YYYY-MM-DD
@@ -400,10 +401,10 @@ ParsedTm parseTm(StringData dateString) {
     iassert(ErrorCodes::BadValue, fmt::format("failed match \'{}\'", dateString), m.rc() >= 0);
     ParsedTm result{};
     auto cap = [&](int i) {
-        return i <= m.rc() ? m[i] : StringData{};
+        return i <= m.rc() ? m[i] : std::string_view{};
     };
 
-    auto s2i = [](StringData s, StringData name, int min, int max) {
+    auto s2i = [](std::string_view s, std::string_view name, int min, int max) {
         int i = 0;
         iassert(NumberParser().base(10)(s, &i));
         iassert(ErrorCodes::BadValue,
@@ -436,7 +437,7 @@ ParsedTm parseTm(StringData dateString) {
 
 }  // namespace
 
-StatusWith<Date_t> dateFromISOString(StringData dateString) {
+StatusWith<Date_t> dateFromISOString(std::string_view dateString) {
     ParsedTm parsed{};
     try {
         parsed = parseTm(dateString);
@@ -686,13 +687,13 @@ std::string dateToCtimeString(Date_t date) {
 }
 
 void outputDateAsISOStringUTC(std::ostream& os, Date_t date) {
-    os << StringData{DateStringBuffer{}.iso8601(date, false)};
+    os << std::string_view{DateStringBuffer{}.iso8601(date, false)};
 }
 void outputDateAsISOStringLocal(std::ostream& os, Date_t date) {
-    os << StringData{DateStringBuffer{}.iso8601(date, true)};
+    os << std::string_view{DateStringBuffer{}.iso8601(date, true)};
 }
 void outputDateAsCtime(std::ostream& os, Date_t date) {
-    os << StringData{DateStringBuffer{}.ctime(date)};
+    os << std::string_view{DateStringBuffer{}.ctime(date)};
 }
 
 }  // namespace mongo

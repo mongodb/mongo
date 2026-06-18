@@ -36,13 +36,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-MONGO_MOD_FILE_PRIVATE constexpr StringData kLockFileBasename = "mongod.lock"_sd;
+MONGO_MOD_FILE_PRIVATE constexpr std::string_view kLockFileBasename = "mongod.lock"_sd;
 
 class MONGO_MOD_PUBLIC StorageEngineLockFile {
     StorageEngineLockFile(const StorageEngineLockFile&) = delete;
@@ -54,13 +55,14 @@ public:
     /**
      * Returns the path where a lockfile would be expected to live given the dbpath.
      */
-    static std::string lockFilePath(StringData dbpath, StringData fileName = kLockFileBasename);
+    static std::string lockFilePath(std::string_view dbpath,
+                                    std::string_view fileName = kLockFileBasename);
 
     /**
      * Creates the lock file used to prevent concurrent processes from accessing the data files,
      * as appropriate.
      */
-    static void create(ServiceContext* service, StringData dbpath);
+    static void create(ServiceContext* service, std::string_view dbpath);
 
     /**
      * Checks existing lock file, if present, to see if it contains data from a previous
@@ -68,7 +70,7 @@ public:
      * Uses open() to read existing lock file or create new file.
      * Uses boost::filesystem to check lock file so may throw boost::exception.
      */
-    StorageEngineLockFile(StringData dbpath, StringData fileName = kLockFileBasename);
+    StorageEngineLockFile(std::string_view dbpath, std::string_view fileName = kLockFileBasename);
 
     virtual ~StorageEngineLockFile();
 
@@ -104,7 +106,7 @@ public:
      * Writes the string to file.
      * Fails if lock file has not been opened.
      */
-    Status writeString(StringData str);
+    Status writeString(std::string_view str);
 
     /**
      * Truncates file contents and releases file locks.

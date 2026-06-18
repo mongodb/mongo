@@ -48,6 +48,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::evaluate_internal_schema_matcher_test {
+using namespace std::literals::string_view_literals;
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchesEmptyQuery) {
     auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {}]}}");
@@ -267,7 +268,7 @@ TEST(InternalSchemaCondMatchExpressionTest, AppliesToSubobjectsViaObjectMatch) {
     auto elseQuery = BSON("interests" << "query optimization");
 
     InternalSchemaObjectMatchExpression objMatch(
-        "job"_sd, createCondMatchExpression(conditionQuery, thenQuery, elseQuery));
+        "job"sv, createCondMatchExpression(conditionQuery, thenQuery, elseQuery));
 
     ASSERT_TRUE(exec::matcher::matchesBSON(
         &objMatch, fromjson("{name: 'anne', job: {team: 'engineering', subteam: 'query'}}")));
@@ -289,7 +290,7 @@ TEST(InternalSchemaCondMatchExpressionTest, AppliesToSubobjectsViaObjectMatch) {
 
 TEST(InternalSchemaEqMatchExpression, DoesNotTraverseThroughAnArrayWithANumericalPathComponent) {
     BSONObj operand = BSON("" << 5);
-    InternalExprEqMatchExpression eq("a.0.b"_sd, operand.firstElement());
+    InternalExprEqMatchExpression eq("a.0.b"sv, operand.firstElement());
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("0" << BSON("b" << 5)))));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("0" << BSON("b" << 6)))));
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSON("b" << 7)))));
@@ -298,13 +299,13 @@ TEST(InternalSchemaEqMatchExpression, DoesNotTraverseThroughAnArrayWithANumerica
 TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesScalarElements) {
     BSONObj numberOperand = BSON("a" << 5);
 
-    InternalSchemaEqMatchExpression eqNumberOperand("a"_sd, numberOperand["a"]);
+    InternalSchemaEqMatchExpression eqNumberOperand("a"sv, numberOperand["a"]);
     ASSERT_TRUE(exec::matcher::matchesBSON(&eqNumberOperand, BSON("a" << 5.0)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eqNumberOperand, BSON("a" << 6)));
 
     BSONObj stringOperand = BSON("a" << "str");
 
-    InternalSchemaEqMatchExpression eqStringOperand("a"_sd, stringOperand["a"]);
+    InternalSchemaEqMatchExpression eqStringOperand("a"sv, stringOperand["a"]);
     ASSERT_TRUE(exec::matcher::matchesBSON(&eqStringOperand, BSON("a" << "str")));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eqStringOperand, BSON("a" << "string")));
 }
@@ -312,7 +313,7 @@ TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesScalarElements) {
 TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesArrayElement) {
     BSONObj operand = BSON("a" << BSON_ARRAY("b" << 5));
 
-    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"sv, operand["a"]);
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << 5))));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(5 << "b"))));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << 5 << 5))));
@@ -322,7 +323,7 @@ TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesArrayElement) {
 TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesNullElement) {
     BSONObj operand = BSON("a" << BSONNULL);
 
-    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"sv, operand["a"]);
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSONNULL)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << 4)));
 }
@@ -330,7 +331,7 @@ TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesNullElement) {
 TEST(InternalSchemaEqMatchExpression, NullElementDoesNotMatchMissing) {
     BSONObj operand = BSON("a" << BSONNULL);
 
-    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"sv, operand["a"]);
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSONObj()));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("b" << 4)));
 }
@@ -338,14 +339,14 @@ TEST(InternalSchemaEqMatchExpression, NullElementDoesNotMatchMissing) {
 TEST(InternalSchemaEqMatchExpression, NullElementDoesNotMatchUndefinedOrMissing) {
     BSONObj operand = BSON("a" << BSONNULL);
 
-    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"sv, operand["a"]);
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSONObj()));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, fromjson("{a: undefined}")));
 }
 
 TEST(InternalSchemaEqMatchExpression, DoesNotTraverseLeafArrays) {
     BSONObj operand = BSON("a" << 5);
-    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"sv, operand["a"]);
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << 5.0)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(5))));
 }
@@ -353,7 +354,7 @@ TEST(InternalSchemaEqMatchExpression, DoesNotTraverseLeafArrays) {
 TEST(InternalSchemaEqMatchExpression, MatchesObjectsIndependentOfFieldOrder) {
     BSONObj operand = fromjson("{a: {b: 1, c: {d: 2, e: 3}}}");
 
-    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"sv, operand["a"]);
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, fromjson("{a: {b: 1, c: {d: 2, e: 3}}}")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, fromjson("{a: {c: {e: 3, d: 2}, b: 1}}")));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, fromjson("{a: {b: 1, c: {d: 2}, e: 3}}")));
@@ -367,7 +368,7 @@ TEST(InternalSchemaFmodMatchExpression, MatchesElement) {
     BSONObj longLongMatch = BSON("a" << 68719476736LL);
     BSONObj notMatch = BSON("a" << 6);
     BSONObj negativeNotMatch = BSON("a" << -2);
-    InternalSchemaFmodMatchExpression fmod(""_sd, Decimal128(3), Decimal128(1));
+    InternalSchemaFmodMatchExpression fmod(""sv, Decimal128(3), Decimal128(1));
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&fmod, match.firstElement()));
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&fmod, largerMatch.firstElement()));
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&fmod, longLongMatch.firstElement()));
@@ -376,38 +377,38 @@ TEST(InternalSchemaFmodMatchExpression, MatchesElement) {
 }
 
 TEST(InternalSchemaFmodMatchExpression, MatchesScalar) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(2));
+    InternalSchemaFmodMatchExpression fmod("a"sv, Decimal128(5), Decimal128(2));
     ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << 7.0)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 4)));
 }
 
 TEST(InternalSchemaFmodMatchExpression, MatchesNonIntegralValue) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(10.5), Decimal128((4.5)));
+    InternalSchemaFmodMatchExpression fmod("a"sv, Decimal128(10.5), Decimal128((4.5)));
     ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << 15.0)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 10.0)));
 }
 
 TEST(InternalSchemaFmodMatchExpression, MatchesArrayValue) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(2));
+    InternalSchemaFmodMatchExpression fmod("a"sv, Decimal128(5), Decimal128(2));
     ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << BSON_ARRAY(5 << 12LL))));
     ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << BSON_ARRAY(6 << 8))));
 }
 
 TEST(InternalSchemaFmodMatchExpression, DoesNotMatchNull) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(2));
+    InternalSchemaFmodMatchExpression fmod("a"sv, Decimal128(5), Decimal128(2));
     ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSONObj()));
     ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << BSONNULL)));
 }
 
 TEST(InternalSchemaFmodMatchExpression, NegativeRemainders) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(-2.4));
+    InternalSchemaFmodMatchExpression fmod("a"sv, Decimal128(5), Decimal128(-2.4));
     ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 7.6)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 12.4)));
     ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << Decimal128(-12.4))));
 }
 
 TEST(InternalSchemaFmodMatchExpression, ElemMatchKey) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(2));
+    InternalSchemaFmodMatchExpression fmod("a"sv, Decimal128(5), Decimal128(2));
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 4), &details));
@@ -489,7 +490,7 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, MatchesIfNotEnoughArrayElemen
 }
 
 TEST(InternalSchemaMaxItemsMatchExpression, RejectsNonArrayElements) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 1);
+    InternalSchemaMaxItemsMatchExpression maxItems("a"sv, 1);
 
     ASSERT(!exec::matcher::matchesBSON(&maxItems, BSON("a" << BSONObj())));
     ASSERT(!exec::matcher::matchesBSON(&maxItems, BSON("a" << 1)));
@@ -497,40 +498,40 @@ TEST(InternalSchemaMaxItemsMatchExpression, RejectsNonArrayElements) {
 }
 
 TEST(InternalSchemaMaxItemsMatchExpression, RejectsArraysWithTooManyElements) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 0);
+    InternalSchemaMaxItemsMatchExpression maxItems("a"sv, 0);
 
     ASSERT(!exec::matcher::matchesBSON(&maxItems, BSON("a" << BSON_ARRAY(1))));
     ASSERT(!exec::matcher::matchesBSON(&maxItems, BSON("a" << BSON_ARRAY(1 << 2))));
 }
 
 TEST(InternalSchemaMaxItemsMatchExpression, AcceptsArrayWithLessThanOrEqualToMaxElements) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 2);
+    InternalSchemaMaxItemsMatchExpression maxItems("a"sv, 2);
 
     ASSERT(exec::matcher::matchesBSON(&maxItems, BSON("a" << BSON_ARRAY(5 << 6))));
     ASSERT(exec::matcher::matchesBSON(&maxItems, BSON("a" << BSON_ARRAY(5))));
 }
 
 TEST(InternalSchemaMaxItemsMatchExpression, MaxItemsZeroAllowsEmptyArrays) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 0);
+    InternalSchemaMaxItemsMatchExpression maxItems("a"sv, 0);
 
     ASSERT(exec::matcher::matchesBSON(&maxItems, BSON("a" << BSONArray())));
 }
 
 TEST(InternalSchemaMaxItemsMatchExpression, NullArrayEntriesCountAsItems) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 2);
+    InternalSchemaMaxItemsMatchExpression maxItems("a"sv, 2);
 
     ASSERT(exec::matcher::matchesBSON(&maxItems, BSON("a" << BSON_ARRAY(BSONNULL << 1))));
     ASSERT(!exec::matcher::matchesBSON(&maxItems, BSON("a" << BSON_ARRAY(BSONNULL << 1 << 2))));
 }
 
 TEST(InternalSchemaMaxItemsMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 2);
+    InternalSchemaMaxItemsMatchExpression maxItems("a"sv, 2);
 
     ASSERT(exec::matcher::matchesBSON(&maxItems, BSON("a" << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3)))));
 }
 
 TEST(InternalSchemaMaxItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a.b"_sd, 2);
+    InternalSchemaMaxItemsMatchExpression maxItems("a.b"sv, 2);
 
     ASSERT(exec::matcher::matchesBSON(&maxItems, BSON("a" << BSON("b" << BSON_ARRAY(1)))));
     ASSERT(
@@ -538,7 +539,7 @@ TEST(InternalSchemaMaxItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsNonStringElements) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 1);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"sv, 1);
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSONObj())));
     ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << 1)));
@@ -546,14 +547,14 @@ TEST(InternalSchemaMaxLengthMatchExpression, RejectsNonStringElements) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsStringsWithTooManyChars) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"sv, 2);
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "abc")));
     ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "abcd")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, AcceptsStringsWithLessThanOrEqualToMax) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"sv, 2);
 
     ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "ab")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "a")));
@@ -561,20 +562,20 @@ TEST(InternalSchemaMaxLengthMatchExpression, AcceptsStringsWithLessThanOrEqualTo
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, MaxLengthZeroAllowsEmptyString) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 0);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"sv, 0);
 
     ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << "")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsNull) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 1);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"sv, 1);
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSONNULL)));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
-    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a"_sd, 0);
-    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a"_sd, 1);
+    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a"sv, 0);
+    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a"sv, 1);
 
     // This string has one code point, so it should meet maximum length 1 but not maximum length 0.
     const auto testString = u8"\U0001f4a9"_as_char_ptr;
@@ -583,8 +584,8 @@ TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharac
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
-    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a"_sd, 4);
-    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a"_sd, 5);
+    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a"sv, 4);
+    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a"sv, 5);
 
     // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte codepoints.
     const auto testString =
@@ -601,7 +602,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 1);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"sv, 1);
 
     // Several kinds of invalid byte sequences listed in the Wikipedia article about UTF-8:
     // https://en.wikipedia.org/wiki/UTF-8
@@ -621,7 +622,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, NestedArraysWorkWithDottedPaths) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a.b"_sd, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a.b"sv, 2);
 
     ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSON("b" << "a"))));
     ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSON("b" << "ab"))));
@@ -677,7 +678,7 @@ TEST(InternalSchemaMaxPropertiesMatchExpression, NestedArraysAreNotUnwound) {
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, RejectsNonArrayElements) {
-    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 1);
+    InternalSchemaMinItemsMatchExpression minItems("a"sv, 1);
 
     ASSERT(!exec::matcher::matchesBSON(&minItems, BSON("a" << BSONObj())));
     ASSERT(!exec::matcher::matchesBSON(&minItems, BSON("a" << 1)));
@@ -685,47 +686,47 @@ TEST(InternalSchemaMinItemsMatchExpression, RejectsNonArrayElements) {
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, RejectsArraysWithTooFewElements) {
-    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);
+    InternalSchemaMinItemsMatchExpression minItems("a"sv, 2);
 
     ASSERT(!exec::matcher::matchesBSON(&minItems, BSON("a" << BSONArray())));
     ASSERT(!exec::matcher::matchesBSON(&minItems, BSON("a" << BSON_ARRAY(1))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, AcceptsArrayWithAtLeastMinElements) {
-    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);
+    InternalSchemaMinItemsMatchExpression minItems("a"sv, 2);
 
     ASSERT(exec::matcher::matchesBSON(&minItems, BSON("a" << BSON_ARRAY(1 << 2))));
     ASSERT(exec::matcher::matchesBSON(&minItems, BSON("a" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, MinItemsZeroAllowsEmptyArrays) {
-    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 0);
+    InternalSchemaMinItemsMatchExpression minItems("a"sv, 0);
 
     ASSERT(exec::matcher::matchesBSON(&minItems, BSON("a" << BSONArray())));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, NullArrayEntriesCountAsItems) {
-    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 1);
+    InternalSchemaMinItemsMatchExpression minItems("a"sv, 1);
 
     ASSERT(exec::matcher::matchesBSON(&minItems, BSON("a" << BSON_ARRAY(BSONNULL))));
     ASSERT(exec::matcher::matchesBSON(&minItems, BSON("a" << BSON_ARRAY(BSONNULL << 1))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);
+    InternalSchemaMinItemsMatchExpression minItems("a"sv, 2);
 
     ASSERT(!exec::matcher::matchesBSON(&minItems, BSON("a" << BSON_ARRAY(BSON_ARRAY(1 << 2)))));
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
-    InternalSchemaMinItemsMatchExpression minItems("a.b"_sd, 2);
+    InternalSchemaMinItemsMatchExpression minItems("a.b"sv, 2);
 
     ASSERT(exec::matcher::matchesBSON(&minItems, BSON("a" << BSON("b" << BSON_ARRAY(1 << 2)))));
     ASSERT(!exec::matcher::matchesBSON(&minItems, BSON("a" << BSON("b" << BSON_ARRAY(1)))));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, RejectsNonStringElements) {
-    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 1);
+    InternalSchemaMinLengthMatchExpression minLength("a"sv, 1);
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSONObj())));
     ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << 1)));
@@ -733,14 +734,14 @@ TEST(InternalSchemaMinLengthMatchExpression, RejectsNonStringElements) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, RejectsStringsWithTooFewChars) {
-    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
+    InternalSchemaMinLengthMatchExpression minLength("a"sv, 2);
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << "")));
     ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << "a")));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, AcceptsStringWithAtLeastMinChars) {
-    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
+    InternalSchemaMinLengthMatchExpression minLength("a"sv, 2);
 
     ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << "ab")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << "abc")));
@@ -748,20 +749,20 @@ TEST(InternalSchemaMinLengthMatchExpression, AcceptsStringWithAtLeastMinChars) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, MinLengthZeroAllowsEmptyString) {
-    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 0);
+    InternalSchemaMinLengthMatchExpression minLength("a"sv, 0);
 
     ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << "")));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, RejectsNull) {
-    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 1);
+    InternalSchemaMinLengthMatchExpression minLength("a"sv, 1);
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSONNULL)));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
-    InternalSchemaMinLengthMatchExpression matchingMinLength("a"_sd, 1);
-    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a"_sd, 2);
+    InternalSchemaMinLengthMatchExpression matchingMinLength("a"sv, 1);
+    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a"sv, 2);
 
     // This string has one code point, so it should meet minimum length 1 but not minimum length 2.
     const auto testString = u8"\U0001f4a9"_as_char_ptr;
@@ -770,8 +771,8 @@ TEST(InternalSchemaMinLengthMatchExpression, TreatsMultiByteCodepointAsOneCharac
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
-    InternalSchemaMinLengthMatchExpression matchingMinLength("a"_sd, 5);
-    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a"_sd, 6);
+    InternalSchemaMinLengthMatchExpression matchingMinLength("a"sv, 5);
+    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a"sv, 6);
 
     // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte code points.
     const auto testString =
@@ -788,7 +789,7 @@ TEST(InternalSchemaMinLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, DealsWithInvalidUTF8) {
-    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 1);
+    InternalSchemaMinLengthMatchExpression minLength("a"sv, 1);
 
     // Several kinds of invalid byte sequences listed in the Wikipedia article about UTF-8:
     // https://en.wikipedia.org/wiki/UTF-8
@@ -808,7 +809,7 @@ TEST(InternalSchemaMinLengthMatchExpression, DealsWithInvalidUTF8) {
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, NestedFieldsWorkWithDottedPaths) {
-    InternalSchemaMinLengthMatchExpression minLength("a.b"_sd, 2);
+    InternalSchemaMinLengthMatchExpression minLength("a.b"sv, 2);
 
     ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSON("b" << "ab"))));
     ASSERT_TRUE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSON("b" << "abc"))));
@@ -870,7 +871,7 @@ TEST(InternalSchemaObjectMatchExpression, RejectsNonObjectElements) {
     auto subExpr = MatchExpressionParser::parse(BSON("b" << 1), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
+    InternalSchemaObjectMatchExpression objMatch("a"sv, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << 1)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << "string")));
@@ -882,7 +883,7 @@ TEST(InternalSchemaObjectMatchExpression, RejectsObjectsThatDontMatch) {
     auto subExpr = MatchExpressionParser::parse(BSON("b" << BSON("$type" << "string")), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
+    InternalSchemaObjectMatchExpression objMatch("a"sv, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("b" << 1))));
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("b" << BSONObj()))));
@@ -893,7 +894,7 @@ TEST(InternalSchemaObjectMatchExpression, AcceptsObjectsThatMatch) {
     auto subExpr = MatchExpressionParser::parse(BSON("b" << BSON("$type" << "string")), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
+    InternalSchemaObjectMatchExpression objMatch("a"sv, std::move(subExpr.getValue()));
 
     ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("b" << "string"))));
     ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch,
@@ -910,7 +911,7 @@ TEST(InternalSchemaObjectMatchExpression, DottedPathAcceptsObjectsThatMatch) {
     auto subExpr = MatchExpressionParser::parse(BSON("b.c.d" << BSON("$type" << "string")), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
+    InternalSchemaObjectMatchExpression objMatch("a"sv, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("d" << "string"))));
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch,
@@ -924,7 +925,7 @@ TEST(InternalSchemaObjectMatchExpression, EmptyMatchAcceptsAllObjects) {
     auto subExpr = MatchExpressionParser::parse(BSONObj(), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
+    InternalSchemaObjectMatchExpression objMatch("a"sv, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << 1)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << "string")));
@@ -986,19 +987,19 @@ TEST(InternalSchemaObjectMatchExpression, RejectsArraysContainingMatchingSubObje
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, RejectsNonArrays) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"sv);
     ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems, BSON("foo" << 1)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems, BSON("foo" << BSONObj())));
     ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems, BSON("foo" << "string")));
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, MatchesEmptyArray) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"sv);
     ASSERT_TRUE(exec::matcher::matchesBSON(&uniqueItems, BSON("foo" << BSONArray())));
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, MatchesOneElementArray) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"sv);
     ASSERT_TRUE(exec::matcher::matchesBSON(&uniqueItems, BSON("foo" << BSON_ARRAY(1))));
     ASSERT_TRUE(exec::matcher::matchesBSON(&uniqueItems, BSON("foo" << BSON_ARRAY(BSONObj()))));
     ASSERT_TRUE(exec::matcher::matchesBSON(&uniqueItems,
@@ -1006,7 +1007,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, MatchesOneElementArray) {
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, MatchesArrayOfUniqueItems) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"sv);
     ASSERT_TRUE(
         exec::matcher::matchesBSON(&uniqueItems, fromjson("{foo: [1, 'bar', {}, [], null]}")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&uniqueItems,
@@ -1017,7 +1018,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, MatchesArrayOfUniqueItems) {
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, MatchesNestedArrayOfUniqueItems) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo.bar"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo.bar"sv);
     ASSERT_TRUE(exec::matcher::matchesBSON(&uniqueItems,
                                            fromjson("{foo: {bar: [1, 'bar', {}, [], null]}}")));
     ASSERT_TRUE(exec::matcher::matchesBSON(
@@ -1029,7 +1030,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, MatchesNestedArrayOfUniqueItems) 
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, RejectsArrayWithDuplicates) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"sv);
     ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems, fromjson("{foo: [1, 1, 1]}")));
     ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems, fromjson("{foo: [['bar'], ['bar']]}")));
     ASSERT_FALSE(exec::matcher::matchesBSON(
@@ -1037,7 +1038,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, RejectsArrayWithDuplicates) {
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, RejectsNestedArrayWithDuplicates) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"sv);
     ASSERT_FALSE(exec::matcher::matchesBSON(&uniqueItems, fromjson("{foo: {bar: [1, 1, 1]}}")));
     ASSERT_FALSE(
         exec::matcher::matchesBSON(&uniqueItems, fromjson("{foo: {bar: [['baz'], ['baz']]}}")));
@@ -1046,7 +1047,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, RejectsNestedArrayWithDuplicates)
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, FieldNameSignificantWhenComparingNestedObjects) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"sv);
     ASSERT_TRUE(exec::matcher::matchesBSON(&uniqueItems, fromjson("{foo: [{x: 7}, {y: 7}]}")));
     ASSERT_TRUE(
         exec::matcher::matchesBSON(&uniqueItems, fromjson("{foo: [{a: 'bar'}, {b: 'bar'}]}")));
@@ -1057,7 +1058,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, FieldNameSignificantWhenComparing
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, AlwaysUsesBinaryComparisonRegardlessOfCollator) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"sv);
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     uniqueItems.setCollator(&collator);
 
@@ -1069,7 +1070,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, AlwaysUsesBinaryComparisonRegardl
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, FindsFirstDuplicateValue) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems(""_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems(""sv);
     auto inputArray = fromjson("[1, 2, 2, 1]");
     auto result = exec::matcher::findFirstDuplicateValue(&uniqueItems, inputArray);
     ASSERT_TRUE(result);
@@ -1550,7 +1551,7 @@ TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {
     MatcherTypeSet typeSet;
     typeSet.bsonTypes.insert(BSONType::string);
     typeSet.bsonTypes.insert(BSONType::date);
-    InternalSchemaBinDataEncryptedTypeExpression expr("a"_sd, std::move(typeSet));
+    InternalSchemaBinDataEncryptedTypeExpression expr("a"sv, std::move(typeSet));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
@@ -1571,7 +1572,7 @@ TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotMatchShortBinData) {
     MatcherTypeSet typeSet;
     typeSet.bsonTypes.insert(BSONType::string);
     typeSet.bsonTypes.insert(BSONType::date);
-    InternalSchemaBinDataEncryptedTypeExpression expr("a"_sd, std::move(typeSet));
+    InternalSchemaBinDataEncryptedTypeExpression expr("a"sv, std::move(typeSet));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
@@ -1731,7 +1732,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBinDataValueDoesNotMat
 }
 
 TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotTraverseLeafArrays) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::string);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"sv, BSONType::string);
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
@@ -1747,7 +1748,7 @@ TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotTraverseLeafArrays) {
 }
 
 TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchShortBinData) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::string);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"sv, BSONType::string);
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
@@ -1766,7 +1767,7 @@ TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchShortBinData) {
 }
 
 TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, MatchesOnlyFLE2ServerSubtypes) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::string);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"sv, BSONType::string);
 
     FleBlobHeader blob;
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
@@ -1792,8 +1793,8 @@ TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, MatchesOnlyFLE2ServerSubtypes) 
 }
 
 TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchIncorrectBsonType) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedString("ssn"_sd, BSONType::string);
-    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedInt("age"_sd, BSONType::numberInt);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedString("ssn"sv, BSONType::string);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedInt("age"sv, BSONType::numberInt);
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);

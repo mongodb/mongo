@@ -36,6 +36,8 @@
 #include "mongo/db/extension/sdk/test_extension_util.h"
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
+#include <string_view>
+
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 using mongo::extension::PipelineRewriteRule;
@@ -140,7 +142,7 @@ public:
     }
 
 private:
-    static mongo::StringData boundsTypeStr(MongoExtensionDocsNeededConstraintType type) {
+    static std::string_view boundsTypeStr(MongoExtensionDocsNeededConstraintType type) {
         switch (type) {
             case kDocsNeededConstraintDiscrete:
                 return "discrete";

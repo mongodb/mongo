@@ -29,18 +29,19 @@
 
 #include "mongo/crypto/encryption_fields_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 TEST(FLEUtils, FindMatchingEncryptedField) {
-    FieldRef fieldAbc("a.b.c"_sd);
-    FieldRef fieldFoo("foo"_sd);
-    FieldRef fieldXyz("x.y.z"_sd);
+    FieldRef fieldAbc("a.b.c"sv);
+    FieldRef fieldFoo("foo"sv);
+    FieldRef fieldXyz("x.y.z"sv);
     FieldRef fieldEmpty;
     std::vector<FieldRef> encryptedFields = {fieldAbc, fieldFoo, fieldEmpty, fieldXyz};
 

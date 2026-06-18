@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"

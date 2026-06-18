@@ -45,14 +45,16 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 StatusWith<NamespaceString> generateRandomCollectionName(OperationContext* opCtx,
                                                          const DatabaseName& dbName,
-                                                         StringData collectionNameModel) {
+                                                         std::string_view collectionNameModel) {
     // There must be at least one percent sign in the collection name model.
     auto numPercentSign = std::count(collectionNameModel.begin(), collectionNameModel.end(), '%');
     if (numPercentSign == 0) {
@@ -66,7 +68,7 @@ StatusWith<NamespaceString> generateRandomCollectionName(OperationContext* opCtx
     static constexpr auto charsToChooseFrom =
         "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz"_sd;
+        "abcdefghijklmnopqrstuvwxyz"sv;
     static constexpr auto charsetSize = charsToChooseFrom.size();
 
     static_assert((10U + 26U * 2) == charsetSize);
@@ -90,7 +92,7 @@ StatusWith<NamespaceString> generateRandomCollectionName(OperationContext* opCtx
 
 StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
                                                      const DatabaseName& dbName,
-                                                     StringData collectionNameModel) {
+                                                     std::string_view collectionNameModel) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
     static constexpr auto kNumGenerationAttempts = 30'000;

@@ -32,7 +32,6 @@
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -56,6 +55,7 @@
 #include "mongo/util/future_impl.h"
 
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/move/utility_core.hpp>
@@ -67,6 +67,7 @@
 namespace mongo {
 namespace txn {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(failRemoteTransactionCommand);
 MONGO_FAIL_POINT_DEFINE(hangWhileTargetingRemoteHost);
@@ -83,9 +84,9 @@ bool shouldActivateFailpoint(BSONObj commandObj, BSONObj data) {
     BSONElement twoPhaseCommitStage = data["twoPhaseCommitStage"];
     invariant(!twoPhaseCommitStage.eoo());
     invariant(twoPhaseCommitStage.type() == BSONType::string);
-    StringData twoPhaseCommitStageValue = twoPhaseCommitStage.valueStringData();
-    constexpr std::array<StringData, 3> fieldNames{
-        "prepareTransaction"_sd, "commitTransaction"_sd, "abortTransaction"_sd};
+    std::string_view twoPhaseCommitStageValue = twoPhaseCommitStage.valueStringData();
+    constexpr std::array<std::string_view, 3> fieldNames{
+        "prepareTransaction"sv, "commitTransaction"sv, "abortTransaction"sv};
     std::array<BSONElement, 3> fields;
     commandObj.getFields(fieldNames, &fields);
     const bool commandIsPrepare = !fields[0].eoo();

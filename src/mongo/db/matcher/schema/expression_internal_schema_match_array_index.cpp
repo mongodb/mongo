@@ -33,16 +33,17 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-constexpr StringData InternalSchemaMatchArrayIndexMatchExpression::kName;
+constexpr std::string_view InternalSchemaMatchArrayIndexMatchExpression::kName;
 
 InternalSchemaMatchArrayIndexMatchExpression::InternalSchemaMatchArrayIndexMatchExpression(
-    boost::optional<StringData> path,
+    boost::optional<std::string_view> path,
     long long index,
     std::unique_ptr<ExpressionWithPlaceholder> expression,
     clonable_ptr<ErrorAnnotation> annotation)

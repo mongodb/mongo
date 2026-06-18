@@ -36,6 +36,7 @@
 #include "mongo/util/string_map.h"
 
 #include <algorithm>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -222,7 +223,7 @@ const ParserMap& LiteParsedDocumentSource::getParserMap() {
     return parserMap;
 }
 
-bool LiteParsedDocumentSource::isRegisteredExtensionStage(StringData stageName) {
+bool LiteParsedDocumentSource::isRegisteredExtensionStage(std::string_view stageName) {
     const auto it = parserMap.find(stageName);
     if (it == parserMap.end()) {
         return false;

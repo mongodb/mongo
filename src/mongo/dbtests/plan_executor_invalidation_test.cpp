@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -62,6 +61,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -150,7 +150,7 @@ public:
         return res;
     }
 
-    bool dropCollection(StringData ns) {
+    bool dropCollection(std::string_view ns) {
         // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
         // query.
         auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");
@@ -200,7 +200,7 @@ public:
             info));
     }
 
-    Status createIndex(StringData ns, const BSONObj& keys, bool unique = false) {
+    Status createIndex(std::string_view ns, const BSONObj& keys, bool unique = false) {
         // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
         // query.
         auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");

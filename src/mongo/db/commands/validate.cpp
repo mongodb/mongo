@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -65,6 +64,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -94,7 +94,7 @@ stdx::condition_variable _validationNotifier;
  * Creates an aggregation command with a $collStats pipeline that fetches 'storageStats' and
  * 'count'.
  */
-BSONObj makeCollStatsCommand(StringData collectionNameOnly) {
+BSONObj makeCollStatsCommand(std::string_view collectionNameOnly) {
     BSONArrayBuilder pipelineBuilder;
     pipelineBuilder << BSON("$collStats"
                             << BSON("storageStats" << BSONObj() << "count" << BSONObj()));

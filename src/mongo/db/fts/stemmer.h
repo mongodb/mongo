@@ -30,11 +30,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <libstemmer.h>
 
@@ -56,11 +56,11 @@ public:
     /**
      * Stems an input word.
      *
-     * The returned StringData is valid until the next call to any method on this object. Since the
-     * input may be returned unmodified, the output's lifetime may also expire when the input's
-     * does.
+     * The returned std::string_view is valid until the next call to any method on this object.
+     * Since the input may be returned unmodified, the output's lifetime may also expire when the
+     * input's does.
      */
-    StringData stem(StringData word) const;
+    std::string_view stem(std::string_view word) const;
 
 private:
     class Impl;

@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
+
+#include <string_view>
 
 #include <absl/hash/hash.h>
 #include <absl/strings/string_view.h>
@@ -48,14 +49,14 @@ struct BucketMetadata {
 public:
     BucketMetadata(tracking::Context&,
                    BSONElement elem,
-                   boost::optional<StringData> trueMetaFieldName);
+                   boost::optional<std::string_view> trueMetaFieldName);
 
     bool operator==(const BucketMetadata& other) const;
 
     BSONObj toBSON() const;
     BSONElement element() const;
 
-    boost::optional<StringData> getMetaField() const;
+    boost::optional<std::string_view> getMetaField() const;
 
     template <typename H>
     friend H AbslHashValue(H h, const BucketMetadata& metadata) {

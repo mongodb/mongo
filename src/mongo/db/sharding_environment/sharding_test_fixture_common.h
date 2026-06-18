@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/global_catalog/chunk_manager.h"

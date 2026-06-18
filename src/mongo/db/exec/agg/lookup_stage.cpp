@@ -41,6 +41,8 @@
 #include "mongo/db/views/resolved_view.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -126,7 +128,7 @@ namespace exec::agg {
 
 REGISTER_AGG_STAGE_MAPPING(lookup, DocumentSourceLookUp::id, documentSourceLookUpToStageFn);
 
-LookUpStage::LookUpStage(StringData stageName,
+LookUpStage::LookUpStage(std::string_view stageName,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          boost::intrusive_ptr<ExpressionContext> fromExpCtx,
                          NamespaceString fromNs,

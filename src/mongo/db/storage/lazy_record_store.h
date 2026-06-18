@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 /**
@@ -65,7 +65,7 @@ public:
      * If called inside an active WriteUnitOfWork with CreateMode::immediate, the WUOW must be
      * committed or rolled back before this LazyRecordStore is destroyed.
      */
-    LazyRecordStore(OperationContext* opCtx, StringData ident, CreateMode createMode);
+    LazyRecordStore(OperationContext* opCtx, std::string_view ident, CreateMode createMode);
     ~LazyRecordStore();
 
     /**
@@ -99,7 +99,7 @@ public:
     /**
      * Immediately creates a table which can later be used with CreateMode::openExisting.
      */
-    static void createTable(OperationContext* opCtx, StringData ident);
+    static void createTable(OperationContext* opCtx, std::string_view ident);
 
 private:
     // Set to true while _tableOrIdent is storing a RecordStore whose creating WUOW has not been
@@ -109,7 +109,7 @@ private:
     std::variant<std::string, std::unique_ptr<RecordStore>> _tableOrIdent;
 
     static std::unique_ptr<RecordStore> _createRecordStore(OperationContext* opCtx,
-                                                           StringData ident,
+                                                           std::string_view ident,
                                                            LazyRecordStore* lrs);
 };
 

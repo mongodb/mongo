@@ -37,7 +37,6 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -54,11 +53,13 @@
 #include <compare>
 #include <cstdint>
 #include <iterator>
+#include <string_view>
 #include <tuple>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 ErrorCodes::Error metadataInconsistencyErrorCode() {
@@ -613,11 +614,11 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
 BSONObj ChunkMap::toBSON() const {
     BSONObjBuilder builder;
 
-    getVersion().serialize("startingVersion"_sd, &builder);
+    getVersion().serialize("startingVersion"sv, &builder);
     builder.append("chunkCount", static_cast<int64_t>(size()));
 
     {
-        BSONArrayBuilder arrayBuilder(builder.subarrayStart("chunks"_sd));
+        BSONArrayBuilder arrayBuilder(builder.subarrayStart("chunks"sv));
         for (const auto& mapIt : _chunkVectorMap) {
             for (const auto& chunkInfoPtr : *mapIt.second) {
                 arrayBuilder.append(chunkInfoPtr->toString());
@@ -1103,12 +1104,12 @@ void ComparableChunkVersion::setChunkVersion(const ChunkVersion& version) {
 std::string ComparableChunkVersion::toString() const {
     BSONObjBuilder builder;
     if (_chunkVersion)
-        _chunkVersion->serialize("chunkVersion"_sd, &builder);
+        _chunkVersion->serialize("chunkVersion"sv, &builder);
     else
-        builder.append("chunkVersion"_sd, "None");
+        builder.append("chunkVersion"sv, "None");
 
-    builder.append("forcedRefreshSequenceNum"_sd, static_cast<int64_t>(_forcedRefreshSequenceNum));
-    builder.append("epochDisambiguatingSequenceNum"_sd,
+    builder.append("forcedRefreshSequenceNum"sv, static_cast<int64_t>(_forcedRefreshSequenceNum));
+    builder.append("epochDisambiguatingSequenceNum"sv,
                    static_cast<int64_t>(_epochDisambiguatingSequenceNum));
 
     return builder.obj().toString();

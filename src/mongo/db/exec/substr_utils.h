@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo::substr_utils {
 
 // Returns the substring of a string. The substring starts with the character at the specified UTF-8
 // code point (CP) index (zero-based) in the string for the number of code points specified.
-StringData getSubstringCP(StringData input, int startingPos, int len);
+std::string_view getSubstringCP(std::string_view input, int startingPos, int len);
 
 }  // namespace mongo::substr_utils

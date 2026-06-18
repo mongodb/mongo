@@ -35,6 +35,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor {
@@ -57,7 +59,7 @@ void ProjectionNode::_addProjectionForPath(const FieldPath& path) {
         // Add to projection unless we already have `path` as a projection.
         if (!_projectedFieldsSet.contains(path.fullPath())) {
             auto it = _projectedFields.insert(_projectedFields.end(), path.fullPath());
-            _projectedFieldsSet.insert(StringData(*it));
+            _projectedFieldsSet.insert(std::string_view(*it));
         }
     } else {
         // FieldPath can't be empty, so it is safe to obtain the first path component here.
@@ -212,7 +214,9 @@ Value ProjectionNode::applyProjectionsToValue(Value inputValue) const {
     }
 }
 
-void ProjectionNode::outputProjectedField(StringData field, Value val, MutableDocument* doc) const {
+void ProjectionNode::outputProjectedField(std::string_view field,
+                                          Value val,
+                                          MutableDocument* doc) const {
     doc->setField(field, val);
 }
 
@@ -225,14 +229,14 @@ void ProjectionNode::applyExpressions(const Document& root,
             // Use position-based access to avoid a second hash lookup when reading and writing the
             // field value.
             const Document& doc = outputDoc->peek();
-            const auto pos = doc.positionOf(StringData{field});
+            const auto pos = doc.positionOf(std::string_view{field});
             Value currentValue = pos.found() ? doc.getField(pos) : Value{};
             Value newValue =
                 childIt->second->applyExpressionsToValue(root, std::move(currentValue), ctx);
             if (pos.found()) {
                 outputDoc->setField(pos, std::move(newValue));
             } else {
-                outputDoc->setField(StringData{field}, std::move(newValue));
+                outputDoc->setField(std::string_view{field}, std::move(newValue));
             }
         } else {
             auto expressionIt = _expressions.find(field);

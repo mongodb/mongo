@@ -35,6 +35,8 @@
 #include "mongo/db/query/query_knobs/query_knob_test_gen.h"
 #include "mongo/idl/idl_parser.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace test_knobs {
 REGISTER_QUERY_KNOBS(TestKnobs, MONGO_EXPAND_QUERY_KNOBS_TEST)
@@ -42,12 +44,12 @@ REGISTER_QUERY_KNOBS(TestKnobs, MONGO_EXPAND_QUERY_KNOBS_TEST)
 
 void TestEnumKnob::append(OperationContext*,
                           BSONObjBuilder* b,
-                          StringData name,
+                          std::string_view name,
                           const boost::optional<TenantId>&) {
     *b << name << idl::serialize(_data.get());
 }
 
-Status TestEnumKnob::setFromString(StringData value, const boost::optional<TenantId>&) {
+Status TestEnumKnob::setFromString(std::string_view value, const boost::optional<TenantId>&) {
     _data = idl::deserialize<TestKnobModeEnum>(value, IDLParserContext("testEnumKnob"));
     return Status::OK();
 }

@@ -30,7 +30,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
@@ -39,6 +38,8 @@
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -102,7 +103,7 @@ BSONObj BatchedCommandResponse::toBSON() const {
 
     if (_writeErrors) {
         auto truncateErrorMessage = [errorCount = size_t(0),
-                                     errorSize = size_t(0)](StringData rawMessage) mutable {
+                                     errorSize = size_t(0)](std::string_view rawMessage) mutable {
             // Start truncating error messages once both of these limits are exceeded.
             constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
             constexpr size_t kErrorCountTruncationMin = 2;

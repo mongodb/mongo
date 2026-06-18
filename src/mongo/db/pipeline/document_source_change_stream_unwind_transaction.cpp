@@ -54,6 +54,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamUnwindTransaction,
                                               ChangeStreamUnwindTransactionLiteParsed::parse);
@@ -188,7 +189,7 @@ Value DocumentSourceChangeStreamUnwindTransaction::doSerialize(
 
     if (opts.isSerializingForExplain()) {
         BSONObjBuilder builder;
-        builder.append("stage"_sd, "internalUnwindTransaction"_sd);
+        builder.append("stage"sv, "internalUnwindTransaction"sv);
         builder.append(DocumentSourceChangeStreamUnwindTransactionSpec::kFilterFieldName,
                        _expression->serialize(opts));
 

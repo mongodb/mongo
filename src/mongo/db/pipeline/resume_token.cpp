@@ -46,10 +46,12 @@
 
 #include <ostream>
 #include <set>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 // This is our default resume token for the representative query shape.
 const auto kDefaultTokenQueryStats = ResumeToken::makeHighWaterMarkToken(Timestamp(), 1);
@@ -59,7 +61,7 @@ ResumeTokenData::ResumeTokenData(Timestamp clusterTimeIn,
                                  int versionIn,
                                  size_t txnOpIndexIn,
                                  const boost::optional<UUID>& uuidIn,
-                                 StringData opType,
+                                 std::string_view opType,
                                  Value documentKey,
                                  Value opDescription)
     : clusterTime(clusterTimeIn), version(versionIn), txnOpIndex(txnOpIndexIn), uuid(uuidIn) {
@@ -76,10 +78,10 @@ ResumeTokenData::ResumeTokenData(Timestamp clusterTimeIn,
     // If we are here, then this is either a v2 classic event or an expanded event. In both cases,
     // the resume token is the operationType plus the documentKey or operationDescription.
     auto opDescOrDocKey = documentKey.missing()
-        ? std::make_pair("operationDescription"_sd, opDescription)
-        : std::make_pair("documentKey"_sd, documentKey);
+        ? std::make_pair("operationDescription"sv, opDescription)
+        : std::make_pair("documentKey"sv, documentKey);
 
-    eventIdentifier = Value(Document{{"operationType"_sd, opType}, std::move(opDescOrDocKey)});
+    eventIdentifier = Value(Document{{"operationType"sv, opType}, std::move(opDescOrDocKey)});
 };
 
 bool ResumeTokenData::operator==(const ResumeTokenData& other) const {

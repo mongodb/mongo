@@ -32,7 +32,6 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_options.h"
 #include "mongo/db/storage/record_data.h"

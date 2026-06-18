@@ -39,6 +39,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
 LogicalTime::LogicalTime(Timestamp ts) : _time(ts.asULL()) {}
@@ -81,7 +83,7 @@ BSONObj LogicalTime::toBSON() const {
     return bldr.obj();
 }
 
-void LogicalTime::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+void LogicalTime::serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const {
     bob->appendElements(BSON(fieldName << asTimestamp()));
 }
 

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
@@ -41,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -62,7 +62,7 @@ using HashAggAccessor = value::MaterializedRowValueAccessor<TableType::iterator>
 template <class Derived>
 class HashAggBaseStage : public PlanStage {
 protected:
-    HashAggBaseStage(StringData stageName,
+    HashAggBaseStage(std::string_view stageName,
                      PlanYieldPolicySBE* yieldPolicy,
                      PlanNodeId planNodeId,
                      value::SlotAccessor* _collatorAccessor,

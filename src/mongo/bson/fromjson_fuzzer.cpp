@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -42,7 +43,7 @@ namespace {
 void doFuzz(const char* data, size_t size) try {
     BSONObj obj;
     try {
-        obj = fromjson(StringData(data, size));
+        obj = fromjson(std::string_view(data, size));
     } catch (...) {
         return;  // ignore fromjson exceptions
     }

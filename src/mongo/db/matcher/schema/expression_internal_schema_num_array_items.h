@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
@@ -41,6 +40,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -54,9 +54,9 @@ namespace mongo {
 class InternalSchemaNumArrayItemsMatchExpression : public ArrayMatchingMatchExpression {
 public:
     InternalSchemaNumArrayItemsMatchExpression(MatchType type,
-                                               boost::optional<StringData> path,
+                                               boost::optional<std::string_view> path,
                                                long long numItems,
-                                               StringData name,
+                                               std::string_view name,
                                                clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     ~InternalSchemaNumArrayItemsMatchExpression() override {}
@@ -85,7 +85,7 @@ public:
         return nullptr;
     }
 
-    StringData getName() const {
+    std::string_view getName() const {
         return _name;
     }
 
@@ -94,7 +94,7 @@ public:
     }
 
 private:
-    StringData _name;
+    std::string_view _name;
     long long _numItems = 0;
 };
 }  // namespace mongo

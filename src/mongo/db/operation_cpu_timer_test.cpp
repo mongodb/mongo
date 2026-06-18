@@ -31,7 +31,6 @@
 #include "mongo/db/operation_cpu_timer.h"
 
 // IWYU pragma: no_include "cxxabi.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"

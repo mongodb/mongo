@@ -37,6 +37,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamHandleTopologyChange,
                                               ChangeStreamHandleTopologyChangeLiteParsed::parse);
@@ -94,7 +95,7 @@ Value DocumentSourceChangeStreamHandleTopologyChange::doSerialize(
     const query_shape::SerializationOptions& opts) const {
     if (opts.isSerializingForExplain()) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
-                         << DOC("stage" << "internalHandleTopologyChange"_sd)));
+                         << DOC("stage" << "internalHandleTopologyChange"sv)));
     }
 
     return Value(Document{{kStageName, Document()}});

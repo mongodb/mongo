@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -47,7 +48,7 @@ namespace mongo::exec::agg {
  */
 class ChangeStreamCheckTopologyChangeStage final : public Stage {
 public:
-    ChangeStreamCheckTopologyChangeStage(StringData stageName,
+    ChangeStreamCheckTopologyChangeStage(std::string_view stageName,
                                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:

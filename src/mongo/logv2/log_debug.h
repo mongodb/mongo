@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -71,8 +71,8 @@ auto argAttrs(const Args&... args) {
  *     }  // namespace mongo
  */
 template <typename... Args>
-void logd(StringData message, const Args&... args) {  // NOLINT
-    doUnstructuredLogImpl(LogSeverity::Log(),         // NOLINT
+void logd(std::string_view message, const Args&... args) {  // NOLINT
+    doUnstructuredLogImpl(LogSeverity::Log(),               // NOLINT
                           LogOptions{LogComponent::kDefault},
                           message,
                           detail::argAttrs(args...));

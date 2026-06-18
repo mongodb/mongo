@@ -39,10 +39,11 @@
 
 namespace mongo {
 namespace expression_evaluation_test {
+using namespace std::literals::string_view_literals;
 
 TEST(ExpressionToHashedIndexKeyTest, StringInputSucceeds) {
     auto expCtx = ExpressionContextForTest{};
-    const BSONObj obj = BSON("$toHashedIndexKey" << "hashThisStringLiteral"_sd);
+    const BSONObj obj = BSON("$toHashedIndexKey" << "hashThisStringLiteral"sv);
     auto expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
     Value result = expression->evaluate({}, &expCtx.variables);
     ASSERT_VALUE_EQ(result, Value::createIntOrLong(-5776344739422278694));

@@ -30,7 +30,6 @@
 #include "mongo/transport/transport_options.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/service_context.h"
 #include "mongo/transport/cidr_range_list_parameter.h"
@@ -39,12 +38,14 @@
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/transport/transport_options_gen.h"
 
+#include <string_view>
+
 namespace mongo::transport {
 
 // TODO: SERVER-106468 Define CIDRRangeListParameter and remove this glue code
 void MaxIncomingConnectionsOverrideServerParameter::append(OperationContext*,
                                                            BSONObjBuilder* bob,
-                                                           StringData name,
+                                                           std::string_view name,
                                                            const boost::optional<TenantId>&) {
     appendCIDRRangeListParameter(serverGlobalParams.maxIncomingConnsOverride, bob, name);
 }
@@ -55,7 +56,7 @@ Status MaxIncomingConnectionsOverrideServerParameter::set(const BSONElement& val
 }
 
 Status MaxIncomingConnectionsOverrideServerParameter::setFromString(
-    StringData str, const boost::optional<TenantId>&) {
+    std::string_view str, const boost::optional<TenantId>&) {
     return setCIDRRangeListParameter(serverGlobalParams.maxIncomingConnsOverride, fromjson(str));
 }
 

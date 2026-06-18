@@ -32,9 +32,13 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
+#include <string_view>
+
 namespace mongo::idl {
 
-void serializeErrorStatus(const Status& status, StringData fieldName, BSONObjBuilder* builder) {
+void serializeErrorStatus(const Status& status,
+                          std::string_view fieldName,
+                          BSONObjBuilder* builder) {
     uassert(7418500, "Status must be an error", !status.isOK());
     BSONObjBuilder sub{builder->subobjStart(fieldName)};
     status.serialize(&sub);

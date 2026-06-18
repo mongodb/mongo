@@ -48,6 +48,8 @@
 #include <boost/none.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+using namespace std::literals::string_view_literals;
+
 namespace mongo {
 namespace {
 
@@ -187,7 +189,7 @@ TEST_F(DocumentSourceQueryStatsTest, ParseAndSerializeShouldIncludeHmacKey) {
     const auto expected =
         Document{{"$queryStats",
                   Document{{"transformIdentifiers",
-                            Document{{"algorithm", "hmac-sha-256"_sd},
+                            Document{{"algorithm", "hmac-sha-256"sv},
                                      {"hmacKey",
                                       BSONBinData("an arbitrary HMACkey for testing",
                                                   32,
@@ -315,7 +317,7 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextKeyFailsToReParse) {
     // but be unable to re-parse the serialized representative value.
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(
         getExpCtx(), {std::make_unique<FindCommandRequest>(kDefaultTestNss)}));
-    parsedFind->filter = std::make_unique<LTEMatchExpression>("a"_sd, Value(BSONRegEx(".*")));
+    parsedFind->filter = std::make_unique<LTEMatchExpression>("a"sv, Value(BSONRegEx(".*")));
 
     auto statusWithShape =
         shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, getExpCtx());

@@ -29,7 +29,6 @@
 
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -64,6 +63,7 @@
 #include "mongo/util/duration.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -75,6 +75,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class ShardsvrDropIndexesCommand final : public TypedCommand<ShardsvrDropIndexesCommand> {
 public:
@@ -216,7 +217,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
 
     // Acquire the DDL lock to serialize with other DDL operations. It also makes sure that we are
     // targeting the primary shard for this database.
-    static constexpr StringData lockReason{"dropIndexes"_sd};
+    static constexpr std::string_view lockReason{"dropIndexes"sv};
     const DDLLockManager::ScopedCollectionDDLLock collDDLLock{opCtx, ns(), lockReason, MODE_X};
 
     setReadWriteConcern(opCtx, dropIdxCmd, this);

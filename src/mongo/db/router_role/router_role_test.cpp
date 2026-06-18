@@ -47,6 +47,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * This sub-class does not initialize a session, so the OperationContext will not contain
@@ -112,7 +113,7 @@ public:
 
     void expectCreateDatabase(const DatabaseName& dbName,
                               const DatabaseVersion& dbVersionToReturn) {
-        static constexpr auto kCmdName = "_configsvrCreateDatabase"_sd;
+        static constexpr auto kCmdName = "_configsvrCreateDatabase"sv;
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kConfigHostAndPort, request.target);
             ASSERT_TRUE(request.cmdObj.hasField(kCmdName))

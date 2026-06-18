@@ -32,13 +32,15 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class ActionsStreamPolicy {
 public:
     virtual ~ActionsStreamPolicy() {}
 
-    virtual StringData getName() const = 0;
+    virtual std::string_view getName() const = 0;
 
     /**
      * Generates a descriptor detailing the next streaming action (and the targeted

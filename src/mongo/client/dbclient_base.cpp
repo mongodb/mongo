@@ -75,6 +75,7 @@
 
 #include <limits>
 #include <ostream>
+#include <string_view>
 #include <utility>
 
 #include <boost/cstdint.hpp>
@@ -457,7 +458,9 @@ void DBClientBase::auth(const BSONObj& params) {
     _auth(params);
 }
 
-void DBClientBase::auth(const DatabaseName& dbname, StringData username, StringData password_text) {
+void DBClientBase::auth(const DatabaseName& dbname,
+                        std::string_view username,
+                        std::string_view password_text) {
     UserName user{username, dbname};
 
     StatusWith<string> mechResult =
@@ -469,7 +472,7 @@ void DBClientBase::auth(const DatabaseName& dbname, StringData username, StringD
 
     // To prevent unexpected behavior for existing clients, default to SCRAM-SHA-1 if the SASL
     // negotiation does not succeeed for some reason.
-    StringData mech =
+    std::string_view mech =
         mechResult.isOK() ? mechResult.getValue() : auth::kInternalAuthFallbackMechanism;
 
     const auto authParams = auth::buildAuthParams(dbname, username, password_text, mech);

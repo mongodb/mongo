@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -73,7 +73,7 @@ bool isInternalClient(Client* client);
 
 // Use to assert that a feature is allowed only if it is used internally.
 void assertAllowedInternalIfRequired(const OperationContext* opCtx,
-                                     StringData operatorName,
+                                     std::string_view operatorName,
                                      AllowedWithClientType allowedWithClientType);
 
 /**
@@ -84,7 +84,7 @@ void assertAllowedInternalIfRequired(const OperationContext* opCtx,
  */
 void assertLanguageFeatureIsAllowed(
     const OperationContext* opCtx,
-    StringData operatorName,
+    std::string_view operatorName,
     AllowedWithApiStrict allowedWithApiStrict,
     AllowedWithClientType allowedWithClientType,
     boost::optional<std::function<void(const APIParameters&)>> conditionalCallback = boost::none);

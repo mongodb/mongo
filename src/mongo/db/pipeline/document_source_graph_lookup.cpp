@@ -55,6 +55,7 @@
 #include "mongo/util/string_map.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -63,6 +64,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -107,7 +109,7 @@ ALLOCATE_AND_REGISTER_STAGE_PARAMS(graphLookup, GraphLookUpStageParams)
 
 ALLOCATE_DOCUMENT_SOURCE_ID(graphLookup, DocumentSourceGraphLookUp::id)
 
-StringData DocumentSourceGraphLookUp::getSourceName() const {
+std::string_view DocumentSourceGraphLookUp::getSourceName() const {
     return kStageName;
 }
 
@@ -410,23 +412,23 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromStageParams(
     // an incomplete spec.
     if (!params.as || !params.startWith || !params.connectFromField || !params.connectToField) {
         std::string missing;
-        auto append = [&](StringData field) {
+        auto append = [&](std::string_view field) {
             if (!missing.empty()) {
                 missing += ", ";
             }
             missing.append(field.data(), field.size());
         };
         if (!params.as) {
-            append("'as'"_sd);
+            append("'as'"sv);
         }
         if (!params.startWith) {
-            append("'startWith'"_sd);
+            append("'startWith'"sv);
         }
         if (!params.connectFromField) {
-            append("'connectFromField'"_sd);
+            append("'connectFromField'"sv);
         }
         if (!params.connectToField) {
-            append("'connectToField'"_sd);
+            append("'connectToField'"sv);
         }
         uasserted(12109300,
                   str::stream() << "$graphLookup is missing required field(s): " << missing);

@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -62,6 +61,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -72,10 +72,11 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kRawFieldName = "raw"_sd;
-constexpr auto kWriteConcernErrorFieldName = "writeConcernError"_sd;
-constexpr auto kTopologyVersionFieldName = "topologyVersion"_sd;
+constexpr auto kRawFieldName = "raw"sv;
+constexpr auto kWriteConcernErrorFieldName = "writeConcernError"sv;
+constexpr auto kTopologyVersionFieldName = "topologyVersion"sv;
 
 class CreateIndexesCmd : public BasicCommandWithRequestParser<CreateIndexesCmd> {
 public:

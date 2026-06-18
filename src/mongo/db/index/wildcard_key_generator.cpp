@@ -47,6 +47,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -57,10 +58,11 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // If the user does not specify any projection, then we default to a projection of {_id: 0} in order
 // to prevent the _id field from being indexed, since it already has its own dedicated index.
-static const BSONObj kDefaultProjection = BSON("_id"_sd << 0);
+static const BSONObj kDefaultProjection = BSON("_id"sv << 0);
 
 // If the enclosing object is an array, then the current element's fieldname is the array index, so
 // we omit this when computing the full path. Otherwise, the full path is the pathPrefix plus the
@@ -87,7 +89,7 @@ void appendToKeyString(const std::vector<BSONElement>& elems,
                        key_string::PooledBuilder* keyString) {
     for (const auto& elem : elems) {
         if (collator) {
-            keyString->appendBSONElement(elem, [&](StringData stringData) {
+            keyString->appendBSONElement(elem, [&](std::string_view stringData) {
                 return collator->getComparisonString(stringData);
             });
         } else {
@@ -200,7 +202,7 @@ void SingleDocumentKeyEncoder::_addKey(BSONElement elem, const FieldRef& fullPat
 
     keyString.appendString(fullPath.dottedField());
     if (_collator && elem) {
-        keyString.appendBSONElement(elem, [&](StringData stringData) {
+        keyString.appendBSONElement(elem, [&](std::string_view stringData) {
             return _collator->getComparisonString(stringData);
         });
     } else if (elem) {
@@ -258,14 +260,14 @@ bool SingleDocumentKeyEncoder::_addKeyForEmptyLeaf(BSONElement elem, const Field
 }
 }  // namespace
 
-constexpr StringData WildcardKeyGenerator::kSubtreeSuffix;
+constexpr std::string_view WildcardKeyGenerator::kSubtreeSuffix;
 
 WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern,
                                                                   BSONObj pathProjection) {
-    StringData indexRoot = "";
+    std::string_view indexRoot = "";
     size_t suffixPos = std::string::npos;
     for (auto elem : keyPattern) {
-        StringData fieldName(elem.fieldNameStringData());
+        std::string_view fieldName(elem.fieldNameStringData());
         if (WildcardNames::isWildcardFieldName(fieldName)) {
             // The _keyPattern is either {..., "$**": 1, ..} for all paths or
             // {.., "path.$**": 1, ...} for a single subtree. If we are indexing a single subtree
@@ -419,7 +421,7 @@ void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBuffe
 }
 
 key_string::Value WildcardKeyGenerator::makeMultikeyMetadataKey(
-    StringData fieldPath,
+    std::string_view fieldPath,
     size_t prefixFieldCount,
     size_t suffixFieldCount,
     key_string::Version version,

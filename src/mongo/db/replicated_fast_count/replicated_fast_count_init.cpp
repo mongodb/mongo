@@ -53,13 +53,17 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
 
 namespace {
 
-void _handleStatus(const Status& status, StringData collDescription, const NamespaceString& nss) {
+void _handleStatus(const Status& status,
+                   std::string_view collDescription,
+                   const NamespaceString& nss) {
     if (status.isOK()) {
         LOGV2(11718601,
               "Created internal {collDescription} collection.",
@@ -166,7 +170,7 @@ void setUpReplicatedFastCount(OperationContext* opCtx) {
 namespace {
 Status _createInternalFastCountContainer(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         StringData ident,
+                                         std::string_view ident,
                                          KeyFormat keyFormat) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
@@ -203,7 +207,7 @@ Status _createInternalFastCountContainer(OperationContext* opCtx,
 
 std::pair<Status, std::string> handleExistingFastCountIdent(OperationContext* opCtx,
                                                             const NamespaceString& nss,
-                                                            StringData existingIdent,
+                                                            std::string_view existingIdent,
                                                             KeyFormat existingIdentFormat) {
     auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -238,9 +242,9 @@ std::pair<Status, std::string> handleExistingFastCountIdent(OperationContext* op
 
 Status createInternalFastCountContainers(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         StringData metadataIdent,
+                                         std::string_view metadataIdent,
                                          KeyFormat metadataKeyFormat,
-                                         StringData timestampsIdent,
+                                         std::string_view timestampsIdent,
                                          KeyFormat timestampsKeyFormat,
                                          bool writeToOplog) {
     // During secondary oplog application we need to use local write intent since regular write

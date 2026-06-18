@@ -35,7 +35,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -55,6 +54,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -66,6 +66,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 const auto getMongosTopologyCoordinator =
     ServiceContext::declareDecoration<MongosTopologyCoordinator>();
@@ -106,8 +107,8 @@ StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
  * ShutdownInProgress error message
  */
 
-constexpr StringData kQuiesceModeShutdownMessage =
-    "Mongos is in quiesce mode and will shut down"_sd;
+constexpr std::string_view kQuiesceModeShutdownMessage =
+    "Mongos is in quiesce mode and will shut down"sv;
 
 }  // namespace
 

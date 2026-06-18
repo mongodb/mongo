@@ -29,7 +29,6 @@
 
 #include "mongo/util/log_with_sampling.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"

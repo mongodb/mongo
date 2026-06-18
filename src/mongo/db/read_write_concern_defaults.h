@@ -47,6 +47,7 @@
 #include "mongo/util/time_support.h"
 
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -67,11 +68,11 @@ public:
 
     using FetchDefaultsFn = unique_function<boost::optional<RWConcernDefault>(OperationContext*)>;
 
-    static constexpr StringData readConcernFieldName = ReadConcern::kReadConcernFieldName;
-    static constexpr StringData writeConcernFieldName = WriteConcern::kWriteConcernField;
+    static constexpr std::string_view readConcernFieldName = ReadConcern::kReadConcernFieldName;
+    static constexpr std::string_view writeConcernFieldName = WriteConcern::kWriteConcernField;
 
     // The _id of the persisted default read/write concern document.
-    static constexpr StringData kPersistedDocumentId = "ReadWriteConcernDefaults"_sd;
+    static constexpr std::string_view kPersistedDocumentId = "ReadWriteConcernDefaults"_sd;
 
     static boost::optional<ReadWriteConcernDefaults>& getDecoration(Service* service);
 

@@ -43,6 +43,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class TimeseriesCollmodTest : public timeseries::TimeseriesTestFixture {
 protected:
@@ -74,7 +75,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModCommandTranslation) {
     collModCmd.setValidator(BSON("a" << "1"));
     collModCmd.setValidationLevel(ValidationLevelEnum::strict);
     collModCmd.setValidationAction(ValidationActionEnum::errorAndLog);
-    collModCmd.setViewOn("test.view"_sd);
+    collModCmd.setViewOn("test.view"sv);
     std::vector<BSONObj> pipeline = {BSON("$match" << BSON("a" << 1))};
     collModCmd.setPipeline(pipeline);
     ChangeStreamPreAndPostImagesOptions changeStreamPreAndPostImagesOptions;
@@ -93,7 +94,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModCommandTranslation) {
     ASSERT((*collModBuckets->getValidator()).binaryEqual(BSON("a" << "1")));
     EXPECT_EQ(*(collModBuckets->getValidationLevel()), ValidationLevelEnum::strict);
     EXPECT_EQ(*(collModBuckets->getValidationAction()), ValidationActionEnum::errorAndLog);
-    EXPECT_EQ(collModBuckets->getViewOn(), "test.view"_sd);
+    EXPECT_EQ(collModBuckets->getViewOn(), "test.view"sv);
     ASSERT((*collModBuckets->getPipeline())[0].binaryEqual(BSON("$match" << BSON("a" << 1))));
     EXPECT_EQ(collModBuckets->getChangeStreamPreAndPostImages()->getEnabled(), true);
     EXPECT_EQ(std::get<int64_t>(*(collModBuckets->getExpireAfterSeconds())), 100);

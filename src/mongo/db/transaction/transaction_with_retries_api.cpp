@@ -36,6 +36,8 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/future_util.h"
 
+#include <string_view>
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
@@ -64,7 +66,7 @@ void logNextStep(Transaction::ErrorHandlingStep nextStep,
                  const BSONObj& txnInfo,
                  int attempts,
                  const StatusWith<CommitResult>& swResult,
-                 StringData errorHandler) {
+                 std::string_view errorHandler) {
     // DynamicAttributes doesn't allow rvalues, so make some local variables.
     auto nextStepString = errorHandlingStepToString(nextStep);
     std::string redactedError, redactedCommitError, redactedCommitWCError;

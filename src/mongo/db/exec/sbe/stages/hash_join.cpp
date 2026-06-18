@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/hash_join.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/stage_visitors.h"
@@ -37,10 +36,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              std::unique_ptr<PlanStage> inner,
                              value::SlotVector outerKey,
@@ -52,7 +54,7 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              PlanNodeId planNodeId,
                              boost::optional<size_t> estimatedBuildCardinality,
                              bool participateInTrialRunTracking)
-    : PlanStage("hj"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
+    : PlanStage("hj"sv, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _outerKey(std::move(outerKey)),
       _outerProjects(std::move(outerProjects)),
       _innerKey(std::move(innerKey)),

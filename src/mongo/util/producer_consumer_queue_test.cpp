@@ -29,7 +29,6 @@
 
 #include "mongo/util/producer_consumer_queue.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -43,6 +42,7 @@
 #include <array>
 #include <mutex>
 #include <ostream>
+#include <string_view>
 #include <thread>
 #include <tuple>
 #include <type_traits>
@@ -65,7 +65,7 @@ public:
     ProducerConsumerQueueTestHelper(ServiceContext* serviceCtx) : _serviceCtx(serviceCtx) {}
 
     template <typename Callback>
-    stdx::thread runThread(StringData name, Callback&& cb) {
+    stdx::thread runThread(std::string_view name, Callback&& cb) {
         return stdx::thread([this, name, cb] {
             auto client = _serviceCtx->getService()->makeClient(std::string{name});
             auto opCtx = client->makeOperationContext();
@@ -92,7 +92,7 @@ public:
         : _serviceCtx(serviceCtx), _timeout(timeout) {}
 
     template <typename Callback>
-    stdx::thread runThread(StringData name, Callback&& cb) {
+    stdx::thread runThread(std::string_view name, Callback&& cb) {
         return stdx::thread([this, name, cb] {
             auto client = _serviceCtx->getService()->makeClient(std::string{name});
             auto opCtx = client->makeOperationContext();

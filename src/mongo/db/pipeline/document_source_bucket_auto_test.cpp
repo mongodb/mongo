@@ -65,6 +65,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 using boost::intrusive_ptr;
 using std::deque;
 using std::string;
@@ -168,10 +169,10 @@ TEST_F(BucketAutoTests, Returns1Of1RequestedBucketWhenAllUniqueValues) {
 
     // Values are 'a', 'b', 'c', 'd'
     results = getResults(bucketAutoSpec,
-                         {Document{{"x", "d"_sd}},
-                          Document{{"x", "b"_sd}},
-                          Document{{"x", "a"_sd}},
-                          Document{{"x", "c"_sd}}});
+                         {Document{{"x", "d"sv}},
+                          Document{{"x", "b"sv}},
+                          Document{{"x", "a"sv}},
+                          Document{{"x", "c"sv}}});
     ASSERT_EQUALS(results.size(), 1UL);
     ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 'a', max : 'd'}, count : 4}")));
 }
@@ -196,7 +197,7 @@ TEST_F(BucketAutoTests, Returns1Of1RequestedBucketWhen1ValueInSource) {
     ASSERT_EQUALS(results.size(), 1UL);
     ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 1, max : 1}, count : 1}")));
 
-    results = getResults(bucketAutoSpec, {Document{{"x", "a"_sd}}});
+    results = getResults(bucketAutoSpec, {Document{{"x", "a"sv}}});
     ASSERT_EQUALS(results.size(), 1UL);
     ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 'a', max : 'a'}, count : 1}")));
 }
@@ -365,9 +366,9 @@ TEST_F(BucketAutoTests, EvaluatesNonFieldPathExpressionInGroupByField) {
 TEST_F(BucketAutoTests, RespectsCanonicalTypeOrderingOfValues) {
     auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}");
     auto results = getResults(bucketAutoSpec,
-                              {Document{{"x", "a"_sd}},
+                              {Document{{"x", "a"sv}},
                                Document{{"x", 1}},
-                               Document{{"x", "b"_sd}},
+                               Document{{"x", "b"sv}},
                                Document{{"x", 2}},
                                Document{{"x", 0.0}}});
 
@@ -1085,7 +1086,7 @@ TEST_F(BucketAutoTests, ShouldFailOnNonNumericValuesWhenGranularitySpecified) {
 
     ASSERT_THROWS_CODE(getResults(bucketAutoSpec,
                                   {Document{{"x", 0}},
-                                   Document{{"x", "test"_sd}},
+                                   Document{{"x", "test"sv}},
                                    Document{{"x", 1}},
                                    Document{{"x", 1}}}),
                        AssertionException,

@@ -38,6 +38,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #ifdef _WIN32
@@ -59,14 +60,14 @@
 namespace mongo::unittest {
 namespace {
 
-int strToInt(StringData s) {
+int strToInt(std::string_view s) {
     int i;
     if (auto st = NumberParser{}(s, &i); !st.isOK())
         iasserted(st);
     return i;
 }
 
-bool strToBool(StringData s) {
+bool strToBool(std::string_view s) {
     if (s == "1" || s == "true")
         return true;
     if (s == "0" || s == "false")
@@ -107,7 +108,7 @@ public:
                 return;  // A "--" that terminates the options.
             bool found = false;
             for (auto&& o : *_opts) {
-                StringData a = *ai;
+                std::string_view a = *ai;
                 if (!(_consumePrefix(a, "--") && _consumePrefix(a, o.name)))
                     continue;
                 if (_consumePrefix(a, "=")) {  // Matches name, has embedded argument.
@@ -152,14 +153,14 @@ public:
     }
 
 private:
-    bool _consumePrefix(StringData& s, StringData pat) {
+    bool _consumePrefix(std::string_view& s, std::string_view pat) {
         if (!s.starts_with(pat))
             return false;
         s.remove_prefix(pat.size());
         return true;
     }
 
-    void _acceptArg(OptSpec& o, StringData a) {
+    void _acceptArg(OptSpec& o, std::string_view a) {
         switch (o.kind) {
             case Kind::switchBool:
                 MONGO_UNREACHABLE;
@@ -266,7 +267,7 @@ UnitTestOptions parseUnitTestOptions(std::vector<std::string>& argVec) {
     TestOptionParser parser{&opts};
     parser.run(argVec);
 
-    auto load = [&]<typename T>(boost::optional<T>* out, StringData key) {
+    auto load = [&]<typename T>(boost::optional<T>* out, std::string_view key) {
         for (const auto& o : opts) {
             if (o.name != key)
                 continue;

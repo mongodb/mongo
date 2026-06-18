@@ -38,12 +38,14 @@
 
 #include <cstdint>
 #include <random>
+#include <string_view>
 #include <vector>
 
 #include <benchmark/benchmark.h>
 
 namespace mongo::sbe {
 namespace {
+using namespace std::literals::string_view_literals;
 
 constexpr int kMeasurementsPerBucket = 1000;
 
@@ -112,7 +114,7 @@ BSONObj generateUncompressedBucket(int numMeasurements, std::mt19937& gen) {
 
 // Compress a v1 bucket into v2 format.
 BSONObj compressBucket(const BSONObj& uncompressed) {
-    auto result = timeseries::compressBucket(uncompressed, "time"_sd, {}, false);
+    auto result = timeseries::compressBucket(uncompressed, "time"sv, {}, false);
     invariant(result.compressedBucket);
     return *result.compressedBucket;
 }
@@ -124,7 +126,7 @@ int getBucketVersion(const BSONObj& bucket) {
 
 // Construct a TsBlock from a bucket for a given field. The bucket must stay alive.
 std::unique_ptr<value::TsBlock> makeTsBlock(const BSONObj& bucket,
-                                            StringData fieldName,
+                                            std::string_view fieldName,
                                             int count) {
     auto bucketElem = bucket["data"][fieldName];
     auto [columnTag, columnVal] = bson::convertToView(bucketElem);

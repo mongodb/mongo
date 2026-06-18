@@ -30,7 +30,6 @@
 #include "mongo/db/router_role/collection_routing_info_targeter.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -63,6 +62,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -566,8 +566,8 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithHashedPrefixHashedSh
 }
 
 TEST(SimpleCollectionRoutingInfoTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocument) {
-    const StringData timeField = "tm";
-    const StringData metaField = "mm";
+    const std::string_view timeField = "tm";
+    const std::string_view metaField = "mm";
 
     TimeseriesOptions options{std::string(timeField)};
     options.setMetaField(metaField);
@@ -841,7 +841,7 @@ public:
           _shardedTimeseriesNss(
               NamespaceString::createNamespaceString_forTest(_dbName, "shardedTS")) {
         _timeseriesOptions.setTimeField(_timeField);
-        _timeseriesOptions.setMetaField(StringData(_metaField));
+        _timeseriesOptions.setMetaField(std::string_view(_metaField));
     }
 
     void setUp() override {

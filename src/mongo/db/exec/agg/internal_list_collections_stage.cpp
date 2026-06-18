@@ -38,6 +38,8 @@
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -64,7 +66,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalListCollections,
                            documentSourceInternalListCollectionsToStageFn)
 
 InternalListCollectionsStage::InternalListCollectionsStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const boost::intrusive_ptr<DocumentSourceMatch>& absorbedMatch)
     : Stage(stageName, pExpCtx), _absorbedMatch(absorbedMatch) {}

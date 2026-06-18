@@ -86,6 +86,7 @@
 #include <list>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <tuple>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -184,7 +185,7 @@ boost::intrusive_ptr<DocumentSourceSort> createNewSortWithMemoryUsage(
  */
 bool checkMetadataSortReorder(
     const SortPattern& sortPattern,
-    StringData metaFieldStr,
+    std::string_view metaFieldStr,
     const boost::optional<std::string&> lastpointTimeField = boost::none) {
     auto timeFound = false;
     for (const auto& sortKey : sortPattern) {
@@ -1086,7 +1087,7 @@ DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
 
     // Extend bucket specification of this stage to include the computed meta projections that are
     // passed through.
-    std::vector<StringData> computedMetaProjFields;
+    std::vector<std::string_view> computedMetaProjFields;
     for (auto&& elem : addFieldsSpec) {
         // If the added field name is same as 'meta', it should be treated as if it's the new 'meta'
         // since it shadows the original 'meta' and so it should not be considered as "computed".
@@ -1223,13 +1224,14 @@ BucketSpec::BucketPredicate DocumentSourceInternalUnpackBucket::createPredicates
     const MatchExpression* matchExpr) const {
     timeseries::Get2dsphereIndexVersionFn get2dsphereIndexVersion;
     if (_geo2dsphereIndexVersions) {
-        get2dsphereIndexVersion = [&versionMap = *_geo2dsphereIndexVersions](
-                                      OperationContext*, const NamespaceString&, StringData field) {
-            auto it = versionMap.find(std::string(field));
-            return it != versionMap.end()
-                ? boost::make_optional(static_cast<S2IndexVersion>(it->second))
-                : boost::optional<S2IndexVersion>();
-        };
+        get2dsphereIndexVersion =
+            [&versionMap = *_geo2dsphereIndexVersions](
+                OperationContext*, const NamespaceString&, std::string_view field) {
+                auto it = versionMap.find(std::string(field));
+                return it != versionMap.end()
+                    ? boost::make_optional(static_cast<S2IndexVersion>(it->second))
+                    : boost::optional<S2IndexVersion>();
+            };
     }
     return BucketSpec::createPredicatesOnBucketLevelField(
         matchExpr,

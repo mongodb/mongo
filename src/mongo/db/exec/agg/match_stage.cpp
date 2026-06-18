@@ -34,6 +34,8 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceMatchToStageFn(
@@ -51,7 +53,7 @@ namespace agg {
 
 REGISTER_AGG_STAGE_MAPPING(match, DocumentSourceMatch::id, documentSourceMatchToStageFn)
 
-MatchStage::MatchStage(StringData stageName,
+MatchStage::MatchStage(std::string_view stageName,
                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                        const std::shared_ptr<MatchProcessor>& matchProcessor,
                        bool isTextQuery)

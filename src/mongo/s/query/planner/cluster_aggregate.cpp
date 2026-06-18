@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -113,6 +112,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -128,6 +128,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 constexpr unsigned ClusterAggregate::kMaxViewRetries;
 using sharded_agg_helpers::PipelineDataSource;
@@ -1126,7 +1127,7 @@ Status ClusterAggregate::runAggregate(
     const PrivilegeVector& privileges,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
-    StringData comment,
+    std::string_view comment,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     return runAggregate(
         opCtx, namespaces, request, {request}, privileges, verbosity, result, comment, ifrContext);
@@ -1382,7 +1383,7 @@ Status ClusterAggregate::runAggregate(
     const PrivilegeVector& privileges,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
-    StringData comment,
+    std::string_view comment,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     // Use the provided IFRContext if available, otherwise create a new one. This ensures consistent
     // flag values throughout the operation, including retries on view errors.
@@ -1703,7 +1704,7 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
                             privileges,
                             verbosity,
                             result,
-                            "ClusterAggregate::retryOnViewOrIFRKickbackError"_sd,
+                            "ClusterAggregate::retryOnViewOrIFRKickbackError"sv,
                             ifrContext);
     }
 
@@ -1723,7 +1724,7 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
                         privileges,
                         verbosity,
                         result,
-                        "ClusterAggregate::retryOnViewOrIFRKickbackError"_sd,
+                        "ClusterAggregate::retryOnViewOrIFRKickbackError"sv,
                         ifrContext);
 }
 

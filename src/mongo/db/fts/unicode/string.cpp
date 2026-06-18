@@ -36,6 +36,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 
 #include <boost/algorithm/searching/boyer_moore.hpp>
@@ -71,17 +72,17 @@ using linenoise_utf8::copyString8to32;
 
 using std::u32string;
 
-String::String(const StringData utf8_src) {
+String::String(const std::string_view utf8_src) {
     // Convert UTF-8 input to UTF-32 data.
     setData(utf8_src);
 }
 
-void String::resetData(const StringData utf8_src) {
+void String::resetData(const std::string_view utf8_src) {
     // Convert UTF-8 input to UTF-32 data.
     setData(utf8_src);
 }
 
-void String::setData(const StringData utf8_src) {
+void String::setData(const std::string_view utf8_src) {
     // _data is the target, resize it so that it's guaranteed to fit all of the input characters,
     // plus a null character if there isn't one.
     _data.resize(utf8_src.size() + 1);
@@ -121,10 +122,10 @@ std::string String::toString() {
 }
 
 template <typename Func>
-StringData String::substrToBufWithTransform(StackBufBuilder* buffer,
-                                            size_t pos,
-                                            size_t len,
-                                            Func func) const {
+std::string_view String::substrToBufWithTransform(StackBufBuilder* buffer,
+                                                  size_t pos,
+                                                  size_t len,
+                                                  Func func) const {
     pos = std::min(pos, _data.size());
     len = std::min(len, _data.size() - pos);
 
@@ -138,17 +139,17 @@ StringData String::substrToBufWithTransform(StackBufBuilder* buffer,
     return {buffer->buf(), size_t(buffer->len())};
 }
 
-StringData String::substrToBuf(StackBufBuilder* buffer, size_t pos, size_t len) const {
+std::string_view String::substrToBuf(StackBufBuilder* buffer, size_t pos, size_t len) const {
     const auto identityFunc = [](char32_t ch) {
         return ch;
     };
     return substrToBufWithTransform(buffer, pos, len, identityFunc);
 }
 
-StringData String::toLowerToBuf(StackBufBuilder* buffer,
-                                CaseFoldMode mode,
-                                size_t pos,
-                                size_t len) const {
+std::string_view String::toLowerToBuf(StackBufBuilder* buffer,
+                                      CaseFoldMode mode,
+                                      size_t pos,
+                                      size_t len) const {
     const auto toLower = [mode](char32_t ch) {
         return codepointToLower(ch, mode);
     };
@@ -156,10 +157,10 @@ StringData String::toLowerToBuf(StackBufBuilder* buffer,
 }
 
 
-StringData String::caseFoldAndStripDiacritics(StackBufBuilder* buffer,
-                                              StringData utf8,
-                                              SubstrMatchOptions options,
-                                              CaseFoldMode mode) {
+std::string_view String::caseFoldAndStripDiacritics(StackBufBuilder* buffer,
+                                                    std::string_view utf8,
+                                                    SubstrMatchOptions options,
+                                                    CaseFoldMode mode) {
     // This fires if your input buffer the same as your output buffer.
     invariant(buffer->buf() != utf8.data());
 
@@ -267,8 +268,8 @@ StringData String::caseFoldAndStripDiacritics(StackBufBuilder* buffer,
     return {buffer->buf(), size_t(buffer->len())};
 }
 
-bool String::substrMatch(StringData str,
-                         StringData find,
+bool String::substrMatch(std::string_view str,
+                         std::string_view find,
                          SubstrMatchOptions options,
                          CaseFoldMode cfMode) {
     if (cfMode == CaseFoldMode::kTurkish) {

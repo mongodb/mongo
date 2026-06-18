@@ -29,7 +29,6 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -42,6 +41,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -63,7 +63,7 @@ public:
             opCtx, std::make_unique<DevNullKVEngine>(), std::unique_ptr<KVEngine>(), options);
     }
 
-    StringData getCanonicalName() const override {
+    std::string_view getCanonicalName() const override {
         return "devnull";
     }
 

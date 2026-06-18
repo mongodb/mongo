@@ -30,14 +30,18 @@
 #include "mongo/base/data_type.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
+
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo {
 
 namespace {
-auto makeOverflowStatus(StringData action, size_t sizeOfT, size_t length, size_t debug_offset) {
+auto makeOverflowStatus(std::string_view action,
+                        size_t sizeOfT,
+                        size_t length,
+                        size_t debug_offset) {
     return Status(
         ErrorCodes::Overflow,
         fmt::format("buffer size too small to {} ({}) bytes out of buffer[{}] at offset: {}",

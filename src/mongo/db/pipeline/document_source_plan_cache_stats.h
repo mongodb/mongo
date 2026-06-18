@@ -52,6 +52,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -65,7 +66,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(PlanCacheStats);
 
 class DocumentSourcePlanCacheStats final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$planCacheStats"_sd;
+    static constexpr std::string_view kStageName = "$planCacheStats"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
@@ -134,7 +135,7 @@ public:
         return boost::none;
     }
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return DocumentSourcePlanCacheStats::kStageName;
     }
 

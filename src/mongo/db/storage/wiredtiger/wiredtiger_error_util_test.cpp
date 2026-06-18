@@ -33,6 +33,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 namespace mongo {
 namespace {
@@ -84,7 +86,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    StringData prefix = "";
+    std::string_view prefix = "";
     const char* reason = "";
     int retCode = 0;
     double cacheThreshold = 0;

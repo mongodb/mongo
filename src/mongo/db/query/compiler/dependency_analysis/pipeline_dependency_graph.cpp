@@ -40,6 +40,7 @@
 #include "mongo/util/string_map.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -141,7 +142,7 @@ class StringPool {
 public:
     using Id = TypedId<StringPool>;
 
-    Id intern(StringData str) {
+    Id intern(std::string_view str) {
         auto it = _stringToId.find(str);
         if (it != _stringToId.end()) {
             return it->second;
@@ -152,14 +153,14 @@ public:
         return id;
     }
 
-    Id lookup(StringData str) const {
+    Id lookup(std::string_view str) const {
         if (auto it = _stringToId.find(str); it != _stringToId.end()) {
             return it->second;
         }
         return Id::none();
     }
 
-    StringData get(Id id) const {
+    std::string_view get(Id id) const {
         return _strings.at(id.value);
     }
 
@@ -447,7 +448,7 @@ void updateMetadataForConstant(FieldMetadata& metadata, const Value& value) {
 /**
  * Extracts the remaining suffix from a dotted path string after skipping 'count' path components.
  */
-StringData skipPathComponents(StringData path, size_t count) {
+std::string_view skipPathComponents(std::string_view path, size_t count) {
     size_t pos = 0;
     for (size_t i = 0; i < count && pos < path.size(); i++) {
         auto dot = path.find('.', pos);
@@ -524,14 +525,14 @@ struct FieldMatch {
 
 }  // namespace
 
-bool defaultCanPathBeArray(StringData path) {
+bool defaultCanPathBeArray(std::string_view path) {
     return true;
 }
 
 namespace {
 /// Wrapper for the PathArrayness API passed into the graph as CanPathBeArray.
 struct CanPathBeArrayForNss {
-    bool operator()(StringData path) const {
+    bool operator()(std::string_view path) const {
         return expCtx.canPathBeArrayForNss(FieldRef(path), nss);
     }
     ExpressionContext& expCtx;
@@ -544,7 +545,8 @@ namespace {
 /// 'buf' to its prior length on destruction. Modeled after FieldRef::FieldRefTempAppend.
 class ScopedPathComponent {
 public:
-    ScopedPathComponent(std::string& buf, StringData component) : _buf(buf), _prevLen(buf.size()) {
+    ScopedPathComponent(std::string& buf, std::string_view component)
+        : _buf(buf), _prevLen(buf.size()) {
         if (!_buf.empty()) {
             _buf.push_back('.');
         }
@@ -1347,7 +1349,7 @@ private:
     /**
      * Joins the given parsed path and the given suffix by '.'.
      */
-    std::string buildDottedPath(const ParsedPath& path, StringData suffix = {}) const {
+    std::string buildDottedPath(const ParsedPath& path, std::string_view suffix = {}) const {
         str::stream ss;
         for (size_t i = 0; i < path.size(); i++) {
             if (i > 0) {

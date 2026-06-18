@@ -34,6 +34,7 @@
 
 #ifdef __linux__
 #include <fstream>
+#include <string_view>
 #endif
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -61,6 +62,7 @@
 
 
 namespace mongo::transport {
+using namespace std::literals::string_view_literals;
 
 TransportLayerManagerImpl::TransportLayerManagerImpl(
     std::vector<std::unique_ptr<TransportLayer>> tls, TransportLayer* defaultEgressLayer)
@@ -179,8 +181,8 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
     boost::optional<int> priorityPort;
     boost::optional<int> secondaryPort;
 
-    using PortMap = std::unordered_map<int, StringData>;
-    auto addUniquePort = [](PortMap& uniquePorts, int port, StringData role) {
+    using PortMap = std::unordered_map<int, std::string_view>;
+    auto addUniquePort = [](PortMap& uniquePorts, int port, std::string_view role) {
         auto [it, inserted] = uniquePorts.try_emplace(port, role);
         if (!inserted) {
             LOGV2_ERROR(11236000,
@@ -193,10 +195,10 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
     };
 
     PortMap uniquePorts;
-    addUniquePort(uniquePorts, serverGlobalParams.port, "main"_sd);
+    addUniquePort(uniquePorts, serverGlobalParams.port, "main"sv);
 
     if (serverGlobalParams.secondaryPort) {
-        addUniquePort(uniquePorts, *serverGlobalParams.secondaryPort, "secondary"_sd);
+        addUniquePort(uniquePorts, *serverGlobalParams.secondaryPort, "secondary"sv);
         secondaryPort = serverGlobalParams.secondaryPort;
     }
 
@@ -204,14 +206,14 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
         const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
         if (loadBalancerPort) {
             proxyPort = loadBalancerPort;
-            addUniquePort(uniquePorts, *loadBalancerPort, "loadbalancer"_sd);
+            addUniquePort(uniquePorts, *loadBalancerPort, "loadbalancer"sv);
         }
     } else {
         // (Ignore FCV check): The proxy port needs to be open before the FCV is set.
         if (gFeatureFlagMongodProxyProtocolSupport.isEnabledAndIgnoreFCVUnsafe() &&
             serverGlobalParams.proxyPort) {
             proxyPort = *serverGlobalParams.proxyPort;
-            addUniquePort(uniquePorts, *proxyPort, "proxy"_sd);
+            addUniquePort(uniquePorts, *proxyPort, "proxy"sv);
         }
     }
 
@@ -223,13 +225,13 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
             quickExit(ExitCode::badOptions);
         }
         priorityPort = serverGlobalParams.priorityPort;
-        addUniquePort(uniquePorts, *priorityPort, "priority"_sd);
+        addUniquePort(uniquePorts, *priorityPort, "priority"sv);
     }
 
     // Check ingress GRPC
 #ifdef MONGO_CONFIG_GRPC
     if (shouldGRPCIngressBeEnabled()) {
-        addUniquePort(uniquePorts, serverGlobalParams.grpcPort, "grpc"_sd);
+        addUniquePort(uniquePorts, serverGlobalParams.grpcPort, "grpc"sv);
     }
 #endif
 
@@ -323,7 +325,7 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
 #ifdef MONGO_CONFIG_SSL
 Status TransportLayerManagerImpl::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                                      bool asyncOCSPStaple) {
-    std::vector<StringData> successfulRotations;
+    std::vector<std::string_view> successfulRotations;
     for (auto&& tl : _tls) {
         if (auto status = tl->rotateCertificates(manager, asyncOCSPStaple); !status.isOK()) {
             LOGV2_INFO(8074101,
@@ -337,7 +339,7 @@ Status TransportLayerManagerImpl::rotateCertificates(std::shared_ptr<SSLManagerI
                 failureMessage << " Before rotation failed for " << tl->getNameForLogging()
                                << ", other transport layer(s) succeeded and are currently "
                                   "using rotated certificates: [ ";
-                for (StringData s : successfulRotations) {
+                for (std::string_view s : successfulRotations) {
                     failureMessage << s << " ";
                 }
                 failureMessage << "]";

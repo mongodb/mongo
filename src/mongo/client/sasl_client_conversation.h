@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -75,7 +76,7 @@ public:
      * A return of false means that the authentication process has more steps.
      *
      */
-    virtual StatusWith<bool> step(StringData inputData, std::string* outputData) = 0;
+    virtual StatusWith<bool> step(std::string_view inputData, std::string* outputData) = 0;
 
     virtual boost::optional<std::uint32_t> currentStep() const {
         return boost::none;

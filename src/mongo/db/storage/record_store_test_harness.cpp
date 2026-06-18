@@ -33,9 +33,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <unordered_map>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 std::function<std::unique_ptr<RecordStoreHarnessHelper>(RecordStoreHarnessHelper::Options)>
     recordStoreHarnessFactory;
@@ -53,7 +55,7 @@ WriteConflictHandlerMap& writeConflictForReadsHandlers() {
 }
 
 std::unique_ptr<FailPointEnableBlock> dispatch(WriteConflictHandlerMap& handlers,
-                                               StringData failPointKind,
+                                               std::string_view failPointKind,
                                                FailPoint::ModeOptions mode) {
     auto it = handlers.find(storageGlobalParams.engine);
     invariant(it != handlers.end(),
@@ -74,7 +76,7 @@ auto newRecordStoreHarnessHelper(RecordStoreHarnessHelper::Options options)
     return recordStoreHarnessFactory(options);
 }
 
-void registerWriteConflictForWritesFactory(StringData engineName,
+void registerWriteConflictForWritesFactory(std::string_view engineName,
                                            WriteConflictFailPointFn factory) {
     auto [it, inserted] =
         writeConflictForWritesHandlers().emplace(std::string{engineName}, std::move(factory));
@@ -83,7 +85,8 @@ void registerWriteConflictForWritesFactory(StringData engineName,
                             << engineName);
 }
 
-void registerWriteConflictForReadsFactory(StringData engineName, WriteConflictFailPointFn factory) {
+void registerWriteConflictForReadsFactory(std::string_view engineName,
+                                          WriteConflictFailPointFn factory) {
     auto [it, inserted] =
         writeConflictForReadsHandlers().emplace(std::string{engineName}, std::move(factory));
     invariant(inserted,
@@ -93,11 +96,10 @@ void registerWriteConflictForReadsFactory(StringData engineName, WriteConflictFa
 
 std::unique_ptr<FailPointEnableBlock> enableWriteConflictForWrites(FailPoint::ModeOptions mode) {
     return dispatch(
-        writeConflictForWritesHandlers(), "write-conflict-for-writes"_sd, std::move(mode));
+        writeConflictForWritesHandlers(), "write-conflict-for-writes"sv, std::move(mode));
 }
 
 std::unique_ptr<FailPointEnableBlock> enableWriteConflictForReads(FailPoint::ModeOptions mode) {
-    return dispatch(
-        writeConflictForReadsHandlers(), "write-conflict-for-reads"_sd, std::move(mode));
+    return dispatch(writeConflictForReadsHandlers(), "write-conflict-for-reads"sv, std::move(mode));
 }
 }  // namespace mongo

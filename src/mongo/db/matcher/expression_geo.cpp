@@ -40,6 +40,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <s2cellid.h>
@@ -92,7 +93,7 @@ GeoNearExpression::GeoNearExpression(const std::string& f)
 /**
  * Takes ownership of the passed-in GeoExpression.
  */
-GeoMatchExpression::GeoMatchExpression(boost::optional<StringData> path,
+GeoMatchExpression::GeoMatchExpression(boost::optional<std::string_view> path,
                                        const GeoExpression* query,
                                        const BSONObj& rawObj,
                                        clonable_ptr<ErrorAnnotation> annotation)
@@ -105,7 +106,7 @@ GeoMatchExpression::GeoMatchExpression(boost::optional<StringData> path,
 /**
  * Takes shared ownership of the passed-in GeoExpression.
  */
-GeoMatchExpression::GeoMatchExpression(boost::optional<StringData> path,
+GeoMatchExpression::GeoMatchExpression(boost::optional<std::string_view> path,
                                        std::shared_ptr<const GeoExpression> query,
                                        const BSONObj& rawObj,
                                        clonable_ptr<ErrorAnnotation> annotation)
@@ -161,12 +162,12 @@ std::unique_ptr<MatchExpression> GeoMatchExpression::clone() const {
 // Parse-only geo expressions: geoNear (formerly known as near).
 //
 
-GeoNearMatchExpression::GeoNearMatchExpression(boost::optional<StringData> path,
+GeoNearMatchExpression::GeoNearMatchExpression(boost::optional<std::string_view> path,
                                                const GeoNearExpression* query,
                                                const BSONObj& rawObj)
     : LeafMatchExpression(GEO_NEAR, path), _rawObj(rawObj), _query(query) {}
 
-GeoNearMatchExpression::GeoNearMatchExpression(boost::optional<StringData> path,
+GeoNearMatchExpression::GeoNearMatchExpression(boost::optional<std::string_view> path,
                                                std::shared_ptr<const GeoNearExpression> query,
                                                const BSONObj& rawObj)
     : LeafMatchExpression(GEO_NEAR, path), _rawObj(rawObj), _query(query) {}

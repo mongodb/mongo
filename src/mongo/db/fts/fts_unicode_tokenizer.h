@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_tokenizer.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 namespace mongo {
 namespace fts {
@@ -67,11 +67,11 @@ class UnicodeFTSTokenizer final : public FTSTokenizer {
 public:
     UnicodeFTSTokenizer(const FTSLanguage* language);
 
-    void reset(StringData document, Options options) override;
+    void reset(std::string_view document, Options options) override;
 
     bool moveNext() override;
 
-    StringData get() const override;
+    std::string_view get() const override;
 
 private:
     /**
@@ -88,7 +88,7 @@ private:
 
     unicode::String _document;
     size_t _pos;
-    StringData _word;
+    std::string_view _word;
     Options _options;
 
     StackBufBuilder _wordBuf;

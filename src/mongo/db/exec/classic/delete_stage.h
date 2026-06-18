@@ -47,6 +47,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -110,7 +111,7 @@ class DeleteStage : public RequiresWritableCollectionStage {
     DeleteStage& operator=(const DeleteStage&) = delete;
 
 public:
-    static constexpr StringData kStageType = "DELETE"_sd;
+    static constexpr std::string_view kStageType = "DELETE"_sd;
 
     DeleteStage(ExpressionContext* expCtx,
                 DeleteStageParams params,
@@ -118,7 +119,7 @@ public:
                 CollectionAcquisition collection,
                 PlanStage* child);
 
-    DeleteStage(StringData stageType,
+    DeleteStage(std::string_view stageType,
                 ExpressionContext* expCtx,
                 DeleteStageParams params,
                 WorkingSet* ws,

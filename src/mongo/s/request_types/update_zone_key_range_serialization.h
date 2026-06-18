@@ -32,12 +32,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 void stringOrNullSerializeToBSON(const boost::optional<std::string>& fields,
-                                 StringData fieldName,
+                                 std::string_view fieldName,
                                  BSONObjBuilder* bob);
 
 boost::optional<std::string> stringOrNullParseFromBSON(const BSONElement& elem);

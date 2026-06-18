@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager.h"
 
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -46,6 +45,7 @@
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -57,6 +57,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 template <typename T>
@@ -721,11 +722,11 @@ void LockManager::getLockInfoArray(const std::map<LockerId, BSONObj>& lockToClie
                 o.append("lockAddr", formatPtr(lock));
             o.append("resourceId", toStringForLogging(lock->resourceId));
             struct {
-                StringData key;
+                std::string_view key;
                 LockRequest* iter;
             } lists[] = {
-                {"granted"_sd, lock->grantedList._front},
-                {"pending"_sd, lock->conflictList._front},
+                {"granted"sv, lock->grantedList._front},
+                {"pending"sv, lock->conflictList._front},
             };
             for (auto [key, iter] : lists) {
                 auto arr = BSONArrayBuilder(o.subarrayStart(key));

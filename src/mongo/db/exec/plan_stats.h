@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -44,6 +43,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -87,9 +87,9 @@ struct MONGO_MOD_NEEDS_REPLACEMENT SpecificStats {
 struct CommonStats {
     CommonStats() = delete;
 
-    CommonStats(StringData type) : CommonStats(type, nullptr /*originalPlanStage*/) {}
+    CommonStats(std::string_view type) : CommonStats(type, nullptr /*originalPlanStage*/) {}
 
-    CommonStats(StringData type, PlanStageKey originalPlanStage)
+    CommonStats(std::string_view type, PlanStageKey originalPlanStage)
         : stageTypeStr(type),
           planStage(originalPlanStage),
           works(0),
@@ -105,7 +105,7 @@ struct CommonStats {
         return filter.objsize() + sizeof(*this);
     }
     // String giving the type of the stage. Not owned.
-    StringData stageTypeStr;
+    std::string_view stageTypeStr;
 
     // Store an identifier to the plan stage which this object is describing.
     PlanStageKey planStage;

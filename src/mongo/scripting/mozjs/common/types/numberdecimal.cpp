@@ -30,7 +30,6 @@
 #include "mongo/scripting/mozjs/common/types/numberdecimal.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/decimal128.h"

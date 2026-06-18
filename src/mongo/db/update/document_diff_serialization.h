@@ -48,6 +48,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -70,14 +71,14 @@ enum DiffType : uint8_t { kDocument, kArray };
 
 // Below are string constants used in the diff format.
 // TODO SERVER-115821 remove external dependencies on these constants.
-MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kArrayHeader = "a"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kDeleteSectionFieldName = "d"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kInsertSectionFieldName = "i"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kUpdateSectionFieldName = "u"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kBinarySectionFieldName = "b"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kArrayHeader = "a"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kDeleteSectionFieldName = "d"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kInsertSectionFieldName = "i"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kUpdateSectionFieldName = "u"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kBinarySectionFieldName = "b"_sd;
 MONGO_MOD_NEEDS_REPLACEMENT constexpr char kSubDiffSectionFieldPrefix = 's';
 // 'l' for length.
-constexpr StringData kResizeSectionFieldName = "l"_sd;
+constexpr std::string_view kResizeSectionFieldName = "l"_sd;
 
 // Below are constants used for computation of Diff size. Note that the computed size is supposed to
 // be an approximate value.
@@ -131,19 +132,19 @@ public:
     /**
      * The below methods get the next type of modification (if any) and advance the iterator.
      */
-    boost::optional<StringData> nextDelete();
+    boost::optional<std::string_view> nextDelete();
     boost::optional<BSONElement> nextUpdate();
     boost::optional<BSONElement> nextInsert();
     boost::optional<BSONElement> nextBinary();
-    boost::optional<std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>
+    boost::optional<std::pair<std::string_view, std::variant<DocumentDiffReader, ArrayDiffReader>>>
     nextSubDiff();
     /**
      * Calls all of the above 'next*' methods.
      */
-    using Modification =
-        std::variant<StringData,
-                     BSONElement,
-                     std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>;
+    using Modification = std::variant<
+        std::string_view,
+        BSONElement,
+        std::pair<std::string_view, std::variant<DocumentDiffReader, ArrayDiffReader>>>;
     boost::optional<Modification> next();
 
 private:
@@ -265,8 +266,8 @@ public:
     InternalNode(size_t size = 0) : sizeTracker(size) {};
 
     // Returns an unowned pointer to the newly added child.
-    virtual Node* addChild(StringData fieldName, std::unique_ptr<Node> node) = 0;
-    virtual Node* getChild(StringData fieldName) const = 0;
+    virtual Node* addChild(std::string_view fieldName, std::unique_ptr<Node> node) = 0;
+    virtual Node* getChild(std::string_view fieldName) const = 0;
     size_t getObjSize() const {
         return sizeTracker.getSize();
     }
@@ -281,28 +282,28 @@ protected:
 class DocumentSubDiffNode : public InternalNode {
 public:
     template <typename E>
-    using ModificationEntries = std::vector<std::pair<StringData, E>>;
+    using ModificationEntries = std::vector<std::pair<std::string_view, E>>;
 
     DocumentSubDiffNode(size_t size = 0)
         : InternalNode(size + doc_diff::kSizeOfEmptyDocumentDiffBuilder) {};
 
-    Node* addChild(StringData fieldName, std::unique_ptr<Node> node) override;
+    Node* addChild(std::string_view fieldName, std::unique_ptr<Node> node) override;
 
-    Node* getChild(StringData fieldName) const override {
+    Node* getChild(std::string_view fieldName) const override {
         auto it = children.find(fieldName);
         return (it != children.end()) ? it->second.get() : nullptr;
     }
 
-    void addUpdate(StringData fieldName, BSONElement value) {
+    void addUpdate(std::string_view fieldName, BSONElement value) {
         addChild(fieldName, std::make_unique<UpdateNode>(value));
     }
-    void addInsert(StringData fieldName, BSONElement value) {
+    void addInsert(std::string_view fieldName, BSONElement value) {
         addChild(fieldName, std::make_unique<InsertNode>(value));
     }
-    void addDelete(StringData fieldName) {
+    void addDelete(std::string_view fieldName) {
         addChild(fieldName, std::make_unique<DeleteNode>());
     }
-    void addBinary(StringData fieldName, BSONElement value) {
+    void addBinary(std::string_view fieldName, BSONElement value) {
         addChild(fieldName, std::make_unique<BinaryNode>(value));
     }
     NodeType type() const override {
@@ -358,7 +359,7 @@ class DocumentInsertionNode : public InternalNode {
 public:
     DocumentInsertionNode() : InternalNode(0) {};
 
-    Node* addChild(StringData fieldName, std::unique_ptr<Node> node) override {
+    Node* addChild(std::string_view fieldName, std::unique_ptr<Node> node) override {
         invariant(node->type() == NodeType::kInsert || node->type() == NodeType::kDocumentInsert);
 
         auto* nodePtr = node.get();
@@ -368,7 +369,7 @@ public:
         return nodePtr;
     }
 
-    Node* getChild(StringData fieldName) const override {
+    Node* getChild(std::string_view fieldName) const override {
         auto it = children.find(fieldName);
         return (it != children.end()) ? it->second.get() : nullptr;
     }
@@ -377,7 +378,7 @@ public:
         return NodeType::kDocumentInsert;
     }
 
-    const std::vector<std::pair<StringData, Node*>>& getInserts() const {
+    const std::vector<std::pair<std::string_view, Node*>>& getInserts() const {
         return inserts;
     }
 
@@ -386,7 +387,7 @@ private:
     // 'children' map every time. Note that the field names of these inserts will reference
     // the field name stored in 'children'. The node objects also point to the value of 'children'
     // map, where they are owned.
-    std::vector<std::pair<StringData, Node*>> inserts;
+    std::vector<std::pair<std::string_view, Node*>> inserts;
 
     // We use absl::node_hash_map here for pointer stability on keys (field names) when a rehash
     // happens.
@@ -401,15 +402,16 @@ public:
     ArrayNode() : InternalNode(doc_diff::kSizeOfEmptyArrayDiffBuilder) {};
 
     Node* addChild(size_t idx, std::unique_ptr<Node> node) {
-        sizeTracker.addEntry(1 /* modification type */ +
-                                 StringData(ItoA(idx)).size() /* Count the number of digits */,
-                             node.get());
+        sizeTracker.addEntry(
+            1 /* modification type */ +
+                std::string_view(ItoA(idx)).size() /* Count the number of digits */,
+            node.get());
         auto itr = children.insert({idx, std::move(node)});
         invariant(itr.second);
         return itr.first->second.get();
     }
 
-    Node* addChild(StringData fieldName, std::unique_ptr<Node> node) override {
+    Node* addChild(std::string_view fieldName, std::unique_ptr<Node> node) override {
         auto idx = str::parseUnsignedBase10Integer(fieldName);
         invariant(idx);
         return addChild(*idx, std::move(node));
@@ -419,7 +421,7 @@ public:
         addChild(idx, std::make_unique<UpdateNode>(value));
     }
 
-    Node* getChild(StringData fieldName) const override {
+    Node* getChild(std::string_view fieldName) const override {
         auto idx = str::parseUnsignedBase10Integer(fieldName);
         invariant(idx);
         auto it = children.find(*idx);

@@ -135,6 +135,7 @@ bool hasOne(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& 
 
 }  // namespace
 namespace {
+using namespace std::literals::string_view_literals;
 NamespaceString usersNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
         return NamespaceString::makeTenantUsersCollection(tenant);
@@ -201,9 +202,9 @@ void serializeResolvedRoles(BSONObjBuilder* user,
 /**
  * Make sure the roleDoc as retreived from storage matches expectations for options.
  */
-constexpr auto kRolesFieldName = "roles"_sd;
-constexpr auto kPrivilegesFieldName = "privileges"_sd;
-constexpr auto kAuthenticationRestrictionFieldName = "authenticationRestrictions"_sd;
+constexpr auto kRolesFieldName = "roles"sv;
+constexpr auto kPrivilegesFieldName = "privileges"sv;
+constexpr auto kAuthenticationRestrictionFieldName = "authenticationRestrictions"sv;
 
 std::vector<RoleName> filterAndMapRole(BSONObjBuilder* builder,
                                        BSONObj role,

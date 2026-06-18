@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -41,13 +43,13 @@ namespace mongo {
  */
 class DocumentSourceInternalReplaceRoot final : public DocumentSource {
 public:
-    static constexpr StringData kStageNameInternal = "$_internalReplaceRoot"_sd;
+    static constexpr std::string_view kStageNameInternal = "$_internalReplaceRoot"_sd;
 
     DocumentSourceInternalReplaceRoot(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                       boost::intrusive_ptr<Expression> newRoot)
         : DocumentSource(kStageNameInternal, pExpCtx), _newRoot(newRoot) {}
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

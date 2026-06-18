@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_mock.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"

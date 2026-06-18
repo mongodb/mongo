@@ -31,7 +31,6 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -82,6 +81,7 @@
 #include <set>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -92,6 +92,7 @@
 
 namespace mongo::doc_validation_error {
 namespace {
+using namespace std::literals::string_view_literals;
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DocumentValidationFailureInfo);
 
 using ErrorAnnotation = MatchExpression::ErrorAnnotation;
@@ -796,9 +797,9 @@ public:
             try {
                 auto expressionResult = exec::matcher::evaluateExpression(expr, &document);
                 appendErrorReason(kNormalReason, kInvertedReason);
-                expressionResult.addToBsonObj(&bob, "expressionResult"_sd);
+                expressionResult.addToBsonObj(&bob, "expressionResult"sv);
             } catch (const DBException& e) {
-                bob.append("reason"_sd, "failed to evaluate aggregation expression");
+                bob.append("reason"sv, "failed to evaluate aggregation expression");
                 BSONObjBuilder exceptionDetailsBuilder = bob.subobjStart("details");
                 e.serialize(&exceptionDetailsBuilder);
                 exceptionDetailsBuilder.done();
@@ -1026,7 +1027,7 @@ public:
             // Append information about array element to the error.
             BSONElement arrayElement = valueAsArray[expr->arrayIndex()];
             BSONObjBuilder& bob = _context->getCurrentObjBuilder();
-            bob.append("itemIndex"_sd, expr->arrayIndex());
+            bob.append("itemIndex"sv, expr->arrayIndex());
 
             // Build a document corresponding to the array element for the child expression to
             // operate on.
@@ -1270,7 +1271,7 @@ private:
      * returns 'boost::none'. 'leafArrayBehavior' determines how the values are enumerated when the
      * leaf value of the path is an array.
      */
-    boost::optional<BSONArray> createValuesArray(const StringData fieldPath,
+    boost::optional<BSONArray> createValuesArray(const std::string_view fieldPath,
                                                  LeafArrayBehavior leafArrayBehavior) {
         // Empty path means that the match is against the root document.
         if (fieldPath.empty())
@@ -1442,7 +1443,7 @@ private:
     /**
      * Returns 'true' if a field exists at path 'fieldPath' in the current document.
      */
-    bool pathExists(StringData fieldPath) {
+    bool pathExists(std::string_view fieldPath) {
         ElementPath path(fieldPath,
                          LeafArrayBehavior::kTraverse);  // Use kTraverse to return at least one
                                                          // item if the field exists.
@@ -1856,7 +1857,7 @@ private:
                 "'InternalSchemaAllElemMatchFromIndexMatchExpression' expression",
                 failingElement);
             _context->getCurrentObjBuilder().appendNumber(
-                "itemIndex"_sd, std::stoll(std::string{failingElement.fieldNameStringData()}));
+                "itemIndex"sv, std::stoll(std::string{failingElement.fieldNameStringData()}));
             _context->setChildInput(toObjectWithPlaceholder(failingElement),
                                     _context->getCurrentInversion());
         } else {
@@ -2370,7 +2371,7 @@ void assertHasErrorAnnotations(const MatchExpression& validatorExpr) {
 void appendDocumentId(const BSONObj& doc, BSONObjBuilder* builder) {
     BSONElement objectIdElement = doc["_id"];
     tassert(9740337, "Failing document must have a value for '_id'", objectIdElement);
-    builder->appendAs(objectIdElement, "failingDocumentId"_sd);
+    builder->appendAs(objectIdElement, "failingDocumentId"sv);
 }
 
 /**
@@ -2437,7 +2438,7 @@ BSONObj generateErrorHelper(const MatchExpression& validatorExpr,
     if (truncate)
         objBuilder.append("truncated", true);
     // Add errors from match expressions.
-    objBuilder.append("details"_sd, std::move(error));
+    objBuilder.append("details"sv, std::move(error));
 
     auto finalError = objBuilder.obj();
     // Verify that the generated error is of valid depth.

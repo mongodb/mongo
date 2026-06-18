@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -45,7 +46,7 @@
  */
 MONGO_MOD_PUBLIC;
 namespace mongo::update_oplog_entry {
-static inline constexpr StringData kDiffObjectFieldName = "diff"_sd;
+static inline constexpr std::string_view kDiffObjectFieldName = "diff"_sd;
 
 constexpr size_t kSizeOfDeltaOplogEntryMetadata = 15;
 
@@ -104,7 +105,7 @@ UpdateType extractUpdateType(const BSONObj& oField);
  * It is a programming error to call this function with a value for 'updateObj' that is not a valid
  * update.
  */
-BSONElement extractNewValueForField(const BSONObj& updateObj, StringData fieldName);
+BSONElement extractNewValueForField(const BSONObj& updateObj, std::string_view fieldName);
 
 /**
  * Given the 'o' field of an update oplog entry document, this function will determine whether the
@@ -118,5 +119,5 @@ BSONElement extractNewValueForField(const BSONObj& updateObj, StringData fieldNa
  * It is a programming error to call this function with a value for 'updateObj' that is not a valid
  * update.
  */
-FieldRemovedStatus isFieldRemovedByUpdate(const BSONObj& updateObj, StringData fieldName);
+FieldRemovedStatus isFieldRemovedByUpdate(const BSONObj& updateObj, std::string_view fieldName);
 }  // namespace mongo::update_oplog_entry

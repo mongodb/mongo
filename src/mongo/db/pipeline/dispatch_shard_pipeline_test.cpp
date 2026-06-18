@@ -33,7 +33,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -69,12 +68,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Use this new name to register these tests under their own unit test suite.
 using DispatchShardPipelineTest = ShardedAggTestFixture;
@@ -285,7 +286,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
         // Shouldn't throw.
         sharding::router::CollectionRouter router(operationContext(), kTestAggregateNss);
         auto results = router.routeWithRoutingContext(
-            "dispatch shard pipeline"_sd, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            "dispatch shard pipeline"sv, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 return sharded_agg_helpers::dispatchShardPipeline(routingCtx,
                                                                   serializedCommand,
                                                                   pipelineDataSource,

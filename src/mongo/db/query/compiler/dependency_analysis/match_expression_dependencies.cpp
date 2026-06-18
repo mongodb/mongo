@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"

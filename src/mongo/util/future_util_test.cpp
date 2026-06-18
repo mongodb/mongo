@@ -29,7 +29,6 @@
 
 #include "mongo/util/future_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/client/retry_strategy.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"

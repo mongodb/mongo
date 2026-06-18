@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -41,6 +40,7 @@
 #include <functional>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -181,7 +181,9 @@ protected:
  * the data.
  */
 template <typename... Ts>
-void appendHistogram(BSONObjBuilder& bob, const Histogram<Ts...>& hist, const StringData histKey) {
+void appendHistogram(BSONObjBuilder& bob,
+                     const Histogram<Ts...>& hist,
+                     const std::string_view histKey) {
     BSONObjBuilder histBob(bob.subobjStart(histKey));
     long long totalCount = 0;
 

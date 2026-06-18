@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -44,9 +43,11 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the cluster count command on mongod.
@@ -54,7 +55,7 @@ namespace {
 struct ClusterCountCmdD {
     using Request = CountCommandRequest;
     using Reply = CountCommandRequest::Reply;
-    static constexpr StringData kCommandName = "clusterCount"_sd;
+    static constexpr std::string_view kCommandName = "clusterCount"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;

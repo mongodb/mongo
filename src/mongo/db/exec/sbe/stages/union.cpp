@@ -31,7 +31,6 @@
 
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -40,15 +39,17 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 UnionStage::UnionStage(PlanStage::Vector inputStages,
                        std::vector<value::SlotVector> inputVals,
                        value::SlotVector outputVals,
                        PlanNodeId planNodeId,
                        bool participateInTrialRunTracking)
-    : PlanStage("union"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("union"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _inputVals{std::move(inputVals)},
       _outputVals{std::move(outputVals)} {
     _children = std::move(inputStages);

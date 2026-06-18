@@ -33,9 +33,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
-void EncryptSchemaKeyId::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+void EncryptSchemaKeyId::serializeToBSON(std::string_view fieldName,
+                                         BSONObjBuilder* builder) const {
     if (_type == Type::kUUIDs) {
         BSONArrayBuilder arrBuilder(builder->subarrayStart(fieldName));
         for (auto uuid : _uuids) {
@@ -47,7 +50,7 @@ void EncryptSchemaKeyId::serializeToBSON(StringData fieldName, BSONObjBuilder* b
     }
 }
 
-void BSONTypeSet::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+void BSONTypeSet::serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
     builder->appendArray(fieldName, _typeSet.toBSONArray());
 }
 

@@ -36,6 +36,7 @@
 #include <limits>
 #include <numeric>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -78,8 +79,11 @@
 #include "mongo/util/str.h"
 #include "mongo/util/summation.h"
 
+using namespace std::literals::string_view_literals;
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+using namespace std::literals::string_view_literals;
 namespace mongo {
 
 
@@ -169,7 +173,7 @@ protected:
         return getAllResults(stage.get(), &resultAccessors[0]);
     }
 
-    void runGroupAggregationTest(StringData groupSpec,
+    void runGroupAggregationTest(std::string_view groupSpec,
                                  std::vector<BSONArray> inputDocs,
                                  const mongo::BSONArray& expectedValue,
                                  std::unique_ptr<CollatorInterface> collator = nullptr) {
@@ -188,7 +192,7 @@ protected:
             << " but got: " << std::make_pair(sortedResultsTag, sortedResultsVal);
     }
 
-    void runGroupAggregationToFail(StringData groupSpec,
+    void runGroupAggregationToFail(std::string_view groupSpec,
                                    std::vector<BSONArray> inputDocs,
                                    ErrorCodes::Error expectedError,
                                    std::unique_ptr<CollatorInterface> collator = nullptr) {
@@ -210,7 +214,7 @@ protected:
      * Note: Currently, the order agnostic comparison only works for arraySets with
      * non-pointer-based accumulated values.
      */
-    void runArrayOutputAccumulatorTest(StringData groupSpec,
+    void runArrayOutputAccumulatorTest(std::string_view groupSpec,
                                        std::vector<BSONArray> inputDocs,
                                        const BSONArray& expectedResult,
                                        std::unique_ptr<CollatorInterface> collator = nullptr) {
@@ -241,7 +245,7 @@ protected:
                                  << std::make_pair(resObjTag, resObjVal);
 
         while (!objEnum.atEnd()) {
-            if (objEnum.getFieldName() == "x"_sd) {
+            if (objEnum.getFieldName() == "x"sv) {
                 auto [arrTag, arrVal] = objEnum.getViewOfValue();
                 ASSERT_EQ(arrTag, TypeTags::bsonArray)
                     << "Expected an array for field x but got: " << std::make_pair(arrTag, arrVal);
@@ -1228,7 +1232,7 @@ TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationRepeatedValue) {
 TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationMixedTypes) {
     const auto bsonArr = BSON_ARRAY(1 << 2 << 3);
     const auto bsonObj = BSON("c" << 1);
-    const auto strVal = "hello"_sd;
+    const auto strVal = "hello"sv;
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 42)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 4.2)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << true)),
@@ -1490,7 +1494,7 @@ TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationAllMissing) {
 TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationVariousTypes) {
     const auto bsonArr = BSON_ARRAY(1 << 2 << 3);
     const auto bsonObj = BSON("c" << 1);
-    const auto strVal = "hello"_sd;
+    const auto strVal = "hello"sv;
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 42)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 4.2)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << true)),
@@ -2214,7 +2218,7 @@ TEST_F(SbeStageBuilderGroupTest, MinMaxNAccumulatorDynamicN) {
 
 class AccumulatorSBEIncompatible final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$incompatible"_sd;
+    static constexpr auto kName = "$incompatible"sv;
     const char* getOpName() const final {
         return kName.data();
     }
@@ -2289,10 +2293,11 @@ TEST_F(SbeStageBuilderGroupTest, SbeIncompatibleExpressionInGroup) {
     }
 }
 
+using namespace std::literals::string_view_literals;
 namespace {
 sbe::value::SlotId registerCollator(stage_builder::StageBuilderState& state,
                                     const CollatorInterface* collator) {
-    return state.env->registerSlot("collator"_sd,
+    return state.env->registerSlot("collator"sv,
                                    sbe::value::TypeTags::collator,
                                    sbe::value::bitcastFrom<const CollatorInterface*>(collator),
                                    false,
@@ -2327,7 +2332,7 @@ public:
                  false /* allowDiskUse */,
                  *_expCtx->getIfrContext()} {}
 
-    AccumulationStatement makeAccumulationStatement(StringData accumName) {
+    AccumulationStatement makeAccumulationStatement(std::string_view accumName) {
         return makeAccumulationStatement(BSON("unused" << BSON(accumName << "unused")));
     }
 
@@ -2410,7 +2415,7 @@ public:
             // Feed in the input value, treating "MISSING" as a special sentinel to indicate the
             // Nothing value.
             if (sbe::value::isString(nextInputTag) &&
-                sbe::value::getStringView(nextInputTag, nextInputVal) == "MISSING"_sd) {
+                sbe::value::getStringView(nextInputTag, nextInputVal) == "MISSING"sv) {
                 _inputAccessor.reset();
             } else {
                 auto copy = sbe::value::TagValueOwned::fromRaw(
@@ -2425,7 +2430,7 @@ public:
             // value into the slot that holds the accumulation state.
             auto [expectedOutputTag, expectedOutputValue] = expectedEnumerator.getViewOfValue();
             if (sbe::value::isString(expectedOutputTag) &&
-                sbe::value::getStringView(expectedOutputTag, expectedOutputValue) == "MISSING"_sd) {
+                sbe::value::getStringView(expectedOutputTag, expectedOutputValue) == "MISSING"sv) {
                 expectedOutputTag = sbe::value::TypeTags::Nothing;
                 expectedOutputValue = 0;
             }
@@ -2707,7 +2712,7 @@ private:
 };
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMin) {
-    auto accStatement = makeAccumulationStatement("$min"_sd);
+    auto accStatement = makeAccumulationStatement("$min"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto inputValues = BSON_ARRAY(8 << 7 << 9 << BSONNULL << 6);
@@ -2721,7 +2726,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMin) {
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinWithCollation) {
-    auto accStatement = makeAccumulationStatement("$min"_sd);
+    auto accStatement = makeAccumulationStatement("$min"sv);
 
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kReverseString};
 
@@ -2742,7 +2747,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinWithCollation) 
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMax) {
-    auto accStatement = makeAccumulationStatement("$max"_sd);
+    auto accStatement = makeAccumulationStatement("$max"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto inputValues = BSON_ARRAY(3 << 1 << 4 << BSONNULL << 8);
@@ -2756,7 +2761,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMax) {
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxWithCollation) {
-    auto accStatement = makeAccumulationStatement("$max"_sd);
+    auto accStatement = makeAccumulationStatement("$max"sv);
 
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kReverseString};
 
@@ -2777,7 +2782,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxWithCollation) 
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirst) {
-    auto accStatement = makeAccumulationStatement("$first"_sd);
+    auto accStatement = makeAccumulationStatement("$first"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto inputValues = BSON_ARRAY(3 << 1 << BSONNULL << "MISSING" << 8);
@@ -2791,7 +2796,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirst) {
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLast) {
-    auto accStatement = makeAccumulationStatement("$last"_sd);
+    auto accStatement = makeAccumulationStatement("$last"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto inputValues = BSON_ARRAY(3 << 1 << BSONNULL << "MISSING" << 8);
@@ -2800,7 +2805,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLast) {
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsPush) {
-    auto accStatement = makeAccumulationStatement("$push"_sd);
+    auto accStatement = makeAccumulationStatement("$push"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto [inputValuesTag, inputValuesVal] = makeArrayAccumVal(
@@ -2817,7 +2822,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsPush) {
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsPushThrowsWhenExceedingSizeLimit) {
-    auto accStatement = makeAccumulationStatement("$push"_sd);
+    auto accStatement = makeAccumulationStatement("$push"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     // If we inject a very large size, we expect the accumulator to throw. This cap prevents the
@@ -2838,7 +2843,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsPushThrowsWhenExce
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAddToSet) {
-    auto accStatement = makeAccumulationStatement("$addToSet"_sd);
+    auto accStatement = makeAccumulationStatement("$addToSet"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto [inputValuesTag, inputValuesVal] =
@@ -2860,7 +2865,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAddToSet) {
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAddToSetWithCollation) {
-    auto accStatement = makeAccumulationStatement("$addToSet"_sd);
+    auto accStatement = makeAccumulationStatement("$addToSet"sv);
 
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
 
@@ -2895,7 +2900,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest,
        CombinePartialAggsAddToSetThrowsWhenExceedingSizeLimit) {
     unittest::ServerParameterGuard queryKnobController("internalQueryMaxAddToSetBytes", 50);
 
-    auto accStatement = makeAccumulationStatement("$addToSet"_sd);
+    auto accStatement = makeAccumulationStatement("$addToSet"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto input = makeArrayAccumVal(BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(1 << 2) << 0)
@@ -2917,7 +2922,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest,
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnion) {
-    auto accStatement = makeAccumulationStatement("$setUnion"_sd);
+    auto accStatement = makeAccumulationStatement("$setUnion"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto [inputValuesTag, inputValuesVal] =
@@ -2939,7 +2944,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnion) {
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnionWithCollation) {
-    auto accStatement = makeAccumulationStatement("$setUnion"_sd);
+    auto accStatement = makeAccumulationStatement("$setUnion"sv);
 
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
 
@@ -2974,7 +2979,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest,
        CombinePartialAggsSetUnionThrowsWhenExceedingSizeLimit) {
     unittest::ServerParameterGuard queryKnobController("internalQueryMaxSetUnionBytes", 50);
 
-    auto accStatement = makeAccumulationStatement("$setUnion"_sd);
+    auto accStatement = makeAccumulationStatement("$setUnion"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto input = makeArrayAccumVal(BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(1 << 2) << 0)
@@ -2996,7 +3001,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest,
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsConcatArrays) {
-    auto accStatement = makeAccumulationStatement("$concatArrays"_sd);
+    auto accStatement = makeAccumulationStatement("$concatArrays"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto [inputValuesTag, inputValuesVal] =
@@ -3018,7 +3023,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest,
        CombinePartialAggsConcatArraysThrowsWhenExceedingSizeLimit) {
     unittest::ServerParameterGuard queryKnobController("internalQueryMaxConcatArraysBytes", 50);
 
-    auto accStatement = makeAccumulationStatement("$concatArrays"_sd);
+    auto accStatement = makeAccumulationStatement("$concatArrays"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto input = makeArrayAccumVal(BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(1 << 2) << 18)
@@ -3039,7 +3044,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest,
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMergeObjects) {
-    auto accStatement = makeAccumulationStatement("$mergeObjects"_sd);
+    auto accStatement = makeAccumulationStatement("$mergeObjects"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
     auto inputValues = BSON_ARRAY(BSONNULL << BSONObj{} << BSON("a" << 1) << BSONNULL << "MISSING"
@@ -3143,7 +3148,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSumLar
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAvg) {
-    auto accStatement = makeAccumulationStatement("$avg"_sd);
+    auto accStatement = makeAccumulationStatement("$avg"sv);
 
     // We expect $avg to result in two separate agg expressions: one for computing the sum and the
     // other for computing the count. Both agg expressions read from the same input slot.
@@ -3186,7 +3191,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevPop) {
                    << BSON_ARRAY(5 << 10 << 6 << 8) << BSON_ARRAY(5 << 10 << 6 << 8)
                    << BSON_ARRAY(5 << 10 << 6 << 8 << 1 << 9 << 10)));
 
-    auto accStatement = makeAccumulationStatement("$stdDevPop"_sd);
+    auto accStatement = makeAccumulationStatement("$stdDevPop"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
     aggregateAndAssertResults(inputTag, inputVal, expectedTag, expectedVal, compiledExpr.get());
 
@@ -3211,7 +3216,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevSamp) {
                    << BSON_ARRAY(5 << 10 << 6 << 8) << BSON_ARRAY(5 << 10 << 6 << 8)
                    << BSON_ARRAY(5 << 10 << 6 << 8 << 1 << 9 << 10)));
 
-    auto accStatement = makeAccumulationStatement("$stdDevSamp"_sd);
+    auto accStatement = makeAccumulationStatement("$stdDevSamp"sv);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
     aggregateAndAssertResults(inputTag, inputVal, expectedTag, expectedVal, compiledExpr.get());
 

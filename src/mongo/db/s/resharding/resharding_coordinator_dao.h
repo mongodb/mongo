@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -161,7 +162,7 @@ private:
     std::unique_ptr<DaoStorageClientFactory> _clientFactory;
     BSONObjBuilder _documentsCopyUpdateBuilder(const ReshardingCoordinatorDocument& doc,
                                                const std::map<ShardId, int64_t>& documents,
-                                               StringData numberOfDocsFieldName);
+                                               std::string_view numberOfDocsFieldName);
 };
 
 }  // namespace resharding

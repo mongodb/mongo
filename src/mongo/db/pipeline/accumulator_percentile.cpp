@@ -44,11 +44,13 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <type_traits>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_ACCUMULATOR(percentile, AccumulatorPercentile::parseArgs);
 REGISTER_STABLE_EXPRESSION(percentile, AccumulatorPercentile::parseExpression);
@@ -113,7 +115,7 @@ Value ExpressionFromAccumulatorQuantile<AccumulatorMedian>::evaluate(
 }
 
 namespace {
-PercentileMethodEnum methodNameToEnum(const VersionContext& vCtx, StringData method) {
+PercentileMethodEnum methodNameToEnum(const VersionContext& vCtx, std::string_view method) {
     uassert(ErrorCodes::BadValue,
             "Currently only 'approximate' can be used as a percentile 'method'.",
             feature_flags::gFeatureFlagAccuratePercentiles.isEnabled(
@@ -136,7 +138,7 @@ PercentileMethodEnum methodNameToEnum(const VersionContext& vCtx, StringData met
         "Currently only 'approximate', 'discrete', and 'continuous' percentiles are supported");
 }
 
-StringData percentileMethodEnumToString(PercentileMethodEnum method) {
+std::string_view percentileMethodEnumToString(PercentileMethodEnum method) {
     switch (method) {
         case PercentileMethodEnum::kApproximate:
             return AccumulatorPercentile::kApproximate;
@@ -162,8 +164,8 @@ std::vector<double> parseP(ExpressionContext* const expCtx,
             constExpr);
     Value pVals = constExpr->getValue();
 
-    constexpr StringData msg =
-        "The $percentile 'p' field must be an array of numbers from [0.0, 1.0], but found: "_sd;
+    constexpr std::string_view msg =
+        "The $percentile 'p' field must be an array of numbers from [0.0, 1.0], but found: "sv;
     if (!pVals.isArray() || pVals.getArrayLength() == 0) {
         uasserted(7750301, str::stream() << msg << pVals.toString());
     }
@@ -210,7 +212,7 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
     return {ExpressionConstant::create(expCtx, Value(BSONNULL)) /*initializer*/,
             std::move(input) /*argument*/,
             std::move(factory),
-            "$percentile"_sd /*name*/};
+            "$percentile"sv /*name*/};
 }
 
 std::pair<std::vector<double> /*ps*/, PercentileMethodEnum>
@@ -369,7 +371,7 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
     return {ExpressionConstant::create(expCtx, Value(BSONNULL)) /*initializer*/,
             std::move(input) /*argument*/,
             std::move(factory),
-            "$median"_sd /*name*/};
+            "$median"sv /*name*/};
 }
 
 std::pair<std::vector<double> /*ps*/, PercentileMethodEnum>

@@ -46,6 +46,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -228,7 +229,7 @@ public:
         return _mockExplainer;
     }
 
-    boost::optional<StringData> getExecutorType() const override {
+    boost::optional<std::string_view> getExecutorType() const override {
         return boost::none;
     }
 

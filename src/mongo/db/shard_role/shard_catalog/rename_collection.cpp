@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -100,6 +99,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -110,6 +110,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
@@ -1263,7 +1264,7 @@ Status renameCollection(OperationContext* opCtx,
                       "renaming a collection across tenants is not allowed");
     }
 
-    StringData dropTargetMsg = options.dropTarget ? "yes"_sd : "no"_sd;
+    std::string_view dropTargetMsg = options.dropTarget ? "yes"sv : "no"sv;
     LOGV2(20400,
           "renameCollectionForCommand",
           "sourceNamespace"_attr = source,

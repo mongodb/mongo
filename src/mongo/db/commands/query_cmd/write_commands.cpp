@@ -31,7 +31,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -99,6 +98,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -109,11 +109,12 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(hangInsertBeforeWrite);
 MONGO_FAIL_POINT_DEFINE(hangUpdateBeforeWrite);
 
-void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
+void redactTooLongLog(mutablebson::Document* cmdObj, std::string_view fieldName) {
     namespace mmb = mutablebson;
     mmb::Element root = cmdObj->root();
     mmb::Element field = root.findFirstChildNamed(fieldName);
@@ -331,7 +332,7 @@ public:
                 }
             } else {
                 if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {
-                        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"sv);
                         return fpNss == request().getNamespace();
                     })) {
                     hangInsertBeforeWrite.pauseWhileSet();
@@ -418,7 +419,7 @@ public:
             invariant(_commandObj.isOwned());
 
             // Extend the lifetime of `updates` to allow asynchronous mirroring.
-            if (auto seq = opMsgRequest.getSequence("updates"_sd); seq && !seq->objs.empty()) {
+            if (auto seq = opMsgRequest.getSequence("updates"sv); seq && !seq->objs.empty()) {
                 // Current design ignores contents of `updates` array except for the first entry.
                 // Assuming identical collation for all elements in `updates`, future design could
                 // use the disjunction primitive (i.e, `$or`) to compile all queries into a single
@@ -564,7 +565,7 @@ public:
                     opCtx, ns(), request(), preConditions, executor, &reply);
             } else {
                 if (hangUpdateBeforeWrite.shouldFail([&](const BSONObj& data) {
-                        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"sv);
                         return fpNss == request().getNamespace();
                     })) {
                     hangUpdateBeforeWrite.pauseWhileSet();

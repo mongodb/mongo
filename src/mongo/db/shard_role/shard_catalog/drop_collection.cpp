@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
@@ -72,6 +71,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -106,7 +106,7 @@ Status _checkReplState(OperationContext* opCtx,
 void checkForCollection(std::shared_ptr<const CollectionCatalog> collectionCatalog,
                         OperationContext* opCtx,
                         const NamespaceString& baseNss,
-                        boost::optional<StringData> collName,
+                        boost::optional<std::string_view> collName,
                         std::vector<std::string>* pLeaked) {
 
     if (collName.has_value()) {

@@ -33,6 +33,7 @@
 #include "mongo/util/string_map.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -94,7 +95,7 @@ public:
         }
     }
 
-    inline bool count(StringData field) const {
+    inline bool count(std::string_view field) const {
         bool scopeIsClosed = _scope == FieldListScope::kClosed;
         bool found = _set.count(field);
         return found == scopeIsClosed;

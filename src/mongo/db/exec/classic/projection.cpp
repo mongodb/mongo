@@ -42,6 +42,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -132,7 +133,7 @@ ProjectionStage::ProjectionStage(ExpressionContext* expCtx,
                                  const BSONObj& projObj,
                                  WorkingSet* ws,
                                  std::unique_ptr<PlanStage> child,
-                                 StringData stageType)
+                                 std::string_view stageType)
     : PlanStage{expCtx, std::move(child), stageType},
       _projObj{expCtx->getExplain() ? boost::make_optional(projObj.getOwned()) : boost::none},
       _ws{*ws} {}
@@ -258,7 +259,7 @@ ProjectionStageCovered::ProjectionStageCovered(ExpressionContext* expCtx,
         if (_includedFields.end() == fieldIt) {
             // Push an unused value on the back to keep _includeKey and _keyFieldNames
             // in sync.
-            _keyFieldNames.push_back(StringData());
+            _keyFieldNames.push_back(std::string_view());
             _includeKey.push_back(false);
         } else {
             // If we are including this key field store its field name.

@@ -32,7 +32,6 @@
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -43,6 +42,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -527,8 +527,9 @@ private:
     constexpr static std::uint64_t kCombinationNaN = 0x1f << 12;
     constexpr static std::uint64_t kCanonicalCoefficientHighFieldMask = (1ull << 49) - 1;
 
-    std::string _convertToScientificNotation(StringData coefficient, int adjustedExponent) const;
-    std::string _convertToStandardDecimalNotation(StringData coefficient, int exponent) const;
+    std::string _convertToScientificNotation(std::string_view coefficient,
+                                             int adjustedExponent) const;
+    std::string _convertToStandardDecimalNotation(std::string_view coefficient, int exponent) const;
 
     /**
      * This function quantizes the current decimal given a quantum reference without normalizing its

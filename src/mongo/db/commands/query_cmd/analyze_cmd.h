@@ -32,6 +32,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
-static constexpr StringData kStatisticsPath = "statistics"_sd;
+static constexpr std::string_view kStatisticsPath = "statistics"_sd;
 }  // namespace mongo

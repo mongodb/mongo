@@ -34,7 +34,6 @@
 #include "mongo/db/auth/user_document_parser.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/mechanism_scram.h"

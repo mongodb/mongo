@@ -43,6 +43,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
@@ -65,8 +66,8 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(FindAndModifyImageLookup);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceFindAndModifyImageLookup : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalFindAndModifyImageLookup"_sd;
-    static constexpr StringData kIncludeCommitTransactionTimestampFieldName =
+    static constexpr std::string_view kStageName = "$_internalFindAndModifyImageLookup"_sd;
+    static constexpr std::string_view kIncludeCommitTransactionTimestampFieldName =
         "includeCommitTransactionTimestamp"_sd;
 
     static boost::intrusive_ptr<DocumentSourceFindAndModifyImageLookup> create(
@@ -92,7 +93,7 @@ public:
         return boost::none;
     }
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return DocumentSourceFindAndModifyImageLookup::kStageName;
     }
 

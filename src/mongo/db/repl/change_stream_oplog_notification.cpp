@@ -29,7 +29,6 @@
 
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/keypattern.h"
@@ -54,6 +53,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -65,7 +65,7 @@ namespace mongo {
 namespace {
 void insertNotificationOplogEntries(OperationContext* opCtx,
                                     std::vector<repl::MutableOplogEntry>&& oplogEntries,
-                                    StringData opStr) {
+                                    std::string_view opStr) {
     writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace, [&] {
         AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork wunit(opCtx);
@@ -86,7 +86,7 @@ void insertNotificationOplogEntries(OperationContext* opCtx,
 void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
                                           const CollectionSharded& notification) {
     BSONObjBuilder cmdBuilder;
-    StringData opName("shardCollection");
+    std::string_view opName("shardCollection");
 
     const auto nssStr =
         NamespaceStringUtil::serialize(notification.getNss(), SerializationContext::stateDefault());
@@ -333,7 +333,7 @@ std::vector<repl::MutableOplogEntry> buildMoveChunkOplogEntries(
 
     {
         repl::MutableOplogEntry oplogEntry;
-        StringData opName("moveChunk");
+        std::string_view opName("moveChunk");
 
         oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
         oplogEntry.setNss(collName);

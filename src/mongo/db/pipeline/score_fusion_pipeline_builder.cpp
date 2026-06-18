@@ -42,10 +42,12 @@
 #include "mongo/db/pipeline/pipeline.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 // The ScoreFusionScoringOptions class validates and stores the normalization,
 // combination.method, and combination.expression fields. combination.expression is not
@@ -159,12 +161,12 @@ private:
  */
 boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const StringData inputPipelineName,
+    const std::string_view inputPipelineName,
     const ScoreFusionNormalizationEnum normalization,
     const double weight) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         {
             const std::string internalFieldsInputPipelineScoreName =
                 hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
@@ -174,7 +176,7 @@ boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
                 addFieldsBob.subobjStart(internalFieldsInputPipelineScoreName));
             {
                 BSONObj scorePath = BSON("$meta" << "score");
-                BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"_sd));
+                BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"sv));
                 BSONObj normalizationScorePath;
                 switch (normalization) {
                     case ScoreFusionNormalizationEnum::kSigmoid:
@@ -211,14 +213,15 @@ boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
  * }
  */
 boost::intrusive_ptr<DocumentSource> buildRawScoreAddFieldsStage(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const StringData inputPipelineName) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const std::string_view inputPipelineName) {
     BSONObjBuilder bob;
     {
         const std::string internalFieldsInputPipelineRawScoreName =
             hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
                 ScoreFusionPipelineBuilder::kScoreFusionInternalFieldsName,
                 fmt::format("{}_rawScore", inputPipelineName));
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         addFieldsBob.append(internalFieldsInputPipelineRawScoreName, BSON("$meta" << "score"));
     }
     const BSONObj spec = bob.obj();
@@ -235,14 +238,14 @@ boost::intrusive_ptr<DocumentSource> buildRawScoreAddFieldsStage(
  */
 boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const StringData inputPipelinePrefix,
+    const std::string_view inputPipelinePrefix,
     const bool inputGeneratesScoreDetails) {
     const std::string scoreDetails = hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
         ScoreFusionPipelineBuilder::kScoreFusionInternalFieldsName,
         fmt::format("{}_scoreDetails", inputPipelinePrefix));
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
 
         if (inputGeneratesScoreDetails) {
             // If the input pipeline generates scoreDetails (for example, $search may generate
@@ -270,7 +273,7 @@ boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
  * comment for what the possible values for <inputPipelineName>_scoreDetails are.
  */
 std::list<boost::intrusive_ptr<DocumentSource>> buildInputPipelineScoreDetails(
-    const StringData inputPipelineName,
+    const std::string_view inputPipelineName,
     const bool inputGeneratesScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     boost::intrusive_ptr<DocumentSource> rawScoreAddFields =
@@ -305,7 +308,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildInputPipelineScoreDetails(
  * $unionWith).
  */
 boost::intrusive_ptr<DocumentSource> builtSetWindowFieldsStageForMinMaxScalerNormalization(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const StringData inputPipelineName) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const std::string_view inputPipelineName) {
     const std::string internalFieldsScore =
         hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
             ScoreFusionPipelineBuilder::kScoreFusionInternalFieldsName,
@@ -421,7 +425,7 @@ boost::intrusive_ptr<DocumentSource> buildSetFinalCombinedScoreStage(
  */
 boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
     const ScoreFusionScoringOptions scoreFusionScoringOptions,
-    const StringData scoreFusionScoreDetailsDescription,
+    const std::string_view scoreFusionScoreDetailsDescription,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     BSONObjBuilder combinationBob(
         BSON("method" << scoreFusionScoringOptions.getCombinationMethodString(
@@ -456,10 +460,10 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
  * weight, and value).
  */
 void ScoreFusionPipelineBuilder::constructCalculatedFinalScoreDetailsStageSpecificScoreDetails(
-    BSONObjBuilder& bob, StringData pipelineName, double weight) {
-    bob.append("inputPipelineRawScore"_sd, fmt::format("${}_rawScore", pipelineName));
-    bob.append("weight"_sd, weight);
-    bob.append("value"_sd, fmt::format("${}_score", pipelineName));
+    BSONObjBuilder& bob, std::string_view pipelineName, double weight) {
+    bob.append("inputPipelineRawScore"sv, fmt::format("${}_rawScore", pipelineName));
+    bob.append("weight"sv, weight);
+    bob.append("value"sv, fmt::format("${}_score", pipelineName));
 }
 
 /**
@@ -477,7 +481,7 @@ void ScoreFusionPipelineBuilder::constructCalculatedFinalScoreDetailsStageSpecif
  */
 std::list<boost::intrusive_ptr<DocumentSource>>
 ScoreFusionPipelineBuilder::buildInputPipelineDesugaringStages(
-    StringData inputPipelineOneName,
+    std::string_view inputPipelineOneName,
     double weight,
     const std::unique_ptr<Pipeline>& pipeline,
     bool inputGeneratesScoreDetails,
@@ -560,7 +564,7 @@ ScoreFusionPipelineBuilder::buildScoreAndMergeStages(
 }
 
 std::string ScoreFusionPipelineBuilder::getScoreDetailsScalarFieldName(
-    StringData pipelineName) const {
+    std::string_view pipelineName) const {
     // The raw (pre-normalization, pre-weighting) score for each input pipeline is the
     // stage-specific scalar preserved for scoreDetails output.
     return fmt::format("{}_rawScore", pipelineName);

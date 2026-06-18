@@ -34,10 +34,12 @@
 #include "mongo/util/assert_util.h"
 
 #include <iostream>
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 boost::optional<NamespaceString> convertedNss(ChangeStreamType type,
@@ -87,15 +89,16 @@ boost::optional<NamespaceString> ChangeStream::getNamespace() const {
 }
 
 std::string ChangeStream::toString() const {
-    StringData mode = _mode == ChangeStreamReadMode::kStrict ? "strict" : "ignoreRemovedShards";
-    StringData type = [&]() -> StringData {
+    std::string_view mode =
+        _mode == ChangeStreamReadMode::kStrict ? "strict" : "ignoreRemovedShards";
+    std::string_view type = [&]() -> std::string_view {
         switch (_type) {
             case ChangeStreamType::kAllDatabases:
-                return "all-databases"_sd;
+                return "all-databases"sv;
             case ChangeStreamType::kDatabase:
-                return "database"_sd;
+                return "database"sv;
             case ChangeStreamType::kCollection:
-                return "collection"_sd;
+                return "collection"sv;
         }
         MONGO_UNREACHABLE_TASSERT(10657559);
     }();

@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/petrick.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <vector>

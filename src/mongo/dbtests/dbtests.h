@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -37,6 +36,8 @@
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -54,7 +55,7 @@ class WriteContextForTests {
     WriteContextForTests& operator=(const WriteContextForTests&) = delete;
 
 public:
-    WriteContextForTests(OperationContext* opCtx, StringData ns);
+    WriteContextForTests(OperationContext* opCtx, std::string_view ns);
 
     Database* db() const {
         return _autoDb->getDb();

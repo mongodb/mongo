@@ -38,6 +38,7 @@
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -47,7 +48,7 @@ public:
     Status initialize() override {
         return Status::OK();
     }
-    Status step(StringData, std::string*) override {
+    Status step(std::string_view, std::string*) override {
         return Status::OK();
     }
     bool isSuccess() const override {

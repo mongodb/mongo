@@ -33,10 +33,13 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/storage_engine.h"
 
+#include <string_view>
+
 namespace mongo {
-static constexpr StringData kIndexNameFieldName = "name"_sd;
-static constexpr StringData kUniqueFieldName = "unique"_sd;
-static constexpr StringData kKeyFieldName = "key"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr std::string_view kIndexNameFieldName = "name"sv;
+static constexpr std::string_view kUniqueFieldName = "unique"sv;
+static constexpr std::string_view kKeyFieldName = "key"sv;
 
 namespace {
 
@@ -50,7 +53,9 @@ bool usesConstraintViolationsTracker(const BSONObj& spec) {
 IndexBuildInfo::IndexBuildInfo(BSONObj specObj, boost::optional<std::string> idxIdent)
     : spec(std::move(specObj)), indexIdent(idxIdent.value_or("")) {}
 
-IndexBuildInfo::IndexBuildInfo(BSONObj specObj, StringData idxIdent, StorageEngine& storageEngine)
+IndexBuildInfo::IndexBuildInfo(BSONObj specObj,
+                               std::string_view idxIdent,
+                               StorageEngine& storageEngine)
     : spec(std::move(specObj)), indexIdent(idxIdent) {
     setInternalIdents(storageEngine);
 }
@@ -62,7 +67,7 @@ IndexBuildInfo::IndexBuildInfo(BSONObj specObj,
     setInternalIdents(storageEngine);
 }
 
-StringData IndexBuildInfo::getIndexName() const {
+std::string_view IndexBuildInfo::getIndexName() const {
     return spec.getStringField(kIndexNameFieldName);
 }
 

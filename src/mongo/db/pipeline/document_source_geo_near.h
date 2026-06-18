@@ -50,6 +50,7 @@
 #include <list>
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -92,11 +93,11 @@ public:
 
 class DocumentSourceGeoNear : public DocumentSource {
 public:
-    static constexpr StringData kKeyFieldName = "key"_sd;
-    static constexpr StringData kStageName = "$geoNear"_sd;
-    static constexpr StringData kDistanceFieldFieldName = "distanceField"_sd;
-    static constexpr StringData kIncludeLocsFieldName = "includeLocs"_sd;
-    static constexpr StringData kNearFieldName = "near"_sd;
+    static constexpr std::string_view kKeyFieldName = "key"_sd;
+    static constexpr std::string_view kStageName = "$geoNear"_sd;
+    static constexpr std::string_view kDistanceFieldFieldName = "distanceField"_sd;
+    static constexpr std::string_view kIncludeLocsFieldName = "includeLocs"_sd;
+    static constexpr std::string_view kNearFieldName = "near"_sd;
 
     /**
      * Only exposed for testing.
@@ -104,7 +105,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceGeoNear> create(
         const boost::intrusive_ptr<ExpressionContext>&);
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return DocumentSourceGeoNear::kStageName;
     }
 
@@ -211,7 +212,7 @@ public:
      * Converts this $geoNear aggregation stage into an equivalent $near or $nearSphere query on
      * 'nearFieldName'.
      */
-    BSONObj asNearQuery(StringData nearFieldName);
+    BSONObj asNearQuery(std::string_view nearFieldName);
 
     /**
      * In a sharded cluster, this becomes a merge sort by distance, from nearest to furthest.

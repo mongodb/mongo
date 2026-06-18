@@ -65,6 +65,7 @@
 #include <iterator>
 #include <list>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -384,14 +385,14 @@ std::unique_ptr<Pipeline> ChangeStreamStageTest::buildTestPipeline(
 }
 
 std::unique_ptr<Pipeline> ChangeStreamStageTest::buildTestPipelineForCollection(
-    const std::vector<BSONObj>& rawPipeline, StringData ns) {
+    const std::vector<BSONObj>& rawPipeline, std::string_view ns) {
     getExpCtx()->setNamespaceString(
         NamespaceString::createNamespaceString_forTest(boost::none, ns));
     return buildTestPipeline(rawPipeline);
 }
 
 std::unique_ptr<Pipeline> ChangeStreamStageTest::buildTestPipelineForDatabase(
-    const std::vector<BSONObj>& rawPipeline, StringData ns) {
+    const std::vector<BSONObj>& rawPipeline, std::string_view ns) {
     getExpCtx()->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, ns)));
     return buildTestPipeline(rawPipeline);

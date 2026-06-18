@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -42,6 +41,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -75,7 +75,7 @@ TEST_F(DDLLockManagerTest, LockNormalCollection) {
     ScopedSetShardRole shardRole(operationContext(), nss, boost::none, _dbVersion);
 
     {
-        const StringData reason;
+        const std::string_view reason;
         DDLLockManager::ScopedCollectionDDLLock ddlLock(operationContext(), nss, reason, MODE_X);
 
         ASSERT_TRUE(
@@ -97,7 +97,7 @@ TEST_F(DDLLockManagerTest, LockTimeseriesBucketsCollection) {
     ScopedSetShardRole shardRole(operationContext(), bucketsNss, boost::none, _dbVersion);
 
     {
-        StringData reason;
+        std::string_view reason;
         DDLLockManager::ScopedCollectionDDLLock ddlLock(
             operationContext(), bucketsNss, reason, MODE_X);
 
@@ -152,7 +152,8 @@ TEST_F(DDLLockManagerTest, TryLockCollection) {
 
     const auto nss = NamespaceString::createNamespaceString_forTest(_dbName, "foo");
     ScopedSetShardRole shardRole(operationContext(), nss, boost::none, _dbVersion);
-    DDLLockManager::ScopedCollectionDDLLock ddlLock(operationContext(), nss, StringData{}, MODE_S);
+    DDLLockManager::ScopedCollectionDDLLock ddlLock(
+        operationContext(), nss, std::string_view{}, MODE_S);
 
     const auto tryLock = [&](LockMode mode, bool shouldSuccess) {
         auto newClient =

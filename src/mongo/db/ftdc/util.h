@@ -43,13 +43,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 #include <boost/filesystem/path.hpp>
 
 namespace mongo {
 
-MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kFTDCThreadName = "ftdc"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kFTDCThreadName = "ftdc"_sd;
 
 /**
  * Utilities for inflating and deflating BSON documents and metric arrays

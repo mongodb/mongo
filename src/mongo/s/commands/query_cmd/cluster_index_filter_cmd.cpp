@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -56,6 +55,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -76,7 +76,7 @@ public:
     /**
      * Instantiates a command that can be invoked by "name", which will be described by "helpText".
      */
-    ClusterIndexFilterCmd(StringData name, std::string helpText)
+    ClusterIndexFilterCmd(std::string_view name, std::string helpText)
         : BasicCommand(name), _helpText(std::move(helpText)) {}
 
     std::string help() const override {

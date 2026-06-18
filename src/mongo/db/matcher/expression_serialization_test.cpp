@@ -29,20 +29,10 @@
 
 // Unit tests for MatchExpression::serialize serialization.
 
-#include <array>
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-
-#include <fmt/format.h>
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -77,15 +67,24 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <array>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
 
-using std::string;
-using std::unique_ptr;
+using namespace std::literals::string_view_literals;
 
 BSONObj serialize(MatchExpression* match) {
     return match->serialize();
@@ -167,8 +166,8 @@ TEST(SerializeBasic, NonLeafDollarPrefixedPathSerializesShapeCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     auto baseOperandVal = BSON("$gt" << 5);
-    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperandVal["$gt"]);
-    auto elemMatchValExpr = std::make_unique<ElemMatchValueMatchExpression>("$a"_sd);
+    auto gt = std::make_unique<GTMatchExpression>(""sv, baseOperandVal["$gt"]);
+    auto elemMatchValExpr = std::make_unique<ElemMatchValueMatchExpression>("$a"sv);
     elemMatchValExpr->add(std::move(gt));
 
     query_shape::SerializationOptions opts;
@@ -647,7 +646,7 @@ TEST(SerializeInternalSchema, CondMatchRedactsCorrectly) {
 }
 
 TEST(SerializeInternalSchema, FmodMatchRedactsCorrectly) {
-    InternalSchemaFmodMatchExpression m("a"_sd, Decimal128(1.7), Decimal128(2));
+    InternalSchemaFmodMatchExpression m("a"sv, Decimal128(1.7), Decimal128(2));
     auto opts = query_shape::SerializationOptions{
         query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     BSONObjBuilder bob;
@@ -686,7 +685,7 @@ TEST(SerializeInternalSchema, MatchArrayIndexRedactsCorrectly) {
 }
 
 TEST(SerializeInternalSchema, MaxItemsRedactsCorrectly) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a.b"_sd, 2);
+    InternalSchemaMaxItemsMatchExpression maxItems("a.b"sv, 2);
     auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaMaxItems":"?number"})",
@@ -694,7 +693,7 @@ TEST(SerializeInternalSchema, MaxItemsRedactsCorrectly) {
 }
 
 TEST(SerializeInternalSchema, MaxLengthRedactsCorrectly) {
-    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"sv, 2);
     auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaMaxLength":"?number"})",
@@ -702,7 +701,7 @@ TEST(SerializeInternalSchema, MaxLengthRedactsCorrectly) {
 }
 
 TEST(SerializeInternalSchema, MinItemsRedactsCorrectly) {
-    InternalSchemaMinItemsMatchExpression minItems("a.b"_sd, 2);
+    InternalSchemaMinItemsMatchExpression minItems("a.b"sv, 2);
     auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -711,7 +710,7 @@ TEST(SerializeInternalSchema, MinItemsRedactsCorrectly) {
 }
 
 TEST(SerializeInternalSchema, MinLengthRedactsCorrectly) {
-    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
+    InternalSchemaMinLengthMatchExpression minLength("a"sv, 2);
     auto opts = query_shape::SerializationOptions{
         query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -770,7 +769,7 @@ TEST(SerializeInternalSchema, BinDataEncryptedTypeRedactsCorrectly) {
     MatcherTypeSet typeSet;
     typeSet.bsonTypes.insert(BSONType::string);
     typeSet.bsonTypes.insert(BSONType::date);
-    InternalSchemaBinDataEncryptedTypeExpression e("a"_sd, std::move(typeSet));
+    InternalSchemaBinDataEncryptedTypeExpression e("a"sv, std::move(typeSet));
     auto opts = query_shape::SerializationOptions{
         query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -779,7 +778,7 @@ TEST(SerializeInternalSchema, BinDataEncryptedTypeRedactsCorrectly) {
 }
 
 TEST(SerializeInternalSchema, BinDataFLE2EncryptedTypeRedactsCorrectly) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression e("ssn"_sd, BSONType::string);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression e("ssn"sv, BSONType::string);
     auto opts = query_shape::SerializationOptions{
         query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -803,7 +802,7 @@ TEST(SerializesInternalSchema, EqRedactsCorrectly) {
     auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto query = fromjson("{$_internalSchemaEq: {a:1, b: {c: 1, d: [1]}}}");
     BSONObjBuilder bob;
-    InternalSchemaEqMatchExpression e("a"_sd, query.firstElement());
+    InternalSchemaEqMatchExpression e("a"sv, query.firstElement());
     e.serialize(&bob, opts);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({

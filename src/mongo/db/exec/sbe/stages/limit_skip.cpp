@@ -29,23 +29,24 @@
 
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,
                                std::unique_ptr<EExpression> limit,
                                std::unique_ptr<EExpression> skip,
                                PlanNodeId planNodeId,
                                bool participateInTrialRunTracking)
-    : PlanStage(!skip ? "limit"_sd : "limitskip"_sd,
+    : PlanStage(!skip ? "limit"sv : "limitskip"sv,
                 nullptr /* yieldPolicy */,
                 planNodeId,
                 participateInTrialRunTracking),

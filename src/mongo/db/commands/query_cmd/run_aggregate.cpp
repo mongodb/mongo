@@ -36,7 +36,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -143,6 +142,7 @@
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -158,6 +158,7 @@ using NamespaceStringSet = stdx::unordered_set<NamespaceString>;
 
 Counter64& allowDiskUseFalseCounter = *MetricBuilder<Counter64>{"query.allowDiskUseFalse"};
 namespace {
+using namespace std::literals::string_view_literals;
 // Ticks for server-side Javascript deprecation log messages.
 Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 
@@ -663,7 +664,7 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
                 // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code
                 // which relies on this parameter does not distinguish/care about the difference so
                 // we simply always pass 'aggregate'.
-                resourceYielder ? resourceYielder->make(opCtx, "aggregate"_sd) : nullptr);
+                resourceYielder ? resourceYielder->make(opCtx, "aggregate"sv) : nullptr);
             pipelines.emplace_back(Pipeline::create({consumer}, expCtx));
         }
     } else {

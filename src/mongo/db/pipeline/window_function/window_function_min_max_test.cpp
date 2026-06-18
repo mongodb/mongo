@@ -29,17 +29,19 @@
 
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WindowFunctionMinMaxTest : public AggregationContextFixture {
 public:
@@ -150,8 +152,8 @@ TEST_F(WindowFunctionMinMaxTest, Ties) {
     // because that would break the invariant that 'add(x); add(y); remove(x)' is equivalent to
     // 'add(y)'.
 
-    auto x = Value{"foo"_sd};
-    auto y = Value{"FOO"_sd};
+    auto x = Value{"foo"sv};
+    auto y = Value{"FOO"sv};
     // x and y are distinguishable,
     ASSERT_VALUE_NE(x, y);
     // but they compare equal according to the ordering.
@@ -172,7 +174,7 @@ TEST_F(WindowFunctionMinMaxTest, TracksMemoryUsageOnAddAndRemove) {
     size_t trackingSize = sizeof(WindowFunctionMin);
     ASSERT_EQ(min.getApproximateSize(), trackingSize);
 
-    auto largeStr = Value{"this is quite a long string"_sd};
+    auto largeStr = Value{"this is quite a long string"sv};
     min.add(largeStr);
     trackingSize += largeStr.getApproximateSize();
     ASSERT_EQ(min.getApproximateSize(), trackingSize);

@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -61,6 +60,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -154,7 +154,7 @@ public:
      * extra settings when 'isOplog' is true.
      */
     static std::string generateCreateString(
-        StringData tableName,
+        std::string_view tableName,
         const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
         bool isOplog = false);
 
@@ -179,8 +179,8 @@ public:
 
     bool isColdCollection() const override;
 
-    StringData getURI() const {
-        return std::visit([](const auto& v) -> StringData { return v.uri(); }, _container);
+    std::string_view getURI() const {
+        return std::visit([](const auto& v) -> std::string_view { return v.uri(); }, _container);
     }
 
     uint64_t tableId() const {

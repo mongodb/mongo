@@ -38,6 +38,8 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -113,7 +115,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalListCollections::optimiz
     }
 }
 
-StringData DocumentSourceInternalListCollections::getSourceName() const {
+std::string_view DocumentSourceInternalListCollections::getSourceName() const {
     return kStageName;
 }
 

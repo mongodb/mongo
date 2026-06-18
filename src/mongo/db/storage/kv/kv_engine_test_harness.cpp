@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -66,6 +65,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -181,7 +181,7 @@ protected:
     std::string getIndexIdent(OperationContext* opCtx,
                               MDBCatalog* catalog,
                               RecordId catalogId,
-                              StringData idxName) {
+                              std::string_view idxName) {
         Lock::GlobalLock globalLk(opCtx, MODE_IS);
         return catalog->getIndexIdent(opCtx, catalogId, idxName);
     }
@@ -234,7 +234,7 @@ protected:
 
     std::unique_ptr<RecordStore> newRecordStore(KVEngine* engine,
                                                 const NamespaceString& nss,
-                                                StringData ident,
+                                                std::string_view ident,
                                                 const RecordStore::Options& recordStoreOptions,
                                                 boost::optional<UUID> uuid) {
         auto opCtx = _makeOperationContext(engine);

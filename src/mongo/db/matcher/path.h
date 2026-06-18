@@ -31,7 +31,6 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
@@ -40,6 +39,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -91,7 +91,7 @@ public:
         kMatchSubpath,
     };
 
-    ElementPath(StringData path,
+    ElementPath(std::string_view path,
                 LeafArrayBehavior leafArrayBehavior = LeafArrayBehavior::kTraverse,
                 NonLeafArrayBehavior nonLeafArrayBehavior = NonLeafArrayBehavior::kTraverse)
         : _leafArrayBehavior(leafArrayBehavior),
@@ -102,7 +102,7 @@ public:
      * Resets this ElementPath to 'newPath'. Note that this method will make a copy of 'newPath'
      * such that there's no lifetime requirements for the string which 'newPath' points into.
      */
-    void reset(StringData newPath) {
+    void reset(std::string_view newPath) {
         _fieldRef.parse(newPath);
     }
 
@@ -270,13 +270,13 @@ private:
         bool more();
         BSONElement next();
 
-        bool isArrayOffsetMatch(StringData fieldName) const;
+        bool isArrayOffsetMatch(std::string_view fieldName) const;
         bool nextEntireRest() const {
             return nextPieceOfPath.size() == restOfPath.size();
         }
 
         std::string restOfPath;
-        StringData nextPieceOfPath;
+        std::string_view nextPieceOfPath;
         bool hasMore;
         bool nextPieceOfPathIsNumber;
 
@@ -295,7 +295,7 @@ private:
 
 struct BSONElementSubIterator {
     BSONElementSubIterator(const BSONObj& objectToIterate,
-                           StringData pathToIterate,
+                           std::string_view pathToIterate,
                            ElementPath::LeafArrayBehavior leafArrayBehavior =
                                ElementPath::LeafArrayBehavior::kTraverse,
                            ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior =

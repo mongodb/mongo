@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/options_parser/option_section.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo::workload_simulation {
@@ -48,7 +48,8 @@ extern SimulatorParams simulatorGlobalParams;
 
 Status addSimulatorOptions(optionenvironment::OptionSection* options);
 
-std::string getSimulatorHelp(StringData name, const optionenvironment::OptionSection& options);
+std::string getSimulatorHelp(std::string_view name,
+                             const optionenvironment::OptionSection& options);
 
 /**
  * Handle options that should come before validation, such as "help".

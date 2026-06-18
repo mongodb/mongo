@@ -30,7 +30,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"

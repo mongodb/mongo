@@ -34,6 +34,7 @@
 #include "mongo/db/extension/sdk/test_extension_factory.h"
 
 #include <memory>
+#include <string_view>
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;

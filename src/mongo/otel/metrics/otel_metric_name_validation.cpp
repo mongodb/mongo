@@ -32,6 +32,8 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/util/pcre.h"
 
+#include <string_view>
+
 namespace mongo::otel::metrics {
 
 namespace {
@@ -41,8 +43,8 @@ namespace {
 // Mixing the two styles within a single segment is disallowed. Underscores in snake_case
 // must be followed by at least one alphanumeric character, so trailing underscores and
 // consecutive underscores are rejected.
-constexpr StringData kSnakeCasePattern = "[a-z0-9]*(?:_[a-z0-9]+)*";
-constexpr StringData kCamelCasePattern = "[a-zA-Z0-9]*";
+constexpr std::string_view kSnakeCasePattern = "[a-z0-9]*(?:_[a-z0-9]+)*";
+constexpr std::string_view kCamelCasePattern = "[a-zA-Z0-9]*";
 std::string segmentPattern() {
     return fmt::format("[a-z](?:{0}|{1})", kSnakeCasePattern, kCamelCasePattern);
 }
@@ -57,7 +59,7 @@ const pcre::Regex& nameRegex() {
 }
 }  // namespace
 
-Status validateOtelMetricName(StringData name) {
+Status validateOtelMetricName(std::string_view name) {
     if (name.empty()) {
         return {ErrorCodes::InvalidOptions, "OpenTelemetry metric name cannot be empty"};
     }

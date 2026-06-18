@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -47,6 +46,7 @@ struct JSRegEx;
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include <jsapi.h>
 
@@ -73,7 +73,7 @@ public:
      * toNumber()
      */
     std::string toString();
-    StringData toStringData(JSStringWrapper* jsstr);
+    std::string_view toStringData(JSStringWrapper* jsstr);
     int type();
     double toNumber();
     int32_t toInt32();
@@ -100,7 +100,7 @@ public:
      * Look in toBSON on ObjectWrapper for the top of that loop.
      */
     void writeThis(BSONObjBuilder* b,
-                   StringData sd,
+                   std::string_view sd,
                    ObjectWrapper::WriteFieldRecursionFrames* frames);
 
     void setOriginalBSON(BSONObj* obj);
@@ -110,7 +110,7 @@ private:
      * Writes the object into a bsonobjbuilder under the name in sd.
      */
     void _writeObject(BSONObjBuilder* b,
-                      StringData sd,
+                      std::string_view sd,
                       ObjectWrapper::WriteFieldRecursionFrames* frames);
 
     JSContext* _context;

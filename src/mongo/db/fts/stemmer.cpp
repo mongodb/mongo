@@ -33,6 +33,7 @@
 
 #include <cstdlib>
 #include <string>
+#include <string_view>
 
 #include <libstemmer.h>
 
@@ -42,15 +43,15 @@ class Stemmer::Impl {
 public:
     explicit Impl(const FTSLanguage* language) : _stemmer{_makeStemmer(language->str())} {}
 
-    StringData stem(StringData word) const {
+    std::string_view stem(std::string_view word) const {
         auto st = _stemmer.get();
         if (!st)
             return word;
         auto sym =
             sb_stemmer_stem(st, reinterpret_cast<const sb_symbol*>(word.data()), word.size());
         invariant(sym);
-        return StringData{reinterpret_cast<const char*>(sym),
-                          static_cast<size_t>(sb_stemmer_length(st))};
+        return std::string_view{reinterpret_cast<const char*>(sym),
+                                static_cast<size_t>(sb_stemmer_length(st))};
     }
 
 private:
@@ -73,7 +74,7 @@ Stemmer::Stemmer(const FTSLanguage* language) : _impl{std::make_unique<Impl>(lan
 
 Stemmer::~Stemmer() = default;
 
-StringData Stemmer::stem(StringData word) const {
+std::string_view Stemmer::stem(std::string_view word) const {
     return _impl->stem(word);
 }
 

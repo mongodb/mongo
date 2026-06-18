@@ -34,7 +34,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -92,6 +91,7 @@
 #include <memory>
 #include <ratio>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -1744,7 +1744,7 @@ protected:
     }
 
     static void assertClientReportStateFields(BSONObj doc, std::string appName, int connectionId) {
-        ASSERT_EQ(StringData(doc.getStringField("appName")), appName);
+        ASSERT_EQ(std::string_view(doc.getStringField("appName")), appName);
         ASSERT_EQ(doc.getIntField("connectionId"), connectionId);
 
         auto expectedDriverName = std::string("DriverName").insert(0, appName);
@@ -1756,13 +1756,13 @@ protected:
 
         ASSERT_TRUE(doc.hasField("clientMetadata"));
         auto driver = doc.getObjectField("clientMetadata").getObjectField("driver");
-        ASSERT_EQ(StringData(driver.getStringField("name")), expectedDriverName);
-        ASSERT_EQ(StringData(driver.getStringField("version")), expectedDriverVersion);
+        ASSERT_EQ(std::string_view(driver.getStringField("name")), expectedDriverName);
+        ASSERT_EQ(std::string_view(driver.getStringField("version")), expectedDriverVersion);
         auto os = doc.getObjectField("clientMetadata").getObjectField("os");
-        ASSERT_EQ(StringData(os.getStringField("type")), expectedOsType);
-        ASSERT_EQ(StringData(os.getStringField("name")), expectedOsName);
-        ASSERT_EQ(StringData(os.getStringField("architecture")), expectedOsArch);
-        ASSERT_EQ(StringData(os.getStringField("version")), expectedOsVersion);
+        ASSERT_EQ(std::string_view(os.getStringField("type")), expectedOsType);
+        ASSERT_EQ(std::string_view(os.getStringField("name")), expectedOsName);
+        ASSERT_EQ(std::string_view(os.getStringField("architecture")), expectedOsArch);
+        ASSERT_EQ(std::string_view(os.getStringField("version")), expectedOsVersion);
     }
 
     Date_t advanceClockSourceAndReturnNewNow() {
@@ -3003,7 +3003,7 @@ TEST_F(TransactionCoordinatorMetricsTest, ClientInformationIncludedInReportState
         BSONObjBuilder builder;
         coordinator->reportState(operationContext(), builder);
         BSONObj reportDoc = builder.obj();
-        ASSERT_EQ(StringData(reportDoc.getStringField("desc")), "transaction coordinator");
+        ASSERT_EQ(std::string_view(reportDoc.getStringField("desc")), "transaction coordinator");
         assertClientReportStateFields(reportDoc, expectedAppName, getClient()->getConnectionId());
     }
 
@@ -3016,7 +3016,7 @@ TEST_F(TransactionCoordinatorMetricsTest, ClientInformationIncludedInReportState
         BSONObjBuilder builder;
         coordinator->reportState(operationContext(), builder);
         BSONObj reportDoc = builder.obj();
-        ASSERT_EQ(StringData(reportDoc.getStringField("desc")), "transaction coordinator");
+        ASSERT_EQ(std::string_view(reportDoc.getStringField("desc")), "transaction coordinator");
         assertClientReportStateFields(reportDoc, expectedAppName2, getClient()->getConnectionId());
     }
 

@@ -32,12 +32,15 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
-static constexpr StringData kNormalString = "normal"_sd;
-static constexpr StringData kLowString = "low"_sd;
-static constexpr StringData kExemptString = "exempt"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr std::string_view kNormalString = "normal"sv;
+static constexpr std::string_view kLowString = "low"sv;
+static constexpr std::string_view kExemptString = "exempt"sv;
 }  // namespace
 
 AdmissionContext::AdmissionContext(const AdmissionContext& other)
@@ -127,7 +130,7 @@ ScopedAdmissionPriorityBase::~ScopedAdmissionPriorityBase() {
     _admCtx->_priority.store(_originalPriority);
 }
 
-StringData toString(AdmissionContext::Priority priority) {
+std::string_view toString(AdmissionContext::Priority priority) {
     switch (priority) {
         case AdmissionContext::Priority::kNormal:
             return kNormalString;

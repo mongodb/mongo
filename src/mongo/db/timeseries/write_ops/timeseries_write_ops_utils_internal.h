@@ -38,6 +38,7 @@
 #include "mongo/util/tracking/allocator.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -105,7 +106,7 @@ BSONObj makeBSONColumnDocDiff(
 BSONObj makeTimeseriesInsertCompressedBucketDocument(
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     const std::vector<
-        std::pair<StringData, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>&
+        std::pair<std::string_view, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>&
         intermediates);
 
 /**

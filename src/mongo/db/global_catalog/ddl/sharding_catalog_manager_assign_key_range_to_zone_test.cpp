@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -62,12 +61,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly);
 
@@ -463,8 +464,8 @@ TEST_F(AssignKeyRangeToZoneTestFixture, PrefixIsNotAllowedOnUnshardedColl) {
 TEST_F(AssignKeyRangeToZoneTestFixture, TimeseriesCollMustHaveTimeKeyRangeMinKey) {
     const NamespaceString ns =
         NamespaceString::createNamespaceString_forTest("test.system.buckets.timeseries");
-    const StringData metaField = "meta"_sd;
-    const StringData timeField = "time"_sd;
+    const std::string_view metaField = "meta"sv;
+    const std::string_view timeField = "time"sv;
     const std::string controlTimeField =
         std::string{timeseries::kControlMinFieldNamePrefix} + std::string(timeField);
     const TimeseriesOptions timeseriesOptions(std::string{timeField});

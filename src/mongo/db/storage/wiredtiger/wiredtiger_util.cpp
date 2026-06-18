@@ -45,6 +45,7 @@
 #include "mongo/util/testing_proctor.h"
 
 #include <algorithm>
+#include <string_view>
 
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -69,7 +70,7 @@ const std::string kTableExtension = ".wt";
 const std::string kWiredTigerBackupFile = "WiredTiger.backup";
 const static StaticImmortal<pcre::Regex> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
 
-StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
+StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, std::string_view uri) {
     std::string strUri = std::string{uri};
     cursor->set_key(cursor, strUri.c_str());
     int ret = cursor->search(cursor);
@@ -108,7 +109,7 @@ WT_CURSOR* _getMaybeCachedCursor(WiredTigerSession& session,
 
 using std::string;
 
-std::string WiredTigerUtil::buildTableUri(StringData ident) {
+std::string WiredTigerUtil::buildTableUri(std::string_view ident) {
     invariant(ident.find(kTableUriPrefix) == string::npos);
     invariant(ident::isValidIdent(ident), ident);
     return std::string{kTableUriPrefix} + std::string{ident};
@@ -138,7 +139,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerSession& session,
 }
 
 StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerSession& session,
-                                                          StringData uri) {
+                                                          std::string_view uri) {
     WT_CURSOR* cursor = _getMaybeCachedCursor(session, "metadata:create", kMetadataCreateTableId);
     ScopeGuard releaser = [&] {
         session.releaseCursor(kMetadataCreateTableId, cursor, "");
@@ -146,7 +147,8 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerSession& ses
     return _getMetadata(cursor, uri);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, StringData uri) {
+StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session,
+                                                    std::string_view uri) {
     WT_CURSOR* cursor = _getMaybeCachedCursor(session, "metadata:", kMetadataTableId);
     ScopeGuard releaser = [&] {
         session.releaseCursor(kMetadataTableId, cursor, "");
@@ -156,7 +158,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, 
 }
 
 StatusWith<std::string> WiredTigerUtil::getSourceMetadata(WiredTigerSession& session,
-                                                          StringData uri) {
+                                                          std::string_view uri) {
     if (uri.starts_with("file:")) {
         return getMetadata(session, uri);
     }
@@ -180,11 +182,11 @@ StatusWith<std::string> WiredTigerUtil::getSourceMetadata(WiredTigerSession& ses
     invariant(item.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING);
 
     // Get the metadata for the file
-    return _getMetadata(cursor, StringData(item.str, item.len));
+    return _getMetadata(cursor, std::string_view(item.str, item.len));
 }
 
 Status WiredTigerUtil::getApplicationMetadata(WiredTigerSession& session,
-                                              StringData uri,
+                                              std::string_view uri,
                                               BSONObjBuilder* bob) {
     StatusWith<std::string> metadataResult = getMetadata(session, uri);
     if (!metadataResult.isOK()) {
@@ -201,7 +203,7 @@ Status WiredTigerUtil::getApplicationMetadata(WiredTigerSession& session,
     if (appMetadata.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "app_metadata must be a nested struct. Actual value: "
-                                    << StringData(appMetadata.str, appMetadata.len));
+                                    << std::string_view(appMetadata.str, appMetadata.len));
     }
 
     WiredTigerConfigParser parser(appMetadata);
@@ -210,7 +212,7 @@ Status WiredTigerUtil::getApplicationMetadata(WiredTigerSession& session,
     int ret;
     StringDataSet keysSeen;
     while ((ret = parser.next(&keyItem, &valueItem)) == 0) {
-        const StringData key(keyItem.str, keyItem.len);
+        const std::string_view key(keyItem.str, keyItem.len);
         if (keysSeen.count(key)) {
             return Status(ErrorCodes::Error(50998),
                           str::stream() << "app_metadata must not contain duplicate keys. "
@@ -226,7 +228,7 @@ Status WiredTigerUtil::getApplicationMetadata(WiredTigerSession& session,
                 bob->appendNumber(key, static_cast<long long>(valueItem.val));
                 break;
             default:
-                bob->append(key, StringData(valueItem.str, valueItem.len));
+                bob->append(key, std::string_view(valueItem.str, valueItem.len));
                 break;
         }
     }
@@ -238,7 +240,7 @@ Status WiredTigerUtil::getApplicationMetadata(WiredTigerSession& session,
 }
 
 StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(WiredTigerSession& session,
-                                                           StringData uri) {
+                                                           std::string_view uri) {
     BSONObjBuilder bob;
     Status status = getApplicationMetadata(session, uri, &bob);
     if (!status.isOK()) {
@@ -248,7 +250,10 @@ StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(WiredTigerSession& se
 }
 
 StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(
-    WiredTigerSession& session, StringData uri, int64_t minimumVersion, int64_t maximumVersion) {
+    WiredTigerSession& session,
+    std::string_view uri,
+    int64_t minimumVersion,
+    int64_t maximumVersion) {
     StatusWith<std::string> result = getMetadata(session, uri);
     if (result == ErrorCodes::NoSuchKey) {
         return result.getStatus();
@@ -265,7 +270,7 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(
         return Status(ErrorCodes::FailedToParse,
                       str::stream()
                           << "application metadata must be enclosed in parentheses. Actual value: "
-                          << StringData(metadata.str, metadata.len));
+                          << std::string_view(metadata.str, metadata.len));
     }
 
     WiredTigerConfigParser parser(metadata);
@@ -282,7 +287,7 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(
         return Status(ErrorCodes::UnsupportedFormat,
                       str::stream() << "'formatVersion' in application metadata for " << uri
                                     << " must be a number. Current value: "
-                                    << StringData(versionItem.str, versionItem.len));
+                                    << std::string_view(versionItem.str, versionItem.len));
     }
 
     if (version < minimumVersion || version > maximumVersion) {
@@ -619,7 +624,7 @@ int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
     WiredTigerEventHandler* wtHandler = reinterpret_cast<WiredTigerEventHandler*>(handler);
 
     try {
-        StringData sd(message);
+        std::string_view sd(message);
         if (!wtHandler->wasStartupSuccessful()) {
             // During startup, storage tries different WiredTiger compatibility modes to determine
             // the state of the data files before FCV can be read. Suppress the error messages
@@ -826,9 +831,9 @@ int WiredTigerUtil::verifyTable(WiredTigerSession& session,
 }
 
 void WiredTigerUtil::validateTableLogging(WiredTigerSession& session,
-                                          StringData uri,
+                                          std::string_view uri,
                                           bool isLogged,
-                                          boost::optional<StringData> indexName,
+                                          boost::optional<std::string_view> indexName,
                                           ValidateResultsIf& validationResult) {
     if (gWiredTigerSkipTableLoggingChecksDuringValidation) {
         LOGV2(9264500,
@@ -1112,9 +1117,9 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
            cursor->get_value(cursor, &statisticDescription, nullptr, &statisticValue) == 0) {
         // The description returned by the statistics cursor of the format: "Category: Measurement",
         // like "cache: bytes read into cache" or "cache: bytes written from cache".
-        StringData key(statisticDescription);
-        StringData category;
-        StringData measurement;
+        std::string_view key(statisticDescription);
+        std::string_view category;
+        std::string_view measurement;
 
         // Attempt to split the description into the category and measurement if a category is
         // provided. Otherwise, attempt to use the first word of the description as the category.
@@ -1168,7 +1173,7 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
     return Status::OK();
 }
 
-StatusWith<std::string> WiredTigerUtil::generateImportString(StringData ident,
+StatusWith<std::string> WiredTigerUtil::generateImportString(std::string_view ident,
                                                              const BSONObj& storageMetadata,
                                                              bool panicOnCorruptWtMetadata,
                                                              bool repair) {
@@ -1451,7 +1456,7 @@ boost::optional<bool> WiredTigerConfigParser::isTableLoggingEnabled() const {
                   fmt::format("expected WT_NOTFOUND from WT_CONFIG_PARSER::get() but got {} "
                               "instead. Log key value: {}",
                               retCode,
-                              StringData{value.str, value.len}));
+                              std::string_view{value.str, value.len}));
         return boost::none;
     }
 
@@ -1489,7 +1494,7 @@ long long WiredTigerUtil::getCancelledCacheMetric_forTest() {
     return cancelledCacheMetric.get();
 }
 
-void WiredTigerUtil::logMetadata(WiredTigerSession& session, StringData uri) {
+void WiredTigerUtil::logMetadata(WiredTigerSession& session, std::string_view uri) {
     WT_CURSOR* cursor = _getMaybeCachedCursor(session, "metadata:", kMetadataTableId);
     ScopeGuard releaser = [&] {
         session.releaseCursor(kMetadataTableId, cursor, "");
@@ -1504,7 +1509,7 @@ void WiredTigerUtil::logMetadata(WiredTigerSession& session, StringData uri) {
     }
 }
 
-void WiredTigerUtil::truncate(WiredTigerRecoveryUnit& ru, StringData uri) {
+void WiredTigerUtil::truncate(WiredTigerRecoveryUnit& ru, std::string_view uri) {
     invariantWTOK(WT_OP_CHECK(ru.getSession()->truncate(uri.data(), nullptr, nullptr, nullptr)),
                   *ru.getSession());
 }

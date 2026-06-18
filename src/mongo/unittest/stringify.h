@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/optional_util.h"
@@ -43,6 +42,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <typeinfo>
@@ -60,7 +60,7 @@ namespace mongo::unittest::stringify {
 template <typename T>
 std::string invoke(const T& x);
 
-std::string formatTypedObj(const std::type_info& ti, StringData obj);
+std::string formatTypedObj(const std::type_info& ti, std::string_view obj);
 
 std::string lastResortFormat(const std::type_info& ti, const void* p, size_t sz);
 
@@ -151,8 +151,8 @@ std::string stringify_forTest(const T& x) {
         return doOstream(optional_io::Extension{x});
     } else if constexpr (HasToString<T>) {
         return x.toString();
-    } else if constexpr (std::is_convertible_v<T, StringData>) {
-        return doFormat(StringData(x));
+    } else if constexpr (std::is_convertible_v<T, std::string_view>) {
+        return doFormat(std::string_view(x));
     } else if constexpr (std::is_pointer_v<T>) {
         return doFormat(static_cast<const void*>(x));
     } else if constexpr (IsSequence<T>) {

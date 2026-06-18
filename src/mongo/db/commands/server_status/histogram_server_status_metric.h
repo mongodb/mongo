@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -89,7 +90,7 @@ struct ServerStatusMetricPolicySelection<HistogramServerStatusMetric> {
             return _v;
         }
 
-        void appendTo(BSONObjBuilder& bob, StringData leafName) const {
+        void appendTo(BSONObjBuilder& bob, std::string_view leafName) const {
             appendHistogram(bob, _v.hist(), leafName);
         }
 

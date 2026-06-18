@@ -44,6 +44,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace transport {
@@ -75,7 +76,7 @@ public:
 
     std::unique_ptr<TaskRunner> makeTaskRunner() override;
 
-    StringData getName() const override {
+    std::string_view getName() const override {
         return "ServiceExecutorReserved"_sd;
     }
 

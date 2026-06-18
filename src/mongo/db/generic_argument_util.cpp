@@ -36,11 +36,12 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(overrideInternalWriteConcernTimeout);
 
 WriteConcernOptions makeMajorityWriteConcernOptions(WriteConcernOptions::Timeout timeout) {
-    static constexpr auto fpFieldName = "wtimeoutMillis"_sd;
+    static constexpr auto fpFieldName = "wtimeoutMillis"sv;
 
     auto& fp = overrideInternalWriteConcernTimeout;
     fp.execute([&](const BSONObj& data) {

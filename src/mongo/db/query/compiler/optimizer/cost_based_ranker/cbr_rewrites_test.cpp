@@ -37,9 +37,12 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 
 namespace mongo::cost_based_ranker {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const BSONObj constantHolder = BSON_ARRAY(BSONArray() << BSONNULL << MINKEY << MAXKEY);
 const BSONElement emptyArrayElem = constantHolder["0"];
@@ -60,7 +63,7 @@ inline void ASSERT_EXPR(const char* expected, const std::unique_ptr<MatchExpress
 IndexBounds indexBoundsForTypeMatchExpression(const char* path, MatcherTypeSet types) {
     const auto keyPattern = BSON(path << 1);
     const auto index = buildSimpleIndexEntry({path});
-    const auto typeExpr = TypeMatchExpression(mongo::StringData(path), types);
+    const auto typeExpr = TypeMatchExpression(std::string_view(path), types);
     OrderedIntervalList oil;
     IndexBoundsBuilder::translate(&typeExpr, keyPattern[path], index, &oil);
     IndexBounds bounds;
@@ -90,7 +93,7 @@ TEST(CBRRewrites, TypeTrivial) {
          }) {
         const auto bounds = indexBoundsForTypeMatchExpression("a", type);
         const auto me = getMatchExpressionFromBounds(bounds, nullptr);
-        const auto expected = TypeMatchExpression("a"_sd, MatcherTypeSet(type));
+        const auto expected = TypeMatchExpression("a"sv, MatcherTypeSet(type));
         ASSERT_EXPR(expected, me);
     }
 }
@@ -103,8 +106,7 @@ TEST(CBRRewrites, TypeMinMaxKey) {
         const auto bounds = indexBoundsForTypeMatchExpression("a", type);
         const auto me = getMatchExpressionFromBounds(bounds, nullptr);
         ASSERT_EXPR(
-            EqualityMatchExpression("a"_sd, type == BSONType::minKey ? minKeyElem : maxKeyElem),
-            me);
+            EqualityMatchExpression("a"sv, type == BSONType::minKey ? minKeyElem : maxKeyElem), me);
     }
 }
 
@@ -127,7 +129,7 @@ TEST(CBRRewrites, TypeNumeric) {
 
 TEST(CBRRewrites, TypeStringSymbol) {
     for (const auto type : {BSONType::string, BSONType::symbol}) {
-        const auto typeExpr = TypeMatchExpression("a"_sd, type);
+        const auto typeExpr = TypeMatchExpression("a"sv, type);
         const auto bounds = indexBoundsForTypeMatchExpression("a", type);
         const auto me = getMatchExpressionFromBounds(bounds, &typeExpr);
         ASSERT_EXPR(typeExpr, me);
@@ -152,7 +154,7 @@ TEST(CBRRewrites, UndefinedPointEmptyArray) {
 
 // TODO(SERVER-105939): Enable this after implementing support for array equalities
 // TEST(CBRRewrites, AdditionalFilterArrayEquality) {
-//     const auto path = "a"_sd;
+//     const auto path = "a"sv;
 //     const auto keyPattern = BSON(path << 1);
 //     const auto index = buildSimpleIndexEntry(keyPattern);
 //     for (const auto& array : {BSON_ARRAY(0), BSON_ARRAY(0 << 1), BSONArray()}) {
@@ -198,7 +200,7 @@ TEST(CBRRewrites, NumberSemiOpenRange) {
 
 TEST(CBRRewrites, NumberNotNaN) {
     const auto tmp = BSON("" << -std::numeric_limits<double>::infinity());
-    const auto query = GTEMatchExpression("a"_sd, tmp[""]);
+    const auto query = GTEMatchExpression("a"sv, tmp[""]);
     const auto keyPattern = BSON("a" << 1);
     const auto index = buildSimpleIndexEntry({"a"});
     OrderedIntervalList oil;

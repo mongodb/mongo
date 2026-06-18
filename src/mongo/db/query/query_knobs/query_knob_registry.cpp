@@ -37,6 +37,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -48,7 +49,7 @@ struct QueryKnobInitializerContext {
     std::vector<QueryKnobRegistry::Entry> entries;
 } globalQueryKnobInitializerContext;
 
-boost::optional<multiversion::FeatureCompatibilityVersion> extractMinFcv(StringData paramName,
+boost::optional<multiversion::FeatureCompatibilityVersion> extractMinFcv(std::string_view paramName,
                                                                          const BSONObj& qk) {
     auto fcvElem = qk["fcv"];
     if (fcvElem.eoo()) {
@@ -144,7 +145,7 @@ void QueryKnobRegistry::init(std::vector<Entry> entries) {
     inst = QueryKnobRegistry(std::move(entries));
 }
 
-boost::optional<QueryKnobId> QueryKnobRegistry::getKnobIdForName(StringData wireName) const {
+boost::optional<QueryKnobId> QueryKnobRegistry::getKnobIdForName(std::string_view wireName) const {
     auto it = _wireNameIndex.find(wireName);
     if (it == _wireNameIndex.end()) {
         return boost::none;
@@ -175,7 +176,7 @@ size_t QueryKnobRegistry::knobsExposedToQuerySettingsCount() const {
 namespace detail {
 void detectOrphanAnnotations(const std::vector<QueryKnobRegistry::Entry>& entries,
                              const ServerParameterSet& params) {
-    auto hasEntryFor = [&](StringData name) {
+    auto hasEntryFor = [&](std::string_view name) {
         return std::any_of(entries.begin(), entries.end(), [name](const auto& e) {
             return e.param->name() == name;
         });

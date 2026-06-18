@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -38,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -45,7 +45,7 @@ namespace mongo::exec::agg {
 
 class MockStage : public Stage {
 public:
-    MockStage(StringData stageName,
+    MockStage(std::string_view stageName,
               const boost::intrusive_ptr<ExpressionContext>& expCtx,
               std::deque<GetNextResult> results);
 

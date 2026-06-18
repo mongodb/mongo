@@ -41,6 +41,7 @@
 #include <algorithm>
 #include <iterator>
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -58,7 +59,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(limit, DocumentSourceLimit, L
 
 ALLOCATE_DOCUMENT_SOURCE_ID(limit, DocumentSourceLimit::id);
 
-constexpr StringData DocumentSourceLimit::kStageName;
+constexpr std::string_view DocumentSourceLimit::kStageName;
 
 DocumentSourceContainer::iterator DocumentSourceLimit::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {

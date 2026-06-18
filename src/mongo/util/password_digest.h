@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -41,6 +41,6 @@ namespace mongo {
 /**
  * Hashes the password so that it can be used for SCRAM-SHA-1 in MONGODB-CR compatability mode.
  */
-std::string createPasswordDigest(StringData username, StringData clearTextPassword);
+std::string createPasswordDigest(std::string_view username, std::string_view clearTextPassword);
 
 }  // namespace mongo

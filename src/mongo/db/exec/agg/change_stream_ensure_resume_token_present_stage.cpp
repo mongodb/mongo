@@ -35,6 +35,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamEnsureResumeTokenPresentToStageFn(
@@ -59,7 +61,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamEnsureResumeTokenPresent,
                            documentSourceChangeStreamEnsureResumeTokenPresentToStageFn)
 
 ChangeStreamEnsureResumeTokenPresentStage::ChangeStreamEnsureResumeTokenPresentStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     ResumeTokenData token)
     : ChangeStreamCheckResumabilityStage(stageName, pExpCtx, std::move(token)) {}

@@ -32,23 +32,24 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
 #include <iostream>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kAction = "action"_sd;
-}
+constexpr std::string_view kAction = "action"sv;
+}  // namespace
 
-StatusWith<ActionType> parseActionFromString(StringData action) {
+StatusWith<ActionType> parseActionFromString(std::string_view action) {
     try {
         return {idl::deserialize<ActionTypeEnum>(action, IDLParserContext(kAction))};
     } catch (DBException&) {
@@ -58,7 +59,7 @@ StatusWith<ActionType> parseActionFromString(StringData action) {
                   fmt::format("Unrecognized action privilege string: {}", action));
 }
 
-StringData toStringData(ActionType a) {
+std::string_view toStringData(ActionType a) {
     return idl::serialize(a);
 }
 

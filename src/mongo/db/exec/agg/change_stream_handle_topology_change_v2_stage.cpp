@@ -63,6 +63,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -724,7 +725,7 @@ private:
         std::string stringifyForLogging() const {
             auto appendShardset = [&](const auto& shardSet) {
                 str::stream result;
-                StringData sep;
+                std::string_view sep;
                 result << "{";
                 for (const auto& shardId : shardSet) {
                     result << std::exchange(sep, ", ") << shardId.toString();
@@ -825,7 +826,7 @@ ChangeStreamHandleTopologyChangeV2Stage::ChangeStreamHandleTopologyChangeV2Stage
     : Stage(DocumentSourceChangeStreamHandleTopologyChangeV2::kStageName, expCtx),
       _params(std::move(params)) {}
 
-StringData ChangeStreamHandleTopologyChangeV2Stage::stateToString(
+std::string_view ChangeStreamHandleTopologyChangeV2Stage::stateToString(
     ChangeStreamHandleTopologyChangeV2Stage::State state) {
     switch (state) {
         case State::kUninitialized:
@@ -1016,13 +1017,13 @@ void ChangeStreamHandleTopologyChangeV2Stage::_setState(
 void ChangeStreamHandleTopologyChangeV2Stage::_assertState(
     ChangeStreamHandleTopologyChangeV2Stage::State expectedState,
     boost::optional<ChangeStreamReadMode> expectedMode,
-    StringData context) const {
+    std::string_view context) const {
     tassert(10657508,
             str::stream() << "unexpected state in " << context << "(), expecting: "
                           << stateToString(expectedState) << ", actual: " << stateToString(_state),
             _state == expectedState);
 
-    auto modeToString = [](ChangeStreamReadMode mode) -> StringData {
+    auto modeToString = [](ChangeStreamReadMode mode) -> std::string_view {
         if (mode == ChangeStreamReadMode::kStrict) {
             return "strict";
         }
@@ -1047,7 +1048,7 @@ void ChangeStreamHandleTopologyChangeV2Stage::_ensureShardTargeter() {
 }
 
 void ChangeStreamHandleTopologyChangeV2Stage::_logShardTargeterDecision(
-    StringData context, ShardTargeterDecision targeterDecision) const {
+    std::string_view context, ShardTargeterDecision targeterDecision) const {
     LOGV2_DEBUG(10657549,
                 3,
                 STAGE_LOG_PREFIX "Shard targeter decision",
@@ -1059,7 +1060,7 @@ void ChangeStreamHandleTopologyChangeV2Stage::_logShardTargeterDecision(
 }
 
 void ChangeStreamHandleTopologyChangeV2Stage::_logShardTargeterDecision(
-    StringData context, ShardTargeterDecision targeterDecision, const Document& event) const {
+    std::string_view context, ShardTargeterDecision targeterDecision, const Document& event) const {
     LOGV2_DEBUG(10657557,
                 3,
                 STAGE_LOG_PREFIX "Shard targeter decision",
@@ -1072,7 +1073,7 @@ void ChangeStreamHandleTopologyChangeV2Stage::_logShardTargeterDecision(
 }
 
 void ChangeStreamHandleTopologyChangeV2Stage::_logShardTargeterDecision(
-    StringData context,
+    std::string_view context,
     ShardTargeterDecision targeterDecision,
     Timestamp segmentStart,
     Timestamp segmentEnd) const {

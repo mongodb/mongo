@@ -37,6 +37,7 @@
 
 #include <compare>
 #include <ostream>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -63,7 +64,7 @@ public:
      * Appends a BSON respresentation of the bound to a BSONObjBuilder. If one is not explicitly
      * provided it reconstructs it from the RecordId.
      */
-    void appendToBSONAs(BSONObjBuilder* builder, StringData fieldName) const {
+    void appendToBSONAs(BSONObjBuilder* builder, std::string_view fieldName) const {
         if (_bson) {
             builder->appendAs(_bson->firstElement(), fieldName);
         } else {

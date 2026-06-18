@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +47,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace mutablebson {
@@ -179,7 +179,7 @@ public:
     Status popBack();
 
     /** Rename this Element to the provided name. */
-    Status rename(StringData newName);
+    Status rename(std::string_view newName);
 
 
     //
@@ -226,18 +226,18 @@ public:
 
     /** Returns the first child, if any, of this Element named 'name'. If no such Element
      *  exists, a non-ok Element is returned. This is not a constant time operation. It is illegal
-     *  to call this on an Array. This method is also available as operator[] taking a StringData
-     *  for convenience.
+     *  to call this on an Array. This method is also available as operator[] taking a
+     * std::string_view for convenience.
      */
-    Element findFirstChildNamed(StringData name) const;
-    inline Element operator[](StringData name) const;
+    Element findFirstChildNamed(std::string_view name) const;
+    inline Element operator[](std::string_view name) const;
 
     /** Returns the first element found named 'name', starting the search at the current
      *  Element, and walking right. If no such Element exists, a non-ok Element is
      *  returned. This is not a constant time operation. This implementation is used in the
      *  specialized implementation of findElement<ElementType, FieldNameEquals>.
      */
-    Element findElementNamed(StringData name) const;
+    Element findElementNamed(std::string_view name) const;
 
     //
     // Counting API.
@@ -301,7 +301,7 @@ public:
     inline double getValueDouble() const;
 
     /** Get the value from a std::string valued Element. */
-    inline StringData getValueString() const;
+    inline std::string_view getValueString() const;
 
     /** Get the value from an object valued Element. Note that this may not always be
      *  possible!
@@ -329,7 +329,7 @@ public:
     inline bool isValueNull() const;
 
     /** Get the value from a symbol valued Element. */
-    inline StringData getValueSymbol() const;
+    inline std::string_view getValueSymbol() const;
 
     /** Get the value from an int valued Element. */
     inline int32_t getValueInt() const;
@@ -425,7 +425,7 @@ public:
     Status setValueDouble(double value);
 
     /** Set the value of this Element to the given string. */
-    Status setValueString(StringData value);
+    Status setValueString(std::string_view value);
 
     /** Set the value of this Element to the given object. The data in 'value' is
      *  copied.
@@ -456,19 +456,19 @@ public:
     Status setValueNull();
 
     /** Set the value of this Element to the given regex parameters. */
-    Status setValueRegex(StringData re, StringData flags);
+    Status setValueRegex(std::string_view re, std::string_view flags);
 
     /** Set the value of this Element to the given db ref parameters. */
-    Status setValueDBRef(StringData ns, OID oid);
+    Status setValueDBRef(std::string_view ns, OID oid);
 
     /** Set the value of this Element to the given code data. */
-    Status setValueCode(StringData value);
+    Status setValueCode(std::string_view value);
 
     /** Set the value of this Element to the given symbol. */
-    Status setValueSymbol(StringData value);
+    Status setValueSymbol(std::string_view value);
 
     /** Set the value of this Element to the given code and scope data. */
-    Status setValueCodeWithScope(StringData code, const BSONObj& scope);
+    Status setValueCodeWithScope(std::string_view code, const BSONObj& scope);
 
     /** Set the value of this Element to the given integer. */
     Status setValueInt(int32_t value);
@@ -534,9 +534,9 @@ public:
     /** Returns the field name of this Element. Note that the value returned here is not
      *  stable across mutations, since the storage for fieldNames may be reallocated. If
      *  you need a stable version of the fieldName, you must call toString on the returned
-     *  StringData.
+     *  std::string_view.
      */
-    StringData getFieldName() const;
+    std::string_view getFieldName() const;
 
     /** Returns the opaque ID for this element. This is unlikely to be useful to a caller
      *  and is mostly for testing.
@@ -551,74 +551,76 @@ public:
     //
 
     /** Append the provided double value as a new field with the provided name. */
-    Status appendDouble(StringData fieldName, double value);
+    Status appendDouble(std::string_view fieldName, double value);
 
     /** Append the provided std::string value as a new field with the provided name. */
-    Status appendString(StringData fieldName, StringData value);
+    Status appendString(std::string_view fieldName, std::string_view value);
 
     /** Append the provided object as a new field with the provided name. The data in
      *  'value' is copied.
      */
-    Status appendObject(StringData fieldName, const BSONObj& value);
+    Status appendObject(std::string_view fieldName, const BSONObj& value);
 
     /** Append the provided array object as a new field with the provided name. The data in
      *  value is copied.
      */
-    Status appendArray(StringData fieldName, const BSONObj& value);
+    Status appendArray(std::string_view fieldName, const BSONObj& value);
 
     /** Append the provided binary data as a new field with the provided name. */
-    Status appendBinary(StringData fieldName,
+    Status appendBinary(std::string_view fieldName,
                         uint32_t len,
                         mongo::BinDataType binType,
                         const void* data);
 
     /** Append an undefined value as a new field with the provided name. */
-    Status appendUndefined(StringData fieldName);
+    Status appendUndefined(std::string_view fieldName);
 
     /** Append the provided OID as a new field with the provided name. */
-    Status appendOID(StringData fieldName, mongo::OID value);
+    Status appendOID(std::string_view fieldName, mongo::OID value);
 
     /** Append the provided bool as a new field with the provided name. */
-    Status appendBool(StringData fieldName, bool value);
+    Status appendBool(std::string_view fieldName, bool value);
 
     /** Append the provided date as a new field with the provided name. */
-    Status appendDate(StringData fieldName, Date_t value);
+    Status appendDate(std::string_view fieldName, Date_t value);
 
     /** Append a null as a new field with the provided name. */
-    Status appendNull(StringData fieldName);
+    Status appendNull(std::string_view fieldName);
 
     /** Append the provided regex data as a new field with the provided name. */
-    Status appendRegex(StringData fieldName, StringData re, StringData flags);
+    Status appendRegex(std::string_view fieldName, std::string_view re, std::string_view flags);
 
     /** Append the provided DBRef data as a new field with the provided name. */
-    Status appendDBRef(StringData fieldName, StringData ns, mongo::OID oid);
+    Status appendDBRef(std::string_view fieldName, std::string_view ns, mongo::OID oid);
 
     /** Append the provided code data as a new field with the iven name. */
-    Status appendCode(StringData fieldName, StringData value);
+    Status appendCode(std::string_view fieldName, std::string_view value);
 
     /** Append the provided symbol data as a new field with the provided name. */
-    Status appendSymbol(StringData fieldName, StringData value);
+    Status appendSymbol(std::string_view fieldName, std::string_view value);
 
     /** Append the provided code and scope data as a new field with the provided name. */
-    Status appendCodeWithScope(StringData fieldName, StringData code, const BSONObj& scope);
+    Status appendCodeWithScope(std::string_view fieldName,
+                               std::string_view code,
+                               const BSONObj& scope);
 
     /** Append the provided integer as a new field with the provided name. */
-    Status appendInt(StringData fieldName, int32_t value);
+    Status appendInt(std::string_view fieldName, int32_t value);
 
     /** Append the provided timestamp as a new field with the provided name. */
-    Status appendTimestamp(StringData fieldName, Timestamp value);
+    Status appendTimestamp(std::string_view fieldName, Timestamp value);
 
     /** Append the provided long integer as a new field with the provided name. */
-    Status appendLong(StringData fieldName, int64_t value);
+    Status appendLong(std::string_view fieldName, int64_t value);
 
     /** Append the provided decimal as a new field with the provided name. */
-    Status appendDecimal(StringData fieldName, Decimal128 value);
+    Status appendDecimal(std::string_view fieldName, Decimal128 value);
 
     /** Append a max key as a new field with the provided name. */
-    Status appendMinKey(StringData fieldName);
+    Status appendMinKey(std::string_view fieldName);
 
     /** Append a min key as a new field with the provided name. */
-    Status appendMaxKey(StringData fieldName);
+    Status appendMaxKey(std::string_view fieldName);
 
     /** Append the given BSONElement. The data in 'value' is copied. */
     Status appendElement(const BSONElement& value);
@@ -626,7 +628,7 @@ public:
     /** Append the provided number as field of the appropriate numeric type with the
      *  provided name.
      */
-    Status appendSafeNum(StringData fieldName, SafeNum value);
+    Status appendSafeNum(std::string_view fieldName, SafeNum value);
 
     /** Convert this element to its JSON representation if ok(),
      *  otherwise return !ok() message */
@@ -642,7 +644,7 @@ private:
 
     MONGO_PRIVATE Status addChild(Element e, bool front);
 
-    MONGO_PRIVATE StringData getValueStringOrSymbol() const;
+    MONGO_PRIVATE std::string_view getValueStringOrSymbol() const;
 
     MONGO_PRIVATE Status setValue(Element::RepIdx newValueIdx);
 
@@ -666,7 +668,7 @@ inline Element Element::operator[](size_t n) const {
     return findNthChild(n);
 }
 
-inline Element Element::operator[](StringData name) const {
+inline Element Element::operator[](std::string_view name) const {
     return findFirstChildNamed(name);
 }
 
@@ -675,7 +677,7 @@ inline double Element::getValueDouble() const {
     return getValue()._numberDouble();
 }
 
-inline StringData Element::getValueString() const {
+inline std::string_view Element::getValueString() const {
     dassert(hasValue() && isType(BSONType::string));
     return getValueStringOrSymbol();
 }
@@ -713,7 +715,7 @@ inline bool Element::isValueNull() const {
     return isType(BSONType::null);
 }
 
-inline StringData Element::getValueSymbol() const {
+inline std::string_view Element::getValueSymbol() const {
     dassert(hasValue() && isType(BSONType::symbol));
     return getValueStringOrSymbol();
 }
@@ -771,7 +773,7 @@ inline Element::Element(Document* doc, RepIdx repIdx) : _doc(doc), _repIdx(repId
     dassert(_doc != nullptr);
 }
 
-inline StringData Element::getValueStringOrSymbol() const {
+inline std::string_view Element::getValueStringOrSymbol() const {
     return getValue().valueStringData();
 }
 

@@ -28,7 +28,6 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/catalog_context.h"
@@ -49,6 +48,7 @@
 #include "mongo/util/modules.h"
 
 #include <algorithm>
+#include <string_view>
 
 namespace mongo::extension::host_connector {
 class PipelineDependenciesAdapter;
@@ -489,7 +489,7 @@ public:
     // This method is invoked by extensions to register descriptor.
     static void registerStage(AggStageDescriptorHandle descriptor);
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return _stageName;
     }
 
@@ -561,11 +561,12 @@ public:
      * given extension stage name in a static extension rule registry that is populated once at
      * startup and accessible by all DocumentSourceExtensionOptimizable instances.
      */
-    static void registerStageRules(StringData stageName,
+    static void registerStageRules(std::string_view stageName,
                                    const std::vector<PipelineRewriteRule>& rules);
 
-    static void unregisterStageRules_forTest(StringData stageName);
-    static const std::vector<PipelineRewriteRule>* getStageRules_forTest(StringData stageName);
+    static void unregisterStageRules_forTest(std::string_view stageName);
+    static const std::vector<PipelineRewriteRule>* getStageRules_forTest(
+        std::string_view stageName);
 
     /**
      * Pushes the pipeline dependencies to the underlying extension logical stage.

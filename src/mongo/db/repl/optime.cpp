@@ -44,6 +44,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -56,7 +57,7 @@ OpTime OpTime::max() {
     return OpTime(Timestamp::max(), std::numeric_limits<long long>::max());
 }
 
-void OpTime::append(StringData fieldName, BSONObjBuilder* builder) const {
+void OpTime::append(std::string_view fieldName, BSONObjBuilder* builder) const {
     BSONObjBuilder opTimeBuilder(builder->subobjStart(fieldName));
     opTimeBuilder.append(kTimestampFieldName, _timestamp);
     opTimeBuilder.append(kTermFieldName, _term);

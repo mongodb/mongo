@@ -29,7 +29,6 @@
 
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -39,6 +38,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -66,7 +66,7 @@ const std::string kControlMaxSomeDataFieldName(std::string(timeseries::kControlM
  */
 TimeseriesOptions makeTimeseriesOptions() {
     TimeseriesOptions options(kTimeseriesTimeFieldName);
-    options.setMetaField(StringData(kTimeseriesMetaFieldName));
+    options.setMetaField(std::string_view(kTimeseriesMetaFieldName));
 
     return options;
 }

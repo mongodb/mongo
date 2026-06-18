@@ -78,6 +78,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using ResolveRoleOption = auth::AuthorizationBackendInterface::ResolveRoleOption;
 
@@ -95,7 +96,7 @@ void setX509PeerInfo(const std::shared_ptr<transport::Session>& session, SSLPeer
 
 #endif
 
-const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
+const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"sv);
 const auto kTestRsrc = ResourcePattern::forDatabaseName(kTestDB);
 
 // Custom RecoveryUnit which extends RecoveryUnitNoop to handle entering and exiting WUOWs. Does
@@ -314,9 +315,9 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
 }
 
 TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
-    constexpr auto kUserFieldName = "user"_sd;
-    constexpr auto kDbFieldName = "db"_sd;
-    constexpr auto kRoleFieldName = "role"_sd;
+    constexpr auto kUserFieldName = "user"sv;
+    constexpr auto kDbFieldName = "db"sv;
+    constexpr auto kRoleFieldName = "role"sv;
 
     // Insert one user on db test and two users on db $external.
     BSONObj externalCredentials = BSON("external" << true);
@@ -516,7 +517,7 @@ using AuthorizationManagerTestDeathTest = AuthorizationManagerTest;
 
 TEST_F(AuthorizationManagerTest, UserRequestCtorWithMechanismRequiresUsername) {
     ASSERT_THROWS_CODE(
-        UserRequestGeneral(UserName(""_sd, "admin"_sd), boost::none, "SCRAM-SHA-256"_sd),
+        UserRequestGeneral(UserName(""sv, "admin"sv), boost::none, "SCRAM-SHA-256"sv),
         DBException,
         ErrorCodes::BadValue);
 }

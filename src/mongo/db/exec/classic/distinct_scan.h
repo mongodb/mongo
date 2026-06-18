@@ -53,6 +53,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -138,7 +139,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "DISTINCT_SCAN"_sd;
+    static constexpr std::string_view kStageType = "DISTINCT_SCAN"_sd;
 
 protected:
     void doSaveStateRequiresIndex() final;

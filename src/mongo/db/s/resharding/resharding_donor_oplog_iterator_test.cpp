@@ -30,7 +30,6 @@
 
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"

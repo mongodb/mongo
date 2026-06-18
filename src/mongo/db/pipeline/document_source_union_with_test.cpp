@@ -71,6 +71,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using MockMongoInterface = StubLookupSingleDocumentProcessInterface;
 
@@ -615,7 +616,7 @@ TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
         std::make_shared<MockMongoInterfaceWithQueryExecution>(std::move(mockForeignContents)));
 
     const auto localMock =
-        exec::agg::MockStage::createForTest({Document{{"_id"_sd, "local"_sd}}}, getExpCtx());
+        exec::agg::MockStage::createForTest({Document{{"_id"sv, "local"sv}}}, getExpCtx());
     auto bson = BSON("$unionWith" << nsToUnionWith.coll());
     auto unionWith =
         exec::agg::buildStage(DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx));
@@ -623,11 +624,11 @@ TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
 
     auto result = unionWith->getNext();
     ASSERT_TRUE(result.isAdvanced());
-    ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"_sd, "local"_sd}}));
+    ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"sv, "local"sv}}));
 
     result = unionWith->getNext();
     ASSERT_TRUE(result.isAdvanced());
-    ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"_sd, 2}}));
+    ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"sv, 2}}));
 
     ASSERT_TRUE(unionWith->getNext().isEOF());
 
@@ -651,7 +652,7 @@ TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
         std::make_shared<MockMongoInterfaceWithQueryExecution>(std::move(mockForeignContents)));
 
     const auto localMock =
-        exec::agg::MockStage::createForTest({Document{{"_id"_sd, "local"_sd}}}, getExpCtx());
+        exec::agg::MockStage::createForTest({Document{{"_id"sv, "local"sv}}}, getExpCtx());
     auto bson = BSON("$unionWith" << BSON(
                          "coll" << viewNsToUnionWith.coll() << "pipeline"
                                 << BSON_ARRAY(fromjson(
@@ -662,13 +663,13 @@ TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
 
     auto result = unionWith->getNext();
     ASSERT_TRUE(result.isAdvanced());
-    ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"_sd, "local"_sd}}));
+    ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"sv, "local"sv}}));
 
     result = unionWith->getNext();
     ASSERT_TRUE(result.isAdvanced());
     // Assert we get the document that originally had an even _id. Note this proves that the view
     // definition was _prepended_ on the pipeline, which is important.
-    ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"_sd, 3}, {"originalId"_sd, 2}}));
+    ASSERT_DOCUMENT_EQ(result.getDocument(), (Document{{"_id"sv, 3}, {"originalId"sv, 2}}));
 
     ASSERT_TRUE(unionWith->getNext().isEOF());
 

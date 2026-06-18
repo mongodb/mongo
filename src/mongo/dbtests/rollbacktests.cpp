@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -67,6 +66,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -102,7 +102,7 @@ Database* getDbOrCreate(OperationContext* opCtx, const NamespaceString& nss) {
     return db;
 }
 
-bool collectionExists(OperationContext* opCtx, StringData ns) {
+bool collectionExists(OperationContext* opCtx, std::string_view ns) {
     return (bool)CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
         opCtx, NamespaceString::createNamespaceString_forTest(ns));
 }

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/repl/repl_settings.h"

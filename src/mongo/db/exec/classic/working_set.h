@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
@@ -45,6 +44,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -403,7 +403,7 @@ public:
      * Returns the index ident for an index that has previously been registered with the WorkingSet
      * using 'registerIndexIdent()'.
      */
-    StringData retrieveIndexIdent(WorkingSetRegisteredIndexId indexId) const {
+    std::string_view retrieveIndexIdent(WorkingSetRegisteredIndexId indexId) const {
         return _registeredIndexes[indexId];
     }
 

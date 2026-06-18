@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -50,7 +50,7 @@ public:
     using SearchIdLookupMetrics = DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics;
 
     InternalSearchIdLookUpStage(
-        StringData stageName,
+        std::string_view stageName,
         DocumentSourceIdLookupSpec spec,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&

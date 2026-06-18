@@ -50,6 +50,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -97,7 +98,7 @@ public:
         kMatchBusiestNode,
     };
 
-    friend StringData matchingStrategyToString(MatchingStrategy strategy) {
+    friend std::string_view matchingStrategyToString(MatchingStrategy strategy) {
         switch (strategy) {
             case ShardingTaskExecutorPoolController::MatchingStrategy::kMatchPrimaryNode:
                 return "matchPrimaryNode"_sd;
@@ -171,7 +172,7 @@ public:
     size_t connectionRequestsMaxQueueDepth() const override;
     size_t maxConnections() const override;
 
-    StringData name() const override {
+    std::string_view name() const override {
         return "ShardingTaskExecutorPoolController"_sd;
     }
 

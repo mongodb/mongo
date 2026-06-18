@@ -47,6 +47,7 @@
 #include "mongo/util/synchronized_value.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
@@ -71,8 +72,8 @@ ConnectionPool::Options makeMongotConnPoolOptions() {
 
 struct State {
     State() {
-        constexpr StringData kMongotExecutorName = "MongotExecutor";
-        constexpr StringData kSearchIndexManagementExecutorName = "SearchIndexMgmtExecutor";
+        constexpr std::string_view kMongotExecutorName = "MongotExecutor";
+        constexpr std::string_view kSearchIndexManagementExecutorName = "SearchIndexMgmtExecutor";
 
         std::unique_ptr<NetworkInterface> mongotExecutorNetworkInterface;
         std::unique_ptr<NetworkInterface> searchIdxNetworkInterface;
@@ -170,7 +171,7 @@ public:
         BSONObjBuilder bob;
         auto* svc = opCtx->getServiceContext();
 
-        auto appendStats = [&](StringData key,
+        auto appendStats = [&](std::string_view key,
                                const StatusWith<std::shared_ptr<TaskExecutor>>& sw) {
             if (!sw.isOK())
                 return;

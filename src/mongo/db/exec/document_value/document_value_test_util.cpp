@@ -33,6 +33,8 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 
 namespace mongo {
 namespace unittest {
@@ -40,8 +42,8 @@ namespace unittest {
 #define _GENERATE_DOCVAL_CMP_FUNC(DOCVAL, NAME, COMPARATOR, OPERATOR)                \
     void assertComparison_##DOCVAL##NAME(const std::string& theFile,                 \
                                          unsigned theLine,                           \
-                                         StringData aExpression,                     \
-                                         StringData bExpression,                     \
+                                         std::string_view aExpression,               \
+                                         std::string_view bExpression,               \
                                          const DOCVAL& aValue,                       \
                                          const DOCVAL& bValue) {                     \
         if (!COMPARATOR().evaluate(aValue OPERATOR bValue)) {                        \

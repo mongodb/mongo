@@ -34,11 +34,11 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -110,18 +110,18 @@ public:
      * If the status is not OK, then there are no guarantees about what value will be stored in
      * result.
      */
-    Status operator()(StringData s, long* out, const char** end = {}) const;
-    Status operator()(StringData s, long long* out, const char** end = {}) const;
-    Status operator()(StringData s, unsigned long* out, const char** end = {}) const;
-    Status operator()(StringData s, unsigned long long* out, const char** end = {}) const;
-    Status operator()(StringData s, short* out, const char** end = {}) const;
-    Status operator()(StringData s, unsigned short* out, const char** end = {}) const;
-    Status operator()(StringData s, int* out, const char** end = {}) const;
-    Status operator()(StringData s, unsigned int* out, const char** end = {}) const;
-    Status operator()(StringData s, int8_t* out, const char** end = {}) const;
-    Status operator()(StringData s, uint8_t* out, const char** end = {}) const;
-    Status operator()(StringData s, double* out, const char** end = {}) const;
-    Status operator()(StringData s, Decimal128* out, const char** end = {}) const;
+    Status operator()(std::string_view s, long* out, const char** end = {}) const;
+    Status operator()(std::string_view s, long long* out, const char** end = {}) const;
+    Status operator()(std::string_view s, unsigned long* out, const char** end = {}) const;
+    Status operator()(std::string_view s, unsigned long long* out, const char** end = {}) const;
+    Status operator()(std::string_view s, short* out, const char** end = {}) const;
+    Status operator()(std::string_view s, unsigned short* out, const char** end = {}) const;
+    Status operator()(std::string_view s, int* out, const char** end = {}) const;
+    Status operator()(std::string_view s, unsigned int* out, const char** end = {}) const;
+    Status operator()(std::string_view s, int8_t* out, const char** end = {}) const;
+    Status operator()(std::string_view s, uint8_t* out, const char** end = {}) const;
+    Status operator()(std::string_view s, double* out, const char** end = {}) const;
+    Status operator()(std::string_view s, Decimal128* out, const char** end = {}) const;
 
     int _base = 0;
     Decimal128::RoundingMode _roundingMode = Decimal128::RoundingMode::kRoundTowardZero;

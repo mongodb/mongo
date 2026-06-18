@@ -56,6 +56,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -72,7 +73,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListCachedAndActiveUsers);
  */
 class DocumentSourceListCachedAndActiveUsers final {
 public:
-    static constexpr StringData kStageName = "$listCachedAndActiveUsers"_sd;
+    static constexpr std::string_view kStageName = "$listCachedAndActiveUsers"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

@@ -31,13 +31,13 @@
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -50,6 +50,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Retrieves the participants corresponding to the expectedState type.
@@ -113,7 +114,7 @@ bool stateTransistionsComplete(WithLock lk,
  */
 template <class TParticipant>
 Status getStatusFromAbortReasonWithShardInfo(const TParticipant& participant,
-                                             StringData participantType) {
+                                             std::string_view participantType) {
     return resharding::getStatusFromAbortReason(participant.getMutableState())
         .withContext(fmt::format("{} shard {} reached an unrecoverable error",
                                  participantType,
@@ -136,13 +137,13 @@ boost::optional<Status> getAbortReasonIfExists(
 
     for (const auto& donorShard : updatedStateDoc.getDonorShards()) {
         if (donorShard.getMutableState().getState() == DonorStateEnum::kError) {
-            return getStatusFromAbortReasonWithShardInfo(donorShard, "Donor"_sd);
+            return getStatusFromAbortReasonWithShardInfo(donorShard, "Donor"sv);
         }
     }
 
     for (const auto& recipientShard : updatedStateDoc.getRecipientShards()) {
         if (recipientShard.getMutableState().getState() == RecipientStateEnum::kError) {
-            return getStatusFromAbortReasonWithShardInfo(recipientShard, "Recipient"_sd);
+            return getStatusFromAbortReasonWithShardInfo(recipientShard, "Recipient"sv);
         }
     }
 

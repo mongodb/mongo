@@ -47,6 +47,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -108,10 +109,10 @@ public:
      * string pattern, which is used for comparisons and serialization.
      */
     struct Pattern {
-        explicit Pattern(StringData pattern)
+        explicit Pattern(std::string_view pattern)
             : rawRegex(pattern), regex(std::make_unique<pcre::Regex>(std::string{rawRegex})) {}
 
-        StringData rawRegex;
+        std::string_view rawRegex;
         std::unique_ptr<pcre::Regex> regex;
     };
 
@@ -121,11 +122,11 @@ public:
      */
     using PatternSchema = std::pair<Pattern, std::unique_ptr<ExpressionWithPlaceholder>>;
 
-    static constexpr StringData kName = "$_internalSchemaAllowedProperties"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaAllowedProperties"_sd;
 
     explicit InternalSchemaAllowedPropertiesMatchExpression(
         StringDataSet properties,
-        StringData namePlaceholder,
+        std::string_view namePlaceholder,
         std::vector<PatternSchema> patternProperties,
         std::unique_ptr<ExpressionWithPlaceholder> otherwise,
         clonable_ptr<ErrorAnnotation> annotation = nullptr);
@@ -198,7 +199,7 @@ public:
         return _patternProperties;
     }
 
-    StringData getNamePlaceholder() const {
+    std::string_view getNamePlaceholder() const {
         return _namePlaceholder;
     }
 
@@ -208,11 +209,11 @@ public:
 
 private:
     // The names of the properties are owned by the BSONObj used to create this match expression.
-    // Since that BSONObj must outlive this object, we can safely store StringData.
+    // Since that BSONObj must outlive this object, we can safely store std::string_view.
     StringDataSet _properties;
 
     // The placeholder used in both '_patternProperties' and '_otherwise'.
-    StringData _namePlaceholder;
+    std::string_view _namePlaceholder;
 
     std::vector<PatternSchema> _patternProperties;
 

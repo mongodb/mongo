@@ -29,7 +29,6 @@
 
 #include "mongo/db/matcher/expression_hasher.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"

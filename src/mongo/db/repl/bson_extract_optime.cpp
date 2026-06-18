@@ -36,9 +36,13 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/optime.h"
 
+#include <string_view>
+
 namespace mongo {
 
-Status bsonExtractOpTimeField(const BSONObj& object, StringData fieldName, repl::OpTime* out) {
+Status bsonExtractOpTimeField(const BSONObj& object,
+                              std::string_view fieldName,
+                              repl::OpTime* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, BSONType::object, &element);
     if (!status.isOK())

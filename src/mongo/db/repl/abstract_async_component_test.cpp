@@ -30,7 +30,6 @@
 #include "mongo/db/repl/abstract_async_component.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/executor/network_interface_mock.h"

@@ -53,6 +53,7 @@
 namespace mongo {
 namespace write_without_shard_key {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WriteWithoutShardKeyUtilTest : public RouterCatalogCacheTestFixture {
 public:
@@ -97,8 +98,8 @@ public:
 private:
     ChunkManager _makeChunkManager() override {
         TimeseriesOptions timeseriesOptions;
-        timeseriesOptions.setTimeField("t"_sd);
-        timeseriesOptions.setMetaField("m"_sd);
+        timeseriesOptions.setTimeField("t"sv);
+        timeseriesOptions.setMetaField("m"sv);
 
         TypeCollectionTimeseriesFields timeseriesFields;
         timeseriesFields.setTimeseriesOptions(timeseriesOptions);

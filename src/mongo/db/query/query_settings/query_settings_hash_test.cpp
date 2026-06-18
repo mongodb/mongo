@@ -38,12 +38,14 @@
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/container_hash/hash.hpp>
 #include <fmt/format.h>
 
 namespace mongo::query_settings {
 namespace {
-QuerySettingsKnobOverrides makeKnobOverrides(StringData jsonString) {
+QuerySettingsKnobOverrides makeKnobOverrides(std::string_view jsonString) {
     return QuerySettingsKnobOverrides::fromBSON(fromjson(jsonString));
 }
 };  // namespace
@@ -103,7 +105,7 @@ TEST(QuerySettingsHashTest, QuerySettingsHashStability) {
     NamespaceSpec ns;
     ns.setDb(
         DatabaseNameUtil::deserialize(boost::none, "testDB", SerializationContext::stateDefault()));
-    ns.setColl(StringData("testColl"));
+    ns.setColl(std::string_view("testColl"));
     settings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a_1")})}});
     settings.setReject(true);
     auto observedHash = mongo::query_settings::hash(settings);

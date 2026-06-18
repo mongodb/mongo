@@ -29,15 +29,17 @@
 
 #include "mongo/db/auth/user_cache_access_stats.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/duration.h"
 
-namespace mongo {
+#include <string_view>
 
-constexpr auto kActiveAcquisitionAttemptsName = "startedUserCacheAcquisitionAttempts"_sd;
-constexpr auto kCompletedAcquisitionAttemptsName = "completedUserCacheAcquisitionAttempts"_sd;
-constexpr auto kWaitTimeName = "userCacheWaitTimeMicros"_sd;
+namespace mongo {
+using namespace std::literals::string_view_literals;
+
+constexpr auto kActiveAcquisitionAttemptsName = "startedUserCacheAcquisitionAttempts"sv;
+constexpr auto kCompletedAcquisitionAttemptsName = "completedUserCacheAcquisitionAttempts"sv;
+constexpr auto kWaitTimeName = "userCacheWaitTimeMicros"sv;
 
 void UserCacheAccessStats::report(BSONObjBuilder* builder, TickSource* tickSource) const {
     builder->append(kActiveAcquisitionAttemptsName, std::int64_t(_startedCacheAccessAttempts));

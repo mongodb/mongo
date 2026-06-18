@@ -45,6 +45,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -432,7 +433,7 @@ template <bool single>
 std::tuple<boost::intrusive_ptr<Expression>, BSONElement, boost::optional<BSONObj>>
 accumulatorNParseArgs(ExpressionContext* expCtx,
                       const BSONElement& elem,
-                      StringData name,
+                      std::string_view name,
                       bool needSortBy,
                       const VariablesParseState& vps) {
     uassert(5788001,

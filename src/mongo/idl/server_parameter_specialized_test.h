@@ -38,6 +38,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -67,7 +68,7 @@ public:
         return _clusterParameterTime;
     }
 
-    StringData getStrData() const {
+    std::string_view getStrData() const {
         std::lock_guard<std::mutex> lg(_mutex);
         return _strData;
     }
@@ -92,7 +93,7 @@ public:
         _intData = intData;
     }
 
-    void setId(StringData id) {
+    void setId(std::string_view id) {
         std::lock_guard<std::mutex> lg(_mutex);
         _id = std::string{id};
     }

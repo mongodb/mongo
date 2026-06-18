@@ -34,6 +34,8 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::stage_builder {
 struct WindowOpInfo;
 
@@ -41,11 +43,11 @@ class WindowOp {
 public:
     WindowOp(std::string opName);
 
-    WindowOp(StringData opName) : WindowOp(std::string{opName}) {}
+    WindowOp(std::string_view opName) : WindowOp(std::string{opName}) {}
 
     WindowOp(const WindowFunctionStatement& wf);
 
-    StringData getOpName() const {
+    std::string_view getOpName() const {
         return _opName;
     }
 

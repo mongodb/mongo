@@ -29,7 +29,6 @@
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"

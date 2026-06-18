@@ -41,6 +41,8 @@
 #include <fmt/format.h>
 
 #ifdef _WIN32
+#include <string_view>
+
 #include <psapi.h>
 #include <windows.h>
 #else
@@ -64,7 +66,7 @@ namespace secure_allocator_details {
 
 namespace {
 
-std::string fmtError(StringData prefix) {
+std::string fmtError(std::string_view prefix) {
     auto ec = lastSystemError();
     return fmt::format("{}: {}", prefix, errorMessage(ec));
 }

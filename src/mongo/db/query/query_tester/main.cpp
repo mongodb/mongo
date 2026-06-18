@@ -49,6 +49,7 @@
 
 namespace mongo::query_tester {
 namespace {
+using namespace std::literals::string_view_literals;
 struct TestSpec {
     TestSpec(std::filesystem::path path, size_t low = kMinTestNum, size_t high = kMaxTestNum)
         : testPath(path), startTest(low), endTest(high) {};
@@ -126,7 +127,7 @@ void exitWithError(const int statusCode, const std::string& msg) {
 bool containsUnsupportedJSWasmOperators(const BSONObj& obj) {
     for (const auto& elem : obj) {
         const auto fieldName = elem.fieldNameStringData();
-        if (fieldName == "$function"_sd) {
+        if (fieldName == "$function"sv) {
             return true;
         }
         if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
@@ -148,7 +149,7 @@ bool shouldSkipFile(const QueryFile& currFile, DBClientConnection* conn) {
     // operators, and if so, skip the file since those queries won't run successfully.
     // Remove this check once all MozJS functionality is supported in mozjs-wasm mode.
     // TODO SERVER-127482: Re-enable $function in version tests once mozjs regex handling is fixed.
-    static constexpr auto kMozJsWasmEngine = "mozjs-wasm"_sd;
+    static constexpr std::string_view kMozJsWasmEngine = "mozjs-wasm";
     auto bob = BSONObjBuilder{};
     bob.append("buildInfo", 1);
     const auto buildInfo = runCommand(conn, "admin", bob.done());

@@ -31,7 +31,6 @@
 #include "mongo/db/topology/vector_clock/vector_clock_mongod.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"

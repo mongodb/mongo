@@ -32,6 +32,8 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -149,7 +151,7 @@ OpTime ReplicationCoordinatorNoOp::getCurrentCommittedSnapshotOpTime() const {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::appendDiagnosticBSON(mongo::BSONObjBuilder*, StringData) {
+void ReplicationCoordinatorNoOp::appendDiagnosticBSON(mongo::BSONObjBuilder*, std::string_view) {
     MONGO_UNREACHABLE;
 }
 

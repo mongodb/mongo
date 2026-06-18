@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -52,6 +51,7 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -63,6 +63,7 @@
 
 namespace mongo::rpc {
 namespace {
+using namespace std::literals::string_view_literals;
 
 struct RewriteEnabled {
     bool enabled = rewriteStateChangeErrors;
@@ -83,7 +84,7 @@ auto enabledForOperation = OperationContext::declareDecoration<RewriteEnabled>()
  * See
  * https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#not-master-and-node-is-recovering
  */
-boost::optional<std::string> scrubErrmsg(StringData val) {
+boost::optional<std::string> scrubErrmsg(std::string_view val) {
     struct Scrub {
         Scrub(std::string pat, std::string sub) : pat(std::move(pat)), sub(std::move(sub)) {}
         pcre::Regex pat;
@@ -96,11 +97,11 @@ boost::optional<std::string> scrubErrmsg(StringData val) {
     // Fast scan for the common case that no key phrase is present.
     static const StaticImmortal fastScan = [] {
         std::string pat;
-        StringData sep;
+        std::string_view sep;
         auto out = std::back_inserter(pat);
         for (const auto& scrub : *scrubs) {
             out = fmt::format_to(out, "{}({})", sep, scrub.pat.pattern());
-            sep = "|"_sd;
+            sep = "|"sv;
         }
         return pcre::Regex(pat);
     }();

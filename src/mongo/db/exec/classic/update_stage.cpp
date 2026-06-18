@@ -65,6 +65,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeUpdaterEnsureDocStillMatchesAndYield);
 }  // namespace
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -261,7 +262,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         if (!_params.request->explain() && _isUserInitiatedWrite) {
             auto [immediateReturnStageState, fromMigrate] = _preWriteFilter.checkIfNotWritable(
                 member->doc.value(),
-                "update"_sd,
+                "update"sv,
                 collectionPtr()->ns(),
                 [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                     planExecutorShardingState(opCtx()).criticalSectionFuture =

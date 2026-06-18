@@ -50,6 +50,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -72,7 +73,7 @@ template <class T>
 class TypeMatchExpressionBase : public LeafMatchExpression {
 public:
     explicit TypeMatchExpressionBase(MatchType matchType,
-                                     boost::optional<StringData> path,
+                                     boost::optional<std::string_view> path,
                                      ElementPath::LeafArrayBehavior leafArrBehavior,
                                      MatcherTypeSet typeSet,
                                      clonable_ptr<ErrorAnnotation> annotation = nullptr)
@@ -88,7 +89,7 @@ public:
     /**
      * Returns the name of this MatchExpression.
      */
-    virtual StringData name() const = 0;
+    virtual std::string_view name() const = 0;
 
     void debugString(StringBuilder& debug, int indentationLevel) const final {
         _debugAddSpace(debug, indentationLevel);
@@ -129,9 +130,9 @@ private:
 
 class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpression> {
 public:
-    static constexpr StringData kName = "$type"_sd;
+    static constexpr std::string_view kName = "$type"_sd;
 
-    TypeMatchExpression(boost::optional<StringData> path,
+    TypeMatchExpression(boost::optional<std::string_view> path,
                         MatcherTypeSet typeSet,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR,
@@ -140,7 +141,7 @@ public:
                                   typeSet,
                                   std::move(annotation)) {}
 
-    StringData name() const final {
+    std::string_view name() const final {
         return kName;
     }
 
@@ -183,9 +184,9 @@ private:
 class InternalSchemaTypeExpression final
     : public TypeMatchExpressionBase<InternalSchemaTypeExpression> {
 public:
-    static constexpr StringData kName = "$_internalSchemaType"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaType"_sd;
 
-    InternalSchemaTypeExpression(boost::optional<StringData> path,
+    InternalSchemaTypeExpression(boost::optional<std::string_view> path,
                                  MatcherTypeSet typeSet,
                                  clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE,
@@ -194,7 +195,7 @@ public:
                                   typeSet,
                                   std::move(annotation)) {}
 
-    StringData name() const final {
+    std::string_view name() const final {
         return kName;
     }
 
@@ -218,9 +219,9 @@ public:
 
 class InternalSchemaBinDataSubTypeExpression final : public LeafMatchExpression {
 public:
-    static constexpr StringData kName = "$_internalSchemaBinDataSubType"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaBinDataSubType"_sd;
 
-    InternalSchemaBinDataSubTypeExpression(boost::optional<StringData> path,
+    InternalSchemaBinDataSubTypeExpression(boost::optional<std::string_view> path,
                                            BinDataType binDataSubType,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : LeafMatchExpression(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE,
@@ -230,7 +231,7 @@ public:
                               std::move(annotation)),
           _binDataSubType(binDataSubType) {}
 
-    StringData name() const {
+    std::string_view name() const {
         return kName;
     }
 
@@ -302,9 +303,9 @@ private:
 class InternalSchemaBinDataEncryptedTypeExpression final
     : public TypeMatchExpressionBase<InternalSchemaBinDataEncryptedTypeExpression> {
 public:
-    static constexpr StringData kName = "$_internalSchemaBinDataEncryptedType"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaBinDataEncryptedType"_sd;
 
-    InternalSchemaBinDataEncryptedTypeExpression(boost::optional<StringData> path,
+    InternalSchemaBinDataEncryptedTypeExpression(boost::optional<std::string_view> path,
                                                  MatcherTypeSet typeSet,
                                                  clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE,
@@ -313,7 +314,7 @@ public:
                                   typeSet,
                                   std::move(annotation)) {}
 
-    StringData name() const override {
+    std::string_view name() const override {
         return kName;
     }
 
@@ -347,10 +348,10 @@ public:
 class InternalSchemaBinDataFLE2EncryptedTypeExpression final
     : public TypeMatchExpressionBase<InternalSchemaBinDataFLE2EncryptedTypeExpression> {
 public:
-    static constexpr StringData kName = "$_internalSchemaBinDataFLE2EncryptedType"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaBinDataFLE2EncryptedType"_sd;
 
     InternalSchemaBinDataFLE2EncryptedTypeExpression(
-        boost::optional<StringData> path,
+        boost::optional<std::string_view> path,
         MatcherTypeSet typeSet,
         clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE,
@@ -359,7 +360,7 @@ public:
                                   std::move(typeSet),
                                   std::move(annotation)) {}
 
-    StringData name() const override {
+    std::string_view name() const override {
         return kName;
     }
 

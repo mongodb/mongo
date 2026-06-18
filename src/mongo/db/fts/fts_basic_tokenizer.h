@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/stemmer.h"
@@ -38,6 +37,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace fts {
@@ -68,11 +68,11 @@ class BasicFTSTokenizer final : public FTSTokenizer {
 public:
     BasicFTSTokenizer(const FTSLanguage* language);
 
-    void reset(StringData document, Options options) override;
+    void reset(std::string_view document, Options options) override;
 
     bool moveNext() override;
 
-    StringData get() const override;
+    std::string_view get() const override;
 
 private:
     const FTSLanguage* const _language;

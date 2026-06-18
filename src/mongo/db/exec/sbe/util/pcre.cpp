@@ -35,11 +35,13 @@
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
+#include <string_view>
+
 namespace mongo::sbe {
 using TypeTags = value::TypeTags;
 using Value = value::Value;
 
-std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options) {
+std::pair<TypeTags, Value> makeNewPcreRegex(std::string_view pattern, std::string_view options) {
     auto regex = std::make_unique<pcre::Regex>(
         std::string{pattern},
         pcre_util::flagsToOptions(options),

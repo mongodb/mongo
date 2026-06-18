@@ -47,6 +47,7 @@
 
 #include <iostream>
 #include <map>
+#include <string_view>
 #include <utility>
 
 #include <boost/filesystem/directory.hpp>
@@ -63,7 +64,8 @@ namespace mongo::workload_simulation {
 
 SimulatorParams simulatorGlobalParams;
 
-std::string getSimulatorHelp(StringData name, const optionenvironment::OptionSection& options) {
+std::string getSimulatorHelp(std::string_view name,
+                             const optionenvironment::OptionSection& options) {
     StringBuilder sb;
     sb << "usage: " << name << " [options] [suite]...\n"
        << options.helpString() << "suite: run the specified workload suite(s) only\n";

@@ -29,7 +29,6 @@
 
 #include "mongo/db/timeseries/timeseries_2dsphere_index_version_lookup.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/index_names.h"
@@ -46,16 +45,18 @@
 #include "mongo/unittest/unittest.h"
 
 #include <optional>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /** Builds a minimal ready index spec for a 2dsphere_bucket index on 'bucketKeyPath' (e.g.
  * data.loc). */
-BSONObj make2dsphereBucketIndexSpec(StringData indexName,
-                                    StringData bucketKeyPath,
+BSONObj make2dsphereBucketIndexSpec(std::string_view indexName,
+                                    std::string_view bucketKeyPath,
                                     BSONObj extraFields = {}) {
     BSONObjBuilder bob;
     bob.append("v", 2);
@@ -145,7 +146,7 @@ TEST_F(Build2dsphereIndexVersionMapTest, EmptyCatalogReturnsEmptyMap) {
 
 TEST_F(Build2dsphereIndexVersionMapTest, MapsDataFieldToVersion) {
     createIndexAssertOk(make2dsphereBucketIndexSpec(
-        "loc_2dsphere", "data.loc"_sd, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
+        "loc_2dsphere", "data.loc"sv, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
 
     auto m = timeseries::build2dsphereIndexVersionMap(collection());
     ASSERT_EQ(m.size(), 1U);
@@ -156,7 +157,7 @@ TEST_F(Build2dsphereIndexVersionMapTest, MapsDataFieldToVersion) {
 
 TEST_F(Build2dsphereIndexVersionMapTest, StripsDataPrefixForNestedPath) {
     createIndexAssertOk(make2dsphereBucketIndexSpec(
-        "geo_2dsphere", "data.geo.sub"_sd, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
+        "geo_2dsphere", "data.geo.sub"sv, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
 
     auto m = timeseries::build2dsphereIndexVersionMap(collection());
     ASSERT_EQ(m.size(), 1U);
@@ -179,9 +180,9 @@ TEST_F(Build2dsphereIndexVersionMapTest, CompoundIndexMapsOnly2dsphereBucketFiel
 
 TEST_F(Build2dsphereIndexVersionMapTest, MultipleIndexesAccumulateDistinctFields) {
     createIndexAssertOk(make2dsphereBucketIndexSpec(
-        "a_geo", "data.a"_sd, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
+        "a_geo", "data.a"sv, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
     createIndexAssertOk(make2dsphereBucketIndexSpec(
-        "b_geo", "data.b"_sd, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
+        "b_geo", "data.b"sv, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
 
     auto m = timeseries::build2dsphereIndexVersionMap(collection());
     ASSERT_EQ(m.size(), 2U);
@@ -201,7 +202,7 @@ TEST_F(Build2dsphereIndexVersionMapTest, Non2dsphereBucketKeySkipped) {
 TEST_F(Build2dsphereIndexVersionMapTest, KeyNotUnderDataPrefixSkipped) {
     // Path must be "data.<userField>" for the map; a root-level geo field is ignored here.
     createIndexAssertOk(make2dsphereBucketIndexSpec(
-        "root_geo", "loc"_sd, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
+        "root_geo", "loc"sv, BSON(IndexDescriptor::k2dsphereVersionFieldName << 3)));
 
     auto m = timeseries::build2dsphereIndexVersionMap(collection());
     ASSERT(m.empty());
@@ -209,7 +210,7 @@ TEST_F(Build2dsphereIndexVersionMapTest, KeyNotUnderDataPrefixSkipped) {
 
 TEST_F(Build2dsphereIndexVersionMapV4Test, MapsDataFieldToVersion4) {
     createIndexAssertOk(make2dsphereBucketIndexSpec(
-        "loc_2dsphere_v4", "data.loc"_sd, BSON(IndexDescriptor::k2dsphereVersionFieldName << 4)));
+        "loc_2dsphere_v4", "data.loc"sv, BSON(IndexDescriptor::k2dsphereVersionFieldName << 4)));
 
     auto m = timeseries::build2dsphereIndexVersionMap(collection());
     ASSERT_EQ(m.size(), 1U);

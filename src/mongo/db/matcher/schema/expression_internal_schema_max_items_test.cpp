@@ -43,11 +43,12 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 DEATH_TEST_REGEX(InternalSchemaMaxItemsMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400215") {
-    InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 2);
+    InternalSchemaMaxItemsMatchExpression maxItems("a"sv, 2);
 
     ASSERT_EQ(maxItems.numChildren(), 0);
     ASSERT_THROWS_CODE(maxItems.getChild(0), AssertionException, 6400215);

@@ -48,6 +48,8 @@
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -103,7 +105,7 @@ public:
         const PrivilegeVector& privileges,
         boost::optional<ExplainOptions::Verbosity> verbosity,
         BSONObjBuilder* result,
-        StringData comment = "ClusterAggregate::runAggregate"_sd,
+        std::string_view comment = "ClusterAggregate::runAggregate"_sd,
         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
 
     /**
@@ -116,7 +118,7 @@ public:
         const PrivilegeVector& privileges,
         boost::optional<ExplainOptions::Verbosity> verbosity,
         BSONObjBuilder* result,
-        StringData comment = "ClusterAggregate::runAggregate"_sd,
+        std::string_view comment = "ClusterAggregate::runAggregate"_sd,
         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
 
     /**

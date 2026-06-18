@@ -53,6 +53,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using executor::RemoteCommandRequest;
 using std::vector;
@@ -94,7 +95,7 @@ protected:
         ConfigServerReadPreferenceForCatalogQueriesParam updatedParam;
         ClusterServerParameter baseCSP;
         baseCSP.setClusterParameterTime(LogicalTime(Timestamp(Date_t::now())));
-        baseCSP.set_id("configServerReadPreferenceForCatalogQueries"_sd);
+        baseCSP.set_id("configServerReadPreferenceForCatalogQueries"sv);
         updatedParam.setClusterServerParameter(baseCSP);
         updatedParam.setMustAlwaysUseNearest(mustAlwaysUseNearest);
         auto param = ServerParameterSet::getClusterParameterSet()->get(

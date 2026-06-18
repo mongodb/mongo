@@ -40,6 +40,7 @@
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -93,7 +94,7 @@ public:
     /**
      * For the error case.
      * As with the `Status` constructors, `reason` can be `std::string` or
-     * anything that can construct one (e.g. `StringData`, `str::stream`).
+     * anything that can construct one (e.g. `std::string_view`, `str::stream`).
      */
     MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, std::string reason)
         : _status(code, std::move(reason)) {}

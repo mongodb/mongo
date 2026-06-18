@@ -35,6 +35,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -42,14 +44,15 @@
 
 namespace mongo {
 namespace {
-constexpr auto kKeyFileStr = "keyFile"_sd;
-constexpr auto kSendKeyFileStr = "sendKeyFile"_sd;
-constexpr auto kSendX509Str = "sendX509"_sd;
-constexpr auto kX509Str = "x509"_sd;
-constexpr auto kUndefinedStr = "undefined"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kKeyFileStr = "keyFile"sv;
+constexpr auto kSendKeyFileStr = "sendKeyFile"sv;
+constexpr auto kSendX509Str = "sendX509"sv;
+constexpr auto kX509Str = "x509"sv;
+constexpr auto kUndefinedStr = "undefined"sv;
 }  // namespace
 
-StatusWith<ClusterAuthMode> ClusterAuthMode::parse(StringData strMode) {
+StatusWith<ClusterAuthMode> ClusterAuthMode::parse(std::string_view strMode) {
     if (strMode == kKeyFileStr) {
         return ClusterAuthMode(Value::kKeyFile);
     } else if (strMode == kSendKeyFileStr) {
@@ -181,7 +184,7 @@ bool ClusterAuthMode::x509Only() const {
     MONGO_UNREACHABLE;
 }
 
-StringData ClusterAuthMode::toString() const {
+std::string_view ClusterAuthMode::toString() const {
     switch (_value) {
         case Value::kUndefined:
             return kUndefinedStr;

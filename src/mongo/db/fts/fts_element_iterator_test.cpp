@@ -30,7 +30,6 @@
 #include "mongo/db/fts/fts_element_iterator.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/unittest/unittest.h"

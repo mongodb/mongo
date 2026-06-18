@@ -37,15 +37,17 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 InternalSchemaFmodMatchExpression::InternalSchemaFmodMatchExpression(
-    boost::optional<StringData> path,
+    boost::optional<std::string_view> path,
     Decimal128 divisor,
     Decimal128 remainder,
     clonable_ptr<ErrorAnnotation> annotation)
@@ -67,7 +69,7 @@ void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug,
 
 void InternalSchemaFmodMatchExpression::appendSerializedRightHandSide(
     BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
-    bob->append("$_internalSchemaFmod"_sd,
+    bob->append("$_internalSchemaFmod"sv,
                 BSON_ARRAY(opts.serializeLiteral(_divisor) << opts.serializeLiteral(_remainder)));
 }
 

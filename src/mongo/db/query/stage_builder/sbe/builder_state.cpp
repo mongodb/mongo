@@ -36,6 +36,7 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 
 namespace mongo::stage_builder {
+using namespace std::literals::string_view_literals;
 sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variableId) {
     if (auto it = data->variableIdToSlotMap.find(variableId);
         it != data->variableIdToSlotMap.end()) {
@@ -188,23 +189,23 @@ bool StageBuilderState::isNothingSlot(sbe::value::SlotId slot) {
 }
 
 sbe::value::SlotId StageBuilderState::getEmptyObjSlot() {
-    auto slotId = env->getSlotIfExists("emptyObj"_sd);
+    auto slotId = env->getSlotIfExists("emptyObj"sv);
 
     if (!slotId) {
         auto tag = sbe::value::TypeTags::bsonObject;
         auto val = sbe::value::bitcastFrom<const char*>(BSONObj::kEmptyObject.objdata());
-        return env->registerSlot("emptyObj"_sd, tag, val, false, slotIdGenerator);
+        return env->registerSlot("emptyObj"sv, tag, val, false, slotIdGenerator);
     }
 
     return *slotId;
 }
 
 boost::optional<sbe::value::SlotId> StageBuilderState::getTimeZoneDBSlot() {
-    auto slotId = env->getSlotIfExists("timeZoneDB"_sd);
+    auto slotId = env->getSlotIfExists("timeZoneDB"sv);
 
     if (!slotId) {
         return env->registerSlot(
-            "timeZoneDB"_sd,
+            "timeZoneDB"sv,
             sbe::value::TypeTags::timeZoneDB,
             sbe::value::bitcastFrom<const TimeZoneDatabase*>(getTimeZoneDatabase(opCtx)),
             false,
@@ -215,11 +216,11 @@ boost::optional<sbe::value::SlotId> StageBuilderState::getTimeZoneDBSlot() {
 }
 
 boost::optional<sbe::value::SlotId> StageBuilderState::getCollatorSlot() {
-    auto slotId = env->getSlotIfExists("collator"_sd);
+    auto slotId = env->getSlotIfExists("collator"sv);
 
     if (!slotId && data != nullptr) {
         if (auto coll = data->queryCollator.get()) {
-            return env->registerSlot("collator"_sd,
+            return env->registerSlot("collator"sv,
                                      sbe::value::TypeTags::collator,
                                      sbe::value::bitcastFrom<const CollatorInterface*>(coll),
                                      false,
@@ -231,11 +232,11 @@ boost::optional<sbe::value::SlotId> StageBuilderState::getCollatorSlot() {
 }
 
 boost::optional<sbe::value::SlotId> StageBuilderState::getOplogTsSlot() {
-    auto slotId = env->getSlotIfExists("oplogTs"_sd);
+    auto slotId = env->getSlotIfExists("oplogTs"sv);
 
     if (!slotId) {
         return env->registerSlot(
-            "oplogTs"_sd, sbe::value::TypeTags::Nothing, 0, false, slotIdGenerator);
+            "oplogTs"sv, sbe::value::TypeTags::Nothing, 0, false, slotIdGenerator);
     }
 
     return slotId;

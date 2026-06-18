@@ -37,6 +37,8 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 // TODO(SERVER-114140): Remove all MONGO_MOD_NEEDS_REPLACEMENT annotations
 
 namespace mongo::sbe {
@@ -85,7 +87,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT SBEColumnMaterializer {
         return value::TagValueView::timestamp(val.asULL());
     }
 
-    static inline Element materialize(BSONElementStorage& allocator, StringData val) {
+    static inline Element materialize(BSONElementStorage& allocator, std::string_view val) {
         if (value::canUseSmallString(val)) {
             return value::makeSmallString(val);
         }
@@ -155,11 +157,11 @@ private:
      * This helper method is used for both bsonJavascript and bsonString data. They both have
      * identical binary representations.
      *
-     * A copy is needed here because the StringData instance will be referencing a 16-byte
+     * A copy is needed here because the std::string_view instance will be referencing a 16-byte
      * decompressed value that is allocated on the stack.
      */
     static inline value::Value copyStringWithLengthPrefix(BSONElementStorage& allocator,
-                                                          StringData data) {
+                                                          std::string_view data) {
         char* storage = allocator.allocate(sizeof(int32_t) + data.size() + 1);
 
         // The length prefix should include the terminating null byte.
@@ -231,7 +233,7 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Timesta
 }
 
 template <>
-inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<StringData>(
+inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<std::string_view>(
     BSONElementStorage& allocator, BSONElement val) {
     dassert(val.type() == BSONType::string, "materialize invoked with incorrect BSONElement type");
 
@@ -284,7 +286,7 @@ inline double SBEColumnMaterializer::get<double>(const Element& elem) {
     return value::bitcastTo<double>(elem.second);
 }
 template <>
-inline StringData SBEColumnMaterializer::get<StringData>(const Element& elem) {
+inline std::string_view SBEColumnMaterializer::get<std::string_view>(const Element& elem) {
     return value::getStringView(elem.first, elem.second);
 }
 template <>

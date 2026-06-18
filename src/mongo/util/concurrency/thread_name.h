@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace MONGO_MOD_PUB mongo {
@@ -89,7 +89,7 @@ public:
         return !!_ptr;
     }
 
-    operator StringData() const {
+    operator std::string_view() const {
         return **this;
     }
 
@@ -155,7 +155,7 @@ inline void setThreadName(std::string name) {
  *
  * Used by the MongoDB GDB pretty printer extentions in `gdb/mongo.py`.
  */
-inline StringData getThreadName() {
+inline std::string_view getThreadName() {
     return *getThreadNameRef();
 }
 

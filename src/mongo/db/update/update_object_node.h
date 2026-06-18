@@ -41,6 +41,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -66,7 +67,7 @@ public:
         modifiertable::ModifierType type,
         BSONElement modExpr,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+        const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
         std::set<std::string>& foundIdentifiers);
 
     /**
@@ -76,10 +77,10 @@ public:
      * identifier to 'foundIdentifiers'.
      */
     static StatusWith<std::string> parseArrayFilterIdentifier(
-        StringData field,
+        std::string_view field,
         size_t position,
         const FieldRef& fieldRef,
-        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+        const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
         std::set<std::string>& foundIdentifiers);
 
     /**

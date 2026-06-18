@@ -31,17 +31,18 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/functional/hash.hpp>
 
 namespace mongo {
 
-StatusWith<HostAndPort> HostAndPort::parse(StringData text) {
+StatusWith<HostAndPort> HostAndPort::parse(std::string_view text) {
     HostAndPort result;
     Status status = result.initialize(text);
     if (!status.isOK()) {
@@ -50,7 +51,7 @@ StatusWith<HostAndPort> HostAndPort::parse(StringData text) {
     return StatusWith<HostAndPort>(result);
 }
 
-Status validateHostAndPort(StringData hostAndPortStr, const boost::optional<TenantId>&) {
+Status validateHostAndPort(std::string_view hostAndPortStr, const boost::optional<TenantId>&) {
     if (hostAndPortStr.empty()) {
         return Status::OK();
     }
@@ -59,7 +60,7 @@ Status validateHostAndPort(StringData hostAndPortStr, const boost::optional<Tena
 
 HostAndPort::HostAndPort() : _port(-1) {}
 
-HostAndPort::HostAndPort(StringData text) {
+HostAndPort::HostAndPort(std::string_view text) {
     uassertStatusOK(initialize(text));
 }
 
@@ -133,13 +134,13 @@ bool HostAndPort::empty() const {
     return _host.empty() && _port < 0;
 }
 
-Status HostAndPort::initialize(StringData s) {
+Status HostAndPort::initialize(std::string_view s) {
     if (s.empty()) {
         return Status(ErrorCodes::FailedToParse, "Cannot parse HostAndPort from empty string");
     }
 
     size_t colonPos = s.rfind(':');
-    StringData hostPart = s.substr(0, colonPos);
+    std::string_view hostPart = s.substr(0, colonPos);
 
     // handle ipv6 hostPart (which we require to be wrapped in []s)
     const size_t openBracketPos = s.find('[');
@@ -184,7 +185,7 @@ Status HostAndPort::initialize(StringData s) {
 
     int port;
     if (colonPos != std::string::npos) {
-        const StringData portPart = s.substr(colonPos + 1);
+        const std::string_view portPart = s.substr(colonPos + 1);
         Status status = NumberParser().base(10)(portPart, &port);
         if (!status.isOK()) {
             return status;

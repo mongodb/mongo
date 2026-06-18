@@ -42,6 +42,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -52,7 +53,7 @@ namespace {
 using namespace mongo;
 using namespace mongo::rpc;
 
-BSONObj addDollarDB(BSONObj command, StringData db) {
+BSONObj addDollarDB(BSONObj command, std::string_view db) {
     return BSONObjBuilder(std::move(command)).append("$db", db).obj();
 }
 

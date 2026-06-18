@@ -36,6 +36,7 @@
 
 #include <fstream>
 #include <string>
+#include <string_view>
 
 #include <wasmtime.hh>
 

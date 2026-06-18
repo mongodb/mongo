@@ -35,6 +35,8 @@
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -58,7 +60,7 @@ public:
 class LiteParsedInternalSearchIdLookUp final
     : public LiteParsedDocumentSourceDefault<LiteParsedInternalSearchIdLookUp> {
 public:
-    static constexpr StringData kStageName = "$_internalSearchIdLookup"_sd;
+    static constexpr std::string_view kStageName = "$_internalSearchIdLookup"_sd;
 
     static std::unique_ptr<LiteParsedInternalSearchIdLookUp> parse(const NamespaceString& nss,
                                                                    const BSONElement& spec,

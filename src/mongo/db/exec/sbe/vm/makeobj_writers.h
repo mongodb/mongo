@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/bson.h"
@@ -38,6 +37,8 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #if defined(_MSC_VER)
 #define MONGO_COMPILER_ALWAYS_INLINE_WITH_INLINE_SPEC MONGO_COMPILER_ALWAYS_INLINE
@@ -97,7 +98,7 @@ public:
     MONGO_COMPILER_ALWAYS_INLINE explicit BsonObjWriter(UniqueBSONObjBuilder bob)
         : _bob(std::move(bob)) {}
 
-    MONGO_COMPILER_ALWAYS_INLINE void appendValue(StringData fieldName,
+    MONGO_COMPILER_ALWAYS_INLINE void appendValue(std::string_view fieldName,
                                                   value::TypeTags tag,
                                                   value::Value val) {
         bson::appendValueToBsonObj(_bob, fieldName, tag, val);
@@ -107,20 +108,20 @@ public:
         _bob.append(bsonElement);
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE BsonObjWriter startObj(StringData fieldName) {
+    MONGO_COMPILER_ALWAYS_INLINE BsonObjWriter startObj(std::string_view fieldName) {
         return BsonObjWriter(UniqueBSONObjBuilder(_bob.subobjStart(fieldName)));
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void finishObj(StringData, BsonObjWriter) {
+    MONGO_COMPILER_ALWAYS_INLINE void finishObj(std::string_view, BsonObjWriter) {
         // Do nothing. The BsonObjWriter class's destructor will perform any necessary finishing
         // steps.
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE BsonArrWriter startArr(StringData fieldName) {
+    MONGO_COMPILER_ALWAYS_INLINE BsonArrWriter startArr(std::string_view fieldName) {
         return BsonArrWriter(UniqueBSONArrayBuilder(_bob.subarrayStart(fieldName)));
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void finishArr(StringData, BsonArrWriter) {
+    MONGO_COMPILER_ALWAYS_INLINE void finishArr(std::string_view, BsonArrWriter) {
         // Do nothing. The BsonArrWriter class's destructor will perform any necessary finishing
         // steps.
     }
@@ -195,28 +196,30 @@ public:
         _obj = std::unique_ptr<value::Object>{value::bitcastTo<value::Object*>(val)};
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void appendValue(StringData fieldName,
+    MONGO_COMPILER_ALWAYS_INLINE void appendValue(std::string_view fieldName,
                                                   value::TypeTags tag,
                                                   value::Value val) {
         auto [copyTag, copyVal] = value::copyValue(tag, val);
         _obj->push_back_raw(fieldName, copyTag, copyVal);
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE ObjectWriter startObj(StringData) {
+    MONGO_COMPILER_ALWAYS_INLINE ObjectWriter startObj(std::string_view) {
         return ObjectWriter();
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void finishObj(StringData fieldName, ObjectWriter nestedWriter) {
+    MONGO_COMPILER_ALWAYS_INLINE void finishObj(std::string_view fieldName,
+                                                ObjectWriter nestedWriter) {
         _obj->push_back_raw(fieldName,
                             value::TypeTags::Object,
                             value::bitcastFrom<value::Object*>(nestedWriter._obj.release()));
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE ArrayWriter startArr(StringData) {
+    MONGO_COMPILER_ALWAYS_INLINE ArrayWriter startArr(std::string_view) {
         return ArrayWriter();
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void finishArr(StringData fieldName, ArrayWriter nestedWriter) {
+    MONGO_COMPILER_ALWAYS_INLINE void finishArr(std::string_view fieldName,
+                                                ArrayWriter nestedWriter) {
         _obj->push_back_raw(fieldName,
                             value::TypeTags::Array,
                             value::bitcastFrom<value::Array*>(nestedWriter._arr.release()));

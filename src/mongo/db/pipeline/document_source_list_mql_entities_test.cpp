@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_list_mql_entities.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/database_name.h"
@@ -44,10 +43,13 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class DocumentSourceListMqlEntitiesTest : public AggregationContextFixture {
 public:
@@ -91,7 +93,7 @@ TEST_F(DocumentSourceListMqlEntitiesTest, Serialize) {
         parse(fromjson("{$listMqlEntities: {'entityType': 'aggregationStages'}}"));
     ASSERT_VALUE_EQ(
         boost::dynamic_pointer_cast<DocumentSourceListMqlEntities>(listMqlEntitiesDS)->serialize(),
-        Value(DOC("$listMqlEntities" << DOC("entityType"_sd << "aggregationStages"_sd))));
+        Value(DOC("$listMqlEntities" << DOC("entityType"sv << "aggregationStages"sv))));
 }
 
 }  // namespace

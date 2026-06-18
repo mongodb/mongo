@@ -30,7 +30,6 @@
 #include "mongo/db/process_health/health_observer.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/process_health/fault.h"

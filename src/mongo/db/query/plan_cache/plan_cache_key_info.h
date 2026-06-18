@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
@@ -39,6 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/container_hash/hash.hpp>
@@ -86,15 +86,16 @@ public:
      * Return the 'indexability discriminators', that is, the plan cache key component after the
      * stable key, but before the boolean indicating whether we are using the classic engine.
      */
-    StringData getIndexabilityDiscriminators() const {
-        return StringData(_key.c_str() + _lengthOfQueryShape, _key.size() - _lengthOfQueryShape);
+    std::string_view getIndexabilityDiscriminators() const {
+        return std::string_view(_key.c_str() + _lengthOfQueryShape,
+                                _key.size() - _lengthOfQueryShape);
     }
 
-    StringData getQueryShapeStringData() const {
-        return StringData(_key.c_str(), _lengthOfQueryShape);
+    std::string_view getQueryShapeStringData() const {
+        return std::string_view(_key.c_str(), _lengthOfQueryShape);
     }
 
-    StringData stringData() const {
+    std::string_view stringData() const {
         return _key;
     }
 

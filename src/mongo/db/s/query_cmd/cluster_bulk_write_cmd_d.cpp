@@ -31,11 +31,14 @@
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/s/commands/query_cmd/cluster_bulk_write_cmd.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 struct ClusterBulkWriteCmdD {
-    static constexpr StringData kName = "clusterBulkWrite"_sd;
+    static constexpr std::string_view kName = "clusterBulkWrite"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;

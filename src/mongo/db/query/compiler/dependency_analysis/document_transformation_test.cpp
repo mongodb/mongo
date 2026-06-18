@@ -37,17 +37,20 @@
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::document_transformation {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace mongo::unittest::match;
 using namespace std::string_literals;
 
 TEST(DocumentTransformationTest, ModifyPathDefaults) {
     ModifyPath op{"a.b.c", ModifiedPrefixPolicy::kNotSupported};
-    EXPECT_EQ(op.getPath(), "a.b.c"_sd);
+    EXPECT_EQ(op.getPath(), "a.b.c"sv);
     EXPECT_TRUE(op.isComputed());
     EXPECT_FALSE(op.isRemoved());
     EXPECT_EQ(op.getExpression(), nullptr);
@@ -56,24 +59,24 @@ TEST(DocumentTransformationTest, ModifyPathDefaults) {
 
 TEST(DocumentTransformationTest, SimpleRenamePathDefaults) {
     RenamePath op{"a", "x"};
-    EXPECT_EQ(op.getNewPath(), "a"_sd);
-    EXPECT_EQ(op.getOldPath(), "x"_sd);
+    EXPECT_EQ(op.getNewPath(), "a"sv);
+    EXPECT_EQ(op.getOldPath(), "x"sv);
     EXPECT_EQ(op.getNewPathMaxArrayTraversals(), 0);
     EXPECT_EQ(op.getOldPathMaxArrayTraversals(), 0);
 }
 
 TEST(DocumentTransformationTest, ComplexRenamePathDefaults) {
     RenamePath op{"a", "x.y"};
-    EXPECT_EQ(op.getNewPath(), "a"_sd);
-    EXPECT_EQ(op.getOldPath(), "x.y"_sd);
+    EXPECT_EQ(op.getNewPath(), "a"sv);
+    EXPECT_EQ(op.getOldPath(), "x.y"sv);
     EXPECT_EQ(op.getNewPathMaxArrayTraversals(), 0);
     EXPECT_EQ(op.getOldPathMaxArrayTraversals(), 1);
 }
 
 TEST(DocumentTransformationTest, OtherRenamePathDefaults) {
     RenamePath op{"a.b.c", "x.y.z"};
-    EXPECT_EQ(op.getNewPath(), "a.b.c"_sd);
-    EXPECT_EQ(op.getOldPath(), "x.y.z"_sd);
+    EXPECT_EQ(op.getNewPath(), "a.b.c"sv);
+    EXPECT_EQ(op.getOldPath(), "x.y.z"sv);
     EXPECT_EQ(op.getNewPathMaxArrayTraversals(), 2);
     EXPECT_EQ(op.getOldPathMaxArrayTraversals(), 2);
 }
@@ -107,8 +110,8 @@ TEST(DocumentTransformationTest, WorksWithOverloadedVisitor) {
         test);
 
     EXPECT_TRUE(replaced);
-    EXPECT_EQ(preserved, "preserve"_sd);
-    EXPECT_EQ(modified, "modify"_sd);
+    EXPECT_EQ(preserved, "preserve"sv);
+    EXPECT_EQ(modified, "modify"sv);
     EXPECT_EQ(renamed, std::make_pair("renameTo"s, "renameFrom"s));
 }
 
@@ -347,52 +350,52 @@ TEST(DocumentTransformationTest, FromFiniteSetWithComplexRename) {
 }
 
 TEST(DocumentTransformationTest, DescribeInclusionPathsWithoutPrefix) {
-    std::vector<StringData> paths{"a"_sd, "b.c"_sd};
+    std::vector<std::string_view> paths{"a"sv, "b.c"sv};
 
     TestVisitor visitor;
     visitor(ReplaceRoot{});
     document_transformation::describeProjectedPaths(
         visitor, paths.begin(), paths.end(), {}, /* isInclusion */ true);
 
-    EXPECT_THAT(visitor.preserved, UnorderedElementsAre("a"_sd, "b.c"_sd));
+    EXPECT_THAT(visitor.preserved, UnorderedElementsAre("a"sv, "b.c"sv));
     EXPECT_THAT(visitor.modified, IsEmpty());
     EXPECT_THAT(visitor.renamed, IsEmpty());
 }
 
 TEST(DocumentTransformationTest, DescribeInclusionPathsWithPrefix) {
-    std::vector<StringData> paths{"a"_sd, "b.c"_sd};
+    std::vector<std::string_view> paths{"a"sv, "b.c"sv};
 
     TestVisitor visitor;
     visitor(ReplaceRoot{});
     document_transformation::describeProjectedPaths(
         visitor, paths.begin(), paths.end(), "root", /* isInclusion */ true);
 
-    EXPECT_THAT(visitor.preserved, UnorderedElementsAre("root.a"_sd, "root.b.c"_sd));
+    EXPECT_THAT(visitor.preserved, UnorderedElementsAre("root.a"sv, "root.b.c"sv));
     EXPECT_THAT(visitor.modified, IsEmpty());
     EXPECT_THAT(visitor.renamed, IsEmpty());
 }
 
 TEST(DocumentTransformationTest, DescribeExclusionPathsWithoutPrefix) {
-    std::vector<StringData> paths{"a"_sd, "b.c"_sd};
+    std::vector<std::string_view> paths{"a"sv, "b.c"sv};
 
     TestVisitor visitor;
     document_transformation::describeProjectedPaths(
         visitor, paths.begin(), paths.end(), {}, /* isInclusion */ false);
 
     EXPECT_THAT(visitor.preserved, IsEmpty());
-    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"_sd, "b.c"_sd));
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"sv, "b.c"sv));
     EXPECT_THAT(visitor.renamed, IsEmpty());
 }
 
 TEST(DocumentTransformationTest, DescribeExclusionPathsWithPrefix) {
-    std::vector<StringData> paths{"a"_sd, "b.c"_sd};
+    std::vector<std::string_view> paths{"a"sv, "b.c"sv};
 
     TestVisitor visitor;
     document_transformation::describeProjectedPaths(
         visitor, paths.begin(), paths.end(), "root", /* isInclusion */ false);
 
     EXPECT_THAT(visitor.preserved, IsEmpty());
-    EXPECT_THAT(visitor.modified, UnorderedElementsAre("root.a"_sd, "root.b.c"_sd));
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("root.a"sv, "root.b.c"sv));
     EXPECT_THAT(visitor.renamed, IsEmpty());
 }
 
@@ -406,7 +409,7 @@ TEST(DocumentTransformationTest, DescribeComputedPathsWithoutPrefix) {
     document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
 
     EXPECT_THAT(visitor.preserved, IsEmpty());
-    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"_sd, "b.c"_sd));
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"sv, "b.c"sv));
     EXPECT_THAT(visitor.renamed, IsEmpty());
 }
 
@@ -420,7 +423,7 @@ TEST(DocumentTransformationTest, DescribeComputedPathsWithPrefix) {
     document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), "root");
 
     EXPECT_THAT(visitor.preserved, IsEmpty());
-    EXPECT_THAT(visitor.modified, UnorderedElementsAre("root.a"_sd, "root.b.c"_sd));
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("root.a"sv, "root.b.c"sv));
     EXPECT_THAT(visitor.renamed, IsEmpty());
 }
 
@@ -581,7 +584,7 @@ TEST(DocumentTransformationTest, DescribeComputedPathsObjectModifications) {
     document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
 
     EXPECT_THAT(visitor.preserved, IsEmpty());
-    EXPECT_THAT(visitor.modified, UnorderedElementsAre("_id.a"_sd, "_id.b.c"_sd));
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("_id.a"sv, "_id.b.c"sv));
     EXPECT_THAT(visitor.renamed, IsEmpty());
 }
 
@@ -668,7 +671,7 @@ TEST(DocumentTransformationTest, DescribeComputedPathsObjectMixed) {
     document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
 
     EXPECT_THAT(visitor.preserved, IsEmpty());
-    EXPECT_THAT(visitor.modified, UnorderedElementsAre("_id.a.c"_sd, "_id.d"_sd));
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("_id.a.c"sv, "_id.d"sv));
     EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("_id.a.b"s, "x.y.z"s)));
     // _id.a and _id.a.b cannot contain arrays.
     EXPECT_EQ(visitor.maxArrayTraversals.at("_id.a.b"s), std::make_pair(0, 2));
@@ -685,7 +688,7 @@ TEST(DocumentTransformationTest, DescribeComputedPathsObjectROOT) {
     document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
 
     EXPECT_THAT(visitor.preserved, IsEmpty());
-    EXPECT_THAT(visitor.modified, UnorderedElementsAre("_id.a"_sd, "_id.d"_sd));
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("_id.a"sv, "_id.d"sv));
     EXPECT_THAT(visitor.renamed, IsEmpty());
 }
 

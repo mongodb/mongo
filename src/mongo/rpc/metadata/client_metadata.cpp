@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -55,6 +54,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -64,23 +64,24 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
-constexpr auto kClientMetadataFieldName = "$client"_sd;
+constexpr auto kClientMetadataFieldName = "$client"sv;
 
-constexpr auto kApplication = "application"_sd;
-constexpr auto kDriver = "driver"_sd;
-constexpr auto kOperatingSystem = "os"_sd;
+constexpr auto kApplication = "application"sv;
+constexpr auto kDriver = "driver"sv;
+constexpr auto kOperatingSystem = "os"sv;
 
-constexpr auto kArchitecture = "architecture"_sd;
-constexpr auto kName = "name"_sd;
-constexpr auto kPid = "pid"_sd;
-constexpr auto kType = "type"_sd;
-constexpr auto kVersion = "version"_sd;
+constexpr auto kArchitecture = "architecture"sv;
+constexpr auto kName = "name"sv;
+constexpr auto kPid = "pid"sv;
+constexpr auto kType = "type"sv;
+constexpr auto kVersion = "version"sv;
 
-constexpr auto kMongoS = "mongos"_sd;
-constexpr auto kHost = "host"_sd;
-constexpr auto kClient = "client"_sd;
+constexpr auto kMongoS = "mongos"sv;
+constexpr auto kHost = "host"sv;
+constexpr auto kClient = "client"sv;
 
 constexpr uint32_t kMaxMongoSMetadataDocumentByteLength = 512U;
 // Due to MongoS appending more information to the client metadata document, we use a higher limit
@@ -122,7 +123,7 @@ ClientMetadata::ClientMetadata(BSONObj doc) {
                           << maxLength << " bytes",
             static_cast<uint32_t>(doc.objsize()) <= maxLength);
 
-    const auto isobj = [](StringData name, const BSONElement& e) {
+    const auto isobj = [](std::string_view name, const BSONElement& e) {
         uassert(ErrorCodes::TypeMismatch,
                 str::stream()
                     << "The '" << name
@@ -175,7 +176,7 @@ StatusWith<std::string> ClientMetadata::parseApplicationDocument(const BSONObj& 
 
     while (i.more()) {
         BSONElement e = i.next();
-        StringData name = e.fieldNameStringData();
+        std::string_view name = e.fieldNameStringData();
 
         // Name is the only required field, and any other fields are simply ignored.
         if (name == kName) {
@@ -211,7 +212,7 @@ Status ClientMetadata::validateDriverDocument(const BSONObj& doc) {
     BSONObjIterator i(doc);
     while (i.more()) {
         BSONElement e = i.next();
-        StringData name = e.fieldNameStringData();
+        std::string_view name = e.fieldNameStringData();
 
         if (name == kName) {
             if (e.type() != BSONType::string) {
@@ -255,7 +256,7 @@ Status ClientMetadata::validateOperatingSystemDocument(const BSONObj& doc) {
     BSONObjIterator i(doc);
     while (i.more()) {
         BSONElement e = i.next();
-        StringData name = e.fieldNameStringData();
+        std::string_view name = e.fieldNameStringData();
 
         if (name == kType) {
             if (e.type() != BSONType::string) {
@@ -278,9 +279,9 @@ Status ClientMetadata::validateOperatingSystemDocument(const BSONObj& doc) {
     return Status::OK();
 }
 
-void ClientMetadata::setMongoSMetadata(StringData hostAndPort,
-                                       StringData mongosClient,
-                                       StringData version) {
+void ClientMetadata::setMongoSMetadata(std::string_view hostAndPort,
+                                       std::string_view mongosClient,
+                                       std::string_view version) {
     _documentWithoutMongosInfo = _document;
     BSONObjBuilder builder;
     builder.appendElements(_document);
@@ -295,8 +296,8 @@ void ClientMetadata::setMongoSMetadata(StringData hostAndPort,
     _document = builder.obj();
 }
 
-void ClientMetadata::serialize(StringData driverName,
-                               StringData driverVersion,
+void ClientMetadata::serialize(std::string_view driverName,
+                               std::string_view driverVersion,
                                BSONObjBuilder* builder) {
 
     ProcessInfo processInfo;
@@ -305,7 +306,7 @@ void ClientMetadata::serialize(StringData driverName,
     if (TestingProctor::instance().isEnabled()) {
         appName = processInfo.getProcessName();
         if (appName.length() > kMaxApplicationNameByteLength) {
-            static constexpr auto kEllipsis = "..."_sd;
+            static constexpr auto kEllipsis = "..."sv;
             appName.replace(appName.begin() + kMaxApplicationNameByteLength - kEllipsis.size(),
                             appName.end(),
                             kEllipsis.begin(),
@@ -324,9 +325,9 @@ void ClientMetadata::serialize(StringData driverName,
         .ignore();
 }
 
-Status ClientMetadata::serialize(StringData driverName,
-                                 StringData driverVersion,
-                                 StringData appName,
+Status ClientMetadata::serialize(std::string_view driverName,
+                                 std::string_view driverVersion,
+                                 std::string_view appName,
                                  BSONObjBuilder* builder) {
 
     ProcessInfo processInfo;
@@ -341,13 +342,13 @@ Status ClientMetadata::serialize(StringData driverName,
                             builder);
 }
 
-Status ClientMetadata::serializePrivate(StringData driverName,
-                                        StringData driverVersion,
-                                        StringData osType,
-                                        StringData osName,
-                                        StringData osArchitecture,
-                                        StringData osVersion,
-                                        StringData appName,
+Status ClientMetadata::serializePrivate(std::string_view driverName,
+                                        std::string_view driverVersion,
+                                        std::string_view osType,
+                                        std::string_view osName,
+                                        std::string_view osArchitecture,
+                                        std::string_view osVersion,
+                                        std::string_view appName,
                                         BSONObjBuilder* builder) {
     if (appName.size() > kMaxApplicationNameByteLength) {
         return Status(ErrorCodes::ClientMetadataAppNameTooLarge,
@@ -386,12 +387,12 @@ Status ClientMetadata::serializePrivate(StringData driverName,
     return Status::OK();
 }
 
-StringData ClientMetadata::getApplicationName() const {
-    return StringData(_appName);
+std::string_view ClientMetadata::getApplicationName() const {
+    return std::string_view(_appName);
 }
 
-StringData ClientMetadata::getDriverName() const {
-    return StringData(_driverName);
+std::string_view ClientMetadata::getDriverName() const {
+    return std::string_view(_driverName);
 }
 
 const BSONObj& ClientMetadata::getDocument() const {
@@ -417,12 +418,12 @@ void ClientMetadata::logClientMetadata(Client* client) const {
 
     auto negotiatedCompressors =
         MessageCompressorManager::forSession(client->session()).getNegotiatedCompressors();
-    std::vector<StringData> negotiatedCompressorNames(negotiatedCompressors.size());
+    std::vector<std::string_view> negotiatedCompressorNames(negotiatedCompressors.size());
     std::transform(
         negotiatedCompressors.begin(),
         negotiatedCompressors.end(),
         negotiatedCompressorNames.begin(),
-        [](auto& messageCompressor) { return StringData(messageCompressor->getName()); });
+        [](auto& messageCompressor) { return std::string_view(messageCompressor->getName()); });
 
     LOGV2(51800,
           "client metadata",
@@ -432,7 +433,7 @@ void ClientMetadata::logClientMetadata(Client* client) const {
           "doc"_attr = getDocument());
 }
 
-StringData ClientMetadata::fieldName() {
+std::string_view ClientMetadata::fieldName() {
     return kClientMetadataFieldName;
 }
 

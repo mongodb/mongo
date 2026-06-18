@@ -31,7 +31,6 @@
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"

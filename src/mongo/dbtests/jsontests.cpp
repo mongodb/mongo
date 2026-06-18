@@ -31,6 +31,7 @@
  * Tests for json.{h,cpp} code and BSONObj::jsonString()
  */
 
+
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -40,6 +41,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -56,7 +58,6 @@
 // IWYU pragma: no_include "boost/property_tree/detail/exception_implementation.hpp"
 // IWYU pragma: no_include "boost/property_tree/detail/ptree_implementation.hpp"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -82,6 +83,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 using unittest::assertGet;
@@ -1284,10 +1286,10 @@ void assertErrorWithContext(std::string inputjson,
         ASSERT(false) << "Expected to fail to parse";
     } catch (const DBException& ex) {
         const auto status = ex.toStatus();
-        const StringData reason = status.reason();
+        const std::string_view reason = status.reason();
         LOGV2_DEBUG(7583700, 3, "Indeeded failed to parse", "reason"_attr = status);
         for (auto&& expectedChar : expectedContextChars) {
-            auto contextStart = reason.find(':', reason.find("Bad character"_sd));
+            auto contextStart = reason.find(':', reason.find("Bad character"sv));
             ASSERT_NE(contextStart, std::string::npos);
             auto contextEnd = reason.find("Full input:");
             ASSERT_NE(contextStart, std::string::npos);

@@ -38,6 +38,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/none.hpp>
@@ -56,7 +57,7 @@ public:
     /**
      * The name of this stage.
      */
-    static constexpr StringData kStageName = "$geoNearCursor"_sd;
+    static constexpr std::string_view kStageName = "$geoNearCursor"_sd;
 
     /**
      * Create a new DocumentSourceGeoNearCursor. If specified, 'distanceMultiplier' must be
@@ -69,7 +70,7 @@ public:
         boost::optional<FieldPath> locationField = boost::none,
         double distanceMultiplier = 1.0);
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

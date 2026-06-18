@@ -28,13 +28,13 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/util/modules.h"
 
 #include <concepts>
+#include <string_view>
 #include <utility>
 
 MONGO_MOD_PUBLIC;
@@ -45,7 +45,7 @@ namespace server_parameter_guard_detail {
  * Used to check if the provided value can be appended to a BSONObjBuilder.
  */
 template <typename T>
-concept IsBSONAppendable = requires(BSONObjBuilder builder, StringData name, T value) {
+concept IsBSONAppendable = requires(BSONObjBuilder builder, std::string_view name, T value) {
     { builder.append(name, value) };
 };
 
@@ -89,7 +89,7 @@ public:
     template <typename T>
     requires server_parameter_guard_detail::IsBSONAppendable<T> ||
         server_parameter_guard_detail::HasToBSON<T>
-    ServerParameterGuard(StringData name, T value) {
+    ServerParameterGuard(std::string_view name, T value) {
         // T must satisfy one of the following criteria:
         //    1. T can be coerced into a type accepted by one of the overloads of
         //    BSONObjBuilder::append(), or
@@ -126,7 +126,7 @@ public:
 
             // Correspondingly, the new parameter value needs to be set by synthesizing a BSONObj
             // that independently includes the name under the _id field.
-            newParamBuilder.append("_id"_sd, name);
+            newParamBuilder.append("_id", name);
             newParamBuilder.appendElementsUnique(value.toBSON());
             uassertStatusOK(serverParam->set(newParamBuilder.obj(), boost::none));
         }

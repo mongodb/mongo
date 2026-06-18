@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -117,7 +117,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void invokeCommandOnShardWithIdempotentRetryPolicy(
  */
 MONGO_MOD_NEEDS_REPLACEMENT void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     OperationContext* opCtx,
-    StringData taskDescription,
+    std::string_view taskDescription,
     std::function<void(OperationContext*)> doWork,
     boost::optional<Backoff> backoff = boost::none);
 

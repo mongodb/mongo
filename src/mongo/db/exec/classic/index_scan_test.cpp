@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/classic/index_scan.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/classic/collection_scan.h"
@@ -40,6 +39,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 namespace mongo {
 namespace {
 
@@ -60,7 +60,7 @@ public:
         ASSERT_OK(replCoordMock->setFollowerMode(repl::MemberState::RS_PRIMARY));
     }
 
-    void createIndex(StringData name, BSONObj keys) {
+    void createIndex(std::string_view name, BSONObj keys) {
         _client->createCollection(kNss);
         IndexSpec spec;
         spec.name(name);
@@ -76,7 +76,7 @@ public:
     }
 
 
-    const IndexCatalogEntry* getIndexEntry(StringData name) {
+    const IndexCatalogEntry* getIndexEntry(std::string_view name) {
         return getCollection().getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx.get(),
                                                                                       name);
     }

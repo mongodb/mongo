@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -41,6 +40,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -54,7 +54,7 @@ auto updateRoundTrip(const char* json, const std::vector<std::string> filterName
     UpdateDriver driver(new ExpressionContextForTest);
     auto bson = mongo::fromjson(json);
     // Include some trivial array filters to allow parsing '$[<identifier>]'.
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> filters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> filters;
     for (const auto& name : filterNames)
         filters[name] = nullptr;
     driver.parse(write_ops::UpdateModification::parseFromClassicUpdate(bson), filters);

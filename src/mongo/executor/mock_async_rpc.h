@@ -38,7 +38,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -72,6 +71,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -95,7 +95,10 @@ namespace MONGO_MOD_PUBLIC async_rpc {
  */
 class RequestInfo {
 public:
-    RequestInfo(BSONObj cmd, StringData dbName, HostAndPort target, Promise<BSONObj>&& promise)
+    RequestInfo(BSONObj cmd,
+                std::string_view dbName,
+                HostAndPort target,
+                Promise<BSONObj>&& promise)
         : _cmd{cmd}, _dbName{dbName}, _target{target}, _responsePromise{std::move(promise)} {}
 
     bool isFinished() const {
@@ -114,7 +117,7 @@ public:
     }
 
     BSONObj _cmd;
-    StringData _dbName;
+    std::string_view _dbName;
     HostAndPort _target;
 
 private:

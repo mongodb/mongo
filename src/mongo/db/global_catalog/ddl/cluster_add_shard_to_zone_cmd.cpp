@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -53,6 +52,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -100,7 +100,7 @@ public:
             return {};
         }
 
-        StringData getShard() const {
+        std::string_view getShard() const {
             return request().getCommandParameter();
         }
 

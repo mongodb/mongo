@@ -34,6 +34,8 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 
 namespace mongo {
 
@@ -66,7 +68,7 @@ std::string IndexEntry::toString() const {
     return sb.str();
 }
 
-bool IndexEntry::pathHasMultikeyComponent(StringData indexedField) const {
+bool IndexEntry::pathHasMultikeyComponent(std::string_view indexedField) const {
     if (multikeyPaths.empty()) {
         // The index has no path-level multikeyness metadata.
         return multikey;

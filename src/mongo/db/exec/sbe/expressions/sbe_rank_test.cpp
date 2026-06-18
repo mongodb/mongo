@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
@@ -39,6 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -201,7 +201,7 @@ TEST_F(SBERankTest, ComputeRankWithCollation) {
     collatorAccessor.reset(value::TypeTags::collator,
                            value::bitcastFrom<CollatorInterfaceMock*>(collator.get()));
 
-    std::vector<StringData> values{"aaa", "bbb", "BBB", "bBb", "ccc"};
+    std::vector<std::string_view> values{"aaa", "bbb", "BBB", "bBb", "ccc"};
     std::vector<int> ranks{1, 2, 2, 2, 5};
     std::vector<int> denseRanks{1, 2, 2, 2, 3};
     for (size_t i = 0; i < values.size(); i++) {

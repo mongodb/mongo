@@ -52,6 +52,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 
 class MigrationDestinationManagerTest : public ShardServerTestFixture {
@@ -200,7 +201,7 @@ TEST_F(MigrationDestinationManagerNetworkTest,
 
     auto future = launchAsync([&] {
         onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listCollections"_sd);
+            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listCollections"sv);
             ASSERT_EQUALS(request.target, HostAndPort("Host0:12345"));
             ASSERT_FALSE(request.cmdObj.hasField("readConcern"));
             ASSERT_FALSE(request.cmdObj.hasField("databaseVersion"));
@@ -227,7 +228,7 @@ TEST_F(MigrationDestinationManagerNetworkTest,
 
     future = launchAsync([&] {
         onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listIndexes"_sd);
+            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listIndexes"sv);
             ASSERT_EQUALS(request.target, HostAndPort("Host0:12345"));
             ASSERT_FALSE(request.cmdObj.hasField("readConcern"));
             ASSERT_FALSE(request.cmdObj.hasField("shardVersion"));

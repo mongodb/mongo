@@ -32,7 +32,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +50,7 @@
 #include <initializer_list>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -62,10 +62,11 @@
 
 namespace mongo::auth {
 namespace {
-constexpr auto kActions = "actions"_sd;
-constexpr auto kResource = "resource"_sd;
-const BSONObj kClusterResource = BSON("cluster"_sd << true);
-const BSONArray kFindActions = BSON_ARRAY("find"_sd);
+using namespace std::literals::string_view_literals;
+constexpr auto kActions = "actions"sv;
+constexpr auto kResource = "resource"sv;
+const BSONObj kClusterResource = BSON("cluster"sv << true);
+const BSONArray kFindActions = BSON_ARRAY("find"sv);
 
 TEST(PrivilegeParserTest, IsNotValidTest) {
     IDLParserContext ctx("IsNotValidTest");
@@ -73,7 +74,7 @@ TEST(PrivilegeParserTest, IsNotValidTest) {
     // must have resource
     const BSONObj noRsrc = BSON(kActions << kFindActions);
     constexpr auto noRsrcExpect =
-        "BSON field 'IsNotValidTest.resource' is missing but a required field"_sd;
+        "BSON field 'IsNotValidTest.resource' is missing but a required field"sv;
     ASSERT_THROWS_CODE_AND_WHAT(ParsedPrivilege::parse(noRsrc, ctx),
                                 DBException,
                                 ErrorCodes::IDLFailedToParse,
@@ -82,7 +83,7 @@ TEST(PrivilegeParserTest, IsNotValidTest) {
     // must have actions
     const BSONObj noActions = BSON(kResource << kClusterResource);
     constexpr auto noActionsExpect =
-        "BSON field 'IsNotValidTest.actions' is missing but a required field"_sd;
+        "BSON field 'IsNotValidTest.actions' is missing but a required field"sv;
     ASSERT_THROWS_CODE_AND_WHAT(ParsedPrivilege::parse(noActions, ctx),
                                 DBException,
                                 ErrorCodes::IDLFailedToParse,
@@ -95,57 +96,57 @@ Privilege resolvePrivilege(BSONObj obj, std::vector<std::string>* unrecognized =
     return Privilege::resolvePrivilegeWithTenant(boost::none /* tenantId */, pp, unrecognized);
 }
 
-const std::set<StringData> kBoolResourceTypes = {
-    "cluster"_sd,
-    "anyResource"_sd,
+const std::set<std::string_view> kBoolResourceTypes = {
+    "cluster"sv,
+    "anyResource"sv,
 };
 
-const std::set<StringData> kAllResourceTypes = {
-    "cluster"_sd,
-    "anyResource"_sd,
-    "db"_sd,
-    "collection"_sd,
-    "system_buckets"_sd,
+const std::set<std::string_view> kAllResourceTypes = {
+    "cluster"sv,
+    "anyResource"sv,
+    "db"sv,
+    "collection"sv,
+    "system_buckets"sv,
 };
 
-BSONObj makeResource(const boost::optional<StringData>& db,
-                     const boost::optional<StringData>& collection,
-                     const boost::optional<StringData>& system_buckets) {
+BSONObj makeResource(const boost::optional<std::string_view>& db,
+                     const boost::optional<std::string_view>& collection,
+                     const boost::optional<std::string_view>& system_buckets) {
     BSONObjBuilder builder;
     if (db) {
-        builder.append("db"_sd, db.get());
+        builder.append("db"sv, db.get());
     }
     if (collection) {
-        builder.append("collection"_sd, collection.get());
+        builder.append("collection"sv, collection.get());
     }
     if (system_buckets) {
-        builder.append("system_buckets"_sd, system_buckets.get());
+        builder.append("system_buckets"sv, system_buckets.get());
     }
     return builder.obj();
 }
 
 TEST(PrivilegeParserTest, CombiningTypesNegative) {
     // resource can't have cluster or anyResource with other keys
-    for (StringData primary : {"cluster"_sd, "anyResource"_sd}) {
-        for (StringData secondary : kAllResourceTypes) {
+    for (std::string_view primary : {"cluster"sv, "anyResource"sv}) {
+        for (std::string_view secondary : kAllResourceTypes) {
             if (primary == secondary) {
                 continue;
             }
 
             BSONObjBuilder builder;
             {
-                BSONObjBuilder rsrcBuilder(builder.subobjStart("resource"_sd));
+                BSONObjBuilder rsrcBuilder(builder.subobjStart("resource"sv));
                 rsrcBuilder.append(primary, true);
                 if (kBoolResourceTypes.count(secondary) > 0) {
                     rsrcBuilder.append(secondary, true);
                 } else {
-                    rsrcBuilder.append(secondary, "foo"_sd);
+                    rsrcBuilder.append(secondary, "foo"sv);
                 }
                 rsrcBuilder.doneFast();
             }
-            builder.append("actions"_sd, kFindActions);
+            builder.append("actions"sv, kFindActions);
 
-            if (secondary == "cluster"_sd) {
+            if (secondary == "cluster"sv) {
                 // Error messages treat cluster as always primary.
                 std::swap(primary, secondary);
             }
@@ -160,24 +161,24 @@ TEST(PrivilegeParserTest, CombiningTypesNegative) {
 
     // collection and system_buckets may not co-exist
     ASSERT_THROWS_CODE_AND_WHAT(
-        resolvePrivilege(BSON("resource"_sd << makeResource("db"_sd, "coll"_sd, "bucket"_sd)
-                                            << "actions"_sd << kFindActions)),
+        resolvePrivilege(BSON("resource"sv << makeResource("db"sv, "coll"sv, "bucket"sv)
+                                           << "actions"sv << kFindActions)),
         DBException,
         ErrorCodes::BadValue,
         "resource: {collection: '...'} conflicts with resource type 'system_buckets'");
 
     // db requires collection (or system_buckets)
     ASSERT_THROWS_CODE_AND_WHAT(
-        resolvePrivilege(BSON("resource"_sd << makeResource("db"_sd, boost::none, boost::none)
-                                            << "actions"_sd << kFindActions)),
+        resolvePrivilege(BSON("resource"sv << makeResource("db"sv, boost::none, boost::none)
+                                           << "actions"sv << kFindActions)),
         DBException,
         ErrorCodes::BadValue,
         "resource pattern must contain 'collection' or 'systemBuckets' specifier");
 
     // resource can't have collection without db
     ASSERT_THROWS_CODE_AND_WHAT(
-        resolvePrivilege(BSON("resource"_sd << makeResource(boost::none, "coll"_sd, boost::none)
-                                            << "actions"_sd << kFindActions)),
+        resolvePrivilege(BSON("resource"sv << makeResource(boost::none, "coll"sv, boost::none)
+                                           << "actions"sv << kFindActions)),
         DBException,
         ErrorCodes::BadValue,
         "resource {collection: '...'} must include 'db' field as well");
@@ -186,107 +187,106 @@ TEST(PrivilegeParserTest, CombiningTypesNegative) {
 TEST(PrivilegeParserTest, IsValidTest) {
     // Works with cluster resource
     auto clusterPriv =
-        resolvePrivilege(BSON("resource"_sd << kClusterResource << "actions"_sd << kFindActions));
+        resolvePrivilege(BSON("resource"sv << kClusterResource << "actions"sv << kFindActions));
     ASSERT_TRUE(clusterPriv.getResourcePattern().isClusterResourcePattern());
 
     // Works with anyResource resource
     auto anyResourcePriv = resolvePrivilege(
-        BSON("resource"_sd << BSON("anyResource"_sd << true) << "actions"_sd << kFindActions));
+        BSON("resource"sv << BSON("anyResource"sv << true) << "actions"sv << kFindActions));
     ASSERT_TRUE(anyResourcePriv.getResourcePattern().isAnyResourcePattern());
 
     // Works with wildcard db and resource
-    auto anyNormalPriv = resolvePrivilege(BSON(
-        "resource"_sd << makeResource(""_sd, ""_sd, boost::none) << "actions"_sd << kFindActions));
+    auto anyNormalPriv = resolvePrivilege(
+        BSON("resource"sv << makeResource(""sv, ""sv, boost::none) << "actions"sv << kFindActions));
     ASSERT_TRUE(anyNormalPriv.getResourcePattern().isAnyNormalResourcePattern());
 
     // Works with real db and collection
     auto exactNSSPriv =
-        resolvePrivilege(BSON("resource"_sd << makeResource("db1"_sd, "coll"_sd, boost::none)
-                                            << "actions"_sd << kFindActions));
+        resolvePrivilege(BSON("resource"sv << makeResource("db1"sv, "coll"sv, boost::none)
+                                           << "actions"sv << kFindActions));
     ASSERT_TRUE(exactNSSPriv.getResourcePattern().isExactNamespacePattern());
-    ASSERT_EQ(exactNSSPriv.getResourcePattern().dbNameToMatch().toString_forTest(), "db1"_sd);
-    ASSERT_EQ(exactNSSPriv.getResourcePattern().collectionToMatch(), "coll"_sd);
+    ASSERT_EQ(exactNSSPriv.getResourcePattern().dbNameToMatch().toString_forTest(), "db1"sv);
+    ASSERT_EQ(exactNSSPriv.getResourcePattern().collectionToMatch(), "coll"sv);
 
     // Works with any bucket in any db (implicit)
     auto anyBucketImplicit =
-        resolvePrivilege(BSON("resource"_sd << makeResource(boost::none, boost::none, ""_sd)
-                                            << "actions"_sd << kFindActions));
+        resolvePrivilege(BSON("resource"sv << makeResource(boost::none, boost::none, ""sv)
+                                           << "actions"sv << kFindActions));
     ASSERT_TRUE(anyBucketImplicit.getResourcePattern().isAnySystemBucketsCollection());
-    ASSERT_EQ(anyBucketImplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""_sd);
-    ASSERT_EQ(anyBucketImplicit.getResourcePattern().collectionToMatch(), ""_sd);
+    ASSERT_EQ(anyBucketImplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""sv);
+    ASSERT_EQ(anyBucketImplicit.getResourcePattern().collectionToMatch(), ""sv);
 
     // Works with any bucket in any db (explicit)
-    auto anyBucketExplicit = resolvePrivilege(BSON(
-        "resource"_sd << makeResource(""_sd, boost::none, ""_sd) << "actions"_sd << kFindActions));
+    auto anyBucketExplicit = resolvePrivilege(
+        BSON("resource"sv << makeResource(""sv, boost::none, ""sv) << "actions"sv << kFindActions));
     ASSERT_TRUE(anyBucketExplicit.getResourcePattern().isAnySystemBucketsCollection());
-    ASSERT_EQ(anyBucketExplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""_sd);
-    ASSERT_EQ(anyBucketExplicit.getResourcePattern().collectionToMatch(), ""_sd);
+    ASSERT_EQ(anyBucketExplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""sv);
+    ASSERT_EQ(anyBucketExplicit.getResourcePattern().collectionToMatch(), ""sv);
 
     // Works with system_buckets in any db (implicit)
     auto bucketAnyDBImplicit =
-        resolvePrivilege(BSON("resource"_sd << makeResource(boost::none, boost::none, "bucket"_sd)
-                                            << "actions"_sd << kFindActions));
+        resolvePrivilege(BSON("resource"sv << makeResource(boost::none, boost::none, "bucket"sv)
+                                           << "actions"sv << kFindActions));
     ASSERT_TRUE(bucketAnyDBImplicit.getResourcePattern().isAnySystemBucketsCollectionInAnyDB());
-    ASSERT_EQ(bucketAnyDBImplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""_sd);
-    ASSERT_EQ(bucketAnyDBImplicit.getResourcePattern().collectionToMatch(), "bucket"_sd);
+    ASSERT_EQ(bucketAnyDBImplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""sv);
+    ASSERT_EQ(bucketAnyDBImplicit.getResourcePattern().collectionToMatch(), "bucket"sv);
 
     // Works with system_buckets in any db (explicit)
     auto bucketAnyDBExplicit =
-        resolvePrivilege(BSON("resource"_sd << makeResource(""_sd, boost::none, "bucket"_sd)
-                                            << "actions"_sd << kFindActions));
+        resolvePrivilege(BSON("resource"sv << makeResource(""sv, boost::none, "bucket"sv)
+                                           << "actions"sv << kFindActions));
     ASSERT_TRUE(bucketAnyDBExplicit.getResourcePattern().isAnySystemBucketsCollectionInAnyDB());
-    ASSERT_EQ(bucketAnyDBExplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""_sd);
-    ASSERT_EQ(bucketAnyDBExplicit.getResourcePattern().collectionToMatch(), "bucket"_sd);
+    ASSERT_EQ(bucketAnyDBExplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""sv);
+    ASSERT_EQ(bucketAnyDBExplicit.getResourcePattern().collectionToMatch(), "bucket"sv);
 
     // Works with any system_bucket in specific db
-    auto bucketInDB =
-        resolvePrivilege(BSON("resource"_sd << makeResource("db1"_sd, boost::none, ""_sd)
-                                            << "actions"_sd << kFindActions));
+    auto bucketInDB = resolvePrivilege(BSON("resource"sv << makeResource("db1"sv, boost::none, ""sv)
+                                                         << "actions"sv << kFindActions));
     ASSERT_TRUE(bucketInDB.getResourcePattern().isAnySystemBucketsCollectionInDB());
-    ASSERT_EQ(bucketInDB.getResourcePattern().dbNameToMatch().toString_forTest(), "db1"_sd);
-    ASSERT_EQ(bucketInDB.getResourcePattern().collectionToMatch(), ""_sd);
+    ASSERT_EQ(bucketInDB.getResourcePattern().dbNameToMatch().toString_forTest(), "db1"sv);
+    ASSERT_EQ(bucketInDB.getResourcePattern().collectionToMatch(), ""sv);
 
     // Works with exact system buckets namespace.
     auto exactBucket =
-        resolvePrivilege(BSON("resource"_sd << makeResource("db1"_sd, boost::none, "bucket"_sd)
-                                            << "actions"_sd << kFindActions));
+        resolvePrivilege(BSON("resource"sv << makeResource("db1"sv, boost::none, "bucket"sv)
+                                           << "actions"sv << kFindActions));
     ASSERT_TRUE(exactBucket.getResourcePattern().isExactSystemBucketsCollection());
-    ASSERT_EQ(exactBucket.getResourcePattern().dbNameToMatch().toString_forTest(), "db1"_sd);
-    ASSERT_EQ(exactBucket.getResourcePattern().collectionToMatch(), "bucket"_sd);
+    ASSERT_EQ(exactBucket.getResourcePattern().dbNameToMatch().toString_forTest(), "db1"sv);
+    ASSERT_EQ(exactBucket.getResourcePattern().collectionToMatch(), "bucket"sv);
 }
 
 TEST(PrivilegeParserTest, RoundTrip) {
     const std::vector<BSONObj> resourcePatterns = {
-        BSON("cluster"_sd << true),
-        BSON("anyResource"_sd << true),
-        BSON("db"_sd << ""
-                     << "collection"_sd
-                     << ""),
-        BSON("db"_sd << ""
-                     << "collection"_sd
-                     << "coll1"),
-        BSON("db"_sd << "db1"
-                     << "collection"_sd
-                     << ""),
-        BSON("db"_sd << "db1"
-                     << "collection"_sd
-                     << "coll1"),
-        BSON("system_buckets"_sd << "bucket"_sd),
-        BSON("db"_sd << "db1"
-                     << "system_buckets"_sd
-                     << "bucket"_sd),
+        BSON("cluster"sv << true),
+        BSON("anyResource"sv << true),
+        BSON("db"sv << ""
+                    << "collection"sv
+                    << ""),
+        BSON("db"sv << ""
+                    << "collection"sv
+                    << "coll1"),
+        BSON("db"sv << "db1"
+                    << "collection"sv
+                    << ""),
+        BSON("db"sv << "db1"
+                    << "collection"sv
+                    << "coll1"),
+        BSON("system_buckets"sv << "bucket"sv),
+        BSON("db"sv << "db1"
+                    << "system_buckets"sv
+                    << "bucket"sv),
     };
     const std::vector<BSONArray> actionTypes = {
-        BSON_ARRAY("find"_sd),
-        BSON_ARRAY("anyAction"_sd),
-        BSON_ARRAY("find"_sd << "insert"_sd
-                             << "remove"_sd
-                             << "update"_sd),
+        BSON_ARRAY("find"sv),
+        BSON_ARRAY("anyAction"sv),
+        BSON_ARRAY("find"sv << "insert"sv
+                            << "remove"sv
+                            << "update"sv),
     };
 
     for (const auto& pattern : resourcePatterns) {
         for (const auto& actions : actionTypes) {
-            auto obj = BSON("resource"_sd << pattern << "actions"_sd << actions);
+            auto obj = BSON("resource"sv << pattern << "actions"sv << actions);
             auto priv = resolvePrivilege(obj);
             auto serialized = priv.toBSON();
             ASSERT_BSONOBJ_EQ(obj, serialized);
@@ -295,8 +295,8 @@ TEST(PrivilegeParserTest, RoundTrip) {
 }
 
 TEST(PrivilegeParserTest, ParseInvalidActionsTest) {
-    auto obj = BSON("resource"_sd << kClusterResource << "actions"_sd
-                                  << BSON_ARRAY("find"_sd << "fakeAction"_sd));
+    auto obj = BSON("resource"sv << kClusterResource << "actions"sv
+                                 << BSON_ARRAY("find"sv << "fakeAction"sv));
     std::vector<std::string> unrecognized;
     auto priv = resolvePrivilege(obj, &unrecognized);
 

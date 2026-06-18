@@ -33,6 +33,8 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace sbe {
 namespace value {
@@ -169,7 +171,7 @@ inline void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
  * true.
  */
 template <class Cb>
-requires std::predicate<Cb&, StringData, TypeTags, Value, const char*>
+requires std::predicate<Cb&, std::string_view, TypeTags, Value, const char*>
 inline void objectForEach(TypeTags tag, Value val, const Cb& cb) {
     if (tag == TypeTags::bsonObject) {
         auto bson = getRawPointerView(val);
@@ -178,7 +180,7 @@ inline void objectForEach(TypeTags tag, Value val, const Cb& cb) {
         const char* cur = bson + 4;
         bool done = false;
         while (!done && (cur != end - 1)) {
-            StringData currFieldName = bson::fieldNameAndLength(cur);
+            std::string_view currFieldName = bson::fieldNameAndLength(cur);
             auto [eltTag, eltVal] = bson::convertToView(cur, end, currFieldName.size());
             done = cb(currFieldName, eltTag, eltVal, cur);
             cur = bson::advance(cur, currFieldName.size());

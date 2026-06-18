@@ -48,6 +48,8 @@
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -55,6 +57,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(SecurityProperty, emptyHasEmptyProperties) {
     SecurityPropertySet set(SecurityPropertySet{});
@@ -95,7 +98,7 @@ public:
 
 protected:
     StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                       StringData input) final {
+                                                       std::string_view input) final {
         return std::make_tuple(true, std::string());
     }
 };
@@ -112,8 +115,8 @@ public:
 
 // Policy for a hypothetical "FOO" SASL mechanism.
 struct FooPolicy {
-    static constexpr StringData getName() {
-        return "FOO"_sd;
+    static constexpr std::string_view getName() {
+        return "FOO"sv;
     }
 
     static constexpr int securityLevel() {
@@ -143,8 +146,8 @@ public:
 
 // Policy for a hypothetical "BAR" SASL mechanism.
 struct BarPolicy {
-    static constexpr StringData getName() {
-        return "BAR"_sd;
+    static constexpr std::string_view getName() {
+        return "BAR"sv;
     }
 
     static constexpr int securityLevel() {
@@ -173,8 +176,8 @@ public:
 
 // Policy for a hypothetical "InternalAuth" SASL mechanism.
 struct InternalAuthPolicy {
-    static constexpr StringData getName() {
-        return "InternalAuth"_sd;
+    static constexpr std::string_view getName() {
+        return "InternalAuth"sv;
     }
 
     static constexpr int securityLevel() {
@@ -251,7 +254,7 @@ public:
             BSONObj()));
 
         std::unique_ptr<UserRequest> systemLocal =
-            std::make_unique<UserRequestGeneral>(UserName("__system"_sd, "local"_sd), boost::none);
+            std::make_unique<UserRequestGeneral>(UserName("__system"sv, "local"sv), boost::none);
         internalSecurity.setUser(std::make_shared<UserHandle>(User(std::move(systemLocal))));
     }
 
@@ -266,8 +269,8 @@ public:
 
     SASLServerMechanismRegistry registry;
 
-    const UserName internalSajack = {"sajack"_sd, "test"_sd};
-    const UserName externalSajack = {"sajack"_sd, DatabaseName::kExternal.db(omitTenant)};
+    const UserName internalSajack = {"sajack"sv, "test"sv};
+    const UserName externalSajack = {"sajack"sv, DatabaseName::kExternal.db(omitTenant)};
 };
 
 TEST_F(MechanismRegistryTest, acquireInternalMechanism) {
@@ -311,7 +314,7 @@ TEST_F(MechanismRegistryTest, invalidUserCantAdvertiseMechs) {
     // that the server will accept. FOO lacks kNoPlainText so it is filtered out for internal
     // DBs, producing an empty saslSupportedMechs array (field present, contents empty).
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSONArray()),
-                      getMechsFor(UserName("noSuchUser"_sd, "test"_sd)));
+                      getMechsFor(UserName("noSuchUser"sv, "test"sv)));
 }
 
 TEST_F(MechanismRegistryTest, strongMechCanAdvertise) {

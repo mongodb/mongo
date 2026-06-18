@@ -39,7 +39,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -70,6 +69,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -80,8 +80,9 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto saslClientLogFieldName = "clientLogLevel"_sd;
+constexpr auto saslClientLogFieldName = "clientLogLevel"sv;
 
 int getSaslClientLogLevel(const auth::Credential& credential) {
     int saslLogLevel = kSaslClientLogLevelDefault;

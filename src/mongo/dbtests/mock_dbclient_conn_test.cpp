@@ -34,7 +34,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -62,6 +61,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -78,7 +78,7 @@ namespace mongo {
 TEST(MockDBClientConnTest, ServerAddress) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
-    conn.connect(server.getServerHostAndPort(), mongo::StringData(), boost::none);
+    conn.connect(server.getServerHostAndPort(), std::string_view(), boost::none);
 
     ASSERT_EQUALS("test:27017", conn.getServerAddress());
     ASSERT_EQUALS("test:27017", conn.toString());
@@ -728,7 +728,7 @@ TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
 
     int numMetaRead = 0;
     conn.setReplyMetadataReader(
-        [&](mongo::OperationContext* opCtx, const BSONObj& metadataObj, mongo::StringData target) {
+        [&](mongo::OperationContext* opCtx, const BSONObj& metadataObj, std::string_view target) {
             numMetaRead++;
             // Verify metadata for each batch.
             ASSERT(metadataObj.hasField("$fakeMetaData"));
@@ -890,7 +890,7 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
     ASSERT_TRUE(blockedOnNetworkSoon(&conn));
     auto m = conn.getLastSentMessage();
     auto msg = mongo::OpMsg::parse(m);
-    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "find");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "find");
     // Set the response for the find command and unblock network call().
     conn.setCallResponses(
         {MockDBClientConnection::mockFindResponse(nss, cursorId, {docObj(1)}, metadata(1))});
@@ -899,7 +899,7 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
     ASSERT_TRUE(blockedOnNetworkSoon(&conn));
     m = conn.getLastSentMessage();
     msg = mongo::OpMsg::parse(m);
-    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     // Set the response for the getMore command and unblock network call().
     conn.setCallResponses({MockDBClientConnection::mockGetMoreResponse(
         nss, cursorId, {docObj(2)}, metadata(2), moreToCome)});
@@ -916,7 +916,7 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
 TEST(MockDBClientConnTest, ShutdownServerBeforeCall) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
-    conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none);
+    conn.connect(mongo::HostAndPort("localhost", 12345), std::string_view(), boost::none);
     mongo::DBClientCursor cursor(
         &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 
@@ -959,7 +959,7 @@ TEST(MockDBClientConnTest, ConnectionAutoReconnect) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server, autoReconnect);
 
-    conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none);
+    conn.connect(mongo::HostAndPort("localhost", 12345), std::string_view(), boost::none);
     mongo::DBClientCursor cursor(
         &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 

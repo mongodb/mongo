@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -43,9 +42,11 @@
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesQuery) {
@@ -1341,8 +1342,8 @@ TEST_F(QueryPlannerTest, NorWithSingleChildCanUseIndexAfterComplementingBounds) 
 TEST_F(QueryPlannerTest, PlansForMultipleIndexesOnTheSameKeyPatternAreGenerated) {
     CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
     CollatorInterfaceMock equalCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    addIndex(BSON("a" << 1), &reverseCollator, "reverse"_sd);
-    addIndex(BSON("a" << 1), &equalCollator, "forward"_sd);
+    addIndex(BSON("a" << 1), &reverseCollator, "reverse"sv);
+    addIndex(BSON("a" << 1), &equalCollator, "forward"sv);
 
     runQuery(BSON("a" << 1));
 

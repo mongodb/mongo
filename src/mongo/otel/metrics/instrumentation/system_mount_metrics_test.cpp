@@ -33,26 +33,29 @@
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using otel::metrics::DynamicMetricNameMaker;
 using otel::metrics::DynamicMetricNameTestPasskeyMaker;
 using otel::metrics::OtelMetricsCapturer;
 
-constexpr StringData kDataMount = "/data"_sd;
-constexpr StringData kTmpMount = "/tmp"_sd;
+constexpr std::string_view kDataMount = "/data"sv;
+constexpr std::string_view kTmpMount = "/tmp"sv;
 
 // All tests register SystemMountMetrics with this fixed mountpoint set. The global MetricsService
 // retains registrations across tests within the same binary, so every test must use the same set.
 const std::vector<std::string> kTestMountpoints = {std::string(kDataMount)};
 
-constexpr StringData kDataCapacity = "systemMetrics.mounts.data.capacity"_sd;
-constexpr StringData kDataAvailable = "systemMetrics.mounts.data.available"_sd;
-constexpr StringData kDataFree = "systemMetrics.mounts.data.free"_sd;
-constexpr StringData kTmpCapacity = "systemMetrics.mounts.tmp.capacity"_sd;
+constexpr std::string_view kDataCapacity = "systemMetrics.mounts.data.capacity"sv;
+constexpr std::string_view kDataAvailable = "systemMetrics.mounts.data.available"sv;
+constexpr std::string_view kDataFree = "systemMetrics.mounts.data.free"sv;
+constexpr std::string_view kTmpCapacity = "systemMetrics.mounts.tmp.capacity"sv;
 
-BSONObj makeMountsBson(StringData mountpoint,
+BSONObj makeMountsBson(std::string_view mountpoint,
                        long long capacity,
                        long long available,
                        long long free) {

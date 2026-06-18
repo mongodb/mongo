@@ -42,6 +42,7 @@
 
 #include <deque>
 #include <initializer_list>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -57,7 +58,7 @@ namespace mongo {
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMock : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$mock"_sd;
+    static constexpr std::string_view kStageName = "$mock"_sd;
 
     static boost::intrusive_ptr<DocumentSourceMock> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -96,7 +97,7 @@ public:
         return Value(Document{{getSourceName(), Document()}});
     }
 
-    StringData getSourceName() const override;
+    std::string_view getSourceName() const override;
 
     static const Id& id;
 

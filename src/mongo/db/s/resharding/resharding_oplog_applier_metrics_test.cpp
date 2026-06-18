@@ -30,7 +30,6 @@
 
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"

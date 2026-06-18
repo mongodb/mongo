@@ -48,6 +48,7 @@
 
 #include <functional>
 #include <map>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -303,7 +304,7 @@ public:
                                                   BSONElement elem,
                                                   VariablesParseState vps);
 
-    static constexpr StringData getName() {
+    static constexpr std::string_view getName() {
         if constexpr (single) {
             if constexpr (sense == TopBottomSense::kTop) {
                 return "$top"_sd;

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -54,6 +53,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <benchmark/benchmark.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -63,6 +63,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Namespace used for a collection-level change stream.
 const NamespaceString kCollectionNss =
@@ -210,7 +211,7 @@ struct IdGeneratorOID {
         oid.init();
     }
     void append(BSONObjBuilder& builder) {
-        builder.append("_id"_sd, oid);
+        builder.append("_id"sv, oid);
     }
     OID bson() const {
         return oid;
@@ -226,7 +227,7 @@ struct IdGeneratorString {
         last = fmt::format("{}-{}", id, current);
     }
     void append(BSONObjBuilder& builder) {
-        builder.append("_id"_sd, last);
+        builder.append("_id"sv, last);
     }
     std::string bson() const {
         return last;
@@ -270,7 +271,7 @@ struct OplogEntryProducerInserts : OplogEntryProducer {
 
         BSONObjBuilder builder;
         this->idGenerator.append(builder);
-        builder.append("group"_sd, increment % 100);
+        builder.append("group"sv, increment % 100);
         if (numFields > 0) {
             std::string fieldName;
             for (int i = 0; i < numFields; ++i) {

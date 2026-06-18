@@ -38,6 +38,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -76,7 +77,7 @@ static constexpr auto kXAmzDateHeader = "X-Amz-Date"_sd;
  * Deserialize a std::string to an IDL object.
  */
 template <typename T>
-T convertFromByteString(StringData rawString) {
+T convertFromByteString(std::string_view rawString) {
     ConstDataRange cdr(rawString.data(), rawString.size());
 
     auto clientFirstBson = cdr.read<Validated<BSONObj>>();

@@ -32,11 +32,13 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 
 class InternalShredDocumentsStage final : public Stage {
 public:
-    InternalShredDocumentsStage(StringData stageName,
+    InternalShredDocumentsStage(std::string_view stageName,
                                 const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:

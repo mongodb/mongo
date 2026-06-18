@@ -36,6 +36,7 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/find_command.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/cstdint.hpp>
@@ -65,7 +66,7 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const BSONObj& 
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
 }
 
-std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(StringData queryStr) {
+std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(std::string_view queryStr) {
     BSONObj queryObj = fromjson(std::string{queryStr});
     return canonicalize(queryObj);
 }

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -190,7 +190,7 @@ public:
      * The object must have exactly one field which is the value of the point interval.
      */
     static Interval makePointInterval(const BSONObj& obj);
-    static Interval makePointInterval(StringData str);
+    static Interval makePointInterval(std::string_view str);
     static Interval makePointInterval(double d);
 
     /**

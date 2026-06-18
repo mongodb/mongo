@@ -82,6 +82,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -119,6 +120,7 @@ bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree) {
 }
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * AppendChar provides the compiler with a type for a "appendChar(...)" member function.
@@ -138,7 +140,7 @@ inline constexpr auto hasAppendChar = stdx::is_detected_exact_v<void, AppendChar
  * backslash.
  */
 template <class BuilderType>
-void encodeUserString(StringData s, BuilderType* builder) {
+void encodeUserString(std::string_view s, BuilderType* builder) {
     for (size_t i = 0; i < s.size(); ++i) {
         char c = s[i];
         switch (c) {
@@ -472,7 +474,7 @@ void encodeRegexFlagsForMatch(RegexIterator first, RegexIterator last, StringBui
             tassert(11320906,
                     fmt::format("Invalid regex flag {}", flag),
                     RegexMatchExpression::kValidRegexFlags.count(flag));
-            encodeUserString(StringData(&flag, 1), keyBuilder);
+            encodeUserString(std::string_view(&flag, 1), keyBuilder);
         }
         *keyBuilder << kEncodeRegexFlagsSeparator;
     }
@@ -534,7 +536,7 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
             const auto* inMatch = static_cast<const InMatchExpression*>(tree);
             if (!inMatch->getRegexes().empty()) {
                 // Append '_re' to distinguish an $in without regexes from an $in with regexes.
-                encodeUserString("_re"_sd, keyBuilder);
+                encodeUserString("_re"sv, keyBuilder);
                 encodeRegexFlagsForMatch(inMatch->getRegexes(), keyBuilder);
             }
             break;
@@ -1249,7 +1251,7 @@ CanonicalQuery::QueryShapeString encodePipeline(
     BufBuilder bufBuilder(bufferSize);
 
     canonical_query_encoder::encodePipeline(expCtx, pipelineStages, &bufBuilder);
-    return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
+    return base64::encode(std::string_view(bufBuilder.buf(), bufBuilder.len()));
 }
 
 void encodeLegacyGetExecutorSubplanningData(const CanonicalQuery& cq, StringBuilder* keyBuilder) {
@@ -1383,7 +1385,7 @@ std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibil
 
     encodePipeline(cq.getExpCtx(), cq.cqPipeline(), &bufBuilder);
 
-    return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
+    return base64::encode(std::string_view(bufBuilder.buf(), bufBuilder.len()));
 }
 
 CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const CanonicalQuery& cq) {
@@ -1424,7 +1426,7 @@ CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const Pipeline& pi
     return key;
 }
 
-uint32_t computeHash(StringData key) {
+uint32_t computeHash(std::string_view key) {
     size_t seed = 0;
     simpleStringDataComparator.hash_combine(seed, key);
     return seed;

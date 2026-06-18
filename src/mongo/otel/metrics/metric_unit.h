@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -63,6 +64,6 @@ enum class MetricUnit {
 };
 
 // Converts any of the above units to a string.
-StringData toString(MetricUnit unit);
+std::string_view toString(MetricUnit unit);
 
 }  // namespace mongo::otel::metrics

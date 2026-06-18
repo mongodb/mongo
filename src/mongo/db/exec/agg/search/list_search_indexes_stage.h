@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/namespace_string.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/uuid.h"
 
 #include <queue>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -47,7 +47,7 @@ namespace mongo::exec::agg {
 
 class ListSearchIndexesStage final : public Stage {
 public:
-    ListSearchIndexesStage(StringData stageName,
+    ListSearchIndexesStage(std::string_view stageName,
                            const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                            BSONObj cmdObj);
 

@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/shard_catalog/drop_database.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
@@ -68,6 +67,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -224,7 +224,7 @@ void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
 /**
  * Removes database from catalog, bypassing dropDatabase().
  */
-void _removeDatabaseFromCatalog(OperationContext* opCtx, StringData dbName) {
+void _removeDatabaseFromCatalog(OperationContext* opCtx, std::string_view dbName) {
     AutoGetDb autoDB(opCtx, DatabaseName::createDatabaseName_forTest(boost::none, dbName), MODE_X);
     auto db = autoDB.getDb();
     // dropDatabase can call awaitReplication more than once, so do not attempt to drop the database

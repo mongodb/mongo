@@ -43,6 +43,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -66,12 +67,12 @@ protected:
             static_cast<ReshardingCumulativeMetrics*>(_cumulativeMetrics.get());
     }
 
-    StringData getRootSectionName() override {
+    std::string_view getRootSectionName() override {
         return kResharding;
     }
 
     template <typename T>
-    StringData fieldNameFor(T state) {
+    std::string_view fieldNameFor(T state) {
         auto maybeFieldName = ReshardingCumulativeMetrics::fieldNameFor(state);
         invariant(maybeFieldName.has_value());
         return *maybeFieldName;

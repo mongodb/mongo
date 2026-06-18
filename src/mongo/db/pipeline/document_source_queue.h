@@ -43,6 +43,7 @@
 
 #include <deque>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -64,11 +65,11 @@ class DocumentSourceQueue : public DocumentSource {
 public:
     using DeferredQueue = DeferredFn<std::deque<GetNextResult>>;
 
-    static constexpr StringData kStageName = "$queue"_sd;
+    static constexpr std::string_view kStageName = "$queue"_sd;
 
     static boost::intrusive_ptr<DocumentSourceQueue> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        boost::optional<StringData> stageNameOverride = boost::none);
+        boost::optional<std::string_view> stageNameOverride = boost::none);
 
     /*
      * Construct a 'DocumentSourceQueue' stage with either a:
@@ -89,13 +90,13 @@ public:
      */
     DocumentSourceQueue(DeferredQueue results,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                        boost::optional<StringData> stageNameOverride = boost::none,
+                        boost::optional<std::string_view> stageNameOverride = boost::none,
                         boost::optional<Value> serializeOverride = boost::none,
                         boost::optional<StageConstraints> constraintsOverride = boost::none);
 
     ~DocumentSourceQueue() override = default;
 
-    StringData getSourceName() const override;
+    std::string_view getSourceName() const override;
 
     static const Id& id;
 
@@ -166,7 +167,7 @@ protected:
 
     // An optional alias name is provided for cases like $documents where we want an error message
     // to indicate the name the user provided, not the internal $queue name.
-    boost::optional<StringData> _stageNameOverride = boost::none;
+    boost::optional<std::string_view> _stageNameOverride = boost::none;
 
     // An optional value provided for cases like '$indexStats' where it's desireable to serialize
     // the stage as something other than '$queue'.

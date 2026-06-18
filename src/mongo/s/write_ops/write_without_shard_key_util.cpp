@@ -78,6 +78,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -88,8 +89,9 @@
 namespace mongo {
 namespace write_without_shard_key {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kIdFieldName = "_id"_sd;
+constexpr auto kIdFieldName = "_id"sv;
 const FieldRef idFieldRef(kIdFieldName);
 
 bool shardKeyHasCollatableType(const BSONObj& shardKey) {
@@ -150,7 +152,7 @@ std::pair<BSONObj, BSONObj> generateUpsertDocument(
 
 BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
                                 const BSONObj& targetDoc,
-                                StringData commandName,
+                                std::string_view commandName,
                                 bool appendPostImage,
                                 bool bulkWriteErrorsOnly) {
     BSONObj reply;

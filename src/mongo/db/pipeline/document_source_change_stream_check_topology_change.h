@@ -41,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -74,7 +75,7 @@ using ChangeStreamCheckTopologyChangeLiteParsed =
 class DocumentSourceChangeStreamCheckTopologyChange final
     : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamCheckTopologyChange"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamCheckTopologyChange"_sd;
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckTopologyChange> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -84,7 +85,7 @@ public:
         return new DocumentSourceChangeStreamCheckTopologyChange(expCtx);
     }
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

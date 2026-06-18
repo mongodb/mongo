@@ -74,6 +74,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -93,7 +94,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Merge);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMerge final : public DocumentSourceWriter {
 public:
-    static constexpr StringData kStageName = "$merge"_sd;
+    static constexpr std::string_view kStageName = "$merge"_sd;
     static constexpr auto kDefaultWhenMatched = MergeStrategyDescriptor::WhenMatched::kMerge;
     static constexpr auto kDefaultWhenNotMatched = MergeStrategyDescriptor::WhenNotMatched::kInsert;
 
@@ -164,7 +165,7 @@ public:
 
     ~DocumentSourceMerge() override = default;
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

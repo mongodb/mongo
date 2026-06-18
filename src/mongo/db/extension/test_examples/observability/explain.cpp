@@ -33,6 +33,7 @@
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 #include <memory>
+#include <string_view>
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;

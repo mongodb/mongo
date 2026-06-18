@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"

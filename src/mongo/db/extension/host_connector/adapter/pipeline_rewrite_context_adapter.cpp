@@ -32,6 +32,8 @@
 #include "mongo/db/extension/host/pipeline_rewrite_context.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 
+#include <string_view>
+
 namespace mongo::extension::host_connector {
 MongoExtensionStatus* PipelineRewriteContextAdapter::_hostGetNthNextStage(
     const MongoExtensionPipelineRewriteContext* ctx,
@@ -118,14 +120,14 @@ HostPipelineRewriteRule wrapExtensionRule(const extension::PipelineRewriteRule& 
             auto hostAdapter =
                 std::make_unique<host_connector::PipelineRewriteContextAdapter>(std::move(hostCtx));
             return extensionStage->evaluatePipelineRewriteRulePrecondition(
-                StringData(ruleName.data(), ruleName.size()), hostAdapter.get());
+                std::string_view(ruleName.data(), ruleName.size()), hostAdapter.get());
         },
         .transform = [extensionStage, ruleName](PipelineRewriteContext& ctx) mutable -> bool {
             auto hostCtx = host::PipelineRewriteContext::make(&ctx);
             auto hostAdapter =
                 std::make_unique<host_connector::PipelineRewriteContextAdapter>(std::move(hostCtx));
             return extensionStage->evaluatePipelineRewriteRuleTransform(
-                StringData(ruleName.data(), ruleName.size()), hostAdapter.get());
+                std::string_view(ruleName.data(), ruleName.size()), hostAdapter.get());
         },
         .tags = tags,
     };

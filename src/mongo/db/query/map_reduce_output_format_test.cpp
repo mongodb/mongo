@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/map_reduce_output_format.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"

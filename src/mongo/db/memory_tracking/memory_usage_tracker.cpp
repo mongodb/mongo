@@ -33,13 +33,14 @@
 #include "mongo/util/str.h"
 
 #include <limits>
+#include <string_view>
 
 #include <absl/strings/string_view.h>
 
 namespace mongo {
 namespace {
 
-absl::string_view toKey(StringData s) {
+absl::string_view toKey(std::string_view s) {
     return {s.data(), s.size()};
 }
 
@@ -74,11 +75,11 @@ MemoryUsageTracker::MemoryUsageTracker(SimpleMemoryUsageTracker* baseParent,
 MemoryUsageTracker::MemoryUsageTracker(bool allowDiskUse, int64_t maxMemoryUsageBytes)
     : MemoryUsageTracker(nullptr, allowDiskUse, maxMemoryUsageBytes) {}
 
-void MemoryUsageTracker::set(StringData name, int64_t total) {
+void MemoryUsageTracker::set(std::string_view name, int64_t total) {
     (*this)[name].set(total);
 }
 
-void MemoryUsageTracker::add(StringData name, int64_t diff) {
+void MemoryUsageTracker::add(std::string_view name, int64_t diff) {
     (*this)[name].add(diff);
 }
 
@@ -146,13 +147,13 @@ void MemoryUsageTracker::clear() {
     resetCurrent();
 }
 
-SimpleMemoryUsageTracker& MemoryUsageTracker::operator[](StringData name) {
+SimpleMemoryUsageTracker& MemoryUsageTracker::operator[](std::string_view name) {
     auto [it, _] = _functionMemoryTracker.try_emplace(
         toKey(name), &_baseTracker, _baseTracker.maxAllowedMemoryUsageBytes());
     return it->second;
 }
 
-int64_t MemoryUsageTracker::peakTrackedMemoryBytes(StringData name) const {
+int64_t MemoryUsageTracker::peakTrackedMemoryBytes(std::string_view name) const {
     const auto it = _functionMemoryTracker.find(toKey(name));
     return it == _functionMemoryTracker.end() ? 0 : it->second.peakTrackedMemoryBytes();
 }

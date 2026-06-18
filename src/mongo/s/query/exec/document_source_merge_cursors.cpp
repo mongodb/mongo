@@ -37,6 +37,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -46,6 +47,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(mergeCursors, MergeCursorsLiteParsed::parse);
 
@@ -55,7 +57,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(mergeCursors,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(mergeCursors, DocumentSourceMergeCursors::id)
 
-constexpr StringData DocumentSourceMergeCursors::kStageName;
+constexpr std::string_view DocumentSourceMergeCursors::kStageName;
 
 DocumentSourceMergeCursors::DocumentSourceMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, AsyncResultsMergerParams armParams)
@@ -113,7 +115,7 @@ std::shared_ptr<BlockingResultsMerger>& DocumentSourceMergeCursors::populateMerg
         // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code which
         // relies on this parameter does not distinguish/care about the difference so we simply
         // always pass 'aggregate'.
-        resourceYielder ? resourceYielder->make(opCtx, "aggregate"_sd) : nullptr);
+        resourceYielder ? resourceYielder->make(opCtx, "aggregate"sv) : nullptr);
     _armParams = boost::none;
 
     // '_blockingResultsMerger' now owns the cursors.
@@ -176,7 +178,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
         // field is present and remove it if necessary. The field will not be present in stage
         // definitions created by 9.0 or higher, so the necessity to rewrite here should be rare.
         // TODO SERVER-126134: remove the check and the rewrite once 9.0 is last LTS.
-        constexpr StringData kRecordRemoteOpWaitTimeFieldName = "recordRemoteOpWaitTime"_sd;
+        constexpr std::string_view kRecordRemoteOpWaitTimeFieldName = "recordRemoteOpWaitTime"sv;
         BSONObj toParse;
         if (elem.embeddedObject().hasElement(kRecordRemoteOpWaitTimeFieldName)) {
             // 'recordRemoteOpWaitTime' is present, so remove it before parsing the stage

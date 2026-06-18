@@ -52,6 +52,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -76,7 +77,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalAllCollectionStats);
  */
 class DocumentSourceInternalAllCollectionStats final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalAllCollectionStats"_sd;
+    static constexpr std::string_view kStageName = "$_internalAllCollectionStats"_sd;
 
     DocumentSourceInternalAllCollectionStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                              DocumentSourceInternalAllCollectionStatsSpec spec);
@@ -115,7 +116,7 @@ public:
         const PrivilegeVector _privileges;
     };
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

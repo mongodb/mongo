@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
@@ -38,10 +37,12 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 using SBEVariableTest = GoldenEExpressionTestFixture;
 
@@ -71,7 +72,7 @@ TEST_F(SBEVariableTest, LocalVariable) {
     FrameId frame = 10;
     auto expr = sbe::makeE<ELocalBind>(
         frame,
-        makeEs(makeC(value::makeNewString("abcdeghijklmnop"_sd))),
+        makeEs(makeC(value::makeNewString("abcdeghijklmnop"sv))),
         makeE<EFunction>(EFn::kNewArray,
                          makeEs(makeE<EVariable>(frame, 0), makeE<EVariable>(frame, 0))));
     printInputExpression(os, *expr);
@@ -88,7 +89,7 @@ TEST_F(SBEVariableTest, LocalVariableMove) {
     value::ViewOfValueAccessor slotAccessor;
     FrameId frame = 10;
     auto expr = sbe::makeE<ELocalBind>(frame,
-                                       makeEs(makeC(value::makeNewString("abcdeghijklmnop"_sd))),
+                                       makeEs(makeC(value::makeNewString("abcdeghijklmnop"sv))),
                                        makeE<EFunction>(EFn::kNewArray,
                                                         makeEs(makeE<EVariable>(frame, 0, true),
                                                                makeE<EVariable>(frame, 0, true))));

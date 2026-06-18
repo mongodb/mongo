@@ -34,6 +34,8 @@
 #include "mongo/db/pipeline/match_processor.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace exec {
 namespace agg {
@@ -41,7 +43,7 @@ namespace agg {
 class MatchStage final : public Stage {
 
 public:
-    MatchStage(StringData stageName,
+    MatchStage(std::string_view stageName,
                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                const std::shared_ptr<MatchProcessor>& matchProcessor,
                bool isTextQuery);

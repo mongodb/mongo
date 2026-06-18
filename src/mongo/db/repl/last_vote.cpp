@@ -30,20 +30,22 @@
 #include "mongo/db/repl/last_vote.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace repl {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kCandidateIndexFieldName = "candidateIndex"_sd;
-constexpr StringData kTermFieldName = "term"_sd;
-constexpr StringData kIdFieldName = "_id"_sd;
+constexpr std::string_view kCandidateIndexFieldName = "candidateIndex"sv;
+constexpr std::string_view kTermFieldName = "term"sv;
+constexpr std::string_view kIdFieldName = "_id"sv;
 
 }  // namespace
 

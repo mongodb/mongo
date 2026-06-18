@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"

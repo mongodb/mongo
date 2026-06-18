@@ -29,28 +29,31 @@
 
 #include "mongo/logv2/log_severity.h"
 
+#include <string_view>
+
 namespace mongo::logv2 {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
-constexpr auto unknownSeverityString = "UNKNOWN"_sd;
-constexpr auto severeSeverityString = "SEVERE"_sd;
-constexpr auto errorSeverityString = "ERROR"_sd;
-constexpr auto warningSeverityString = "warning"_sd;
-constexpr auto infoSeverityString = "info"_sd;
-constexpr auto debugSeverityString = "debug"_sd;
+constexpr auto unknownSeverityString = "UNKNOWN"sv;
+constexpr auto severeSeverityString = "SEVERE"sv;
+constexpr auto errorSeverityString = "ERROR"sv;
+constexpr auto warningSeverityString = "warning"sv;
+constexpr auto infoSeverityString = "info"sv;
+constexpr auto debugSeverityString = "debug"sv;
 
-constexpr StringData kDebugLevelStrings[LogSeverity::kMaxDebugLevel] = {
-    "D1"_sd,
-    "D2"_sd,
-    "D3"_sd,
-    "D4"_sd,
-    "D5"_sd,
+constexpr std::string_view kDebugLevelStrings[LogSeverity::kMaxDebugLevel] = {
+    "D1"sv,
+    "D2"sv,
+    "D3"sv,
+    "D4"sv,
+    "D5"sv,
 };
 
 }  // namespace
 
-StringData LogSeverity::toStringData() const {
+std::string_view LogSeverity::toStringData() const {
     if (_severity > 0)
         return debugSeverityString;
     if (*this == LogSeverity::Severe())
@@ -66,26 +69,26 @@ StringData LogSeverity::toStringData() const {
     return unknownSeverityString;
 }
 
-StringData LogSeverity::toStringDataCompact() const {
+std::string_view LogSeverity::toStringDataCompact() const {
 
     if ((*this == LogSeverity::Log()) || (*this == LogSeverity::Info()))
-        return "I"_sd;
+        return "I"sv;
 
     if ((_severity > 0) && (_severity <= kMaxDebugLevel))
         return kDebugLevelStrings[_severity - 1];
 
     if (*this == LogSeverity::Warning())
-        return "W"_sd;
+        return "W"sv;
 
     if (*this == LogSeverity::Error())
-        return "E"_sd;
+        return "E"sv;
 
     // 'S' might be confused with "Success"
     // Return 'F' to imply Fatal instead.
     if (*this == LogSeverity::Severe())
-        return "F"_sd;
+        return "F"sv;
 
-    return "U"_sd;
+    return "U"sv;
 }
 
 }  // namespace mongo::logv2

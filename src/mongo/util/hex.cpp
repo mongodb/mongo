@@ -37,19 +37,21 @@
 #include <array>
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
-constexpr StringData kHexUpper = "0123456789ABCDEF"_sd;
-constexpr StringData kHexLower = "0123456789abcdef"_sd;
+constexpr std::string_view kHexUpper = "0123456789ABCDEF"sv;
+constexpr std::string_view kHexLower = "0123456789abcdef"sv;
 
 using EncodeLookupTable = std::array<std::array<char, 2>, 256>;
 
-consteval EncodeLookupTable generateHexDumpTable(StringData hexDigits) {
+consteval EncodeLookupTable generateHexDumpTable(std::string_view hexDigits) {
     std::array<std::array<char, 2>, 256> arr;
     for (size_t i = 0; i < arr.size(); ++i) {
         arr[i][0] = hexDigits[(i >> 4) & 0xf];
@@ -62,7 +64,7 @@ consteval EncodeLookupTable generateHexDumpTable(StringData hexDigits) {
  * Encodes the raw input string 'data' to hex, two bytes at a time. The resulting string will be
  * exactly twice as long as the input string.
  */
-std::string _hexPack(StringData data, const EncodeLookupTable& table) {
+std::string _hexPack(std::string_view data, const EncodeLookupTable& table) {
     std::string out(2 * data.size(), '\0');
     auto p = out.begin();
     for (auto c : data) {
@@ -78,7 +80,7 @@ std::string _hexPack(StringData data, const EncodeLookupTable& table) {
  * Only safe to call if the length of the input string is a multiple of 2.
  */
 template <typename F>
-void _decode(StringData s, const F& f) {
+void _decode(std::string_view s, const F& f) {
     for (auto p = s.begin(); p != s.end();) {
         auto hi = hexblob::decodeDigit(*p++);
         auto lo = hexblob::decodeDigit(*p++);
@@ -101,38 +103,38 @@ unsigned char decodeDigit(unsigned char c) {
               fmt::format("The character \\x{:02x} failed to parse from hex.", c));
 }
 
-unsigned char decodePair(StringData c) {
+unsigned char decodePair(std::string_view c) {
     uassert(ErrorCodes::FailedToParse, "Need two hex digits", c.size() == 2);
     return (decodeDigit(c[0]) << 4) | decodeDigit(c[1]);
 }
 
-bool validate(StringData s) {
+bool validate(std::string_view s) {
     // There must be an even number of characters, since each pair encodes a single byte.
     return s.size() % 2 == 0 &&
         std::all_of(s.begin(), s.end(), [](auto c) { return ctype::isXdigit(c); });
 }
 
-std::string encode(StringData data) {
+std::string encode(std::string_view data) {
     static constexpr EncodeLookupTable lookupTable = generateHexDumpTable(kHexUpper);
     return _hexPack(data, lookupTable);
 }
 
-std::string encodeLower(StringData data) {
+std::string encodeLower(std::string_view data) {
     static constexpr EncodeLookupTable lookupTable = generateHexDumpTable(kHexLower);
     return _hexPack(data, lookupTable);
 }
 
-void decode(StringData s, BufBuilder* buf) {
+void decode(std::string_view s, BufBuilder* buf) {
     uassert(ErrorCodes::FailedToParse, "Hex blob with odd digit count", s.size() % 2 == 0);
     _decode(s, [&](unsigned char c) { buf->appendChar(c); });
 }
 
-std::string decode(StringData s) {
+std::string decode(std::string_view s) {
     uassert(ErrorCodes::FailedToParse, "Hex blob with odd digit count", s.size() % 2 == 0);
     return decodeFromValidSizedInput(s);
 }
 
-std::string decodeFromValidSizedInput(StringData s) {
+std::string decodeFromValidSizedInput(std::string_view s) {
     std::string r(s.size() / 2, '\0');
     size_t i = 0;
     _decode(s, [&](unsigned char c) { r[i++] = c; });
@@ -141,7 +143,7 @@ std::string decodeFromValidSizedInput(StringData s) {
 
 }  // namespace hexblob
 
-std::string hexdump(StringData data) {
+std::string hexdump(std::string_view data) {
     tassert(7781000, "Data length exceeds maximum buffer size", data.size() < kHexDumpMaxSize);
     std::string out;
     out.reserve(3 * data.size());
@@ -156,10 +158,10 @@ std::string hexdump(StringData data) {
 }
 
 std::ostream& StreamableHexdump::_streamTo(std::ostream& os) const {
-    StringData sep;
+    std::string_view sep;
     for (auto p = _data; p != _data + _size; ++p) {
         os << sep << kHexLower[(*p >> 4) & 0x0f] << kHexLower[*p & 0x0f];
-        sep = " "_sd;
+        sep = " "sv;
     }
     return os;
 }

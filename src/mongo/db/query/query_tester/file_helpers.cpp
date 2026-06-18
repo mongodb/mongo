@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/query_tester/file_helpers.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/stdx/unordered_map.h"
@@ -40,18 +39,20 @@
 #include <fstream>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
 
 namespace mongo::query_tester {
 namespace {
-constexpr auto kColorBold = "\033[1m"_sd;
-constexpr auto kColorBrown = "\033[33m"_sd;
-constexpr auto kColorCyan = "\033[1;36m"_sd;
-constexpr auto kColorRed = "\033[1;31m"_sd;
-constexpr auto kColorReset = "\033[m"_sd;
-constexpr auto kColorYellow = "\033[1;33m"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kColorBold = "\033[1m"sv;
+constexpr auto kColorBrown = "\033[33m"sv;
+constexpr auto kColorCyan = "\033[1;36m"sv;
+constexpr auto kColorRed = "\033[1;31m"sv;
+constexpr auto kColorReset = "\033[m"sv;
+constexpr auto kColorYellow = "\033[1;33m"sv;
 
 /**
  * Regex to match the hunk header of the git diff output, which looks like @@ -lineNum, +lineNum @@

@@ -42,6 +42,7 @@
 #include <limits>
 
 namespace mongo::evaluate_matcher_test {
+using namespace std::literals::string_view_literals;
 
 const double kNaN = std::numeric_limits<double>::quiet_NaN();
 
@@ -67,8 +68,8 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementSingle) {
     auto baseOperand = BSON("b" << 5);
     auto match = BSON("a" << BSON_ARRAY(BSON("b" << 5.0)));
     auto notMatch = BSON("a" << BSON_ARRAY(BSON("b" << 6)));
-    auto eq = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand["b"]);
-    auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
+    auto eq = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand["b"]);
+    auto op = ElemMatchObjectMatchExpression{"a"sv, std::move(eq)};
     ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch["a"]));
 }
@@ -77,8 +78,8 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementArray) {
     auto baseOperand = BSON("1" << 5);
     auto match = BSON("a" << BSON_ARRAY(BSON_ARRAY('s' << 5.0)));
     auto notMatch = BSON("a" << BSON_ARRAY(BSON_ARRAY(5 << 6)));
-    auto eq = std::make_unique<EqualityMatchExpression>("1"_sd, baseOperand["1"]);
-    auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
+    auto eq = std::make_unique<EqualityMatchExpression>("1"sv, baseOperand["1"]);
+    auto op = ElemMatchObjectMatchExpression{"a"sv, std::move(eq)};
     ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch["a"]));
 }
@@ -91,16 +92,16 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementMultiple) {
     auto notMatch2 = BSON("a" << BSON_ARRAY(BSON("b" << 6 << "c" << 7)));
     auto notMatch3 = BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(5 << 6))));
     auto match = BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(5 << 6) << "c" << 7)));
-    auto eq1 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand1["b"]);
-    auto eq2 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand2["b"]);
-    auto eq3 = std::make_unique<EqualityMatchExpression>("c"_sd, baseOperand3["c"]);
+    auto eq1 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand1["b"]);
+    auto eq2 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand2["b"]);
+    auto eq3 = std::make_unique<EqualityMatchExpression>("c"sv, baseOperand3["c"]);
 
     auto andOp = std::make_unique<AndMatchExpression>();
     andOp->add(std::move(eq1));
     andOp->add(std::move(eq2));
     andOp->add(std::move(eq3));
 
-    auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(andOp)};
+    auto op = ElemMatchObjectMatchExpression{"a"sv, std::move(andOp)};
     ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch1["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch2["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch3["a"]));
@@ -109,8 +110,8 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementMultiple) {
 
 TEST(ElemMatchObjectMatchExpression, MatchesNonArray) {
     auto baseOperand = BSON("b" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand["b"]);
-    auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
+    auto eq = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand["b"]);
+    auto op = ElemMatchObjectMatchExpression{"a"sv, std::move(eq)};
     // Directly nested objects are not matched with $elemMatch.  An intervening array is
     // required.
     ASSERT(!exec::matcher::matchesBSON(&op, BSON("a" << BSON("b" << 5)), nullptr));
@@ -120,8 +121,8 @@ TEST(ElemMatchObjectMatchExpression, MatchesNonArray) {
 
 TEST(ElemMatchObjectMatchExpression, MatchesArrayObject) {
     auto baseOperand = BSON("b" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand["b"]);
-    auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
+    auto eq = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand["b"]);
+    auto op = ElemMatchObjectMatchExpression{"a"sv, std::move(eq)};
     ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(BSON("b" << 5))), nullptr));
     ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(4 << BSON("b" << 5))), nullptr));
     ASSERT(exec::matcher::matchesBSON(
@@ -132,8 +133,8 @@ TEST(ElemMatchObjectMatchExpression, MatchesArrayObject) {
 
 TEST(ElemMatchObjectMatchExpression, MatchesMultipleNamedValues) {
     auto baseOperand = BSON("c" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("c"_sd, baseOperand["c"]);
-    auto op = ElemMatchObjectMatchExpression{"a.b"_sd, std::move(eq)};
+    auto eq = std::make_unique<EqualityMatchExpression>("c"sv, baseOperand["c"]);
+    auto op = ElemMatchObjectMatchExpression{"a.b"sv, std::move(eq)};
     ASSERT(exec::matcher::matchesBSON(
         &op, BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(BSON("c" << 5))))), nullptr));
     ASSERT(exec::matcher::matchesBSON(
@@ -145,8 +146,8 @@ TEST(ElemMatchObjectMatchExpression, MatchesMultipleNamedValues) {
 
 TEST(ElemMatchObjectMatchExpression, ElemMatchKey) {
     auto baseOperand = BSON("c" << 6);
-    auto eq = std::make_unique<EqualityMatchExpression>("c"_sd, baseOperand["c"]);
-    auto op = ElemMatchObjectMatchExpression{"a.b"_sd, std::move(eq)};
+    auto eq = std::make_unique<EqualityMatchExpression>("c"sv, baseOperand["c"]);
+    auto op = ElemMatchObjectMatchExpression{"a.b"sv, std::move(eq)};
     auto details = MatchDetails{};
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&op, BSONObj(), &details));
@@ -172,8 +173,8 @@ TEST(ElemMatchObjectMatchExpression, Collation) {
     auto baseOperand = BSON("b" << "string");
     auto match = BSON("a" << BSON_ARRAY(BSON("b" << "string")));
     auto notMatch = BSON("a" << BSON_ARRAY(BSON("b" << "string2")));
-    auto eq = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand["b"]);
-    auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
+    auto eq = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand["b"]);
+    auto op = ElemMatchObjectMatchExpression{"a"sv, std::move(eq)};
     auto collator = CollatorInterfaceMock{CollatorInterfaceMock::MockType::kAlwaysEqual};
     op.setCollator(&collator);
     ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
@@ -184,9 +185,8 @@ TEST(ElemMatchValueMatchExpression, MatchesElementSingle) {
     auto baseOperand = BSON("$gt" << 5);
     auto match = BSON("a" << BSON_ARRAY(6));
     auto notMatch = BSON("a" << BSON_ARRAY(4));
-    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand["$gt"]);
-    auto op =
-        ElemMatchValueMatchExpression{"a"_sd, std::unique_ptr<MatchExpression>{std::move(gt)}};
+    auto gt = std::make_unique<GTMatchExpression>(""sv, baseOperand["$gt"]);
+    auto op = ElemMatchValueMatchExpression{"a"sv, std::unique_ptr<MatchExpression>{std::move(gt)}};
     ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch["a"]));
 }
@@ -197,10 +197,10 @@ TEST(ElemMatchValueMatchExpression, MatchesElementMultiple) {
     auto notMatch1 = BSON("a" << BSON_ARRAY(0 << 1));
     auto notMatch2 = BSON("a" << BSON_ARRAY(10 << 11));
     auto match = BSON("a" << BSON_ARRAY(0 << 5 << 11));
-    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand1["$gt"]);
-    auto lt = std::make_unique<LTMatchExpression>(""_sd, baseOperand2["$lt"]);
+    auto gt = std::make_unique<GTMatchExpression>(""sv, baseOperand1["$gt"]);
+    auto lt = std::make_unique<LTMatchExpression>(""sv, baseOperand2["$lt"]);
 
-    auto op = ElemMatchValueMatchExpression{"a"_sd};
+    auto op = ElemMatchValueMatchExpression{"a"sv};
     op.add(std::move(gt));
     op.add(std::move(lt));
 
@@ -211,8 +211,8 @@ TEST(ElemMatchValueMatchExpression, MatchesElementMultiple) {
 
 TEST(ElemMatchValueMatchExpression, MatchesNonArray) {
     auto baseOperand = BSON("$gt" << 5);
-    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand["$gt"]);
-    auto op = ElemMatchObjectMatchExpression("a"_sd, std::move(gt));
+    auto gt = std::make_unique<GTMatchExpression>(""sv, baseOperand["$gt"]);
+    auto op = ElemMatchObjectMatchExpression("a"sv, std::move(gt));
     // Directly nested objects are not matched with $elemMatch.  An intervening array is
     // required.
     ASSERT(!exec::matcher::matchesBSON(&op, BSON("a" << 6), nullptr));
@@ -221,9 +221,8 @@ TEST(ElemMatchValueMatchExpression, MatchesNonArray) {
 
 TEST(ElemMatchValueMatchExpression, MatchesArrayScalar) {
     auto baseOperand = BSON("$gt" << 5);
-    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand["$gt"]);
-    auto op =
-        ElemMatchValueMatchExpression{"a"_sd, std::unique_ptr<MatchExpression>{std::move(gt)}};
+    auto gt = std::make_unique<GTMatchExpression>(""sv, baseOperand["$gt"]);
+    auto op = ElemMatchValueMatchExpression{"a"sv, std::unique_ptr<MatchExpression>{std::move(gt)}};
     ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(6)), nullptr));
     ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
     ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(BSONObj() << 7)), nullptr));
@@ -231,9 +230,9 @@ TEST(ElemMatchValueMatchExpression, MatchesArrayScalar) {
 
 TEST(ElemMatchValueMatchExpression, MatchesMultipleNamedValues) {
     auto baseOperand = BSON("$gt" << 5);
-    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand["$gt"]);
+    auto gt = std::make_unique<GTMatchExpression>(""sv, baseOperand["$gt"]);
     auto op =
-        ElemMatchValueMatchExpression{"a.b"_sd, std::unique_ptr<MatchExpression>{std::move(gt)}};
+        ElemMatchValueMatchExpression{"a.b"sv, std::unique_ptr<MatchExpression>{std::move(gt)}};
     ASSERT(exec::matcher::matchesBSON(
         &op, BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(6)))), nullptr));
     ASSERT(exec::matcher::matchesBSON(
@@ -244,9 +243,9 @@ TEST(ElemMatchValueMatchExpression, MatchesMultipleNamedValues) {
 
 TEST(ElemMatchValueMatchExpression, ElemMatchKey) {
     auto baseOperand = BSON("$gt" << 6);
-    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand["$gt"]);
+    auto gt = std::make_unique<GTMatchExpression>(""sv, baseOperand["$gt"]);
     auto op =
-        ElemMatchValueMatchExpression{"a.b"_sd, std::unique_ptr<MatchExpression>{std::move(gt)}};
+        ElemMatchValueMatchExpression{"a.b"sv, std::unique_ptr<MatchExpression>{std::move(gt)}};
     auto details = MatchDetails{};
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&op, BSONObj(), &details));
@@ -266,31 +265,31 @@ TEST(ElemMatchValueMatchExpression, ElemMatchKey) {
 
 TEST(AndOfElemMatch, MatchesElement) {
     auto baseOperanda1 = BSON("a" << 1);
-    auto eqa1 = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperanda1["a"]);
+    auto eqa1 = std::make_unique<EqualityMatchExpression>("a"sv, baseOperanda1["a"]);
 
     auto baseOperandb1 = BSON("b" << 1);
-    auto eqb1 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperandb1["b"]);
+    auto eqb1 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperandb1["b"]);
 
     auto and1 = std::make_unique<AndMatchExpression>();
     and1->add(std::move(eqa1));
     and1->add(std::move(eqb1));
     // and1 = { a : 1, b : 1 }
 
-    auto elemMatch1 = std::make_unique<ElemMatchObjectMatchExpression>("x"_sd, std::move(and1));
+    auto elemMatch1 = std::make_unique<ElemMatchObjectMatchExpression>("x"sv, std::move(and1));
     // elemMatch1 = { x : { $elemMatch : { a : 1, b : 1 } } }
 
     auto baseOperanda2 = BSON("a" << 2);
-    auto eqa2 = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperanda2["a"]);
+    auto eqa2 = std::make_unique<EqualityMatchExpression>("a"sv, baseOperanda2["a"]);
 
     auto baseOperandb2 = BSON("b" << 2);
-    auto eqb2 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperandb2["b"]);
+    auto eqb2 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperandb2["b"]);
 
     auto and2 = std::make_unique<AndMatchExpression>();
     and2->add(std::move(eqa2));
     and2->add(std::move(eqb2));
     // and2 = { a : 2, b : 2 }
 
-    auto elemMatch2 = std::make_unique<ElemMatchObjectMatchExpression>("x"_sd, std::move(and2));
+    auto elemMatch2 = std::make_unique<ElemMatchObjectMatchExpression>("x"sv, std::move(and2));
     // elemMatch2 = { x : { $elemMatch : { a : 2, b : 2 } } }
 
     auto andOfEM = std::make_unique<AndMatchExpression>();
@@ -317,23 +316,23 @@ TEST(AndOfElemMatch, MatchesElement) {
 
 TEST(AndOfElemMatch, Matches) {
     auto baseOperandgt1 = BSON("$gt" << 1);
-    auto gt1 = std::make_unique<GTMatchExpression>(""_sd, baseOperandgt1["$gt"]);
+    auto gt1 = std::make_unique<GTMatchExpression>(""sv, baseOperandgt1["$gt"]);
 
     auto baseOperandlt1 = BSON("$lt" << 10);
-    auto lt1 = std::make_unique<LTMatchExpression>(""_sd, baseOperandlt1["$lt"]);
+    auto lt1 = std::make_unique<LTMatchExpression>(""sv, baseOperandlt1["$lt"]);
 
-    auto elemMatch1 = std::make_unique<ElemMatchValueMatchExpression>("x"_sd);
+    auto elemMatch1 = std::make_unique<ElemMatchValueMatchExpression>("x"sv);
     elemMatch1->add(std::move(gt1));
     elemMatch1->add(std::move(lt1));
     // elemMatch1 = { x : { $elemMatch : { $gt : 1 , $lt : 10 } } }
 
     auto baseOperandgt2 = BSON("$gt" << 101);
-    auto gt2 = std::make_unique<GTMatchExpression>(""_sd, baseOperandgt2["$gt"]);
+    auto gt2 = std::make_unique<GTMatchExpression>(""sv, baseOperandgt2["$gt"]);
 
     auto baseOperandlt2 = BSON("$lt" << 110);
-    auto lt2 = std::make_unique<LTMatchExpression>(""_sd, baseOperandlt2["$lt"]);
+    auto lt2 = std::make_unique<LTMatchExpression>(""sv, baseOperandlt2["$lt"]);
 
-    auto elemMatch2 = std::make_unique<ElemMatchValueMatchExpression>("x"_sd);
+    auto elemMatch2 = std::make_unique<ElemMatchValueMatchExpression>("x"sv);
     elemMatch2->add(std::move(gt2));
     elemMatch2->add(std::move(lt2));
     // elemMatch2 = { x : { $elemMatch : { $gt : 101 , $lt : 110 } } }
@@ -361,7 +360,7 @@ TEST(AndOfElemMatch, Matches) {
 TEST(SizeMatchExpression, MatchesElement) {
     auto match = BSON("a" << BSON_ARRAY(5 << 6));
     auto notMatch = BSON("a" << BSON_ARRAY(5));
-    auto size = SizeMatchExpression{""_sd, 2};
+    auto size = SizeMatchExpression{""sv, 2};
     ASSERT(exec::matcher::matchesSingleElement(&size, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&size, notMatch.firstElement()));
 }
@@ -371,14 +370,14 @@ TEST(SizeMatchExpression, MatchesNonArray) {
     auto stringValue = BSON("a" << "z");
     auto numberValue = BSON("a" << 0);
     auto arrayValue = BSON("a" << BSONArray());
-    auto size = SizeMatchExpression{""_sd, 0};
+    auto size = SizeMatchExpression{""sv, 0};
     ASSERT(!exec::matcher::matchesSingleElement(&size, stringValue.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&size, numberValue.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&size, arrayValue.firstElement()));
 }
 
 TEST(SizeMatchExpression, MatchesArray) {
-    auto size = SizeMatchExpression{"a"_sd, 2};
+    auto size = SizeMatchExpression{"a"sv, 2};
     ASSERT(exec::matcher::matchesBSON(&size, BSON("a" << BSON_ARRAY(4 << 5.5)), nullptr));
     // Arrays are not unwound to look for matching subarrays.
     ASSERT(!exec::matcher::matchesBSON(
@@ -386,14 +385,14 @@ TEST(SizeMatchExpression, MatchesArray) {
 }
 
 TEST(SizeMatchExpression, MatchesNestedArray) {
-    auto size = SizeMatchExpression{"a.2"_sd, 2};
+    auto size = SizeMatchExpression{"a.2"sv, 2};
     // A numerically referenced nested array is matched.
     ASSERT(exec::matcher::matchesBSON(
         &size, BSON("a" << BSON_ARRAY(4 << 5.5 << BSON_ARRAY(1 << 2))), nullptr));
 }
 
 TEST(SizeMatchExpression, ElemMatchKey) {
-    auto size = SizeMatchExpression{"a.b"_sd, 3};
+    auto size = SizeMatchExpression{"a.b"sv, 3};
     auto details = MatchDetails{};
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&size, BSON("a" << 1), &details));
@@ -756,14 +755,14 @@ TEST(InternalExprEqMatchExpression, ConsidersFieldNameInObjectEquality) {
 
 TEST(ComparisonMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
     BSONObj operand = BSON("a" << "string");
-    EqualityMatchExpression eq("a"_sd, operand["a"]);
+    EqualityMatchExpression eq("a"sv, operand["a"]);
     ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << "string2"), nullptr));
 }
 
 TEST(ComparisonMatchExpression, StringMatchingRespectsCollation) {
     BSONObj operand = BSON("a" << "string");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    EqualityMatchExpression eq("a"_sd, operand["a"]);
+    EqualityMatchExpression eq("a"sv, operand["a"]);
     eq.setCollator(&collator);
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << "string2"), nullptr));
 }
@@ -771,7 +770,7 @@ TEST(ComparisonMatchExpression, StringMatchingRespectsCollation) {
 TEST(ComparisonMatchExpression, UnequalLengthString) {
     BSONObj operand = BSON("a" << "abc");
     BSONObj match = BSON("a" << "abcd");
-    EqualityMatchExpression eq(""_sd, operand["a"]);
+    EqualityMatchExpression eq(""sv, operand["a"]);
     ASSERT(!exec::matcher::matchesSingleElement(&eq, match.firstElement()));
 }
 
@@ -779,27 +778,27 @@ TEST(ComparisonMatchExpression, NaNComparison) {
     BSONObj match = BSON("a" << 10);
 
     BSONObj operand = BSON("a" << sqrt(-2));
-    EqualityMatchExpression eq(""_sd, operand["a"]);
+    EqualityMatchExpression eq(""sv, operand["a"]);
     ASSERT(!exec::matcher::matchesSingleElement(&eq, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&eq, operand.firstElement()));
 
     BSONObj gteOp = BSON("$gte" << sqrt(-2));
-    GTEMatchExpression gte(""_sd, gteOp["$gte"]);
+    GTEMatchExpression gte(""sv, gteOp["$gte"]);
     ASSERT(!exec::matcher::matchesSingleElement(&gte, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&gte, operand.firstElement()));
 
     BSONObj gtOp = BSON("$gt" << sqrt(-2));
-    GTMatchExpression gt(""_sd, gtOp["$gt"]);
+    GTMatchExpression gt(""sv, gtOp["$gt"]);
     ASSERT(!exec::matcher::matchesSingleElement(&gt, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&gt, operand.firstElement()));
 
     BSONObj lteOp = BSON("$lte" << sqrt(-2));
-    LTEMatchExpression lte(""_sd, lteOp["$lte"]);
+    LTEMatchExpression lte(""sv, lteOp["$lte"]);
     ASSERT(!exec::matcher::matchesSingleElement(&lte, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&lte, operand.firstElement()));
 
     BSONObj ltOp = BSON("$lt" << sqrt(-2));
-    LTMatchExpression lt(""_sd, ltOp["$lt"]);
+    LTMatchExpression lt(""sv, ltOp["$lt"]);
     ASSERT(!exec::matcher::matchesSingleElement(&lt, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&lt, operand.firstElement()));
 }
@@ -808,27 +807,27 @@ TEST(ComparisonMatchExpression, NaNComparisonDecimal) {
     BSONObj match = BSON("a" << 10);
 
     BSONObj operand = BSON("a" << Decimal128::kPositiveNaN);
-    EqualityMatchExpression eq(""_sd, operand["a"]);
+    EqualityMatchExpression eq(""sv, operand["a"]);
     ASSERT(!exec::matcher::matchesSingleElement(&eq, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&eq, operand.firstElement()));
 
     BSONObj gteOp = BSON("$gte" << Decimal128::kPositiveNaN);
-    GTEMatchExpression gte(""_sd, gteOp["$gte"]);
+    GTEMatchExpression gte(""sv, gteOp["$gte"]);
     ASSERT(!exec::matcher::matchesSingleElement(&gte, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&gte, operand.firstElement()));
 
     BSONObj gtOp = BSON("$gt" << Decimal128::kPositiveNaN);
-    GTMatchExpression gt(""_sd, gtOp["$gt"]);
+    GTMatchExpression gt(""sv, gtOp["$gt"]);
     ASSERT(!exec::matcher::matchesSingleElement(&gt, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&gt, operand.firstElement()));
 
     BSONObj lteOp = BSON("$lte" << Decimal128::kPositiveNaN);
-    LTEMatchExpression lte(""_sd, lteOp["$lte"]);
+    LTEMatchExpression lte(""sv, lteOp["$lte"]);
     ASSERT(!exec::matcher::matchesSingleElement(&lte, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&lte, operand.firstElement()));
 
     BSONObj ltOp = BSON("$lt" << Decimal128::kPositiveNaN);
-    LTMatchExpression lt(""_sd, ltOp["$lt"]);
+    LTMatchExpression lt(""sv, ltOp["$lt"]);
     ASSERT(!exec::matcher::matchesSingleElement(&lt, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&lt, operand.firstElement()));
 }
@@ -838,7 +837,7 @@ TEST(EqOp, MatchesElement) {
     BSONObj match = BSON("a" << 5.0);
     BSONObj notMatch = BSON("a" << 6);
 
-    EqualityMatchExpression eq(""_sd, operand["a"]);
+    EqualityMatchExpression eq(""sv, operand["a"]);
     ASSERT(exec::matcher::matchesSingleElement(&eq, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&eq, notMatch.firstElement()));
 
@@ -847,21 +846,21 @@ TEST(EqOp, MatchesElement) {
 
 TEST(EqOp, MatchesScalar) {
     BSONObj operand = BSON("a" << 5);
-    EqualityMatchExpression eq("a"_sd, operand["a"]);
+    EqualityMatchExpression eq("a"sv, operand["a"]);
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << 5.0), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << 4), nullptr));
 }
 
 TEST(EqOp, MatchesArrayValue) {
     BSONObj operand = BSON("a" << 5);
-    EqualityMatchExpression eq("a"_sd, operand["a"]);
+    EqualityMatchExpression eq("a"sv, operand["a"]);
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(5.0 << 6)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
 }
 
 TEST(EqOp, MatchesReferencedObjectValue) {
     BSONObj operand = BSON("a.b" << 5);
-    EqualityMatchExpression eq("a.b"_sd, operand["a.b"]);
+    EqualityMatchExpression eq("a.b"sv, operand["a.b"]);
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << 5)), nullptr));
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << BSON_ARRAY(5))), nullptr));
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSON("b" << 5))), nullptr));
@@ -869,14 +868,14 @@ TEST(EqOp, MatchesReferencedObjectValue) {
 
 TEST(EqOp, MatchesReferencedArrayValue) {
     BSONObj operand = BSON("a.0" << 5);
-    EqualityMatchExpression eq("a.0"_sd, operand["a.0"]);
+    EqualityMatchExpression eq("a.0"sv, operand["a.0"]);
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(5)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
 }
 
 TEST(EqOp, MatchesNull) {
     BSONObj operand = BSON("a" << BSONNULL);
-    EqualityMatchExpression eq("a"_sd, operand["a"]);
+    EqualityMatchExpression eq("a"sv, operand["a"]);
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSONObj(), nullptr));
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSONNULL), nullptr));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << 4), nullptr));
@@ -890,7 +889,7 @@ TEST(EqOp, MatchesNull) {
 // not necessarily how it should work ideally.
 TEST(EqOp, MatchesNestedNull) {
     BSONObj operand = BSON("a.b" << BSONNULL);
-    EqualityMatchExpression eq("a.b"_sd, operand["a.b"]);
+    EqualityMatchExpression eq("a.b"sv, operand["a.b"]);
     // null matches any empty object that is on a subpath of a.b
     ASSERT(exec::matcher::matchesBSON(&eq, BSONObj(), nullptr));
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSONObj()), nullptr));
@@ -909,7 +908,7 @@ TEST(EqOp, MatchesNestedNull) {
 
 TEST(EqOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << BSONType::minKey);
-    EqualityMatchExpression eq("a"_sd, operand["a"]);
+    EqualityMatchExpression eq("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -926,7 +925,7 @@ TEST(EqOp, MatchesMinKey) {
 
 TEST(EqOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << BSONType::maxKey);
-    EqualityMatchExpression eq("a"_sd, operand["a"]);
+    EqualityMatchExpression eq("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -942,7 +941,7 @@ TEST(EqOp, MatchesMaxKey) {
 
 TEST(EqOp, MatchesFullArray) {
     BSONObj operand = BSON("a" << BSON_ARRAY(1 << 2));
-    EqualityMatchExpression eq("a"_sd, operand["a"]);
+    EqualityMatchExpression eq("a"sv, operand["a"]);
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1 << 2 << 3)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1)), nullptr));
@@ -951,14 +950,14 @@ TEST(EqOp, MatchesFullArray) {
 
 TEST(EqOp, MatchesThroughNestedArray) {
     BSONObj operand = BSON("a.b.c.d" << 3);
-    EqualityMatchExpression eq("a.b.c.d"_sd, operand["a.b.c.d"]);
+    EqualityMatchExpression eq("a.b.c.d"sv, operand["a.b.c.d"]);
     BSONObj obj = fromjson("{a:{b:[{c:[{d:1},{d:2}]},{c:[{d:3}]}]}}");
     ASSERT(exec::matcher::matchesBSON(&eq, obj, nullptr));
 }
 
 TEST(EqOp, ElemMatchKey) {
     BSONObj operand = BSON("a" << 5);
-    EqualityMatchExpression eq("a"_sd, operand["a"]);
+    EqualityMatchExpression eq("a"sv, operand["a"]);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << 4), &details));
@@ -991,7 +990,7 @@ TEST(LtOp, MatchesElement) {
     BSONObj notMatch = BSON("a" << 6);
     BSONObj notMatchEqual = BSON("a" << 5);
     BSONObj notMatchWrongType = BSON("a" << "foo");
-    LTMatchExpression lt(""_sd, operand["$lt"]);
+    LTMatchExpression lt(""sv, operand["$lt"]);
     ASSERT(exec::matcher::matchesSingleElement(&lt, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&lt, notMatch.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&lt, notMatchEqual.firstElement()));
@@ -1000,28 +999,28 @@ TEST(LtOp, MatchesElement) {
 
 TEST(LtOp, MatchesScalar) {
     BSONObj operand = BSON("$lt" << 5);
-    LTMatchExpression lt("a"_sd, operand["$lt"]);
+    LTMatchExpression lt("a"sv, operand["$lt"]);
     ASSERT(exec::matcher::matchesBSON(&lt, BSON("a" << 4.5), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << 6), nullptr));
 }
 
 TEST(LtOp, MatchesScalarEmptyKey) {
     BSONObj operand = BSON("$lt" << 5);
-    LTMatchExpression lt(""_sd, operand["$lt"]);
+    LTMatchExpression lt(""sv, operand["$lt"]);
     ASSERT(exec::matcher::matchesBSON(&lt, BSON("" << 4.5), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("" << 6), nullptr));
 }
 
 TEST(LtOp, MatchesArrayValue) {
     BSONObj operand = BSON("$lt" << 5);
-    LTMatchExpression lt("a"_sd, operand["$lt"]);
+    LTMatchExpression lt("a"sv, operand["$lt"]);
     ASSERT(exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(6 << 4.5)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
 }
 
 TEST(LtOp, MatchesWholeArray) {
     BSONObj operand = BSON("$lt" << BSON_ARRAY(5));
-    LTMatchExpression lt("a"_sd, operand["$lt"]);
+    LTMatchExpression lt("a"sv, operand["$lt"]);
     ASSERT(exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(4)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(5)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(6)), nullptr));
@@ -1033,7 +1032,7 @@ TEST(LtOp, MatchesWholeArray) {
 
 TEST(LtOp, MatchesNull) {
     BSONObj operand = BSON("$lt" << BSONNULL);
-    LTMatchExpression lt("a"_sd, operand["$lt"]);
+    LTMatchExpression lt("a"sv, operand["$lt"]);
     ASSERT(!exec::matcher::matchesBSON(&lt, BSONObj(), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSONNULL), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << 4), nullptr));
@@ -1043,7 +1042,7 @@ TEST(LtOp, MatchesNull) {
 
 TEST(LtOp, MatchesDotNotationNull) {
     BSONObj operand = BSON("$lt" << BSONNULL);
-    LTMatchExpression lt("a.b"_sd, operand["$lt"]);
+    LTMatchExpression lt("a.b"sv, operand["$lt"]);
     ASSERT(!exec::matcher::matchesBSON(&lt, BSONObj(), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSONNULL), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << 4), nullptr));
@@ -1058,7 +1057,7 @@ TEST(LtOp, MatchesDotNotationNull) {
 
 TEST(LtOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << BSONType::minKey);
-    LTMatchExpression lt("a"_sd, operand["a"]);
+    LTMatchExpression lt("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -1074,7 +1073,7 @@ TEST(LtOp, MatchesMinKey) {
 
 TEST(LtOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << BSONType::maxKey);
-    LTMatchExpression lt("a"_sd, operand["a"]);
+    LTMatchExpression lt("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -1090,7 +1089,7 @@ TEST(LtOp, MatchesMaxKey) {
 
 TEST(LtOp, ElemMatchKey) {
     BSONObj operand = BSON("$lt" << 5);
-    LTMatchExpression lt("a"_sd, operand["$lt"]);
+    LTMatchExpression lt("a"sv, operand["$lt"]);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << 6), &details));
@@ -1108,7 +1107,7 @@ TEST(LteOp, MatchesElement) {
     BSONObj equalMatch = BSON("a" << 5);
     BSONObj notMatch = BSON("a" << 6);
     BSONObj notMatchWrongType = BSON("a" << "foo");
-    LTEMatchExpression lte(""_sd, operand["$lte"]);
+    LTEMatchExpression lte(""sv, operand["$lte"]);
     ASSERT(exec::matcher::matchesSingleElement(&lte, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&lte, equalMatch.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&lte, notMatch.firstElement()));
@@ -1117,21 +1116,21 @@ TEST(LteOp, MatchesElement) {
 
 TEST(LteOp, MatchesScalar) {
     BSONObj operand = BSON("$lte" << 5);
-    LTEMatchExpression lte("a"_sd, operand["$lte"]);
+    LTEMatchExpression lte("a"sv, operand["$lte"]);
     ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << 4.5), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << 6), nullptr));
 }
 
 TEST(LteOp, MatchesArrayValue) {
     BSONObj operand = BSON("$lte" << 5);
-    LTEMatchExpression lte("a"_sd, operand["$lte"]);
+    LTEMatchExpression lte("a"sv, operand["$lte"]);
     ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(6 << 4.5)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
 }
 
 TEST(LteOp, MatchesWholeArray) {
     BSONObj operand = BSON("$lte" << BSON_ARRAY(5));
-    LTEMatchExpression lte("a"_sd, operand["$lte"]);
+    LTEMatchExpression lte("a"sv, operand["$lte"]);
     ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(4)), nullptr));
     ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(5)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(6)), nullptr));
@@ -1143,7 +1142,7 @@ TEST(LteOp, MatchesWholeArray) {
 
 TEST(LteOp, MatchesNull) {
     BSONObj operand = BSON("$lte" << BSONNULL);
-    LTEMatchExpression lte("a"_sd, operand["$lte"]);
+    LTEMatchExpression lte("a"sv, operand["$lte"]);
     ASSERT(exec::matcher::matchesBSON(&lte, BSONObj(), nullptr));
     ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSONNULL), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << 4), nullptr));
@@ -1153,7 +1152,7 @@ TEST(LteOp, MatchesNull) {
 
 TEST(LteOp, MatchesDotNotationNull) {
     BSONObj operand = BSON("$lte" << BSONNULL);
-    LTEMatchExpression lte("a.b"_sd, operand["$lte"]);
+    LTEMatchExpression lte("a.b"sv, operand["$lte"]);
     ASSERT(exec::matcher::matchesBSON(&lte, BSONObj(), nullptr));
     ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSONNULL), nullptr));
     ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << 4), nullptr));
@@ -1168,7 +1167,7 @@ TEST(LteOp, MatchesDotNotationNull) {
 
 TEST(LteOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << BSONType::minKey);
-    LTEMatchExpression lte("a"_sd, operand["a"]);
+    LTEMatchExpression lte("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -1184,7 +1183,7 @@ TEST(LteOp, MatchesMinKey) {
 
 TEST(LteOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << BSONType::maxKey);
-    LTEMatchExpression lte("a"_sd, operand["a"]);
+    LTEMatchExpression lte("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -1200,7 +1199,7 @@ TEST(LteOp, MatchesMaxKey) {
 
 TEST(LteOp, ElemMatchKey) {
     BSONObj operand = BSON("$lte" << 5);
-    LTEMatchExpression lte("a"_sd, operand["$lte"]);
+    LTEMatchExpression lte("a"sv, operand["$lte"]);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << 6), &details));
@@ -1214,21 +1213,21 @@ TEST(LteOp, ElemMatchKey) {
 
 TEST(GtOp, MatchesScalar) {
     BSONObj operand = BSON("$gt" << 5);
-    GTMatchExpression gt("a"_sd, operand["$gt"]);
+    GTMatchExpression gt("a"sv, operand["$gt"]);
     ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << 5.5), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << 4), nullptr));
 }
 
 TEST(GtOp, MatchesArrayValue) {
     BSONObj operand = BSON("$gt" << 5);
-    GTMatchExpression gt("a"_sd, operand["$gt"]);
+    GTMatchExpression gt("a"sv, operand["$gt"]);
     ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(3 << 5.5)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(2 << 4)), nullptr));
 }
 
 TEST(GtOp, MatchesWholeArray) {
     BSONObj operand = BSON("$gt" << BSON_ARRAY(5));
-    GTMatchExpression gt("a"_sd, operand["$gt"]);
+    GTMatchExpression gt("a"sv, operand["$gt"]);
     ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(4)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(5)), nullptr));
     ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(6)), nullptr));
@@ -1242,7 +1241,7 @@ TEST(GtOp, MatchesWholeArray) {
 
 TEST(GtOp, MatchesNull) {
     BSONObj operand = BSON("$gt" << BSONNULL);
-    GTMatchExpression gt("a"_sd, operand["$gt"]);
+    GTMatchExpression gt("a"sv, operand["$gt"]);
     ASSERT(!exec::matcher::matchesBSON(&gt, BSONObj(), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSONNULL), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << 4), nullptr));
@@ -1252,7 +1251,7 @@ TEST(GtOp, MatchesNull) {
 
 TEST(GtOp, MatchesDotNotationNull) {
     BSONObj operand = BSON("$gt" << BSONNULL);
-    GTMatchExpression gt("a.b"_sd, operand["$gt"]);
+    GTMatchExpression gt("a.b"sv, operand["$gt"]);
     ASSERT(!exec::matcher::matchesBSON(&gt, BSONObj(), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSONNULL), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << 4), nullptr));
@@ -1267,7 +1266,7 @@ TEST(GtOp, MatchesDotNotationNull) {
 
 TEST(GtOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << BSONType::minKey);
-    GTMatchExpression gt("a"_sd, operand["a"]);
+    GTMatchExpression gt("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -1283,7 +1282,7 @@ TEST(GtOp, MatchesMinKey) {
 
 TEST(GtOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << BSONType::maxKey);
-    GTMatchExpression gt("a"_sd, operand["a"]);
+    GTMatchExpression gt("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -1299,7 +1298,7 @@ TEST(GtOp, MatchesMaxKey) {
 
 TEST(GtOp, ElemMatchKey) {
     BSONObj operand = BSON("$gt" << 5);
-    GTMatchExpression gt("a"_sd, operand["$gt"]);
+    GTMatchExpression gt("a"sv, operand["$gt"]);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << 4), &details));
@@ -1317,7 +1316,7 @@ TEST(GteOp, MatchesElement) {
     BSONObj equalMatch = BSON("a" << 5);
     BSONObj notMatch = BSON("a" << 4);
     BSONObj notMatchWrongType = BSON("a" << "foo");
-    GTEMatchExpression gte(""_sd, operand["$gte"]);
+    GTEMatchExpression gte(""sv, operand["$gte"]);
     ASSERT(exec::matcher::matchesSingleElement(&gte, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&gte, equalMatch.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&gte, notMatch.firstElement()));
@@ -1326,21 +1325,21 @@ TEST(GteOp, MatchesElement) {
 
 TEST(GteOp, MatchesScalar) {
     BSONObj operand = BSON("$gte" << 5);
-    GTEMatchExpression gte("a"_sd, operand["$gte"]);
+    GTEMatchExpression gte("a"sv, operand["$gte"]);
     ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << 5.5), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << 4), nullptr));
 }
 
 TEST(GteOp, MatchesArrayValue) {
     BSONObj operand = BSON("$gte" << 5);
-    GTEMatchExpression gte("a"_sd, operand["$gte"]);
+    GTEMatchExpression gte("a"sv, operand["$gte"]);
     ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(4 << 5.5)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
 }
 
 TEST(GteOp, MatchesWholeArray) {
     BSONObj operand = BSON("$gte" << BSON_ARRAY(5));
-    GTEMatchExpression gte("a"_sd, operand["$gte"]);
+    GTEMatchExpression gte("a"sv, operand["$gte"]);
     ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(4)), nullptr));
     ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(5)), nullptr));
     ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(6)), nullptr));
@@ -1353,7 +1352,7 @@ TEST(GteOp, MatchesWholeArray) {
 
 TEST(GteOp, MatchesNull) {
     BSONObj operand = BSON("$gte" << BSONNULL);
-    GTEMatchExpression gte("a"_sd, operand["$gte"]);
+    GTEMatchExpression gte("a"sv, operand["$gte"]);
     ASSERT(exec::matcher::matchesBSON(&gte, BSONObj(), nullptr));
     ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSONNULL), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << 4), nullptr));
@@ -1363,7 +1362,7 @@ TEST(GteOp, MatchesNull) {
 
 TEST(GteOp, MatchesDotNotationNull) {
     BSONObj operand = BSON("$gte" << BSONNULL);
-    GTEMatchExpression gte("a.b"_sd, operand["$gte"]);
+    GTEMatchExpression gte("a.b"sv, operand["$gte"]);
     ASSERT(exec::matcher::matchesBSON(&gte, BSONObj(), nullptr));
     ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSONNULL), nullptr));
     ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << 4), nullptr));
@@ -1378,7 +1377,7 @@ TEST(GteOp, MatchesDotNotationNull) {
 
 TEST(GteOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << BSONType::minKey);
-    GTEMatchExpression gte("a"_sd, operand["a"]);
+    GTEMatchExpression gte("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -1394,7 +1393,7 @@ TEST(GteOp, MatchesMinKey) {
 
 TEST(GteOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << BSONType::maxKey);
-    GTEMatchExpression gte("a"_sd, operand["a"]);
+    GTEMatchExpression gte("a"sv, operand["a"]);
     BSONObj minKeyObj = BSON("a" << BSONType::minKey);
     BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
@@ -1410,7 +1409,7 @@ TEST(GteOp, MatchesMaxKey) {
 
 TEST(GteOp, ElemMatchKey) {
     BSONObj operand = BSON("$gte" << 5);
-    GTEMatchExpression gte("a"_sd, operand["$gte"]);
+    GTEMatchExpression gte("a"sv, operand["$gte"]);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << 4), &details));
@@ -1425,7 +1424,7 @@ TEST(GteOp, ElemMatchKey) {
 TEST(RegexMatchExpression, MatchesElementExact) {
     BSONObj match = BSON("a" << "b");
     BSONObj notMatch = BSON("a" << "c");
-    RegexMatchExpression regex(""_sd, "b", "");
+    RegexMatchExpression regex(""sv, "b", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
@@ -1433,7 +1432,7 @@ TEST(RegexMatchExpression, MatchesElementExact) {
 TEST(RegexMatchExpression, MatchesElementSimplePrefix) {
     BSONObj match = BSON("x" << "abc");
     BSONObj notMatch = BSON("x" << "adz");
-    RegexMatchExpression regex(""_sd, "^ab", "");
+    RegexMatchExpression regex(""sv, "^ab", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
@@ -1441,7 +1440,7 @@ TEST(RegexMatchExpression, MatchesElementSimplePrefix) {
 TEST(RegexMatchExpression, MatchesElementCaseSensitive) {
     BSONObj match = BSON("x" << "abc");
     BSONObj notMatch = BSON("x" << "ABC");
-    RegexMatchExpression regex(""_sd, "abc", "");
+    RegexMatchExpression regex(""sv, "abc", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
@@ -1450,7 +1449,7 @@ TEST(RegexMatchExpression, MatchesElementCaseInsensitive) {
     BSONObj match = BSON("x" << "abc");
     BSONObj matchUppercase = BSON("x" << "ABC");
     BSONObj notMatch = BSON("x" << "abz");
-    RegexMatchExpression regex(""_sd, "abc", "i");
+    RegexMatchExpression regex(""sv, "abc", "i");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&regex, matchUppercase.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
@@ -1459,7 +1458,7 @@ TEST(RegexMatchExpression, MatchesElementCaseInsensitive) {
 TEST(RegexMatchExpression, MatchesElementMultilineOff) {
     BSONObj match = BSON("x" << "az");
     BSONObj notMatch = BSON("x" << "\naz");
-    RegexMatchExpression regex(""_sd, "^a", "");
+    RegexMatchExpression regex(""sv, "^a", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
@@ -1468,7 +1467,7 @@ TEST(RegexMatchExpression, MatchesElementMultilineOn) {
     BSONObj match = BSON("x" << "az");
     BSONObj matchMultiline = BSON("x" << "\naz");
     BSONObj notMatch = BSON("x" << "\n\n");
-    RegexMatchExpression regex(""_sd, "^a", "m");
+    RegexMatchExpression regex(""sv, "^a", "m");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&regex, matchMultiline.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
@@ -1477,7 +1476,7 @@ TEST(RegexMatchExpression, MatchesElementMultilineOn) {
 TEST(RegexMatchExpression, MatchesElementExtendedOff) {
     BSONObj match = BSON("x" << "a b");
     BSONObj notMatch = BSON("x" << "ab");
-    RegexMatchExpression regex(""_sd, "a b", "");
+    RegexMatchExpression regex(""sv, "a b", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
@@ -1485,7 +1484,7 @@ TEST(RegexMatchExpression, MatchesElementExtendedOff) {
 TEST(RegexMatchExpression, MatchesElementExtendedOn) {
     BSONObj match = BSON("x" << "ab");
     BSONObj notMatch = BSON("x" << "a b");
-    RegexMatchExpression regex(""_sd, "a b", "x");
+    RegexMatchExpression regex(""sv, "a b", "x");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
@@ -1493,7 +1492,7 @@ TEST(RegexMatchExpression, MatchesElementExtendedOn) {
 TEST(RegexMatchExpression, MatchesElementDotAllOff) {
     BSONObj match = BSON("x" << "a b");
     BSONObj notMatch = BSON("x" << "a\nb");
-    RegexMatchExpression regex(""_sd, "a.b", "");
+    RegexMatchExpression regex(""sv, "a.b", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
@@ -1502,7 +1501,7 @@ TEST(RegexMatchExpression, MatchesElementDotAllOn) {
     BSONObj match = BSON("x" << "a b");
     BSONObj matchDotAll = BSON("x" << "a\nb");
     BSONObj notMatch = BSON("x" << "ab");
-    RegexMatchExpression regex(""_sd, "a.b", "s");
+    RegexMatchExpression regex(""sv, "a.b", "s");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&regex, matchDotAll.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
@@ -1510,7 +1509,7 @@ TEST(RegexMatchExpression, MatchesElementDotAllOn) {
 
 TEST(RegexMatchExpression, MatchesElementMultipleFlags) {
     BSONObj matchMultilineDotAll = BSON("x" << "\na\nb");
-    RegexMatchExpression regex(""_sd, "^a.b", "ms");
+    RegexMatchExpression regex(""sv, "^a.b", "ms");
     ASSERT(exec::matcher::matchesSingleElement(&regex, matchMultilineDotAll.firstElement()));
 }
 
@@ -1518,7 +1517,7 @@ TEST(RegexMatchExpression, MatchesElementRegexType) {
     BSONObj match = BSONObjBuilder().appendRegex("x", "yz", "i").obj();
     BSONObj notMatchPattern = BSONObjBuilder().appendRegex("x", "r", "i").obj();
     BSONObj notMatchFlags = BSONObjBuilder().appendRegex("x", "yz", "s").obj();
-    RegexMatchExpression regex(""_sd, "yz", "i");
+    RegexMatchExpression regex(""sv, "yz", "i");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatchPattern.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatchFlags.firstElement()));
@@ -1527,7 +1526,7 @@ TEST(RegexMatchExpression, MatchesElementRegexType) {
 TEST(RegexMatchExpression, MatchesElementSymbolType) {
     BSONObj match = BSONObjBuilder().appendSymbol("x", "yz").obj();
     BSONObj notMatch = BSONObjBuilder().appendSymbol("x", "gg").obj();
-    RegexMatchExpression regex(""_sd, "yz", "");
+    RegexMatchExpression regex(""sv, "yz", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
@@ -1535,37 +1534,37 @@ TEST(RegexMatchExpression, MatchesElementSymbolType) {
 TEST(RegexMatchExpression, MatchesElementWrongType) {
     BSONObj notMatchInt = BSON("x" << 1);
     BSONObj notMatchBool = BSON("x" << true);
-    RegexMatchExpression regex(""_sd, "1", "");
+    RegexMatchExpression regex(""sv, "1", "");
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatchInt.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatchBool.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementUtf8) {
     BSONObj multiByteCharacter = BSON("x" << "\xc2\xa5");
-    RegexMatchExpression regex(""_sd, "^.$", "");
+    RegexMatchExpression regex(""sv, "^.$", "");
     ASSERT(exec::matcher::matchesSingleElement(&regex, multiByteCharacter.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesScalar) {
-    RegexMatchExpression regex("a"_sd, "b", "");
+    RegexMatchExpression regex("a"sv, "b", "");
     ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << "b"), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&regex, BSON("a" << "c"), nullptr));
 }
 
 TEST(RegexMatchExpression, MatchesArrayValue) {
-    RegexMatchExpression regex("a"_sd, "b", "");
+    RegexMatchExpression regex("a"sv, "b", "");
     ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << BSON_ARRAY("c" << "b")), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&regex, BSON("a" << BSON_ARRAY("d" << "c")), nullptr));
 }
 
 TEST(RegexMatchExpression, MatchesNull) {
-    RegexMatchExpression regex("a"_sd, "b", "");
+    RegexMatchExpression regex("a"sv, "b", "");
     ASSERT(!exec::matcher::matchesBSON(&regex, BSONObj(), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&regex, BSON("a" << BSONNULL), nullptr));
 }
 
 TEST(RegexMatchExpression, ElemMatchKey) {
-    RegexMatchExpression regex("a"_sd, "b", "");
+    RegexMatchExpression regex("a"sv, "b", "");
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&regex, BSON("a" << "c"), &details));
@@ -1578,7 +1577,7 @@ TEST(RegexMatchExpression, ElemMatchKey) {
 }
 
 TEST(RegexMatchExpression, RegexAcceptsUCPStartOption) {
-    RegexMatchExpression regex("a"_sd, "(*UCP)(\\w|\u304C)", "");
+    RegexMatchExpression regex("a"sv, "(*UCP)(\\w|\u304C)", "");
     ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << "k")));
     ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << "\u304B")));
     ASSERT(exec::matcher::matchesBSON(&regex, BSON("a" << "\u304C")));
@@ -1587,11 +1586,11 @@ TEST(RegexMatchExpression, RegexAcceptsUCPStartOption) {
 TEST(RegexMatchExpression, RegexAcceptsLFOption) {
     // The LF option tells the regex to only treat \n as a newline. "." will not match newlines (by
     // default) so a\nb will not match, but a\rb will.
-    RegexMatchExpression regexLF("a"_sd, "(*LF)a.b", "");
+    RegexMatchExpression regexLF("a"sv, "(*LF)a.b", "");
     ASSERT(!exec::matcher::matchesBSON(&regexLF, BSON("a" << "a\nb")));
     ASSERT(exec::matcher::matchesBSON(&regexLF, BSON("a" << "a\rb")));
 
-    RegexMatchExpression regexCR("a"_sd, "(*CR)a.b", "");
+    RegexMatchExpression regexCR("a"sv, "(*CR)a.b", "");
     ASSERT(exec::matcher::matchesBSON(&regexCR, BSON("a" << "a\nb")));
     ASSERT(!exec::matcher::matchesBSON(&regexCR, BSON("a" << "a\rb")));
 }
@@ -1602,7 +1601,7 @@ TEST(ModMatchExpression, MatchesElement) {
     BSONObj longLongMatch = BSON("a" << 68719476736LL);
     BSONObj notMatch = BSON("a" << 6);
     BSONObj negativeNotMatch = BSON("a" << -2);
-    ModMatchExpression mod(""_sd, 3, 1);
+    ModMatchExpression mod(""sv, 3, 1);
     ASSERT(exec::matcher::matchesSingleElement(&mod, match.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&mod, largerMatch.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&mod, longLongMatch.firstElement()));
@@ -1611,25 +1610,25 @@ TEST(ModMatchExpression, MatchesElement) {
 }
 
 TEST(ModMatchExpression, MatchesScalar) {
-    ModMatchExpression mod("a"_sd, 5, 2);
+    ModMatchExpression mod("a"sv, 5, 2);
     ASSERT(exec::matcher::matchesBSON(&mod, BSON("a" << 7.0), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&mod, BSON("a" << 4), nullptr));
 }
 
 TEST(ModMatchExpression, MatchesArrayValue) {
-    ModMatchExpression mod("a"_sd, 5, 2);
+    ModMatchExpression mod("a"sv, 5, 2);
     ASSERT(exec::matcher::matchesBSON(&mod, BSON("a" << BSON_ARRAY(5 << 12LL)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&mod, BSON("a" << BSON_ARRAY(6 << 8)), nullptr));
 }
 
 TEST(ModMatchExpression, MatchesNull) {
-    ModMatchExpression mod("a"_sd, 5, 2);
+    ModMatchExpression mod("a"sv, 5, 2);
     ASSERT(!exec::matcher::matchesBSON(&mod, BSONObj(), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&mod, BSON("a" << BSONNULL), nullptr));
 }
 
 TEST(ModMatchExpression, ElemMatchKey) {
-    ModMatchExpression mod("a"_sd, 5, 2);
+    ModMatchExpression mod("a"sv, 5, 2);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&mod, BSON("a" << 4), &details));
@@ -1645,7 +1644,7 @@ TEST(ExistsMatchExpression, MatchesElement) {
     BSONObj existsInt = BSON("a" << 5);
     BSONObj existsNull = BSON("a" << BSONNULL);
     BSONObj doesntExist = BSONObj();
-    ExistsMatchExpression exists(""_sd);
+    ExistsMatchExpression exists(""sv);
     ASSERT(exec::matcher::matchesSingleElement(&exists, existsInt.firstElement()));
     ASSERT(exec::matcher::matchesSingleElement(&exists, existsNull.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&exists, doesntExist.firstElement()));
@@ -1654,25 +1653,25 @@ TEST(ExistsMatchExpression, MatchesElement) {
 TEST(ExistsMatchExpression, MatchesElementExistsTrueValue) {
     BSONObj exists = BSON("a" << 5);
     BSONObj missing = BSONObj();
-    ExistsMatchExpression existsTrueValue(""_sd);
+    ExistsMatchExpression existsTrueValue(""sv);
     ASSERT(exec::matcher::matchesSingleElement(&existsTrueValue, exists.firstElement()));
     ASSERT(!exec::matcher::matchesSingleElement(&existsTrueValue, missing.firstElement()));
 }
 
 TEST(ExistsMatchExpression, MatchesScalar) {
-    ExistsMatchExpression exists("a"_sd);
+    ExistsMatchExpression exists("a"sv);
     ASSERT(exec::matcher::matchesBSON(&exists, BSON("a" << 1), nullptr));
     ASSERT(exec::matcher::matchesBSON(&exists, BSON("a" << BSONNULL), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&exists, BSON("b" << 1), nullptr));
 }
 
 TEST(ExistsMatchExpression, MatchesArray) {
-    ExistsMatchExpression exists("a"_sd);
+    ExistsMatchExpression exists("a"sv);
     ASSERT(exec::matcher::matchesBSON(&exists, BSON("a" << BSON_ARRAY(4 << 5.5)), nullptr));
 }
 
 TEST(ExistsMatchExpression, ElemMatchKey) {
-    ExistsMatchExpression exists("a.b"_sd);
+    ExistsMatchExpression exists("a.b"sv);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&exists, BSON("a" << 1), &details));
@@ -1689,7 +1688,7 @@ TEST(InMatchExpression, MatchesElementSingle) {
     BSONArray operand = BSON_ARRAY(1);
     BSONObj match = BSON("a" << 1);
     BSONObj notMatch = BSON("a" << 2);
-    InMatchExpression in(""_sd);
+    InMatchExpression in(""sv);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
     ASSERT(exec::matcher::matchesSingleElement(&in, match["a"]));
@@ -1697,7 +1696,7 @@ TEST(InMatchExpression, MatchesElementSingle) {
 }
 
 TEST(InMatchExpression, MatchesEmpty) {
-    InMatchExpression in("a"_sd);
+    InMatchExpression in("a"sv);
 
     BSONObj notMatch = BSON("a" << 2);
     ASSERT(!exec::matcher::matchesSingleElement(&in, notMatch["a"]));
@@ -1707,7 +1706,7 @@ TEST(InMatchExpression, MatchesEmpty) {
 
 TEST(InMatchExpression, MatchesElementMultiple) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << 1);
-    InMatchExpression in(""_sd);
+    InMatchExpression in(""sv);
     std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
@@ -1724,7 +1723,7 @@ TEST(InMatchExpression, MatchesElementMultiple) {
 
 TEST(InMatchExpression, MatchesScalar) {
     BSONObj operand = BSON_ARRAY(5);
-    InMatchExpression in("a"_sd);
+    InMatchExpression in("a"sv);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
@@ -1734,7 +1733,7 @@ TEST(InMatchExpression, MatchesScalar) {
 
 TEST(InMatchExpression, MatchesArrayValue) {
     BSONObj operand = BSON_ARRAY(5);
-    InMatchExpression in("a"_sd);
+    InMatchExpression in("a"sv);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
@@ -1746,7 +1745,7 @@ TEST(InMatchExpression, MatchesArrayValue) {
 TEST(InMatchExpression, MatchesNull) {
     BSONObj operand = BSON_ARRAY(BSONNULL);
 
-    InMatchExpression in("a"_sd);
+    InMatchExpression in("a"sv);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
@@ -1762,7 +1761,7 @@ TEST(InMatchExpression, MatchesNull) {
 
 TEST(InMatchExpression, MatchesMinKey) {
     BSONObj operand = BSON_ARRAY(BSONType::minKey);
-    InMatchExpression in("a"_sd);
+    InMatchExpression in("a"sv);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
@@ -1773,7 +1772,7 @@ TEST(InMatchExpression, MatchesMinKey) {
 
 TEST(InMatchExpression, MatchesMaxKey) {
     BSONObj operand = BSON_ARRAY(BSONType::maxKey);
-    InMatchExpression in("a"_sd);
+    InMatchExpression in("a"sv);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
@@ -1784,7 +1783,7 @@ TEST(InMatchExpression, MatchesMaxKey) {
 
 TEST(InMatchExpression, MatchesFullArray) {
     BSONObj operand = BSON_ARRAY(BSON_ARRAY(1 << 2) << 4 << 5);
-    InMatchExpression in("a"_sd);
+    InMatchExpression in("a"sv);
     std::vector<BSONElement> equalities{operand[0], operand[1], operand[2]};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
@@ -1796,7 +1795,7 @@ TEST(InMatchExpression, MatchesFullArray) {
 
 TEST(InMatchExpression, ElemMatchKey) {
     BSONObj operand = BSON_ARRAY(5 << 2);
-    InMatchExpression in("a"_sd);
+    InMatchExpression in("a"sv);
     std::vector<BSONElement> equalities{operand[0], operand[1]};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
@@ -1814,7 +1813,7 @@ TEST(InMatchExpression, ElemMatchKey) {
 TEST(InMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
     BSONArray operand = BSON_ARRAY("string");
     BSONObj notMatch = BSON("a" << "string2");
-    InMatchExpression in(""_sd);
+    InMatchExpression in(""sv);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
     ASSERT(!exec::matcher::matchesSingleElement(&in, notMatch["a"]));
@@ -1824,7 +1823,7 @@ TEST(InMatchExpression, StringMatchingRespectsCollation) {
     BSONArray operand = BSON_ARRAY("string");
     BSONObj match = BSON("a" << "string2");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    InMatchExpression in(""_sd);
+    InMatchExpression in(""sv);
     in.setCollator(&collator);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
@@ -1854,10 +1853,10 @@ TEST(BitTestMatchExpression, DoesNotMatchOther) {
     BSONObj notMatch17 =
         fromjson("{a: NumberDecimal(\"-5.5\")}");  // Negative-integral NumberDecimal
 
-    BitsAllSetMatchExpression balls("a"_sd, bitPositions);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositions);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositions);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositions);
+    BitsAllSetMatchExpression balls("a"sv, bitPositions);
+    BitsAllClearMatchExpression ballc("a"sv, bitPositions);
+    BitsAnySetMatchExpression banys("a"sv, bitPositions);
+    BitsAnyClearMatchExpression banyc("a"sv, bitPositions);
 
     ASSERT_EQ((size_t)0, balls.numBitPositions());
     ASSERT_EQ((size_t)0, ballc.numBitPositions());
@@ -1938,10 +1937,10 @@ TEST(BitTestMatchExpression, MatchBinaryWithLongBitMask) {
 
     BSONObj match = fromjson("{a: {$binary: 'NgAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
 
-    BitsAllSetMatchExpression balls("a"_sd, bitMask);
-    BitsAllClearMatchExpression ballc("a"_sd, bitMask);
-    BitsAnySetMatchExpression banys("a"_sd, bitMask);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitMask);
+    BitsAllSetMatchExpression balls("a"sv, bitMask);
+    BitsAllClearMatchExpression ballc("a"sv, bitMask);
+    BitsAnySetMatchExpression banys("a"sv, bitMask);
+    BitsAnyClearMatchExpression banyc("a"sv, bitMask);
 
     std::vector<uint32_t> bitPositions = balls.getBitPositions();
     ASSERT(exec::matcher::matchesSingleElement(&balls, match["a"]));
@@ -1956,10 +1955,10 @@ TEST(BitTestMatchExpression, MatchLongWithBinaryBitMask) {
 
     BSONObj match = fromjson("{a: 54}");
 
-    BitsAllSetMatchExpression balls("a"_sd, bitMaskSet, 4);
-    BitsAllClearMatchExpression ballc("a"_sd, bitMaskClear, 9);
-    BitsAnySetMatchExpression banys("a"_sd, bitMaskSet, 4);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitMaskClear, 9);
+    BitsAllSetMatchExpression balls("a"sv, bitMaskSet, 4);
+    BitsAllClearMatchExpression ballc("a"sv, bitMaskClear, 9);
+    BitsAnySetMatchExpression banys("a"sv, bitMaskSet, 4);
+    BitsAnyClearMatchExpression banyc("a"sv, bitMaskClear, 9);
 
     ASSERT(exec::matcher::matchesSingleElement(&balls, match["a"]));
     ASSERT(exec::matcher::matchesSingleElement(&ballc, match["a"]));
@@ -1975,10 +1974,10 @@ TEST(BitTestMatchExpression, MatchesEmpty) {
     BSONObj match3 = fromjson("{a: 54.0}");
     BSONObj match4 = fromjson("{a: {$binary: '2AAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}");
 
-    BitsAllSetMatchExpression balls("a"_sd, bitPositions);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositions);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositions);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositions);
+    BitsAllSetMatchExpression balls("a"sv, bitPositions);
+    BitsAllClearMatchExpression ballc("a"sv, bitPositions);
+    BitsAnySetMatchExpression banys("a"sv, bitPositions);
+    BitsAnyClearMatchExpression banyc("a"sv, bitPositions);
 
     ASSERT_EQ((size_t)0, balls.numBitPositions());
     ASSERT_EQ((size_t)0, ballc.numBitPositions());
@@ -2023,10 +2022,10 @@ TEST(BitTestMatchExpression, MatchesInteger) {
     BSONObj match2 = fromjson("{a: NumberLong(54)}");
     BSONObj match3 = fromjson("{a: 54.0}");
 
-    BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositionsSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositionsClear);
+    BitsAllSetMatchExpression balls("a"sv, bitPositionsSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitPositionsClear);
+    BitsAnySetMatchExpression banys("a"sv, bitPositionsSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitPositionsClear);
 
     ASSERT_EQ((size_t)4, balls.numBitPositions());
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
@@ -2056,10 +2055,10 @@ TEST(BitTestMatchExpression, MatchesNegativeInteger) {
     BSONObj match2 = fromjson("{a: NumberLong(-54)}");
     BSONObj match3 = fromjson("{a: -54.0}");
 
-    BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositionsSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositionsClear);
+    BitsAllSetMatchExpression balls("a"sv, bitPositionsSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitPositionsClear);
+    BitsAnySetMatchExpression banys("a"sv, bitPositionsSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitPositionsClear);
 
     ASSERT_EQ((size_t)5, balls.numBitPositions());
     ASSERT_EQ((size_t)4, ballc.numBitPositions());
@@ -2087,10 +2086,10 @@ TEST(BitTestMatchExpression, MatchesIntegerWithBitMask) {
     BSONObj match2 = fromjson("{a: NumberLong(54)}");
     BSONObj match3 = fromjson("{a: 54.0}");
 
-    BitsAllSetMatchExpression balls("a"_sd, bitMaskSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitMaskClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitMaskSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitMaskClear);
+    BitsAllSetMatchExpression balls("a"sv, bitMaskSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitMaskClear);
+    BitsAnySetMatchExpression banys("a"sv, bitMaskSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitMaskClear);
 
     ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
     ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
@@ -2114,10 +2113,10 @@ TEST(BitTestMatchExpression, MatchesNegativeIntegerWithBitMask) {
     BSONObj match2 = fromjson("{a: NumberLong(-54)}");
     BSONObj match3 = fromjson("{a: -54.0}");
 
-    BitsAllSetMatchExpression balls("a"_sd, bitMaskSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitMaskClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitMaskSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitMaskClear);
+    BitsAllSetMatchExpression balls("a"sv, bitMaskSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitMaskClear);
+    BitsAnySetMatchExpression banys("a"sv, bitMaskSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitMaskClear);
 
     ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
     ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
@@ -2143,10 +2142,10 @@ TEST(BitTestMatchExpression, DoesNotMatchInteger) {
     BSONObj match2 = fromjson("{a: NumberLong(54)}");
     BSONObj match3 = fromjson("{a: 54.0}");
 
-    BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositionsSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositionsClear);
+    BitsAllSetMatchExpression balls("a"sv, bitPositionsSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitPositionsClear);
+    BitsAnySetMatchExpression banys("a"sv, bitPositionsSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitPositionsClear);
 
     ASSERT_EQ((size_t)5, balls.numBitPositions());
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
@@ -2174,10 +2173,10 @@ TEST(BitTestMatchExpression, DoesNotMatchIntegerWithBitMask) {
     BSONObj match2 = fromjson("{a: NumberLong(54)}");
     BSONObj match3 = fromjson("{a: 54.0}");
 
-    BitsAllSetMatchExpression balls("a"_sd, bitMaskSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitMaskClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitMaskSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitMaskClear);
+    BitsAllSetMatchExpression balls("a"sv, bitMaskSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitMaskClear);
+    BitsAnySetMatchExpression banys("a"sv, bitMaskSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitMaskClear);
 
     ASSERT(!exec::matcher::matchesSingleElement(&balls, match1["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&balls, match2["a"]));
@@ -2204,10 +2203,10 @@ TEST(BitTestMatchExpression, MatchesBinary1) {
     BSONObj match2 = fromjson("{a: {$binary: 'NgAjqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
     // Base64 to Binary: 00110110...
 
-    BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositionsSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositionsClear);
+    BitsAllSetMatchExpression balls("a"sv, bitPositionsSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitPositionsClear);
+    BitsAnySetMatchExpression banys("a"sv, bitPositionsSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitPositionsClear);
 
     ASSERT_EQ((size_t)4, balls.numBitPositions());
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
@@ -2234,10 +2233,10 @@ TEST(BitTestMatchExpression, MatchesBinary2) {
     BSONObj match2 = fromjson("{a: {$binary: 'JANgqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
     // Base64 to Binary: ........ 00000011 01100000
 
-    BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositionsSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositionsClear);
+    BitsAllSetMatchExpression balls("a"sv, bitPositionsSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitPositionsClear);
+    BitsAnySetMatchExpression banys("a"sv, bitPositionsSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitPositionsClear);
 
     ASSERT_EQ((size_t)4, balls.numBitPositions());
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
@@ -2262,10 +2261,10 @@ TEST(BitTestMatchExpression, MatchesBinaryWithBitMask) {
     BSONObj match2 = fromjson("{a: {$binary: 'JANgAwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
     // Base64 to Binary: ........ 00000011 01100000
 
-    BitsAllSetMatchExpression balls("a"_sd, bas, 21);
-    BitsAllClearMatchExpression ballc("a"_sd, bac, 21);
-    BitsAnySetMatchExpression banys("a"_sd, bas, 21);
-    BitsAnyClearMatchExpression banyc("a"_sd, bac, 21);
+    BitsAllSetMatchExpression balls("a"sv, bas, 21);
+    BitsAllClearMatchExpression ballc("a"sv, bac, 21);
+    BitsAnySetMatchExpression banys("a"sv, bas, 21);
+    BitsAnyClearMatchExpression banyc("a"sv, bac, 21);
 
     ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
     ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
@@ -2288,10 +2287,10 @@ TEST(BitTestMatchExpression, DoesNotMatchBinary1) {
     BSONObj match2 = fromjson("{a: {$binary: 'NgAjqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
     // Base64 to Binary: 00110110...
 
-    BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositionsSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositionsClear);
+    BitsAllSetMatchExpression balls("a"sv, bitPositionsSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitPositionsClear);
+    BitsAnySetMatchExpression banys("a"sv, bitPositionsSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitPositionsClear);
 
     ASSERT_EQ((size_t)5, balls.numBitPositions());
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
@@ -2318,10 +2317,10 @@ TEST(BitTestMatchExpression, DoesNotMatchBinary2) {
     BSONObj match2 = fromjson("{a: {$binary: 'JANgqwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
     // Base64 to Binary: ........ 00000011 01100000
 
-    BitsAllSetMatchExpression balls("a"_sd, bitPositionsSet);
-    BitsAllClearMatchExpression ballc("a"_sd, bitPositionsClear);
-    BitsAnySetMatchExpression banys("a"_sd, bitPositionsSet);
-    BitsAnyClearMatchExpression banyc("a"_sd, bitPositionsClear);
+    BitsAllSetMatchExpression balls("a"sv, bitPositionsSet);
+    BitsAllClearMatchExpression ballc("a"sv, bitPositionsClear);
+    BitsAnySetMatchExpression banys("a"sv, bitPositionsSet);
+    BitsAnyClearMatchExpression banyc("a"sv, bitPositionsClear);
 
     ASSERT_EQ((size_t)5, balls.numBitPositions());
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
@@ -2346,10 +2345,10 @@ TEST(BitTestMatchExpression, DoesNotMatchBinaryWithBitMask) {
     BSONObj match2 = fromjson("{a: {$binary: 'JANgAwetkqwklEWRbWERKKJREtbq', $type: '00'}}");
     // Base64 to Binary: ........ 00000011 01100000
 
-    BitsAllSetMatchExpression balls("a"_sd, bas, 22);
-    BitsAllClearMatchExpression ballc("a"_sd, bac, 22);
-    BitsAnySetMatchExpression banys("a"_sd, bas, 22);
-    BitsAnyClearMatchExpression banyc("a"_sd, bac, 22);
+    BitsAllSetMatchExpression balls("a"sv, bas, 22);
+    BitsAllClearMatchExpression ballc("a"sv, bac, 22);
+    BitsAnySetMatchExpression banys("a"sv, bas, 22);
+    BitsAnyClearMatchExpression banyc("a"sv, bac, 22);
     ASSERT(!exec::matcher::matchesSingleElement(&balls, match1["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&balls, match2["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&ballc, match1["a"]));
@@ -2362,7 +2361,7 @@ TEST(BitTestMatchExpression, DoesNotMatchBinaryWithBitMask) {
 
 TEST(LeafMatchExpressionTest, Equal1) {
     BSONObj temp = BSON("x" << 5);
-    EqualityMatchExpression e("x"_sd, temp["x"]);
+    EqualityMatchExpression e("x"sv, temp["x"]);
 
     ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : [5] }")));
@@ -2380,7 +2379,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     BSONObj temp = BSON("x" << 5);
 
     {
-        LTEMatchExpression e("x"_sd, temp["x"]);
+        LTEMatchExpression e("x"sv, temp["x"]);
         ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
         ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 4 }")));
         ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 6 }")));
@@ -2388,7 +2387,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     }
 
     {
-        LTMatchExpression e("x"_sd, temp["x"]);
+        LTMatchExpression e("x"sv, temp["x"]);
         ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
         ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 4 }")));
         ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 6 }")));
@@ -2396,7 +2395,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     }
 
     {
-        GTEMatchExpression e("x"_sd, temp["x"]);
+        GTEMatchExpression e("x"sv, temp["x"]);
         ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
         ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 4 }")));
         ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 6 }")));
@@ -2404,7 +2403,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     }
 
     {
-        GTMatchExpression e("x"_sd, temp["x"]);
+        GTMatchExpression e("x"sv, temp["x"]);
         ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
         ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 4 }")));
         ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 6 }")));
@@ -2414,7 +2413,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
 
 TEST(MatchesBSONElement, ScalarEquality) {
     auto filterObj = fromjson("{i: 5}");
-    EqualityMatchExpression filter("i"_sd, filterObj["i"]);
+    EqualityMatchExpression filter("i"sv, filterObj["i"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -2454,7 +2453,7 @@ TEST(MatchesBSONElement, ScalarEquality) {
 
 TEST(MatchesBSONElement, DottedPathEquality) {
     auto filterObj = fromjson("{'i.a': 5}");
-    EqualityMatchExpression filter("i.a"_sd, filterObj["i.a"]);
+    EqualityMatchExpression filter("i.a"sv, filterObj["i.a"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -2504,7 +2503,7 @@ TEST(MatchesBSONElement, DottedPathEquality) {
 
 TEST(MatchesBSONElement, ArrayIndexEquality) {
     auto filterObj = fromjson("{'i.1': 5}");
-    EqualityMatchExpression filter("i.1"_sd, filterObj["i.1"]);
+    EqualityMatchExpression filter("i.1"sv, filterObj["i.1"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -2549,7 +2548,7 @@ TEST(MatchesBSONElement, ArrayIndexEquality) {
 
 TEST(MatchesBSONElement, ObjectEquality) {
     auto filterObj = fromjson("{i: {a: 5}}");
-    EqualityMatchExpression filter("i"_sd, filterObj["i"]);
+    EqualityMatchExpression filter("i"sv, filterObj["i"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -2599,7 +2598,7 @@ TEST(MatchesBSONElement, ObjectEquality) {
 
 TEST(MatchesBSONElement, ArrayEquality) {
     auto filterObj = fromjson("{i: [5]}");
-    EqualityMatchExpression filter("i"_sd, filterObj["i"]);
+    EqualityMatchExpression filter("i"sv, filterObj["i"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -2629,7 +2628,7 @@ TEST(MatchesBSONElement, ArrayEquality) {
 
 TEST(NotMatchExpression, MatchesScalar) {
     auto baseOperand = BSON("$lt" << 5);
-    auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
+    auto lt = std::make_unique<LTMatchExpression>("a"sv, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
     ASSERT(exec::matcher::matchesBSON(&notOp, BSON("a" << 6), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&notOp, BSON("a" << 4), nullptr));
@@ -2637,7 +2636,7 @@ TEST(NotMatchExpression, MatchesScalar) {
 
 TEST(NotMatchExpression, MatchesArray) {
     auto baseOperand = BSON("$lt" << 5);
-    auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
+    auto lt = std::make_unique<LTMatchExpression>("a"sv, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
     ASSERT(exec::matcher::matchesBSON(&notOp, BSON("a" << BSON_ARRAY(6)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&notOp, BSON("a" << BSON_ARRAY(4)), nullptr));
@@ -2647,7 +2646,7 @@ TEST(NotMatchExpression, MatchesArray) {
 
 TEST(NotMatchExpression, ElemMatchKey) {
     auto baseOperand = BSON("$lt" << 5);
-    auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
+    auto lt = std::make_unique<LTMatchExpression>("a"sv, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
     auto details = MatchDetails{};
     details.requestElemMatchKey();
@@ -2662,7 +2661,7 @@ TEST(NotMatchExpression, ElemMatchKey) {
 
 TEST(NotMatchExpression, SetCollatorPropagatesToChild) {
     auto baseOperand = BSON("a" << "string");
-    auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand["a"]);
+    auto eq = std::make_unique<EqualityMatchExpression>("a"sv, baseOperand["a"]);
     auto notOp = NotMatchExpression{eq.release()};
     auto collator = CollatorInterfaceMock{CollatorInterfaceMock::MockType::kAlwaysEqual};
     notOp.setCollator(&collator);
@@ -2682,9 +2681,9 @@ TEST(AndOp, MatchesElementThreeClauses) {
     auto notMatch2 = BSON("a" << "a1");
     auto notMatch3 = BSON("a" << "r");
 
-    auto sub1 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand1["$lt"]);
-    auto sub2 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand2["$gt"]);
-    auto sub3 = std::make_unique<RegexMatchExpression>("a"_sd, "1", "");
+    auto sub1 = std::make_unique<LTMatchExpression>("a"sv, baseOperand1["$lt"]);
+    auto sub2 = std::make_unique<GTMatchExpression>("a"sv, baseOperand2["$gt"]);
+    auto sub3 = std::make_unique<RegexMatchExpression>("a"sv, "1", "");
 
     auto andOp = AndMatchExpression{};
     andOp.add(std::move(sub1));
@@ -2699,7 +2698,7 @@ TEST(AndOp, MatchesElementThreeClauses) {
 
 TEST(AndOp, MatchesSingleClause) {
     auto baseOperand = BSON("$ne" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand["$ne"]);
+    auto eq = std::make_unique<EqualityMatchExpression>("a"sv, baseOperand["$ne"]);
     auto ne = std::make_unique<NotMatchExpression>(eq.release());
 
     auto andOp = AndMatchExpression{};
@@ -2716,9 +2715,9 @@ TEST(AndOp, MatchesThreeClauses) {
     auto baseOperand2 = BSON("$lt" << 10);
     auto baseOperand3 = BSON("$lt" << 100);
 
-    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<LTMatchExpression>("b"_sd, baseOperand3["$lt"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"sv, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"sv, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<LTMatchExpression>("b"sv, baseOperand3["$lt"]);
 
     auto andOp = AndMatchExpression{};
     andOp.add(std::move(sub1));
@@ -2736,8 +2735,8 @@ TEST(AndOp, ElemMatchKey) {
     auto baseOperand1 = BSON("a" << 1);
     auto baseOperand2 = BSON("b" << 2);
 
-    auto sub1 = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand1["a"]);
-    auto sub2 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand2["b"]);
+    auto sub1 = std::make_unique<EqualityMatchExpression>("a"sv, baseOperand1["a"]);
+    auto sub2 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand2["b"]);
 
     auto andOp = AndMatchExpression{};
     andOp.add(std::move(sub1));
@@ -2763,7 +2762,7 @@ TEST(OrOp, NoClauses) {
 
 TEST(OrOp, MatchesSingleClause) {
     auto baseOperand = BSON("$ne" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand["$ne"]);
+    auto eq = std::make_unique<EqualityMatchExpression>("a"sv, baseOperand["$ne"]);
     auto ne = std::make_unique<NotMatchExpression>(eq.release());
 
     auto orOp = OrMatchExpression{};
@@ -2778,8 +2777,8 @@ TEST(OrOp, MatchesSingleClause) {
 TEST(OrOp, MatchesTwoClauses) {
     auto clauseObj1 = fromjson("{i: 5}");
     auto clauseObj2 = fromjson("{'i.a': 6}");
-    auto clause1 = std::make_unique<EqualityMatchExpression>("i"_sd, clauseObj1["i"]);
-    auto clause2 = std::make_unique<EqualityMatchExpression>("i.a"_sd, clauseObj2["i.a"]);
+    auto clause1 = std::make_unique<EqualityMatchExpression>("i"sv, clauseObj1["i"]);
+    auto clause2 = std::make_unique<EqualityMatchExpression>("i.a"sv, clauseObj2["i.a"]);
 
     auto filter = OrMatchExpression{};
     filter.add(std::move(clause1));
@@ -2810,9 +2809,9 @@ TEST(OrOp, MatchesThreeClauses) {
     auto baseOperand1 = BSON("$gt" << 10);
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);
-    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand3["b"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"sv, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"sv, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand3["b"]);
 
     auto orOp = OrMatchExpression{};
     orOp.add(std::move(sub1));
@@ -2831,8 +2830,8 @@ TEST(OrOp, MatchesThreeClauses) {
 TEST(OrOp, ElemMatchKey) {
     auto baseOperand1 = BSON("a" << 1);
     auto baseOperand2 = BSON("b" << 2);
-    auto sub1 = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand1["a"]);
-    auto sub2 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand2["b"]);
+    auto sub1 = std::make_unique<EqualityMatchExpression>("a"sv, baseOperand1["a"]);
+    auto sub2 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand2["b"]);
 
     auto orOp = OrMatchExpression{};
     orOp.add(std::move(sub1));
@@ -2858,7 +2857,7 @@ TEST(NorOp, NoClauses) {
 
 TEST(NorOp, MatchesSingleClause) {
     auto baseOperand = BSON("$ne" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand["$ne"]);
+    auto eq = std::make_unique<EqualityMatchExpression>("a"sv, baseOperand["$ne"]);
     auto ne = std::make_unique<NotMatchExpression>(eq.release());
 
     auto norOp = NorMatchExpression{};
@@ -2875,9 +2874,9 @@ TEST(NorOp, MatchesThreeClauses) {
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);
 
-    auto sub1 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand1["$gt"]);
-    auto sub2 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand2["$lt"]);
-    auto sub3 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand3["b"]);
+    auto sub1 = std::make_unique<GTMatchExpression>("a"sv, baseOperand1["$gt"]);
+    auto sub2 = std::make_unique<LTMatchExpression>("a"sv, baseOperand2["$lt"]);
+    auto sub3 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand3["b"]);
 
     auto norOp = NorMatchExpression{};
     norOp.add(std::move(sub1));
@@ -2896,8 +2895,8 @@ TEST(NorOp, MatchesThreeClauses) {
 TEST(NorOp, ElemMatchKey) {
     auto baseOperand1 = BSON("a" << 1);
     auto baseOperand2 = BSON("b" << 2);
-    auto sub1 = std::make_unique<EqualityMatchExpression>("a"_sd, baseOperand1["a"]);
-    auto sub2 = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand2["b"]);
+    auto sub1 = std::make_unique<EqualityMatchExpression>("a"sv, baseOperand1["a"]);
+    auto sub2 = std::make_unique<EqualityMatchExpression>("b"sv, baseOperand2["b"]);
 
     auto norOp = NorMatchExpression{};
     norOp.add(std::move(sub1));
@@ -2919,7 +2918,7 @@ TEST(NorOp, ElemMatchKey) {
 TEST(ExpressionTypeTest, MatchesElementStringType) {
     BSONObj match = BSON("a" << "abc");
     BSONObj notMatch = BSON("a" << 5);
-    TypeMatchExpression type(""_sd, BSONType::string);
+    TypeMatchExpression type(""sv, BSONType::string);
     ASSERT(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -2927,7 +2926,7 @@ TEST(ExpressionTypeTest, MatchesElementStringType) {
 TEST(ExpressionTypeTest, MatchesElementNullType) {
     BSONObj match = BSON("a" << BSONNULL);
     BSONObj notMatch = BSON("a" << "abc");
-    TypeMatchExpression type(""_sd, BSONType::null);
+    TypeMatchExpression type(""sv, BSONType::null);
     ASSERT(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -2943,7 +2942,7 @@ TEST(ExpressionTypeTest, MatchesElementNumber) {
 
     MatcherTypeSet typeSet;
     typeSet.allNumbers = true;
-    TypeMatchExpression typeExpr("a"_sd, std::move(typeSet));
+    TypeMatchExpression typeExpr("a"sv, std::move(typeSet));
 
     ASSERT_EQ("a", typeExpr.path());
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&typeExpr, match1["a"]));
@@ -2953,13 +2952,13 @@ TEST(ExpressionTypeTest, MatchesElementNumber) {
 }
 
 TEST(ExpressionTypeTest, MatchesScalar) {
-    TypeMatchExpression type("a"_sd, BSONType::boolean);
+    TypeMatchExpression type("a"sv, BSONType::boolean);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << true), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << 1), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesArray) {
-    TypeMatchExpression type("a"_sd, BSONType::numberInt);
+    TypeMatchExpression type("a"sv, BSONType::numberInt);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(4)), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(4 << "a")), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY("a" << 4)), nullptr));
@@ -2968,7 +2967,7 @@ TEST(ExpressionTypeTest, MatchesArray) {
 }
 
 TEST(ExpressionTypeTest, TypeArrayMatchesOuterAndInnerArray) {
-    TypeMatchExpression type("a"_sd, BSONType::array);
+    TypeMatchExpression type("a"sv, BSONType::array);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSONArray()), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(4 << "a")), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(BSONArray() << 2)), nullptr));
@@ -2976,44 +2975,44 @@ TEST(ExpressionTypeTest, TypeArrayMatchesOuterAndInnerArray) {
 }
 
 TEST(ExpressionTypeTest, MatchesObject) {
-    TypeMatchExpression type("a"_sd, BSONType::object);
+    TypeMatchExpression type("a"sv, BSONType::object);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON("b" << 1)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << 1), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesDotNotationFieldObject) {
-    TypeMatchExpression type("a.b"_sd, BSONType::object);
+    TypeMatchExpression type("a.b"sv, BSONType::object);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON("b" << BSON("c" << 1))), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << BSON("b" << 1)), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesDotNotationArrayElementArray) {
-    TypeMatchExpression type("a.0"_sd, BSONType::array);
+    TypeMatchExpression type("a.0"sv, BSONType::array);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(BSON_ARRAY(1))), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY("b")), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesDotNotationArrayElementScalar) {
-    TypeMatchExpression type("a.0"_sd, BSONType::string);
+    TypeMatchExpression type("a.0"sv, BSONType::string);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY("b")), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(1)), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesDotNotationArrayElementObject) {
-    TypeMatchExpression type("a.0"_sd, BSONType::object);
+    TypeMatchExpression type("a.0"sv, BSONType::object);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(BSON("b" << 1))), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(1)), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesNull) {
-    TypeMatchExpression type("a"_sd, BSONType::null);
+    TypeMatchExpression type("a"sv, BSONType::null);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSONNULL), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << 4), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSONObj(), nullptr));
 }
 
 TEST(ExpressionTypeTest, ElemMatchKey) {
-    TypeMatchExpression type("a.b"_sd, BSONType::string);
+    TypeMatchExpression type("a.b"sv, BSONType::string);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << 1), &details));
@@ -3031,7 +3030,7 @@ TEST(ExpressionTypeTest, ElemMatchKey) {
 }
 
 TEST(ExpressionTypeTest, InternalSchemaTypeArrayOnlyMatchesArrays) {
-    InternalSchemaTypeExpression expr("a"_sd, BSONType::array);
+    InternalSchemaTypeExpression expr("a"sv, BSONType::array);
     ASSERT_TRUE(exec::matcher::matchesBSON(&expr, fromjson("{a: []}")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&expr, fromjson("{a: [1]}")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&expr, fromjson("{a: [{b: 1}, {b: 2}]}")));
@@ -3042,7 +3041,7 @@ TEST(ExpressionTypeTest, InternalSchemaTypeArrayOnlyMatchesArrays) {
 TEST(ExpressionTypeTest, InternalSchemaTypeNumberDoesNotMatchArrays) {
     MatcherTypeSet typeSet;
     typeSet.allNumbers = true;
-    InternalSchemaTypeExpression expr("a"_sd, std::move(typeSet));
+    InternalSchemaTypeExpression expr("a"sv, std::move(typeSet));
     ASSERT_FALSE(exec::matcher::matchesBSON(&expr, fromjson("{a: []}")));
     ASSERT_FALSE(exec::matcher::matchesBSON(&expr, fromjson("{a: [1]}")));
     ASSERT_FALSE(exec::matcher::matchesBSON(&expr, fromjson("{a: ['b', 2, 3]}")));
@@ -3056,7 +3055,7 @@ TEST(ExpressionTypeTest, TypeExprWithMultipleTypesMatchesAllSuchTypes) {
     typeSet.allNumbers = true;
     typeSet.bsonTypes.insert(BSONType::string);
     typeSet.bsonTypes.insert(BSONType::object);
-    TypeMatchExpression expr("a"_sd, std::move(typeSet));
+    TypeMatchExpression expr("a"sv, std::move(typeSet));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&expr, fromjson("{a: []}")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&expr, fromjson("{a: 1}")));
@@ -3072,7 +3071,7 @@ TEST(ExpressionTypeTest, InternalSchemaTypeExprWithMultipleTypesMatchesAllSuchTy
     typeSet.allNumbers = true;
     typeSet.bsonTypes.insert(BSONType::string);
     typeSet.bsonTypes.insert(BSONType::object);
-    InternalSchemaTypeExpression expr("a"_sd, std::move(typeSet));
+    InternalSchemaTypeExpression expr("a"sv, std::move(typeSet));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&expr, fromjson("{a: []}")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&expr, fromjson("{a: 1}")));
@@ -3086,7 +3085,7 @@ TEST(ExpressionTypeTest, InternalSchemaTypeExprWithMultipleTypesMatchesAllSuchTy
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataGeneral) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::BinDataGeneral));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::bdtCustom));
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::BinDataGeneral);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::BinDataGeneral);
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -3094,7 +3093,7 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataGeneral) {
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataFunction) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Function));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::MD5Type));
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Function);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::Function);
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -3102,7 +3101,7 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataFunction) {
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataNewUUID) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::BinDataGeneral));
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::newUUID);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::newUUID);
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -3110,7 +3109,7 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataNewUUID) {
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataMD5Type) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::MD5Type));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::MD5Type);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::MD5Type);
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -3118,7 +3117,7 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataMD5Type) {
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataEncryptType) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Encrypt));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Encrypt);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::Encrypt);
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -3126,7 +3125,7 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataEncryptType) {
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataColumnType) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Column));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Column);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::Column);
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -3134,7 +3133,7 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataColumnType) {
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataSensitiveType) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Sensitive));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Sensitive);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::Sensitive);
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -3142,7 +3141,7 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataSensitiveType) {
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataVectorType) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Vector));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Vector);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::Vector);
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -3150,13 +3149,13 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataVectorType) {
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataBdtCustom) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::bdtCustom));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Function));
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::bdtCustom);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::bdtCustom);
     ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, DoesNotMatchArrays) {
-    InternalSchemaBinDataSubTypeExpression type("a"_sd, BinDataType::BinDataGeneral);
+    InternalSchemaBinDataSubTypeExpression type("a"sv, BinDataType::BinDataGeneral);
     ASSERT_FALSE(exec::matcher::matchesBSON(
         &type,
         BSON("a" << BSON_ARRAY(BSONBinData(nullptr, 0, BinDataType::BinDataGeneral)
@@ -3169,7 +3168,7 @@ TEST(ExpressionBinDataSubTypeTest, DoesNotMatchArrays) {
 
 TEST(ExpressionBinDataSubTypeTest, DoesNotMatchString) {
     BSONObj notMatch = BSON("a" << "str");
-    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::bdtCustom);
+    InternalSchemaBinDataSubTypeExpression type(""sv, BinDataType::bdtCustom);
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 

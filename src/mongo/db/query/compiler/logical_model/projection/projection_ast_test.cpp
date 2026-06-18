@@ -50,6 +50,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -636,7 +637,7 @@ TEST_F(ProjectionASTTest, ParserErrorsOnSliceWithWrongArgumentType) {
 }
 
 TEST_F(ProjectionASTTest, ParserErrorsOnFindSliceWithSpecialValuesAsArguments) {
-    const StringData fieldName = "a";
+    const std::string_view fieldName = "a";
 
     auto checkSliceArguments = [&](const BSONObj& projection,
                                    int expectedLimit,

@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/lock_manager/fill_locker_info.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -42,6 +41,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -49,6 +49,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using LockerInfo = Locker::LockerInfo;
 using OneLock = Locker::OneLock;
@@ -94,7 +95,7 @@ TEST(FillLockerInfo, DoesReportLockStats) {
 
 TEST(FillLockerInfo, DoesReportLocksHeld) {
     const ResourceId dbId(RESOURCE_DATABASE,
-                          DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"_sd));
+                          DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"sv));
     LockerInfo info;
     info.locks = {OneLock{resourceIdGlobal, MODE_IX}, OneLock{dbId, MODE_IX}};
 
@@ -112,9 +113,9 @@ TEST(FillLockerInfo, DoesReportLocksHeld) {
 
 TEST(FillLockerInfo, ShouldReportMaxTypeHeldForResourceType) {
     const ResourceId firstDbId(RESOURCE_DATABASE,
-                               DatabaseName::createDatabaseName_forTest(boost::none, "FirstDB"_sd));
+                               DatabaseName::createDatabaseName_forTest(boost::none, "FirstDB"sv));
     const ResourceId secondDbId(
-        RESOURCE_DATABASE, DatabaseName::createDatabaseName_forTest(boost::none, "SecondDB"_sd));
+        RESOURCE_DATABASE, DatabaseName::createDatabaseName_forTest(boost::none, "SecondDB"sv));
     LockerInfo info;
     info.locks = {OneLock{resourceIdGlobal, MODE_IX},
                   OneLock{firstDbId, MODE_IX},

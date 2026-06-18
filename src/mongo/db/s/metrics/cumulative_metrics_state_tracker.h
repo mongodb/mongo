@@ -34,13 +34,15 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 template <typename... StateEnums>
 class CumulativeMetricsStateTracker {
 public:
     using AnyState = std::variant<StateEnums...>;
-    using StateFieldNameMap = stdx::unordered_map<AnyState, StringData>;
+    using StateFieldNameMap = stdx::unordered_map<AnyState, std::string_view>;
 
     template <typename T>
     void onStateTransition(boost::optional<T> before, boost::optional<T> after) {
@@ -57,7 +59,8 @@ public:
     }
 
     template <typename State>
-    static boost::optional<StringData> getNameFor(State state, const StateFieldNameMap& names) {
+    static boost::optional<std::string_view> getNameFor(State state,
+                                                        const StateFieldNameMap& names) {
         auto it = names.find(state);
         if (it == names.end()) {
             return boost::none;

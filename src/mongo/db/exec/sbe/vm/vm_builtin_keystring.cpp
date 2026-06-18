@@ -33,6 +33,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 #include <absl/container/inlined_vector.h>
 
@@ -71,7 +72,7 @@ value::TagValueMaybeOwned ByteCode::genericNewKeyString(ArityType arity,
 
     key_string::HeapBuilder kb{ksVersion, Ordering::make(orders)};
 
-    const auto stringTransformFn = [&](StringData stringData) {
+    const auto stringTransformFn = [&](std::string_view stringData) {
         return collator->getComparisonString(stringData);
     };
 

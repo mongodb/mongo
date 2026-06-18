@@ -46,6 +46,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -63,9 +64,9 @@ class ClientAPIVersionParameters;
  *
  * Optionally allows passthrough characters to remain unescaped.
  */
-void uriEncode(std::ostream& ss, StringData str, StringData passthrough = ""_sd);
+void uriEncode(std::ostream& ss, std::string_view str, std::string_view passthrough = ""_sd);
 
-inline std::string uriEncode(StringData str, StringData passthrough = ""_sd) {
+inline std::string uriEncode(std::string_view str, std::string_view passthrough = ""_sd) {
     std::ostringstream ss;
     uriEncode(ss, str, passthrough);
     return ss.str();
@@ -75,7 +76,7 @@ inline std::string uriEncode(StringData str, StringData passthrough = ""_sd) {
  * Decode a URI encoded string.
  * Replaces + and %xx sequences with their original byte.
  */
-StatusWith<std::string> uriDecode(StringData str);
+StatusWith<std::string> uriDecode(std::string_view str);
 
 /**
  * MongoURI handles parsing of URIs for mongodb, and falls back to old-style
@@ -120,7 +121,7 @@ public:
     public:
         CaseInsensitiveString(std::string str);
 
-        CaseInsensitiveString(StringData sd) : CaseInsensitiveString(std::string(sd)) {}
+        CaseInsensitiveString(std::string_view sd) : CaseInsensitiveString(std::string(sd)) {}
         CaseInsensitiveString(const char* str) : CaseInsensitiveString(std::string(str)) {}
 
         friend bool operator<(const CaseInsensitiveString& lhs, const CaseInsensitiveString& rhs) {
@@ -147,21 +148,21 @@ public:
     // whichever map type is used provides that guarantee.
     using OptionsMap = std::map<CaseInsensitiveString, std::string>;
 
-    static StatusWith<MongoURI> parse(StringData url);
+    static StatusWith<MongoURI> parse(std::string_view url);
 
     /*
      * Returns true if str starts with one of the uri schemes (e.g. mongodb:// or mongodb+srv://)
      */
-    static bool isMongoURI(StringData str);
+    static bool isMongoURI(std::string_view str);
 
     /*
      * Returns a copy of the input url as a string with the password and connection options
      * removed. This may uassert or return a mal-formed string if the input is not a valid URI
      */
-    static std::string redact(StringData url);
+    static std::string redact(std::string_view url);
 
     DBClientBase* connect(
-        StringData applicationName,
+        std::string_view applicationName,
         std::string& errmsg,
         boost::optional<double> socketTimeoutSecs = boost::none,
         const ClientAPIVersionParameters* apiParameters = nullptr,
@@ -295,7 +296,7 @@ public:
     // server (say a member of a replica-set), you can pass in its HostAndPort information to
     // get a new URI with the same info, except type() will be kStandalone and getServers() will
     // be the single host you pass in.
-    MongoURI cloneURIForServer(HostAndPort hostAndPort, StringData applicationName) const {
+    MongoURI cloneURIForServer(HostAndPort hostAndPort, std::string_view applicationName) const {
         auto out = *this;
         out._connectString = ConnectionString(std::move(hostAndPort));
 
@@ -356,7 +357,7 @@ private:
           _options(std::move(options)) {}
 #endif
 
-    static MongoURI parseImpl(StringData url);
+    static MongoURI parseImpl(std::string_view url);
 
     ConnectionString _connectString;
     boost::optional<auth::Credential> _credential;

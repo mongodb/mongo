@@ -70,6 +70,7 @@
 namespace mongo::extension::sdk {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 template <class Variant>
 const extension::AggStageAstNodeHandle& asAst(const Variant& v) {
@@ -254,7 +255,7 @@ TEST_F(AggStageTest, TransformAstNodeTest) {
     auto opCtx = testCtx.makeOperationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(
         opCtx.get(),
-        NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+        NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv),
         SerializationContext());
     const auto catalogContext = mongo::extension::host::CatalogContext(*expCtx);
     [[maybe_unused]] auto logicalStageHandle = handle->promote(catalogContext.getAsBoundaryType());
@@ -426,8 +427,8 @@ TEST_F(AggStageTest, BadTypeRequiredPrivilegesAstNodeFails) {
 class SimpleSerializationLogicalStage
     : public sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage> {
 public:
-    static constexpr StringData kStageName = "$simpleSerialization";
-    static constexpr StringData kStageSpec = "mongodb";
+    static constexpr std::string_view kStageName = "$simpleSerialization";
+    static constexpr std::string_view kStageSpec = "mongodb";
 
     SimpleSerializationLogicalStage()
         : sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage>(kStageName,
@@ -527,8 +528,8 @@ TEST(AggregationStageTest, ExplainExecutionStats) {
 
 class SimpleQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
-    static constexpr StringData kStageName = "$simpleQueryShape";
-    static constexpr StringData kStageSpec = "mongodb";
+    static constexpr std::string_view kStageName = "$simpleQueryShape";
+    static constexpr std::string_view kStageSpec = "mongodb";
 
     SimpleQueryShapeParseNode() : sdk::AggStageParseNode(kStageName) {}
 
@@ -568,9 +569,9 @@ TEST_F(AggStageTest, SimpleComputeQueryShapeSucceeds) {
 
 class IdentifierQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
-    static constexpr StringData kStageName = "$identifierQueryShape";
-    static constexpr StringData kIndexFieldName = "index";
-    static constexpr StringData kIndexValue = "identifier";
+    static constexpr std::string_view kStageName = "$identifierQueryShape";
+    static constexpr std::string_view kIndexFieldName = "index";
+    static constexpr std::string_view kIndexValue = "identifier";
 
     IdentifierQueryShapeParseNode() : sdk::AggStageParseNode(kStageName) {}
 
@@ -598,7 +599,7 @@ public:
         return std::make_unique<IdentifierQueryShapeParseNode>();
     }
 
-    static std::string applyHmacForTest(StringData sd) {
+    static std::string applyHmacForTest(std::string_view sd) {
         return "REDACT_" + std::string{sd};
     }
 };
@@ -664,9 +665,9 @@ TEST_F(AggStageTest, SourceStageParseTest) {
 
 class FieldPathQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
-    static constexpr StringData kStageName = "$fieldPathQueryShape";
-    static constexpr StringData kSingleFieldPath = "simpleField";
-    static constexpr StringData kNestedFieldPath = "nested.Field.Path";
+    static constexpr std::string_view kStageName = "$fieldPathQueryShape";
+    static constexpr std::string_view kSingleFieldPath = "simpleField";
+    static constexpr std::string_view kNestedFieldPath = "nested.Field.Path";
 
     FieldPathQueryShapeParseNode() : sdk::AggStageParseNode(kStageName) {}
 
@@ -697,7 +698,7 @@ public:
         return std::make_unique<FieldPathQueryShapeParseNode>();
     }
 
-    static std::string applyHmacForTest(StringData sd) {
+    static std::string applyHmacForTest(std::string_view sd) {
         return "REDACT_" + std::string{sd};
     }
 };
@@ -748,14 +749,14 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformation) {
 
 class LiteralQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
-    static constexpr StringData kStageName = "$literalQueryShape";
-    static constexpr StringData kStringField = "str";
-    static constexpr StringData kStringValue = "mongodb";
-    static constexpr StringData kNumberField = "num";
+    static constexpr std::string_view kStageName = "$literalQueryShape";
+    static constexpr std::string_view kStringField = "str";
+    static constexpr std::string_view kStringValue = "mongodb";
+    static constexpr std::string_view kNumberField = "num";
     static constexpr int kNumberValue = 5;
-    static constexpr StringData kObjectField = "obj";
+    static constexpr std::string_view kObjectField = "obj";
     static const BSONObj kObjectValue;
-    static constexpr StringData kDateField = "date";
+    static constexpr std::string_view kDateField = "date";
     static const Date_t kDateValue;
 
     LiteralQueryShapeParseNode() : sdk::AggStageParseNode(kStageName) {}
@@ -796,7 +797,7 @@ public:
         return std::make_unique<LiteralQueryShapeParseNode>();
     }
 
-    static std::string applyHmacForTest(StringData sd) {
+    static std::string applyHmacForTest(std::string_view sd) {
         return "REDACT_" + std::string{sd};
     }
 };
@@ -1027,7 +1028,7 @@ TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
     // Create a test expression context that can be wrapped by QueryExecutionContextAdapter.
     auto expCtx = make_intrusive<ExpressionContextForTest>(
         opCtx.get(),
-        NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+        NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv),
         SerializationContext());
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(expCtx.get());

@@ -36,6 +36,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
@@ -45,7 +47,7 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(QueryStatsFailedToRecordInfo);
 
 QueryStatsFailedToRecordInfo::QueryStatsFailedToRecordInfo(BSONObj cmdObj,
                                                            Status status,
-                                                           StringData versionString)
+                                                           std::string_view versionString)
     : _cmdObj(cmdObj.getOwned()), _status(std::move(status)), _versionString(versionString) {}
 
 void QueryStatsFailedToRecordInfo::serialize(BSONObjBuilder* bob) const {

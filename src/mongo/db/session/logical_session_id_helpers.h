@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/privilege.h"
@@ -40,6 +39,7 @@
 
 #include <cstddef>
 #include <initializer_list>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -56,7 +56,7 @@ SHA256Block getLogicalSessionUserDigestForLoggedInUser(const OperationContext* o
 /**
  * Get a user digest for a specific user/db identifier.
  */
-SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db);
+SHA256Block getLogicalSessionUserDigestFor(std::string_view user, std::string_view db);
 
 /**
  * Returns if the given session is a parent session, ie only has fields that could have come from an

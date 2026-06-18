@@ -30,7 +30,6 @@
 #include "mongo/scripting/mozjs/common/types/bson.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
@@ -54,6 +53,8 @@
 
 #include <jsapi.h>
 #if !defined(MONGO_MOZJS_WASI_BUILD)
+#include <string_view>
+
 #include <jscustomallocator.h>
 #endif
 
@@ -229,8 +230,8 @@ void BSONInfo::enumerate(JSContext* cx,
     while (i.more()) {
         BSONElement e = i.next();
 
-        // TODO SERVER-122826: when we get heterogeneous set lookup, switch to StringData rather
-        // than involving the temporary string
+        // TODO SERVER-122826: when we get heterogeneous set lookup, switch to std::string_view
+        // rather than involving the temporary string
         auto fieldNameStringData = e.fieldNameStringData();
         if (holder->_removed.find(std::string{fieldNameStringData}) != holder->_removed.end())
             continue;
@@ -350,7 +351,7 @@ void BSONInfo::Functions::bsonObjToArray::call(JSContext* cx, JS::CallArgs args)
 namespace {
 void bsonCompareCommon(JSContext* cx,
                        JS::CallArgs args,
-                       StringData funcName,
+                       std::string_view funcName,
                        BSONObj::ComparisonRulesSet rules) {
     if (args.length() != 2)
         uasserted(ErrorCodes::BadValue, fmt::format("{} needs 2 arguments", funcName));
@@ -402,7 +403,8 @@ void BSONInfo::Functions::bsonToBase64::call(JSContext* cx, JS::CallArgs args) {
     bool isBSON = getProto<BSONInfo>(runtime).instanceOf(args.get(0));
     BSONObj bsonObject = getBSONFromArg(cx, args.get(0), isBSON);
 
-    auto encoded = mongo::base64::encode(StringData(bsonObject.objdata(), bsonObject.objsize()));
+    auto encoded =
+        mongo::base64::encode(std::string_view(bsonObject.objdata(), bsonObject.objsize()));
     ValueReader(cx, args.rval()).fromStringData(encoded);
 }
 

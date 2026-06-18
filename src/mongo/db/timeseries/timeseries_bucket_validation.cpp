@@ -36,6 +36,7 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 
 #include <charconv>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -74,7 +75,7 @@ void logExceptionRateLimited(const DBException& ex) {
 /**
  * Attempts to parse the field name to integer.
  */
-int _idxInt(StringData idx) {
+int _idxInt(std::string_view idx) {
     int value = INT_MIN;
     auto [ptr, ec] = std::from_chars(idx.data(), idx.data() + idx.size(), value);
     // Ensure that the parsing consumes the entire buffer.
@@ -87,7 +88,7 @@ int _idxInt(StringData idx) {
 /**
  * Validates an uncompressed column against expected min/max.
  */
-void _validateUncompressedMinMax(StringData fieldName,
+void _validateUncompressedMinMax(std::string_view fieldName,
                                  BSONElement data,
                                  BSONElement min,
                                  BSONElement max,
@@ -157,7 +158,7 @@ void _validateUncompressedMinMax(StringData fieldName,
  * Validates a compressed column against expected count and min/max.
  */
 void _validateCompressedMinMax(boost::intrusive_ptr<BSONElementStorage>& allocator,
-                               StringData fieldName,
+                               std::string_view fieldName,
                                BSONElement data,
                                BSONElement min,
                                BSONElement max,
@@ -544,7 +545,7 @@ void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
                                const BSONObj& controlMin,
                                bool criticalValidationOnly) {
     // Ensure the time field exists
-    const StringData timeField = timeseriesOptions.getTimeField();
+    const std::string_view timeField = timeseriesOptions.getTimeField();
 
     // Compares both timestamps as Dates.
     auto minTimestamp = controlMin[timeField].Date();

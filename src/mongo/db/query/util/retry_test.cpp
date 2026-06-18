@@ -33,6 +33,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 TEST(RetryOnTest, RetriesUntilSuccessUpToMax) {
     constexpr auto kMaxRetries = 3;
     auto numCalls = 0;
@@ -131,7 +132,7 @@ TEST(RetryOnTest, OnErrorInvokedForEachRetryWithState) {
     };
 
     auto result = retryOnWithState<ErrorCodes::BadValue>(
-        "RetryOnWithStateTest"_sd, initialThrowsRemaining, kMaxRetries, fn, onError);
+        "RetryOnWithStateTest"sv, initialThrowsRemaining, kMaxRetries, fn, onError);
 
     ASSERT_EQ(result, 42);
     // 2 throws + 1 success = 3 total attempts.
@@ -176,7 +177,7 @@ TEST(RetryOnWithStateMultiTest, MultipleErrorCodesRetryWithState) {
         ++state.namespaceNotFoundCount;
     };
 
-    auto result = retryOnWithState("StateUpdateTest"_sd,
+    auto result = retryOnWithState("StateUpdateTest"sv,
                                    initialState,
                                    kMaxRetries,
                                    fn,
@@ -202,7 +203,7 @@ TEST(RetryOnWithStateMultiTest, ThrowsAfterExhaustingMaxRetries) {
     auto onError1 = [&](ExceptionFor<ErrorCodes::BadValue>& ex, int& state) {
     };
 
-    ASSERT_THROWS_CODE(retryOnWithState("ExhaustRetriesTest"_sd,
+    ASSERT_THROWS_CODE(retryOnWithState("ExhaustRetriesTest"sv,
                                         0,
                                         kMaxRetries,
                                         fn,
@@ -230,7 +231,7 @@ TEST(RetryOnWithStateMultiTest, HandlersAreNotCalledForMismatchedErrorCode) {
         ++handlerCalls;
     };
 
-    ASSERT_THROWS_CODE(retryOnWithState("UnhandledErrorTest"_sd,
+    ASSERT_THROWS_CODE(retryOnWithState("UnhandledErrorTest"sv,
                                         0,
                                         kMaxRetries,
                                         fn,

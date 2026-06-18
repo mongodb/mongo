@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -66,6 +65,7 @@
 #include <initializer_list>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -80,7 +80,7 @@ namespace {
 
 Rarely _sampler;
 
-auto fieldIsAnyOf = [](StringData v, std::initializer_list<StringData> il) {
+auto fieldIsAnyOf = [](std::string_view v, std::initializer_list<std::string_view> il) {
     auto ei = il.end();
     return std::find(il.begin(), ei, v) != ei;
 };
@@ -342,7 +342,7 @@ public:
                                 static_cast<long long>(!countField.eoo() ? countField.Number() : 0);
 
                             for (const auto& e : res) {
-                                StringData fieldName = e.fieldNameStringData();
+                                std::string_view fieldName = e.fieldNameStringData();
                                 if (fieldIsAnyOf(fieldName,
                                                  {"ns", "ok", "lastExtentSize", "paddingFactor"})) {
                                     continue;

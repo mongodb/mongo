@@ -62,6 +62,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 using boost::intrusive_ptr;
 using std::deque;
 using std::string;
@@ -491,7 +492,7 @@ class SeveralMoreDocuments : public CheckResultsBase {
     deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << BSONNULL),
                 DOC("_id" << 1),
-                DOC("_id" << 2 << "a" << DOC_ARRAY("a"_sd << "b"_sd)),
+                DOC("_id" << 2 << "a" << DOC_ARRAY("a"sv << "b"sv)),
                 DOC("_id" << 3),
                 DOC("_id" << 4 << "a" << DOC_ARRAY(1 << 2 << 3)),
                 DOC("_id" << 5 << "a" << DOC_ARRAY(4 << 5 << 6)),

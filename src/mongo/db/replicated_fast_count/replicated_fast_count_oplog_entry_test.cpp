@@ -32,12 +32,14 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
-BSONObj makeInitReplicatedFastCountO2(StringData metadataIdent,
+BSONObj makeInitReplicatedFastCountO2(std::string_view metadataIdent,
                                       int metadataKeyFormat,
-                                      StringData timestampsIdent,
+                                      std::string_view timestampsIdent,
                                       int timestampsKeyFormat) {
     return BSON("fastCountMetadataStoreIdent"
                 << metadataIdent << "fastCountMetadataStoreKeyFormat" << metadataKeyFormat

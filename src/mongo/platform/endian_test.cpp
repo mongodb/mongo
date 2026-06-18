@@ -29,7 +29,6 @@
 
 #include "mongo/platform/endian.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 

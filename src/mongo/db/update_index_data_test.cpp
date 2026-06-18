@@ -32,10 +32,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 TEST(UpdateIndexDataTest, Simple1) {
     UpdateIndexData a;
-    a.addPath(FieldRef("a.b"_sd));
+    a.addPath(FieldRef("a.b"sv));
     ASSERT_TRUE(a.mightBeIndexed(FieldRef("a.b")));
     ASSERT_TRUE(a.mightBeIndexed(FieldRef("a")));
     ASSERT_TRUE(a.mightBeIndexed(FieldRef("a.b.c")));
@@ -50,7 +51,7 @@ TEST(UpdateIndexDataTest, Simple1) {
 
 TEST(UpdateIndexDataTest, Simple2) {
     UpdateIndexData a;
-    a.addPath(FieldRef("ab"_sd));
+    a.addPath(FieldRef("ab"sv));
     ASSERT_FALSE(a.mightBeIndexed(FieldRef("a")));
     a.clear();
     ASSERT_FALSE(a.mightBeIndexed(FieldRef("ab")));
@@ -58,7 +59,7 @@ TEST(UpdateIndexDataTest, Simple2) {
 
 TEST(UpdateIndexDataTest, Component1) {
     UpdateIndexData a;
-    a.addPathComponent("a"_sd);
+    a.addPathComponent("a"sv);
     ASSERT_FALSE(a.mightBeIndexed(FieldRef("")));
     ASSERT_TRUE(a.mightBeIndexed(FieldRef("a")));
     ASSERT_TRUE(a.mightBeIndexed(FieldRef("b.a")));
@@ -83,7 +84,7 @@ TEST(UpdateIndexDataTest, AllPathsIndexed2) {
     a.setAllPathsIndexed();
     ASSERT_TRUE(a.mightBeIndexed(FieldRef("a")));
     ASSERT_TRUE(a.mightBeIndexed(FieldRef("")));
-    a.addPathComponent("a"_sd);
+    a.addPathComponent("a"sv);
     ASSERT_TRUE(a.mightBeIndexed(FieldRef("a")));
     ASSERT_TRUE(a.mightBeIndexed(FieldRef("b")));
     a.clear();

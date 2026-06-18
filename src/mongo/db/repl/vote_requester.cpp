@@ -55,6 +55,7 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -138,7 +139,7 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
 
     _responsesProcessed++;
     if (!response.isOK()) {  // failed response
-        logAttrs.add("failReason", "failed to receive response"_sd);
+        logAttrs.add("failReason", "failed to receive response"sv);
         logAttrs.add("error", response.status);
         logAttrs.add("from", request.target);
         return;
@@ -155,7 +156,7 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
         status = voteResponse.initialize(response.data);
     }
     if (!status.isOK()) {
-        logAttrs.add("failReason", "received an invalid response"_sd);
+        logAttrs.add("failReason", "received an invalid response"sv);
         logAttrs.add("error", status);
         logAttrs.add("from", request.target);
         logAttrs.add("message", response.data);
@@ -163,14 +164,14 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
     }
 
     if (voteResponse.getVoteGranted()) {
-        logAttrs.add("vote", "yes"_sd);
+        logAttrs.add("vote", "yes"sv);
         logAttrs.add("from", request.target);
         if (_primaryHost == request.target) {
             _primaryVote = PrimaryVote::Yes;
         }
         _votes++;
     } else {
-        logAttrs.add("vote", "no"_sd);
+        logAttrs.add("vote", "no"sv);
         logAttrs.add("from", request.target);
         logAttrs.add("reason", voteResponse.getReason());
     }

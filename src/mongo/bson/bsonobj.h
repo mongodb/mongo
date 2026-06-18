@@ -34,7 +34,6 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
@@ -60,6 +59,7 @@
 #include <limits>
 #include <list>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -374,7 +374,7 @@ public:
      * Remove specified field and return a new object with the remaining fields.
      * slowish as builds a full new object
      */
-    BSONObj removeField(StringData name) const;
+    BSONObj removeField(std::string_view name) const;
 
     /**
      * Remove specified fields and return a new object with the remaining fields.
@@ -401,14 +401,14 @@ public:
      * Thus, this BSONObj must outlive the returned BSONElement, hence the lifetime bound
      * annotation.
      */
-    BSONElement getField(StringData name) const MONGO_COMPILER_LIFETIME_BOUND;
+    BSONElement getField(std::string_view name) const MONGO_COMPILER_LIFETIME_BOUND;
 
     /**
      * Get several fields at once. This is faster than separate getField() calls as the size of
      * elements iterated can then be calculated only once each.
      */
     template <size_t N>
-    void getFields(const std::array<StringData, N>& fieldNames,
+    void getFields(const std::array<std::string_view, N>& fieldNames,
                    std::array<BSONElement, N>* fields) const;
 
 
@@ -416,7 +416,7 @@ public:
      * Get the field of the specified name. eoo() is true on the returned
      * element if not found.
      */
-    BSONElement operator[](StringData field) const {
+    BSONElement operator[](std::string_view field) const {
         return getField(field);
     }
 
@@ -429,37 +429,37 @@ public:
     /**
      * @return true if field exists
      */
-    bool hasField(StringData name) const {
+    bool hasField(std::string_view name) const {
         return !getField(name).eoo();
     }
     /**
      * @return true if field exists
      */
-    bool hasElement(StringData name) const {
+    bool hasElement(std::string_view name) const {
         return hasField(name);
     }
 
     /**
      * Looks up the element with the given 'name'. If the element is a string,
-     * returns it as a StringData. Otherwise returns an empty StringData.
+     * returns it as a std::string_view. Otherwise returns an empty std::string_view.
      */
-    StringData getStringField(StringData name) const;
+    std::string_view getStringField(std::string_view name) const;
 
     /**
      * @return subobject of the given name
      */
-    BSONObj getObjectField(StringData name) const;
+    BSONObj getObjectField(std::string_view name) const;
 
     /**
      * @return INT_MIN if not present - does some type conversions
      */
-    int getIntField(StringData name) const;
+    int getIntField(std::string_view name) const;
 
     /**
      * @return false if not present
      * @see BSONElement::trueValue()
      */
-    bool getBoolField(StringData name) const;
+    bool getBoolField(std::string_view name) const;
 
     /**
      * @param pattern a BSON obj indicating a set of (un-dotted) field
@@ -632,8 +632,8 @@ public:
         return *p == stdx::to_underlying(BSONType::eoo) ? "" : p + 1;
     }
 
-    StringData firstElementFieldNameStringData() const {
-        return StringData(firstElementFieldName());
+    std::string_view firstElementFieldNameStringData() const {
+        return std::string_view(firstElementFieldName());
     }
 
     BSONType firstElementType() const {
@@ -672,7 +672,7 @@ public:
      *          ... // Do something with elem
      *      }
      *
-     * You can also loop over a bson object as-if it were a map<StringData, BSONElement>:
+     * You can also loop over a bson object as-if it were a map<std::string_view, BSONElement>:
      *
      *      for (auto [fieldName, elem] : BSON("a" << 1 << "b" << 2)) {
      *          ... // Do something with fieldName and elem
@@ -971,7 +971,7 @@ protected:
     BSONIteratorSorted(const BSONObj& o, const FieldNameCmp& cmp);
 
 private:
-    std::vector<StringData> _fields;
+    std::vector<std::string_view> _fields;
     int _cur;
 };
 
@@ -1032,7 +1032,7 @@ struct DataType::Handler<BSONObj> {
 };
 
 template <size_t N>
-inline void BSONObj::getFields(const std::array<StringData, N>& fieldNames,
+inline void BSONObj::getFields(const std::array<std::string_view, N>& fieldNames,
                                std::array<BSONElement, N>* fields) const {
     std::bitset<N> foundFields;
     for (auto&& el : *this) {

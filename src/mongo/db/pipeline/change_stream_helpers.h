@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -69,17 +70,17 @@ repl::MutableOplogEntry createEndOfTransactionOplogEntry(
  * Represents the change stream operation types that are NOT guarded behind the 'showExpandedEvents'
  * flag.
  */
-static const std::set<StringData> kClassicOperationTypes =
-    std::set<StringData>{DocumentSourceChangeStream::kUpdateOpType,
-                         DocumentSourceChangeStream::kDeleteOpType,
-                         DocumentSourceChangeStream::kReplaceOpType,
-                         DocumentSourceChangeStream::kInsertOpType,
-                         DocumentSourceChangeStream::kDropCollectionOpType,
-                         DocumentSourceChangeStream::kRenameCollectionOpType,
-                         DocumentSourceChangeStream::kDropDatabaseOpType,
-                         DocumentSourceChangeStream::kInvalidateOpType,
-                         DocumentSourceChangeStream::kReshardBeginOpType,
-                         DocumentSourceChangeStream::kReshardBlockingWritesOpType,
-                         DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
-                         DocumentSourceChangeStream::kNewShardDetectedOpType};
+static const std::set<std::string_view> kClassicOperationTypes =
+    std::set<std::string_view>{DocumentSourceChangeStream::kUpdateOpType,
+                               DocumentSourceChangeStream::kDeleteOpType,
+                               DocumentSourceChangeStream::kReplaceOpType,
+                               DocumentSourceChangeStream::kInsertOpType,
+                               DocumentSourceChangeStream::kDropCollectionOpType,
+                               DocumentSourceChangeStream::kRenameCollectionOpType,
+                               DocumentSourceChangeStream::kDropDatabaseOpType,
+                               DocumentSourceChangeStream::kInvalidateOpType,
+                               DocumentSourceChangeStream::kReshardBeginOpType,
+                               DocumentSourceChangeStream::kReshardBlockingWritesOpType,
+                               DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
+                               DocumentSourceChangeStream::kNewShardDetectedOpType};
 }  // namespace mongo::change_stream

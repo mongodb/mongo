@@ -35,6 +35,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::extension::host {
 
 /**
@@ -55,7 +57,7 @@ public:
     void registerStageRules(MongoExtensionByteView stageName,
                             const MongoExtensionPipelineRewriteRule* rules,
                             size_t numRules) const override {
-        StringData name(reinterpret_cast<const char*>(stageName.data), stageName.len);
+        std::string_view name(reinterpret_cast<const char*>(stageName.data), stageName.len);
         std::vector<PipelineRewriteRule> extensionStageRules;
         extensionStageRules.reserve(numRules);
         for (size_t i = 0; i < numRules; i++) {

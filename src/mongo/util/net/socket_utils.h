@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
 
@@ -47,8 +47,8 @@ void setSocketKeepAliveParams(int sock,
                               Seconds maxKeepIdleSecs = kMaxKeepIdleSecs,
                               Seconds maxKeepIntvlSecs = kMaxKeepIntvlSecs);
 
-std::string makeUnixSockPath(int port, StringData label = "");
-std::string makeProxyUnixSockPath(int port, StringData prefix);
+std::string makeUnixSockPath(int port, std::string_view label = "");
+std::string makeProxyUnixSockPath(int port, std::string_view prefix);
 
 /**
  * Extracts the port number from the specified unix domain socket path name, under the assumption
@@ -57,9 +57,9 @@ std::string makeProxyUnixSockPath(int port, StringData prefix);
  * Returns -1 if an error occurs.
  * Note that this function assumes that the port passed to makeUnixSockPath was not negative.
  */
-int parsePortFromUnixSockPath(StringData path);
+int parsePortFromUnixSockPath(std::string_view path);
 
-inline bool isUnixDomainSocket(StringData hostname) {
+inline bool isUnixDomainSocket(std::string_view hostname) {
     return hostname.find('/') != std::string::npos;
 }
 

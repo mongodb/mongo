@@ -40,6 +40,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -47,10 +48,10 @@
 
 namespace mongo {
 namespace repl {
-void ReplSetWriteConcernModeDefinitions::serializeToBSON(StringData fieldName,
+void ReplSetWriteConcernModeDefinitions::serializeToBSON(std::string_view fieldName,
                                                          BSONObjBuilder* bob) const {
     BSONObjBuilder mapBuilder(bob->subobjStart(fieldName));
-    std::vector<std::pair<StringData, const Definition*>> sortedDefinitions;
+    std::vector<std::pair<std::string_view, const Definition*>> sortedDefinitions;
     for (const auto& definitionItems : _definitions) {
         sortedDefinitions.emplace_back(definitionItems.first, &definitionItems.second);
     }

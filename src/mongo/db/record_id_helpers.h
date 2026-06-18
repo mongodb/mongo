@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -42,6 +41,8 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
+
+#include <string_view>
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC record_id_helpers {
@@ -76,8 +77,8 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len);
  * RecordId because it loses information about the original RecordId format. If you require passing
  * a RecordId as a token or storing for a resumable scan, for example, use RecordId::serializeToken.
  */
-void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, StringData fieldName);
-BSONObj toBSONAs(const RecordId& rid, StringData fieldName);
+void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, std::string_view fieldName);
+BSONObj toBSONAs(const RecordId& rid, std::string_view fieldName);
 
 /**
  * Enumerates all reserved ids that have been allocated for a specific purpose. These IDs may not be

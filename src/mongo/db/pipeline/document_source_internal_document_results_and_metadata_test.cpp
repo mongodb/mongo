@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -54,10 +53,13 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kStageName = "$_internalDocumentResultsAndMetadata"_sd;
+constexpr std::string_view kStageName = "$_internalDocumentResultsAndMetadata"sv;
 
 const auto kSourceOnly =
     BSON("source" << BSON("$collStats" << BSONObj()) << "returnCursor" << false);
@@ -99,7 +101,7 @@ using DocumentSourceInternalDocumentResultsAndMetadataDeathTest =
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, ParsesFullSpec) {
     auto* stage = parse(BSON(kStageName << kFullSpec));
-    ASSERT_EQ(stage->getSourceStage()->getSourceName(), StringData("$collStats"));
+    ASSERT_EQ(stage->getSourceStage()->getSourceName(), std::string_view("$collStats"));
     ASSERT(stage->getMetadata().has_value());
     ASSERT_EQ(stage->getMetadata()->getAs(), "SEARCH_META");
     ASSERT_TRUE(stage->getReturnCursor());
@@ -363,9 +365,9 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
 
     const auto& stages = execPipeline->getStages();
     ASSERT_EQ(stages.size(), 2u);
-    ASSERT_EQ(StringData(stages[0]->getCommonStats().stageTypeStr),
+    ASSERT_EQ(std::string_view(stages[0]->getCommonStats().stageTypeStr),
               DocumentSourceExchange::kStageName);
-    ASSERT_EQ(StringData(stages[1]->getCommonStats().stageTypeStr), "$replaceRoot"_sd);
+    ASSERT_EQ(std::string_view(stages[1]->getCommonStats().stageTypeStr), "$replaceRoot"sv);
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
@@ -381,11 +383,11 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
 
     const auto& stages = execPipeline->getStages();
     ASSERT_EQ(stages.size(), 3u);
-    ASSERT_EQ(StringData(stages[0]->getCommonStats().stageTypeStr),
+    ASSERT_EQ(std::string_view(stages[0]->getCommonStats().stageTypeStr),
               DocumentSourceExchange::kStageName);
-    ASSERT_EQ(StringData(stages[1]->getCommonStats().stageTypeStr), "$replaceRoot"_sd);
-    ASSERT_EQ(StringData(stages[2]->getCommonStats().stageTypeStr),
-              "$setVariableFromSubPipeline"_sd);
+    ASSERT_EQ(std::string_view(stages[1]->getCommonStats().stageTypeStr), "$replaceRoot"sv);
+    ASSERT_EQ(std::string_view(stages[2]->getCommonStats().stageTypeStr),
+              "$setVariableFromSubPipeline"sv);
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
@@ -402,9 +404,9 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
 
     const auto& stages = execPipeline->getStages();
     ASSERT_EQ(stages.size(), 2u);
-    ASSERT_EQ(StringData(stages[0]->getCommonStats().stageTypeStr),
+    ASSERT_EQ(std::string_view(stages[0]->getCommonStats().stageTypeStr),
               DocumentSourceExchange::kStageName);
-    ASSERT_EQ(StringData(stages[1]->getCommonStats().stageTypeStr), "$replaceRoot"_sd);
+    ASSERT_EQ(std::string_view(stages[1]->getCommonStats().stageTypeStr), "$replaceRoot"sv);
 
     auto additionalCursorPipeline = dsRef->takeAdditionalCursorPipeline();
     ASSERT_NE(additionalCursorPipeline, nullptr);
@@ -416,7 +418,7 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     auto stageIt = metaStages.begin();
     ASSERT_EQ((*stageIt)->getSourceName(), DocumentSourceExchange::kStageName);
     ++stageIt;
-    ASSERT_EQ(StringData((*stageIt)->getSourceName()), "$replaceRoot"_sd);
+    ASSERT_EQ(std::string_view((*stageIt)->getSourceName()), "$replaceRoot"sv);
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
@@ -542,8 +544,8 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ASSERT_TRUE(dpl->mergeSortPattern.has_value());
     ASSERT_BSONOBJ_EQ(*dpl->mergeSortPattern, BSON("score" << 1));
     ASSERT_EQ(dpl->mergingStages.size(), 1u);
-    ASSERT_EQ(StringData(dpl->mergingStages.front()->getSourceName()),
-              "$setVariableFromSubPipeline"_sd);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
 }
 
 }  // namespace

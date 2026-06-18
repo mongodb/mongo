@@ -44,6 +44,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -58,7 +59,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListExtensions);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceListExtensions final {
 public:
-    static constexpr StringData kStageName = "$listExtensions"_sd;
+    static constexpr std::string_view kStageName = "$listExtensions"_sd;
 
     class LiteParsed : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

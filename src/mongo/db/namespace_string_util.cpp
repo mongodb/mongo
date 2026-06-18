@@ -41,6 +41,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -51,8 +52,8 @@
 namespace mongo {
 
 NamespaceString AuthNamespaceStringUtil::deserialize(const boost::optional<TenantId>& tenantId,
-                                                     StringData db,
-                                                     StringData coll) {
+                                                     std::string_view db,
+                                                     std::string_view coll) {
     uassert(ErrorCodes::InternalError,
             "A tenant ID is only accepted when multitenancySupport is on",
             !tenantId || gMultitenancySupport);
@@ -117,33 +118,34 @@ std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
 }
 
 NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId,
-                                                 StringData ns,
+                                                 std::string_view ns,
                                                  const SerializationContext& context) {
     auto dotIndex = ns.find('.');
     if (dotIndex != std::string::npos) {
         return deserialize(
             std::move(tenantId), ns.substr(0, dotIndex), ns.substr(dotIndex + 1), context);
     }
-    return deserialize(std::move(tenantId), ns, StringData{}, context);
+    return deserialize(std::move(tenantId), ns, std::string_view{}, context);
 }
 
 NamespaceString NamespaceStringUtil::deserializeForCatalog(
-    const boost::optional<TenantId>& tenantId, StringData ns) {
+    const boost::optional<TenantId>& tenantId, std::string_view ns) {
     auto dotIndex = ns.find('.');
     if (dotIndex != std::string::npos) {
         return deserializeForStorage(
             std::move(tenantId), ns.substr(0, dotIndex), ns.substr(dotIndex + 1));
     }
-    return deserializeForStorage(std::move(tenantId), ns, StringData{});
+    return deserializeForStorage(std::move(tenantId), ns, std::string_view{});
 }
 
-NamespaceString NamespaceStringUtil::deserialize(const DatabaseName& dbName, StringData coll) {
+NamespaceString NamespaceStringUtil::deserialize(const DatabaseName& dbName,
+                                                 std::string_view coll) {
     return NamespaceString{dbName, coll};
 }
 
 NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<TenantId> tenantId,
-                                                           StringData db,
-                                                           StringData coll) {
+                                                           std::string_view db,
+                                                           std::string_view coll) {
     // TODO SERVER-84275: Change to use isEnabled again.
     // We need to use isEnabledUseLastLTSFCVWhenUninitialized instead of isEnabled because
     // this could run during startup while the FCV is still uninitialized.
@@ -174,8 +176,8 @@ NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<Tenan
 }
 
 NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<TenantId> tenantId,
-                                                            StringData db,
-                                                            StringData coll,
+                                                            std::string_view db,
+                                                            std::string_view coll,
                                                             const SerializationContext& context) {
     // we only get here if we are processing a Command Request.  We disregard the feature flag
     // in this case, essentially letting the request dictate the state of the feature.
@@ -219,8 +221,8 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
 }
 
 NamespaceString NamespaceStringUtil::deserialize(const boost::optional<TenantId>& tenantId,
-                                                 StringData db,
-                                                 StringData coll,
+                                                 std::string_view db,
+                                                 std::string_view coll,
                                                  const SerializationContext& context) {
     if (!gMultitenancySupport) {
         massert(6972102,
@@ -252,17 +254,17 @@ NamespaceString NamespaceStringUtil::deserialize(const boost::optional<TenantId>
 }
 
 NamespaceString NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
-    StringData ns) {
+    std::string_view ns) {
     auto dotIndex = ns.find('.');
     if (dotIndex != std::string::npos) {
         return parseFromStringExpectTenantIdInMultitenancyMode(ns.substr(0, dotIndex),
                                                                ns.substr(dotIndex + 1));
     }
-    return parseFromStringExpectTenantIdInMultitenancyMode(ns, StringData{});
+    return parseFromStringExpectTenantIdInMultitenancyMode(ns, std::string_view{});
 }
 
 NamespaceString NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
-    StringData db, StringData coll) {
+    std::string_view db, std::string_view coll) {
 
     if (!gMultitenancySupport) {
         return NamespaceString(boost::none, db, coll);
@@ -286,13 +288,13 @@ NamespaceString NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancy
 }
 
 NamespaceString NamespaceStringUtil::parseFailPointData(const BSONObj& data,
-                                                        StringData nsFieldName,
+                                                        std::string_view nsFieldName,
                                                         const boost::optional<TenantId>& tenantId) {
     const auto ns = data.getStringField(nsFieldName);
     return NamespaceStringUtil::deserialize(tenantId, ns, SerializationContext::stateDefault());
 }
 
-NamespaceString NamespaceStringUtil::deserializeForErrorMsg(StringData nsInErrMsg) {
+NamespaceString NamespaceStringUtil::deserializeForErrorMsg(std::string_view nsInErrMsg) {
     // TenantId always prefix in the error message. This method returns either (tenantId,
     // nonPrefixedDb) or (none, prefixedDb) depending on gMultitenancySupport flag.
     return NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nsInErrMsg);

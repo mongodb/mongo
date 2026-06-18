@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -38,9 +37,11 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the cluster getMore command on mongos.
@@ -48,7 +49,7 @@ namespace {
 struct ClusterGetMoreCmdS {
     using Request = GetMoreCommandRequest;
     using Reply = GetMoreCommandRequest::Reply;
-    static constexpr StringData kCommandName = "getMore"_sd;
+    static constexpr std::string_view kCommandName = "getMore"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;

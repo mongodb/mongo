@@ -61,6 +61,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -79,7 +80,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalSetWindowFields);
  * and $_internalSetWindowFields.
  */
 namespace document_source_set_window_fields {
-constexpr StringData kStageName = "$setWindowFields"_sd;
+constexpr std::string_view kStageName = "$setWindowFields"_sd;
 
 std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -95,7 +96,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> create(
 
 class DocumentSourceInternalSetWindowFields final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalSetWindowFields"_sd;
+    static constexpr std::string_view kStageName = "$_internalSetWindowFields"_sd;
 
     /**
      * Parses 'elem' into a $setWindowFields stage, or throws a AssertionException if 'elem' was an
@@ -136,7 +137,7 @@ public:
                                 UnionRequirement::kAllowed);
     }
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     };
 

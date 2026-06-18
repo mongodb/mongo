@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 namespace exec {
@@ -45,7 +46,7 @@ namespace agg {
  */
 class ExtensionStage final : public Stage {
 public:
-    ExtensionStage(StringData name,
+    ExtensionStage(std::string_view name,
                    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                    extension::ExecAggStageHandle execAggStageHandle);
     Document getExplainOutput(const query_shape::SerializationOptions& opts =

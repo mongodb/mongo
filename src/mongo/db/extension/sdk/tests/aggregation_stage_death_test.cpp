@@ -62,6 +62,7 @@
 
 namespace mongo::extension::sdk {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class AggStageErrorFixture : public unittest::Test {
 public:
@@ -470,7 +471,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
     auto opCtx = testCtx.makeOperationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(
         opCtx.get(),
-        NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+        NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv),
         SerializationContext());
 
     auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
@@ -513,7 +514,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, NoSourceStageForTransformStage, "109
     auto opCtx = testCtx.makeOperationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(
         opCtx.get(),
-        NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+        NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv),
         SerializationContext());
 
     host::QueryExecutionContext wrappedCtx(expCtx.get());

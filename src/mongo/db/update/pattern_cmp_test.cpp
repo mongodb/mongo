@@ -29,7 +29,6 @@
 
 #include "mongo/db/update/pattern_cmp.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -42,10 +41,12 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using mongo::mutablebson::Element;
 using mongo::mutablebson::sortChildren;
@@ -65,7 +66,7 @@ public:
         _objs[_size] = obj;
         _size++;
 
-        ASSERT_OK(_doc.root()["x"].appendObject(mongo::StringData(), obj));
+        ASSERT_OK(_doc.root()["x"].appendObject(std::string_view(), obj));
     }
 
     BSONObj getOrigObj(size_t i) {
@@ -231,7 +232,7 @@ TEST(PatternValueCmpTest, PatternValueCmpDescendingOrder) {
 
 TEST(PatternValueCmpTest, PatternValueCmpStrings) {
     assertExpectedSortResults(
-        {Value("a"_sd), Value("b"_sd)}, {Value("a"_sd), Value("b"_sd)}, fromjson("{'': 1}"));
+        {Value("a"sv), Value("b"sv)}, {Value("a"sv), Value("b"sv)}, fromjson("{'': 1}"));
 }
 
 TEST(PatternValueCmpTest, PatternValueCmpObjects) {
@@ -284,11 +285,11 @@ TEST(PatternValueCmpTest, PatternValueCmpWithCollator) {
     const auto sortPattern = fromjson("{'': 1}");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
 
-    assertExpectedSortResults({Value("abc"_sd), Value("acb"_sd), Value("cba"_sd)},
-                              {Value("abc"_sd), Value("acb"_sd), Value("cba"_sd)},
+    assertExpectedSortResults({Value("abc"sv), Value("acb"sv), Value("cba"sv)},
+                              {Value("abc"sv), Value("acb"sv), Value("cba"sv)},
                               sortPattern);
-    assertExpectedSortResults({Value("abc"_sd), Value("acb"_sd), Value("cba"_sd)},
-                              {Value("cba"_sd), Value("acb"_sd), Value("abc"_sd)},
+    assertExpectedSortResults({Value("abc"sv), Value("acb"sv), Value("cba"sv)},
+                              {Value("cba"sv), Value("acb"sv), Value("abc"sv)},
                               sortPattern,
                               &collator);
 }

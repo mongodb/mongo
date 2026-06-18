@@ -33,7 +33,6 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
@@ -73,6 +72,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -95,13 +95,13 @@ public:
                                   }}});
     }
 
-    void appendAs(const BSONElement& e, StringData name) {
+    void appendAs(const BSONElement& e, std::string_view name) {
         if (e.type() == BSONType::object &&
             e.valuesize() == 5) {  // empty object -- this way we can add to it later
             _prepareContext(std::string{name} + ".foo");
             return;
         }
-        StringData leafName = _prepareContext(name);
+        std::string_view leafName = _prepareContext(name);
         _builders.back().second->appendAs(e, leafName);
     }
 
@@ -111,10 +111,10 @@ public:
     }
 
 private:
-    std::vector<StringData> _splitByDots(StringData name) {
-        std::vector<StringData> parts;
+    std::vector<std::string_view> _splitByDots(std::string_view name) {
+        std::vector<std::string_view> parts;
         while (!name.empty()) {
-            StringData part;
+            std::string_view part;
             auto sep = name.find('.');
             if (sep == name.npos) {
                 part = name;
@@ -137,8 +137,8 @@ private:
      * `name` is a dot-delimited hierarchical node path.
      * Calls must be made with the `name` parameter in ascending order.
      */
-    StringData _prepareContext(StringData name) {
-        std::vector<StringData> parts = _splitByDots(name);
+    std::string_view _prepareContext(std::string_view name) {
+        std::vector<std::string_view> parts = _splitByDots(name);
         auto lastPart = parts.back();
         parts.pop_back();
         size_t i = 0;
@@ -806,6 +806,7 @@ public:
 };
 
 namespace Validation {
+using namespace std::literals::string_view_literals;
 
 class Base {
 public:
@@ -899,7 +900,7 @@ class WrongStringSize : public Base {
     BSONObj invalid() const override {
         BSONObj ret = valid();
         auto val = ret.firstElement().valueStringData();
-        ASSERT_EQUALS(val, "b"_sd);
+        ASSERT_EQUALS(val, "b"sv);
         auto d = const_cast<char*>(val.data());
         ASSERT_EQUALS(d[1], 0);
         d[1] = 1;
@@ -1293,8 +1294,8 @@ public:
         ASSERT_EQUALS(arrTypeOf(""), BSONType::string);
         ASSERT_EQUALS(objTypeOf(std::string()), BSONType::string);
         ASSERT_EQUALS(arrTypeOf(std::string()), BSONType::string);
-        ASSERT_EQUALS(objTypeOf(StringData("")), BSONType::string);
-        ASSERT_EQUALS(arrTypeOf(StringData("")), BSONType::string);
+        ASSERT_EQUALS(objTypeOf(std::string_view("")), BSONType::string);
+        ASSERT_EQUALS(arrTypeOf(std::string_view("")), BSONType::string);
 
         ASSERT_EQUALS(objTypeOf(BSONObj()), BSONType::object);
         ASSERT_EQUALS(arrTypeOf(BSONObj()), BSONType::object);

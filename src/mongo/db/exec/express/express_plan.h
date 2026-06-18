@@ -66,6 +66,7 @@
 #include "mongo/db/update/update_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -274,7 +275,7 @@ template <class WriteFunction, class Continuation>
 PlanProgress recoverFromNonFatalWriteException(
     OperationContext* opCtx,
     const ExceptionRecoveryPolicy& exceptionRecoveryPolicy,
-    StringData operationName,
+    std::string_view operationName,
     WriteFunction writeFunction,
     Continuation continuation) {
     try {
@@ -589,7 +590,7 @@ struct CreateDocumentFromIndexKey {
         BSONObjIterator valueIter(dehydratedKey);
 
         while (keyIter.more() && valueIter.more()) {
-            StringData fieldName = keyIter.next().fieldNameStringData();
+            std::string_view fieldName = keyIter.next().fieldNameStringData();
             auto nextValue = valueIter.next();
 
             // Erase the element to support indexes with duplicate fields.
@@ -812,7 +813,7 @@ template <class Continuation>
 PlanProgress applyShardFilter(NoShardFilter&,
                               const Snapshotted<BSONObj>&,
                               const NamespaceString&,
-                              StringData,
+                              std::string_view,
                               Continuation continuation) {
     bool shouldWriteToOrphan = false;
     return continuation(shouldWriteToOrphan);
@@ -822,7 +823,7 @@ template <class Continuation>
 PlanProgress applyShardFilter(ScopedCollectionFilter& collectionFilter,
                               const Snapshotted<BSONObj>& obj,
                               const NamespaceString&,
-                              StringData,
+                              std::string_view,
                               Continuation continuation) {
     bool accepted = [&]() {
         if (!collectionFilter.isSharded()) {
@@ -855,7 +856,7 @@ template <class Continuation>
 PlanProgress applyShardFilter(write_stage_common::PreWriteFilter& preWriteFilter,
                               const Snapshotted<BSONObj>& obj,
                               const NamespaceString& nss,
-                              StringData operationName,
+                              std::string_view operationName,
                               Continuation continuation) {
     boost::optional<CriticalSectionSignal> criticalSectionSignal;
     auto [filterStatus, shouldWriteToOrphan] =
@@ -888,7 +889,7 @@ const FieldRef idFieldRef(idFieldName);
 
 class UpdateOperation {
 public:
-    static constexpr StringData name = "update"_sd;
+    static constexpr std::string_view name = "update"_sd;
 
     UpdateOperation(UpdateDriver* updateDriver,
                     bool isUserInitiatedWrite,
@@ -1049,7 +1050,7 @@ public:
             });
     }
 
-    static constexpr StringData name = "delete"_sd;
+    static constexpr std::string_view name = "delete"_sd;
 
 private:
     StmtId _stmtId;
@@ -1087,7 +1088,7 @@ public:
         }
     }
 
-    static constexpr StringData name = "delete"_sd;
+    static constexpr std::string_view name = "delete"_sd;
 
 private:
     bool _returnDeleted;
@@ -1097,7 +1098,7 @@ private:
 
 class NoWriteOperation {
 public:
-    static constexpr StringData name = "nowriteop"_sd;
+    static constexpr std::string_view name = "nowriteop"_sd;
 
     void open(WriteOperationStats*) {}
 

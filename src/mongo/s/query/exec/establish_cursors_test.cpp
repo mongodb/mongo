@@ -30,7 +30,6 @@
 #include "mongo/s/query/exec/establish_cursors.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -57,12 +56,14 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using executor::RemoteCommandRequest;
 
@@ -273,7 +274,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithInvalidMessage) {
     AsyncRequestsSender::ShardHostMap designatedHosts;
     auto shard0Secondary = HostAndPort("SecondaryHostShard0", 12345);
     _targeters[0]->setConnectionStringReturnValue(
-        ConnectionString::forReplicaSet("shard0_rs"_sd, {kTestShardHosts[0], shard0Secondary}));
+        ConnectionString::forReplicaSet("shard0_rs"sv, {kTestShardHosts[0], shard0Secondary}));
     designatedHosts[kTestShardIds[0]] = shard0Secondary;
 
     // Intentionally throw an exception during validation.
@@ -352,7 +353,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithDesignatedHost) {
     AsyncRequestsSender::ShardHostMap designatedHosts;
     auto shard0Secondary = HostAndPort("SecondaryHostShard0", 12345);
     _targeters[0]->setConnectionStringReturnValue(
-        ConnectionString::forReplicaSet("shard0_rs"_sd, {kTestShardHosts[0], shard0Secondary}));
+        ConnectionString::forReplicaSet("shard0_rs"sv, {kTestShardHosts[0], shard0Secondary}));
     designatedHosts[kTestShardIds[0]] = shard0Secondary;
     auto future = launchAsync([&] {
         auto cursors = establishCursors(operationContext(),
@@ -1249,7 +1250,7 @@ TEST_F(EstablishCursorsTest, FailedUnyieldAfterErrorResponse) {
     };
     struct MockResourceYielderFactory : public ResourceYielderFactory {
         std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
-                                              StringData cmdName) const override {
+                                              std::string_view cmdName) const override {
             return std::make_unique<MockResourceYielder>();
         }
     };

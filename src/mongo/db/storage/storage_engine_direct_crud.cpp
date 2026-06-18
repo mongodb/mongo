@@ -36,12 +36,13 @@
 #include "mongo/util/shared_buffer.h"
 
 #include <span>
+#include <string_view>
 
 namespace mongo::storage_engine_direct_crud {
 
 Status insert(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               std::span<const char> key,
               std::span<const char> value,
               BlindWritePolicy policy) {
@@ -50,7 +51,7 @@ Status insert(StorageEngine& engine,
 
 Status insert(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               int64_t key,
               std::span<const char> value,
               BlindWritePolicy policy) {
@@ -59,7 +60,7 @@ Status insert(StorageEngine& engine,
 
 Status update(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               std::span<const char> key,
               std::span<const char> value,
               BlindWritePolicy policy) {
@@ -68,7 +69,7 @@ Status update(StorageEngine& engine,
 
 Status update(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               int64_t key,
               std::span<const char> value,
               BlindWritePolicy policy) {
@@ -77,21 +78,21 @@ Status update(StorageEngine& engine,
 
 StatusWith<UniqueBuffer> get(StorageEngine& engine,
                              RecoveryUnit& ru,
-                             StringData ident,
+                             std::string_view ident,
                              std::span<const char> key) {
     return engine.getEngine()->getFromIdent(ru, ident, key);
 }
 
 StatusWith<UniqueBuffer> get(StorageEngine& engine,
                              RecoveryUnit& ru,
-                             StringData ident,
+                             std::string_view ident,
                              int64_t key) {
     return engine.getEngine()->getFromIdent(ru, ident, key);
 }
 
 Status remove(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               std::span<const char> key,
               BlindWritePolicy policy) {
     return engine.getEngine()->deleteFromIdent(ru, ident, key, policy);
@@ -99,7 +100,7 @@ Status remove(StorageEngine& engine,
 
 Status remove(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               int64_t key,
               BlindWritePolicy policy) {
     return engine.getEngine()->deleteFromIdent(ru, ident, key, policy);

@@ -41,6 +41,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -64,7 +65,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -557,7 +557,7 @@ static void edit(const std::string& whatToEdit) {
             remove(filename.c_str());
             return;
         }
-        sb.append(StringData(buf, bytes));
+        sb.append(std::string_view(buf, bytes));
     } while (bytes);
 
     // Done with temp file, close and delete it
@@ -577,7 +577,7 @@ static void edit(const std::string& whatToEdit) {
 
 bool mechanismRequiresPassword(const MongoURI& uri) {
     if (const auto authMechanisms = uri.getOption("authMechanism")) {
-        constexpr std::array<StringData, 3> passwordlessMechanisms{
+        constexpr std::array<std::string_view, 3> passwordlessMechanisms{
             auth::kMechanismGSSAPI, auth::kMechanismMongoX509, auth::kMechanismMongoOIDC};
         const std::string& authMechanism = authMechanisms.value();
         for (const auto& mechanism : passwordlessMechanisms) {

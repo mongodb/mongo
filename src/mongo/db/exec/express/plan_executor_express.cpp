@@ -70,6 +70,7 @@
 #include "mongo/util/fail_point.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -84,6 +85,7 @@ MONGO_FAIL_POINT_DEFINE(expressExecutorHangBeforeLogAndBackoff);
 MONGO_FAIL_POINT_DEFINE(expressExecutorHangBeforeTemporarilyUnavailableBackoff);
 
 namespace {
+using namespace std::literals::string_view_literals;
 class DoNotRecoverPolicy final : public express::ExceptionRecoveryPolicy {
 public:
     express::PlanProgress recoverIfPossible(
@@ -102,13 +104,13 @@ public:
 
     express::PlanProgress recoverIfPossible(
         ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& exception) const override {
-        exception.addContext("Internal retry explicitly disabled for query"_sd);
+        exception.addContext("Internal retry explicitly disabled for query"sv);
         throw exception;
     }
 
     express::PlanProgress recoverIfPossible(
         ExceptionFor<ErrorCodes::StaleConfig>& exception) const override {
-        exception.addContext("Internal retry explicitly disabled for query"_sd);
+        exception.addContext("Internal retry explicitly disabled for query"sv);
         throw exception;
     }
 };
@@ -296,7 +298,7 @@ public:
         return _planExplainer;
     }
 
-    boost::optional<StringData> getExecutorType() const override {
+    boost::optional<std::string_view> getExecutorType() const override {
         return idl::serialize(_cursorType);
     }
 
@@ -466,7 +468,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
             }
             logWriteConflictAndBackoff(numAttempts,
                                        "plan execution",
-                                       "write contention during express execution"_sd,
+                                       "write contention during express execution"sv,
                                        NamespaceStringOrUUID(_nss));
         });
     } else {
@@ -475,7 +477,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
         }
         logWriteConflictAndBackoff(numAttempts,
                                    "plan execution",
-                                   "write contention during express execution"_sd,
+                                   "write contention during express execution"sv,
                                    NamespaceStringOrUUID(_nss));
         _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {});
     }
@@ -499,7 +501,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForBackoff,
                 "plan executor",
                 NamespaceStringOrUUID(_nss),
                 Status(ErrorCodes::TemporarilyUnavailable,
-                       "resource contention during express execution"_sd),
+                       "resource contention during express execution"sv),
                 numWriteConflictYieldsSinceLastSuccess);
         });
 }
@@ -882,7 +884,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
 
 bool canCoverProjection(const IndexEntry& index,
                         const OrderedPathSet& paths,
-                        StringData filterPath,
+                        std::string_view filterPath,
                         bool collationRelevantForFilter) {
     if (index.multikey && index.multikeyPaths.empty()) {
         return false;
@@ -900,7 +902,7 @@ bool canCoverProjection(const IndexEntry& index,
     StringDataSet coveredPaths;
     size_t keyPatternFieldIndex = 0;
     for (auto&& elt : index.keyPattern) {
-        StringData path = elt.fieldNameStringData();
+        std::string_view path = elt.fieldNameStringData();
         if (elt.isNumber() &&
             (!index.multikey || index.multikeyPaths[keyPatternFieldIndex].empty()) &&
             paths.contains(path)) {

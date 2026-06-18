@@ -30,6 +30,7 @@
 #include "mongo/db/query/plan_explainer_express.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 std::string PlanExplainerExpress::getPlanSummary() const {
     StackStringBuilder ssb;
 
@@ -59,15 +60,15 @@ PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
 
     bob.append("isCached", false);
     if (_writeOperationStats->stageName().empty()) {
-        bob.append("stage"_sd, _iteratorStats->stageName());
+        bob.append("stage"sv, _iteratorStats->stageName());
     } else {
-        bob.append("stage"_sd, _writeOperationStats->stageName());
+        bob.append("stage"sv, _writeOperationStats->stageName());
     }
     _iteratorStats->appendDataAccessStats(bob);
 
     if (!_projection.isEmpty()) {
-        bob.append("projection"_sd, _projection);
-        bob.append("projectionCovered"_sd, _iteratorStats->projectionCovered());
+        bob.append("projection"sv, _projection);
+        bob.append("projectionCovered"sv, _iteratorStats->projectionCovered());
     }
     // Express queries are ineligible for join optimization so if the knob is enabled, indicate
     // in the explain output that the join optimization was not applied.

@@ -34,6 +34,8 @@
 #include "mongo/bson/column/bsoncolumn_test_util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
+#include <string_view>
+
 static bool isDataOnlyInterleaved(const char* binary, size_t size) {
     using namespace mongo;
     const char* pos = binary;
@@ -75,7 +77,7 @@ static bool containsDuplicateFields(mongo::BSONObj obj) {
     using namespace mongo;
     StringDataSet fields;
     for (auto&& elem : obj) {
-        StringData fieldName = elem.fieldNameStringData();
+        std::string_view fieldName = elem.fieldNameStringData();
         if (fields.contains(fieldName)) {
             return true;
         }
@@ -275,14 +277,14 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
             invariant(
                 iteratorElem.first == blockElem.first ||
                     (blockElem.first == sbe::value::TypeTags::bsonString && iteratorTagIsAString),
-                str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                               << " For the path: " << (*blockBasedRes).first._pathRequest.toString()
                               << ". The types differ. Iterator API returned " << iteratorElem.first
                               << ". The block based API returned " << blockElem.first);
 
             invariant(bsoncolumn::areSBEBinariesEqual(blockElem, iteratorElem),
                       str::stream()
-                          << "For the input: " << base64::encode(StringData(Data, Size))
+                          << "For the input: " << base64::encode(std::string_view(Data, Size))
                           << " For the path: " << (*blockBasedRes).first._pathRequest.toString()
                           << ".  The values differ. Iterator API returned "
                           << sbe::value::print(iteratorElem) << ". The block based API returned "

@@ -29,7 +29,6 @@
 
 #include "mongo/util/tick_source.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/system_tick_source.h"

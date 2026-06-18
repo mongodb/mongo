@@ -46,6 +46,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 template <class T>
 int64_t getRandomIndex(const std::vector<T>& items) {
@@ -193,7 +194,7 @@ boost::optional<std::pair<NamespaceString, ChunkType>> getRandomUntrackedCollect
  */
 std::vector<std::pair<NamespaceString, ChunkType>> getTrackedUnshardedCollectionsOnShard(
     OperationContext* opCtx, const ShardId& shardId) {
-    static constexpr auto chunkFieldName = "chunk"_sd;
+    static constexpr auto chunkFieldName = "chunk"sv;
 
     std::vector<BSONObj> rawPipelineStages{
         // Match only unsplittable collections

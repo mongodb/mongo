@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -61,7 +62,7 @@ REGISTER_AGG_STAGE_MAPPING(internalGeoNearDistanceStage,
                            documentSourceInternalGeoNearDistanceToStageFn);
 
 InternalGeoNearDistanceStage::InternalGeoNearDistanceStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     std::string key,
     std::unique_ptr<PointWithCRS> centroid,

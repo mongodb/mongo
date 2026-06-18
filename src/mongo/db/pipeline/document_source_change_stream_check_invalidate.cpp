@@ -43,6 +43,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamCheckInvalidate,
                                               ChangeStreamCheckInvalidateLiteParsed::parse);
@@ -85,7 +86,7 @@ Value DocumentSourceChangeStreamCheckInvalidate::doSerialize(
     BSONObjBuilder builder;
     if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
-        sub.append("stage"_sd, kStageName);
+        sub.append("stage"sv, kStageName);
         sub.done();
     }
     DocumentSourceChangeStreamCheckInvalidateSpec spec;

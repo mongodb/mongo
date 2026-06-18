@@ -29,14 +29,15 @@
 
 #include "mongo/util/shared_buffer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using SharedBufferTest = unittest::Test;
 
@@ -80,7 +81,7 @@ TEST_F(SharedBufferTest, ReallocOrCopyGrow) {
     ASSERT(buf);
     ASSERT(!buf.isShared());
     ASSERT_EQ(buf.capacity(), 10u);
-    ASSERT_EQ("foo"_sd, buf.get());
+    ASSERT_EQ("foo"sv, buf.get());
 }
 
 TEST_F(SharedBufferTest, ReallocOrCopyGrowShared) {
@@ -94,8 +95,8 @@ TEST_F(SharedBufferTest, ReallocOrCopyGrowShared) {
     ASSERT(!buf.isShared());
     ASSERT_EQ(buf.capacity(), 10u);
     ASSERT_EQ(sharer.capacity(), 4u);
-    ASSERT_EQ("foo"_sd, buf.get());
-    ASSERT_EQ("foo"_sd, sharer.get());
+    ASSERT_EQ("foo"sv, buf.get());
+    ASSERT_EQ("foo"sv, sharer.get());
     ASSERT_NE(buf.get(), sharer.get());
 }
 
@@ -127,7 +128,7 @@ TEST_F(SharedBufferTest, ReallocOrCopyShrinkShared) {
     ASSERT_EQ(buf.capacity(), 1u);
     ASSERT_EQ(sharer.capacity(), 4u);
     ASSERT_EQ('f', buf.get()[0]);
-    ASSERT_EQ("foo"_sd, sharer.get());
+    ASSERT_EQ("foo"sv, sharer.get());
     ASSERT_NE(buf.get(), sharer.get());
 }
 

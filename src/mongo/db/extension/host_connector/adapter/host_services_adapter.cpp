@@ -39,6 +39,8 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
 
+#include <string_view>
+
 namespace mongo::extension::host_connector {
 
 namespace {
@@ -47,9 +49,9 @@ namespace {
  * {<stageName>: {...}}.
  */
 void uassertWellFormedStageSpec(const BSONObj& specObj,
-                                StringData stageName,
+                                std::string_view stageName,
                                 int code,
-                                StringData message) {
+                                std::string_view message) {
     uassert(code,
             message,
             specObj.nFields() == 1 && specObj.firstElementFieldNameStringData() == stageName &&

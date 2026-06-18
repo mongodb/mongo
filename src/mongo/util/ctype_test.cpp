@@ -35,7 +35,6 @@
 // IWYU pragma: no_include <ctype.h>
 
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/ctype.h"
 

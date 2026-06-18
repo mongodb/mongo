@@ -36,6 +36,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/functional/hash.hpp>
 
@@ -64,7 +65,7 @@ ShardRef ShardRef::parse(const BSONElement& element) {
     return ShardRef(uassertStatusOK(UUID::parse(element)));
 }
 
-void ShardRef::serialize(StringData fieldName, BSONObjBuilder* builder) const {
+void ShardRef::serialize(std::string_view fieldName, BSONObjBuilder* builder) const {
     visit(OverloadedVisitor{
               [&](const ShardId& ref) { builder->append(fieldName, ref.toString()); },
               [&](const UUID& ref) { ref.appendToBuilder(builder, fieldName); },

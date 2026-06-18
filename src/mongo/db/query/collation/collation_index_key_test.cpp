@@ -30,7 +30,6 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -41,8 +40,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace mongo;
 
@@ -50,7 +52,7 @@ void assertKeyStringCollatorOutput(const CollatorInterfaceMock& collator,
                                    const BSONObj& dataObj,
                                    const BSONObj& expected) {
     key_string::Builder ks(key_string::Version::kLatestVersion, key_string::ALL_ASCENDING);
-    ks.appendBSONElement(dataObj.firstElement(), [&](StringData stringData) {
+    ks.appendBSONElement(dataObj.firstElement(), [&](std::string_view stringData) {
         return collator.getComparisonString(stringData);
     });
 
@@ -62,7 +64,7 @@ void assertKeyStringCollatorOutput(const CollatorInterfaceMock& collator,
 void assertKeyStringCollatorThrows(const CollatorInterfaceMock& collator, const BSONObj& dataObj) {
     key_string::Builder ks(key_string::Version::kLatestVersion, key_string::ALL_ASCENDING);
     ASSERT_THROWS_CODE(ks.appendBSONElement(dataObj.firstElement(),
-                                            [&](StringData stringData) {
+                                            [&](std::string_view stringData) {
                                                 return collator.getComparisonString(stringData);
                                             }),
                        AssertionException,
@@ -113,11 +115,11 @@ TEST(CollationIndexKeyTest, KeyStringAppendReversesStringWithReverseMockCollator
 TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesEmptyComparisonKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObjBuilder builder;
-    builder.append("foo", StringData());
+    builder.append("foo", std::string_view());
     BSONObj dataObj = builder.obj();
 
     BSONObjBuilder expectedBuilder;
-    expectedBuilder.append("", StringData());
+    expectedBuilder.append("", std::string_view());
     BSONObj expectedObj = expectedBuilder.obj();
 
     BSONObjBuilder out;
@@ -128,21 +130,21 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesEmptyComparis
 TEST(CollationIndexKeyTest, KeyStringAppendCorrectlySerializesEmptyComparisonKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObjBuilder builder;
-    builder.append("foo", StringData());
+    builder.append("foo", std::string_view());
 
     BSONObjBuilder expectedBuilder;
-    expectedBuilder.append("", StringData());
+    expectedBuilder.append("", std::string_view());
     assertKeyStringCollatorOutput(collator, builder.obj(), expectedBuilder.obj());
 }
 
 TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesWithEmbeddedNullByte) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObjBuilder builder;
-    builder.append("foo", "a\0b"_sd);
+    builder.append("foo", "a\0b"sv);
     BSONObj dataObj = builder.obj();
 
     BSONObjBuilder expectedBuilder;
-    expectedBuilder.append("", "b\0a"_sd);
+    expectedBuilder.append("", "b\0a"sv);
     BSONObj expectedObj = expectedBuilder.obj();
 
     BSONObjBuilder out;
@@ -153,10 +155,10 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesWithEmbeddedN
 TEST(CollationIndexKeyTest, KeyStringAppendCorrectlySerializesWithEmbeddedNullByte) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObjBuilder builder;
-    builder.append("foo", "a\0b"_sd);
+    builder.append("foo", "a\0b"sv);
 
     BSONObjBuilder expectedBuilder;
-    expectedBuilder.append("", "b\0a"_sd);
+    expectedBuilder.append("", "b\0a"sv);
     assertKeyStringCollatorOutput(collator, builder.obj(), expectedBuilder.obj());
 }
 

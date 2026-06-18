@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -49,6 +50,6 @@ namespace mongo::otel::metrics {
  *   `-`.
  * - must not equal "metrics" or start with "metrics" since the prefix is added automatically.
  */
-Status validateServerStatusMetricPath(StringData dottedPath);
+Status validateServerStatusMetricPath(std::string_view dottedPath);
 
 }  // namespace mongo::otel::metrics

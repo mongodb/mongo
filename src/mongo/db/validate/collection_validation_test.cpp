@@ -30,7 +30,6 @@
 #include "mongo/db/validate/collection_validation.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -79,6 +78,7 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -87,6 +87,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.t");
 
@@ -271,7 +272,7 @@ int setUpInvalidData(OperationContext* opCtx) {
 
     {
         WriteUnitOfWork wuow(opCtx);
-        auto invalidBson = "\0\0\0\0\0"_sd;
+        auto invalidBson = "\0\0\0\0\0"sv;
         ASSERT_OK(rs->insertRecord(opCtx,
                                    *shard_role_details::getRecoveryUnit(opCtx),
                                    invalidBson.data(),
@@ -743,11 +744,11 @@ INSTANTIATE_TEST_SUITE_P(
 
 template <class T = BSONObj>
 BSONObj replaceNestedField(const BSONObj& bson,
-                           std::span<const StringData> nestedFieldNames,
+                           std::span<const std::string_view> nestedFieldNames,
                            const T& replacement,
-                           boost::optional<StringData> replacementFieldName = boost::none) {
+                           boost::optional<std::string_view> replacementFieldName = boost::none) {
     invariant(!nestedFieldNames.empty());
-    const StringData cur = nestedFieldNames.front();
+    const std::string_view cur = nestedFieldNames.front();
     BSONObjBuilder bob;
     // Ordering must be preserved to avoid out of order errors, so fields must be added
     // one-by-one.
@@ -775,9 +776,9 @@ BSONObj replaceNestedField(const BSONObj& bson,
     return bob.obj();
 }
 
-BSONObj removeNestedField(const BSONObj& bson, std::span<const StringData> nestedFieldNames) {
+BSONObj removeNestedField(const BSONObj& bson, std::span<const std::string_view> nestedFieldNames) {
     invariant(!nestedFieldNames.empty());
-    const StringData cur = nestedFieldNames.front();
+    const std::string_view cur = nestedFieldNames.front();
     auto removed = bson.removeField(cur);
     if (nestedFieldNames.size() == 1) {
         return removed;
@@ -943,7 +944,7 @@ public:
         return {getSampleDoc(), getVersion3ControlSampleDoc(), getExtendedTimeRangeSampleDoc()};
     };
 
-    static constexpr auto replacementIncorrectTimeField = "t"_sd;
+    static constexpr auto replacementIncorrectTimeField = "t"sv;
 
     void insertDocs(std::span<const BSONObj> docs, ErrorCodes::Error expected = ErrorCodes::OK) {
         ASSERT_OK(storageInterface()->createCollection(_opCtx, _nss, _options));
@@ -959,9 +960,9 @@ public:
     }
 
 
-    static BSONObj getSampleDocMismatchedMeasurementField(StringData measurementField) {
+    static BSONObj getSampleDocMismatchedMeasurementField(std::string_view measurementField) {
         const auto origBson = getSampleDoc();
-        const BSONColumn colData(origBson.getObjectField("data"_sd).firstElement());
+        const BSONColumn colData(origBson.getObjectField("data"sv).firstElement());
 
         BSONColumnBuilder bcb;
         const size_t sz = colData.size();
@@ -974,7 +975,7 @@ public:
             ++copied;
         }
 
-        const std::vector<StringData> nested = {"data"_sd, measurementField};
+        const std::vector<std::string_view> nested = {"data"sv, measurementField};
         return replaceNestedField(origBson, nested, bcb.finalize());
     }
 
@@ -992,7 +993,7 @@ protected:
         _options.timeseries = TimeseriesOptions(/*timeField*/ "date");
         _options.timeseries->setBucketRoundingSeconds(60);
         _options.timeseries->setBucketMaxSpanSeconds(60 * 60 * 24);
-        _options.timeseries->setMetaField("ticker"_sd);
+        _options.timeseries->setMetaField("ticker"sv);
         _options.timeseries->setGranularity(BucketGranularityEnum::Seconds);
         _options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
         _options.validationAction = ValidationActionEnum::errorAndLog;
@@ -1066,7 +1067,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationBadBucketSpan) {
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationBadControlCount) {
-    static constexpr std::array nested = {"control"_sd, "count"_sd};
+    static constexpr std::array nested = {"control"sv, "count"sv};
     insertDoc(replaceNestedField(getSampleDoc(), nested, 4));
     foregroundValidate(_nss,
                        _opCtx,
@@ -1075,7 +1076,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationBadControlCount) 
 }
 
 TEST_P(TimeseriesCollectionValidationSchemaViolationTest, TimeseriesValidationMissingMin) {
-    static constexpr std::array nested = {"control"_sd, "min"_sd};
+    static constexpr std::array nested = {"control"sv, "min"sv};
     const auto doc = removeNestedField(getSampleDoc(), nested);
     if (GetParam() == SchemaViolationTestMode::ExpectFailOnDocumentInsert) {
         insertDoc(doc, ErrorCodes::DocumentValidationFailure);
@@ -1089,7 +1090,7 @@ TEST_P(TimeseriesCollectionValidationSchemaViolationTest, TimeseriesValidationMi
 }
 
 TEST_P(TimeseriesCollectionValidationSchemaViolationTest, TimeseriesValidationMissingMax) {
-    static constexpr std::array nested = {"control"_sd, "max"_sd};
+    static constexpr std::array nested = {"control"sv, "max"sv};
     const auto doc = removeNestedField(getSampleDoc(), nested);
     if (GetParam() == SchemaViolationTestMode::ExpectFailOnDocumentInsert) {
         insertDoc(doc, ErrorCodes::DocumentValidationFailure);
@@ -1104,13 +1105,13 @@ TEST_P(TimeseriesCollectionValidationSchemaViolationTest, TimeseriesValidationMi
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinTimestamp) {
     const auto invalidDoc = std::invoke([] {
-        static constexpr auto newMinIso = "1990-12-18T15:59:00Z"_sd;
+        static constexpr auto newMinIso = "1990-12-18T15:59:00Z"sv;
         auto doc = getSampleDoc();
-        auto oid = doc.getField("_id"_sd).OID();
+        auto oid = doc.getField("_id"sv).OID();
         oid.setTimestamp(dateFromISOString(newMinIso).getValue().toMillisSinceEpoch());
-        doc = replaceNestedField(doc, std::array{"_id"_sd}, oid);
+        doc = replaceNestedField(doc, std::array{"_id"sv}, oid);
         doc = replaceNestedField(doc,
-                                 std::array{"control"_sd, "min"_sd, "date"_sd},
+                                 std::array{"control"sv, "min"sv, "date"sv},
                                  dateFromISOString(newMinIso).getValue());
         return doc;
     });
@@ -1125,8 +1126,8 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinTimes
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinIdField) {
-    static constexpr std::array nested = {"control"_sd, "min"_sd, "_id"_sd};
-    insertDoc(replaceNestedField(getSampleDoc(), nested, "xyz"_sd));
+    static constexpr std::array nested = {"control"sv, "min"sv, "_id"sv};
+    insertDoc(replaceNestedField(getSampleDoc(), nested, "xyz"sv));
     // Timestamp and ID generate errors for mismatch between data and control block and for
     // improperly formatted bucket as the timestamp and _id are coupled.
     foregroundValidate(_nss,
@@ -1136,7 +1137,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinIdFie
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinMeasurement) {
-    static constexpr std::array nested = {"control"_sd, "min"_sd, "volume"_sd};
+    static constexpr std::array nested = {"control"sv, "min"sv, "volume"sv};
     insertDoc(replaceNestedField(getSampleDoc(), nested, 42));
     foregroundValidate(_nss,
                        _opCtx,
@@ -1145,7 +1146,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinMeasu
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMaxMeasurement) {
-    static constexpr std::array nested = {"control"_sd, "max"_sd, "volume"_sd};
+    static constexpr std::array nested = {"control"sv, "max"sv, "volume"sv};
     insertDoc(replaceNestedField(getSampleDoc(), nested, 1'000'000));
     foregroundValidate(_nss,
                        _opCtx,
@@ -1155,9 +1156,9 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMaxMeasu
 
 TEST_F(TimeseriesCollectionValidationTest,
        TimeseriesValidationIncorrectMaxTimestampWithBucketSpanError) {
-    static constexpr std::array nested = {"control"_sd, "max"_sd, "date"_sd};
+    static constexpr std::array nested = {"control"sv, "max"sv, "date"sv};
     insertDoc(replaceNestedField(
-        getSampleDoc(), nested, dateFromISOString("2025-12-18T15:59:00Z"_sd).getValue()));
+        getSampleDoc(), nested, dateFromISOString("2025-12-18T15:59:00Z"sv).getValue()));
     foregroundValidate(_nss,
                        _opCtx,
                        {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
@@ -1165,9 +1166,9 @@ TEST_F(TimeseriesCollectionValidationTest,
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMaxTimestampTooHigh) {
-    static constexpr std::array nested = {"control"_sd, "max"_sd, "date"_sd};
+    static constexpr std::array nested = {"control"sv, "max"sv, "date"sv};
     insertDoc(replaceNestedField(
-        getSampleDoc(), nested, dateFromISOString("2021-12-18T16:00:00Z"_sd).getValue()));
+        getSampleDoc(), nested, dateFromISOString("2021-12-18T16:00:00Z"sv).getValue()));
     foregroundValidate(_nss,
                        _opCtx,
                        {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
@@ -1175,9 +1176,9 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMaxTimestampTooHi
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMaxTimestampTooLow) {
-    static constexpr std::array nested = {"control"_sd, "max"_sd, "date"_sd};
+    static constexpr std::array nested = {"control"sv, "max"sv, "date"sv};
     insertDoc(replaceNestedField(
-        getSampleDoc(), nested, dateFromISOString("2021-12-18T10:00:00Z"_sd).getValue()));
+        getSampleDoc(), nested, dateFromISOString("2021-12-18T10:00:00Z"sv).getValue()));
     foregroundValidate(_nss,
                        _opCtx,
                        {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
@@ -1186,7 +1187,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMaxTimestampTooLo
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesControlSchema) {
     auto doc = getSampleDoc();
-    const auto control = doc.getObjectField("control"_sd);
+    const auto control = doc.getObjectField("control"sv);
     const auto newMinObj = std::invoke([&control] {
         auto minObj = control.getField("min").Obj();
         // Rotate the fields by 1 then reinsert the object into the control block.
@@ -1197,7 +1198,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesControlSchema) {
         bob.append(minObj.firstElement());
         return bob.obj();
     });
-    insertDoc(replaceNestedField(doc, std::array{"control"_sd, "min"_sd}, newMinObj));
+    insertDoc(replaceNestedField(doc, std::array{"control"sv, "min"sv}, newMinObj));
     foregroundValidate(_nss,
                        _opCtx,
                        {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
@@ -1205,10 +1206,10 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesControlSchema) {
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectBucketObjectID) {
-    static constexpr std::array nested = {"_id"_sd};
+    static constexpr std::array nested = {"_id"sv};
     const auto doc = getSampleDoc();
-    auto oid = doc.getField("_id"_sd).OID();
-    oid.setTimestamp(dateFromISOString("1990-12-18T15:59:00Z"_sd).getValue().toMillisSinceEpoch());
+    auto oid = doc.getField("_id"sv).OID();
+    oid.setTimestamp(dateFromISOString("1990-12-18T15:59:00Z"sv).getValue().toMillisSinceEpoch());
     insertDoc(replaceNestedField(doc, nested, oid));
     foregroundValidate(_nss,
                        _opCtx,
@@ -1217,7 +1218,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectBucketOb
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingDate) {
-    static constexpr std::array nested = {"data"_sd, "date"_sd};
+    static constexpr std::array nested = {"data"sv, "date"sv};
     insertDoc(removeNestedField(getSampleDoc(), nested));
     foregroundValidate(_nss,
                        _opCtx,
@@ -1231,18 +1232,18 @@ TEST_P(TimeseriesCollectionValidationSchemaViolationTest, TimeseriesValidationIn
 
         const auto minDate = doc["control"]["min"]["date"];
         doc = replaceNestedField(doc,
-                                 std::array{"control"_sd, "min"_sd, "date"_sd},
+                                 std::array{"control"sv, "min"sv, "date"sv},
                                  minDate.Date(),
                                  replacementIncorrectTimeField);
 
         const auto maxDate = doc["control"]["max"]["date"];
         doc = replaceNestedField(doc,
-                                 std::array{"control"_sd, "max"_sd, "date"_sd},
+                                 std::array{"control"sv, "max"sv, "date"sv},
                                  maxDate.Date(),
                                  replacementIncorrectTimeField);
 
         doc = replaceNestedField(doc,
-                                 std::array{"data"_sd, "date"_sd},
+                                 std::array{"data"sv, "date"sv},
                                  doc["data"]["date"],
                                  replacementIncorrectTimeField);
         return doc;
@@ -1267,9 +1268,9 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectTimeFiel
     const auto doc = std::invoke([&] {
         BSONObj doc = getSampleDoc();
         doc = replaceNestedField(doc,
-                                 std::array{"data"_sd, "date"_sd},
+                                 std::array{"data"sv, "date"sv},
                                  doc["data"]["date"],
-                                 "clearlyIncorrectReplacementTimeField"_sd);
+                                 "clearlyIncorrectReplacementTimeField"sv);
         return doc;
     });
     insertDoc(doc);
@@ -1284,7 +1285,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectTimeFiel
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMeasurementClose) {
-    static constexpr std::array nested = {"data"_sd, "close"_sd};
+    static constexpr std::array nested = {"data"sv, "close"sv};
     insertDoc(removeNestedField(getSampleDoc(), nested));
     foregroundValidate(_nss,
                        _opCtx,
@@ -1293,7 +1294,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMeasuremen
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMeasurementFieldVolume) {
-    static constexpr std::array nested = {"data"_sd, "volume"_sd};
+    static constexpr std::array nested = {"data"sv, "volume"sv};
     insertDoc(removeNestedField(getSampleDoc(), nested));
     foregroundValidate(_nss,
                        _opCtx,
@@ -1302,7 +1303,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMeasuremen
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMismatchedMeasurementFieldClose) {
-    insertDoc(getSampleDocMismatchedMeasurementField("close"_sd));
+    insertDoc(getSampleDocMismatchedMeasurementField("close"sv));
     foregroundValidate(_nss,
                        _opCtx,
                        {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
@@ -1310,7 +1311,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMismatchedMeasure
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMismatchedMeasurementFieldVolume) {
-    insertDoc(getSampleDocMismatchedMeasurementField("volume"_sd));
+    insertDoc(getSampleDocMismatchedMeasurementField("volume"sv));
     foregroundValidate(_nss,
                        _opCtx,
                        {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
@@ -1421,7 +1422,7 @@ TEST_F(TimeseriesCollectionValidationTest, ValidationOfDocumentJustPastEpochMax)
 }
 
 TEST_F(TimeseriesCollectionValidationTest, ReportWarningForV3BucketWithMeasurementsInOrder) {
-    static constexpr std::array version = {"control"_sd, "version"_sd};
+    static constexpr std::array version = {"control"sv, "version"sv};
     insertDoc(replaceNestedField(getSampleDoc(), version, 3));
     foregroundValidate(
         _nss, _opCtx, {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 1});
@@ -1436,7 +1437,7 @@ TEST_F(TimeseriesCollectionValidationTest, ReportInvalidBSONColumnReason) {
     const char kInvalidColumnBytes[] = "\xF1\x05\x00\x00\x00\x00";
     const BSONBinData invalidColumn{
         kInvalidColumnBytes, sizeof(kInvalidColumnBytes) - 1, BinDataType::Column};
-    static constexpr std::array dataIdField = {"data"_sd, "_id"_sd};
+    static constexpr std::array dataIdField = {"data"sv, "_id"sv};
     insertDoc(replaceNestedField(getSampleDoc(), dataIdField, invalidColumn));
 
     const auto results = foregroundValidate(

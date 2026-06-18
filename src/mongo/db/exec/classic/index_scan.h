@@ -51,6 +51,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -152,7 +153,7 @@ public:
         return &_specificStats;
     }
 
-    static constexpr StringData kStageType = "IXSCAN"_sd;
+    static constexpr std::string_view kStageType = "IXSCAN"_sd;
 
     const BSONObj& getKeyPattern() const {
         return _keyPattern;

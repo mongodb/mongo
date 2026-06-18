@@ -47,6 +47,7 @@
 #include "mongo/util/exit.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/cstdint.hpp>
@@ -56,6 +57,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 auto& gCursorStats = *new CursorStats{};
@@ -89,8 +91,8 @@ auto& gErrorRetriableOther = change_stream::errorRetriableOther();
 }  // namespace change_stream_metrics
 }  // namespace
 
-Counter64& CursorStats::_makeStat(StringData name) {
-    static constexpr auto prefix = "cursor"_sd;
+Counter64& CursorStats::_makeStat(std::string_view name) {
+    static constexpr auto prefix = "cursor"sv;
     return *MetricBuilder<Counter64>(fmt::format("{}.{}", prefix, name))
                 .setRole(ClusterRole::ShardServer);
 }

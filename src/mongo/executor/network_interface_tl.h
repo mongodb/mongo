@@ -63,6 +63,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -321,7 +322,7 @@ private:
         kStopped,
     };
 
-    friend StringData toString(State s) {
+    friend std::string_view toString(State s) {
         return std::array{
             "Default"_sd,
             "Started"_sd,

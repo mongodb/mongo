@@ -40,6 +40,7 @@
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 namespace {
 // Verify that the block is made of booleans, and that it's not completely false.
 bool allFalse(const value::DeblockedTagVals& booleanBlock) {
@@ -98,7 +99,7 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      PlanNodeId planNodeId,
                                      bool participateInTrialRunTracking,
                                      bool forceIncreasedSpilling)
-    : HashAggBaseStage("block_group"_sd,
+    : HashAggBaseStage("block_group"sv,
                        yieldPolicy,
                        planNodeId,
                        nullptr,

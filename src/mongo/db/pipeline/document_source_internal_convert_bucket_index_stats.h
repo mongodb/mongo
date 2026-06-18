@@ -41,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -55,7 +56,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalConvertBucketIndexStats);
  */
 class DocumentSourceInternalConvertBucketIndexStats : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalConvertBucketIndexStats"_sd;
+    static constexpr std::string_view kStageName = "$_internalConvertBucketIndexStats"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -64,7 +65,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         TimeseriesIndexConversionOptions timeseriesOptions);
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     }
 

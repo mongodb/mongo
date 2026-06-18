@@ -37,7 +37,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -55,6 +54,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 
@@ -112,7 +112,7 @@ public:
      * and for reporting purposes. Its ref count will be bumped by this Client.
      */
     static void initThread(
-        StringData desc,
+        std::string_view desc,
         Service* service,
         std::shared_ptr<transport::Session> session = noSession(),
         ClientOperationKillableByStepdown killable = ClientOperationKillableByStepdown{true},
@@ -501,7 +501,7 @@ public:
      * Only the Service pointer is a required parameter. All other parameters are optional and will
      * take defaults specified below.
      */
-    ThreadClient(StringData desc,
+    ThreadClient(std::string_view desc,
                  Service* service,
                  std::shared_ptr<transport::Session> session,
                  Killable killable,
@@ -523,16 +523,18 @@ public:
      * Then, if the session pointer is not specified, default it to the sentinel value for no
      * session.
      */
-    ThreadClient(StringData desc, Service* service)
+    ThreadClient(std::string_view desc, Service* service)
         : ThreadClient{desc, service, Client::noSession()} {}
-    ThreadClient(StringData desc, Service* service, Killable killable)
+    ThreadClient(std::string_view desc, Service* service, Killable killable)
         : ThreadClient{desc, service, Client::noSession(), killable} {}
 
     /**
      * Then, if it's not specified whether the client's operation should be killable, default it to
      * true.
      */
-    ThreadClient(StringData desc, Service* service, std::shared_ptr<transport::Session> session)
+    ThreadClient(std::string_view desc,
+                 Service* service,
+                 std::shared_ptr<transport::Session> session)
         : ThreadClient{desc,
                        service,
                        std::move(session),

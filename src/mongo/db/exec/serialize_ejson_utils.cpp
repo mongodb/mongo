@@ -37,6 +37,8 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/base64.h"
 
+#include <string_view>
+
 namespace mongo::exec::expression::serialize_ejson_utils {
 
 namespace {
@@ -80,38 +82,38 @@ struct ExtendedJsonOptions {
 };
 
 /// Formats according to the Extended JSON spec for $uuid.
-std::string uuidToFormattedString(StringData data) {
+std::string uuidToFormattedString(std::string_view data) {
     return UUID::fromCDR(data).toString();
 }
 
 // Define string constants to avoid misspelling :)
 
-constexpr StringData kMinKey = "$minKey";
-constexpr StringData kMaxKey = "$maxKey";
-constexpr StringData kUndefined = "$undefined";
-constexpr StringData kNumberInt = "$numberInt";
-constexpr StringData kNumberLong = "$numberLong";
-constexpr StringData kNumberDouble = "$numberDouble";
-constexpr StringData kNumberDecimal = "$numberDecimal";
-constexpr StringData kBinary = "$binary";
-constexpr StringData kUuid = "$uuid";
-constexpr StringData kSubType = "subType";
-constexpr StringData kBase64 = "base64";
-constexpr StringData kOid = "$oid";
-constexpr StringData kDate = "$date";
-constexpr StringData kRegularExpression = "$regularExpression";
-constexpr StringData kPattern = "pattern";
-constexpr StringData kOptions = "options";
-constexpr StringData kDbPointer = "$dbPointer";
-constexpr StringData kRef = "$ref";
-constexpr StringData kId = "$id";
-constexpr StringData kCode = "$code";
-constexpr StringData kSymbol = "$symbol";
-constexpr StringData kNaN = "NaN";
-constexpr StringData kPosInfinity = "Infinity";
-constexpr StringData kNegInfinity = "-Infinity";
-constexpr StringData kScope = "$scope";
-constexpr StringData kTimestamp = "$timestamp";
+constexpr std::string_view kMinKey = "$minKey";
+constexpr std::string_view kMaxKey = "$maxKey";
+constexpr std::string_view kUndefined = "$undefined";
+constexpr std::string_view kNumberInt = "$numberInt";
+constexpr std::string_view kNumberLong = "$numberLong";
+constexpr std::string_view kNumberDouble = "$numberDouble";
+constexpr std::string_view kNumberDecimal = "$numberDecimal";
+constexpr std::string_view kBinary = "$binary";
+constexpr std::string_view kUuid = "$uuid";
+constexpr std::string_view kSubType = "subType";
+constexpr std::string_view kBase64 = "base64";
+constexpr std::string_view kOid = "$oid";
+constexpr std::string_view kDate = "$date";
+constexpr std::string_view kRegularExpression = "$regularExpression";
+constexpr std::string_view kPattern = "pattern";
+constexpr std::string_view kOptions = "options";
+constexpr std::string_view kDbPointer = "$dbPointer";
+constexpr std::string_view kRef = "$ref";
+constexpr std::string_view kId = "$id";
+constexpr std::string_view kCode = "$code";
+constexpr std::string_view kSymbol = "$symbol";
+constexpr std::string_view kNaN = "NaN";
+constexpr std::string_view kPosInfinity = "Infinity";
+constexpr std::string_view kNegInfinity = "-Infinity";
+constexpr std::string_view kScope = "$scope";
+constexpr std::string_view kTimestamp = "$timestamp";
 
 /**
  * Set of all of the type wrapper keys (all starting with $). We will not allow these to be present
@@ -147,7 +149,7 @@ struct ToExtendedJsonConverter {
     }
 
     Value binData(const BSONBinData& binData) const {
-        StringData data(static_cast<const char*>(binData.data), binData.length);
+        std::string_view data(static_cast<const char*>(binData.data), binData.length);
         if (binData.type == BinDataType::newUUID && binData.length == UUID::kNumBytes) {
             // We are permitted to but not required to emit $uuid under the spec.
             // However ExtendedCanonicalV200Generator does this, so we do the same here.
@@ -160,8 +162,8 @@ struct ToExtendedJsonConverter {
         fmt::memory_buffer buffer;
         base64::encode(buffer, data);
         return Value(
-            BSON(kBinary << BSON(kBase64 << StringData(buffer.data(), buffer.size()) << kSubType
-                                         << fmt::format("{:x}", binData.type))));
+            BSON(kBinary << BSON(kBase64 << std::string_view(buffer.data(), buffer.size())
+                                         << kSubType << fmt::format("{:x}", binData.type))));
     }
 
     Value oid(const OID& oid) const {
@@ -172,7 +174,7 @@ struct ToExtendedJsonConverter {
     Value date(Date_t date) const {
         if (opts.relaxed && date.isFormattable()) {
             return Value(
-                BSON(kDate << StringData{DateStringBuffer{}.iso8601(date, opts.localDate)}));
+                BSON(kDate << std::string_view{DateStringBuffer{}.iso8601(date, opts.localDate)}));
         }
         return Value(BSON(kDate << BSON(kNumberLong << fmt::to_string(date.toMillisSinceEpoch()))));
     }
@@ -310,13 +312,16 @@ struct ToExtendedJsonConverter {
 
 namespace parsers {
 
-void uassertValueType(StringData valuePath, const Value& value, BSONType type) {
+void uassertValueType(std::string_view valuePath, const Value& value, BSONType type) {
     uassert(ErrorCodes::ConversionFailure,
             fmt::format("{} value must be of type {}", valuePath, typeName(type)),
             value.getType() == type);
 }
 
-void uassertValueType(StringData root, StringData subField, const Value& value, BSONType type) {
+void uassertValueType(std::string_view root,
+                      std::string_view subField,
+                      const Value& value,
+                      BSONType type) {
     uassert(ErrorCodes::ConversionFailure,
             fmt::format("{}.{} value must be of type {}", root, subField, typeName(type)),
             value.getType() == type);
@@ -327,7 +332,7 @@ void uassertValueType(StringData root, StringData subField, const Value& value, 
  * If any other exception is thrown, throws a DBException with the given code and message.
  */
 template <ErrorCodes::Error EC, typename Callable>
-auto rethrowWithErrorCode(Callable&& c, StringData msg) -> decltype(auto) {
+auto rethrowWithErrorCode(Callable&& c, std::string_view msg) -> decltype(auto) {
     try {
         return c();
     } catch (const ExceptionFor<EC>& e) {
@@ -631,7 +636,8 @@ static const StringDataMap<ConvertFunction> convertFromExtendedJsonMap{
  * Returns the parsed value or none on failure.
  * IMPORTANT: The $code wrapper is not supported, since it has two variants.
  */
-boost::optional<Value> tryConvertFromSingleKeyExtendedJson(StringData fieldName, Value value) {
+boost::optional<Value> tryConvertFromSingleKeyExtendedJson(std::string_view fieldName,
+                                                           Value value) {
     if (fieldName.front() != '$') {
         return boost::none;
     }

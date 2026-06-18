@@ -58,6 +58,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -148,7 +149,7 @@ public:
     StatusWith<ClientCursorPin> pinCursor(
         OperationContext* opCtx,
         CursorId id,
-        StringData commandName,
+        std::string_view commandName,
         const std::function<void(const ClientCursor&)>& checkPinAllowed = {},
         AuthCheck checkSessionAuth = kCheckSession);
 

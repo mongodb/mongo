@@ -30,31 +30,31 @@
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/str.h"
 
 #include <cstddef>
 #include <cstring>
+#include <string_view>
 
 namespace mongo {
 
 namespace {
 
-Status makeStoreStatus(StringData sdata, size_t length, std::ptrdiff_t debug_offset) {
+Status makeStoreStatus(std::string_view sdata, size_t length, std::ptrdiff_t debug_offset) {
     str::stream ss;
-    ss << "buffer size too small to write StringData(" << sdata.size() << ") bytes into buffer["
-       << length << "] at offset: " << debug_offset;
+    ss << "buffer size too small to write std::string_view(" << sdata.size()
+       << ") bytes into buffer[" << length << "] at offset: " << debug_offset;
     return Status(ErrorCodes::Overflow, ss);
 }
 }  // namespace
 
-Status DataType::Handler<StringData>::load(StringData* sdata,
-                                           const char* ptr,
-                                           size_t length,
-                                           size_t* advanced,
-                                           std::ptrdiff_t debug_offset) {
+Status DataType::Handler<std::string_view>::load(std::string_view* sdata,
+                                                 const char* ptr,
+                                                 size_t length,
+                                                 size_t* advanced,
+                                                 std::ptrdiff_t debug_offset) {
     if (sdata) {
-        *sdata = StringData(ptr, length);
+        *sdata = std::string_view(ptr, length);
     }
 
     if (advanced) {
@@ -64,8 +64,11 @@ Status DataType::Handler<StringData>::load(StringData* sdata,
     return Status::OK();
 }
 
-Status DataType::Handler<StringData>::store(
-    StringData sdata, char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset) {
+Status DataType::Handler<std::string_view>::store(std::string_view sdata,
+                                                  char* ptr,
+                                                  size_t length,
+                                                  size_t* advanced,
+                                                  std::ptrdiff_t debug_offset) {
     if (sdata.size() > length) {
         return makeStoreStatus(sdata, length, debug_offset);
     }

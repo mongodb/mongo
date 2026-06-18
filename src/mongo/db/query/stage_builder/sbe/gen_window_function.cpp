@@ -138,6 +138,7 @@ struct WindowOpInfo {
 };
 
 namespace {
+using namespace std::literals::string_view_literals;
 SbExpr::Vector buildAccumOpAccumAggsForWindowFunc(const WindowOp& op,
                                                   AccumInputsPtr inputs,
                                                   StageBuilderState& state) {
@@ -266,7 +267,7 @@ SbExpr::Vector buildWindowAddConcatArrays(const WindowOp& op,
     auto expr = b.makeIf(b.makeFunction(sbe::EFn::kIsArray, argValue),
                          argValue,
                          b.makeFail(ErrorCodes::TypeMismatch,
-                                    "Expected new value for $concatArrays to be an array"_sd));
+                                    "Expected new value for $concatArrays to be an array"sv));
     auto argWithTypeCheck =
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 
@@ -283,11 +284,10 @@ SbExpr::Vector buildWindowRemoveConcatArrays(const WindowOp& op,
 
     auto frameId = state.frameId();
     auto argValue = SbLocalVar{frameId, 0};
-    auto expr =
-        b.makeIf(b.makeFunction(sbe::EFn::kIsArray, argValue),
-                 argValue,
-                 b.makeFail(ErrorCodes::TypeMismatch,
-                            "Expected value to remove for $concatArrays to be an array"_sd));
+    auto expr = b.makeIf(b.makeFunction(sbe::EFn::kIsArray, argValue),
+                         argValue,
+                         b.makeFail(ErrorCodes::TypeMismatch,
+                                    "Expected value to remove for $concatArrays to be an array"sv));
     auto argWithTypeCheck =
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 
@@ -618,7 +618,7 @@ SbExpr::Vector buildWindowAddSetUnion(const WindowOp& op,
     auto expr = b.makeIf(
         b.makeFunction(sbe::EFn::kIsArray, argValue),
         argValue,
-        b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"_sd));
+        b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"sv));
     auto argWithTypeCheck =
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 
@@ -637,7 +637,7 @@ SbExpr::Vector buildWindowRemoveSetUnion(const WindowOp& op,
     auto expr = b.makeIf(b.makeFunction(sbe::EFn::kIsArray, argValue),
                          argValue,
                          b.makeFail(ErrorCodes::TypeMismatch,
-                                    "Expected value to remove for $setUnion to be an array"_sd));
+                                    "Expected value to remove for $setUnion to be an array"sv));
     auto argWithTypeCheck =
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 

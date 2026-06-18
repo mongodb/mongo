@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -40,10 +39,12 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::evaluate_matcher_test {
+using namespace std::literals::string_view_literals;
 
 TEST(MatchExpressionParserTreeTest, OR1) {
     BSONObj query = BSON("$or" << BSON_ARRAY(BSON("x" << 1) << BSON("y" << 2)));
@@ -1022,7 +1023,7 @@ TEST(MatchExpressionParserLeafTest, RegexEmbeddedNULByte) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    const auto value = "a\0b"_sd;
+    const auto value = "a\0b"sv;
     ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << value)));
     ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << "a")));
 }
@@ -1397,7 +1398,7 @@ TEST(SerializeBasic, ExpressionNotWithDirectPathExpSerializesCorrectly) {
     // able to serialize.
     auto originalBSON = fromjson("{a: {$not: {$eq: 2}}}");
     auto equalityRHSElem = originalBSON["a"]["$not"]["$eq"];
-    auto equalityExpression = std::make_unique<EqualityMatchExpression>("a"_sd, equalityRHSElem);
+    auto equalityExpression = std::make_unique<EqualityMatchExpression>("a"sv, equalityRHSElem);
 
     auto notExpression = std::make_unique<NotMatchExpression>(equalityExpression.release());
     Matcher reserialized(serialize(notExpression.get()),
@@ -1419,7 +1420,7 @@ TEST(SerializeBasic, ExpressionNotNotDirectlySerializesCorrectly) {
     // {$not: {$not: ...}}.
     auto originalBSON = fromjson("{a: {$not: {$not: {$eq: 2}}}}");
     auto equalityRHSElem = originalBSON["a"]["$not"]["$not"]["$eq"];
-    auto equalityExpression = std::make_unique<EqualityMatchExpression>("a"_sd, equalityRHSElem);
+    auto equalityExpression = std::make_unique<EqualityMatchExpression>("a"sv, equalityRHSElem);
 
     auto nestedNot = std::make_unique<NotMatchExpression>(equalityExpression.release());
     auto topNot = std::make_unique<NotMatchExpression>(nestedNot.release());

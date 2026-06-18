@@ -37,15 +37,16 @@
 #include "mongo/util/synchronized_value.h"
 
 #include <string>
+#include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
 
-constexpr StringData kOID_CommonName = "2.5.4.3"_sd;
-constexpr StringData kOID_CountryName = "2.5.4.6"_sd;
-constexpr StringData kOID_LocalityName = "2.5.4.7"_sd;
-constexpr StringData kOID_StateName = "2.5.4.8"_sd;
-constexpr StringData kOID_OName = "2.5.4.10"_sd;
-constexpr StringData kOID_OUName = "2.5.4.11"_sd;
+constexpr std::string_view kOID_CommonName = "2.5.4.3"_sd;
+constexpr std::string_view kOID_CountryName = "2.5.4.6"_sd;
+constexpr std::string_view kOID_LocalityName = "2.5.4.7"_sd;
+constexpr std::string_view kOID_StateName = "2.5.4.8"_sd;
+constexpr std::string_view kOID_OName = "2.5.4.10"_sd;
+constexpr std::string_view kOID_OUName = "2.5.4.11"_sd;
 
 /**
  * Represents a structed X509 certificate subject name.
@@ -79,7 +80,7 @@ public:
      * Retrieve the first instance of the value for a given OID in this name.
      * Returns ErrorCodes::KeyNotFound if the OID does not exist.
      */
-    StatusWith<std::string> getOID(StringData oid) const;
+    StatusWith<std::string> getOID(std::string_view oid) const;
 
     bool empty() const {
         return std::all_of(
@@ -125,7 +126,7 @@ inline bool operator<(const SSLX509Name::Entry& lhs, const SSLX509Name::Entry& r
 
 class SSLConfiguration {
 public:
-    bool isClusterMember(StringData subjectName,
+    bool isClusterMember(std::string_view subjectName,
                          const boost::optional<std::string>& clusterExtensionValue) const;
     bool isClusterMember(SSLX509Name subjectName,
                          const boost::optional<std::string>& clusterExtensionValue) const;

@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/update/update_leaf_node.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace modifiertable {
@@ -63,7 +63,7 @@ enum ModifierType {
  * Returns the modifier type for 'typeStr', if it was recognized as an existing update
  * mod, or MOD_UNKNOWN otherwise.
  */
-ModifierType getType(StringData typeStr);
+ModifierType getType(std::string_view typeStr);
 
 /**
  * Instantiate an UpdateLeafNode that corresponds to 'modType' or nullptr if 'modType' is not valid.

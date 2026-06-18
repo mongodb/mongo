@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
 void validateRseqKernelCompat();
-MONGO_MOD_FILE_PRIVATE bool isKernelVersionSafeForTCMallocPerCPUCache(StringData release);
+MONGO_MOD_FILE_PRIVATE bool isKernelVersionSafeForTCMallocPerCPUCache(std::string_view release);
 
 }  // namespace mongo

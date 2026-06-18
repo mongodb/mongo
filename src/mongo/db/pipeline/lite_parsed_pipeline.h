@@ -49,6 +49,7 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -326,7 +327,7 @@ public:
      * offending stage and `parentStageName` (e.g. "$rankFusion"). Used by hybrid search stages
      * to validate input pipelines.
      */
-    void validateAllStagesAreSelection(int errorCode, StringData parentStageName) const {
+    void validateAllStagesAreSelection(int errorCode, std::string_view parentStageName) const {
         for (const auto& stage : _stageSpecs) {
             uassert(errorCode,
                     str::stream()

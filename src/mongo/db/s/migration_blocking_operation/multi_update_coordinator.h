@@ -35,13 +35,15 @@
 #include "mongo/db/s/primary_only_service_helpers/retry_until_majority_commit.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class MultiUpdateCoordinatorInstance;
 
 class MONGO_MOD_PUBLIC MultiUpdateCoordinatorService : public repl::PrimaryOnlyService {
 public:
-    static constexpr StringData kServiceName = "MultiUpdateCoordinatorService"_sd;
+    static constexpr std::string_view kServiceName = "MultiUpdateCoordinatorService"_sd;
 
     friend MultiUpdateCoordinatorInstance;
 
@@ -54,7 +56,7 @@ public:
         ServiceContext* serviceContext,
         std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> factory);
 
-    MONGO_MOD_PRIVATE StringData getServiceName() const override;
+    MONGO_MOD_PRIVATE std::string_view getServiceName() const override;
 
     MONGO_MOD_PRIVATE NamespaceString getStateDocumentsNS() const override;
 

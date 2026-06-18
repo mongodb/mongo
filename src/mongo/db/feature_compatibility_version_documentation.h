@@ -33,11 +33,13 @@
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::feature_compatibility_version_documentation {
-MONGO_MOD_PUB constexpr inline auto kReleaseNotesRoot =
-    "https://docs.mongodb.com/master/release-notes"_sd;
+MONGO_MOD_PUB constexpr inline std::string_view kReleaseNotesRoot{
+    "https://docs.mongodb.com/master/release-notes"};
 
 MONGO_MOD_PUB inline std::string compatibilityLink() {
     return fmt::format(                                //

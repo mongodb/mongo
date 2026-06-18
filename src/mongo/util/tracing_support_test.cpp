@@ -31,7 +31,6 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -42,6 +41,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -149,7 +149,7 @@ TEST(TracingSupportTest, BasicUsage) {
     ASSERT_BSONOBJ_EQ(expected, trace.value());
 }
 
-BSONObj beginEvent(StringData name, int64_t time) {
+BSONObj beginEvent(std::string_view name, int64_t time) {
     return BSON("name" << name << "ph"
                        << "B"
                        << "ts" << time << "pid" << 1 << "tid" << 1);

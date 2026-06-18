@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters.h"
@@ -53,6 +52,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -305,7 +305,7 @@ public:
     /**
      * Returns true if the given stage name is registered as an extension stage.
      */
-    static bool isRegisteredExtensionStage(StringData stageName);
+    static bool isRegisteredExtensionStage(std::string_view stageName);
 
     void setApiStrict(AllowedWithApiStrict apiStrict) {
         _apiStrict = apiStrict;
@@ -461,7 +461,7 @@ public:
         // Override for the stage name in timeseries error messages. If not set,
         // getParseTimeName() is used. Useful when a stage is conditionally disallowed
         // (e.g. $match is only disallowed when it contains $text).
-        boost::optional<StringData> timeseriesUnsupportedStageName;
+        boost::optional<std::string_view> timeseriesUnsupportedStageName;
     };
 
     virtual Constraints constraints() const {
@@ -689,14 +689,14 @@ protected:
 
     std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext;
 
-    void transactionNotSupported(StringData stageName) const {
+    void transactionNotSupported(std::string_view stageName) const {
         uasserted(ErrorCodes::OperationNotSupportedInTransaction,
                   str::stream() << "Operation not permitted in transaction :: caused by :: "
                                 << "Aggregation stage " << stageName << " cannot run within a "
                                 << "multi-document transaction.");
     }
 
-    ReadConcernSupportResult onlySingleReadConcernSupported(StringData stageName,
+    ReadConcernSupportResult onlySingleReadConcernSupported(std::string_view stageName,
                                                             repl::ReadConcernLevel supportedLevel,
                                                             repl::ReadConcernLevel candidateLevel,
                                                             bool isImplicitDefault) const {
@@ -712,7 +712,7 @@ protected:
                                 << " does not permit default readConcern to be applied."}}};
     }
 
-    ReadConcernSupportResult onlyReadConcernLocalSupported(StringData stageName,
+    ReadConcernSupportResult onlyReadConcernLocalSupported(std::string_view stageName,
                                                            repl::ReadConcernLevel level,
                                                            bool isImplicitDefault) const {
         return onlySingleReadConcernSupported(

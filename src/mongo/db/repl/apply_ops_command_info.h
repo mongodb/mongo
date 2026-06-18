@@ -35,6 +35,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 namespace MONGO_MOD_PUB mongo {
@@ -48,7 +49,7 @@ bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd);
 
 class ApplyOps {
 public:
-    static constexpr StringData kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
+    static constexpr std::string_view kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
 
     /**
      * Extracts CRUD operations from an applyOps oplog entry. Throws UserException on error.

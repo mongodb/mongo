@@ -33,6 +33,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace fts {
@@ -49,7 +50,9 @@ class BasicFTSPhraseMatcher final : public FTSPhraseMatcher {
 public:
     BasicFTSPhraseMatcher() = default;
 
-    bool phraseMatches(StringData phrase, StringData haystack, Options options) const override;
+    bool phraseMatches(std::string_view phrase,
+                       std::string_view haystack,
+                       Options options) const override;
 };
 
 }  // namespace fts

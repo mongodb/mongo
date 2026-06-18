@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/jwks_fetcher.h"
@@ -42,6 +41,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 
 
 namespace mongo::crypto {
@@ -58,7 +58,7 @@ public:
      * If the keyId does not exist, it will refresh _keyMaterial and _validators and retry.
      * If it still cannot be found, it will return an error.
      */
-    StatusWith<SharedValidator> getValidator(StringData keyId);
+    StatusWith<SharedValidator> getValidator(std::string_view keyId);
 
     std::size_t size() const {
         return _validators->size();

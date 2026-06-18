@@ -55,6 +55,7 @@
 #include <cstring>
 #include <iterator>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -66,10 +67,11 @@ namespace mongo {
 namespace timeseries {
 
 namespace {
+using namespace std::literals::string_view_literals;
 MONGO_FAIL_POINT_DEFINE(simulateBsonColumnCompressionDataLoss);
 
 CompressionResult _compressBucket(const BSONObj& bucketDoc,
-                                  StringData timeFieldName,
+                                  std::string_view timeFieldName,
                                   const NamespaceString& nss,
                                   bool validateDecompression) try {
     CompressionResult result;
@@ -82,7 +84,7 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
     std::vector<write_ops_utils::details::Measurement>
         measurements;                       // Extracted measurements from uncompressed bucket
     boost::optional<BSONObjIterator> time;  // Iterator to read time fields from uncompressed bucket
-    std::vector<std::pair<StringData, BSONObjIterator>>
+    std::vector<std::pair<std::string_view, BSONObjIterator>>
         columns;  // Iterators to read data fields from uncompressed bucket
 
     BSONElement bucketId;
@@ -92,7 +94,7 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
     // Read everything from the uncompressed bucket
     for (auto& elem : bucketDoc) {
         // Record bucketId
-        if (elem.fieldNameStringData() == "_id"_sd) {
+        if (elem.fieldNameStringData() == "_id"sv) {
             bucketId = elem;
             continue;
         }
@@ -224,7 +226,7 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
     // Last, compress elements and build compressed bucket
     {
         // Helper to validate compressed data by binary comparing decompressed with original.
-        auto validate = [&](BSONBinData binary, StringData fieldName, auto getField) {
+        auto validate = [&](BSONBinData binary, std::string_view fieldName, auto getField) {
             if (!validateDecompression)
                 return true;
 
@@ -351,7 +353,7 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
 }  // namespace
 
 CompressionResult compressBucket(const BSONObj& bucketDoc,
-                                 StringData timeFieldName,
+                                 std::string_view timeFieldName,
                                  const NamespaceString& ns,
                                  bool validateDecompression) try {
     // Compressing already compressed buckets is a no-op.

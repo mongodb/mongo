@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 
+#include <string_view>
+
 namespace mongo {
 boost::intrusive_ptr<exec::agg::Stage> documentSourceQueueToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSourceQueue) {
@@ -45,7 +47,7 @@ namespace exec::agg {
 
 REGISTER_AGG_STAGE_MAPPING(queueStage, DocumentSourceQueue::id, documentSourceQueueToStageFn);
 
-QueueStage::QueueStage(StringData stageName,
+QueueStage::QueueStage(std::string_view stageName,
                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                        std::deque<GetNextResult> queue)
     : Stage(stageName, pExpCtx), _queue(std::move(queue)) {}

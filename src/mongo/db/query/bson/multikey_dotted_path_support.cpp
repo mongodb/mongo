@@ -41,6 +41,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace multikey_dotted_path_support {
@@ -52,7 +53,7 @@ const BSONElement kNullElt = kNullObj.firstElement();
 
 template <typename BSONElementColl>
 void _extractAllElementsAlongPath(const BSONObj& obj,
-                                  StringData path,
+                                  std::string_view path,
                                   BSONElementColl& elements,
                                   bool expandArrayOnTrailingField,
                                   BSONDepthIndex depth,
@@ -68,8 +69,8 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
                 depth,
                 std::numeric_limits<BSONDepthIndex>::max()),
             depth != std::numeric_limits<BSONDepthIndex>::max());
-        StringData left = path.substr(0, idx);
-        StringData next = path.substr(idx + 1, path.size());
+        std::string_view left = path.substr(0, idx);
+        std::string_view next = path.substr(idx + 1, path.size());
 
         BSONElement e = obj.getField(left);
 
@@ -136,7 +137,7 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
 }  // namespace
 
 void extractAllElementsAlongPath(const BSONObj& obj,
-                                 StringData path,
+                                 std::string_view path,
                                  BSONElementSet& elements,
                                  bool expandArrayOnTrailingField,
                                  MultikeyComponents* arrayComponents) {
@@ -146,7 +147,7 @@ void extractAllElementsAlongPath(const BSONObj& obj,
 }
 
 void extractAllElementsAlongPath(const BSONObj& obj,
-                                 StringData path,
+                                 std::string_view path,
                                  BSONElementMultiSet& elements,
                                  bool expandArrayOnTrailingField,
                                  MultikeyComponents* arrayComponents) {
@@ -161,7 +162,7 @@ namespace {
  * This is the implementation as it existed before SERVER-76875.
  */
 void _extractAllElementsAlongPathLegacy(const BSONObj& obj,
-                                        StringData path,
+                                        std::string_view path,
                                         BSONElementSet& elements,
                                         bool expandArrayOnTrailingField,
                                         BSONDepthIndex depth,
@@ -172,8 +173,8 @@ void _extractAllElementsAlongPathLegacy(const BSONObj& obj,
         size_t idx = path.find('.');
         if (idx != std::string::npos) {
             invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
-            StringData left = path.substr(0, idx);
-            StringData next = path.substr(idx + 1, path.size());
+            std::string_view left = path.substr(0, idx);
+            std::string_view next = path.substr(idx + 1, path.size());
 
             BSONElement e = obj.getField(left);
 
@@ -236,7 +237,7 @@ void _extractAllElementsAlongPathLegacy(const BSONObj& obj,
 }  // namespace
 
 void extractAllElementsAlongPathLegacy_forValidationOnly(const BSONObj& obj,
-                                                         StringData path,
+                                                         std::string_view path,
                                                          BSONElementSet& elements,
                                                          bool expandArrayOnTrailingField,
                                                          MultikeyComponents* arrayComponents) {

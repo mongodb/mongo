@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+
 #include <absl/container/node_hash_map.h>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -34,7 +35,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -57,10 +57,12 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
 namespace auth {
+using namespace std::literals::string_view_literals;
 namespace {
 
 Status checkAuthorizedToGrantPrivilege(AuthorizationSession* authzSession,
@@ -76,7 +78,7 @@ Status checkAuthorizedToGrantPrivilege(AuthorizationSession* authzSession,
         }
     } else if (!authzSession->isAuthorizedForActionsOnResource(
                    ResourcePattern::forDatabaseName(DatabaseNameUtil::deserialize(
-                       targetDb.tenantId(), "admin"_sd, SerializationContext::stateDefault())),
+                       targetDb.tenantId(), "admin"sv, SerializationContext::stateDefault())),
                    ActionType::grantRole)) {
         return Status(ErrorCodes::Unauthorized,
                       "To grant privileges affecting multiple databases or the cluster,"
@@ -152,7 +154,7 @@ Status checkAuthorizedToRevokePrivilege(AuthorizationSession* authzSession,
         }
     } else if (!authzSession->isAuthorizedForActionsOnResource(
                    ResourcePattern::forDatabaseName(DatabaseNameUtil::deserialize(
-                       targetDb.tenantId(), "admin"_sd, SerializationContext::stateDefault())),
+                       targetDb.tenantId(), "admin"sv, SerializationContext::stateDefault())),
                    ActionType::revokeRole)) {
         return Status(ErrorCodes::Unauthorized,
                       "To revoke privileges affecting multiple databases or the cluster,"

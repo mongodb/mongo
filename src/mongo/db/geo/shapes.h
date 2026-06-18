@@ -41,6 +41,7 @@
 #include <cmath>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <s2.h>
@@ -264,7 +265,7 @@ enum CRS {
     STRICT_SPHERE  // WGS84 with strict winding order
 };
 
-inline StringData crsName(CRS crs) {
+inline std::string_view crsName(CRS crs) {
     switch (crs) {
         case UNSET:
             return "UNSET"_sd;

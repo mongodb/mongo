@@ -48,6 +48,7 @@
 #include <utility>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -102,7 +103,7 @@ void appendInputPipeline(StageSpecs perPipeline,
 
 StageSpecs desugarRankFusion(const LiteParsedRankFusion& stage,
                              const NamespaceString& nss,
-                             StringData userCollName) {
+                             std::string_view userCollName) {
     const auto& spec = stage.getSpec();
     const auto& subPipelines = *stage.getSubPipelines();
     const bool includeScoreDetails = spec.getScoreDetails();
@@ -119,7 +120,7 @@ StageSpecs desugarRankFusion(const LiteParsedRankFusion& stage,
     StringMap<double> weights;
     if (const auto& combinationSpec = spec.getCombination()) {
         weights = common_utils::validateWeights(
-            combinationSpec->getWeights(), pipelineNames, "$rankFusion"_sd);
+            combinationSpec->getWeights(), pipelineNames, "$rankFusion"sv);
     }
 
     StageSpecs out;
@@ -195,14 +196,14 @@ size_t rankFusionStageExpander(LiteParsedPipeline* pipeline,
         return index + 1;
     }
     const NamespaceString& nss = pipeline->getOriginalParseNss();
-    StringData userCollName = nss.coll();
+    std::string_view userCollName = nss.coll();
     auto desugared = desugarRankFusion(*rankFusionStage, nss, userCollName);
     return pipeline->replaceStageWith(index, std::move(desugared));
 }
 
 StageSpecs desugarScoreFusion(const LiteParsedScoreFusion& stage,
                               const NamespaceString& nss,
-                              StringData userCollName) {
+                              std::string_view userCollName) {
     const auto& spec = stage.getSpec();
     const auto& subPipelines = *stage.getSubPipelines();
     const bool includeScoreDetails = spec.getScoreDetails();
@@ -220,7 +221,7 @@ StageSpecs desugarScoreFusion(const LiteParsedScoreFusion& stage,
     StringMap<double> weights;
     if (const auto& combinationSpec = spec.getCombination()) {
         if (const auto& weightsObj = combinationSpec->getWeights()) {
-            weights = common_utils::validateWeights(*weightsObj, pipelineNames, "$scoreFusion"_sd);
+            weights = common_utils::validateWeights(*weightsObj, pipelineNames, "$scoreFusion"sv);
         }
     }
 
@@ -292,7 +293,7 @@ size_t scoreFusionStageExpander(LiteParsedPipeline* pipeline,
         return index + 1;
     }
     const NamespaceString& nss = pipeline->getOriginalParseNss();
-    StringData userCollName = nss.coll();
+    std::string_view userCollName = nss.coll();
     auto desugared = desugarScoreFusion(*scoreFusionStage, nss, userCollName);
     return pipeline->replaceStageWith(index, std::move(desugared));
 }

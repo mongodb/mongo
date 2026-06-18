@@ -37,6 +37,8 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <absl/hash/hash.h>
 
 namespace mongo::query_stats {
@@ -183,7 +185,7 @@ TEST_F(FindKeyTest, OriginalQueryShapeHashAbsentWhenNotSet) {
 }
 
 TEST_F(FindKeyTest, DifferentOriginalQueryShapeHashesProduceDifferentKeys) {
-    auto makeKeyWithHash = [](StringData hexHash) {
+    auto makeKeyWithHash = [](std::string_view hexHash) {
         auto expCtx = make_intrusive<ExpressionContextForTest>();
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setFilter(BSON("x" << 1));

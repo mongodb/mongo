@@ -44,6 +44,8 @@
 #include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <absl/container/flat_hash_set.h>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -109,7 +111,7 @@ WriteOpState WriteOp::getWriteState() const {
     return _state;
 }
 
-StringData WriteOp::getWriteStateAsString() const {
+std::string_view WriteOp::getWriteStateAsString() const {
     switch (_state) {
         case WriteOpState_Ready:
             return "Ready";

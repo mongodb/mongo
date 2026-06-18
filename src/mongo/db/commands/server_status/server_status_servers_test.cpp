@@ -44,6 +44,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -62,7 +63,7 @@ using otel::metrics::MetricNames;
  * TODO SERVER-125804: Remove these and make these tests simpler.
  */
 MetricName verifyNotUsedInTest(MetricName name) {
-    static stdx::unordered_set<StringData> usedNames;
+    static stdx::unordered_set<std::string_view> usedNames;
     invariant(usedNames.insert(name.getName()).second);
     return name;
 }
@@ -143,7 +144,7 @@ protected:
                                                  });
     }
 
-    BSONObj getMetricsSection(StringData pathPrefix) {
+    BSONObj getMetricsSection(std::string_view pathPrefix) {
         Service* const service = getServiceContext()->getService();
         ServiceContext::UniqueClient client =
             service->makeClient("ServerStatusServersRoleTestFixture");

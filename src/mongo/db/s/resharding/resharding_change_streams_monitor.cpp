@@ -43,20 +43,23 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(failReshardingChangeStreamsMonitorAfterProcessingBatch);
 MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeStarting);
 MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeReceivingNextBatch);
 MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeKillingCursors);
 
-const StringData kAggregateCommentFieldName = "reshardingChangeStreamsMonitor"_sd;
-const StringData kCommonUUIDFieldName = "commonUUID"_sd;
-const StringData kReshardingUUIDFieldName = "reshardingUUID"_sd;
+const std::string_view kAggregateCommentFieldName = "reshardingChangeStreamsMonitor"sv;
+const std::string_view kCommonUUIDFieldName = "commonUUID"sv;
+const std::string_view kReshardingUUIDFieldName = "reshardingUUID"sv;
 
 const UUID commonUUID = UUID::gen();
 
@@ -460,7 +463,7 @@ ReshardingChangeStreamsMonitor::EventBatch::EventBatch(Role role)
     : _role(role), _createdAt(Date_t::now()) {}
 
 void ReshardingChangeStreamsMonitor::EventBatch::add(const BSONObj& event) {
-    const StringData eventOpType =
+    const std::string_view eventOpType =
         event.getStringField(DocumentSourceChangeStream::kOperationTypeField);
 
     if (eventOpType == DocumentSourceChangeStream::kInsertOpType) {

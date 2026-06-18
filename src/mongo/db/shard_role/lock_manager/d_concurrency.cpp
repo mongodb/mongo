@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/server_feature_flags_gen.h"

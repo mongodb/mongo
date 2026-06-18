@@ -35,6 +35,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -56,7 +58,7 @@ BSONObj parseHint(const BSONElement& element) {
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void serializeHintToBSON(const BSONObj& hint, StringData fieldName, BSONObjBuilder* builder) {
+void serializeHintToBSON(const BSONObj& hint, std::string_view fieldName, BSONObjBuilder* builder) {
     if (hint.isEmpty())
         return;
     builder->append(fieldName, hint);

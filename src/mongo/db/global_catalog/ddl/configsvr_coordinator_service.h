@@ -40,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -49,7 +50,7 @@ class ConfigsvrCoordinator;
 class MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinatorService final
     : public repl::PrimaryOnlyService {
 public:
-    static constexpr StringData kServiceName = "ConfigsvrCoordinatorService"_sd;
+    static constexpr std::string_view kServiceName = "ConfigsvrCoordinatorService"_sd;
 
     explicit ConfigsvrCoordinatorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext) {}
@@ -58,7 +59,7 @@ public:
 
     static ConfigsvrCoordinatorService* getService(OperationContext* opCtx);
 
-    StringData getServiceName() const override {
+    std::string_view getServiceName() const override {
         return kServiceName;
     }
 

@@ -35,10 +35,13 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <string_view>
 #include <vector>
 
 #include <absl/numeric/int128.h>
 #include <boost/optional/optional.hpp>
+
+using namespace std::literals::string_view_literals;
 
 using namespace mongo;
 
@@ -75,7 +78,7 @@ void assertBinaryEqual(char* val, size_t size, int128_t expected) {
     EXPECT_EQ(charPtr[size], unused);
 }
 
-void assertStringEqual(StringData val, int128_t expected) {
+void assertStringEqual(std::string_view val, int128_t expected) {
     boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString(val);
     EXPECT_EQ(*encodeResult, expected);
 
@@ -472,14 +475,14 @@ TEST(Simple8bTypeUtil, LeadingAndTrailingZeros) {
 }
 
 TEST(Simple8bTypeUtil, BaseString) {
-    assertStringEqual("a"_sd, 97);
+    assertStringEqual("a"sv, 97);
 }
 
 TEST(Simple8bTypeUtil, BaseString2Letter) {
     // a = 97 = 01100001
     // b = 98 = 01100010
     // reversed in little endian = 0110000101100010
-    assertStringEqual("ab"_sd, 24930);
+    assertStringEqual("ab"sv, 24930);
 }
 
 TEST(Simple8bTypeUtil, LargeString) {
@@ -489,7 +492,7 @@ TEST(Simple8bTypeUtil, LargeString) {
     // d = 100
     // reversed in little endian = 1100001 01100001 01100001 01100001 01100010 01100010 01100010
     // 01100010 01100011 01100011 01100011 01100011 01100100 01100100 01100100 01100100
-    assertStringEqual("aaaabbbbccccdddd"_sd,
+    assertStringEqual("aaaabbbbccccdddd"sv,
                       absl::MakeInt128(0x6161616162626262, 0x6363636364646464));
 }
 
@@ -506,12 +509,12 @@ TEST(Simple8bTypeUtil, OddCharString) {
 }
 
 TEST(Simple8bTypeUtil, OversizdString) {
-    boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString("aaaaabbbbbcccccdd"_sd);
+    boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString("aaaaabbbbbcccccdd"sv);
     EXPECT_FALSE(encodeResult);
 }
 
 TEST(Simple8bTypeUtil, BrokenString) {
-    StringData val("\0a", 3);
+    std::string_view val("\0a", 3);
     boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString(val);
     EXPECT_FALSE(encodeResult);
 }

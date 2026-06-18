@@ -33,6 +33,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 /*
@@ -57,7 +59,7 @@ constexpr inline auto kCurOpIsNullMsg = "the opCtx's curOp is null"_sd;
  * operation isn't eligible, returns a message indicating why. Otherwise, returns boost::none. For
  * example, this function ensures that the CurOp stack and Command permit the logging.
  */
-boost::optional<StringData> isIneligibleForDiagnosticPrinting(OperationContext* opCtx);
+boost::optional<std::string_view> isIneligibleForDiagnosticPrinting(OperationContext* opCtx);
 
 class MONGO_MOD_PUB CurOpPrinter {
 public:
@@ -70,7 +72,7 @@ public:
 
         Info info = _gatherInfo();
         out = fmt::format_to(out, "{{");
-        auto field = [&, sep = ""_sd](StringData name, const auto& value) mutable {
+        auto field = [&, sep = ""_sd](std::string_view name, const auto& value) mutable {
             out = fmt::format_to(out, "{}'{}': {}", std::exchange(sep, ", "_sd), name, value);
         };
         field("currentOp", info.opDebug);

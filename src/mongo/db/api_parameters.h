@@ -39,6 +39,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
@@ -53,9 +54,9 @@ namespace MONGO_MOD_PUBLIC mongo {
 class APIParameters {
 
 public:
-    static constexpr StringData kAPIVersionFieldName = "apiVersion"_sd;
-    static constexpr StringData kAPIStrictFieldName = "apiStrict"_sd;
-    static constexpr StringData kAPIDeprecationErrorsFieldName = "apiDeprecationErrors"_sd;
+    static constexpr std::string_view kAPIVersionFieldName = "apiVersion"_sd;
+    static constexpr std::string_view kAPIStrictFieldName = "apiStrict"_sd;
+    static constexpr std::string_view kAPIDeprecationErrorsFieldName = "apiDeprecationErrors"_sd;
 
     static const OperationContext::Decoration<APIParameters> get;
     static APIParameters fromClient(const APIParametersFromClient& apiParamsFromClient);
@@ -75,7 +76,7 @@ public:
     void setInfo(CommandType& request) const {
         request.setApiStrict(getAPIStrict());
         if (auto& apiVersion = getAPIVersion()) {
-            request.setApiVersion(StringData(*apiVersion));
+            request.setApiVersion(std::string_view(*apiVersion));
         } else {
             request.setApiVersion(boost::none);
         }
@@ -88,7 +89,7 @@ public:
         return _apiVersion;
     }
 
-    void setAPIVersion(StringData apiVersion) {
+    void setAPIVersion(std::string_view apiVersion) {
         _apiVersion = std::string{apiVersion};
     }
 

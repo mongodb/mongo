@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -63,6 +62,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/cstdint.hpp>
@@ -72,8 +72,9 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-static constexpr auto kBatchSizeFieldName = "batchSize"_sd;
+static constexpr auto kBatchSizeFieldName = "batchSize"sv;
 
 const Document kDefaultCursorOptionDocument{
     {kBatchSizeFieldName, aggregation_request_helper::kDefaultBatchSize}};

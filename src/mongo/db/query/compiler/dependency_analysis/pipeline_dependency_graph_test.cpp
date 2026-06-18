@@ -52,6 +52,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -61,8 +62,11 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+using namespace std::literals::string_view_literals;
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+using namespace std::literals::string_view_literals;
 namespace mongo::pipeline::dependency_graph {
 namespace {
 
@@ -77,7 +81,7 @@ protected:
         pipeline->getContext()->setPathArraynessForNss(pipeline->getContext()->getNamespaceString(),
                                                        pathArrayness);
         stages.assign(pipeline->getSources().begin(), pipeline->getSources().end());
-        canPathBeArray = [this](StringData path) -> bool {
+        canPathBeArray = [this](std::string_view path) -> bool {
             return pipeline->getContext()->canPathBeArrayForNss(
                 FieldRef(path), pipeline->getContext()->getNamespaceString());
         };
@@ -141,14 +145,14 @@ private:
             rawPipeline.push_back(stageElem.embeddedObject());
         }
 
-        const StringData kDBName = "test";
+        const std::string_view kDBName = "test";
         const NamespaceString kTestNss =
             NamespaceString::createNamespaceString_forTest(kDBName, "collection");
 
         auto additionalNs = std::vector<NamespaceString>(
-            {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd),
-             NamespaceString::createNamespaceString_forTest("test.coll_c"_sd),
-             NamespaceString::createNamespaceString_forTest("test2.coll_d"_sd)});
+            {NamespaceString::createNamespaceString_forTest("test.coll_b"sv),
+             NamespaceString::createNamespaceString_forTest("test.coll_c"sv),
+             NamespaceString::createNamespaceString_forTest("test2.coll_d"sv)});
 
         ResolvedNamespaceMap resolvedNs;
         resolvedNs.insert_or_assign(kTestNss, {kTestNss, std::vector<BSONObj>{}});
@@ -2587,7 +2591,7 @@ TEST_F(PipelineDependencyGraphTest, GetConstantStringLiteral) {
     runTest([&] {
         auto c = graph->getConstant(nullptr, "a");
         ASSERT_TRUE(c.has_value());
-        ASSERT_VALUE_EQ(*c, Value("hello"_sd));
+        ASSERT_VALUE_EQ(*c, Value("hello"sv));
     });
 }
 
@@ -2614,7 +2618,7 @@ TEST_F(PipelineDependencyGraphTest, GetConstantObjectLiteralCapturesLeafConstant
 
         auto ac = graph->getConstant(nullptr, "a.c");
         ASSERT_TRUE(ac.has_value());
-        ASSERT_VALUE_EQ(*ac, Value("two"_sd));
+        ASSERT_VALUE_EQ(*ac, Value("two"sv));
     });
 }
 
@@ -2725,7 +2729,7 @@ TEST_F(PipelineDependencyGraphTest, GetConstantLiteralExpression) {
     runTest([&] {
         auto a = graph->getConstant(nullptr, "a");
         ASSERT_TRUE(a.has_value());
-        ASSERT_VALUE_EQ(*a, Value("$x"_sd));
+        ASSERT_VALUE_EQ(*a, Value("$x"sv));
     });
 }
 

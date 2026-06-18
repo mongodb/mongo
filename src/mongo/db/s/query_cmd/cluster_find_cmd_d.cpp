@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -46,17 +45,19 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the cluster find command on mongod.
  */
 struct ClusterFindCmdD {
     using Request = FindCommandRequest;
-    static constexpr StringData kCommandName = "clusterFind"_sd;
+    static constexpr std::string_view kCommandName = "clusterFind"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;

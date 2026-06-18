@@ -37,6 +37,8 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/options_parser/startup_options.h"
 
+#include <string_view>
+
 #include <absl/strings/str_split.h>
 #include <boost/filesystem/operations.hpp>
 
@@ -51,7 +53,7 @@ using std::string;
 SSLParams sslGlobalParams;
 
 namespace {
-std::vector<uint8_t> hexToVector(StringData hex) {
+std::vector<uint8_t> hexToVector(std::string_view hex) {
     try {
         std::string data = hexblob::decode(hex);
         return std::vector<uint8_t>(data.begin(), data.end());
@@ -118,8 +120,8 @@ Status storeSSLDisabledProtocols(const std::string& disabledProtocols,
 }
 
 Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
-                                StringData name,
-                                StringData value) {
+                                std::string_view name,
+                                std::string_view value) {
     selector->subject.clear();
     selector->thumbprint.clear();
 
@@ -152,7 +154,7 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
     return Status::OK();
 }
 
-StatusWith<SSLParams::SSLModes> SSLParams::sslModeParse(StringData strMode) {
+StatusWith<SSLParams::SSLModes> SSLParams::sslModeParse(std::string_view strMode) {
     if (strMode == "disabled") {
         return SSLParams::SSLMode_disabled;
     } else if (strMode == "allowSSL") {
@@ -170,7 +172,7 @@ StatusWith<SSLParams::SSLModes> SSLParams::sslModeParse(StringData strMode) {
     }
 }
 
-StatusWith<SSLParams::SSLModes> SSLParams::tlsModeParse(StringData strMode) {
+StatusWith<SSLParams::SSLModes> SSLParams::tlsModeParse(std::string_view strMode) {
     if (strMode == "disabled") {
         return SSLParams::SSLMode_disabled;
     } else if (strMode == "allowTLS") {

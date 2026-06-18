@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -70,7 +71,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalAllCollectionStats,
                            documentSourceInternalAllCollectionStatsToStageFn)
 
 InternalAllCollectionStatsStage::InternalAllCollectionStatsStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     DocumentSourceInternalAllCollectionStatsSpec internalAllCollectionStatsSpec,
     const boost::intrusive_ptr<DocumentSourceMatch>& absorbedMatch,

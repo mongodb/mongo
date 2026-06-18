@@ -29,7 +29,6 @@
 
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -102,6 +101,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -133,7 +133,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeListCollections);
  * Note the collection names returned are not guaranteed to exist, nor are they guaranteed to
  * match 'matcher'.
  */
-boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* matcher) {
+boost::optional<vector<std::string_view>> _getExactNameMatches(const MatchExpression* matcher) {
     if (!matcher) {
         return {};
     }
@@ -142,19 +142,19 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
     if (matchType == MatchExpression::EQ) {
         auto eqMatch = checked_cast<const EqualityMatchExpression*>(matcher);
         if (eqMatch->path() == "name") {
-            StringData name(eqMatch->getData().valueStringDataSafe());
+            std::string_view name(eqMatch->getData().valueStringDataSafe());
             if (name.size()) {
-                return {vector<StringData>{name}};
+                return {vector<std::string_view>{name}};
             } else {
-                return vector<StringData>();
+                return vector<std::string_view>();
             }
         }
     } else if (matchType == MatchExpression::MATCH_IN) {
         auto matchIn = checked_cast<const InMatchExpression*>(matcher);
         if (matchIn->path() == "name" && matchIn->getRegexes().empty()) {
-            vector<StringData> exactMatches;
+            vector<std::string_view> exactMatches;
             for (auto&& elem : matchIn->getEqualities()) {
-                StringData name(elem.valueStringDataSafe());
+                std::string_view name(elem.valueStringDataSafe());
                 if (name.size()) {
                     exactMatches.push_back(elem.valueStringData());
                 }

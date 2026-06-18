@@ -65,6 +65,7 @@
 #include <list>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 
 #include <absl/container/node_hash_map.h>
@@ -265,7 +266,7 @@ Status compressAndWriteBucket(OperationContext* opCtx,
                               BucketCatalog& catalog,
                               const Collection* bucketsColl,
                               const BucketId& uncompressedBucketId,
-                              StringData timeField,
+                              std::string_view timeField,
                               const CompressAndWriteBucketFunc& compressAndWriteBucketFunc) {
     try {
         LOGV2(8654200,

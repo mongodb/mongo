@@ -35,7 +35,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/timestamp.h"
@@ -89,6 +88,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -97,6 +97,7 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 // Failpoint which causes the initial sync function to hang after getting the oldest active
 // transaction timestamp from the sync source.
@@ -2799,36 +2800,36 @@ BSONObj InitialSyncSummaryStats::getReport() const {
     return bob.obj();
 }
 
-StringData InitialSyncer::phaseToString(Phase phase) {
+std::string_view InitialSyncer::phaseToString(Phase phase) {
     switch (phase) {
         case Phase::kNotStarted:
-            return "notStarted"_sd;
+            return "notStarted"sv;
         case Phase::kUntracked:
-            return "untracked"_sd;
+            return "untracked"sv;
         case Phase::kInitializing:
-            return "initializing"_sd;
+            return "initializing"sv;
         case Phase::kSelectingSyncSource:
-            return "selectingSyncSource"_sd;
+            return "selectingSyncSource"sv;
         case Phase::kPreparingStorage:
-            return "preparingStorage"_sd;
+            return "preparingStorage"sv;
         case Phase::kCheckingSourceRollback:
-            return "checkingSourceRollback"_sd;
+            return "checkingSourceRollback"sv;
         case Phase::kDeterminingStartOpTime:
-            return "determiningStartOpTime"_sd;
+            return "determiningStartOpTime"sv;
         case Phase::kFetchingFCV:
-            return "fetchingFCV"_sd;
+            return "fetchingFCV"sv;
         case Phase::kWaitingForSyncSourceStableTs:
-            return "waitingForSyncSourceStableTs"_sd;
+            return "waitingForSyncSourceStableTs"sv;
         case Phase::kCloningData:
-            return "cloningData"_sd;
+            return "cloningData"sv;
         case Phase::kDeterminingStopTimestamp:
-            return "determiningStopTimestamp"_sd;
+            return "determiningStopTimestamp"sv;
         case Phase::kApplyingOplog:
-            return "applyingOplog"_sd;
+            return "applyingOplog"sv;
         case Phase::kCheckingFinalRollback:
-            return "checkingFinalRollback"_sd;
+            return "checkingFinalRollback"sv;
         case Phase::kComplete:
-            return "complete"_sd;
+            return "complete"sv;
     }
     MONGO_UNREACHABLE;
 }

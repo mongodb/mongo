@@ -44,6 +44,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -51,6 +52,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /*
  * $_internalStreamingGroup is an internal stage that is only used in certain cases by the
@@ -66,9 +68,9 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalStreamingGroup,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalStreamingGroup, DocumentSourceStreamingGroup::id)
 
-constexpr StringData DocumentSourceStreamingGroup::kStageName;
+constexpr std::string_view DocumentSourceStreamingGroup::kStageName;
 
-StringData DocumentSourceStreamingGroup::getSourceName() const {
+std::string_view DocumentSourceStreamingGroup::getSourceName() const {
     return kStageName;
 }
 
@@ -130,7 +132,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
                 "if there is no explicit id fields, " + std::string{kMonotonicIdFieldsSpecField} +
                     " must contain a single \"_id\" string",
                 monotonicIdFields.size() == 1 &&
-                    monotonicIdFields[0].valueStringDataSafe() == "_id"_sd);
+                    monotonicIdFields[0].valueStringDataSafe() == "_id"sv);
         groupStage->_monotonicExpressionIndexes.push_back(0);
     } else {
         groupStage->_monotonicExpressionIndexes.reserve(monotonicIdFields.size());
@@ -138,7 +140,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
             uassert(7026704,
                     std::string{kMonotonicIdFieldsSpecField} + " elements must be strings",
                     fieldNameElem.type() == BSONType::string);
-            StringData fieldName = fieldNameElem.valueStringData();
+            std::string_view fieldName = fieldNameElem.valueStringData();
             auto it = std::find(idFieldNames.begin(), idFieldNames.end(), fieldName);
             uassert(7026705, "id field not found", it != idFieldNames.end());
             groupStage->_monotonicExpressionIndexes.push_back(
@@ -165,7 +167,7 @@ void DocumentSourceStreamingGroup::serializeAdditionalFields(
     out[kMonotonicIdFieldsSpecField] = Value(std::move(monotonicIdFields));
 }
 
-bool DocumentSourceStreamingGroup::isSpecFieldReserved(StringData fieldName) {
+bool DocumentSourceStreamingGroup::isSpecFieldReserved(std::string_view fieldName) {
     return fieldName == kMonotonicIdFieldsSpecField;
 }
 

@@ -42,6 +42,7 @@
 
 #include <functional>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -79,7 +80,7 @@ namespace mongo {
  */
 class DocumentSourceInternalDocumentResultsAndMetadata final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalDocumentResultsAndMetadata"_sd;
+    static constexpr std::string_view kStageName = "$_internalDocumentResultsAndMetadata"_sd;
 
     // Sort pattern for merge-sorting the document results stream across shards, and the
     // merge pipeline for the metadata stream on the router. Provided by the configured
@@ -104,7 +105,7 @@ public:
         boost::optional<MetadataBindSpec> metadata,
         bool returnCursor = false);
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

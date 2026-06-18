@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/namespace_string.h"
@@ -45,6 +44,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -87,7 +87,7 @@ public:
     /*
      * ActionsStreamPolicy overridden methods.
      */
-    StringData getName() const override;
+    std::string_view getName() const override;
     boost::optional<BalancerStreamAction> getNextStreamingAction(OperationContext* opCtx) override;
     void applyActionResult(OperationContext* opCtx,
                            const BalancerStreamAction& action,

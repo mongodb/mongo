@@ -38,19 +38,22 @@
 #include "mongo/unittest/framework.h"
 
 #include <memory>
+#include <string_view>
 #include <tuple>
 
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
+
 const QueryKnobRegistry& registry() {
     return QueryKnobRegistry::instance();
 }
 
 struct QueryKnobAnnotationArgs {
-    boost::optional<StringData> wireName;
+    boost::optional<std::string_view> wireName;
     boost::optional<bool> pqsSettable;
-    boost::optional<StringData> minFcv;
+    boost::optional<std::string_view> minFcv;
 };
 BSONObj annotations(QueryKnobAnnotationArgs args) {
     BSONObjBuilder builder;
@@ -71,7 +74,7 @@ BSONObj annotations(QueryKnobAnnotationArgs args) {
 }
 
 template <typename T>
-auto createDummyServerParameter(StringData paramName, BSONObj annotations) {
+auto createDummyServerParameter(std::string_view paramName, BSONObj annotations) {
     using Storage = AtomicWord<T>;
     using SPT = IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, Storage>;
     static Storage atomic;
@@ -89,7 +92,7 @@ QueryKnobRegistry::Entry createDummyKnobEntry(ServerParameter* sp, QueryKnobId i
 // -----------------------------------------------------------------------------
 
 TEST(QueryKnobRegistryTest, PqsKnobIsFindableByWireName) {
-    auto id = registry().getKnobIdForName("testIntKnobWire"_sd);
+    auto id = registry().getKnobIdForName("testIntKnobWire"sv);
     ASSERT_TRUE(id.has_value());
     ASSERT_EQ(*id, test_knobs::testIntKnob.id);
     const auto& entry = registry().entry(*id);
@@ -97,14 +100,14 @@ TEST(QueryKnobRegistryTest, PqsKnobIsFindableByWireName) {
 }
 
 TEST(QueryKnobRegistryTest, NonPqsKnobInvisibleToLookupButCarriesWireName) {
-    ASSERT_EQ(registry().getKnobIdForName("testDoubleKnobWire"_sd), boost::none);
+    ASSERT_EQ(registry().getKnobIdForName("testDoubleKnobWire"sv), boost::none);
     const auto& entry = registry().entry(test_knobs::testDoubleKnob.id);
-    ASSERT_EQ(entry.wireName, "testDoubleKnobWire"_sd);
+    ASSERT_EQ(entry.wireName, "testDoubleKnobWire"sv);
     ASSERT_FALSE(entry.pqsSettable);
 }
 
 TEST(QueryKnobRegistryTest, PlainServerParameterNotRegistered) {
-    ASSERT_FALSE(registry().getKnobIdForName("testPlainParam"_sd).has_value());
+    ASSERT_FALSE(registry().getKnobIdForName("testPlainParam"sv).has_value());
     auto* plain = ServerParameterSet::getNodeParameterSet()->getIfExists("testPlainParam");
     ASSERT(plain);
     for (auto&& entry : registry().entries()) {
@@ -114,11 +117,11 @@ TEST(QueryKnobRegistryTest, PlainServerParameterNotRegistered) {
 
 TEST(QueryKnobRegistryTest, MinFcvRoundTrip) {
     const auto& reg = QueryKnobRegistry::instance();
-    auto id = reg.getKnobIdForName("testIntKnobWire"_sd);
+    auto id = reg.getKnobIdForName("testIntKnobWire"sv);
     ASSERT_TRUE(id.has_value());
     const auto& e = reg.entry(*id);
     ASSERT_TRUE(e.minFcv.has_value());
-    ASSERT_EQ(*e.minFcv, multiversion::parseVersionForFeatureFlags("9.0"_sd));
+    ASSERT_EQ(*e.minFcv, multiversion::parseVersionForFeatureFlags("9.0"sv));
 }
 
 TEST(QueryKnobRegistryTest, DenseIndicesKnobs) {
@@ -168,15 +171,15 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  "duplicate wire name.*dup") {
     auto paramA = createDummyServerParameter<bool>("dupParamA",
                                                    annotations({
-                                                       .wireName = "dup"_sd,
+                                                       .wireName = "dup"sv,
                                                        .pqsSettable = true,
-                                                       .minFcv = "9.0"_sd,
+                                                       .minFcv = "9.0"sv,
                                                    }));
     auto paramB = createDummyServerParameter<bool>("dupParamB",
                                                    annotations({
-                                                       .wireName = "dup"_sd,
+                                                       .wireName = "dup"sv,
                                                        .pqsSettable = true,
-                                                       .minFcv = "9.0"_sd,
+                                                       .minFcv = "9.0"sv,
                                                    }));
     QueryKnobRegistry registry{{
         createDummyKnobEntry(paramA.get(), QueryKnobId(0)),
@@ -189,7 +192,7 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  "wire name must not be empty") {
     auto param = createDummyServerParameter<bool>("emptyWireNameParam",
                                                   annotations({
-                                                      .wireName = ""_sd,
+                                                      .wireName = ""sv,
                                                   }));
     std::ignore = createDummyKnobEntry(param.get());
 }
@@ -199,7 +202,7 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  "PQS knob.*pqsKnobWithNoFcv.*requires minFcv") {
     auto param = createDummyServerParameter<bool>("pqsKnobWithNoFcv",
                                                   annotations({
-                                                      .wireName = "foo"_sd,
+                                                      .wireName = "foo"sv,
                                                       .pqsSettable = true,
                                                   }));
     std::ignore = createDummyKnobEntry(param.get());
@@ -224,9 +227,9 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  "fcv.min 'nope'.*foo.*not a valid FCV") {
     auto param = createDummyServerParameter<bool>("pqsKnobWithNoFcv",
                                                   annotations({
-                                                      .wireName = "foo"_sd,
+                                                      .wireName = "foo"sv,
                                                       .pqsSettable = true,
-                                                      .minFcv = "nope"_sd,
+                                                      .minFcv = "nope"sv,
                                                   }));
     std::ignore = createDummyKnobEntry(param.get());
 }
@@ -238,9 +241,9 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  "fcv.min '5.0'.*foo.*not a valid FCV") {
     auto param = createDummyServerParameter<bool>("oldFcvKnob",
                                                   annotations({
-                                                      .wireName = "foo"_sd,
+                                                      .wireName = "foo"sv,
                                                       .pqsSettable = true,
-                                                      .minFcv = "5.0"_sd,
+                                                      .minFcv = "5.0"sv,
                                                   }));
     std::ignore = createDummyKnobEntry(param.get());
 }
@@ -250,15 +253,15 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  "paramC.*has a query_knob annotation but no matching QueryKnob") {
     auto paramA = createDummyServerParameter<bool>("paramA",
                                                    annotations({
-                                                       .wireName = "paramA"_sd,
+                                                       .wireName = "paramA"sv,
                                                    }));
     auto paramB = createDummyServerParameter<bool>("paramB",
                                                    annotations({
-                                                       .wireName = "paramB"_sd,
+                                                       .wireName = "paramB"sv,
                                                    }));
     auto paramC = createDummyServerParameter<bool>("paramC",
                                                    annotations({
-                                                       .wireName = "paramC"_sd,
+                                                       .wireName = "paramC"sv,
                                                    }));
     std::vector entries = {
         createDummyKnobEntry(paramA.get(), QueryKnobId(0)),

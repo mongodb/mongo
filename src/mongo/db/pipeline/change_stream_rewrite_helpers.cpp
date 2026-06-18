@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +50,7 @@
 #include <array>
 #include <cstddef>
 #include <functional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -74,6 +74,7 @@ using AggExpressionRewrite =
                                                    std::vector<BSONObj>&)>;
 
 namespace {
+using namespace std::literals::string_view_literals;
 const auto kExistsTrue = Document{{"$exists", true}};
 
 // Note: there is no physical '$exists' operator that can check for field-nonexistence.
@@ -83,36 +84,36 @@ const auto kExistsFalse = Document{{"$exists", false}};
 
 // Maps the operation type to the corresponding rewritten document in the oplog format.
 const StringMap<Document> kOpTypeRewriteMap = {
-    {"insert", {{"op", "i"_sd}}},
-    {"delete", {{"op", "d"_sd}}},
-    {"update", {{"op", "u"_sd}, {"o._id"_sd, kExistsFalse}}},
-    {"replace", {{"op", "u"_sd}, {"o._id"_sd, kExistsTrue}}},
-    {"drop", {{"op", "c"_sd}, {"o.drop"_sd, kExistsTrue}}},
-    {"create", {{"op", "c"_sd}, {"o.create"_sd, kExistsTrue}}},
+    {"insert", {{"op", "i"sv}}},
+    {"delete", {{"op", "d"sv}}},
+    {"update", {{"op", "u"sv}, {"o._id"sv, kExistsFalse}}},
+    {"replace", {{"op", "u"sv}, {"o._id"sv, kExistsTrue}}},
+    {"drop", {{"op", "c"sv}, {"o.drop"sv, kExistsTrue}}},
+    {"create", {{"op", "c"sv}, {"o.create"sv, kExistsTrue}}},
     {"createIndexes",
-     {{"op", "c"_sd},
-      {"$or"_sd,
-       std::vector<Value>{Value({{"o.createIndexes"_sd, kExistsTrue}}),
-                          Value({{"o.commitIndexBuild"_sd, kExistsTrue}})}}}},
-    {"startIndexBuild", {{"op", "c"_sd}, {"o.startIndexBuild"_sd, kExistsTrue}}},
-    {"abortIndexBuild", {{"op", "c"_sd}, {"o.abortIndexBuild"_sd, kExistsTrue}}},
-    {"dropIndexes", {{"op", "c"_sd}, {"o.dropIndexes"_sd, kExistsTrue}}},
-    {"modify", {{"op", "c"_sd}, {"o.collMod"_sd, kExistsTrue}}},
+     {{"op", "c"sv},
+      {"$or"sv,
+       std::vector<Value>{Value({{"o.createIndexes"sv, kExistsTrue}}),
+                          Value({{"o.commitIndexBuild"sv, kExistsTrue}})}}}},
+    {"startIndexBuild", {{"op", "c"sv}, {"o.startIndexBuild"sv, kExistsTrue}}},
+    {"abortIndexBuild", {{"op", "c"sv}, {"o.abortIndexBuild"sv, kExistsTrue}}},
+    {"dropIndexes", {{"op", "c"sv}, {"o.dropIndexes"sv, kExistsTrue}}},
+    {"modify", {{"op", "c"sv}, {"o.collMod"sv, kExistsTrue}}},
 
     {"rename",
-     {{"op", "c"_sd},
-      {"$or"_sd,
-       std::vector<Value>{Value({{"o.renameCollection"_sd, kExistsTrue}}),
-                          Value({{"o.upgradeDowngradeViewlessTimeseries"_sd, kExistsTrue}})}}}},
+     {{"op", "c"sv},
+      {"$or"sv,
+       std::vector<Value>{Value({{"o.renameCollection"sv, kExistsTrue}}),
+                          Value({{"o.upgradeDowngradeViewlessTimeseries"sv, kExistsTrue}})}}}},
 
-    {"dropDatabase", {{"op", "c"_sd}, {"o.dropDatabase"_sd, kExistsTrue}}}};
+    {"dropDatabase", {{"op", "c"sv}, {"o.dropDatabase"sv, kExistsTrue}}}};
 
 // $exists and null-equality checks on 'updateDescription' or its immediate subfields are AlwaysTrue
 // or AlwaysFalse, since these fields are always present in the update event.
-const std::set<StringData> kUpdateExistentFields = {"updateDescription",
-                                                    "updateDescription.updatedFields",
-                                                    "updateDescription.removedFields",
-                                                    "updateDescription.truncatedArrays"};
+const std::set<std::string_view> kUpdateExistentFields = {"updateDescription",
+                                                          "updateDescription.updatedFields",
+                                                          "updateDescription.removedFields",
+                                                          "updateDescription.truncatedArrays"};
 
 // The oplog field corresponding to "updateDescription.updatedFields" can be in any one of three
 // locations. We will attempt to construct a filter to match against them all.
@@ -130,9 +131,8 @@ const std::set<std::string> kNSValidSubFieldNames = {"ns.db", "ns.coll"};
 /**
  * Whether or not a change stream event type is a CRUD operation.
  */
-bool isCrudOperation(StringData name) {
-    return name == "insert"_sd || name == "update"_sd || name == "replace"_sd ||
-        name == "delete"_sd;
+bool isCrudOperation(std::string_view name) {
+    return name == "insert"sv || name == "update"sv || name == "replace"sv || name == "delete"sv;
 }
 
 /**
@@ -223,7 +223,7 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
 
             // First collect all requested operation types in a vector. The operation types in the
             // IN list should be sorted and unique already.
-            std::vector<StringData> operationTypes;
+            std::vector<std::string_view> operationTypes;
             for (const auto& elem : inME->getEqualities()) {
                 // Abandon the entire rewrite if any of the rewrites fails.
                 if (BSONType::string == elem.type() &&
@@ -233,20 +233,21 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
             }
 
             // Sort the collection operation types so that CRUD operations come first.
-            std::sort(
-                operationTypes.begin(), operationTypes.end(), [&](StringData lhs, StringData rhs) {
-                    bool lhsIsCrud = isCrudOperation(lhs);
-                    bool rhsIsCrud = isCrudOperation(rhs);
-                    if (lhsIsCrud != rhsIsCrud) {
-                        // If one of the compared operations is a CRUD operation and the other
-                        // isn't, sort the CRUD operation first because it should have higher
-                        // selectivity.
-                        return lhsIsCrud;
-                    }
+            std::sort(operationTypes.begin(),
+                      operationTypes.end(),
+                      [&](std::string_view lhs, std::string_view rhs) {
+                          bool lhsIsCrud = isCrudOperation(lhs);
+                          bool rhsIsCrud = isCrudOperation(rhs);
+                          if (lhsIsCrud != rhsIsCrud) {
+                              // If one of the compared operations is a CRUD operation and the other
+                              // isn't, sort the CRUD operation first because it should have higher
+                              // selectivity.
+                              return lhsIsCrud;
+                          }
 
-                    // Otherwise sort alphabetically by operation type name so the
-                    return lhs < rhs;
-                });
+                          // Otherwise sort alphabetically by operation type name so the
+                          return lhs < rhs;
+                      });
 
             // The individual matches for "update" and "replace" are:
             // - update:  {op: "u", "o._id": {$exists: false}}
@@ -256,7 +257,7 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
             // This also allows further optimizations so that the single op type match can be fused
             // with other op type matches into a single IN list match for the op type, e.g.
             //            {op: {$in: [...]}}
-            constexpr StringData kFusedUpdateReplace = "fusedUpdateReplace"_sd;
+            constexpr std::string_view kFusedUpdateReplace = "fusedUpdateReplace"sv;
 
             auto itUpdate = std::find(operationTypes.begin(), operationTypes.end(), "update");
             auto itReplace = std::find(operationTypes.begin(), operationTypes.end(), "replace");
@@ -326,7 +327,7 @@ const BSONObj& getOperationTypeRewriteExpressionBSON() {
         opCases.push_back(BSON("case" << BSON("$ne" << BSON_ARRAY("$op" << "c")) << "then"
                                       << "$$REMOVE"));
 
-        constexpr std::array<std::pair<StringData, StringData>, 10> kCommandOpCases = {
+        constexpr std::array<std::pair<std::string_view, std::string_view>, 10> kCommandOpCases = {
             std::make_pair("$o.drop", "drop"),
             std::make_pair("$o.create", "create"),
             std::make_pair("$o.dropDatabase", "dropDatabase"),
@@ -400,11 +401,11 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
 
     // Helper to generate a filter on the 'op' field for the specified type. This filter will also
     // include a copy of 'predicate' with the path renamed to apply to the oplog.
-    auto generateFilterForOp = [&](StringData op, const StringMap<std::string>& renameList) {
+    auto generateFilterForOp = [&](std::string_view op, const StringMap<std::string>& renameList) {
         auto renamedPredicate = cloneWithSubstitution(predicate, renameList);
 
         auto andExpr = std::make_unique<AndMatchExpression>();
-        andExpr->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value(op)));
+        andExpr->add(std::make_unique<EqualityMatchExpression>("op"sv, Value(op)));
         andExpr->add(std::move(renamedPredicate));
         return andExpr;
     };
@@ -423,9 +424,9 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
     }
 
     // Handle update, replace, delete and insert. The predicate path can simply be renamed.
-    rewrittenPredicate->add(generateFilterForOp("u"_sd, {{"documentKey", "o2"}}));
-    rewrittenPredicate->add(generateFilterForOp("d"_sd, {{"documentKey", "o"}}));
-    rewrittenPredicate->add(generateFilterForOp("i"_sd, {{"documentKey", "o2"}}));
+    rewrittenPredicate->add(generateFilterForOp("u"sv, {{"documentKey", "o2"}}));
+    rewrittenPredicate->add(generateFilterForOp("d"sv, {{"documentKey", "o"}}));
+    rewrittenPredicate->add(generateFilterForOp("i"sv, {{"documentKey", "o2"}}));
 
     return rewrittenPredicate;
 }
@@ -521,9 +522,9 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
     // Handle the case of non-replacement update entries. For the general case, we cannot apply the
     // predicate and must return all such events.
     auto updateCase = std::make_unique<AndMatchExpression>();
-    updateCase->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
+    updateCase->add(std::make_unique<EqualityMatchExpression>("op"sv, Value("u"sv)));
     updateCase->add(
-        std::make_unique<NotMatchExpression>(std::make_unique<ExistsMatchExpression>("o._id"_sd)));
+        std::make_unique<NotMatchExpression>(std::make_unique<ExistsMatchExpression>("o._id"sv)));
     rewrittenPredicate->add(std::move(updateCase));
 
     // Handle the case of insert and replacement entries. We can always apply the predicate in these
@@ -546,7 +547,7 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
     // Handle the case of delete and non-CRUD events. The 'fullDocument' field never exists for such
     // events, so we evaluate the predicate against a non-existent field to see whether it matches.
     if (exec::matcher::matchesSingleElement(predicate, {})) {
-        auto deleteCase = std::make_unique<EqualityMatchExpression>("op"_sd, Value("d"_sd));
+        auto deleteCase = std::make_unique<EqualityMatchExpression>("op"sv, Value("d"sv));
         rewrittenPredicate->add(std::move(deleteCase));
 
         auto nonCRUDCase = MatchExpressionParser::parseAndNormalize(
@@ -608,7 +609,7 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
         //     ]}
         //   ]}
         if (predicate->fieldRef()->numParts() == 3 &&
-            predicate->fieldRef()->getPart(1) == "updatedFields"_sd) {
+            predicate->fieldRef()->getPart(1) == "updatedFields"sv) {
             // If this predicate matches against a missing field, then we must apply an $and to all
             // three potential locations, since at least two of them will always be missing. If not,
             // then we build an $or to match if the field is present at any of the locations.
@@ -657,7 +658,7 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
         //     ]}
         //   ]}
         if (predicate->fieldRef()->numParts() == 2 &&
-            predicate->fieldRef()->getPart(1) == "removedFields"_sd) {
+            predicate->fieldRef()->getPart(1) == "removedFields"sv) {
             // Helper to rewrite an equality on "updateDescription.removedFields" into the oplog.
             auto rewriteEqOnRemovedFields = [](auto& rhsElem) -> std::unique_ptr<MatchExpression> {
                 // We can only rewrite equality matches on strings.
@@ -676,7 +677,7 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
                 // not need to check whether the predicate matches a missing field in this case.
                 for (auto&& oplogField : kUpdateDescriptionRemoveOplogFields) {
                     rewrittenEquality->add(std::make_unique<ExistsMatchExpression>(
-                        StringData(fmt::format("{}.{}", oplogField, fieldName))));
+                        std::string_view(fmt::format("{}.{}", oplogField, fieldName))));
                 }
                 return rewrittenEquality;
             };
@@ -735,9 +736,9 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
     // inexact rewrite is permissible. First write a predicate to check that this is an update
     // that is not a full-document replacement, i.e. {op: "u", "o._id": {$exists: false}}.
     std::unique_ptr<ListOfMatchExpression> finalPredicate = std::make_unique<AndMatchExpression>();
-    finalPredicate->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
+    finalPredicate->add(std::make_unique<EqualityMatchExpression>("op"sv, Value("u"sv)));
     finalPredicate->add(
-        std::make_unique<NotMatchExpression>(std::make_unique<ExistsMatchExpression>("o._id"_sd)));
+        std::make_unique<NotMatchExpression>(std::make_unique<ExistsMatchExpression>("o._id"sv)));
 
     // If we were able to rewrite the user predicate, add it into the final predicate.
     if (rewrittenUserPredicate) {
@@ -775,9 +776,9 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
 std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const PathMatchExpression* predicate,
-    StringData nsField,
+    std::string_view nsField,
     bool nsFieldIsCmdNs = false,
-    boost::optional<StringData> collNameField = boost::none) {
+    boost::optional<std::string_view> collNameField = boost::none) {
     // A collection name can only be specified with 'nsFieldIsCmdNs' set to true.
     tassert(5554100,
             "Cannot specify 'collNameField' with 'nsFieldIsCmdNs' set to false",
@@ -1069,7 +1070,7 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
     //
 
     // CRUD ops are rewritten to the 'ns' field that contains a full namespace string.
-    auto crudNsRewrite = matchRewriteGenericNamespace(expCtx, predicate, "ns"_sd);
+    auto crudNsRewrite = matchRewriteGenericNamespace(expCtx, predicate, "ns"sv);
 
     // If we can't rewrite this predicate for CRUD operations, then we don't expect to be able to
     // rewrite it for any other operations either.
@@ -1091,72 +1092,72 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
     auto cmdCases = std::make_unique<OrMatchExpression>();
 
     // The 'rename' event is rewritten to a field that contains the full namespace string.
-    auto renameNsRewrite = matchRewriteGenericNamespace(expCtx, predicate, "o.renameCollection"_sd);
+    auto renameNsRewrite = matchRewriteGenericNamespace(expCtx, predicate, "o.renameCollection"sv);
     tassert(5554103, "Unexpected rewrite failure", renameNsRewrite);
     cmdCases->add(std::move(renameNsRewrite));
 
     // The 'drop' event is rewritten to the cmdNs in 'ns' and the collection name in 'o.drop'.
     auto dropNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.drop"_sd);
+        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.drop"sv);
     tassert(5554104, "Unexpected rewrite failure", dropNsRewrite);
     cmdCases->add(std::move(dropNsRewrite));
 
     // The 'create' event is rewritten to the cmdNs in 'ns' and the collection name in 'o.create'.
     auto createNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.create"_sd);
+        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.create"sv);
     tassert(6280101, "Unexpected rewrite failure", createNsRewrite);
     cmdCases->add(std::move(createNsRewrite));
 
     // The 'createIndexes' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.createIndexes'.
     auto createIndexesNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.createIndexes"_sd);
+        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.createIndexes"sv);
     tassert(6339400, "Unexpected rewrite failure", createIndexesNsRewrite);
     cmdCases->add(std::move(createIndexesNsRewrite));
 
     // The 'commitIndexBuild' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.commitIndexBuild'.
     auto commitIndexBuildNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.commitIndexBuild"_sd);
+        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.commitIndexBuild"sv);
     tassert(6339401, "Unexpected rewrite failure", commitIndexBuildNsRewrite);
     cmdCases->add(std::move(commitIndexBuildNsRewrite));
 
     // The 'startIndexBuild' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.startIndexBuild'.
     auto startIndexBuildNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.startIndexBuild"_sd);
+        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.startIndexBuild"sv);
     tassert(9315300, "Unexpected rewrite failure", startIndexBuildNsRewrite);
     cmdCases->add(std::move(startIndexBuildNsRewrite));
 
     // The 'abortIndexBuild' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.abortIndexBuild'.
     auto abortIndexBuildNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.abortIndexBuild"_sd);
+        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.abortIndexBuild"sv);
     tassert(9315400, "Unexpected rewrite failure", abortIndexBuildNsRewrite);
     cmdCases->add(std::move(abortIndexBuildNsRewrite));
 
     // The 'dropIndexes' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.dropIndexes'.
     auto dropIndexesNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.dropIndexes"_sd);
+        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.dropIndexes"sv);
     tassert(6339402, "Unexpected rewrite failure", dropIndexesNsRewrite);
     cmdCases->add(std::move(dropIndexesNsRewrite));
 
     // The 'modify' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.collMod'.
     auto collModNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.collMod"_sd);
+        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.collMod"sv);
     tassert(6316200, "Unexpected rewrite failure", collModNsRewrite);
     cmdCases->add(std::move(collModNsRewrite));
 
     // The 'dropDatabase' event is rewritten to the cmdNs in 'ns'. It does not have a collection
     // field.
     auto dropDbNsRewrite =
-        matchRewriteGenericNamespace(expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */);
+        matchRewriteGenericNamespace(expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */);
     tassert(5554105, "Unexpected rewrite failure", dropDbNsRewrite);
     auto andDropDbNsRewrite = std::make_unique<AndMatchExpression>(std::move(dropDbNsRewrite));
     andDropDbNsRewrite->add(
-        std::make_unique<EqualityMatchExpression>("o.dropDatabase"_sd, Value(1)));
+        std::make_unique<EqualityMatchExpression>("o.dropDatabase"sv, Value(1)));
     cmdCases->add(std::move(andDropDbNsRewrite));
 
     // Create the final namespace filter for {op: 'c'} operations.
@@ -1185,7 +1186,7 @@ const BSONObj& getNSCollRewriteExpressionBSON() {
     const static BSONObj rewriteExpression = []() -> BSONObj {
         // Helper function to extract the collection name from a given field, using the known
         // $$dbName.
-        auto getCollFromNSField = [](StringData fieldName) -> BSONObj {
+        auto getCollFromNSField = [](std::string_view fieldName) -> BSONObj {
             return BSON("$substrBytes" << BSON_ARRAY(
                             fieldName
                             << BSON("$add" << BSON_ARRAY(BSON("$strLenBytes" << "$$dbName") << 1))
@@ -1219,7 +1220,7 @@ const BSONObj& getNSCollRewriteExpressionBSON() {
                                  << "then" << getCollFromNSField("$o.renameCollection")));
 
         // All following commands are handled in the same way.
-        constexpr std::array<StringData, 8> kCommandCases = {
+        constexpr std::array<std::string_view, 8> kCommandCases = {
             "$o.drop",
             "$o.create",
             "$o.createIndexes",
@@ -1328,7 +1329,7 @@ std::unique_ptr<MatchExpression> matchRewriteTo(
             str::stream() << "Unexpected predicate on " << predicate->path(),
             predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kRenameTargetNssField);
 
-    if (auto rewriteTo = matchRewriteGenericNamespace(expCtx, predicate, "o.to"_sd)) {
+    if (auto rewriteTo = matchRewriteGenericNamespace(expCtx, predicate, "o.to"sv)) {
         auto andRewriteTo =
             std::make_unique<AndMatchExpression>(MatchExpressionParser::parseAndNormalize(
                 backingBsonObjs.emplace_back(BSON("op" << "c")), expCtx));

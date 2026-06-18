@@ -46,6 +46,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -60,7 +61,7 @@ public:
         : _expCtx(expCtx) {}
 
     template <class T>
-    void addStage(const StringData el) {
+    void addStage(const std::string_view el) {
         _pipeline.push_back(T::createFromBson(fromjson(el).firstElement(), _expCtx));
     }
 

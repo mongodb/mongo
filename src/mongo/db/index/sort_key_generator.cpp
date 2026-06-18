@@ -46,9 +46,11 @@
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 const BSONObj kBsonWithNull = BSON("" << NullLabeler{});
 const BSONElement kNullElement = kBsonWithNull.firstElement();
@@ -113,7 +115,7 @@ key_string::Value SortKeyGenerator::computeSortKeyString(const BSONObj& obj) {
         key_string::HeapBuilder builder(key_string::Version::kLatestVersion, _ordering);
         for (auto elt : _localEltStorage) {
             if (_collator) {
-                builder.appendBSONElement(elt, [&](StringData stringData) {
+                builder.appendBSONElement(elt, [&](std::string_view stringData) {
                     return _collator->getComparisonString(stringData);
                 });
             } else {
@@ -185,7 +187,7 @@ BSONObj SortKeyGenerator::computeSortKeyFromDocument(const BSONObj& obj,
         auto value =
             part.expression->evaluate(documentWithMetdata.freeze(), nullptr /* variables */, {});
         if (!value.missing()) {
-            value.addToBsonObj(&mergedKeyBob, ""_sd);
+            value.addToBsonObj(&mergedKeyBob, ""sv);
         } else {
             mergedKeyBob.appendNull("");
         }
@@ -258,7 +260,7 @@ Value SortKeyGenerator::getCollationComparisonKey(const Value& val) const {
     // Otherwise, for non-string collatable types, take the slow path and round-trip the value
     // through BSON.
     BSONObjBuilder input;
-    val.addToBsonObj(&input, ""_sd);
+    val.addToBsonObj(&input, ""sv);
 
     BSONObjBuilder output;
     CollationIndexKey::collationAwareIndexKeyAppend(input.obj().firstElement(), _collator, &output);
@@ -433,7 +435,7 @@ void SortKeyGenerator::generateSortKeyComponentVector(const BSONObj& bson,
 
     Value sortKeyVal = computeSortKeyFromDocument(doc, meta);
 
-    Document outDoc(std::vector<std::pair<StringData, Value>>{{""_sd, sortKeyVal}});
+    Document outDoc(std::vector<std::pair<std::string_view, Value>>{{""sv, sortKeyVal}});
     _localObjStorage = outDoc.toBson();
     tassert(8770400,
             "Expected BSONElement array to be the same size as the sortPattern",

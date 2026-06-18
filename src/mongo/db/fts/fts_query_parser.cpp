@@ -31,11 +31,13 @@
 
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace fts {
 
-FTSQueryParser::FTSQueryParser(StringData str) : _pos(0), _raw(str) {
+FTSQueryParser::FTSQueryParser(std::string_view str) : _pos(0), _raw(str) {
     skipWhitespace();
     _previousWhiteSpace = true;
 }
@@ -62,7 +64,7 @@ QueryToken FTSQueryParser::next() {
         }
     }
 
-    StringData ret = _raw.substr(start, _pos - start);
+    std::string_view ret = _raw.substr(start, _pos - start);
     bool old = _previousWhiteSpace;
     _previousWhiteSpace = skipWhitespace();
 

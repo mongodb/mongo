@@ -40,6 +40,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
+#include <string_view>
 #include <tuple>
 
 #include <fmt/format.h>
@@ -111,7 +112,8 @@ constexpr UniqueArray validFcvVersions = makeValidVersions(
  * Helper used to parse the `versionString` against the `validVersions`
  */
 template <std::size_t N>
-StatusWith<FCV> parseVersion(const UniqueArray<FCV, N>& validVersions, StringData versionString) {
+StatusWith<FCV> parseVersion(const UniqueArray<FCV, N>& validVersions,
+                             std::string_view versionString) {
     try {
         const auto version = multiversion::parseVersion(versionString);
         if (validVersions.contains(version)) {
@@ -122,7 +124,7 @@ StatusWith<FCV> parseVersion(const UniqueArray<FCV, N>& validVersions, StringDat
 
     // Create a comma-separated list of valid versions
     std::ostringstream validVersionsStream;
-    StringData sep;
+    std::string_view sep;
     for (const auto& ver : validVersions) {
         validVersionsStream << sep << "'" << toString(ver) << "'";
         sep = ", ";
@@ -136,11 +138,11 @@ StatusWith<FCV> parseVersion(const UniqueArray<FCV, N>& validVersions, StringDat
 
 }  // namespace
 
-FCV FeatureCompatibilityVersionParser::parseVersionForOfcvString(StringData versionString) {
+FCV FeatureCompatibilityVersionParser::parseVersionForOfcvString(std::string_view versionString) {
     return uassertStatusOK(parseVersion(validOfcvVersions, versionString));
 }
 
-FCV FeatureCompatibilityVersionParser::parseVersionForFcvString(StringData versionString) {
+FCV FeatureCompatibilityVersionParser::parseVersionForFcvString(std::string_view versionString) {
     const auto version = parseVersion(validFcvVersions, versionString);
     if (version.isOK()) {
         return version.getValue();
@@ -151,25 +153,25 @@ FCV FeatureCompatibilityVersionParser::parseVersionForFcvString(StringData versi
                             << ".");
 }
 
-FCV FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(StringData versionString) {
+FCV FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(std::string_view versionString) {
     return multiversion::parseVersionForFeatureFlags(versionString);
 }
 
-StringData FeatureCompatibilityVersionParser::serializeVersionForOfcvString(FCV version) {
+std::string_view FeatureCompatibilityVersionParser::serializeVersionForOfcvString(FCV version) {
     invariant(validOfcvVersions.contains(version),
               str::stream() << "Invalid feature compatibility version value: "
                             << multiversion::toString(version));
     return multiversion::toString(version);
 }
 
-StringData FeatureCompatibilityVersionParser::serializeVersionForFcvString(FCV version) {
+std::string_view FeatureCompatibilityVersionParser::serializeVersionForFcvString(FCV version) {
     invariant(validFcvVersions.contains(version),
               str::stream() << "Invalid feature compatibility version value: "
                             << multiversion::toString(version));
     return multiversion::toString(version);
 }
 
-StringData FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(FCV version) {
+std::string_view FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(FCV version) {
     if (multiversion::isStandardFCV(version)) {
         return multiversion::toString(version);
     }

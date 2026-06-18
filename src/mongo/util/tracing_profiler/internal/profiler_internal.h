@@ -42,6 +42,7 @@
 #include <algorithm>
 #include <mutex>
 #include <shared_mutex>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/align/aligned_alloc.hpp>
@@ -79,7 +80,7 @@ struct TagIdHash {
  */
 struct ProfilerTag {
     TagId id;
-    StringData name;
+    std::string_view name;
 };
 
 /**
@@ -89,7 +90,7 @@ class ProfilerTags {
 public:
     static ProfilerTags* get();
 
-    ProfilerTag getOrInsertTag(StringData name);
+    ProfilerTag getOrInsertTag(std::string_view name);
 
     MONGO_COMPILER_ALWAYS_INLINE const std::vector<ProfilerTag>& tags() const {
         return _tags;

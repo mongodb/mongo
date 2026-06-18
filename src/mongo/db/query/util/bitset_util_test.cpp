@@ -32,6 +32,8 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 /**

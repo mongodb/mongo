@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,6 +51,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -104,7 +104,7 @@ public:
 
     virtual void setElement(const char* field, const BSONElement& e, const BSONObj& parent) = 0;
     virtual void setNumber(const char* field, double val) = 0;
-    virtual void setString(const char* field, StringData val) = 0;
+    virtual void setString(const char* field, std::string_view val) = 0;
     virtual void setObject(const char* field, const BSONObj& obj, bool readOnly = true) = 0;
     virtual void setBoolean(const char* field, bool val) = 0;
     virtual void setFunction(const char* field, const char* code) = 0;
@@ -167,14 +167,14 @@ public:
 
     virtual void injectNative(const char* field, NativeFunction func, void* data = nullptr) = 0;
 
-    virtual bool exec(StringData code,
+    virtual bool exec(std::string_view code,
                       const std::string& name,
                       bool printResult,
                       bool reportError,
                       bool assertOnError,
                       int timeoutMs = 0) = 0;
 
-    virtual void execSetup(StringData code, const std::string& name = "setup") {
+    virtual void execSetup(std::string_view code, const std::string& name = "setup") {
         exec(code, name, false, true, true, 0);
     }
 
@@ -282,10 +282,10 @@ public:
     void setScopeInitCallback(void (*func)(Scope&)) {
         _scopeInitCallback = func;
     }
-    static void setConnectCallback(void (*func)(DBClientBase&, StringData)) {
+    static void setConnectCallback(void (*func)(DBClientBase&, std::string_view)) {
         _connectCallback = func;
     }
-    static void runConnectCallback(DBClientBase& c, StringData uri) {
+    static void runConnectCallback(DBClientBase& c, std::string_view uri) {
         if (_connectCallback)
             _connectCallback(c, uri);
     }
@@ -307,7 +307,7 @@ protected:
     void (*_scopeInitCallback)(Scope&);
 
 private:
-    static void (*_connectCallback)(DBClientBase&, StringData);
+    static void (*_connectCallback)(DBClientBase&, std::string_view);
 };
 
 void installGlobalUtils(Scope& scope);

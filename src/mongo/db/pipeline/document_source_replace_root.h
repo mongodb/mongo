@@ -45,6 +45,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -192,7 +193,7 @@ private:
     // This can be helpful if you are using $replaceRoot as part of an alias expansion as we do in
     // $documents for example. Goes first in the template error message below.
     std::string _errMsgContextForNonObject;
-    static constexpr StringData kErrorTemplate =
+    static constexpr std::string_view kErrorTemplate =
         "{} must evaluate to an object, but resulting value was: {}. Type of resulting value: "
         "'{}'. Input document: {}"_sd;
 
@@ -211,8 +212,8 @@ private:
  */
 class DocumentSourceReplaceRoot final {
 public:
-    static constexpr StringData kStageName = "$replaceRoot"_sd;
-    static constexpr StringData kAliasNameReplaceWith = "$replaceWith"_sd;
+    static constexpr std::string_view kStageName = "$replaceRoot"_sd;
+    static constexpr std::string_view kAliasNameReplaceWith = "$replaceWith"_sd;
     /**
      * Creates a new replaceRoot DocumentSource from the BSON specification of the $replaceRoot
      * stage.

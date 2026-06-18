@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/modules.h"
 
@@ -37,6 +36,7 @@
 #include <iosfwd>
 #include <span>
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -93,7 +93,7 @@ public:
      *
      * NOTE: Also returns UnknownError for the string "UnknownError".
      */
-    static Error fromString(StringData name);
+    static Error fromString(std::string_view name);
 
     /**
      * Reuses a unique numeric code in a way that suppresses the duplicate code detection. This

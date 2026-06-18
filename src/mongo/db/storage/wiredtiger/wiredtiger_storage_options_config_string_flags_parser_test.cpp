@@ -32,10 +32,12 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
-static BSONObj makeStorageEngineWithConfigString(StringData configString) {
+static BSONObj makeStorageEngineWithConfigString(std::string_view configString) {
     return BSON(kWiredTigerEngineName << BSON(WiredTigerUtil::kConfigStringField << configString));
 }
 

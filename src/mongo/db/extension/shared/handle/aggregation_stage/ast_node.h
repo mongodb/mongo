@@ -35,6 +35,8 @@
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <absl/base/nullability.h>
 
 namespace mongo::extension {
@@ -57,11 +59,11 @@ public:
         : VTableAPI<::MongoExtensionAggStageAstNode>(ptr) {}
 
     /**
-     * Returns a StringData containing the name of this aggregation stage.
+     * Returns a std::string_view containing the name of this aggregation stage.
      */
-    StringData getName() const {
+    std::string_view getName() const {
         auto stringView = byteViewAsStringView(_vtable().get_name(get()));
-        return StringData{stringView.data(), stringView.size()};
+        return std::string_view{stringView.data(), stringView.size()};
     }
 
     MongoExtensionStaticProperties getProperties() const;

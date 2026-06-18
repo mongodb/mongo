@@ -30,7 +30,6 @@
 #include "mongo/db/repl/hello/hello_auth.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/db/auth/authentication_session.h"

@@ -34,12 +34,13 @@
 #include "mongo/db/error_labels.h"
 
 #include <algorithm>
+#include <string_view>
 
 namespace mongo {
 namespace {
 
 bool isRetryableError(std::span<const std::string> errorLabels) {
-    constexpr auto isRetryableErrorLabel = [](StringData label) {
+    constexpr auto isRetryableErrorLabel = [](std::string_view label) {
         return label == ErrorLabel::kRetryableWrite || label == ErrorLabel::kRetryableError;
     };
 

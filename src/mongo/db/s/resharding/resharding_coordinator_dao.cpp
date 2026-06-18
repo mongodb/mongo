@@ -37,6 +37,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
@@ -74,7 +75,7 @@ ReshardingCoordinatorDocument buildAndExecuteRequest(OperationContext* opCtx,
     return client->readState(opCtx, reshardingUUID);
 }
 
-boost::optional<StringData> getTimedPhaseFieldNameFor(CoordinatorStateEnum coordinatorPhase) {
+boost::optional<std::string_view> getTimedPhaseFieldNameFor(CoordinatorStateEnum coordinatorPhase) {
     switch (coordinatorPhase) {
         case CoordinatorStateEnum::kCloning:
             return ReshardingCoordinatorMetrics::kDocumentCopyFieldName;
@@ -364,7 +365,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToAbortingPhas
 BSONObjBuilder ReshardingCoordinatorDao::_documentsCopyUpdateBuilder(
     const ReshardingCoordinatorDocument& doc,
     const std::map<ShardId, int64_t>& documents,
-    StringData numberOfDocsFieldName) {
+    std::string_view numberOfDocsFieldName) {
     BSONObjBuilder updateBuilder;
     {
         BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/optime.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -166,7 +166,7 @@ public:
     void setHeartbeatVersion(long long newVal);
     void setSenderId(long long newVal);
     void setSenderHost(const HostAndPort& newVal);
-    void setSetName(StringData newVal);
+    void setSetName(std::string_view newVal);
     void setTerm(long long newVal);
     void setPrimaryId(long long primaryId);
     void setCheckEmpty();

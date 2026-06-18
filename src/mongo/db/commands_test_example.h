@@ -32,6 +32,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands_test_example_gen.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace commands_test_example {
 
@@ -249,7 +251,7 @@ public:
 
     using Request = ExampleVoid;
 
-    explicit MyCommand(StringData name) : TypedCommand<MyCommand>(name) {}
+    explicit MyCommand(std::string_view name) : TypedCommand<MyCommand>(name) {}
 
     void doRun() const {}
     void doAuth() const {}

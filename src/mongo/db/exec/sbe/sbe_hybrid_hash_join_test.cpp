@@ -45,6 +45,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/math/distributions/chi_squared.hpp>
 
@@ -63,7 +64,7 @@ value::MaterializedRow makeKeyRow(int64_t key) {
 /**
  * Helper to create a MaterializedRow with a single string project value.
  */
-value::MaterializedRow makeProjectRow(StringData payload) {
+value::MaterializedRow makeProjectRow(std::string_view payload) {
     auto [tag, val] = value::makeNewString(payload);
     value::MaterializedRow row(1);
     row.reset(0, true, tag, val);
@@ -93,7 +94,7 @@ std::vector<int64_t> drainCursor(JoinCursor& cursor) {
 /**
  * Helper to create a MaterializedRow with a single string key.
  */
-value::MaterializedRow makeStringKeyRow(StringData key) {
+value::MaterializedRow makeStringKeyRow(std::string_view key) {
     auto [tag, val] = value::makeNewString(key);
     value::MaterializedRow row(1);
     row.reset(0, true, tag, val);

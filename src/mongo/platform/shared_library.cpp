@@ -29,6 +29,8 @@
 
 #include "mongo/platform/shared_library.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
@@ -37,7 +39,7 @@ typedef StatusWith<void (*)()> StatusWithFunc;
 
 SharedLibrary::SharedLibrary(void* handle) : _handle(handle) {}
 
-StatusWithFunc SharedLibrary::getFunction(StringData name) {
+StatusWithFunc SharedLibrary::getFunction(std::string_view name) {
     StatusWith<void*> s = getSymbol(name);
 
     if (!s.isOK()) {

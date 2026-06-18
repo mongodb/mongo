@@ -30,7 +30,6 @@
 #include "mongo/base/dependency_graph.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 
@@ -38,6 +37,7 @@
 #include <compare>
 #include <iterator>
 #include <random>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -69,9 +69,9 @@ namespace {
 
 
 template <typename Seq>
-void strAppendJoin(std::string& out, StringData separator, const Seq& sequence) {
-    StringData currSep;
-    for (StringData str : sequence) {
+void strAppendJoin(std::string& out, std::string_view separator, const Seq& sequence) {
+    std::string_view currSep;
+    for (std::string_view str : sequence) {
         out.append(currSep.data(), currSep.size());
         out.append(str.data(), str.size());
         currSep = separator;
@@ -137,7 +137,7 @@ std::vector<std::string> DependencyGraph::topSort(unsigned randomSeed,
             std::transform(prereqs.begin(),
                            prereqs.end(),
                            std::back_inserter(element.children),
-                           [&](StringData childName) {
+                           [&](std::string_view childName) {
                                auto iter = byName.find(childName);
                                uassert(ErrorCodes::BadValue,
                                        fmt::format("node {} depends on missing node {}",

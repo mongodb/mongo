@@ -35,6 +35,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceMockToStageFn(
@@ -51,7 +53,7 @@ namespace exec::agg {
 
 REGISTER_AGG_STAGE_MAPPING(mockStage, mongo::DocumentSourceMock::id, documentSourceMockToStageFn)
 
-MockStage::MockStage(StringData stageType,
+MockStage::MockStage(std::string_view stageType,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      std::deque<GetNextResult> results)
     : Stage(stageType, expCtx) {

@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/s/request_types/update_zone_key_range_gen.h"

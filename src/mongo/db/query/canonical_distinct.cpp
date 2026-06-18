@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/canonical_distinct.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,6 +37,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <cstddef>
+#include <string_view>
 
 
 namespace mongo {
@@ -69,7 +69,7 @@ void addMatchRemovingNestedArrays(BSONArrayBuilder* pipelineBuilder, const Field
 
 
     for (size_t i = 0; i < unwindPath.getPathLength() - 1; ++i) {
-        StringData pathPrefix = unwindPath.getSubpath(i);
+        std::string_view pathPrefix = unwindPath.getSubpath(i);
         // Add a clause to the $match predicate requiring that intermediate paths are objects so
         // that no implicit array traversal happens.
         predicateBuilder.append(pathPrefix, BSON("$_internalSchemaType" << "object"));

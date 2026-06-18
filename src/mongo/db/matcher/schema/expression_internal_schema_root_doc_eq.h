@@ -44,6 +44,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -61,7 +62,7 @@ namespace mongo {
  */
 class InternalSchemaRootDocEqMatchExpression final : public MatchExpression {
 public:
-    static constexpr StringData kName = "$_internalSchemaRootDocEq"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaRootDocEq"_sd;
 
     /**
      * Constructs a new match expression, taking ownership of 'rhs'.

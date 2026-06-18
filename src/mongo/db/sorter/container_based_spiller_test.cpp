@@ -60,6 +60,7 @@
 
 namespace mongo::sorter {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using Storage = ContainerBasedStorage<IntWrapper, IntWrapper>;
 
@@ -807,7 +808,7 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     ASSERT(replCoord);
     replCoord->alwaysAllowWrites(true);
 
-    const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
+    const auto identStr = ident::generateNewInternalIdent("container_spill"sv);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats stats{nullptr};
     int64_t spilled = 0;
@@ -861,7 +862,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
     ASSERT(replCoord);
     replCoord->alwaysAllowWrites(true);
 
-    const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
+    const auto identStr = ident::generateNewInternalIdent("container_spill"sv);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats containerStats{nullptr};
     int64_t spilled = 0;
@@ -931,7 +932,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
     ASSERT(replCoord);
     replCoord->alwaysAllowWrites(true);
 
-    const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
+    const auto identStr = ident::generateNewInternalIdent("container_spill"sv);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats containerStats{nullptr};
     int64_t spilled = 0;
@@ -1017,7 +1018,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsOnSpillSeesCompleteIteratorView) {
     ASSERT(replCoord);
     replCoord->alwaysAllowWrites(true);
 
-    const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
+    const auto identStr = ident::generateNewInternalIdent("container_spill"sv);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats containerStats{nullptr};
     std::vector<std::vector<std::pair<int64_t, int64_t>>> snapshots;
@@ -1146,7 +1147,7 @@ TEST_P(ContainerBasedSpillerTest, SpillerWithStartingKeyPreservesExistingEntries
         ->alwaysAllowWrites(true);
 
     ViewableIntegerKeyedContainer container{
-        std::make_shared<Ident>(ident::generateNewInternalIdent("starting_key_test"_sd))};
+        std::make_shared<Ident>(ident::generateNewInternalIdent("starting_key_test"sv))};
     SorterContainerStats stats{nullptr};
     using Settings = Spiller<IntWrapper, IntWrapper, IWComparator>::Settings;
 
@@ -1656,7 +1657,7 @@ protected:
         ASSERT(replCoord);
         replCoord->alwaysAllowWrites(true);
         _container.setIdent(
-            std::make_shared<Ident>(ident::generateNewInternalIdent("container_spill"_sd)));
+            std::make_shared<Ident>(ident::generateNewInternalIdent("container_spill"sv)));
     }
 
     auto makeContainerBasedSpiller(

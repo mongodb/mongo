@@ -34,6 +34,7 @@
 #include "mongo/transport/grpc/util.h"
 
 #include <string>
+#include <string_view>
 
 #include <grpcpp/grpcpp.h>
 
@@ -60,8 +61,8 @@ public:
     MetadataView getServerInitialMetadata() const override {
         MetadataView mv;
         for (auto& kvp : _ctx.GetServerInitialMetadata()) {
-            mv.insert({StringData{kvp.first.data(), kvp.first.length()},
-                       StringData{kvp.second.data(), kvp.second.length()}});
+            mv.insert({std::string_view{kvp.first.data(), kvp.first.length()},
+                       std::string_view{kvp.second.data(), kvp.second.length()}});
         }
         return mv;
     }

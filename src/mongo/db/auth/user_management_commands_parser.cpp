@@ -46,6 +46,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -58,12 +59,12 @@ namespace auth {
 using std::vector;
 
 Status _checkNoExtraFields(const BSONObj& cmdObj,
-                           StringData cmdName,
+                           std::string_view cmdName,
                            const stdx::unordered_set<std::string>& validFieldNames) {
     // Iterate through all fields in command object and make sure there are no unexpected
     // ones.
     for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
-        StringData fieldName = (*iter).fieldNameStringData();
+        std::string_view fieldName = (*iter).fieldNameStringData();
         if (!isGenericArgument(fieldName) && !validFieldNames.count(std::string{fieldName})) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "\"" << fieldName
@@ -78,9 +79,9 @@ Status _checkNoExtraFields(const BSONObj& cmdObj,
 // Extracts a UserName or RoleName object from a BSONElement.
 template <typename Name>
 Status _parseNameFromBSONElement(const BSONElement& element,
-                                 StringData dbname,
-                                 StringData nameFieldName,
-                                 StringData sourceFieldName,
+                                 std::string_view dbname,
+                                 std::string_view nameFieldName,
+                                 std::string_view sourceFieldName,
                                  Name* parsedName) {
     if (element.type() == BSONType::string) {
         *parsedName = Name(element.String(), dbname);
@@ -109,9 +110,9 @@ Status _parseNameFromBSONElement(const BSONElement& element,
 // Extracts UserName or RoleName objects from a BSONArray of role/user names.
 template <typename Name>
 Status _parseNamesFromBSONArray(const BSONArray& array,
-                                StringData dbname,
-                                StringData nameFieldName,
-                                StringData sourceFieldName,
+                                std::string_view dbname,
+                                std::string_view nameFieldName,
+                                std::string_view sourceFieldName,
                                 std::vector<Name>* parsedNames) {
     for (BSONObjIterator it(array); it.more(); it.next()) {
         BSONElement element = *it;
@@ -127,7 +128,7 @@ Status _parseNamesFromBSONArray(const BSONArray& array,
 }
 
 Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
-                                   StringData dbname,
+                                   std::string_view dbname,
                                    std::vector<UserName>* parsedUserNames) {
     return _parseNamesFromBSONArray(usersArray,
                                     dbname,
@@ -137,7 +138,7 @@ Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
 }
 
 Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
-                                   StringData dbname,
+                                   std::string_view dbname,
                                    std::vector<RoleName>* parsedRoleNames) {
     return _parseNamesFromBSONArray(rolesArray,
                                     dbname,

@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/ddl/list_collections_filter.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"

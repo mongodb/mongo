@@ -30,7 +30,6 @@
 #include "mongo/db/update/storage_validation.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsontypes.h"
@@ -42,13 +41,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace storage_validation {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-const StringData idFieldName = "_id"_sd;
+const std::string_view idFieldName = "_id"sv;
 
 void scanDocumentChildren(mutablebson::ConstElement elem,
                           const bool deep,

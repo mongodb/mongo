@@ -39,6 +39,7 @@
 #include "mongo/db/write_concern_options.h"
 
 #include <cstdint>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -197,7 +198,7 @@ MigrationSecondaryThrottleOptions MigrationSecondaryThrottleOptions::parseFromBa
 }
 
 void MigrationSecondaryThrottleOptions::serializeToBalancerConfigElement(
-    StringData fieldName, BSONObjBuilder* builder) const {
+    std::string_view fieldName, BSONObjBuilder* builder) const {
 
     if (_secondaryThrottle == kDefault) {
         return;

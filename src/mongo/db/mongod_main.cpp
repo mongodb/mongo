@@ -34,7 +34,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -299,6 +298,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -1850,7 +1850,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                            &shutdownTimeElapsedBuilder);
             auto& serviceLifecycle =
                 rss::ReplicatedStorageService::get(serviceContext).getServiceLifecycle();
-            serviceContext->setKillAllOperations([&serviceLifecycle](const StringData t) {
+            serviceContext->setKillAllOperations([&serviceLifecycle](const std::string_view t) {
                 return t == kFTDCThreadName ||
                     serviceLifecycle.shouldKeepThreadAliveUntilStorageEngineHasShutDown(t);
             });

@@ -44,6 +44,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -157,7 +158,7 @@ namespace document_source_densify {
 list<intrusive_ptr<DocumentSource>> createFromBsonInternal(
     BSONElement elem,
     const intrusive_ptr<ExpressionContext>& expCtx,
-    StringData stageName,
+    std::string_view stageName,
     bool isInternal) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << stageName << " stage specification must be an object, found "

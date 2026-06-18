@@ -56,6 +56,7 @@
 #include "mongo/platform/compiler.h"
 
 #include <limits>
+#include <string_view>
 
 namespace mongo::sbe::vm {
 namespace {  // NOLINT(google-build-namespaces) See WHITELIST comment above.
@@ -234,7 +235,7 @@ private:
 
                 // Get the field name for this field, and then consult 'action' to see what
                 // action should be taken.
-                StringData fieldName = fields[fieldIdx];
+                std::string_view fieldName = fields[fieldIdx];
                 const auto& action = actions[fieldIdx];
 
                 const auto tag = TypeTags::Nothing;
@@ -297,7 +298,7 @@ private:
     void traverseAndProduceObj(const MakeObjSpec* spec,
                                value::TypeTags tag,
                                value::Value val,
-                               StringData fieldName,
+                               std::string_view fieldName,
                                ObjWriterT& bob) const {
         constexpr int64_t maxInt64 = std::numeric_limits<int64_t>::max();
 
@@ -332,7 +333,7 @@ private:
 
     template <typename ObjWriterT>
     MONGO_COMPILER_ALWAYS_INLINE void performSetArgAction(const MakeObjSpec::FieldAction& action,
-                                                          StringData fieldName,
+                                                          std::string_view fieldName,
                                                           ObjWriterT& bob) const {
         size_t argIdx = action.getSetArgIdx();
         auto [_, tag, val] = getArg(argIdx);
@@ -341,7 +342,7 @@ private:
 
     template <typename ObjWriterT>
     MONGO_COMPILER_ALWAYS_INLINE void performAddArgAction(const MakeObjSpec::FieldAction& action,
-                                                          StringData fieldName,
+                                                          std::string_view fieldName,
                                                           ObjWriterT& bob) const {
         size_t argIdx = action.getAddArgIdx();
         auto [_, tag, val] = getArg(argIdx);
@@ -352,7 +353,7 @@ private:
     MONGO_COMPILER_ALWAYS_INLINE void performLambdaArgAction(const MakeObjSpec::FieldAction& action,
                                                              value::TypeTags tag,
                                                              value::Value val,
-                                                             StringData fieldName,
+                                                             std::string_view fieldName,
                                                              ObjWriterT& bob) const {
         const auto& lambdaArg = action.getLambdaArg();
         size_t argIdx = lambdaArg.argIdx;
@@ -373,7 +374,7 @@ private:
     MONGO_COMPILER_ALWAYS_INLINE void performMakeObjAction(const MakeObjSpec::FieldAction& action,
                                                            value::TypeTags tag,
                                                            value::Value val,
-                                                           StringData fieldName,
+                                                           std::string_view fieldName,
                                                            ObjWriterT& bob) const {
         const MakeObjSpec* spec = action.getMakeObjSpec();
         traverseAndProduceObj(spec, tag, val, fieldName, bob);

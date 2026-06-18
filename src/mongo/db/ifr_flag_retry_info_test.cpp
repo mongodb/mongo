@@ -34,10 +34,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
-constexpr StringData kDisabledFlagName = "disabledFlagName";
+constexpr std::string_view kDisabledFlagName = "disabledFlagName";
 
 BSONObj serializeIFRFlagRetryInfoToBson(const IFRFlagRetryInfo& info) {
     BSONObjBuilder bob;

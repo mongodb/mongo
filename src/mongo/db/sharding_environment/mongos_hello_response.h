@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -50,10 +51,10 @@ class BSONObjBuilder;
  */
 class MONGO_MOD_NEEDS_REPLACEMENT MongosHelloResponse {
 public:
-    static constexpr StringData kTopologyVersionFieldName = "topologyVersion"_sd;
-    static constexpr StringData kIsMasterFieldName = "ismaster"_sd;
-    static constexpr StringData kIsWritablePrimaryFieldName = "isWritablePrimary"_sd;
-    static constexpr StringData kMsgFieldName = "msg"_sd;
+    static constexpr std::string_view kTopologyVersionFieldName = "topologyVersion"_sd;
+    static constexpr std::string_view kIsMasterFieldName = "ismaster"_sd;
+    static constexpr std::string_view kIsWritablePrimaryFieldName = "isWritablePrimary"_sd;
+    static constexpr std::string_view kMsgFieldName = "msg"_sd;
 
     /**
      * Explicit constructor that sets the _topologyVersion field.

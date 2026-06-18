@@ -44,17 +44,19 @@
 #include <limits>
 #include <numeric>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-const StringData PushNode::kEachClauseName = "$each"_sd;
-const StringData PushNode::kSliceClauseName = "$slice";
-const StringData PushNode::kSortClauseName = "$sort";
-const StringData PushNode::kPositionClauseName = "$position";
+const std::string_view PushNode::kEachClauseName = "$each"sv;
+const std::string_view PushNode::kSliceClauseName = "$slice";
+const std::string_view PushNode::kSortClauseName = "$sort";
+const std::string_view PushNode::kPositionClauseName = "$position";
 
 namespace {
 
@@ -236,7 +238,7 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
 
     auto& document = array->getDocument();
     auto firstElementToInsert =
-        document.makeElementWithNewFieldName(StringData(), valuesToPush.front());
+        document.makeElementWithNewFieldName(std::string_view(), valuesToPush.front());
 
     // We assume that no array has more than std::numerical_limits<long long>::max() elements.
     long long arraySize = static_cast<long long>(countChildren(*array));
@@ -275,8 +277,8 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
                         valuesToPush.end(),
                         firstElementToInsert,
                         [&document](auto&& insertAfter, auto& valueToInsert) {
-                            auto nextElementToInsert =
-                                document.makeElementWithNewFieldName(StringData(), valueToInsert);
+                            auto nextElementToInsert = document.makeElementWithNewFieldName(
+                                std::string_view(), valueToInsert);
                             invariant(insertAfter.addSiblingRight(nextElementToInsert));
                             return nextElementToInsert;
                         });

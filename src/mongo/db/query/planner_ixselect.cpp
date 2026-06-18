@@ -61,6 +61,7 @@
 #include <functional>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -68,6 +69,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -88,7 +90,7 @@ bool isComparisonWithArrayPred(const MatchExpression* me) {
     return false;
 }
 
-std::size_t numPathComponents(StringData path) {
+std::size_t numPathComponents(std::string_view path) {
     return FieldRef{path}.numParts();
 }
 
@@ -288,7 +290,7 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findIndexesByHint(
     const BSONObj& hintedIndex, const std::vector<IndexEntry>& allIndices) {
     std::vector<IndexEntry> out;
     BSONElement firstHintElt = hintedIndex.firstElement();
-    if (firstHintElt.fieldNameStringData() == "$hint"_sd &&
+    if (firstHintElt.fieldNameStringData() == "$hint"sv &&
         firstHintElt.type() == BSONType::string) {
         auto hintName = firstHintElt.valueStringData();
         for (auto&& entry : allIndices) {
@@ -377,7 +379,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                                        const IndexEntry& index,
                                        std::size_t keyPatternIdx,
                                        MatchExpression* node,
-                                       StringData fullPathToNode,
+                                       std::string_view fullPathToNode,
                                        const QueryContext& queryContext,
                                        bool nodeIsNotChild) {
     if ((boundsGeneratingNodeContainsComparisonToType(node, BSONType::string) ||
@@ -828,8 +830,8 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
         // Note we skip empty path components since they are not allowed in index key patterns.
         const auto newPath = prefix + std::string{node->path()};
         ElemMatchContext newEMContext;
-        // Note this StringData is unowned and references the string declared on the stack here.
-        // This should be fine since we are only ever reading from this in recursive calls as
+        // Note this std::string_view is unowned and references the string declared on the stack
+        // here. This should be fine since we are only ever reading from this in recursive calls as
         // context to help make planning decisions.
         newEMContext.fullPathToParentElemMatch = newPath;
         newEMContext.innermostParentElemMatch = static_cast<ElemMatchObjectMatchExpression*>(node);
@@ -1088,7 +1090,7 @@ bool isConjunctiveNode(MatchExpression* node) {
 }
 
 void stripInvalidCompoundWildcardIndexAssignmentImpl(MatchExpression* node,
-                                                     StringData wildcardField,
+                                                     std::string_view wildcardField,
                                                      size_t idx);
 /**
  * This function traverses and collects AND-related predicates. The following expressions are
@@ -1114,7 +1116,7 @@ void stripInvalidCompoundWildcardIndexAssignmentImpl(MatchExpression* node,
  *   identified during the traversal.
  */
 std::pair<bool, std::vector<MatchExpression*>> traverseAndPropagateANDRelatedPredicates(
-    MatchExpression* node, StringData wildcardField, size_t idx) {
+    MatchExpression* node, std::string_view wildcardField, size_t idx) {
     if (!Indexability::nodeCanUseIndexOnOwnField(node) && !isConjunctiveNode(node) &&
         !isQueryNegatingEqualToNull(node)) {
         stripInvalidCompoundWildcardIndexAssignmentImpl(node, wildcardField, idx);
@@ -1184,7 +1186,7 @@ std::pair<bool, std::vector<MatchExpression*>> traverseAndPropagateANDRelatedPre
  *   assignment from all the assigned predicates.
  */
 void stripInvalidCompoundWildcardIndexAssignmentImpl(MatchExpression* node,
-                                                     StringData wildcardField,
+                                                     std::string_view wildcardField,
                                                      size_t idx) {
     // If 'node' is conjunctive such as $and and $elemMatch, traverse and collect assigned
     // predicates before determining to strip assignments.

@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_registry.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo {
 namespace {
-const auto kBytesIn = "bytesIn"_sd;
-const auto kBytesOut = "bytesOut"_sd;
+using namespace std::literals::string_view_literals;
+const auto kBytesIn = "bytesIn"sv;
+const auto kBytesOut = "bytesOut"sv;
 }  // namespace
 
 void appendMessageCompressionStats(BSONObjBuilder* b) {

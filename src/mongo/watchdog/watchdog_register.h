@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -40,7 +40,7 @@ namespace MONGO_MOD_PUBLIC mongo {
 /**
  * Allow components a way to tell the watchdog what to watch.
  */
-void registerWatchdogPath(StringData path);
+void registerWatchdogPath(std::string_view path);
 
 /**
  * Get list of registered watchdog paths.

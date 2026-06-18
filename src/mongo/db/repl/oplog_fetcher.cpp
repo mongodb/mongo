@@ -39,7 +39,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -83,6 +82,7 @@
 
 #include <algorithm>
 #include <mutex>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -560,7 +560,7 @@ void OplogFetcher::_setMetadataWriterAndReader() {
     });
 
     _conn->setReplyMetadataReader(
-        [this](OperationContext* opCtx, const BSONObj& metadataObj, StringData source) {
+        [this](OperationContext* opCtx, const BSONObj& metadataObj, std::string_view source) {
             _metadataObj = metadataObj.getOwned();
 
             // Run VectorClockMetadataHook on reply metadata so this matches the behavior of the

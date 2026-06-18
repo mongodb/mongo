@@ -31,26 +31,29 @@
 
 #include "mongo/db/namespace_spec_gen.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 namespace mongo {
 namespace {
-static constexpr StringData kClusterTimeField = "clusterTime"_sd;
-static constexpr StringData kIdField = "_id"_sd;
-static constexpr StringData kNamespaceField = "ns"_sd;
-static constexpr StringData kOperationTypeField = "operationType"_sd;
-static constexpr StringData kFullDocumentField = "fullDocument"_sd;
-static constexpr StringData kCommittedAtField = "committedAt"_sd;
-static constexpr StringData kDonorField = "donor"_sd;
-static constexpr StringData kRecipientField = "recipient"_sd;
-static constexpr StringData kAllCollectionChunksMigratedFromDonorField =
-    "allCollectionChunksMigratedFromDonor"_sd;
-static constexpr StringData kFromField = "from"_sd;
-static constexpr StringData kToField = "to"_sd;
-static constexpr StringData kOperationDescriptionField = "operationDescription"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr std::string_view kClusterTimeField = "clusterTime"sv;
+static constexpr std::string_view kIdField = "_id"sv;
+static constexpr std::string_view kNamespaceField = "ns"sv;
+static constexpr std::string_view kOperationTypeField = "operationType"sv;
+static constexpr std::string_view kFullDocumentField = "fullDocument"sv;
+static constexpr std::string_view kCommittedAtField = "committedAt"sv;
+static constexpr std::string_view kDonorField = "donor"sv;
+static constexpr std::string_view kRecipientField = "recipient"sv;
+static constexpr std::string_view kAllCollectionChunksMigratedFromDonorField =
+    "allCollectionChunksMigratedFromDonor"sv;
+static constexpr std::string_view kFromField = "from"sv;
+static constexpr std::string_view kToField = "to"sv;
+static constexpr std::string_view kOperationDescriptionField = "operationDescription"sv;
 
-Value assertFieldType(const Document& document, StringData fieldName, BSONType expectedType) {
+Value assertFieldType(const Document& document, std::string_view fieldName, BSONType expectedType) {
     auto val = document[fieldName];
     uassert(ErrorCodes::BadValue,
             str::stream() << "failed to convert change event into control event: expected \""

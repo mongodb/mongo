@@ -43,6 +43,7 @@
 #include "mongo/util/processinfo.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -113,7 +114,7 @@ void SpillWiredTigerKVEngine::_openWiredTiger(const std::string& path,
 }
 
 std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getInternalRecordStore(RecoveryUnit& ru,
-                                                                             StringData ident,
+                                                                             std::string_view ident,
                                                                              KeyFormat keyFormat) {
     WiredTigerRecordStore::Params params;
     params.uuid = boost::none;
@@ -130,9 +131,8 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getInternalRecordStore(Rec
         this, WiredTigerRecoveryUnit::get(ru), std::move(params));
 }
 
-std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeInternalRecordStore(RecoveryUnit& ru,
-                                                                              StringData ident,
-                                                                              KeyFormat keyFormat) {
+std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeInternalRecordStore(
+    RecoveryUnit& ru, std::string_view ident, KeyFormat keyFormat) {
 
     WiredTigerConnection::BlockShutdown blockShutdown(_connection.get());
     iassert(ErrorCodes::ShutdownInProgress,
@@ -181,7 +181,7 @@ int64_t SpillWiredTigerKVEngine::storageSize(RecoveryUnit& ru) {
                            });
 }
 
-bool SpillWiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {
+bool SpillWiredTigerKVEngine::hasIdent(RecoveryUnit& ru, std::string_view ident) const {
     WiredTigerConnection::BlockShutdown blockShutdown(_connection.get());
     if (blockShutdown.isShuttingDown()) {
         return false;
@@ -190,7 +190,7 @@ bool SpillWiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const
                      WiredTigerUtil::buildTableUri(ident));
 }
 
-int64_t SpillWiredTigerKVEngine::getIdentSize(RecoveryUnit& ru, StringData ident) {
+int64_t SpillWiredTigerKVEngine::getIdentSize(RecoveryUnit& ru, std::string_view ident) {
     WiredTigerConnection::BlockShutdown blockShutdown(_connection.get());
     if (blockShutdown.isShuttingDown()) {
         return 0;
@@ -209,7 +209,7 @@ std::vector<std::string> SpillWiredTigerKVEngine::getAllIdents(RecoveryUnit& ru)
 }
 
 Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
-                                          StringData ident,
+                                          std::string_view ident,
                                           bool identHasSizeInfo,
                                           const StorageEngine::DropIdentCallback& onDrop,
                                           boost::optional<uint64_t> schemaEpoch) {

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -50,6 +49,7 @@
 
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <typeindex>
 #include <vector>
 
@@ -109,7 +109,7 @@ struct HistogramOptions {
  */
 class MetricsService final {
 public:
-    static constexpr StringData kMeterName = "mongodb";
+    static constexpr std::string_view kMeterName = "mongodb";
 
     static MetricsService& instance() {
         static MetricsService metricsService;

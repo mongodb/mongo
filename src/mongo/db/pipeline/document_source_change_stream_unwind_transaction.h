@@ -49,6 +49,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -71,7 +72,7 @@ using ChangeStreamUnwindTransactionLiteParsed =
 class DocumentSourceChangeStreamUnwindTransaction final
     : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamUnwindTransaction"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamUnwindTransaction"_sd;
 
     DocumentSourceChangeStreamUnwindTransaction(
         BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -98,7 +99,7 @@ public:
         return boost::none;
     }
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return DocumentSourceChangeStreamUnwindTransaction::kStageName;
     }
 

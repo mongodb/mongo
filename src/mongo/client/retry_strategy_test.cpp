@@ -39,9 +39,11 @@
 
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class RetryStrategyTest : public ServiceContextTest {
 public:
@@ -163,7 +165,7 @@ public:
         return _amountCallbackCalled.load();
     }
 
-    static constexpr auto kExampleResultValue = "result"_sd;
+    static constexpr auto kExampleResultValue = "result"sv;
 
 protected:
     AdaptiveRetryStrategy::RetryBudget _retryBudget;
@@ -536,7 +538,7 @@ TEST_F(RetryStrategyTest, RunWithRetryStrategyWithRetry) {
     auto result =
         runWithRetryStrategy(opCtx(), strategy, [&](const TargetingMetadata& targetingMetadata) {
             // Always fail in this case to cause retries until we reach the maximum.
-            return RetryStrategy::Result<StringData>{statusRetriableErrorCategory, {}};
+            return RetryStrategy::Result<std::string_view>{statusRetriableErrorCategory, {}};
         });
 
     ASSERT_FALSE(result.isOK());
@@ -552,7 +554,7 @@ TEST_F(RetryStrategyTest, RunWithRetryStrategyTargetingMetadata) {
             // At the first try, there is no target1 in the list of deprioritized servers.
             if (std::ranges::find(targetingMetadata.deprioritizedServers, target1) ==
                 targetingMetadata.deprioritizedServers.end()) {
-                return RetryStrategy::Result<StringData>{
+                return RetryStrategy::Result<std::string_view>{
                     statusNonRetriable, errorLabelsSystemOverloaded, target1};
             }
 
@@ -560,7 +562,7 @@ TEST_F(RetryStrategyTest, RunWithRetryStrategyTargetingMetadata) {
             // servers.
             if (std::ranges::find(targetingMetadata.deprioritizedServers, target2) ==
                 targetingMetadata.deprioritizedServers.end()) {
-                return RetryStrategy::Result<StringData>{
+                return RetryStrategy::Result<std::string_view>{
                     statusNonRetriable, errorLabelsSystemOverloaded, target2};
             }
 
@@ -580,7 +582,7 @@ TEST_F(RetryStrategyTest, RunWithRetryStrategyWithNonRetryableFailure) {
     // We expect run operation to not retry when the retry strategy returns false.
     auto result =
         runWithRetryStrategy(opCtx(), strategy, [](const TargetingMetadata& targetingMetadata) {
-            return RetryStrategy::Result<StringData>{statusNonRetriable, {}};
+            return RetryStrategy::Result<std::string_view>{statusNonRetriable, {}};
         });
 
     // Since there was no retry, we expect to get the same error code and we expect
@@ -598,7 +600,7 @@ TEST_F(RetryStrategyTest, RunWithRetryStrategyWithNonRetryableFailureException) 
     auto result = runWithRetryStrategy(
         opCtx(),
         strategy,
-        [](const TargetingMetadata& targetingMetadata) -> RetryStrategy::Result<StringData> {
+        [](const TargetingMetadata& targetingMetadata) -> RetryStrategy::Result<std::string_view> {
             uasserted(statusNonRetriable.code(), statusNonRetriable.reason());
         });
 
@@ -614,8 +616,8 @@ TEST_F(RetryStrategyTest, RunWithRetryStrategyWithArtificialDeadlineNow) {
         opCtx()->runWithDeadline(getClockSource()->now(), ErrorCodes::MaxTimeMSExpired, [&] {
             return runWithRetryStrategy(
                 opCtx(), strategy, [](const TargetingMetadata& targetingMetadata) {
-                    return RetryStrategy::Result<StringData>{statusNonRetriable,
-                                                             errorLabelsRetriable};
+                    return RetryStrategy::Result<std::string_view>{statusNonRetriable,
+                                                                   errorLabelsRetriable};
                 });
         });
 
@@ -678,23 +680,24 @@ TEST_F(RetryStrategyResultTest, nonDefaultConstructible) {
 }
 
 TEST_F(RetryStrategyResultTest, AssertionFormat) {
-    ASSERT_EQ(
-        unittest::stringify::invoke(RetryStrategy::Result<StringData>(statusNonRetriable, {})),
-        unittest::stringify::invoke(statusNonRetriable));
-    ASSERT_EQ(unittest::stringify::invoke(StatusWith<StringData>("foo")), "foo");
+    ASSERT_EQ(unittest::stringify::invoke(
+                  RetryStrategy::Result<std::string_view>(statusNonRetriable, {})),
+              unittest::stringify::invoke(statusNonRetriable));
+    ASSERT_EQ(unittest::stringify::invoke(StatusWith<std::string_view>("foo")), "foo");
 }
 
 TEST_F(RetryStrategyResultTest, ErrorLabels) {
-    auto rLabels = RetryStrategy::Result<StringData>{statusNonRetriable, errorLabelsRetriable};
+    auto rLabels =
+        RetryStrategy::Result<std::string_view>{statusNonRetriable, errorLabelsRetriable};
     ASSERT(std::ranges::equal(rLabels.getErrorLabels(), errorLabelsRetriable));
-    auto rNoLabels = RetryStrategy::Result<StringData>{statusNonRetriable, {}};
+    auto rNoLabels = RetryStrategy::Result<std::string_view>{statusNonRetriable, {}};
     ASSERT(std::ranges::equal(rNoLabels.getErrorLabels(), std::vector<std::string>{}));
 }
 
 TEST_F(RetryStrategyResultTest, OriginError) {
-    auto rWithOrigin = RetryStrategy::Result<StringData>{statusNonRetriable, {}, target1};
+    auto rWithOrigin = RetryStrategy::Result<std::string_view>{statusNonRetriable, {}, target1};
     ASSERT_EQ(rWithOrigin.getOrigin(), target1);
-    auto rNoOrigin = RetryStrategy::Result<StringData>{statusNonRetriable, {}};
+    auto rNoOrigin = RetryStrategy::Result<std::string_view>{statusNonRetriable, {}};
     ASSERT_EQ(rNoOrigin.getOrigin(), boost::none);
 }
 
@@ -724,8 +727,8 @@ TEST_F(RetryStrategyResultTest, ConvertingMoveOK) {
 }
 
 TEST_F(RetryStrategyResultTest, ConvertingCopyError) {
-    auto r1 =
-        RetryStrategy::Result<StringData>{statusNonRetriable, errorLabelsNonRetriable, target1};
+    auto r1 = RetryStrategy::Result<std::string_view>{
+        statusNonRetriable, errorLabelsNonRetriable, target1};
     auto r2 = RetryStrategy::Result<std::string>{r1};
 
     ASSERT_FALSE(r2.isOK());
@@ -735,8 +738,8 @@ TEST_F(RetryStrategyResultTest, ConvertingCopyError) {
 }
 
 TEST_F(RetryStrategyResultTest, ConvertingMoveError) {
-    auto r1 =
-        RetryStrategy::Result<StringData>{statusNonRetriable, errorLabelsNonRetriable, target1};
+    auto r1 = RetryStrategy::Result<std::string_view>{
+        statusNonRetriable, errorLabelsNonRetriable, target1};
     auto r2 = RetryStrategy::Result<std::string>{std::move(r1)};
 
     ASSERT_FALSE(r2.isOK());
@@ -746,7 +749,7 @@ TEST_F(RetryStrategyResultTest, ConvertingMoveError) {
 }
 
 TEST_F(RetryStrategyResultTest, ConvertingStatusWithCopy) {
-    auto r1 = RetryStrategy::Result<StringData>{statusNonRetriable, {}};
+    auto r1 = RetryStrategy::Result<std::string_view>{statusNonRetriable, {}};
     auto sw = StatusWith<std::string>{r1};
 
     ASSERT_FALSE(sw.isOK());
@@ -754,7 +757,7 @@ TEST_F(RetryStrategyResultTest, ConvertingStatusWithCopy) {
 }
 
 TEST_F(RetryStrategyResultTest, ConvertingStatusWithMove) {
-    auto r1 = RetryStrategy::Result<StringData>{statusNonRetriable, {}};
+    auto r1 = RetryStrategy::Result<std::string_view>{statusNonRetriable, {}};
     auto sw = StatusWith<std::string>{std::move(r1)};
 
     ASSERT_FALSE(sw.isOK());

@@ -45,6 +45,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -56,8 +57,8 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Redact);
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceRedact final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$redact"_sd;
-    StringData getSourceName() const final;
+    static constexpr std::string_view kStageName = "$redact"_sd;
+    std::string_view getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize();
 
     static const Id& id;

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -40,11 +41,11 @@
 
 namespace mongo {
 
-constexpr StringData InternalSchemaAllElemMatchFromIndexMatchExpression::kName;
+constexpr std::string_view InternalSchemaAllElemMatchFromIndexMatchExpression::kName;
 
 InternalSchemaAllElemMatchFromIndexMatchExpression::
     InternalSchemaAllElemMatchFromIndexMatchExpression(
-        boost::optional<StringData> path,
+        boost::optional<std::string_view> path,
         long long index,
         std::unique_ptr<ExpressionWithPlaceholder> expression,
         clonable_ptr<ErrorAnnotation> annotation)

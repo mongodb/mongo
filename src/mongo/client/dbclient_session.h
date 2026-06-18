@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"
@@ -69,6 +68,7 @@
 #include <mutex>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -123,7 +123,7 @@ public:
      * @param server The server to connect to.
      */
     virtual void connect(const HostAndPort& server,
-                         StringData applicationName,
+                         std::string_view applicationName,
                          const boost::optional<TransientSSLParams>& transientSSLParams);
 
     /**
@@ -231,7 +231,7 @@ public:
         return _uri;
     }
 
-    static Status appendClientMetadata(StringData applicationName, BSONObjBuilder* bob);
+    static Status appendClientMetadata(std::string_view applicationName, BSONObjBuilder* bob);
 
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() override;

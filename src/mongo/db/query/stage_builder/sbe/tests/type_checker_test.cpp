@@ -30,14 +30,16 @@
 
 #include "mongo/db/query/stage_builder/sbe/type_checker.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::stage_builder {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace abt;
 
@@ -247,9 +249,9 @@ TEST(TypeCheckerTest, TypeCheckSwitch2) {
                   make<FunctionCall>("dateAdd",
                                      makeSeq(make<Variable>("timezoneVar"),
                                              make<Variable>("inputVar"),
-                                             Constant::str("hour"_sd),
+                                             Constant::str("hour"sv),
                                              Constant::int32(8),
-                                             Constant::str("UTC"_sd))),
+                                             Constant::str("UTC"sv))),
                   Constant::null()});
 
     TypeSignature sign = TypeChecker{}.typeCheck(tree);
@@ -604,12 +606,12 @@ TEST(TypeCheckerTest, NotOnNonBooleanCanReturnNothing) {
             .typesMask);
 }
 
-// The FunctionCall(StringData, ABTVector) constructor must resolve the string name to its EFn
+// The FunctionCall(std::string_view, ABTVector) constructor must resolve the string name to its EFn
 // value at construction time so that fn() returns the enum and name() returns the canonical string.
 TEST(TypeCheckerTest, FunctionCallStringConstructorResolvesEFn) {
     auto node = make<FunctionCall>("abs", ABTVector{});
     ASSERT_EQUALS(sbe::EFn::kAbs, node.cast<FunctionCall>()->fn());
-    ASSERT_EQUALS("abs"_sd, node.cast<FunctionCall>()->name());
+    ASSERT_EQUALS("abs"sv, node.cast<FunctionCall>()->name());
 }
 
 }  // namespace

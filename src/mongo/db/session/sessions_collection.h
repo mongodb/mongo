@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <functional>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -52,7 +53,7 @@ class OperationContext;
  */
 class MONGO_MOD_OPEN SessionsCollection {
 public:
-    static constexpr StringData kSessionsTTLIndex = "lsidTTLIndex"_sd;
+    static constexpr std::string_view kSessionsTTLIndex = "lsidTTLIndex"_sd;
 
     virtual ~SessionsCollection();
 

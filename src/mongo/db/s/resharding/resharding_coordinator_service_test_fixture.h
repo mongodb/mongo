@@ -68,6 +68,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -665,7 +666,7 @@ public:
         ASSERT_NE(coordDoc.getStartTime(), Date_t::min());
 
         auto donorShards = coordDoc.getDonorShards();
-        auto keyPre = [](StringData suffix) {
+        auto keyPre = [](std::string_view suffix) {
             return fmt::format("{}.$[].mutableState.{}",
                                ReshardingCoordinatorDocument::kDonorShardsFieldName,
                                suffix);

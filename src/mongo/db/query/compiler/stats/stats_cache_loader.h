@@ -39,6 +39,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 
@@ -61,7 +62,7 @@ public:
 
     virtual ~StatsCacheLoader() {}
 
-    static constexpr StringData kStatsPrefix = "system.statistics"_sd;
+    static constexpr std::string_view kStatsPrefix = "system.statistics"_sd;
 };
 
 }  // namespace mongo::stats

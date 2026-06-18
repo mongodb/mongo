@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
@@ -48,10 +47,12 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo::stage_builder {
+using namespace std::literals::string_view_literals;
 
 class GoldenSbeFilterBuilderTestFixture : public GoldenSbeExprBuilderTestFixture {
 public:
@@ -68,7 +69,7 @@ public:
                  boost::optional<SbSlot> rootSlot,
                  bool isFilterOverIxscan,
                  bool expected,
-                 StringData test,
+                 std::string_view test,
                  PlanStageSlots slots = {}) {
         auto sbExpr = generateFilter(*_state, expr, rootSlot, slots, isFilterOverIxscan);
 
@@ -82,7 +83,7 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
     auto root =
         BSON("_id" << 0 << "field1" << 5 << "arr" << BSON_ARRAY(4 << BSON("a" << 5)) << "str"
                    << "abc");
-    auto rootSlotId = _env->registerSlot("root"_sd,
+    auto rootSlotId = _env->registerSlot("root"sv,
                                          sbe::value::TypeTags::bsonObject,
                                          sbe::value::bitcastFrom<const char*>(root.objdata()),
                                          false,
@@ -95,7 +96,7 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 false /* expected */,
-                "AlwaysFalseMatchExpression"_sd);
+                "AlwaysFalseMatchExpression"sv);
     }
     {
         AlwaysTrueMatchExpression alwaysTrueExpr{};
@@ -103,33 +104,33 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "AlwaysTrueMatchExpression"_sd);
+                "AlwaysTrueMatchExpression"sv);
     }
     {
-        auto eq = std::make_unique<EqualityMatchExpression>("a"_sd, Value(5));
-        ElemMatchObjectMatchExpression elemMatchObjExpr("arr"_sd, std::move(eq));
+        auto eq = std::make_unique<EqualityMatchExpression>("a"sv, Value(5));
+        ElemMatchObjectMatchExpression elemMatchObjExpr("arr"sv, std::move(eq));
         runTest(&elemMatchObjExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "ElemMatchObjectMatchExpression"_sd);
+                "ElemMatchObjectMatchExpression"sv);
     }
     {
-        auto gt = std::make_unique<GTMatchExpression>(""_sd, Value(3));
-        ElemMatchValueMatchExpression elemMatchValExpr("arr"_sd, std::move(gt));
+        auto gt = std::make_unique<GTMatchExpression>(""sv, Value(3));
+        ElemMatchValueMatchExpression elemMatchValExpr("arr"sv, std::move(gt));
         runTest(&elemMatchValExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "ElemMatchValueMatchExpression"_sd);
+                "ElemMatchValueMatchExpression"sv);
     }
     {
-        ExistsMatchExpression existsExpr("not-exist"_sd);
+        ExistsMatchExpression existsExpr("not-exist"sv);
         runTest(&existsExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 false /* expected */,
-                "ExistsMatchExpression"_sd);
+                "ExistsMatchExpression"sv);
     }
     {
         auto field1Expr = ExpressionFieldPath::createPathFromString(
@@ -143,75 +144,75 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "ExprMatchExpression"_sd);
+                "ExprMatchExpression"sv);
     }
     {
-        InMatchExpression inExpr("field1"_sd);
+        InMatchExpression inExpr("field1"sv);
         BSONArray arr = BSON_ARRAY(3 << 4 << 5);
         ASSERT_OK(inExpr.setEqualitiesArray(std::move(arr)));
         runTest(&inExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "InMatchExpression"_sd);
+                "InMatchExpression"sv);
     }
     {
-        InMatchExpression inExpr("str"_sd);
-        ASSERT_OK(inExpr.addRegex(std::make_unique<RegexMatchExpression>(""_sd, "ABc", "i")));
+        InMatchExpression inExpr("str"sv);
+        ASSERT_OK(inExpr.addRegex(std::make_unique<RegexMatchExpression>(""sv, "ABc", "i")));
         BSONArray arr = BSON_ARRAY("3" << "4" << BSONNULL);
         ASSERT_OK(inExpr.setEqualitiesArray(std::move(arr)));
         runTest(&inExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "InMatchExpressionRegex"_sd);
+                "InMatchExpressionRegex"sv);
     }
     {
-        ModMatchExpression modExpr("field1"_sd, 4, 1);
+        ModMatchExpression modExpr("field1"sv, 4, 1);
         runTest(&modExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "ModMatchExpression"_sd);
+                "ModMatchExpression"sv);
     }
     {
         NorMatchExpression norExpr{};
-        norExpr.add(std::make_unique<EqualityMatchExpression>("field1"_sd, Value(4)));
+        norExpr.add(std::make_unique<EqualityMatchExpression>("field1"sv, Value(4)));
         runTest(&norExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "NorMatchExpression"_sd);
+                "NorMatchExpression"sv);
     }
     {
-        RegexMatchExpression regexExpr("str"_sd, "ABc", "i");
+        RegexMatchExpression regexExpr("str"sv, "ABc", "i");
         runTest(&regexExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "RegexMatchExpression"_sd);
+                "RegexMatchExpression"sv);
     }
     {
-        SizeMatchExpression sizeExpr("str"_sd, 4);
+        SizeMatchExpression sizeExpr("str"sv, 4);
         runTest(&sizeExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 false /* expected */,
-                "SizeMatchExpression"_sd);
+                "SizeMatchExpression"sv);
     }
     {
-        TypeMatchExpression typeExpr("field1"_sd, MatcherTypeSet{BSONType::numberInt});
+        TypeMatchExpression typeExpr("field1"sv, MatcherTypeSet{BSONType::numberInt});
         runTest(&typeExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "TypeMatchExpression"_sd);
+                "TypeMatchExpression"sv);
     }
 }
 
 TEST_F(GoldenSbeFilterBuilderTestFixture, TestBitsExpr) {
     auto root = BSON("_id" << 0 << "field1" << 5);
-    auto rootSlotId = _env->registerSlot("root"_sd,
+    auto rootSlotId = _env->registerSlot("root"sv,
                                          sbe::value::TypeTags::bsonObject,
                                          sbe::value::bitcastFrom<const char*>(root.objdata()),
                                          false,
@@ -219,43 +220,43 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestBitsExpr) {
     auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
     {
         // 35 has 0, 1, 5 bit positions set.
-        BitsAllClearMatchExpression bitsAllClearExp("field1"_sd, 35);
+        BitsAllClearMatchExpression bitsAllClearExp("field1"sv, 35);
         runTest(&bitsAllClearExp,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 false /* expected */,
-                "BitsAllClearMatchExpression"_sd);
+                "BitsAllClearMatchExpression"sv);
     }
     {
-        BitsAllSetMatchExpression bitsAllSetExp("field1"_sd, {0, 2});
+        BitsAllSetMatchExpression bitsAllSetExp("field1"sv, {0, 2});
         runTest(&bitsAllSetExp,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "BitsAllSetMatchExpression"_sd);
+                "BitsAllSetMatchExpression"sv);
     }
     {
         // 137 has 0, 3, 7 bit positions set.
-        BitsAnyClearMatchExpression bitsAnyClearExp("field1"_sd, 137);
+        BitsAnyClearMatchExpression bitsAnyClearExp("field1"sv, 137);
         runTest(&bitsAnyClearExp,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "BitsAnyClearMatchExpression"_sd);
+                "BitsAnyClearMatchExpression"sv);
     }
     {
-        BitsAnySetMatchExpression bitsAnySetExp("field1"_sd, {0, 2});
+        BitsAnySetMatchExpression bitsAnySetExp("field1"sv, {0, 2});
         runTest(&bitsAnySetExp,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "BitsAnySetMatchExpression"_sd);
+                "BitsAnySetMatchExpression"sv);
     }
 }
 
 TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
     auto root = BSON("_id" << 0 << "field1" << 5);
-    auto rootSlotId = _env->registerSlot("root"_sd,
+    auto rootSlotId = _env->registerSlot("root"sv,
                                          sbe::value::TypeTags::bsonObject,
                                          sbe::value::bitcastFrom<const char*>(root.objdata()),
                                          false,
@@ -263,48 +264,48 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
     auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
     {
         auto idxFieldSlotId = _env->registerSlot(
-            "field1"_sd, sbe::value::TypeTags::NumberInt32, 5 /* val */, true, &_slotIdGenerator);
+            "field1"sv, sbe::value::TypeTags::NumberInt32, 5 /* val */, true, &_slotIdGenerator);
         PlanStageSlots slots;
-        slots.set(std::make_pair(PlanStageSlots::kField, "field1"_sd), SbSlot{idxFieldSlotId});
-        GTEMatchExpression gteExpr("field1"_sd, Value(1));
+        slots.set(std::make_pair(PlanStageSlots::kField, "field1"sv), SbSlot{idxFieldSlotId});
+        GTEMatchExpression gteExpr("field1"sv, Value(1));
         runTest(&gteExpr,
                 rootSlot,
                 true /* isFilterOverIxscan */,
                 true /* expected */,
-                "GTEMatchExpression_isFilterOverIxscan"_sd,
+                "GTEMatchExpression_isFilterOverIxscan"sv,
                 slots);
     }
     {
-        GTEMatchExpression gteExpr("field1"_sd, Value(MinKeyLabeler{}));
+        GTEMatchExpression gteExpr("field1"sv, Value(MinKeyLabeler{}));
         runTest(&gteExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "GTEMatchExpression_MinKey"_sd);
+                "GTEMatchExpression_MinKey"sv);
     }
     {
-        GTEMatchExpression gteExpr("field1"_sd, Value(MaxKeyLabeler{}));
+        GTEMatchExpression gteExpr("field1"sv, Value(MaxKeyLabeler{}));
         runTest(&gteExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 false /* expected */,
-                "GTEMatchExpression_MaxKey"_sd);
+                "GTEMatchExpression_MaxKey"sv);
     }
     {
-        GTMatchExpression gtExpr("field1"_sd, Value(MinKeyLabeler{}));
+        GTMatchExpression gtExpr("field1"sv, Value(MinKeyLabeler{}));
         runTest(&gtExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "GTMatchExpression_MinKey"_sd);
+                "GTMatchExpression_MinKey"sv);
     }
     {
-        GTMatchExpression gtExpr("field1"_sd, Value(MaxKeyLabeler{}));
+        GTMatchExpression gtExpr("field1"sv, Value(MaxKeyLabeler{}));
         runTest(&gtExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 false /* expected */,
-                "GTMatchExpression_MaxKey"_sd);
+                "GTMatchExpression_MaxKey"sv);
     }
     {
         InternalExprEqMatchExpression eqExpr(root.firstElement().fieldNameStringData(),
@@ -313,7 +314,7 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "InternalExprEqMatchExpression"_sd);
+                "InternalExprEqMatchExpression"sv);
     }
     {
         InternalExprGTMatchExpression gtExpr(root.firstElement().fieldNameStringData(),
@@ -322,7 +323,7 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 false /* expected */,
-                "InternalExprGTMatchExpression"_sd);
+                "InternalExprGTMatchExpression"sv);
     }
     {
         InternalExprGTEMatchExpression gteExpr(root.firstElement().fieldNameStringData(),
@@ -331,7 +332,7 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "InternalExprGTEMatchExpression"_sd);
+                "InternalExprGTEMatchExpression"sv);
     }
     {
         InternalExprLTMatchExpression ltExpr(root.firstElement().fieldNameStringData(),
@@ -340,7 +341,7 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 false /* expected */,
-                "InternalExprLTMatchExpression"_sd);
+                "InternalExprLTMatchExpression"sv);
     }
     {
         InternalExprLTEMatchExpression lteExpr(root.firstElement().fieldNameStringData(),
@@ -349,59 +350,59 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "InternalExprLTEMatchExpression"_sd);
+                "InternalExprLTEMatchExpression"sv);
     }
     {
-        LTEMatchExpression lteExpr("field1"_sd, Value(10));
+        LTEMatchExpression lteExpr("field1"sv, Value(10));
         runTest(&lteExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "LTEMatchExpression"_sd);
+                "LTEMatchExpression"sv);
     }
     {
-        LTEMatchExpression lteExpr("field1"_sd, Value(MaxKeyLabeler{}));
+        LTEMatchExpression lteExpr("field1"sv, Value(MaxKeyLabeler{}));
         runTest(&lteExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "LTEMatchExpression_MaxKey"_sd);
+                "LTEMatchExpression_MaxKey"sv);
     }
     {
-        LTMatchExpression ltExpr("field1"_sd, Value(10));
+        LTMatchExpression ltExpr("field1"sv, Value(10));
         runTest(&ltExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 true /* expected */,
-                "LTMatchExpression"_sd);
+                "LTMatchExpression"sv);
     }
     {
-        LTMatchExpression ltExpr("field1"_sd, Value(MinKeyLabeler{}));
+        LTMatchExpression ltExpr("field1"sv, Value(MinKeyLabeler{}));
         runTest(&ltExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,
                 false /* expected */,
-                "LTMatchExpression_MinKey"_sd);
+                "LTMatchExpression_MinKey"sv);
     }
 }
 
 TEST_F(GoldenSbeFilterBuilderTestFixture, InternalExprEqOnDottedPathOverIxscan) {
-    auto abSlotId = _env->registerSlot("aDotB"_sd,
+    auto abSlotId = _env->registerSlot("aDotB"sv,
                                        sbe::value::TypeTags::NumberInt32,
                                        0 /* val */,
                                        true /* owned */,
                                        &_slotIdGenerator);
     PlanStageSlots slots;
-    slots.set(std::make_pair(PlanStageSlots::kField, "a.b"_sd), SbSlot{abSlotId});
+    slots.set(std::make_pair(PlanStageSlots::kField, "a.b"sv), SbSlot{abSlotId});
 
     auto rhs = BSON("" << 0);
-    InternalExprEqMatchExpression eqExpr("a.b"_sd, rhs.firstElement());
+    InternalExprEqMatchExpression eqExpr("a.b"sv, rhs.firstElement());
 
     runTest(&eqExpr,
             boost::none /* rootSlot, as at the IXSCAN level */,
             true /* isFilterOverIxscan */,
             true /* expected: slot value 0 == 0 */,
-            "InternalExprEqOnDottedPathOverIxscan"_sd,
+            "InternalExprEqOnDottedPathOverIxscan"sv,
             std::move(slots));
 }
 
@@ -419,7 +420,7 @@ public:
     void runTestWithPathArrayness(const MatchExpression* expr,
                                   boost::optional<SbSlot> rootSlot,
                                   bool expected,
-                                  StringData test,
+                                  std::string_view test,
                                   PlanStageSlots slots = {}) {
         auto sbExpr = generateFilter(*_state,
                                      expr,
@@ -438,7 +439,7 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFEli
     unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
 
     auto root = BSON("a" << BSON("b" << 1) << "c" << BSON("d" << 1));
-    auto rootSlotId = _env->registerSlot("root"_sd,
+    auto rootSlotId = _env->registerSlot("root"sv,
                                          sbe::value::TypeTags::bsonObject,
                                          sbe::value::bitcastFrom<const char*>(root.objdata()),
                                          false,
@@ -446,14 +447,14 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFEli
     auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
 
     {
-        EqualityMatchExpression eqExpr("a.b"_sd, Value(1));
+        EqualityMatchExpression eqExpr("a.b"sv, Value(1));
         runTestWithPathArrayness(
-            &eqExpr, rootSlot, true /* expected */, "TraverseFElided_KnownNonArrayPath"_sd);
+            &eqExpr, rootSlot, true /* expected */, "TraverseFElided_KnownNonArrayPath"sv);
     }
     {
-        EqualityMatchExpression eqExpr("c.d"_sd, Value(1));
+        EqualityMatchExpression eqExpr("c.d"sv, Value(1));
         runTestWithPathArrayness(
-            &eqExpr, rootSlot, true /* expected */, "TraverseFRetained_UnknownPath"_sd);
+            &eqExpr, rootSlot, true /* expected */, "TraverseFRetained_UnknownPath"sv);
     }
 }
 
@@ -464,7 +465,7 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
     // All null-matching predicates should return true (field path doesn't exist).
     {
         auto root = BSON("a" << 42);
-        auto rootSlotId = _env->registerSlot("scalarRoot"_sd,
+        auto rootSlotId = _env->registerSlot("scalarRoot"sv,
                                              sbe::value::TypeTags::bsonObject,
                                              sbe::value::bitcastFrom<const char*>(root.objdata()),
                                              false,
@@ -472,41 +473,37 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
         auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
 
         {
-            EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
-            runTestWithPathArrayness(&eqExpr,
-                                     rootSlot,
-                                     true /* expected */,
-                                     "NothingCheck_EqNull_ScalarIntermediate"_sd);
+            EqualityMatchExpression eqExpr("a.b"sv, Value(BSONNULL));
+            runTestWithPathArrayness(
+                &eqExpr, rootSlot, true /* expected */, "NothingCheck_EqNull_ScalarIntermediate"sv);
         }
         {
-            LTEMatchExpression lteExpr("a.b"_sd, Value(BSONNULL));
+            LTEMatchExpression lteExpr("a.b"sv, Value(BSONNULL));
             runTestWithPathArrayness(&lteExpr,
                                      rootSlot,
                                      true /* expected */,
-                                     "NothingCheck_LteNull_ScalarIntermediate"_sd);
+                                     "NothingCheck_LteNull_ScalarIntermediate"sv);
         }
         {
-            GTEMatchExpression gteExpr("a.b"_sd, Value(BSONNULL));
+            GTEMatchExpression gteExpr("a.b"sv, Value(BSONNULL));
             runTestWithPathArrayness(&gteExpr,
                                      rootSlot,
                                      true /* expected */,
-                                     "NothingCheck_GteNull_ScalarIntermediate"_sd);
+                                     "NothingCheck_GteNull_ScalarIntermediate"sv);
         }
         {
-            InMatchExpression inExpr("a.b"_sd);
+            InMatchExpression inExpr("a.b"sv);
             BSONArray arr = BSON_ARRAY(BSONNULL);
             ASSERT_OK(inExpr.setEqualitiesArray(std::move(arr)));
-            runTestWithPathArrayness(&inExpr,
-                                     rootSlot,
-                                     true /* expected */,
-                                     "NothingCheck_InNull_ScalarIntermediate"_sd);
+            runTestWithPathArrayness(
+                &inExpr, rootSlot, true /* expected */, "NothingCheck_InNull_ScalarIntermediate"sv);
         }
     }
 
     // Document with object intermediate: "a.b" is 1, not null.
     {
         auto root = BSON("a" << BSON("b" << 1));
-        auto rootSlotId = _env->registerSlot("objectRoot"_sd,
+        auto rootSlotId = _env->registerSlot("objectRoot"sv,
                                              sbe::value::TypeTags::bsonObject,
                                              sbe::value::bitcastFrom<const char*>(root.objdata()),
                                              false,
@@ -514,18 +511,18 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
         auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
 
         {
-            EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
+            EqualityMatchExpression eqExpr("a.b"sv, Value(BSONNULL));
             runTestWithPathArrayness(&eqExpr,
                                      rootSlot,
                                      false /* expected */,
-                                     "NothingCheck_EqNull_ObjectIntermediate"_sd);
+                                     "NothingCheck_EqNull_ObjectIntermediate"sv);
         }
     }
 
     // Document with missing field: "a" doesn't exist, so path is entirely absent.
     {
         auto root = BSONObj();
-        auto rootSlotId = _env->registerSlot("emptyRoot"_sd,
+        auto rootSlotId = _env->registerSlot("emptyRoot"sv,
                                              sbe::value::TypeTags::bsonObject,
                                              sbe::value::bitcastFrom<const char*>(root.objdata()),
                                              false,
@@ -533,9 +530,9 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
         auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
 
         {
-            EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
+            EqualityMatchExpression eqExpr("a.b"sv, Value(BSONNULL));
             runTestWithPathArrayness(
-                &eqExpr, rootSlot, true /* expected */, "NothingCheck_EqNull_MissingField"_sd);
+                &eqExpr, rootSlot, true /* expected */, "NothingCheck_EqNull_MissingField"sv);
         }
     }
 }

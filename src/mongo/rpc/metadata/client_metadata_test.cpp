@@ -50,21 +50,22 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kMetadataDoc = "client"_sd;
-constexpr auto kApplication = "application"_sd;
-constexpr auto kDriver = "driver"_sd;
-constexpr auto kName = "name"_sd;
-constexpr auto kPid = "pid"_sd;
-constexpr auto kType = "type"_sd;
-constexpr auto kVersion = "version"_sd;
-constexpr auto kOperatingSystem = "os"_sd;
-constexpr auto kArchitecture = "architecture"_sd;
-constexpr auto kMongos = "mongos"_sd;
-constexpr auto kClient = "client"_sd;
-constexpr auto kHost = "host"_sd;
+constexpr auto kMetadataDoc = "client"sv;
+constexpr auto kApplication = "application"sv;
+constexpr auto kDriver = "driver"sv;
+constexpr auto kName = "name"sv;
+constexpr auto kPid = "pid"sv;
+constexpr auto kType = "type"sv;
+constexpr auto kVersion = "version"sv;
+constexpr auto kOperatingSystem = "os"sv;
+constexpr auto kArchitecture = "architecture"sv;
+constexpr auto kMongos = "mongos"sv;
+constexpr auto kClient = "client"sv;
+constexpr auto kHost = "host"sv;
 
-constexpr auto kUnknown = "unkown"_sd;
+constexpr auto kUnknown = "unkown"sv;
 
 #define ASSERT_DOC_OK(...)                                                                \
     do {                                                                                  \

@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -56,6 +55,7 @@
 #include <mutex>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>
@@ -127,7 +127,7 @@ public:
     using FindDocumentsFn =
         std::function<StatusWith<std::vector<BSONObj>>(OperationContext*,
                                                        const NamespaceString&,
-                                                       boost::optional<StringData>,
+                                                       boost::optional<std::string_view>,
                                                        ScanDirection,
                                                        const BSONObj&,
                                                        BoundInclusion,
@@ -135,7 +135,7 @@ public:
     using DeleteDocumentsFn =
         std::function<StatusWith<std::vector<BSONObj>>(OperationContext*,
                                                        const NamespaceString&,
-                                                       boost::optional<StringData>,
+                                                       boost::optional<std::string_view>,
                                                        ScanDirection,
                                                        const BSONObj&,
                                                        BoundInclusion,
@@ -236,7 +236,7 @@ public:
 
     StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   boost::optional<StringData> indexName,
+                                                   boost::optional<std::string_view> indexName,
                                                    ScanDirection scanDirection,
                                                    const BSONObj& startKey,
                                                    BoundInclusion boundInclusion,
@@ -247,7 +247,7 @@ public:
 
     StatusWith<std::vector<BSONObj>> deleteDocuments(OperationContext* opCtx,
                                                      const NamespaceString& nss,
-                                                     boost::optional<StringData> indexName,
+                                                     boost::optional<std::string_view> indexName,
                                                      ScanDirection scanDirection,
                                                      const BSONObj& startKey,
                                                      BoundInclusion boundInclusion,
@@ -455,7 +455,7 @@ public:
     };
     FindDocumentsFn findDocumentsFn = [](OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         boost::optional<StringData> indexName,
+                                         boost::optional<std::string_view> indexName,
                                          ScanDirection scanDirection,
                                          const BSONObj& startKey,
                                          BoundInclusion boundInclusion,
@@ -464,7 +464,7 @@ public:
     };
     DeleteDocumentsFn deleteDocumentsFn = [](OperationContext* opCtx,
                                              const NamespaceString& nss,
-                                             boost::optional<StringData> indexName,
+                                             boost::optional<std::string_view> indexName,
                                              ScanDirection scanDirection,
                                              const BSONObj& startKey,
                                              BoundInclusion boundInclusion,

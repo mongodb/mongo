@@ -33,6 +33,8 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/pipeline/document_path_support.h"
 
+#include <string_view>
+
 namespace mongo {
 
 MatchProcessor::MatchProcessor(std::unique_ptr<MatchExpression> expr,
@@ -71,7 +73,7 @@ bool MatchProcessor::process(const Document& input, const EvaluationContext& ctx
 }
 
 bool MatchProcessor::dependenciesHaveUniqueFirstFields(const OrderedPathSet& paths) {
-    boost::optional<StringData> prevFirstField = boost::none;
+    boost::optional<std::string_view> prevFirstField = boost::none;
     for (auto&& path : paths) {
         auto firstField = FieldPath::extractFirstFieldFromDottedPath(path);
         if (prevFirstField == firstField) {

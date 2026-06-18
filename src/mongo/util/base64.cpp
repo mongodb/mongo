@@ -36,6 +36,7 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -49,7 +50,7 @@ bool valid(unsigned char x) {
 }
 
 template <typename Mode, typename Writer>
-void encodeImpl(Writer&& write, StringData in) {
+void encodeImpl(Writer&& write, std::string_view in) {
     static_assert(Mode::kEncodeTable.size() == 64, "Invalid encoding table");
     const char* data = in.data();
     std::size_t size = in.size();
@@ -114,7 +115,7 @@ void encodeImpl(Writer&& write, StringData in) {
 }
 
 template <typename Mode, typename Writer>
-void decodeImpl(const Writer& write, StringData in) {
+void decodeImpl(const Writer& write, std::string_view in) {
     static_assert(Mode::kDecodeTable.size() == 256, "Invalid decode table");
     const char* data = in.data();
     std::size_t size = in.size();
@@ -189,7 +190,7 @@ void decodeImpl(const Writer& write, StringData in) {
 }  // namespace
 
 template <typename Mode>
-std::string Base64Impl<Mode>::encode(StringData in) {
+std::string Base64Impl<Mode>::encode(std::string_view in) {
     std::string r;
     r.reserve(encodedLength(in.size()));
     encodeImpl<Mode>([&](const char* s, std::size_t n) { r.append(s, s + n); }, in);
@@ -197,7 +198,7 @@ std::string Base64Impl<Mode>::encode(StringData in) {
 }
 
 template <typename Mode>
-std::string Base64Impl<Mode>::decode(StringData in) {
+std::string Base64Impl<Mode>::decode(std::string_view in) {
     std::string r;
     r.reserve(in.size() / 4 * 3);
     decodeImpl<Mode>([&](const char* s, std::size_t n) { r.append(s, s + n); }, in);
@@ -205,29 +206,29 @@ std::string Base64Impl<Mode>::decode(StringData in) {
 }
 
 template <typename Mode>
-void Base64Impl<Mode>::encode(std::stringstream& ss, StringData in) {
+void Base64Impl<Mode>::encode(std::stringstream& ss, std::string_view in) {
     encodeImpl<Mode>([&](const char* s, std::size_t n) { ss.write(s, n); }, in);
 }
 
 template <typename Mode>
-void Base64Impl<Mode>::decode(std::stringstream& ss, StringData in) {
+void Base64Impl<Mode>::decode(std::stringstream& ss, std::string_view in) {
     decodeImpl<Mode>([&](const char* s, std::size_t n) { ss.write(s, n); }, in);
 }
 
 template <typename Mode>
-void Base64Impl<Mode>::encode(fmt::memory_buffer& buffer, StringData in) {
+void Base64Impl<Mode>::encode(fmt::memory_buffer& buffer, std::string_view in) {
     buffer.reserve(buffer.size() + encodedLength(in.size()));
     encodeImpl<Mode>([&](const char* s, std::size_t n) { buffer.append(s, s + n); }, in);
 }
 
 template <typename Mode>
-void Base64Impl<Mode>::decode(fmt::memory_buffer& buffer, StringData in) {
+void Base64Impl<Mode>::decode(fmt::memory_buffer& buffer, std::string_view in) {
     buffer.reserve(buffer.size() + in.size() / 4 * 3);
     decodeImpl<Mode>([&](const char* s, std::size_t n) { buffer.append(s, s + n); }, in);
 }
 
 template <>
-bool Base64Impl<Standard>::validate(StringData s) {
+bool Base64Impl<Standard>::validate(std::string_view s) {
     if (s.size() % 4) {
         return false;
     }
@@ -244,7 +245,7 @@ bool Base64Impl<Standard>::validate(StringData s) {
 }
 
 template <>
-bool Base64Impl<URL>::validate(StringData s) {
+bool Base64Impl<URL>::validate(std::string_view s) {
     if (s.empty()) {
         return true;
     }

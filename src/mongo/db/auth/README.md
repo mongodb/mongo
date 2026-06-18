@@ -387,7 +387,7 @@ information.
 
 [`UserName`](user_name.h) and [`RoleName`](role_name.h) specializations are CRTP defined to include
 additional `getUser()` and `getRole()` accessors which proxy to `getName()`, and provide a set of
-`constexpr StringData` identifiers relating to their type.
+`constexpr std::string_view` identifiers relating to their type.
 
 #### Serializations
 
@@ -399,8 +399,8 @@ additional `getUser()` and `getRole()` accessors which proxy to `getName()`, and
 #### Multitenancy
 
 `AuthName` objects may be associated with a `TenantId` either separately via
-`AuthName(StringData name, StringData db, boost::optional<TenantId> tenant = boost::none)` or using
-the compound `DatabaseName` type `AuthName(StringData name, DatabaseName db)`.
+`AuthName(std::string_view name, std::string_view db, boost::optional<TenantId> tenant = boost::none)`
+or using the compound `DatabaseName` type `AuthName(std::string_view name, DatabaseName db)`.
 
 When a `TenantId` is associated with an `AuthName`, it will NOT be included in `BSON` or `String`
 serializations unless explicitly requested with a boolean argument to these functions.

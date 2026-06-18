@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -91,7 +91,7 @@ public:
      * DO NOT call this method directly. Instead, use the ALLOCATE_STAGE_PARAMS_ID macro defined
      * in this file.
      */
-    static Id allocateId(StringData name);
+    static Id allocateId(std::string_view name);
 };
 
 using StageParamsPipeline = std::vector<std::unique_ptr<StageParams>>;

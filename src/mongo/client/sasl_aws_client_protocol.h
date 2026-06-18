@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_aws_protocol_common.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -49,7 +49,7 @@ std::string generateClientFirst(std::vector<char>* clientNonce);
 /**
  * Parse AWS Auth server first message and generate client second.
  */
-std::string generateClientSecond(StringData serverFirst,
+std::string generateClientSecond(std::string_view serverFirst,
                                  const std::vector<char>& clientNonce,
                                  const AWSCredentials& credentials);
 
@@ -59,7 +59,7 @@ std::string generateClientSecond(StringData serverFirst,
  *
  * The input is expected to be a simple line that ends in a newline (\n).
  */
-std::string parseRoleFromEC2IamSecurityCredentials(StringData data);
+std::string parseRoleFromEC2IamSecurityCredentials(std::string_view data);
 
 /**
  * Get the AWS region from a DNS Name
@@ -72,7 +72,7 @@ std::string parseRoleFromEC2IamSecurityCredentials(StringData data);
  * first.second           second
  * first                  us-east-1
  */
-std::string getRegionFromHost(StringData host);
+std::string getRegionFromHost(std::string_view host);
 
 /**
  * Get a set of AWS Credentials from a request to
@@ -94,7 +94,7 @@ std::string getRegionFromHost(StringData host);
  *   "Expiration" : "EXPIRATION_DATE"
  * }
  */
-AWSCredentials parseCredentialsFromEC2IamSecurityCredentials(StringData data);
+AWSCredentials parseCredentialsFromEC2IamSecurityCredentials(std::string_view data);
 
 /**
  * Get a set of AWS Credentials from a request to
@@ -113,7 +113,7 @@ AWSCredentials parseCredentialsFromEC2IamSecurityCredentials(StringData data);
  *     "Token": "SECURITY_TOKEN_STRING"
  * }
  */
-AWSCredentials parseCredentialsFromECSTaskIamCredentials(StringData data);
+AWSCredentials parseCredentialsFromECSTaskIamCredentials(std::string_view data);
 
 }  // namespace awsIam
 }  // namespace mongo

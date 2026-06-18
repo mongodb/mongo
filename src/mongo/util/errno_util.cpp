@@ -29,6 +29,7 @@
 
 #include "mongo/util/errno_util.h"
 
+#include <string_view>
 #include <system_error>
 
 #include <fmt/format.h>
@@ -43,6 +44,7 @@
 #endif
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 #ifdef _WIN32
 namespace errno_util_win32_detail {
@@ -81,9 +83,9 @@ std::string errorMessage(std::error_code ec) {
     std::string r = ec.message();
     bool vague = false;
 #if defined(_WIN32)
-    vague = (r == "unknown error"_sd);
+    vague = (r == "unknown error"sv);
 #elif defined(_LIBCPP_VERSION)
-    vague = StringData{r}.starts_with("unspecified"_sd);
+    vague = std::string_view{r}.starts_with("unspecified"sv);
 #endif
     if (vague)
         return fmt::format("Unknown error {}", ec.value());

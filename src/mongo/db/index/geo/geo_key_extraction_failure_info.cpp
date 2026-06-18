@@ -30,11 +30,11 @@
 #include "mongo/db/index/geo/geo_key_extraction_failure_info.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -42,11 +42,11 @@ namespace {
 
 // Nested under errInfo so drivers surface these fields to users as details; fields placed
 // elsewhere on the writeError are dropped before reaching the user.
-constexpr auto kErrInfoFieldName = "errInfo"_sd;
-constexpr auto kFailingPathFieldName = "failingPath"_sd;
-constexpr auto kUnderlyingCodeFieldName = "underlyingCode"_sd;
-constexpr auto kUnderlyingReasonFieldName = "underlyingReason"_sd;
-constexpr auto kFailingElementFieldName = "failingElement"_sd;
+constexpr std::string_view kErrInfoFieldName = "errInfo";
+constexpr std::string_view kFailingPathFieldName = "failingPath";
+constexpr std::string_view kUnderlyingCodeFieldName = "underlyingCode";
+constexpr std::string_view kUnderlyingReasonFieldName = "underlyingReason";
+constexpr std::string_view kFailingElementFieldName = "failingElement";
 
 }  // namespace
 

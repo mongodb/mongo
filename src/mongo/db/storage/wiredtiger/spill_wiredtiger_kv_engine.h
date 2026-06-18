@@ -33,6 +33,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class ClockSource;
@@ -53,11 +55,11 @@ public:
     ~SpillWiredTigerKVEngine() override;
 
     std::unique_ptr<RecordStore> getInternalRecordStore(RecoveryUnit& ru,
-                                                        StringData ident,
+                                                        std::string_view ident,
                                                         KeyFormat keyFormat) override;
 
     std::unique_ptr<RecordStore> makeInternalRecordStore(RecoveryUnit& ru,
-                                                         StringData ident,
+                                                         std::string_view ident,
                                                          KeyFormat keyFormat) override;
 
     int64_t storageSize(RecoveryUnit& ru);
@@ -66,21 +68,21 @@ public:
         return std::make_unique<WiredTigerRecoveryUnit>(_connection.get());
     }
 
-    int64_t getIdentSize(RecoveryUnit&, StringData ident) override;
+    int64_t getIdentSize(RecoveryUnit&, std::string_view ident) override;
 
-    bool hasIdent(RecoveryUnit&, StringData ident) const override;
+    bool hasIdent(RecoveryUnit&, std::string_view ident) const override;
 
     std::vector<std::string> getAllIdents(RecoveryUnit&) const override;
 
     Status dropIdent(RecoveryUnit& ru,
-                     StringData ident,
+                     std::string_view ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr,
                      boost::optional<uint64_t> schemaEpoch = boost::none) override;
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,
-                                                StringData ident,
+                                                std::string_view ident,
                                                 const RecordStore::Options& options,
                                                 boost::optional<UUID> uuid) override {
         MONGO_UNREACHABLE;
@@ -90,7 +92,7 @@ public:
                                                                 RecoveryUnit& ru,
                                                                 const NamespaceString& nss,
                                                                 const UUID& uuid,
-                                                                StringData ident,
+                                                                std::string_view ident,
                                                                 const IndexConfig& config,
                                                                 KeyFormat keyFormat) override {
         MONGO_UNREACHABLE;
@@ -99,7 +101,7 @@ public:
     Status createRecordStore(const rss::PersistenceProvider&,
                              RecoveryUnit& ru,
                              const NamespaceString& nss,
-                             StringData ident,
+                             std::string_view ident,
                              const RecordStore::Options& options) override {
         MONGO_UNREACHABLE;
     }
@@ -134,21 +136,21 @@ public:
         RecoveryUnit&,
         const NamespaceString& nss,
         const UUID& uuid,
-        StringData ident,
+        std::string_view ident,
         const IndexConfig& indexConfig,
         const boost::optional<mongo::BSONObj>& storageEngineOptions) override {
         MONGO_UNREACHABLE;
     }
 
-    Status dropSortedDataInterface(RecoveryUnit&, StringData ident) override {
+    Status dropSortedDataInterface(RecoveryUnit&, std::string_view ident) override {
         MONGO_UNREACHABLE;
     }
 
-    Status repairIdent(RecoveryUnit& ru, StringData ident) override {
+    Status repairIdent(RecoveryUnit& ru, std::string_view ident) override {
         MONGO_UNREACHABLE;
     }
 
-    void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override {
+    void dropIdentForImport(Interruptible&, RecoveryUnit&, std::string_view ident) override {
         MONGO_UNREACHABLE;
     }
 
@@ -184,13 +186,13 @@ public:
     }
 
     BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
-                                    StringData flagName,
+                                    std::string_view flagName,
                                     boost::optional<bool> flagValue) const override {
         MONGO_UNREACHABLE;
     }
 
     boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
-                                                    StringData flagName) const override {
+                                                    std::string_view flagName) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -224,7 +226,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void publishIdent(WiredTigerRecoveryUnit& ru, StringData ident, uint64_t schemaEpoch) override {
+    void publishIdent(WiredTigerRecoveryUnit& ru,
+                      std::string_view ident,
+                      uint64_t schemaEpoch) override {
         MONGO_UNREACHABLE;
     }
 

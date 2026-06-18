@@ -39,6 +39,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC executor {
@@ -46,13 +47,13 @@ namespace MONGO_MOD_PUBLIC executor {
 /**
  * Returns a new NetworkInterface that uses a connection pool with the default options.
  */
-std::unique_ptr<NetworkInterface> makeNetworkInterface(StringData instanceName);
+std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string_view instanceName);
 
 /**
  * Returns a new NetworkInterface with the given connection hook set.
  */
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
-    StringData instanceName,
+    std::string_view instanceName,
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
     ConnectionPool::Options options = ConnectionPool::Options(),
@@ -66,14 +67,14 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
  * Handshake (e.g. hello/auth) during setup.
  */
 std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
-    StringData instanceName, std::unique_ptr<rpc::EgressMetadataHook> metadataHook = nullptr);
+    std::string_view instanceName, std::unique_ptr<rpc::EgressMetadataHook> metadataHook = nullptr);
 #endif
 
 /**
  * Returns a new NetworkInterface that uses the provided AsyncClientFactory.
  */
 std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
-    StringData instanceName,
+    std::string_view instanceName,
     std::shared_ptr<AsyncClientFactory> clientFactory,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
     bool trackRequestCounts = false);

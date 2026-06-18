@@ -50,6 +50,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -70,7 +71,7 @@ extern FailPoint sleepWhileMultiplanning;
  */
 class MultiPlanStage final : public RequiresCollectionStage {
 public:
-    static constexpr StringData kStageType = "MULTI_PLAN"_sd;
+    static constexpr std::string_view kStageType = "MULTI_PLAN"_sd;
 
     struct EstimationResult {
         // The total cost of all plans (sum of plan costs).

@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <queue>
+#include <string_view>
 
 namespace mongo {
 /*
@@ -96,7 +97,9 @@ private:
      * executor is shutting down, the task is not re-enqueued (it will be recovered from disk on
      * the next step-up).
      */
-    void _rescheduleRangeDeletion(const RangeDeletionTask& task, Seconds delay, StringData reason);
+    void _rescheduleRangeDeletion(const RangeDeletionTask& task,
+                                  Seconds delay,
+                                  std::string_view reason);
 
     ServiceContext* const _service;
 

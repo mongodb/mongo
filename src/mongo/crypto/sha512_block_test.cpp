@@ -42,11 +42,12 @@
 
 #include <ostream>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
 
-ConstDataRange makeTestItem(StringData sd) {
+ConstDataRange makeTestItem(std::string_view sd) {
     return ConstDataRange(sd.data(), sd.size());
 }
 

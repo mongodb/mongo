@@ -42,6 +42,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::mozjs {
@@ -323,7 +325,7 @@ void WasmtimeImplScope::setNumber(const char* field, double val) {
     _bridge->setGlobalValue(field, BSON("" << val));
 }
 
-void WasmtimeImplScope::setString(const char* field, StringData val) {
+void WasmtimeImplScope::setString(const char* field, std::string_view val) {
     _bridge->setGlobalValue(field, BSON("" << val));
 }
 

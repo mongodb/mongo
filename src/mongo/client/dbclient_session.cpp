@@ -78,6 +78,7 @@
 #include <cmath>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -88,6 +89,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 // Tracks the number of times DbClientSession detects that the connection has been broken in
 // ensureConnection() and attempts to reconnect.
@@ -167,7 +169,7 @@ StatusWith<bool> completeSpeculativeAuth(DBClientSession* conn,
  */
 executor::RemoteCommandResponse initWireVersion(
     DBClientSession* conn,
-    StringData applicationName,
+    std::string_view applicationName,
     const MongoURI& uri,
     std::vector<std::string>* saslMechsForAuth,
     auth::SpeculativeAuthType* speculativeAuthType,
@@ -256,7 +258,7 @@ boost::optional<Milliseconds> clampTimeout(double timeoutInSec) {
 }  // namespace
 
 void DBClientSession::connect(const HostAndPort& serverAddress,
-                              StringData applicationName,
+                              std::string_view applicationName,
                               const boost::optional<TransientSSLParams>& transientSSLParams) {
 
     // Internal connections must always carry an applicationName so that server-side policies
@@ -286,7 +288,7 @@ void DBClientSession::connect(const HostAndPort& serverAddress,
     if (!swHelloReply.isOK()) {
         _markFailed(kSetFlag);
         swHelloReply.status.addContext(
-            "Connection handshake failed. Is your mongod/mongos 3.4 or older?"_sd);
+            "Connection handshake failed. Is your mongod/mongos 3.4 or older?"sv);
         uassertStatusOK(swHelloReply.status);
     }
 
@@ -478,7 +480,8 @@ uint64_t DBClientSession::getSockCreationMicroSec() const {
     }
 }
 
-Status DBClientSession::appendClientMetadata(StringData applicationName, BSONObjBuilder* bob) {
+Status DBClientSession::appendClientMetadata(std::string_view applicationName,
+                                             BSONObjBuilder* bob) {
     auto versionString = VersionInfoInterface::instance().version();
 
     return ClientMetadata::serialize(

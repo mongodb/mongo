@@ -43,6 +43,7 @@
 
 #include <map>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -103,7 +104,7 @@ public:
      */
     std::string determineHorizon(const Parameters& horizonParameters) const;
 
-    const HostAndPort& getHostAndPort(StringData horizon) const {
+    const HostAndPort& getHostAndPort(std::string_view horizon) const {
         invariant(!_forwardMapping.empty());
         invariant(!horizon.empty());
         auto found = _forwardMapping.find(horizon);

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
@@ -59,6 +58,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -295,7 +295,7 @@ public:
                             TickSource::Tick curTicks,
                             TransactionRouter::TerminationCause terminationCause,
                             TransactionRouter::CommitType commitType,
-                            StringData abortCause);
+                            std::string_view abortCause);
 
     private:
         // Pointer to the service context used to get the tick source and router wide transaction
@@ -444,7 +444,7 @@ public:
          * TODO SERVER-37207: Change batch writes to retry only the failed writes in a batch, to
          * allow retrying writes beyond the first overall statement.
          */
-        bool canContinueOnStaleShardOrDbError(StringData cmdName, const Status& status) const;
+        bool canContinueOnStaleShardOrDbError(std::string_view cmdName, const Status& status) const;
 
         /**
          * Updates the transaction state to allow for a retry of the current command on a stale
@@ -452,7 +452,7 @@ public:
          * throw if the transaction cannot be continued.
          */
         void onStaleShardOrDbError(OperationContext* opCtx,
-                                   StringData cmdName,
+                                   std::string_view cmdName,
                                    const Status& status);
 
         /**

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -38,7 +39,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -108,6 +108,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -116,6 +117,7 @@
 
 namespace mongo::transport {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace admission;
 
@@ -126,7 +128,7 @@ const Status kArbitraryError{ErrorCodes::InternalError, "Something happened"};
 
 // Returns true iff `body` carries all of `expectedLabels` in its errorLabels array and no
 // additional labels.
-bool hasErrorLabels(const BSONObj& body, std::vector<StringData> expectedLabels) {
+bool hasErrorLabels(const BSONObj& body, std::vector<std::string_view> expectedLabels) {
     if (!body.hasField(kErrorLabelsFieldName)) {
         return false;
     }
@@ -136,11 +138,12 @@ bool hasErrorLabels(const BSONObj& body, std::vector<StringData> expectedLabels)
         return false;
     }
 
-    return std::all_of(expectedLabels.begin(), expectedLabels.end(), [&](StringData expected) {
-        return std::any_of(labels.begin(), labels.end(), [&](const BSONElement& e) {
-            return e.String() == expected;
+    return std::all_of(
+        expectedLabels.begin(), expectedLabels.end(), [&](std::string_view expected) {
+            return std::any_of(labels.begin(), labels.end(), [&](const BSONElement& e) {
+                return e.String() == expected;
+            });
         });
-    });
 }
 
 template <typename F>
@@ -174,8 +177,8 @@ struct FunctionTraits<R(A...)> {
 enum class Event { EVENT_TABLE(X) };
 #undef X
 
-StringData toString(Event e) {
-#define X(e, sig) #e ""_sd,
+std::string_view toString(Event e) {
+#define X(e, sig) #e ""sv,
     return std::array{EVENT_TABLE(X)}[static_cast<size_t>(e)];
 #undef X
 }
@@ -663,7 +666,7 @@ TEST_F(SessionWorkflowTest, CleanupFromGetMore) {
             p.emplaceValue(msg);
             return makeResponse({});
         });
-    ASSERT_EQ(OpMsgRequest::parse(killCursors.future.get()).getCommandName(), "killCursors"_sd);
+    ASSERT_EQ(OpMsgRequest::parse(killCursors.future.get()).getCommandName(), "killCursors"sv);
 
     // Because they're fire-and-forget commands, we will only observe `handleRequest`
     // calls to the SEP for the cleanup "killCursors", and the next thing to happen
@@ -862,8 +865,8 @@ public:
 
 private:
     double _convertBurstSizeToBurstCapacitySecs(double refreshRate, double burstSize) {
-        // Rounding needed to ensure that the conversion back to burstSize won't be incorrect due
-        // to imprecisions in floating point division.
+        // Rounding needed to ensure that the conversion back to burstSize won't be incorrect
+        // due to imprecisions in floating point division.
         return std::round(burstSize / refreshRate);
     }
 
@@ -980,7 +983,8 @@ TEST_F(IngressRequestRateLimiterTest, IterationFrameClearsDeferredAdmissionToken
 
 TEST_F(IngressRequestRateLimiterTest, ImmediateRejectionHasExpectedErrorLabels) {
     enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
-    // Default maxQueueDepth is 0: requests are rejected immediately when the burst is exhausted.
+    // Default maxQueueDepth is 0: requests are rejected immediately when the burst is
+    // exhausted.
 
     startSession();
 
@@ -1030,8 +1034,8 @@ TEST_F(IngressRequestRateLimiterTest, QueueDepthExceededRejectionHasExpectedErro
     runSepHandleRequest([](OperationContext*, const Message&) { return makeResponse(Message{}); });
 
     // Fill the single queue slot using a separate client so that the session's iter 2 request
-    // finds the queue at capacity. The session_workflow blocks in sessionSourceMessage.pop() until
-    // we push a handler, so filling the queue here is safe from races.
+    // finds the queue at capacity. The session_workflow blocks in sessionSourceMessage.pop()
+    // until we push a handler, so filling the queue here is safe from races.
     auto queueFillerClient =
         getServiceContext()->getService()->makeClient("queue-depth-rejection-test");
     ASSERT_TRUE(
@@ -1260,8 +1264,8 @@ public:
     enum class Action { ACTION_TABLE(X) };
 #undef X
 
-    friend StringData toString(Action action) {
-#define X(a) #a ""_sd,
+    friend std::string_view toString(Action action) {
+#define X(a) #a ""sv,
         return std::array{ACTION_TABLE(X)}[static_cast<size_t>(action)];
 #undef X
     }

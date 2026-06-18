@@ -85,6 +85,7 @@
 
 #include <iterator>
 #include <mutex>
+#include <string_view>
 #include <tuple>
 
 #include <boost/move/utility_core.hpp>
@@ -436,7 +437,7 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx,
     });
 }
 
-void performNoopMajorityWriteLocally(OperationContext* opCtx, StringData msg) {
+void performNoopMajorityWriteLocally(OperationContext* opCtx, std::string_view msg) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     {

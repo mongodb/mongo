@@ -31,7 +31,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -77,6 +76,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -566,14 +566,14 @@ public:
     /**
      * Sets the message for FailPoints used.
      */
-    void setFailPointMessage(WithLock, StringData message) {
+    void setFailPointMessage(WithLock, std::string_view message) {
         _failPointMessage = std::string{message};
     }
 
     /**
      * Sets the message for this CurOp.
      */
-    void setMessage(WithLock lk, StringData message);
+    void setMessage(WithLock lk, std::string_view message);
 
     /**
      * Sets the message and the progress meter for this CurOp.
@@ -582,7 +582,7 @@ public:
      * locking scheme as CurOp. It is necessary to hold the lock while this method executes.
      */
     ProgressMeter& setProgress(WithLock,
-                               StringData name,
+                               std::string_view name,
                                unsigned long long progressMeterTotal = 0,
                                int secondsBetween = 3);
 
@@ -666,11 +666,11 @@ public:
     void setNS(WithLock, NamespaceString nss);
     void setNS(WithLock, const DatabaseName& dbName);
 
-    StringData getPlanSummary() const {
+    std::string_view getPlanSummary() const {
         return _planSummary;
     }
 
-    void setPlanSummary(WithLock, StringData summary) {
+    void setPlanSummary(WithLock, std::string_view summary) {
         _planSummary = std::string{summary};
     }
 

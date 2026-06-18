@@ -32,13 +32,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-namespace mongo::substr_utils {
+#include <string_view>
 
-StringData getSubstringCP(StringData input, int startingPos, int len) {
+namespace mongo::substr_utils {
+using namespace std::literals::string_view_literals;
+
+std::string_view getSubstringCP(std::string_view input, int startingPos, int len) {
     std::size_t startIndexBytes = 0;
     for (int i = 0; i < startingPos; ++i) {
         if (startIndexBytes >= input.size()) {
-            return ""_sd;
+            return ""sv;
         }
         uassert(34456,
                 "$substrCP: invalid UTF-8 string",

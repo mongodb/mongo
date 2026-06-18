@@ -31,7 +31,6 @@
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -44,9 +43,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 // Make this test suite robust against changes to WT default open options.
 static constexpr auto kWiredTigerAllocationSize = 4096;
 static constexpr auto kExtraOpenOptions = "allocation_size=4K";
@@ -122,7 +124,7 @@ TEST_F(SpillWiredTigerKVEngineTest, StorageSize) {
 }
 
 TEST_F(SpillWiredTigerKVEngineTest, InFlightDrop) {
-    FailPoint* fp = globalFailPointRegistry().find("hangOnSpillWiredTigerKVEngineCleanShutdown"_sd);
+    FailPoint* fp = globalFailPointRegistry().find("hangOnSpillWiredTigerKVEngineCleanShutdown"sv);
     const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
     auto kvEngine = makeKvEngine();
     auto ru = kvEngine->newRecoveryUnit();
@@ -186,7 +188,7 @@ TEST_F(SpillWiredTigerKVEngineTest, BusyInFlightDrop) {
 }
 
 TEST_F(SpillWiredTigerKVEngineTest, InFlightTruncation) {
-    FailPoint* fp = globalFailPointRegistry().find("hangOnSpillWiredTigerKVEngineCleanShutdown"_sd);
+    FailPoint* fp = globalFailPointRegistry().find("hangOnSpillWiredTigerKVEngineCleanShutdown"sv);
     const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
     auto kvEngine = makeKvEngine();
     auto ru = kvEngine->newRecoveryUnit();
@@ -237,7 +239,7 @@ TEST_F(SpillWiredTigerKVEngineTest, BusyInFlightTruncation) {
 }
 
 TEST_F(SpillWiredTigerKVEngineTest, SetIsolationMidShutdown) {
-    FailPoint* fp = globalFailPointRegistry().find("hangOnSpillWiredTigerKVEngineCleanShutdown"_sd);
+    FailPoint* fp = globalFailPointRegistry().find("hangOnSpillWiredTigerKVEngineCleanShutdown"sv);
     const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
     auto kvEngine = makeKvEngine();
     auto ru = kvEngine->newRecoveryUnit();
@@ -262,7 +264,7 @@ TEST_F(SpillWiredTigerKVEngineTest, SetIsolationMidShutdown) {
 }
 
 TEST_F(SpillWiredTigerKVEngineTest, IdentStatusesMidShutdown) {
-    FailPoint* fp = globalFailPointRegistry().find("hangOnSpillWiredTigerKVEngineCleanShutdown"_sd);
+    FailPoint* fp = globalFailPointRegistry().find("hangOnSpillWiredTigerKVEngineCleanShutdown"sv);
     const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
     auto kvEngine = makeKvEngine();
     auto ru = kvEngine->newRecoveryUnit();

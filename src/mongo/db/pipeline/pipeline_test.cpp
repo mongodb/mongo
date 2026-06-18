@@ -93,6 +93,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -103,8 +104,9 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-const StringData kDBName = "test";
+const std::string_view kDBName = "test";
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest(kDBName, "collection");
 const NamespaceString kAdminCollectionlessNss =
@@ -3769,7 +3771,7 @@ public:
                                           ResumeTokenData::kDefaultTokenVersion,
                                           0,
                                           UUID::gen(),
-                                          Value(Document{{"operationType", "drop"_sd}})};
+                                          Value(Document{{"operationType", "drop"sv}})};
         return ResumeToken(resumeTokenDataIn).toBSON().toString();
     }
 
@@ -6971,7 +6973,7 @@ TEST_F(InvolvedNamespacesTest, NoInvolvedNamespacesForMatchSortProject) {
         {mockSource(),
          matchStage("{x: 1}"),
          sortStage("{y: -1}"),
-         DocumentSourceProject::create(BSON("x" << 1 << "y" << 1), expCtx, "$project"_sd)});
+         DocumentSourceProject::create(BSON("x" << 1 << "y" << 1), expCtx, "$project"sv)});
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT(involvedNssSet.empty());
 }

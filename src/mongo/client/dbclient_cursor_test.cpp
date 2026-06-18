@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,6 +51,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -194,7 +194,7 @@ TEST_F(DBClientCursorTest, DBClientCursorCallsMetaDataReaderOncePerBatch) {
 
     int numMetaRead = 0;
     conn.setReplyMetadataReader(
-        [&](OperationContext* opCtx, const BSONObj& metadataObj, StringData target) {
+        [&](OperationContext* opCtx, const BSONObj& metadataObj, std::string_view target) {
             numMetaRead++;
             return Status::OK();
         });
@@ -311,7 +311,7 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
 
     ASSERT(!m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
@@ -373,7 +373,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     m = conn.getLastSentMessage();
     ASSERT(!m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_EQ(msg.body["batchSize"].number(), 2);
@@ -396,7 +396,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     m = conn.getLastSentMessage();
     ASSERT(!m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
@@ -635,7 +635,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     m = conn.getLastSentMessage();
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
@@ -655,7 +655,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     m = conn.getLastSentMessage();
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_FALSE(cursor.moreInCurrentBatch());
@@ -673,7 +673,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     m = conn.getLastSentMessage();
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_BSONOBJ_EQ(docObj(3), cursor.next());
@@ -734,7 +734,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitData) {
     m = conn.getLastSentMessage();
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     // Make sure the correct awaitData timeout is sent.
@@ -803,7 +803,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     m = conn.getLastSentMessage();
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_EQ(msg.body["maxTimeMS"].number(), 5000);
@@ -875,7 +875,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     m = conn.getLastSentMessage();
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_EQ(msg.body["maxTimeMS"].number(), 5000);
@@ -956,7 +956,7 @@ TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
     m = conn.getLastSentMessage();
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
-    ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore") << msg.body;
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore") << msg.body;
     ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong) << msg.body;
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId) << msg.body;
     // Make sure the correct awaitData timeout is sent.

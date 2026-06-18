@@ -65,6 +65,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 // Sets up replication services for `svcCtx`.
 // TODO SERVER-122243: Make this benchmark call into some utility that is also used by
 // `mongod_main`.
@@ -162,8 +163,8 @@ void setupStorage(ServiceContext* svcCtx) {
 
 class CrudBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
 public:
-    static constexpr auto kCollection = "test"_sd;
-    static constexpr auto kDatabase = "test"_sd;
+    static constexpr auto kCollection = "test"sv;
+    static constexpr auto kDatabase = "test"sv;
     static inline const std::string kDocumentData = std::string(256, 'x');
     static constexpr int kBatchSize = 100;
     static constexpr int kDeleteOneIterations = 10'000;

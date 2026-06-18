@@ -33,6 +33,8 @@
 #include "mongo/crypto/jwks_fetcher_impl.h"
 #include "mongo/util/clock_source.h"
 
+#include <string_view>
+
 namespace mongo::crypto {
 
 /**
@@ -42,7 +44,7 @@ namespace mongo::crypto {
  */
 class MockJWKSFetcher : public JWKSFetcherImpl {
 public:
-    static constexpr StringData kMockIssuer = "https://localhost/issuer/mock"_sd;
+    static constexpr std::string_view kMockIssuer = "https://localhost/issuer/mock"_sd;
 
     MockJWKSFetcher(ClockSource* clock, BSONObj keys)
         : JWKSFetcherImpl(clock, kMockIssuer), _keys(std::move(keys)) {}

@@ -30,6 +30,7 @@
 #include "mongo/db/update_index_data.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <absl/container/btree_set.h>
 
@@ -43,7 +44,7 @@ void UpdateIndexData::addPath(const FieldRef& path) {
     _canonicalPaths.insert(FieldRef::getCanonicalIndexField(path));
 }
 
-void UpdateIndexData::addPathComponent(StringData pathComponent) {
+void UpdateIndexData::addPathComponent(std::string_view pathComponent) {
     _pathComponents.insert(std::string{pathComponent});
 }
 

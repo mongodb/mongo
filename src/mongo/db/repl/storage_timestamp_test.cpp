@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -157,6 +156,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -167,6 +167,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
     return acquireCollection(
@@ -236,13 +237,14 @@ private:
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 void assertIndexMetaDataMissing(std::shared_ptr<durable_catalog::CatalogEntryMetaData> collMetaData,
-                                StringData indexName) {
+                                std::string_view indexName) {
     const auto idxOffset = collMetaData->findIndexOffset(indexName);
     ASSERT_EQUALS(-1, idxOffset) << indexName << ". Collection Metdata: " << collMetaData->toBSON();
 }
 
 durable_catalog::CatalogEntryMetaData::IndexMetaData getIndexMetaData(
-    std::shared_ptr<durable_catalog::CatalogEntryMetaData> collMetaData, StringData indexName) {
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> collMetaData,
+    std::string_view indexName) {
     const auto idxOffset = collMetaData->findIndexOffset(indexName);
     ASSERT_GT(idxOffset, -1) << indexName;
     return collMetaData->indexes[idxOffset];
@@ -745,8 +747,8 @@ public:
     }
 
     void assertIdentsExistAtTimestamp(MDBCatalog* mdbCatalog,
-                                      StringData collIdent,
-                                      StringData indexIdent,
+                                      std::string_view collIdent,
+                                      std::string_view indexIdent,
                                       Timestamp timestamp) {
         OneOffRead oor(_opCtx, timestamp);
 
@@ -763,8 +765,8 @@ public:
     }
 
     void assertIdentsMissingAtTimestamp(MDBCatalog* mdbCatalog,
-                                        StringData collIdent,
-                                        StringData indexIdent,
+                                        std::string_view collIdent,
+                                        std::string_view indexIdent,
                                         Timestamp timestamp) {
         OneOffRead oor(_opCtx, timestamp);
         auto allIdents = mdbCatalog->getAllIdents(_opCtx);
@@ -795,7 +797,7 @@ public:
 
     void assertMultikeyPaths(OperationContext* _opCtx,
                              const CollectionPtr& collection,
-                             StringData indexName,
+                             std::string_view indexName,
                              Timestamp ts,
                              bool shouldBeMultikey,
                              const MultikeyPaths& expectedMultikeyPaths) {
@@ -3973,7 +3975,7 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
 
 class RetryableFindAndModifyTest : public StorageTimestampTest {
 public:
-    const StringData dbName = "unittest"_sd;
+    const std::string_view dbName = "unittest"sv;
     const BSONObj oldObj = BSON("_id" << 0 << "a" << 1);
 
     RetryableFindAndModifyTest()
@@ -4208,7 +4210,7 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyDelete) {
 
 class MultiDocumentTransactionTest : public StorageTimestampTest {
 public:
-    const StringData dbName = "unittest"_sd;
+    const std::string_view dbName = "unittest"sv;
     const BSONObj doc = BSON("_id" << 1 << "TestValue" << 1);
     const BSONObj docKey = BSON("_id" << 1);
 

@@ -30,13 +30,13 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/shared_library.h"
 #include "mongo/util/str.h"
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <dlfcn.h>
 
@@ -72,13 +72,13 @@ StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
         std::unique_ptr<SharedLibrary>(new SharedLibrary(handle)));
 }
 
-StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
+StatusWith<void*> SharedLibrary::getSymbol(std::string_view name) {
     // Clear dlerror() before calling dlsym,
     // see man dlerror(3) or dlerror(3p) on any POSIX system for details
     // Ignore return
     dlerror();
 
-    // StringData is not assued to be null-terminated
+    // std::string_view is not assued to be null-terminated
     std::string symbolName = std::string{name};
 
     void* symbol = dlsym(_handle, symbolName.c_str());

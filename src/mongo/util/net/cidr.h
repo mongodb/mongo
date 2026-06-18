@@ -30,13 +30,13 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
 
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -51,7 +51,7 @@ namespace MONGO_MOD_PUBLIC mongo {
  */
 class CIDR {
 public:
-    explicit CIDR(StringData);
+    explicit CIDR(std::string_view);
 
     /**
      * If the given BSONElement represents a valid CIDR range,
@@ -65,7 +65,7 @@ public:
      * constructs and returns the CIDR.
      * Otherwise returns an error.
      */
-    static StatusWith<CIDR> parse(StringData from);
+    static StatusWith<CIDR> parse(std::string_view from);
 
     /**
      * Returns true if the provided address range is contained
@@ -111,7 +111,9 @@ public:
      * Supports use of CIDR with the BSON macro:
      *     BSON("cidr" << cidr) -> { cidr: "..." }
      */
-    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const CIDR& value) {
+    friend void appendToBson(BSONObjBuilder& builder,
+                             std::string_view fieldName,
+                             const CIDR& value) {
         builder.append(fieldName, value.toString());
     }
 

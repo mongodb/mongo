@@ -35,11 +35,14 @@
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
 
-constexpr inline auto kOmitForUnshardedCollectionMsg = "omitted: collection isn't sharded"_sd;
+constexpr inline std::string_view kOmitForUnshardedCollectionMsg{
+    "omitted: collection isn't sharded"};
 
 struct ShardKeyDiagnosticPrinter {
     ShardKeyDiagnosticPrinter(const BSONObj& shardKeyPattern) {

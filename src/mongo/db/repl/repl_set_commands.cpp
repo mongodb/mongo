@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+
 #include <cstdint>
 #include <cstring>
 
@@ -37,7 +38,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -95,6 +95,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -108,10 +109,11 @@ namespace mongo {
 namespace repl {
 
 namespace {
-constexpr StringData kInternalIncludeNewlyAddedFieldName = "$_internalIncludeNewlyAdded"_sd;
+using namespace std::literals::string_view_literals;
+constexpr std::string_view kInternalIncludeNewlyAddedFieldName = "$_internalIncludeNewlyAdded"sv;
 
 struct ExecutorMetricPolicy {
-    void appendTo(BSONObjBuilder& b, StringData leafName) const {
+    void appendTo(BSONObjBuilder& b, std::string_view leafName) const {
         ReplicationCoordinator::get(getGlobalServiceContext())->appendDiagnosticBSON(&b, leafName);
     }
 };
@@ -381,7 +383,7 @@ public:
             auto appendMember =
                 [&members, serial = DecimalCounter<uint32_t>()](const HostAndPort& host) mutable {
                     members.append(
-                        StringData{serial},
+                        std::string_view{serial},
                         BSON("_id" << static_cast<int>(serial) << "host" << host.toString()));
                     ++serial;
                 };

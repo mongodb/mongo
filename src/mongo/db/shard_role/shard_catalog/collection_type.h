@@ -32,6 +32,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 MONGO_MOD_PUBLIC;
 
 namespace mongo::query_shape {
@@ -49,7 +51,7 @@ enum class CollectionType {
     kNonExistent,
 };
 
-static StringData toStringData(CollectionType type) {
+static std::string_view toStringData(CollectionType type) {
     switch (type) {
         case CollectionType::kUnknown:
             return "unknown"_sd;

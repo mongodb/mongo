@@ -29,7 +29,6 @@
 
 #include "mongo/db/fts/fts_query_impl.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 

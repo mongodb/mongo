@@ -38,6 +38,7 @@
 #include "mongo/db/query/explain_options.h"
 
 #include <iterator>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -51,7 +52,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(singleDocumentTransformation,
 DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransformation(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     std::unique_ptr<TransformerInterface> parsedTransform,
-    const StringData name,
+    const std::string_view name,
     bool isIndependentOfAnyCollection)
     : DocumentSource(name, pExpCtx),
       _name(std::string{name}),
@@ -62,7 +63,7 @@ DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransfor
     }
 }
 
-StringData DocumentSourceSingleDocumentTransformation::getSourceName() const {
+std::string_view DocumentSourceSingleDocumentTransformation::getSourceName() const {
     return _name;
 }
 

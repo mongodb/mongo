@@ -40,7 +40,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -109,6 +108,7 @@
 #include <mutex>
 #include <ratio>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -119,6 +119,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using std::string;
 using std::vector;
@@ -134,10 +135,11 @@ const Milliseconds kBalanceRoundDefaultInterval(10 * 1000);
 /**
  * Balancer status response
  */
-static constexpr StringData kBalancerPolicyStatusDraining = "draining"_sd;
-static constexpr StringData kBalancerPolicyStatusZoneViolation = "zoneViolation"_sd;
-static constexpr StringData kBalancerPolicyStatusChunksImbalance = "chunksImbalance"_sd;
-static constexpr StringData kBalancerPolicyStatusDefragmentingChunks = "defragmentingChunks"_sd;
+static constexpr std::string_view kBalancerPolicyStatusDraining = "draining"sv;
+static constexpr std::string_view kBalancerPolicyStatusZoneViolation = "zoneViolation"sv;
+static constexpr std::string_view kBalancerPolicyStatusChunksImbalance = "chunksImbalance"sv;
+static constexpr std::string_view kBalancerPolicyStatusDefragmentingChunks =
+    "defragmentingChunks"sv;
 
 /**
  * Utility class to generate timing and statistics for a single balancer round.
@@ -182,10 +184,10 @@ public:
             builder.append("candidateUnshardedCollections", _numCandidateUnshardedCollections);
             builder.append("unshardedCollectionsMoved", _numUnshardedCollectionsMoved);
             builder.append("imbalancedCachedCollections", _numImbalancedCachedCollections);
-            BSONObjBuilder timeInfo{builder.subobjStart("times"_sd)};
-            timeInfo.append("selectionTimeMillis"_sd, _selectionTime.count());
-            timeInfo.append("throttleTimeMillis"_sd, _throttleTime.count());
-            timeInfo.append("migrationTimeMillis"_sd, _migrationTime.count());
+            BSONObjBuilder timeInfo{builder.subobjStart("times"sv)};
+            timeInfo.append("selectionTimeMillis"sv, _selectionTime.count());
+            timeInfo.append("throttleTimeMillis"sv, _throttleTime.count());
+            timeInfo.append("migrationTimeMillis"sv, _migrationTime.count());
             timeInfo.done();
         }
         return builder.obj();
@@ -775,7 +777,7 @@ void Balancer::moveRange(OperationContext* opCtx,
 
     sharding::router::CollectionRouter router(opCtx, nss);
     router.routeWithRoutingContext(
-        "moveRange"_sd, [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+        "moveRange"sv, [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
             unusedRoutingCtx.skipValidation();
 
             const auto cm = uassertStatusOK(getPlacementInfoForShardedCollection(opCtx, nss));
@@ -1424,12 +1426,13 @@ BalancerCollectionStatusResponse Balancer::getBalancerStatusForNs(OperationConte
     maxChunkSizeMB = std::ceil(maxChunkSizeMB * 100.0) / 100.0;
 
     BalancerCollectionStatusResponse response(maxChunkSizeMB, true /*balancerCompliant*/);
-    auto setViolationOnResponse =
-        [&response](StringData reason, const boost::optional<BSONObj>& details = boost::none) {
-            response.setBalancerCompliant(false);
-            response.setFirstComplianceViolation(reason);
-            response.setDetails(details);
-        };
+    auto setViolationOnResponse = [&response](std::string_view reason,
+                                              const boost::optional<BSONObj>& details =
+                                                  boost::none) {
+        response.setBalancerCompliant(false);
+        response.setFirstComplianceViolation(reason);
+        response.setDetails(details);
+    };
 
     bool isDefragmenting = coll.getDefragmentCollection();
     if (isDefragmenting) {

@@ -31,10 +31,12 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
-constexpr StringData InternalSchemaUniqueItemsMatchExpression::kName;
+constexpr std::string_view InternalSchemaUniqueItemsMatchExpression::kName;
 
 void InternalSchemaUniqueItemsMatchExpression::debugString(StringBuilder& debug,
                                                            int indentationLevel) const {

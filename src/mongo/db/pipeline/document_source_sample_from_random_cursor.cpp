@@ -38,6 +38,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -59,7 +60,7 @@ DocumentSourceSampleFromRandomCursor::DocumentSourceSampleFromRandomCursor(
       _idField(std::move(idField)),
       _nDocsInColl(nDocsInCollection) {}
 
-StringData DocumentSourceSampleFromRandomCursor::getSourceName() const {
+std::string_view DocumentSourceSampleFromRandomCursor::getSourceName() const {
     return kStageName;
 }
 

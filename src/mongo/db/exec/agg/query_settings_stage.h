@@ -40,6 +40,8 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
@@ -49,7 +51,7 @@ using QueryShapeConfigurationMap = stdx::unordered_map<query_shape::QueryShapeHa
 
 class QuerySettingsStage final : public Stage {
 public:
-    static constexpr StringData kDebugQueryShapeFieldName = "debugQueryShape"_sd;
+    static constexpr std::string_view kDebugQueryShapeFieldName = "debugQueryShape"_sd;
 
     /**
      * The possible states of the stage. First we are reading all the 'config.representativeQueries'
@@ -62,7 +64,7 @@ public:
         kReadingFromQueryShapeConfigsMap
     };
 
-    QuerySettingsStage(StringData stageName,
+    QuerySettingsStage(std::string_view stageName,
                        const boost::intrusive_ptr<ExpressionContext>& pExtCtx,
                        bool showDebugQueryShape);
 

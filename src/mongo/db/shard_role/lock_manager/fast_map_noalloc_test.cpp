@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/lock_manager/fast_map_noalloc.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"

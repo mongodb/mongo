@@ -42,6 +42,7 @@
 #include <functional>
 #include <limits>
 #include <stack>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/none.hpp>
@@ -89,7 +90,7 @@ void InternalNode::ApproxBSONSizeTracker::addEntry(size_t fieldSize, const Node*
     }
 }
 
-Node* DocumentSubDiffNode::addChild(StringData fieldName, std::unique_ptr<Node> node) {
+Node* DocumentSubDiffNode::addChild(std::string_view fieldName, std::unique_ptr<Node> node) {
     auto* nodePtr = node.get();
 
     // Add size of field name and the child element.
@@ -99,7 +100,7 @@ Node* DocumentSubDiffNode::addChild(StringData fieldName, std::unique_ptr<Node> 
     uassert(7693400,
             str::stream() << "Document already has a field named '" << fieldName << "'",
             result.second);
-    StringData storedFieldName = result.first->first;
+    std::string_view storedFieldName = result.first->first;
     switch (nodePtr->type()) {
         case (NodeType::kArray):
         case (NodeType::kDocumentSubDiff): {
@@ -143,7 +144,7 @@ Node* DocumentSubDiffNode::addChild(StringData fieldName, std::unique_ptr<Node> 
 
 namespace {
 void appendElementToBuilder(std::variant<mutablebson::Element, BSONElement> elem,
-                            StringData fieldName,
+                            std::string_view fieldName,
                             BSONObjBuilder* builder) {
     visit(OverloadedVisitor{[&](const mutablebson::Element& element) {
                                 if (element.hasValue()) {
@@ -188,7 +189,7 @@ UniqueFrame makeSubNodeFrameHelper(InternalNode* node, BSONObjBuilder builder);
 // Given a 'node' stored in the 'inserts' section of an InternalNode, will either append that
 // node's value to the given builder, or return a new stack frame which will build the object to be
 // inserted. 'node' must be an InsertionNode or a DocumentInsertNode.
-UniqueFrame handleInsertHelper(StringData fieldName, Node* node, BSONObjBuilder* bob);
+UniqueFrame handleInsertHelper(std::string_view fieldName, Node* node, BSONObjBuilder* bob);
 
 // Stack frame used to maintain state while serializing DocumentInsertionNodes.
 class DocumentInsertFrame final : public Frame {
@@ -332,7 +333,7 @@ public:
 
         auto formatFieldName = [&](char pre, size_t idx) {
             const char* fieldNameStorageEnd = fmt::format_to(fieldNameStorage, "{}{}", pre, idx);
-            return StringData(fieldNameStorage, fieldNameStorageEnd - fieldNameStorage);
+            return std::string_view(fieldNameStorage, fieldNameStorageEnd - fieldNameStorage);
         };
 
         // Make sure that 'doc_diff::kUpdateSectionFieldName' is a single character.
@@ -437,7 +438,7 @@ UniqueFrame makeSubNodeFrameHelper(InternalNode* node, BSONObjBuilder builder) {
     }
 }
 
-UniqueFrame handleInsertHelper(StringData fieldName, Node* node, BSONObjBuilder* bob) {
+UniqueFrame handleInsertHelper(std::string_view fieldName, Node* node, BSONObjBuilder* bob) {
     if (node->type() == NodeType::kInsert) {
         appendElementToBuilder(checked_cast<InsertNode*>(node)->elt, fieldName, bob);
         return nullptr;
@@ -487,7 +488,7 @@ void checkSection(BSONElement element, char sectionName, BSONType expectedType) 
 }
 
 // Converts a (decimal) string to number. Will throw if the string is not a valid unsigned int.
-size_t extractArrayIndex(StringData fieldName) {
+size_t extractArrayIndex(std::string_view fieldName) {
     auto idx = str::parseUnsignedBase10Integer(fieldName);
     uassert(4770512, str::stream() << "Expected integer but got " << fieldName, idx);
     return *idx;
@@ -612,7 +613,7 @@ DocumentDiffReader::DocumentDiffReader(const Diff& diff) : _diff(diff) {
             hasSubDiffSections || !it.more());
 }
 
-boost::optional<StringData> DocumentDiffReader::nextDelete() {
+boost::optional<std::string_view> DocumentDiffReader::nextDelete() {
     if (!_deletes || !_deletes->more()) {
         return {};
     }
@@ -641,7 +642,7 @@ boost::optional<BSONElement> DocumentDiffReader::nextBinary() {
     return _binaries->next();
 }
 
-boost::optional<std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>
+boost::optional<std::pair<std::string_view, std::variant<DocumentDiffReader, ArrayDiffReader>>>
 DocumentDiffReader::nextSubDiff() {
     if (!_subDiffs || !_subDiffs->more()) {
         return {};
@@ -663,7 +664,7 @@ DocumentDiffReader::nextSubDiff() {
 
 boost::optional<DocumentDiffReader::Modification> DocumentDiffReader::next() {
     // Exhaust nextDelete.
-    if (boost::optional<StringData> del = nextDelete(); del.has_value()) {
+    if (boost::optional<std::string_view> del = nextDelete(); del.has_value()) {
         return boost::make_optional(DocumentDiffReader::Modification{*del});
     }
 
@@ -683,8 +684,9 @@ boost::optional<DocumentDiffReader::Modification> DocumentDiffReader::next() {
     }
 
     // Exhaust nextSubDiff.
-    if (boost::optional<std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>
-            subDiff = nextSubDiff();
+    if (boost::optional<std::pair<std::string_view,
+                                  std::variant<DocumentDiffReader, ArrayDiffReader>>> subDiff =
+            nextSubDiff();
         subDiff.has_value()) {
         return boost::make_optional(DocumentDiffReader::Modification{*subDiff});
     }

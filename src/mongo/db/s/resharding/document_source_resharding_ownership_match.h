@@ -43,6 +43,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -60,7 +61,7 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingOwnershipMatch);
  */
 class MONGO_MOD_PUBLIC DocumentSourceReshardingOwnershipMatch final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalReshardingOwnershipMatch"_sd;
+    static constexpr std::string_view kStageName = "$_internalReshardingOwnershipMatch"_sd;
 
     static boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch> create(
         ShardId recipientShardId,
@@ -87,7 +88,7 @@ public:
         return boost::none;
     }
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return DocumentSourceReshardingOwnershipMatch::kStageName;
     }
 

@@ -36,6 +36,8 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::sbe::value {
 
 struct FilterPositionInfoRecorder {
@@ -168,7 +170,7 @@ struct ObjectWalkNode {
                         1>
         getChildrenVector;
 
-    ObjectWalkNode<ProjectionRecorder>* findChild(StringData fieldName) {
+    ObjectWalkNode<ProjectionRecorder>* findChild(std::string_view fieldName) {
         for (auto&& child : getChildrenVector) {
             auto& name = child.first;
             if (name == fieldName) {

@@ -31,7 +31,6 @@
  * This file contains tests for sbe::HashAggStage.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -63,6 +62,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -313,7 +313,7 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
 
     auto [expectedTag, expectedVal] = value::makeNewArray();
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
-    for (auto&& sv : std::array<StringData, 4>{"Aa", "BB", "cc", "dD"}) {
+    for (auto&& sv : std::array<std::string_view, 4>{"Aa", "BB", "cc", "dD"}) {
         auto [tag, val] = value::makeNewString(sv);
         value::getArrayView(expectedVal)->push_back_raw(tag, val);
     }

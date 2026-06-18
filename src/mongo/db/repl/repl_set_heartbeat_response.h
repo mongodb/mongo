@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/time_support.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -143,7 +143,7 @@ public:
     /**
      * Sets _setName to "name".
      */
-    void setSetName(StringData name) {
+    void setSetName(std::string_view name) {
         _setName = std::string{name};
     }
 

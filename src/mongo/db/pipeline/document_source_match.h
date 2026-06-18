@@ -50,6 +50,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -85,7 +86,10 @@ public:
     // $match with $text is not allowed on timeseries collections.
     Constraints constraints() const override {
         if (_isTextQuery) {
-            return {.canRunOnTimeseries = false, .timeseriesUnsupportedStageName = "$text"_sd};
+            return {
+                .canRunOnTimeseries = false,
+                .timeseriesUnsupportedStageName = std::string_view{"$text"},
+            };
         }
         return {};
     }
@@ -108,7 +112,7 @@ public:
 
     ~DocumentSourceMatch() override = default;
 
-    static constexpr StringData kStageName = "$match"_sd;
+    static constexpr std::string_view kStageName = "$match"_sd;
     /**
      * Convenience method for creating a $match stage.
      */
@@ -125,13 +129,13 @@ public:
      * Returns a new DocumentSourceMatch with a MatchExpression that, if executed on the
      * sub-document at 'path', is equivalent to 'expression'.
      *
-     * For example, if the original expression is {$and: [{'a.b': {$gt: 0}}, {'a.d': {$eq: 3}}]},
-     * the new $match will have the expression {$and: [{b: {$gt: 0}}, {d: {$eq: 3}}]} after
-     * descending on the path 'a'.
+     * For example, if the original expression is {$and: [{'a.b': {$gt: 0}}, {'a.d': {$eq:
+     * 3}}]}, the new $match will have the expression {$and: [{b: {$gt: 0}}, {d: {$eq: 3}}]}
+     * after descending on the path 'a'.
      *
-     * Should be called _only_ on a MatchExpression that is a predicate on 'path', or subfields of
-     * 'path'. It is also invalid to call this method on an expression including a $elemMatch on
-     * 'path', for example: {'path': {$elemMatch: {'subfield': 3}}}
+     * Should be called _only_ on a MatchExpression that is a predicate on 'path', or subfields
+     * of 'path'. It is also invalid to call this method on an expression including a $elemMatch
+     * on 'path', for example: {'path': {$elemMatch: {'subfield': 3}}}
      */
     static boost::intrusive_ptr<DocumentSourceMatch> descendMatchOnPath(
         const MatchExpression* matchExpr,
@@ -139,9 +143,9 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Returns a pair of pointers to $match stages, either of which can be null. The first entry in
-     * the pair is a $match stage that can be moved before this stage, the second is a $match stage
-     * that must remain after this stage.
+     * Returns a pair of pointers to $match stages, either of which can be null. The first entry
+     * in the pair is a $match stage that can be moved before this stage, the second is a $match
+     * stage that must remain after this stage.
      */
     static std::pair<boost::intrusive_ptr<DocumentSourceMatch>,
                      boost::intrusive_ptr<DocumentSourceMatch>>
@@ -156,7 +160,7 @@ public:
 
     boost::intrusive_ptr<DocumentSource> optimize();
 
-    StringData getSourceName() const override;
+    std::string_view getSourceName() const override;
 
     static const Id& id;
 
@@ -211,9 +215,9 @@ public:
 
     /**
      * Combines the filter in this $match with the filter of 'other' using a specified join
-     * predicate, updating this match in place. This uses the stages' 'MatchExpression's, as those
-     * are kept up to date during any optimizations. Currently, the join predicate can only be
-     * either 'MatchExpression::MatchType::AND' or 'MatchExpression::MatchType::OR'.
+     * predicate, updating this match in place. This uses the stages' 'MatchExpression's, as
+     * those are kept up to date during any optimizations. Currently, the join predicate can
+     * only be either 'MatchExpression::MatchType::AND' or 'MatchExpression::MatchType::OR'.
      */
     void joinMatchWith(boost::intrusive_ptr<DocumentSourceMatch> other,
                        MatchExpression::MatchType joinPred);
@@ -317,8 +321,8 @@ public:
     /**
      * Must override the serialize method, since internal change stream stages are serialized
      * differently than match stages. This function mirrors
-     * DocumentSourceInternalChangeStreamStage::serialize and was added because this class cannot
-     * inherit from both DocumentSourceInternalChangeStreamStage and DocumentSourceMatch.
+     * DocumentSourceInternalChangeStreamStage::serialize and was added because this class
+     * cannot inherit from both DocumentSourceInternalChangeStreamStage and DocumentSourceMatch.
      */
     Value serialize(const query_shape::SerializationOptions& opts =
                         query_shape::SerializationOptions{}) const final;

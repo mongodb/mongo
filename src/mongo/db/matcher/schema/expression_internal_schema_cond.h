@@ -39,6 +39,7 @@
 
 #include <array>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -49,7 +50,7 @@ namespace mongo {
 class InternalSchemaCondMatchExpression final
     : public FixedArityMatchExpression<InternalSchemaCondMatchExpression, 3> {
 public:
-    static constexpr StringData kName = "$_internalSchemaCond"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaCond"_sd;
 
     explicit InternalSchemaCondMatchExpression(
         std::array<std::unique_ptr<MatchExpression>, 3> expressions,
@@ -69,7 +70,7 @@ public:
         return expressions()[2].get();
     }
 
-    StringData name() const final {
+    std::string_view name() const final {
         return kName;
     }
 

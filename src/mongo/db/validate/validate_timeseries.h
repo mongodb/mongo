@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -135,7 +135,7 @@ TimeseriesValidationStatus validateTimeseriesFixedBucketingConsistency(
     const CollectionPtr& coll,
     timeseries::bucket_catalog::MinMax& minmax,
     const BSONElement& controlMin,
-    StringData fieldName,
+    std::string_view fieldName,
     ValidateResults& results);
 
 /**
@@ -146,7 +146,7 @@ TimeseriesValidationStatus validateTimeSeriesMinMax(const TimeseriesOptions& tim
                                                     timeseries::bucket_catalog::MinMax& minmax,
                                                     const BSONElement& controlMin,
                                                     const BSONElement& controlMax,
-                                                    StringData fieldName,
+                                                    std::string_view fieldName,
                                                     int version,
                                                     const CollatorInterface* collator);
 
@@ -158,7 +158,7 @@ TimeseriesValidationStatus validateTimeSeriesDataTimeField(const CollectionPtr& 
                                                            const BSONElement& timeField,
                                                            const BSONElement& controlMin,
                                                            const BSONElement& controlMax,
-                                                           StringData fieldName,
+                                                           std::string_view fieldName,
                                                            ValidateResults& results,
                                                            int version,
                                                            int* bucketCount);
@@ -171,7 +171,7 @@ TimeseriesValidationStatus validateTimeSeriesDataField(const CollectionPtr& coll
                                                        const BSONElement& dataField,
                                                        const BSONElement& controlMin,
                                                        const BSONElement& controlMax,
-                                                       StringData fieldName,
+                                                       std::string_view fieldName,
                                                        ValidateResults& results,
                                                        int version,
                                                        int bucketCount);
@@ -191,7 +191,7 @@ TimeseriesValidationStatus validateTimeSeriesDataFields(const CollectionPtr& col
  * expected field.
  */
 TimeseriesValidationStatus validateTimeseriesExtendedRangeTimestamps(
-    bool requiresExtendedRangeSupport, StringData timeFieldName, const BSONObj& recordBson);
+    bool requiresExtendedRangeSupport, std::string_view timeFieldName, const BSONObj& recordBson);
 
 /**
  * Validates the consistency of a time-series bucket.

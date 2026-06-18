@@ -47,6 +47,8 @@
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/tracking/context.h"
 
+#include <string_view>
+
 #include <boost/iterator/transform_iterator.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -75,7 +77,7 @@ doc_diff::VerifierFunc makeVerifierFunction(std::shared_ptr<bucket_catalog::Writ
             [&source](const BSONObj&) { return source == OperationSource::kTimeseriesUpdate; });
 
         using AddAttrsFn = std::function<void(logv2::DynamicAttributes&)>;
-        auto failed = [&measurements, &batch, &docToWrite, &pre](StringData reason,
+        auto failed = [&measurements, &batch, &docToWrite, &pre](std::string_view reason,
                                                                  AddAttrsFn addAttrsWithoutData,
                                                                  AddAttrsFn addAttrsWithData) {
             logv2::DynamicAttributes attrs;
@@ -132,12 +134,12 @@ doc_diff::VerifierFunc makeVerifierFunction(std::shared_ptr<bucket_catalog::Writ
         // itself, and a size_t type counter. The iterator allows us to iterate across the
         // BSONColumn as we inspect each element and compare it to the expected value in the actual
         // measurement we inserted. The column is stored to prevent the iterator on it from going
-        // out of scope. The StringData representation of the binary allows us to log the binary in
-        // the case that we encounter an error. The size_t counter represents how many times the
-        // iterator has been advanced - this allows us to detect when we didn't have a value set for
-        // a field in a particular measurement, so that we can check the corresponding BSONColumn
-        // for a skip value.
-        StringDataMap<std::tuple<BSONColumn::Iterator, BSONColumn, StringData, size_t>>
+        // out of scope. The std::string_view representation of the binary allows us to log the
+        // binary in the case that we encounter an error. The size_t counter represents how many
+        // times the iterator has been advanced - this allows us to detect when we didn't have a
+        // value set for a field in a particular measurement, so that we can check the corresponding
+        // BSONColumn for a skip value.
+        StringDataMap<std::tuple<BSONColumn::Iterator, BSONColumn, std::string_view, size_t>>
             fieldsToDataAndNextCountMap;
 
         // First, populate our map.
@@ -150,7 +152,8 @@ doc_diff::VerifierFunc makeVerifierFunction(std::shared_ptr<bucket_catalog::Writ
                 auto it = c.begin();
                 std::advance(it, batch->numPreviouslyCommittedMeasurements);
                 fieldsToDataAndNextCountMap.emplace(
-                    key, std::make_tuple(it, std::move(c), StringData(binData, binLength), 0));
+                    key,
+                    std::make_tuple(it, std::move(c), std::string_view(binData, binLength), 0));
             } catch (const DBException& e) {
                 failed(
                     "exception",
@@ -235,7 +238,7 @@ write_ops_utils::BucketDocument makeNewDocument(const OID& bucketId,
                                                 const BSONObj& min,
                                                 const BSONObj& max,
                                                 StringDataMap<BSONObjBuilder>& dataBuilders,
-                                                StringData timeField,
+                                                std::string_view timeField,
                                                 const NamespaceString& nss,
                                                 const UUID& collectionUUID,
                                                 std::uint32_t keySignature) {
@@ -290,7 +293,7 @@ boost::optional<std::pair<BSONObj, BSONObj>> processTimeseriesMeasurements(
     bool computeMinmax = options && comparator;
 
     auto metadataElem = metadata.firstElement();
-    boost::optional<StringData> metaFieldName;
+    boost::optional<std::string_view> metaFieldName;
     if (metadataElem) {
         metaFieldName = metadataElem.fieldNameStringData();
     }
@@ -381,7 +384,7 @@ BSONObj makeBSONColumnDocDiff(
 BSONObj makeTimeseriesInsertCompressedBucketDocument(
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     const std::vector<
-        std::pair<StringData, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>&
+        std::pair<std::string_view, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>&
         intermediates) {
     BSONObjBuilder insertBuilder;
     insertBuilder.append(kBucketIdFieldName, batch->bucketId.oid);

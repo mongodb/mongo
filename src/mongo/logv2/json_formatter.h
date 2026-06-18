@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
@@ -44,6 +43,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include <boost/log/core/record_view.hpp>
 #include <boost/log/utility/formatting_ostream_fwd.hpp>
@@ -63,8 +63,8 @@ public:
                 Date_t date,
                 int32_t id,
                 LogService service,
-                StringData context,
-                StringData message,
+                std::string_view context,
+                std::string_view message,
                 const TypeErasedAttributeStorage& attrs,
                 LogTag tags,
                 const std::string& tenant,

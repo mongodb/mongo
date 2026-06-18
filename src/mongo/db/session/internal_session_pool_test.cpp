@@ -29,7 +29,6 @@
 
 #include "mongo/db/session/internal_session_pool.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id_helpers.h"

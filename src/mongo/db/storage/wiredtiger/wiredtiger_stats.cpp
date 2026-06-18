@@ -31,13 +31,13 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -48,7 +48,7 @@ namespace mongo {
 
 namespace {
 
-void appendIfNonZero(StringData fieldName, int64_t value, BSONObjBuilder* builder) {
+void appendIfNonZero(std::string_view fieldName, int64_t value, BSONObjBuilder* builder) {
     if (value != 0) {
         builder->append(fieldName, value);
     }

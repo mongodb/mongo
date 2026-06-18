@@ -39,6 +39,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using GetNextResult = mongo::exec::agg::GetNextResult;
 
@@ -58,7 +59,7 @@ private:
     MockStageTracking(std::deque<GetNextResult> results,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       Tracker tracker)
-        : mongo::exec::agg::MockStage{"mockedStage"_sd, expCtx, std::move(results)},
+        : mongo::exec::agg::MockStage{"mockedStage"sv, expCtx, std::move(results)},
           _tracker{std::move(tracker)} {}
 
     GetNextResult doGetNext() override {
@@ -124,9 +125,9 @@ protected:
         ASSERT_EQ(0, peakTrackedMemBytes);
 
         std::deque<DocumentSource::GetNextResult> docs{
-            Document{{"_id", 0}, {"a", 100}, {"b", "hello"_sd}},
-            Document{{"_id", 1}, {"a", 200}, {"b", "howareya"_sd}},
-            Document{{"_id", 2}, {"a", 300}, {"b", "goodbye"_sd}},
+            Document{{"_id", 0}, {"a", 100}, {"b", "hello"sv}},
+            Document{{"_id", 1}, {"a", 200}, {"b", "howareya"sv}},
+            Document{{"_id", 2}, {"a", 300}, {"b", "goodbye"sv}},
         };
         auto mock = createMock(docs, getExpCtx());
 
@@ -185,7 +186,7 @@ TEST_F(OperationMemoryUsageTrackerTest, StageMemoryUsageAggregatedInOperationMem
 TEST_F(OperationMemoryUsageTrackerTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
     unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", false);
     auto mock = MockStageTracking<SimpleMemoryUsageTracker>::createForTest(
-        {Document{{"_id", 0}, {"a", 100}, {"b", "hello"_sd}}}, getExpCtx());
+        {Document{{"_id", 0}, {"a", 100}, {"b", "hello"sv}}}, getExpCtx());
     ASSERT_TRUE(mock->getNext().isAdvanced());
 
     int64_t inUseTrackedMemBytes, peakTrackedMemBytes;

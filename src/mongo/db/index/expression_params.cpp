@@ -29,7 +29,6 @@
 
 #include "mongo/db/index/expression_params.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/index_names.h"

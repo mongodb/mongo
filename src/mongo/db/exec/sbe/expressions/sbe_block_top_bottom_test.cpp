@@ -38,6 +38,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 class SBEBlockTopBottomTest : public EExpressionTestFixture {
 public:
@@ -962,7 +963,7 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNOracleTest) {
         std::vector<TypedValues> inputKeys;
         for (const auto& inVal : input) {
             UniqueBSONObjBuilder bob;
-            bson::appendValueToBsonObj(bob, "b"_sd, inVal.tag(), inVal.value());
+            bson::appendValueToBsonObj(bob, "b"sv, inVal.tag(), inVal.value());
             bob.doneFast();
             inputKeys.push_back(
                 TypedValues{std::pair{value::TypeTags::bsonObject,

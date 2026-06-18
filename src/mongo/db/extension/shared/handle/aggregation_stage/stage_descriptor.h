@@ -28,13 +28,14 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <absl/base/nullability.h>
 
@@ -56,11 +57,11 @@ public:
         : VTableAPI<::MongoExtensionAggStageDescriptor>(descriptor) {}
 
     /**
-     * Returns a StringData containing the name of this aggregation stage.
+     * Returns a std::string_view containing the name of this aggregation stage.
      */
-    StringData getName() const {
+    std::string_view getName() const {
         auto stringView = byteViewAsStringView(_vtable().get_name(get()));
-        return StringData{stringView.data(), stringView.size()};
+        return std::string_view{stringView.data(), stringView.size()};
     }
 
     /**

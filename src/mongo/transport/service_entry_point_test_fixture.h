@@ -45,6 +45,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source_mock.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUBLIC mongo {
 
 class MONGO_MOD_OPEN ServiceEntryPointTestFixture : public ServiceContextTest {
@@ -214,7 +216,7 @@ public:
         // Run the list command as subcommand.
         auto cmdBSON = BSON(TestCmdProcessInternalSucceedCommand::kCommandName << 1);
 
-        constexpr auto dummyDatabaseName = StringData{"dummy_database_name"};
+        constexpr auto dummyDatabaseName = std::string_view{"dummy_database_name"};
         BSONObj info;
         DBDirectClient{opCtx}.runCommand(
             DatabaseName{dummyDatabaseName.data(), dummyDatabaseName.size()}, cmdBSON, info);

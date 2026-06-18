@@ -32,6 +32,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
@@ -43,7 +45,7 @@ void validateWriteAllowed(OperationContext* opCtx) {
 
 }  // namespace
 
-RecordStoreBase::RecordStoreBase(boost::optional<UUID> uuid, StringData ident)
+RecordStoreBase::RecordStoreBase(boost::optional<UUID> uuid, std::string_view ident)
     : _ident(std::make_shared<Ident>(std::string{ident})), _uuid(uuid) {}
 
 boost::optional<UUID> RecordStoreBase::uuid() const {
@@ -58,7 +60,7 @@ std::shared_ptr<Ident> RecordStoreBase::getSharedIdent() const {
     return _ident;
 }
 
-StringData RecordStoreBase::getIdent() const {
+std::string_view RecordStoreBase::getIdent() const {
     return _ident->getIdent();
 }
 

@@ -43,6 +43,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
 #include <boost/optional/optional.hpp>
@@ -102,7 +104,7 @@ StageConstraints DocumentSourceListMqlEntities::constraints(PipelineSplitState p
     return constraints;
 }
 
-StringData DocumentSourceListMqlEntities::getSourceName() const {
+std::string_view DocumentSourceListMqlEntities::getSourceName() const {
     return kStageName;
 }
 

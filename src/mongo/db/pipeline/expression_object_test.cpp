@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +47,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -58,6 +58,7 @@ namespace {
 using std::vector;
 
 namespace Object {
+using namespace std::literals::string_view_literals;
 using mongo::ExpressionObject;
 
 template <typename T>
@@ -85,7 +86,7 @@ TEST(ExpressionObjectParse, ShouldAcceptLiteralsAsValues) {
                                                    << "c" << BSONNULL),
                                           vps);
     auto expectedResult =
-        Value(Document{{"a", literal(5)}, {"b", literal("string"_sd)}, {"c", literal(BSONNULL)}});
+        Value(Document{{"a", literal(5)}, {"b", literal("string"sv)}, {"c", literal(BSONNULL)}});
     ASSERT_VALUE_EQ(expectedResult, object->serialize());
 }
 

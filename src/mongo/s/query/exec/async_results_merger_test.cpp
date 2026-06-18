@@ -66,6 +66,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
@@ -76,6 +77,7 @@ namespace mongo {
 using AsyncResultsMergerTest = ResultsMergerTestFixture;
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 LogicalSessionId parseSessionIdFromCmd(BSONObj cmdObj) {
     return LogicalSessionId::parse(cmdObj["lsid"].Obj(), IDLParserContext("lsid"));
@@ -117,8 +119,8 @@ NextHighWaterMarkDeterminingStrategyPtr buildNextHighWaterMarkDeterminingStrateg
 }
 
 BSONObj makeResponseObjWithErrorLabels(int errorCode,
-                                       StringData reason,
-                                       std::vector<StringData> errorLabels) {
+                                       std::string_view reason,
+                                       std::vector<std::string_view> errorLabels) {
     BSONObjBuilder responseBuilder;
     responseBuilder.append("ok", 0);
     responseBuilder.append("code", errorCode);
@@ -4451,7 +4453,7 @@ DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
     auto nextHighWaterMarkDeterminingStrategy = NextHighWaterMarkDeterminingStrategyFactory::
         createInvalidHighWaterMarkDeterminingStrategy();
 
-    ASSERT_EQ("invalid"_sd, nextHighWaterMarkDeterminingStrategy->getName());
+    ASSERT_EQ("invalid"sv, nextHighWaterMarkDeterminingStrategy->getName());
 
     // Throws whenever this strategy is used.
     ASSERT_THROWS_CODE((*nextHighWaterMarkDeterminingStrategy)(BSONObj(), BSONObj()),
@@ -4465,7 +4467,7 @@ DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
     auto nextHighWaterMarkDeterminingStrategy =
         buildNextHighWaterMarkDeterminingStrategy(false /* recognizeControlEvents */);
 
-    ASSERT_EQ("changeStreamV1"_sd, nextHighWaterMarkDeterminingStrategy->getName());
+    ASSERT_EQ("changeStreamV1"sv, nextHighWaterMarkDeterminingStrategy->getName());
 
     // '$sortKey' field is always expected. Will fail when passing in a BSONObj without a '$sortKey'
     // field.
@@ -4491,7 +4493,7 @@ TEST(NextHighWaterMarkDeterminingStrategyTest,
             auto nextHighWaterMarkDeterminingStrategy =
                 buildNextHighWaterMarkDeterminingStrategy(recognizeControlEvents);
 
-            ASSERT_EQ(recognizeControlEvents ? "recognizeControlEvents"_sd : "changeStreamV1"_sd,
+            ASSERT_EQ(recognizeControlEvents ? "recognizeControlEvents"sv : "changeStreamV1"sv,
                       nextHighWaterMarkDeterminingStrategy->getName());
 
             // Send in initial document with resume token. This should return the same high water
@@ -4528,7 +4530,7 @@ DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
     auto nextHighWaterMarkDeterminingStrategy =
         buildNextHighWaterMarkDeterminingStrategy(true /* recognizeControlEvents */);
 
-    ASSERT_EQ("recognizeControlEvents"_sd, nextHighWaterMarkDeterminingStrategy->getName());
+    ASSERT_EQ("recognizeControlEvents"sv, nextHighWaterMarkDeterminingStrategy->getName());
 
     // '$sortKey' field is always expected in the input document. Will fail when passing in a
     // BSONObj without a '$sortKey' field.

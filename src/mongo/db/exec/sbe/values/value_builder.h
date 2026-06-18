@@ -35,6 +35,7 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo::sbe::value {
@@ -103,10 +104,10 @@ public:
     }
 
     void append(const std::string& in) override {
-        append(StringData{in});
+        append(std::string_view{in});
     }
 
-    void append(StringData in) override {
+    void append(std::string_view in) override {
         if (canUseSmallString({in.data(), in.size()})) {
             appendValue(makeSmallString({in.data(), in.size()}));
         } else {

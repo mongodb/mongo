@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace MONGO_MOD_PUB mongo {
 
@@ -52,6 +53,6 @@ class OpTime;
  * subfield is not Timestamp, or the term subfield is not numeric.  For return values other than
  * Status::OK(), the resulting value of "*out" is undefined.
  */
-Status bsonExtractOpTimeField(const BSONObj& object, StringData fieldName, repl::OpTime* out);
+Status bsonExtractOpTimeField(const BSONObj& object, std::string_view fieldName, repl::OpTime* out);
 
 }  // namespace MONGO_MOD_PUB mongo

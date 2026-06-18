@@ -44,6 +44,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -86,7 +87,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "IDHACK"_sd;
+    static constexpr std::string_view kStageType = "IDHACK"_sd;
 
 protected:
     void doSaveStateRequiresIndex() final;

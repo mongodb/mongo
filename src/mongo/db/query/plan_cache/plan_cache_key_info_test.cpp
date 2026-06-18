@@ -52,11 +52,13 @@
 
 #include <iosfwd>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using std::string;
 using std::unique_ptr;
@@ -68,7 +70,7 @@ std::ostream& operator<<(std::ostream& stream, const PlanCacheKeyInfo& key) {
     return stream;
 }
 
-auto makeDbName(StringData dbName) {
+auto makeDbName(std::string_view dbName) {
     return DatabaseNameUtil::deserialize(
         boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
 }
@@ -144,7 +146,7 @@ TEST_F(PlanCacheKeyInfoTest, EqualityOperator) {
 
     NamespaceSpec nsSpec;
     nsSpec.setDb(makeDbName("db"));
-    nsSpec.setColl("coll"_sd);
+    nsSpec.setColl("coll"sv);
     query_settings::QuerySettings settingsA1IndexKeyPattern;
     settingsA1IndexKeyPattern.setIndexHints(
         {{query_settings::IndexHintSpec(nsSpec, {IndexHint(BSON("a" << 1))})}});

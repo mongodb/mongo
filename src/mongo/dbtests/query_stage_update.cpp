@@ -31,7 +31,6 @@
  * This file tests the UpdateStage class
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -73,6 +72,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -236,7 +236,8 @@ public:
                 write_ops::UpdateModification::parseFromClassicUpdate(updates));
             request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-            const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+            const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>
+                arrayFilters;
             const auto constants = boost::none;
 
             ASSERT_DOES_NOT_THROW(driver.parse(
@@ -318,7 +319,8 @@ public:
                 write_ops::UpdateModification::parseFromClassicUpdate(updates));
             request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-            const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+            const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>
+                arrayFilters;
             const auto constants = boost::none;
 
             ASSERT_DOES_NOT_THROW(driver.parse(
@@ -442,7 +444,7 @@ public:
         request.setReturnDocs(UpdateRequest::RETURN_OLD);
         request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+        const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
         const auto constants = boost::none;
 
         ASSERT_DOES_NOT_THROW(driver.parse(
@@ -538,7 +540,7 @@ public:
         request.setReturnDocs(UpdateRequest::RETURN_NEW);
         request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+        const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
         const auto constants = boost::none;
 
         ASSERT_DOES_NOT_THROW(driver.parse(
@@ -624,7 +626,7 @@ public:
             write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$inc: {x: 1}}")));
         request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+        const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
         const auto constants = boost::none;
         ASSERT_DOES_NOT_THROW(driver.parse(
             request.getUpdateModification(), arrayFilters, constants, request.isMulti()));
@@ -684,7 +686,7 @@ public:
             write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$inc: {x: 1}}")));
         request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+        const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
         const auto constants = boost::none;
         ASSERT_DOES_NOT_THROW(driver.parse(
             request.getUpdateModification(), arrayFilters, constants, request.isMulti()));

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/writer_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
@@ -38,6 +37,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -56,7 +56,7 @@ namespace mongo::exec::agg {
 class MONGO_MOD_NEEDS_REPLACEMENT MergeStage final
     : public WriterStage<MongoProcessInterface::BatchObject> {
 public:
-    MergeStage(StringData stageName,
+    MergeStage(std::string_view stageName,
                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                NamespaceString outputNs,
                std::shared_ptr<std::set<FieldPath>> mergeOnFields,

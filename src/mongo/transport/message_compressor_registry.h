@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/util/modules.h"
@@ -42,6 +41,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -99,7 +99,7 @@ public:
     /* Returns a compressor given a name. If no compressor with that name exists, it returns
      * nullptr
      */
-    MessageCompressorBase* getCompressor(StringData name) const;
+    MessageCompressorBase* getCompressor(std::string_view name) const;
 
     /*
      * Sets the list of supported compressors for this registry. Should be called during

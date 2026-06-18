@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 

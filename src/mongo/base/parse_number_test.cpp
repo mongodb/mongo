@@ -40,6 +40,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <typeinfo>
 #include <vector>
 
@@ -60,6 +61,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 template <typename... Ts>
 struct TypeListTag {};
@@ -111,7 +113,7 @@ auto allTypes = TypeListTag<short,
 
 PARSE_TEST(TestParsingNegatives) {
     struct Spec {
-        StringData spec;
+        std::string_view spec;
         int expectedValue;
     };
     std::vector<Spec> specs = {{"-0", 0}, {"-10", -10}, {"-0xff", -0xff}};
@@ -135,7 +137,7 @@ TEST(NumberParser, ParseNegatives) {
 PARSE_TEST(TestRejectingBadBases) {
     struct Spec {
         int base;
-        StringData spec;
+        std::string_view spec;
     };
     std::vector<Spec> specs = {{-1, "0"}, {1, "10"}, {37, "-10"}, {-1, " "}, {37, "f"}, {-1, "^%"}};
     if (typeid(NumberType) == typeid(double)) {
@@ -159,7 +161,7 @@ TEST(NumberParser, RejectBadBases) {
 
 PARSE_TEST(TestParsingNonNegatives) {
     struct {
-        StringData spec;
+        std::string_view spec;
         int expectedValue;
     } specs[] = {{"10", 10}, {"0", 0}, {"1", 1}, {"0xff", 0xff}, {"077", 077}};
     for (const auto& [str, expected] : specs) {
@@ -173,20 +175,20 @@ TEST(NumberParser, ParseNonNegatives) {
 
 PARSE_TEST(TestParsingGarbage) {
     NumberType ignored;
-    StringData garbage[] = {"",     " ",     " 10",   "15b",  "--10", "+-10", "++10",
-                            "--10", "0x+10", "0x-10", "0+10", "0-10", "48*3", "0x",
-                            "0X",   "+",     "-",     "+0x",  "+0X",  "-0X",  "-0x"};
+    std::string_view garbage[] = {"",     " ",     " 10",   "15b",  "--10", "+-10", "++10",
+                                  "--10", "0x+10", "0x-10", "0+10", "0-10", "48*3", "0x",
+                                  "0X",   "+",     "-",     "+0x",  "+0X",  "-0X",  "-0x"};
 
-    StringData decimalGarbage[] = {"1.0.1",
-                                   "1.0-1",
-                                   " 1.0",
-                                   "1.0P4",
-                                   "1e6	",
-                                   "	1e6",
-                                   "1e6 ",
-                                   " 1e6",
-                                   "0xabcab.defPa",
-                                   "1.0\0garbage"_sd};
+    std::string_view decimalGarbage[] = {"1.0.1",
+                                         "1.0-1",
+                                         " 1.0",
+                                         "1.0P4",
+                                         "1e6	",
+                                         "	1e6",
+                                         "1e6 ",
+                                         " 1e6",
+                                         "0xabcab.defPa",
+                                         "1.0\0garbage"sv};
     for (const auto& str : garbage) {
         ASSERT_EQ(ErrorCodes::FailedToParse, NumberParser{}(str, &ignored));
     }
@@ -203,7 +205,7 @@ TEST(NumberParser, ParseGarbage) {
 
 PARSE_TEST(TestParsingWithExplicitBase) {
     struct {
-        StringData spec;
+        std::string_view spec;
         int base;
         NumberType val;
     } passes[] = {{"15b", 16, 0x15b},
@@ -218,7 +220,7 @@ PARSE_TEST(TestParsingWithExplicitBase) {
     }
 
     struct {
-        StringData spec;
+        std::string_view spec;
         int base;
     } fails[] = {{"1b", 10},  {"80", 8},   {"0X", 16},  {"0x", 16},  {"0X", 8},  {"0x", 8},
                  {"0X", 10},  {"0x", 10},  {"+0X", 16}, {"+0x", 16}, {"+0X", 8}, {"+0x", 8},
@@ -261,9 +263,9 @@ TEST(NumberParser, ParseLimits) {
 }
 
 PARSE_TEST(TestSkipLeadingWhitespace) {
-    StringData whitespaces[] = {" ", "", "\t  \t", "\r\n\n\t", "\f\v "};
+    std::string_view whitespaces[] = {" ", "", "\t  \t", "\r\n\n\t", "\f\v "};
     struct {
-        StringData spec;
+        std::string_view spec;
         bool is_negative;
     } specs[] = {{"10", false},
                  {"0", false},
@@ -289,7 +291,7 @@ PARSE_TEST(TestSkipLeadingWhitespace) {
             ASSERT_EQ(ErrorCodes::FailedToParse, parsed);
         }
 
-        for (StringData ws : whitespaces) {
+        for (std::string_view ws : whitespaces) {
             std::string withWhitespace = fmt::format("{}{}", ws, numStr);
             if (shouldParse) {
                 ASSERT_PARSES_WITH_PARSER(NumberType, withWhitespace, skipWs, expected);
@@ -307,7 +309,7 @@ TEST(NumberParser, TestSkipLeadingWhitespace) {
 
 PARSE_TEST(TestEndOfNum) {
     struct {
-        StringData spec;
+        std::string_view spec;
         bool is_negative;
     } specs[] = {{"10", false},
                  {"0", false},
@@ -319,7 +321,7 @@ PARSE_TEST(TestEndOfNum) {
                  {"-1", true},
                  {"-0xff", true},
                  {"-077", true}};
-    StringData suffixes[] = {
+    std::string_view suffixes[] = {
         " ",
         "\r\t",
         "@!()",
@@ -337,7 +339,7 @@ PARSE_TEST(TestEndOfNum) {
         } else {
             ASSERT_EQ(ErrorCodes::FailedToParse, parsed);
         }
-        for (StringData& suffix : suffixes) {
+        for (std::string_view& suffix : suffixes) {
             std::string spec = fmt::format("{}{}", numStr, suffix);
             const char* numEnd = nullptr;
             NumberType actual;
@@ -345,7 +347,7 @@ PARSE_TEST(TestEndOfNum) {
             if (shouldParse) {
                 ASSERT_OK(parsed);
                 ASSERT_EQ(actual, expected);
-                StringData remaining_str{numEnd, suffix.size()};
+                std::string_view remaining_str{numEnd, suffix.size()};
                 ASSERT_TRUE(remaining_str == suffix);
             } else {
                 ASSERT_EQ(ErrorCodes::FailedToParse, parsed);
@@ -360,7 +362,7 @@ TEST(NumberParser, TestEndOfNum) {
 }
 
 PARSE_TEST(TestNotNullTerminated) {
-    StringData noNull{"1234", 3};
+    std::string_view noNull{"1234", 3};
     NumberParser parsers[] = {NumberParser(),
                               NumberParser().skipWhitespace(),
                               NumberParser().base(10),
@@ -376,7 +378,7 @@ TEST(NumberParser, TestNotNullTerminated) {
 
 PARSE_TEST(TestSkipLeadingWsAndEndptr) {
     struct {
-        StringData spec;
+        std::string_view spec;
         bool is_negative;
     } specs[] = {{"10", false},
                  {"0", false},
@@ -388,7 +390,7 @@ PARSE_TEST(TestSkipLeadingWsAndEndptr) {
                  {"-1", true},
                  {"-0xff", true},
                  {"-077", true}};
-    StringData whitespaces[] = {" ", "", "\t  \t", "\r\n\n\t", "\f\v "};
+    std::string_view whitespaces[] = {" ", "", "\t  \t", "\r\n\n\t", "\f\v "};
     NumberParser defaultParser;
     for (const auto& [numStr, is_negative] : specs) {
         NumberType expected;
@@ -399,7 +401,7 @@ PARSE_TEST(TestSkipLeadingWsAndEndptr) {
         } else {
             ASSERT_EQ(ErrorCodes::FailedToParse, parsed);
         }
-        for (StringData& prefix : whitespaces) {
+        for (std::string_view& prefix : whitespaces) {
             std::string spec = fmt::format("{}{}", prefix, numStr);
             const char* numEnd = nullptr;
             NumberType actual;
@@ -410,7 +412,7 @@ PARSE_TEST(TestSkipLeadingWsAndEndptr) {
                 ASSERT_TRUE(numEnd == (spec.c_str() + spec.size()));
             } else {
                 ASSERT_EQ(ErrorCodes::FailedToParse, parsed);
-                ASSERT_TRUE(StringData(numEnd, spec.size()) == spec.c_str());
+                ASSERT_TRUE(std::string_view(numEnd, spec.size()) == spec.c_str());
             }
         }
     }
@@ -421,7 +423,7 @@ TEST(NumberParser, TestSkipLeadingWsAndEndptr) {
 }
 
 TEST(ParseNumber, NotNullTerminated) {
-    ASSERT_PARSES(int, StringData("1234", 3), 123);
+    ASSERT_PARSES(int, std::string_view("1234", 3), 123);
 }
 
 TEST(ParseNumber, Int8) {

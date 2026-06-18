@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
@@ -49,6 +48,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <string_view>
 
 #include <boost/container/small_vector.hpp>
 #include <boost/optional/optional.hpp>
@@ -82,7 +82,7 @@ public:
     Bucket(TrackingContexts&,
            const BucketId& bucketId,
            BucketKey bucketKey,
-           StringData timeField,
+           std::string_view timeField,
            Date_t minTime,
            BucketStateRegistry& bucketStateRegistry);
 
@@ -190,7 +190,7 @@ bool allCommitted(const Bucket&);
  */
 bool schemaIncompatible(Bucket& bucket,
                         const BSONObj& input,
-                        boost::optional<StringData> metaField,
+                        boost::optional<std::string_view> metaField,
                         const StringDataComparator* comparator);
 
 /**
@@ -206,7 +206,7 @@ bool schemaIncompatible(Bucket& bucket,
 void calculateBucketFieldsAndSizeChange(TrackingContexts&,
                                         const Bucket& bucket,
                                         const BSONObj& doc,
-                                        boost::optional<StringData> metaField,
+                                        boost::optional<std::string_view> metaField,
                                         Bucket::NewFieldNames& newFieldNamesToBeInserted,
                                         Sizes& sizesToBeAdded);
 

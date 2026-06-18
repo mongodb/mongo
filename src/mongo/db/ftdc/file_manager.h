@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
@@ -43,6 +42,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -106,7 +106,7 @@ public:
      * Public for use by unit tests only.
      */
     StatusWith<boost::filesystem::path> generateArchiveFileName(const boost::filesystem::path& path,
-                                                                StringData suffix);
+                                                                std::string_view suffix);
 
 private:
     FTDCFileManager(const FTDCConfig* config,

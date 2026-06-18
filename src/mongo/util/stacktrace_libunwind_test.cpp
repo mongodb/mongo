@@ -28,7 +28,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace_libunwind_test_functions.h"
@@ -38,6 +37,7 @@
 #include <functional>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <cxxabi.h>
@@ -98,13 +98,13 @@ std::string trace() {
     return out;
 }
 
-void assertAndRemovePrefix(StringData& v, StringData prefix) {
+void assertAndRemovePrefix(std::string_view& v, std::string_view prefix) {
     auto pos = v.find(prefix);
     ASSERT(pos != v.npos) << fmt::format("expected to find '{}' in '{}'", prefix, v);
     v.remove_prefix(pos + prefix.size());
 }
 
-void assertAndRemoveSuffix(StringData& v, StringData suffix) {
+void assertAndRemoveSuffix(std::string_view& v, std::string_view suffix) {
     auto pos = v.rfind(suffix);
     ASSERT(pos != v.npos) << fmt::format("expected to find '{}' in '{}'", suffix, v);
     v.remove_suffix(v.size() - pos);
@@ -145,7 +145,7 @@ TEST(Unwind, Linkage) {
     normalFunction(os);
     std::string stacktrace = os.str();
 
-    StringData view = stacktrace;
+    std::string_view view = stacktrace;
 
     LOGV2_OPTIONS(31429, {logv2::LogTruncation::Disabled}, "Trace", "trace"_attr = view);
 
@@ -153,7 +153,7 @@ TEST(Unwind, Linkage) {
     assertAndRemovePrefix(view, R"(BACKTRACE: {"backtrace":)");
     assertAndRemovePrefix(view, "}\n");
 
-    StringData remainder = stacktrace;
+    std::string_view remainder = stacktrace;
 
     // Check that these function names appear in the trace, in order. The tracing code which
     // preceded our libunwind integration could *not* symbolize hiddenFunction,

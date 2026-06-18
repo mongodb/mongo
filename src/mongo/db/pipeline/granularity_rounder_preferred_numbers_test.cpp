@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -42,6 +41,7 @@
 #include <cstddef>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -53,6 +53,7 @@ using std::string;
 using std::vector;
 
 namespace {
+using namespace std::literals::string_view_literals;
 const double DELTA = 0.0001;
 
 const vector<string> preferredNumberSeries{
@@ -510,7 +511,7 @@ TEST(GranularityRounderPreferredNumbersTest, ShouldFailOnRoundingNonNumericValue
             GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), series);
 
         // Make sure that each GranularityRounder fails when rounding a non-numeric value.
-        Value stringValue = Value("test"_sd);
+        Value stringValue = Value("test"sv);
         ASSERT_THROWS_CODE(rounder->roundUp(stringValue), AssertionException, 40262);
         ASSERT_THROWS_CODE(rounder->roundDown(stringValue), AssertionException, 40262);
     }

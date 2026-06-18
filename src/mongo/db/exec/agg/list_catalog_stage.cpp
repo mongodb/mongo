@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/document_source_list_catalog.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceListCatalogToStageFn(
@@ -51,7 +53,7 @@ REGISTER_AGG_STAGE_MAPPING(listCatalog,
                            DocumentSourceListCatalog::id,
                            documentSourceListCatalogToStageFn)
 
-ListCatalogStage::ListCatalogStage(StringData stageName,
+ListCatalogStage::ListCatalogStage(std::string_view stageName,
                                    const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
     : Stage(stageName, pExpCtx) {}
 

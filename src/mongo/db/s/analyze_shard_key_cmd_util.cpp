@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -114,6 +113,7 @@
 #include <numeric>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -131,20 +131,21 @@ namespace mongo {
 namespace analyze_shard_key {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsMetrics);
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics);
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingCollStatsMetrics);
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyHangInClusterAggregate);
 
-constexpr StringData kIndexKeyFieldName = "key"_sd;
-constexpr StringData kDocFieldName = "doc"_sd;
-constexpr StringData kNumDocsFieldName = "numDocs"_sd;
-constexpr StringData kNumBytesFieldName = "numBytes"_sd;
-constexpr StringData kNumDistinctValuesFieldName = "numDistinctValues"_sd;
-constexpr StringData kMostCommonValuesFieldName = "mostCommonValues"_sd;
-constexpr StringData kFrequencyFieldName = "frequency"_sd;
-constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
+constexpr std::string_view kIndexKeyFieldName = "key"sv;
+constexpr std::string_view kDocFieldName = "doc"sv;
+constexpr std::string_view kNumDocsFieldName = "numDocs"sv;
+constexpr std::string_view kNumBytesFieldName = "numBytes"sv;
+constexpr std::string_view kNumDistinctValuesFieldName = "numDistinctValues"sv;
+constexpr std::string_view kMostCommonValuesFieldName = "mostCommonValues"sv;
+constexpr std::string_view kFrequencyFieldName = "frequency"sv;
+constexpr std::string_view kNumOrphanDocsFieldName = "numOrphanDocs"sv;
 
 const std::string kOrphanDocsWarningMessage =
     "Due to performance reasons, the analyzeShardKey command does not filter out orphan documents "

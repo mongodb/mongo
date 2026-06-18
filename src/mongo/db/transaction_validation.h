@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -40,18 +39,20 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUB mongo {
 
 /**
  * Returns true if the given command name can run as a retryable write.
  */
-bool isRetryableWriteCommand(Service* service, StringData cmdName);
+bool isRetryableWriteCommand(Service* service, std::string_view cmdName);
 
 /**
  * Returns true if the given cmd name is a transaction control command.  These are also the only
  * commands allowed to specify write concern in a transaction.
  */
-bool isTransactionCommand(Service* service, StringData cmdName);
+bool isTransactionCommand(Service* service, std::string_view cmdName);
 
 /**
  * Throws if the given write concern is not allowed in a transaction.

@@ -49,6 +49,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -66,7 +67,7 @@ NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {
  * Converts the key field on time to 'control.min.$timeField' field. Depends on error checking from
  * 'createBucketsSpecFromTimeseriesSpec()' which should be called before this function.
  */
-BSONObj convertToTTLTimeField(const BSONObj& origKeyField, StringData timeField) {
+BSONObj convertToTTLTimeField(const BSONObj& origKeyField, std::string_view timeField) {
     BSONObjBuilder keyBuilder;
     uassert(ErrorCodes::CannotCreateIndex,
             str::stream() << "TTL indexes are single-field indexes, compound indexes do "
@@ -88,8 +89,8 @@ BSONObj convertToTTLTimeField(const BSONObj& origKeyField, StringData timeField)
 
 BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
                               const NamespaceString& ns,
-                              const StringData nsFieldName,
-                              boost::optional<StringData> appendTimeSeriesFlag) {
+                              const std::string_view nsFieldName,
+                              boost::optional<std::string_view> appendTimeSeriesFlag) {
     // Translate time-series collection view namespace to bucket namespace.
     const auto bucketNs = ns.makeTimeseriesBucketsNamespace();
     BSONObjBuilder builder;

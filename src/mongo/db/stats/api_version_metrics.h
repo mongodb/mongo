@@ -43,6 +43,7 @@
 #include <array>
 #include <ctime>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -77,7 +78,7 @@ public:
     APIVersionMetrics() = default;
 
     // Update the timestamp for the API version used by the application.
-    void update(StringData appName, const APIParameters& apiParams);
+    void update(std::string_view appName, const APIParameters& apiParams);
 
     void appendAPIVersionMetricsInfo(BSONObjBuilder* b);
 

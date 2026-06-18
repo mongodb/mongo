@@ -30,7 +30,6 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -80,6 +79,7 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -89,6 +89,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // This failpoint throws a WriteConflictException after a successful call to
 // insertDocumentForBulkLoader
@@ -301,7 +302,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
             auto scoped = corruptDocumentOnInsert.scoped();
-            const auto fpNss = NamespaceStringUtil::parseFailPointData(scoped.getData(), "ns"_sd);
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(scoped.getData(), "ns"sv);
             if (collection->ns() == fpNss) {
                 //  Insert a truncated record that is half the expected size of the source document.
                 records.emplace_back(

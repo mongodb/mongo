@@ -32,10 +32,12 @@
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/feature_flag_test_gen.h"
 
+#include <string_view>
+
 namespace mongo {
 
 void ExpressionTestFeatureFlags::_validateInternal(const BSONElement& expr,
-                                                   StringData testExpressionName) {
+                                                   std::string_view testExpressionName) {
     uassert(10445700,
             str::stream() << testExpressionName
                           << " only supported input is the integer 1, but found "

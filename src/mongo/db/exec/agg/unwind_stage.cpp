@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceUnwindToStageFn(
@@ -51,7 +53,7 @@ namespace agg {
 
 REGISTER_AGG_STAGE_MAPPING(unwind, DocumentSourceUnwind::id, documentSourceUnwindToStageFn);
 
-UnwindStage::UnwindStage(StringData stageName,
+UnwindStage::UnwindStage(std::string_view stageName,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          std::unique_ptr<UnwindProcessor> unwindProcessor)
     : Stage(stageName, pExpCtx), _unwindProcessor(std::move(unwindProcessor)) {};

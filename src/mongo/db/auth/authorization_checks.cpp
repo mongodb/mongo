@@ -30,7 +30,6 @@
 #include "mongo/db/auth/authorization_checks.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,6 +51,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -60,6 +60,7 @@
 
 namespace mongo {
 namespace auth {
+using namespace std::literals::string_view_literals;
 namespace {
 
 // Checks if this connection has the privileges necessary to create or modify the view 'viewNs'
@@ -171,11 +172,11 @@ Status checkAuthForUpdate(AuthorizationSession* authSession,
                           const write_ops::UpdateModification& update,
                           bool upsert) {
     ActionSet required{ActionType::update};
-    StringData operationType = "update"_sd;
+    std::string_view operationType = "update"sv;
 
     if (upsert) {
         required.addAction(ActionType::insert);
-        operationType = "upsert"_sd;
+        operationType = "upsert"sv;
     }
 
     if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {

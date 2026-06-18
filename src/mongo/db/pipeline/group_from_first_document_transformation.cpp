@@ -33,6 +33,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -104,7 +106,7 @@ void GroupFromFirstDocumentTransformation::describeTransformation(
 std::unique_ptr<GroupFromFirstDocumentTransformation> GroupFromFirstDocumentTransformation::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::string& groupId,
-    StringData originalStageName,
+    std::string_view originalStageName,
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs,
     AccumulatorDocumentsNeeded docsNeeded) {
     return std::make_unique<GroupFromFirstDocumentTransformation>(

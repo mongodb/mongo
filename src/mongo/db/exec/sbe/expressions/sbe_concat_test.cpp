@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -45,12 +44,14 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo::sbe {
 class SBEConcatTest : public EExpressionTestFixture {
 protected:
-    void runAndAssertExpression(const vm::CodeFragment* compiledExpr, StringData expectedVal) {
+    void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
+                                std::string_view expectedVal) {
         auto [tag, val] = runCompiledExpression(compiledExpr);
         value::ValueGuard guard(tag, val);
 

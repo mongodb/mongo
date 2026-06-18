@@ -49,6 +49,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -64,7 +65,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(IndexStats);
  */
 class DocumentSourceIndexStats final {
 public:
-    static constexpr StringData kStageName = "$indexStats"_sd;
+    static constexpr std::string_view kStageName = "$indexStats"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

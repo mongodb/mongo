@@ -28,7 +28,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/update/document_diff_serialization.h"
@@ -37,6 +36,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -76,7 +76,7 @@ TEST(DiffApplierTest, InsertSimple) {
     const BSONObj preImage(BSON("f1" << 1 << "foo" << 2 << "f2" << 3));
 
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
-    StringData newField = "newField";
+    std::string_view newField = "newField";
 
     diff_tree::DocumentSubDiffNode diffNode;
     diffNode.addInsert("f1", storage["a"]);
@@ -218,7 +218,7 @@ TEST(DiffApplierTest, UpdateSimple) {
     const BSONObj preImage(BSON("f1" << 0 << "foo" << 2 << "f2" << 3));
 
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
-    StringData newField = "newField";
+    std::string_view newField = "newField";
 
     diff_tree::DocumentSubDiffNode diffNode;
     diffNode.addUpdate("f1", storage["a"]);
@@ -251,7 +251,7 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithAppend) {
     const BSONObj preImage(BSON("arr" << BSON_ARRAY(999 << 999 << 999 << 999)));
 
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
-    StringData arr = "arr";
+    std::string_view arr = "arr";
 
     diff_tree::DocumentSubDiffNode diffNode;
     {
@@ -270,7 +270,7 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithTruncate) {
     const BSONObj preImage(BSON("arr" << BSON_ARRAY(999 << 999 << 999 << 999)));
 
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
-    StringData arr = "arr";
+    std::string_view arr = "arr";
 
     diff_tree::DocumentSubDiffNode diffNode;
     {
@@ -288,7 +288,7 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithNullPadding) {
     const BSONObj preImage(BSON("arr" << BSON_ARRAY(0)));
 
     BSONObj storage(BSON("a" << 1));
-    StringData arr = "arr";
+    std::string_view arr = "arr";
 
     diff_tree::DocumentSubDiffNode diffNode;
     {
@@ -304,7 +304,7 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithNullPadding) {
 
 TEST(DiffApplierTest, NestedSubObjUpdateScalar) {
     BSONObj storage(BSON("a" << 1));
-    StringData subObj = "subObj";
+    std::string_view subObj = "subObj";
     diff_tree::DocumentSubDiffNode diffNode;
     {
         auto subDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
@@ -350,10 +350,10 @@ TEST(DiffApplierTest, UpdateArrayOfObjectsSubDiff) {
 
     BSONObj storage(
         BSON("uFieldNew" << 999 << "newObj" << BSON("x" << 1) << "a" << 1 << "b" << 2 << "c" << 3));
-    StringData arr = "arr";
-    StringData dFieldA = "dFieldA";
-    StringData dFieldB = "dFieldB";
-    StringData uField = "uField";
+    std::string_view arr = "arr";
+    std::string_view dFieldA = "dFieldA";
+    std::string_view dFieldB = "dFieldB";
+    std::string_view uField = "uField";
 
     diff_tree::DocumentSubDiffNode diffNode;
     diffNode.addDelete(dFieldA);
@@ -427,7 +427,7 @@ TEST(DiffApplierTest, UpdateArrayOfObjectsSubDiff) {
 // Case where an array diff rewrites several non contiguous indices which are objects.
 TEST(DiffApplierTest, UpdateArrayOfObjectsWithUpdateOperationNonContiguous) {
     BSONObj storage(BSON("dummyA" << 997 << "dummyB" << BSON("newVal" << 998) << "dummyC" << 999));
-    StringData arr = "arr";
+    std::string_view arr = "arr";
     diff_tree::DocumentSubDiffNode diffNode;
     {
         auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/client/credential.h"
 #include "mongo/util/modules.h"
 
@@ -37,6 +36,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -76,12 +76,13 @@ std::string getInternalAuthDB();
  * Returns the internal auth credential for the given index and mechanism.
  * Returns boost::none if no internal auth has been configured or index is out of range.
  */
-boost::optional<Credential> getInternalAuthParams(size_t idx, StringData mechanism);
+boost::optional<Credential> getInternalAuthParams(size_t idx, std::string_view mechanism);
 
 /**
  * Create a Credential for internal X.509 authentication.
  */
-Credential createInternalX509AuthCredential(boost::optional<StringData> userName = boost::none);
+Credential createInternalX509AuthCredential(
+    boost::optional<std::string_view> userName = boost::none);
 
 }  // namespace MONGO_MOD_PUBLIC auth
 }  // namespace mongo

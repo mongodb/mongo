@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_type.h"
@@ -59,6 +58,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -68,6 +68,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 bool requestsShouldBeSerialized(OperationContext* opCtx,
                                 const ShardsvrCreateCollectionRequest& incomingOp,
@@ -335,7 +336,7 @@ public:
             // access the collection outside of the critical section on the local
             // catalog to check the options. We need to serialize any create
             // collection/view to prevent wrong results
-            static constexpr StringData lockReason{"CreateCollectionUntracked"_sd};
+            static constexpr std::string_view lockReason{"CreateCollectionUntracked"sv};
             const DDLLockManager::ScopedCollectionDDLLock collDDLLock{
                 opCtx, ns(), lockReason, MODE_X};
             auto cmd = create_collection_util::makeCreateCommand(

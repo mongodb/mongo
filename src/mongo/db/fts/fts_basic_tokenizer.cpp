@@ -35,6 +35,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace fts {
@@ -44,7 +45,7 @@ using std::string;
 BasicFTSTokenizer::BasicFTSTokenizer(const FTSLanguage* language)
     : _language(language), _stemmer(language), _stopWords(StopWords::getStopWords(language)) {}
 
-void BasicFTSTokenizer::reset(StringData document, Options options) {
+void BasicFTSTokenizer::reset(std::string_view document, Options options) {
     _options = options;
     _document = std::string{document};
     _tokenizer = std::make_unique<Tokenizer>(_language, _document);
@@ -82,7 +83,7 @@ bool BasicFTSTokenizer::moveNext() {
     }
 }
 
-StringData BasicFTSTokenizer::get() const {
+std::string_view BasicFTSTokenizer::get() const {
     return _stem;
 }
 

@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <string_view>
 
 namespace MONGO_MOD_PUB mongo {
 
@@ -56,16 +56,16 @@ public:
         return std::string{_str};
     }
 
-    StringData toStringData() const {
+    std::string_view toStringData() const {
         return _str;
     }
 
-    operator StringData() const {
+    operator std::string_view() const {
         return _str;
     }
 
 private:
-    StringData _str;
+    std::string_view _str;
     char _buf[kBufSize];
 };
 

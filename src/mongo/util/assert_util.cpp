@@ -43,6 +43,7 @@
 #include <csignal>
 #include <exception>
 #include <ostream>
+#include <string_view>
 
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
@@ -55,6 +56,7 @@
 #define XSTR(x) XSTR_INNER_(x)
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 // Used by `logScopedDebugInfo` below to determine if we should log anything.
 Atomic<bool> shouldLogScopedDebugInfoInAssertUtil{true};
@@ -322,8 +324,8 @@ void warnIfTripwireAssertionsOccurred() {
     }
 }
 
-std::string causedBy(StringData e) {
-    static constexpr auto prefix = " :: caused by :: "_sd;
+std::string causedBy(std::string_view e) {
+    static constexpr auto prefix = " :: caused by :: "sv;
     std::string out;
     out.reserve(prefix.size() + e.size());
     out += prefix;

@@ -39,6 +39,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -587,9 +588,9 @@ MongoProcessInterface::BatchObject MergeProcessor::makeBatchObject(
     const std::set<FieldPath>& mergeOnFieldPaths,
     bool mergeOnFieldPathsIncludeId) const {
     // Generate an _id if the uniqueKey includes _id but the document doesn't have one.
-    if (mergeOnFieldPathsIncludeId && doc.getField("_id"_sd).missing()) {
+    if (mergeOnFieldPathsIncludeId && doc.getField("_id"sv).missing()) {
         MutableDocument mutableDoc(std::move(doc));
-        mutableDoc["_id"_sd] = Value(OID::gen());
+        mutableDoc["_id"sv] = Value(OID::gen());
         doc = mutableDoc.freeze();
     }
 

@@ -45,6 +45,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
+#include <string_view>
 #include <type_traits>
 
 namespace mongo {
@@ -100,7 +101,7 @@ public:
                     }
                     // If the submitter specified a subset of types, only join those.
                     if (types) {
-                        return std::ranges::any_of(*types, [&](StringData type) {
+                        return std::ranges::any_of(*types, [&](std::string_view type) {
                             return idl::deserialize<CoordinatorTypeEnum>(type, parserContext) ==
                                 opType;
                         });

@@ -38,6 +38,8 @@
 #include "mongo/stdx/trusted_hasher.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 /**
  * Truncates the 256 bit QueryShapeHash by taking only the first sizeof(size_t) bytes.
@@ -125,7 +127,8 @@ public:
      * Query settings module is responsible for maintaining the information about what aggregation
      * stages can be rejected.
      */
-    static const stdx::unordered_set<StringData, StringMapHasher>& getRejectionIncompatibleStages();
+    static const stdx::unordered_set<std::string_view, StringMapHasher>&
+    getRejectionIncompatibleStages();
 
     /**
      * Creates the QuerySettingsService that is attached to the 'serviceContext' with the logic

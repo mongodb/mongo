@@ -32,7 +32,6 @@
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -52,6 +51,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -217,7 +217,7 @@ public:
      */
     virtual const IndexCatalogEntry* findIndexByName(
         OperationContext* opCtx,
-        StringData name,
+        std::string_view name,
         InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const = 0;
 
     /**
@@ -255,7 +255,7 @@ public:
      */
     virtual const IndexCatalogEntry* findIndexByIdent(
         OperationContext* opCtx,
-        StringData ident,
+        std::string_view ident,
         InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const = 0;
 
     /**
@@ -282,7 +282,7 @@ public:
      */
     virtual IndexCatalogEntry* getWritableEntryByName(
         OperationContext* opCtx,
-        StringData name,
+        std::string_view name,
         InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) = 0;
     virtual IndexCatalogEntry* getWritableEntryByKeyPatternAndOptions(
         OperationContext* opCtx,
@@ -368,7 +368,7 @@ public:
         RemoveExistingIndexesFlags() {};
         RemoveExistingIndexesFlags(
             bool removeInProgressIndexBuilds,
-            const std::map<StringData, std::set<IndexType>>* fieldsToUseForComparison)
+            const std::map<std::string_view, std::set<IndexType>>* fieldsToUseForComparison)
             : removeInProgressIndexBuilds(removeInProgressIndexBuilds),
               fieldsToUseForComparison(fieldsToUseForComparison) {};
         // Flag indicating whether we should also check unfinished index builds for wether the given
@@ -381,7 +381,7 @@ public:
         //
         // Useful when comapring against output that has been fixed beforehand and won't affect the
         // correctness of the check.
-        const std::map<StringData, std::set<IndexType>>* fieldsToUseForComparison = nullptr;
+        const std::map<std::string_view, std::set<IndexType>>* fieldsToUseForComparison = nullptr;
     };
     /**
      * Filters out ready and in-progress indexes that already exist and returns the remaining

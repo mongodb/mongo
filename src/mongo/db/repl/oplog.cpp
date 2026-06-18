@@ -165,6 +165,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/optional.hpp>
@@ -179,6 +180,7 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace repl {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Failpoint to block oplog application after receiving an IndexBuildAlreadyInProgress error.
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildConflict);
@@ -223,14 +225,15 @@ void applyImportCollectionDefault(OperationContext* opCtx,
                         "isDryRun"_attr = isDryRun);
 }
 
-StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool isDataConsistent) {
+std::string_view getInvalidatingReason(const OplogApplication::Mode mode,
+                                       const bool isDataConsistent) {
     if (mode == OplogApplication::Mode::kInitialSync) {
-        return "initial sync"_sd;
+        return "initial sync"sv;
     } else if (!isDataConsistent) {
-        return "minvalid suggests inconsistent snapshot"_sd;
+        return "minvalid suggests inconsistent snapshot"sv;
     }
 
-    return ""_sd;
+    return ""sv;
 }
 
 boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
@@ -440,7 +443,7 @@ void writeToImageCollectionIfNeeded(OperationContext* opCtx,
                                     const Timestamp timestamp,
                                     repl::RetryImageEnum imageKind,
                                     const BSONObj& dataImage,
-                                    StringData invalidatedReason) {
+                                    std::string_view invalidatedReason) {
     auto& rss = rss::ReplicatedStorageService::get(opCtx);
     if (!rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
         return;
@@ -808,7 +811,7 @@ NamespaceString extractNs(DatabaseName dbName, const BSONObj& cmdObj) {
     uassert(40073,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(BSONType::string));
-    StringData coll = first.valueStringData();
+    std::string_view coll = first.valueStringData();
     uassert(28635, "no collection name specified", !coll.empty());
     return NamespaceStringUtil::deserialize(dbName, coll);
 }
@@ -1507,7 +1510,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
           // KeyFormats are not validated in the RecordStore create path so we validate them here
           // before attempting creation.
-          auto getKeyFormat = [](StringData ident, int keyFormatInt) -> StatusWith<KeyFormat> {
+          auto getKeyFormat = [](std::string_view ident,
+                                 int keyFormatInt) -> StatusWith<KeyFormat> {
               auto keyFormat = static_cast<KeyFormat>(keyFormatInt);
               if (keyFormatInt != static_cast<int>(KeyFormat::Long) &&
                   keyFormatInt != static_cast<int>(KeyFormat::String)) {
@@ -1621,14 +1625,14 @@ void assertOnInconsistentDocuments(OperationContext* opCtx,
 }
 }  // namespace
 
-constexpr StringData OplogApplication::kInitialSyncOplogApplicationMode;
-constexpr StringData OplogApplication::kRecoveringOplogApplicationMode;
-constexpr StringData OplogApplication::kStableRecoveringOplogApplicationMode;
-constexpr StringData OplogApplication::kUnstableRecoveringOplogApplicationMode;
-constexpr StringData OplogApplication::kSecondaryOplogApplicationMode;
-constexpr StringData OplogApplication::kApplyOpsCmdOplogApplicationMode;
+constexpr std::string_view OplogApplication::kInitialSyncOplogApplicationMode;
+constexpr std::string_view OplogApplication::kRecoveringOplogApplicationMode;
+constexpr std::string_view OplogApplication::kStableRecoveringOplogApplicationMode;
+constexpr std::string_view OplogApplication::kUnstableRecoveringOplogApplicationMode;
+constexpr std::string_view OplogApplication::kSecondaryOplogApplicationMode;
+constexpr std::string_view OplogApplication::kApplyOpsCmdOplogApplicationMode;
 
-StringData OplogApplication::modeToString(OplogApplication::Mode mode) {
+std::string_view OplogApplication::modeToString(OplogApplication::Mode mode) {
     switch (mode) {
         case OplogApplication::Mode::kInitialSync:
             return OplogApplication::kInitialSyncOplogApplicationMode;
@@ -3216,16 +3220,16 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // for each collection dropped. 'applyOps' and 'commitTransaction' will try to apply each
     // individual operation, and those will be caught then if they are a problem. 'abortTransaction'
     // won't ever change the server configuration collection.
-    constexpr std::array<StringData, 10> allowlistedOps{"dropDatabase",
-                                                        "applyOps",
-                                                        "dbCheck",
-                                                        "commitTransaction",
-                                                        "abortTransaction",
-                                                        "startIndexBuild",
-                                                        "commitIndexBuild",
-                                                        "abortIndexBuild",
-                                                        "initReplicatedFastCount",
-                                                        "dropIdent"};
+    constexpr std::array<std::string_view, 10> allowlistedOps{"dropDatabase",
+                                                              "applyOps",
+                                                              "dbCheck",
+                                                              "commitTransaction",
+                                                              "abortTransaction",
+                                                              "startIndexBuild",
+                                                              "commitIndexBuild",
+                                                              "abortIndexBuild",
+                                                              "initReplicatedFastCount",
+                                                              "dropIdent"};
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(allowlistedOps.begin(), allowlistedOps.end(), o.firstElementFieldName()) ==
          allowlistedOps.end()) &&

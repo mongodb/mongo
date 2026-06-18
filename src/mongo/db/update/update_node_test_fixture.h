@@ -39,6 +39,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class UpdateTestFixture : public ServiceContextTest {
@@ -49,7 +51,7 @@ protected:
     // Creates a RuntimeUpdatePath from a string, assuming that all numeric path components are
     // array indexes. Tests which use numeric field names in objects must manually create a
     // RuntimeUpdatePath.
-    static RuntimeUpdatePath makeRuntimeUpdatePathForTest(StringData path) {
+    static RuntimeUpdatePath makeRuntimeUpdatePathForTest(std::string_view path) {
         FieldRef fr(path);
         std::vector<RuntimeUpdatePath::ComponentType> types;
 
@@ -71,7 +73,7 @@ protected:
         _immutablePaths.clear();
         _pathToCreate = std::make_shared<FieldRef>();
         _pathTaken = std::make_shared<RuntimeUpdatePath>();
-        _matchedField = StringData();
+        _matchedField = std::string_view();
         _insert = false;
         _fromOplogApplication = false;
         _validateForStorage = true;
@@ -121,13 +123,13 @@ protected:
         return applyParams;
     }
 
-    void addImmutablePath(StringData path) {
+    void addImmutablePath(std::string_view path) {
         auto fieldRef = std::make_unique<FieldRef>(path);
         _immutablePathsVector.push_back(std::move(fieldRef));
         _immutablePaths.insert(_immutablePathsVector.back().get());
     }
 
-    void setPathToCreate(StringData path) {
+    void setPathToCreate(std::string_view path) {
         _pathToCreate->clear();
         _pathToCreate->parse(path);
     }
@@ -136,7 +138,7 @@ protected:
         *_pathTaken = pathTaken;
     }
 
-    void setMatchedField(StringData matchedField) {
+    void setMatchedField(std::string_view matchedField) {
         _matchedField = matchedField;
     }
 
@@ -152,7 +154,7 @@ protected:
         _validateForStorage = validateForStorage;
     }
 
-    void addIndexedPath(StringData path) {
+    void addIndexedPath(std::string_view path) {
         if (!_indexData) {
             _indexData = std::make_unique<UpdateIndexData>();
         }
@@ -188,7 +190,7 @@ private:
     FieldRefSet _immutablePaths;
     std::shared_ptr<FieldRef> _pathToCreate;
     std::shared_ptr<RuntimeUpdatePath> _pathTaken;
-    StringData _matchedField;
+    std::string_view _matchedField;
     bool _insert;
     bool _fromOplogApplication;
     bool _validateForStorage;

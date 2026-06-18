@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -82,6 +81,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -92,6 +92,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Helper function to verify field of map_reduce_common::OutputOptions.
@@ -426,13 +427,13 @@ protected:
      * Creates a mapReduce command object that reads from 'inputNss' and writes results to
      * 'outputNss'.
      */
-    BSONObj _makeCmdObj(StringData mapCode, StringData reduceCode);
+    BSONObj _makeCmdObj(std::string_view mapCode, std::string_view reduceCode);
 
     /**
      * Runs a mapReduce command.
      * Ensures that temporary collections created by mapReduce no longer exist on success.
      */
-    Status _runCommand(StringData mapCode, StringData reduceCode);
+    Status _runCommand(std::string_view mapCode, std::string_view reduceCode);
 
     /**
      * Checks that temporary collections created during mapReduce have been dropped.
@@ -493,7 +494,7 @@ repl::ReplicationCoordinatorMock* MapReduceCommandTest::_getReplCoord() const {
     return replCoordMock;
 }
 
-BSONObj MapReduceCommandTest::_makeCmdObj(StringData mapCode, StringData reduceCode) {
+BSONObj MapReduceCommandTest::_makeCmdObj(std::string_view mapCode, std::string_view reduceCode) {
     BSONObjBuilder bob;
     bob.append("mapReduce", inputNss.coll());
     bob.appendCode("map", mapCode);
@@ -502,7 +503,7 @@ BSONObj MapReduceCommandTest::_makeCmdObj(StringData mapCode, StringData reduceC
     return bob.obj();
 }
 
-Status MapReduceCommandTest::_runCommand(StringData mapCode, StringData reduceCode) {
+Status MapReduceCommandTest::_runCommand(std::string_view mapCode, std::string_view reduceCode) {
     auto command = CommandHelpers::findCommand(_opCtx.get(), "mapReduce");
     ASSERT(command) << "Unable to look up mapReduce command";
 
@@ -532,8 +533,8 @@ TEST_F(MapReduceCommandTest, MapIdToValue) {
     auto sourceDoc = BSON("_id" << 0);
     ASSERT_OK(_storage.insertDocument(_opCtx.get(), inputNss, {sourceDoc, Timestamp(0)}, 1LL));
 
-    auto mapCode = "function() { emit(this._id, this._id); }"_sd;
-    auto reduceCode = "function(k, v) { return Array.sum(v); }"_sd;
+    auto mapCode = "function() { emit(this._id, this._id); }"sv;
+    auto reduceCode = "function(k, v) { return Array.sum(v); }"sv;
     ASSERT_OK(_runCommand(mapCode, reduceCode));
 
     auto targetDoc = BSON("_id" << 0 << "value" << 0);
@@ -549,8 +550,8 @@ TEST_F(MapReduceCommandTest, DropTemporaryCollectionsOnInsertError) {
         uasserted(ErrorCodes::OperationFailed, "");
     };
 
-    auto mapCode = "function() { emit(this._id, this._id); }"_sd;
-    auto reduceCode = "function(k, v) { return Array.sum(v); }"_sd;
+    auto mapCode = "function() { emit(this._id, this._id); }"sv;
+    auto reduceCode = "function(k, v) { return Array.sum(v); }"sv;
     ASSERT_EQ(_runCommand(mapCode, reduceCode), ErrorCodes::OperationFailed);
 
     // Temporary collections created by mapReduce will be removed on failure if the server is able
@@ -567,8 +568,8 @@ TEST_F(MapReduceCommandTest, PrimaryStepDownPreventsTemporaryCollectionDrops) {
         uasserted(ErrorCodes::OperationFailed, "");
     };
 
-    auto mapCode = "function() { emit(this._id, this._id); }"_sd;
-    auto reduceCode = "function(k, v) { return Array.sum(v); }"_sd;
+    auto mapCode = "function() { emit(this._id, this._id); }"sv;
+    auto reduceCode = "function(k, v) { return Array.sum(v); }"sv;
     ASSERT_EQ(_runCommand(mapCode, reduceCode), ErrorCodes::OperationFailed);
 
     // Temporary collections should still be present because the server will not accept writes after
@@ -610,8 +611,8 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
     auto sourceDoc = BSON("_id" << 0);
     ASSERT_OK(_storage.insertDocument(_opCtx.get(), inputNss, {sourceDoc, Timestamp(0)}, 1LL));
 
-    auto mapCode = "function() { emit(this._id, this._id); }"_sd;
-    auto reduceCode = "function(k, v) { return Array.sum(v); }"_sd;
+    auto mapCode = "function() { emit(this._id, this._id); }"sv;
+    auto reduceCode = "function(k, v) { return Array.sum(v); }"sv;
     ASSERT_OK(_runCommand(mapCode, reduceCode));
 
     // MapReduce should filter existing indexes in the temporary collection, such as

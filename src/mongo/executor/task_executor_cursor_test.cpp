@@ -31,7 +31,6 @@
 #include "mongo/executor/task_executor_cursor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -45,6 +44,7 @@
 
 #include <climits>
 #include <cstddef>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -78,7 +78,7 @@ public:
         Base::tearDown();
     }
 
-    BSONObj scheduleSuccessfulCursorResponse(StringData fieldName,
+    BSONObj scheduleSuccessfulCursorResponse(std::string_view fieldName,
                                              size_t start,
                                              size_t end,
                                              size_t cursorId,
@@ -87,7 +87,7 @@ public:
             fieldName, start, end, cursorId, expectedPrefetch);
     }
 
-    BSONObj scheduleSuccessfulMultiCursorResponse(StringData fieldName,
+    BSONObj scheduleSuccessfulMultiCursorResponse(std::string_view fieldName,
                                                   size_t start,
                                                   size_t end,
                                                   std::vector<size_t> cursorIds,

@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamInjectControlEventsToStageFn(
@@ -56,7 +58,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamInjectControlEvents,
                            documentSourceChangeStreamInjectControlEventsToStageFn)
 
 ChangeStreamInjectControlEventsStage::ChangeStreamInjectControlEventsStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     DocumentSourceChangeStreamInjectControlEvents::ActionsMap actions)
     : Stage(stageName, pExpCtx), _actions(std::move(actions)) {}

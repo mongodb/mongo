@@ -32,12 +32,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -57,7 +57,7 @@ public:
     void serialize(BSONObjBuilder*) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-    StringData failingPath() const {
+    std::string_view failingPath() const {
         return _failingPath;
     }
     const Status& underlyingStatus() const {

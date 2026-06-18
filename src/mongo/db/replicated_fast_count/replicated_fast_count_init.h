@@ -33,6 +33,8 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/key_format.h"
 
+#include <string_view>
+
 namespace mongo {
 /**
  * Sets up the internal collections that are used to persist replicated fast count metadata and
@@ -48,9 +50,9 @@ MONGO_MOD_PUBLIC void setUpReplicatedFastCount(OperationContext* opCtx);
 
 MONGO_MOD_PUBLIC Status createInternalFastCountContainers(OperationContext* opCtx,
                                                           const NamespaceString& nss,
-                                                          StringData metadataIdent,
+                                                          std::string_view metadataIdent,
                                                           KeyFormat metadataKeyFormat,
-                                                          StringData timestampsIdent,
+                                                          std::string_view timestampsIdent,
                                                           KeyFormat timestampsKeyFormat,
                                                           bool writeToOplog);
 
@@ -69,7 +71,7 @@ MONGO_MOD_PUBLIC Status createInternalFastCountContainers(OperationContext* opCt
 MONGO_MOD_PUBLIC std::pair<Status, std::string> handleExistingFastCountIdent(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    StringData existingIdent,
+    std::string_view existingIdent,
     KeyFormat existingIdentFormat);
 
 namespace replicated_fast_count {

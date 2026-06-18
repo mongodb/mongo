@@ -28,7 +28,6 @@
  */
 
 #pragma once
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/repl/idempotency_scalar_generator.h"
@@ -36,6 +35,7 @@
 
 #include <cstddef>
 #include <set>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -43,13 +43,13 @@ namespace mongo {
 class BSONArrayBuilder;
 
 struct DocumentStructureEnumeratorConfig {
-    DocumentStructureEnumeratorConfig(std::set<StringData> fields_,
+    DocumentStructureEnumeratorConfig(std::set<std::string_view> fields_,
                                       std::size_t depth_,
                                       std::size_t length_,
                                       bool skipSubDocs_ = false,
                                       bool skipSubArrs_ = false);
 
-    std::set<StringData> fields = {};
+    std::set<std::string_view> fields = {};
     std::size_t depth = 0;
     std::size_t length = 0;
     const bool skipSubDocs = false;

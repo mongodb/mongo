@@ -30,7 +30,6 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_text.h"

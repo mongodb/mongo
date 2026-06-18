@@ -28,7 +28,6 @@
  */
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -41,6 +40,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -305,7 +305,7 @@ public:
                         Instruction::Parameter::decodeParam(pcPointer);
                     auto size = readFromMemory<uint8_t>(pcPointer);
                     pcPointer += sizeof(size);
-                    StringData fieldName(reinterpret_cast<const char*>(pcPointer), size);
+                    std::string_view fieldName(reinterpret_cast<const char*>(pcPointer), size);
                     pcPointer += size;
 
                     os << "popParam: " << popParam << ", moveFromParam: " << moveFromParam

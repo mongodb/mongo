@@ -72,6 +72,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -84,6 +85,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class AuthorizationSessionImplTestHelper {
 public:
@@ -97,7 +99,7 @@ public:
             {Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useTenant)});
         auto* as = dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(client));
         if (as->_authenticatedUser != boost::none) {
-            as->logoutAllDatabases("AuthorizationSessionImplTestHelper"_sd);
+            as->logoutAllDatabases("AuthorizationSessionImplTestHelper"sv);
         }
         as->_authenticatedUser = std::move(user);
         as->_authenticationMode = AuthorizationSession::AuthenticationMode::kConnection;
@@ -604,8 +606,8 @@ void testSerializer(const Message& fromSerializer, OpMsgBytes&& expected) {
     ASSERT_EQ(fromSerializer.operation(), dbMsg);
     // Ignoring request and reply ids since they aren't handled by OP_MSG code.
 
-    auto gotSD = StringData(fromSerializer.singleData().data(), fromSerializer.dataSize());
-    auto expectedSD = StringData(expectedMsg.singleData().data(), expectedMsg.dataSize());
+    auto gotSD = std::string_view(fromSerializer.singleData().data(), fromSerializer.dataSize());
+    auto expectedSD = std::string_view(expectedMsg.singleData().data(), expectedMsg.dataSize());
     if (gotSD == expectedSD)
         return;
 
@@ -861,7 +863,7 @@ TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
     const auto kTenantId = TenantId(OID::gen());
     const auto token = std::string{auth::ValidatedTenancyScopeFactory::create(
                                        UserName("user", "admin", kTenantId),
-                                       "secret"_sd,
+                                       "secret"sv,
                                        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
                                        auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
                                        .getOriginalToken()};
@@ -973,11 +975,11 @@ TEST(OpMsgRequestBuilder, WithVTS) {
     const TenantId tenantId(OID::gen());
     const auto vts = auth::ValidatedTenancyScopeFactory::create(
         UserName("user", "admin", tenantId),
-        "secret"_sd,
+        "secret"sv,
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
-    const StringData dbString = "testDb";
+    const std::string_view dbString = "testDb";
     auto const body = fromjson("{ping: 1}");
 
     OpMsgRequest msg = OpMsgRequestBuilder::create(
@@ -993,7 +995,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
     unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     const TenantId tenantId(OID::gen());
-    const StringData dbString = "testDb";
+    const std::string_view dbString = "testDb";
     const std::string dbStringWithTid = str::stream() << tenantId.toString() << "_" << dbString;
     auto const body = fromjson("{ping: 1}");
 
@@ -1001,7 +1003,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
 
     auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
         UserName("user", "admin", tenantId),
-        "secret"_sd,
+        "secret"sv,
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
@@ -1017,7 +1019,7 @@ void CheckVtsSetsPrefix(Client* client, bool simulateAtlasProxyTenantProtocol) {
     const auto token =
         std::string{auth::ValidatedTenancyScopeFactory::create(
                         UserName("user", "admin", kTenantId),
-                        "secret"_sd,
+                        "secret"sv,
                         simulateAtlasProxyTenantProtocol
                             ? auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy
                             : auth::ValidatedTenancyScope::TenantProtocol::kDefault,
@@ -1112,7 +1114,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
     unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     const TenantId tenantId(OID::gen());
-    const StringData dbString = "testDb";
+    const std::string_view dbString = "testDb";
     const std::string dbStringWithTid = str::stream() << tenantId.toString() << "_" << dbString;
     auto const body = fromjson("{ping: 1}");
 
@@ -1120,7 +1122,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
 
     auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
         UserName("user", "admin", tenantId),
-        "secret"_sd,
+        "secret"sv,
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
@@ -1137,7 +1139,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
     unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     const TenantId tenantId(OID::gen());
-    const StringData dbString = "testDb";
+    const std::string_view dbString = "testDb";
     const std::string dbStringWithTid = str::stream() << tenantId.toString() << "_" << dbString;
     auto const body = fromjson("{ping: 1}");
 
@@ -1145,7 +1147,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
 
     auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
         UserName("user", "admin", tenantId),
-        "secret"_sd,
+        "secret"sv,
         auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy,
         auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
@@ -1167,7 +1169,7 @@ TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
 
     auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
         UserName("user", "admin", tenantId),
-        "secret"_sd,
+        "secret"sv,
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 

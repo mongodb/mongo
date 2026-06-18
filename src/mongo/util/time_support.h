@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -42,6 +41,7 @@
 #include <iosfwd>
 #include <limits>
 #include <string>
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -277,12 +277,12 @@ public:
      */
     DateStringBuffer& ctime(Date_t date);
 
-    explicit operator StringData() const {
-        return StringData{_data.data(), _size};
+    explicit operator std::string_view() const {
+        return std::string_view{_data.data(), _size};
     }
 
     explicit operator std::string() const {
-        return std::string{StringData{*this}};
+        return std::string{std::string_view{*this}};
     }
 
 private:
@@ -324,7 +324,7 @@ void outputDateAsCtime(std::ostream& os, Date_t date);
  *
  * Local times are currently not supported.
  */
-StatusWith<Date_t> dateFromISOString(StringData dateString);
+StatusWith<Date_t> dateFromISOString(std::string_view dateString);
 
 void sleepsecs(int s);
 void sleepmillis(long long ms);

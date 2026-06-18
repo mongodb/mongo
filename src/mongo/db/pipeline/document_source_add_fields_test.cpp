@@ -52,6 +52,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using std::vector;
 
@@ -324,16 +325,16 @@ TEST_F(AddFieldsTest, TestDescribeTransformation) {
                                [](const PreservePath&) { FAIL("PreservePath"); },
                                [&modifications](const ModifyPath& op) {
                                    modifications++;
-                                   EXPECT_EQ(op.getPath(), "a"_sd);
+                                   EXPECT_EQ(op.getPath(), "a"sv);
                                    EXPECT_TRUE(op.isComputed());
                                },
                                [&renames](const RenamePath& op) {
                                    renames++;
                                    if (op.getNewPath() == "b") {
-                                       EXPECT_EQ(op.getOldPath(), "c"_sd);
+                                       EXPECT_EQ(op.getOldPath(), "c"sv);
                                    } else {
-                                       EXPECT_EQ(op.getNewPath(), "d"_sd);
-                                       EXPECT_EQ(op.getOldPath(), "e.f"_sd);
+                                       EXPECT_EQ(op.getNewPath(), "d"sv);
+                                       EXPECT_EQ(op.getOldPath(), "e.f"sv);
                                    }
                                },
                            },

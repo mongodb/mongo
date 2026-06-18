@@ -90,6 +90,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(pauseShardingCoordinatorServiceOnRecovery);
 
@@ -185,7 +186,7 @@ std::shared_ptr<ShardingCoordinator> constructShardingCoordinatorInstance(
 
 
 size_t countCoordinatorDocs(OperationContext* opCtx, const NamespaceString& nss) {
-    constexpr auto kNumCoordLabel = "numCoordinators"_sd;
+    constexpr auto kNumCoordLabel = "numCoordinators"sv;
     static const auto countStage = BSON("$count" << kNumCoordLabel);
 
     AggregateCommandRequest aggRequest{nss, {countStage}};

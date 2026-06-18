@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/const_element.h"
@@ -49,6 +48,7 @@
 #include "mongo/util/str.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -115,7 +115,7 @@ protected:
     }
 
 private:
-    StringData operatorName() const final {
+    std::string_view operatorName() const final {
         return "$set";
     }
 

@@ -53,6 +53,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -220,7 +221,7 @@ public:
                   const BSONObj& end,
                   boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
                   DataThrottle* dataThrottle,
-                  boost::optional<StringData> indexName = boost::none,
+                  boost::optional<std::string_view> indexName = boost::none,
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
                   int64_t maxBytes = std::numeric_limits<int64_t>::max(),
                   Date_t deadlineOnSecondary = Date_t::max());
@@ -294,7 +295,7 @@ private:
     BSONObj _maxKey;
     BSONObj _lastKeySeen = kMinBSONKey;
 
-    boost::optional<StringData> _indexName;
+    boost::optional<std::string_view> _indexName;
 
     // Represents the max number of docs or keys seen, which varies based on the validation mode:
     //  - "dataConsistency": _countDocsSeen <= _maxCount

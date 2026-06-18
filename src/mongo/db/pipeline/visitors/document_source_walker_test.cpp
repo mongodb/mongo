@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/document_source_match.h"

@@ -55,6 +55,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -91,7 +92,7 @@ public:
     };
 
     Status dropIdent(RecoveryUnit& ru,
-                     StringData ident,
+                     std::string_view ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop,
                      boost::optional<uint64_t> schemaEpoch) override {
@@ -125,8 +126,8 @@ public:
     std::vector<DroppedIdent> droppedIdents;
 
     // Override to modify dropIdent() behavior.
-    using DropIdentFn = std::function<Status(RecoveryUnit&, StringData)>;
-    DropIdentFn dropIdentFn = [](RecoveryUnit&, StringData) {
+    using DropIdentFn = std::function<Status(RecoveryUnit&, std::string_view)>;
+    DropIdentFn dropIdentFn = [](RecoveryUnit&, std::string_view) {
         return Status::OK();
     };
 
@@ -582,7 +583,7 @@ DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest,
     EXPECT_EQ(dropTimestamp, *reaper.getEarliestDropTimestamp());
 
     // Make KVEngineMock::dropIndent() fail.
-    engine->dropIdentFn = [&identName](RecoveryUnit& ru, StringData identToDropName) {
+    engine->dropIdentFn = [&identName](RecoveryUnit& ru, std::string_view identToDropName) {
         ASSERT_EQUALS(identName, identToDropName);
         return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIndent() failed.");
     };
@@ -680,7 +681,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampReportsDropErrors
     dropIdentAtOldest(reaper, dropTimestamp, identName);
 
     auto opCtx = makeOpCtx();
-    engine->dropIdentFn = [](RecoveryUnit&, StringData) {
+    engine->dropIdentFn = [](RecoveryUnit&, std::string_view) {
         return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIndent() failed.");
     };
     EXPECT_EQ(reaper.immediatelyCompletePendingDropAtTimestamp(
@@ -699,7 +700,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampRetriesOnObjectIs
     dropIdentAtOldest(reaper, dropTimestamp, identName);
 
     int attempts = 0;
-    engine->dropIdentFn = [&](RecoveryUnit&, StringData) -> Status {
+    engine->dropIdentFn = [&](RecoveryUnit&, std::string_view) -> Status {
         if (++attempts < 3) {
             return Status(ErrorCodes::ObjectIsBusy, "Mock EBUSY");
         }
@@ -723,7 +724,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampReturnsInterruptS
     dropIdentAtOldest(reaper, dropTimestamp, identName);
 
     auto opCtx = makeOpCtx();
-    engine->dropIdentFn = [&](RecoveryUnit&, StringData) -> Status {
+    engine->dropIdentFn = [&](RecoveryUnit&, std::string_view) -> Status {
         opCtx->markKilled(ErrorCodes::InterruptedAtShutdown);
         return Status(ErrorCodes::ObjectIsBusy, "Mock EBUSY");
     };
@@ -840,7 +841,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropReportsDropErrors) {
     reaper.addDropPendingIdent(StorageEngine::Immediate{}, std::make_shared<Ident>(identName));
 
     auto opCtx = makeOpCtx();
-    engine->dropIdentFn = [](RecoveryUnit&, StringData) {
+    engine->dropIdentFn = [](RecoveryUnit&, std::string_view) {
         return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIndent() failed.");
     };
     EXPECT_EQ(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName),

@@ -32,11 +32,12 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kHelloString = "hello"_sd;
+constexpr auto kHelloString = "hello"sv;
 // Aliases for the hello command in order to provide backwards compatibility.
-constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
-constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
+constexpr auto kCamelCaseIsMasterString = "isMaster"sv;
+constexpr auto kLowerCaseIsMasterString = "ismaster"sv;
 
 /**
  * Implements { hello : 1} for mock_mongot.

@@ -33,6 +33,8 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -75,7 +77,7 @@ DocumentSourceMock::DocumentSourceMock(std::deque<GetNextResult> results,
     mockConstraints.setConstraintsForNoInputSources();
 }
 
-StringData DocumentSourceMock::getSourceName() const {
+std::string_view DocumentSourceMock::getSourceName() const {
     return kStageName;
 }
 

@@ -33,9 +33,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUBLIC mongo {
 
-constexpr inline auto kIsDirectSystemBucketsAccessFieldName = "isDirectSystemBucketsAccess"_sd;
+constexpr inline std::string_view kIsDirectSystemBucketsAccessFieldName{
+    "isDirectSystemBucketsAccess"};
 
 /**
  * Returns a settable boolean indicating whether the given operation context originated from a user

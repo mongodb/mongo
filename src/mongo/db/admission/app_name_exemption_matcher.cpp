@@ -35,6 +35,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 
+#include <string_view>
+
 
 namespace mongo {
 
@@ -89,7 +91,7 @@ std::shared_ptr<std::vector<std::string>> parseAppNameExemptionList(const BSONOb
 
 void appendAppNameExemptionList(const VersionedValue<std::vector<std::string>>::Snapshot& snapshot,
                                 BSONObjBuilder* bob,
-                                StringData name) {
+                                std::string_view name) {
     if (snapshot) {
         BSONObjBuilder subObj(bob->subobjStart(name));
         BSONArrayBuilder bb(bob->subarrayStart("appNames"));

@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -46,27 +47,27 @@ namespace mongo {
  * and should generally be ignored by individual command implementations. In particular,
  * commands that fail on unrecognized arguments must not fail for any of these.
  */
-bool isGenericArgument(StringData arg);
+bool isGenericArgument(std::string_view arg);
 
 /**
  * Returns true if the provided reply field is one that is handled by the command processing layer
  * and should generally be ignored by individual command implementations. In particular,
  * replies that fail on unrecognized fields must not fail for any of these.
  */
-bool isGenericReply(StringData arg);
+bool isGenericReply(std::string_view arg);
 
 /**
  * Returns true if arg should be forwarded to shards.
  *
  * See 'CommandHelpers::filterCommandRequestForPassthrough'.
  */
-bool shouldForwardToShards(StringData arg);
+bool shouldForwardToShards(std::string_view arg);
 
 /**
  * Returns true if replyField should be forwarded from shards to clients.
  *
  * See 'CommandHelpers::filterCommandReplyForPassthrough'.
  */
-bool shouldForwardFromShards(StringData replyField);
+bool shouldForwardFromShards(std::string_view replyField);
 
 }  // namespace mongo

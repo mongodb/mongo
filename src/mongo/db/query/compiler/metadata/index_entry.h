@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/container_size_helper.h"
@@ -47,6 +46,7 @@
 #include <iosfwd>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/container/small_vector.hpp>
@@ -230,7 +230,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT IndexEntry : CoreIndexInfo {
      * these cases we only have a single boolean to track whether any path in the index is multikey.
      * If this is the case we defensively return true for any path.
      */
-    bool pathHasMultikeyComponent(StringData indexedField) const;
+    bool pathHasMultikeyComponent(std::string_view indexedField) const;
 
     /**
      * It's not obvious which element is the wildcard element in a compound wildcard index key

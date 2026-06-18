@@ -38,11 +38,13 @@
 
 #include <fstream>
 #include <iostream>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExtension
 
 namespace mongo::extension::host {
 namespace {
+using namespace std::literals::string_view_literals;
 const std::filesystem::path& getExtensionStubParserFile() {
     static const std::filesystem::path kExtensionStubParserPath = [] {
         constexpr auto kFileName = "aggregation_stage_fallback_parsers.json";
@@ -66,10 +68,10 @@ const std::filesystem::path& getExtensionStubParserFile() {
  *   ]
  * }
  */
-static constexpr StringData kExtensionStubParserField = "stubParsers"_sd;
-static constexpr StringData kExtensionStubParserStageNameField = "stageName"_sd;
-static constexpr StringData kExtensionStubParserMessageField = "message"_sd;
-static constexpr StringData kExtensionStubParserFeatureFlagField = "featureFlag"_sd;
+static constexpr std::string_view kExtensionStubParserField = "stubParsers"sv;
+static constexpr std::string_view kExtensionStubParserStageNameField = "stageName"sv;
+static constexpr std::string_view kExtensionStubParserMessageField = "message"sv;
+static constexpr std::string_view kExtensionStubParserFeatureFlagField = "featureFlag"sv;
 }  // namespace
 
 void registerStubParser(std::string stageName, std::string message, FeatureFlag* featureFlag) {

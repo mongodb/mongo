@@ -32,10 +32,11 @@
 #include "mongo/util/murmur3.h"
 
 #include <cstdlib>
+#include <string_view>
 
 namespace mongo {
 
-void SimpleStringDataComparator::hash_combine(size_t& seed, StringData stringToHash) const {
+void SimpleStringDataComparator::hash_combine(size_t& seed, std::string_view stringToHash) const {
     seed = murmur3<sizeof(seed)>(stringToHash, seed);
 }
 

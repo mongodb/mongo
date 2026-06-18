@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"

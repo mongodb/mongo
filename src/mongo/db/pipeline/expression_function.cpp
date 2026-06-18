@@ -42,6 +42,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_STABLE_EXPRESSION(function, ExpressionFunction::parse);
 
@@ -59,11 +60,11 @@ ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
 }
 
 Value ExpressionFunction::serialize(const query_shape::SerializationOptions& options) const {
-    MutableDocument innerOpts(Document{{"body"_sd, options.serializeLiteral(_funcSource)},
-                                       {"args"_sd, _passedArgs->serialize(options)},
+    MutableDocument innerOpts(Document{{"body"sv, options.serializeLiteral(_funcSource)},
+                                       {"args"sv, _passedArgs->serialize(options)},
                                        // "lang" is purposefully not treated as a literal since it
                                        // is more of a selection of an enum
-                                       {"lang"_sd, _lang}});
+                                       {"lang"sv, _lang}});
 
     // This field will only be serialized when desugaring $where in $expr + $_internalJs
     if (_assignFirstArgToThis) {

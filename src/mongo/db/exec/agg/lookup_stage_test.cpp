@@ -54,6 +54,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace test;
 
@@ -98,9 +99,9 @@ TEST_F(LookupStageTest, ShouldPropagatePauses) {
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
                                 Document{{"from", fromNs.coll()},
-                                         {"localField", "foreignId"_sd},
-                                         {"foreignField", "_id"_sd},
-                                         {"as", "foreignDocs"_sd}}}}
+                                         {"localField", "foreignId"sv},
+                                         {"foreignField", "_id"sv},
+                                         {"as", "foreignDocs"sv}}}}
                           .toBson();
     auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
     auto lookupStage = exec::agg::buildStageAndStitch(lookup, mockLocalStage);
@@ -146,9 +147,9 @@ TEST_F(LookupStageTest, ShouldPropagatePausesWhileUnwinding) {
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
                                 Document{{"from", fromNs.coll()},
-                                         {"localField", "foreignId"_sd},
-                                         {"foreignField", "_id"_sd},
-                                         {"as", "foreignDoc"_sd}}}}
+                                         {"localField", "foreignId"sv},
+                                         {"foreignField", "_id"sv},
+                                         {"as", "foreignDoc"sv}}}}
                           .toBson();
     auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
 

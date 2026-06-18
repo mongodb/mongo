@@ -48,6 +48,7 @@
 #include <memory>
 #include <queue>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -85,7 +86,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "CACHED_PLAN"_sd;
+    static constexpr std::string_view kStageType = "CACHED_PLAN"_sd;
 
     /**
      * Runs the cached plan for a trial period, yielding during the trial period according to

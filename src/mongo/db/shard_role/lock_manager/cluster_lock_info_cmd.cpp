@@ -59,9 +59,10 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kRawFieldName = "raw"_sd;
-constexpr auto kTopologyVersionFieldName = "topologyVersion"_sd;
+constexpr auto kRawFieldName = "raw"sv;
+constexpr auto kTopologyVersionFieldName = "topologyVersion"sv;
 
 class ClusterLockInfoCmd final : public BasicCommandWithRequestParser<ClusterLockInfoCmd> {
 public:

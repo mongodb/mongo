@@ -47,6 +47,8 @@
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/util/string_map.h"
 
+#include <string_view>
+
 #include <absl/container/flat_hash_map.h>
 
 namespace mongo {
@@ -109,8 +111,8 @@ int matchExpressionComparator(const MatchExpression* lhs, const MatchExpression*
         return lhsMatchType < rhsMatchType ? -1 : 1;
     }
 
-    StringData lhsPath = lhs->path();
-    StringData rhsPath = rhs->path();
+    std::string_view lhsPath = lhs->path();
+    std::string_view rhsPath = rhs->path();
     int pathsCompare = lhsPath.compare(rhsPath);
     if (pathsCompare != 0) {
         return pathsCompare;
@@ -344,7 +346,7 @@ std::unique_ptr<MatchExpression> listOfOptimizer(std::unique_ptr<MatchExpression
                 }
             }
 
-            StringData key = childExpression->path();
+            std::string_view key = childExpression->path();
             if (auto it = pathToExprsMap.find(key); it == pathToExprsMap.end()) {
                 std::vector<std::unique_ptr<MatchExpression>> exprs;
                 exprs.push_back(std::move(childExpression));
@@ -395,7 +397,7 @@ std::unique_ptr<MatchExpression> listOfOptimizer(std::unique_ptr<MatchExpression
                         "Expecting more than one one predicate against the path " + path,
                         exprs.size() > 1);
 
-                auto inExpression = std::make_unique<InMatchExpression>(StringData(path));
+                auto inExpression = std::make_unique<InMatchExpression>(std::string_view(path));
                 BSONArrayBuilder bab;
 
                 // If at least one of the expressions that we will combine into the $in

@@ -43,14 +43,15 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class OAuthDiscoveryFactoryFixture : public unittest::Test {
 public:
-    static constexpr auto kIssuer = "https://idp.example"_sd;
-    static constexpr auto kAuthorizationEndpoint = "https://idp.example/authorization"_sd;
-    static constexpr auto kTokenEndpoint = "https://idp.example/token"_sd;
-    static constexpr auto kDeviceAuthorizationEndpoint = "https://idp.example/dae"_sd;
-    static constexpr auto kJWKSUri = "https://idp.example/jwks"_sd;
+    static constexpr auto kIssuer = "https://idp.example"sv;
+    static constexpr auto kAuthorizationEndpoint = "https://idp.example/authorization"sv;
+    static constexpr auto kTokenEndpoint = "https://idp.example/token"sv;
+    static constexpr auto kDeviceAuthorizationEndpoint = "https://idp.example/dae"sv;
+    static constexpr auto kJWKSUri = "https://idp.example/jwks"sv;
 
     // Includes every expected field in OIDC discovery document.
     OAuthAuthorizationServerMetadata makeDefaultMetadata() {
@@ -74,18 +75,18 @@ public:
     // Omits the required JWKS URI field. Constructs BSON directly since serializing
     // OAuthAuthorizationServerMetadata with missing required fields triggers an invariant.
     BSONObj makeWithoutJWKSUriMetadata() {
-        return BSON("issuer"_sd << kIssuer << "authorization_endpoint"_sd << kAuthorizationEndpoint
-                                << "token_endpoint"_sd << kTokenEndpoint
-                                << "device_authorization_endpoint"_sd
-                                << kDeviceAuthorizationEndpoint);
+        return BSON("issuer"sv << kIssuer << "authorization_endpoint"sv << kAuthorizationEndpoint
+                               << "token_endpoint"sv << kTokenEndpoint
+                               << "device_authorization_endpoint"sv
+                               << kDeviceAuthorizationEndpoint);
     }
 
     // Omit the required issuer field. Constructs BSON directly since serializing
     // OAuthAuthorizationServerMetadata with missing required fields triggers an invariant.
     BSONObj makeWithoutIssuerMetadata() {
-        return BSON("authorization_endpoint"_sd
-                    << kAuthorizationEndpoint << "token_endpoint"_sd << kTokenEndpoint
-                    << "device_authorization_endpoint"_sd << kDeviceAuthorizationEndpoint
+        return BSON("authorization_endpoint"sv
+                    << kAuthorizationEndpoint << "token_endpoint"sv << kTokenEndpoint
+                    << "device_authorization_endpoint"sv << kDeviceAuthorizationEndpoint
                     << "jwks_uri" << kJWKSUri);
     }
 };
@@ -175,7 +176,7 @@ TEST_F(OAuthDiscoveryFactoryFixture, IssuerAndJWKSUriMustBeSecure) {
         BSONObj splicedMetadata = [&] {
             BSONObjBuilder builder;
             builder.append(field.fieldName(),
-                           field.str().replace(0, "https://"_sd.size(), "http://"));
+                           field.str().replace(0, "https://"sv.size(), "http://"));
             builder.appendElementsUnique(defaultMetadata.toBSON());
             return builder.obj();
         }();
@@ -188,7 +189,7 @@ TEST_F(OAuthDiscoveryFactoryFixture, IssuerAndJWKSUriMustBeSecure) {
 
         // If the insecure field is jwks_uri or issuer, then the factory should throw upon
         // retrieving the well-known document.
-        if (field.fieldName() == "jwks_uri"_sd || field.fieldName() == "issuer"_sd) {
+        if (field.fieldName() == "jwks_uri"sv || field.fieldName() == "issuer"sv) {
             ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
         } else {
             // All other endpoints are permitted to not be https since the server will not directly
@@ -209,7 +210,7 @@ TEST_F(OAuthDiscoveryFactoryFixture, EndpointMayBeInsecureLocalhostUnderTest) {
             BSONObjBuilder builder;
             builder.append(
                 field.fieldName(),
-                field.str().replace(0, "https://idp.example"_sd.size(), "http://localhost:9000"));
+                field.str().replace(0, "https://idp.example"sv.size(), "http://localhost:9000"));
             builder.appendElementsUnique(defaultMetadata.toBSON());
             return builder.obj();
         }();

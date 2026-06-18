@@ -33,10 +33,12 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
-constexpr StringData kDisabledFlagFieldName = "disabledFlagName";
+constexpr std::string_view kDisabledFlagFieldName = "disabledFlagName";
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(IFRFlagRetryInfo);
 
 }  // namespace

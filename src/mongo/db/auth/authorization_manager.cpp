@@ -36,19 +36,20 @@
 #include "mongo/bson/bsonobjbuilder.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
 SystemAuthInfo internalSecurity;
 
-constexpr StringData AuthorizationManager::USERID_FIELD_NAME;
-constexpr StringData AuthorizationManager::USER_NAME_FIELD_NAME;
-constexpr StringData AuthorizationManager::USER_DB_FIELD_NAME;
-constexpr StringData AuthorizationManager::ROLE_NAME_FIELD_NAME;
-constexpr StringData AuthorizationManager::ROLE_DB_FIELD_NAME;
-constexpr StringData AuthorizationManager::PASSWORD_FIELD_NAME;
-constexpr StringData AuthorizationManager::V1_USER_NAME_FIELD_NAME;
-constexpr StringData AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
+constexpr std::string_view AuthorizationManager::USERID_FIELD_NAME;
+constexpr std::string_view AuthorizationManager::USER_NAME_FIELD_NAME;
+constexpr std::string_view AuthorizationManager::USER_DB_FIELD_NAME;
+constexpr std::string_view AuthorizationManager::ROLE_NAME_FIELD_NAME;
+constexpr std::string_view AuthorizationManager::ROLE_DB_FIELD_NAME;
+constexpr std::string_view AuthorizationManager::PASSWORD_FIELD_NAME;
+constexpr std::string_view AuthorizationManager::V1_USER_NAME_FIELD_NAME;
+constexpr std::string_view AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
 
 const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::AuthenticationFailed,
                                                               "Authentication failed.");

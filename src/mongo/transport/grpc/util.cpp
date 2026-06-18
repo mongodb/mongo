@@ -35,15 +35,18 @@
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::transport::grpc::util {
 namespace constants {
+using namespace std::literals::string_view_literals;
 const std::string kClusterMaxWireVersionKey = "mongodb-maxwireversion";
-constexpr StringData kUriSchemes[] = {"dns:"_sd, "ipv4:"_sd, "ipv6:"_sd, "unix:"_sd};
+constexpr std::string_view kUriSchemes[] = {"dns:"sv, "ipv4:"sv, "ipv6:"sv, "unix:"sv};
 }  // namespace constants
 
-::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(StringData filePath) {
+::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(std::string_view filePath) {
 
     ::grpc::SslServerCredentialsOptions::PemKeyCertPair certPair;
 
@@ -62,7 +65,7 @@ std::string toGRPCFormattedURI(const HostAndPort& address) {
     }
 }
 
-HostAndPort parseGRPCFormattedURI(StringData uri) {
+HostAndPort parseGRPCFormattedURI(std::string_view uri) {
     // See: https://github.com/grpc/grpc/issues/35006
     if (uri == "unix:") {
         return HostAndPort("", 0);

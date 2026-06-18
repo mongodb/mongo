@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/ts_bucket_to_cell_block.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
@@ -42,8 +41,10 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 TsBucketToCellBlockStage::TsBucketToCellBlockStage(std::unique_ptr<PlanStage> input,
                                                    value::SlotId bucketSlot,
                                                    std::vector<value::PathRequest> pathReqs,
@@ -53,7 +54,7 @@ TsBucketToCellBlockStage::TsBucketToCellBlockStage(std::unique_ptr<PlanStage> in
                                                    const std::string& timeField,
                                                    PlanNodeId nodeId,
                                                    bool participateInTrialRunTracking)
-    : PlanStage("ts_bucket_to_cellblock"_sd,
+    : PlanStage("ts_bucket_to_cellblock"sv,
                 nullptr /* yieldPolicy */,
                 nodeId,
                 participateInTrialRunTracking),

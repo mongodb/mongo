@@ -51,6 +51,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -83,13 +84,13 @@ namespace mongo {
 namespace idl {
 
 struct FieldMetadata {
-    StringData name;
+    std::string_view name;
     bool required;
 };
 
 template <const auto& fieldMeta>
-consteval std::array<StringData, fieldMeta.size()> extractNames() {
-    std::array<StringData, fieldMeta.size()> out;
+consteval std::array<std::string_view, fieldMeta.size()> extractNames() {
+    std::array<std::string_view, fieldMeta.size()> out;
     for (size_t i = 0; i != fieldMeta.size(); ++i)
         out[i] = fieldMeta[i].name;
     return out;
@@ -115,7 +116,7 @@ template <typename T>
 constexpr bool hasBSONSerialize = stdx::is_detected_v<HasBSONSerializeOp, T>;
 
 template <typename T>
-void idlSerialize(BSONObjBuilder* builder, StringData fieldName, T arg) {
+void idlSerialize(BSONObjBuilder* builder, std::string_view fieldName, T arg) {
     if constexpr (hasBSONSerialize<decltype(arg)>) {
         BSONObjBuilder subObj(builder->subobjStart(fieldName));
         arg.serialize(&subObj);
@@ -125,7 +126,7 @@ void idlSerialize(BSONObjBuilder* builder, StringData fieldName, T arg) {
 }
 
 template <typename T>
-void idlSerialize(BSONObjBuilder* builder, StringData fieldName, std::vector<T> arg) {
+void idlSerialize(BSONObjBuilder* builder, std::string_view fieldName, std::vector<T> arg) {
     BSONArrayBuilder arrayBuilder(builder->subarrayStart(fieldName));
     for (const auto& item : arg) {
         if constexpr (hasBSONSerialize<decltype(item)>) {
@@ -250,7 +251,7 @@ void handleMissingRequiredFields(const auto& hasMembers,
         if (hasMembers.hasAllRequired())
             return;
         std::string msg = "Missing required fields: ";
-        StringData sep;
+        std::string_view sep;
         size_t reqIdx = 0;
         for (size_t i = 0; i < meta.size(); ++i) {
             auto&& [name, required] = meta[i];
@@ -357,8 +358,8 @@ class MONGO_MOD_NEEDS_REPLACEMENT IDLParserContext {
 
     template <typename T>
     friend void throwComparisonError(IDLParserContext& ctxt,
-                                     StringData fieldName,
-                                     StringData op,
+                                     std::string_view fieldName,
+                                     std::string_view op,
                                      T actualValue,
                                      T expectedValue);
 
@@ -370,13 +371,13 @@ public:
     static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
     static constexpr auto kTenantIdField = "$tenant"_sd;
 
-    explicit IDLParserContext(StringData fieldName)
+    explicit IDLParserContext(std::string_view fieldName)
         : IDLParserContext{fieldName,
                            boost::optional<auth::ValidatedTenancyScope>{boost::none},
                            boost::optional<TenantId>{boost::none},
                            SerializationContext::stateDefault()} {}
 
-    IDLParserContext(StringData fieldName,
+    IDLParserContext(std::string_view fieldName,
                      const boost::optional<auth::ValidatedTenancyScope>& vts,
                      boost::optional<TenantId> tenantId,
                      const SerializationContext& serializationContext)
@@ -386,14 +387,14 @@ public:
           _predecessor(nullptr),
           _validatedTenancyScope(vts) {}
 
-    IDLParserContext(StringData fieldName, const IDLParserContext* predecessor)
+    IDLParserContext(std::string_view fieldName, const IDLParserContext* predecessor)
         : IDLParserContext(fieldName,
                            predecessor,
                            boost::optional<auth::ValidatedTenancyScope>{boost::none},
                            SerializationContext::stateDefault(),
                            boost::optional<TenantId>{boost::none}) {}
 
-    IDLParserContext(StringData fieldName,
+    IDLParserContext(std::string_view fieldName,
                      const IDLParserContext* predecessor,
                      const boost::optional<auth::ValidatedTenancyScope>& vts,
                      const SerializationContext& serializationContext,
@@ -457,28 +458,28 @@ public:
     /**
      * Throw an error message about the BSONElement being a duplicate field.
      */
-    MONGO_COMPILER_NORETURN void throwDuplicateField(StringData fieldName) const;
+    MONGO_COMPILER_NORETURN void throwDuplicateField(std::string_view fieldName) const;
 
     /**
      * Throw an error message about the required field missing from the document.
      */
-    MONGO_COMPILER_NORETURN void throwMissingField(StringData fieldName) const;
+    MONGO_COMPILER_NORETURN void throwMissingField(std::string_view fieldName) const;
 
     /**
      * Throw an error message about an unknown field in a document.
      */
-    MONGO_COMPILER_NORETURN void throwUnknownField(StringData fieldName) const;
+    MONGO_COMPILER_NORETURN void throwUnknownField(std::string_view fieldName) const;
 
     /**
      * Throw an error message about the array field name not being the next number in the sequence.
      */
-    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberSequence(StringData actualValue,
-                                                                  StringData expectedValue) const;
+    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberSequence(
+        std::string_view actualValue, std::string_view expectedValue) const;
 
     /**
      * Throw an error message about an unrecognized enum value.
      */
-    MONGO_COMPILER_NORETURN void throwBadEnumValue(StringData enumValue) const;
+    MONGO_COMPILER_NORETURN void throwBadEnumValue(std::string_view enumValue) const;
     MONGO_COMPILER_NORETURN void throwBadEnumValue(int enumValue) const;
 
     /**
@@ -491,14 +492,14 @@ public:
      * Check that the collection name in 'element' is valid. Throws an exception if not valid.
      * Returns the collection name otherwise.
      */
-    static StringData checkAndAssertCollectionName(const BSONElement& element,
-                                                   bool allowGlobalCollectionName);
+    static std::string_view checkAndAssertCollectionName(const BSONElement& element,
+                                                         bool allowGlobalCollectionName);
 
     /**
      * Check that the collection name or UUID in 'element' is valid. Throws an exception if not
      * valid. Returns either the collection name or UUID otherwise.
      */
-    static std::variant<UUID, StringData> checkAndAssertCollectionNameOrUUID(
+    static std::variant<UUID, std::string_view> checkAndAssertCollectionNameOrUUID(
         const BSONElement& element);
 
     const boost::optional<TenantId>& getTenantId() const;
@@ -517,7 +518,7 @@ private:
      * Return a dot seperated path to the specified field. For instance, if the code is parsing a
      * grandchild field that has an error, this will return "grandparent.parent.child".
      */
-    std::string getElementPath(StringData fieldName) const;
+    std::string getElementPath(std::string_view fieldName) const;
 
     /**
      * See comment on checkAndAssertType.
@@ -547,7 +548,7 @@ private:
     const SerializationContext _serializationContext;
 
     // Name of the current field that is being parsed.
-    const StringData _currentField;
+    const std::string_view _currentField;
 
     const boost::optional<TenantId> _tenantId;
 
@@ -571,7 +572,7 @@ public:
      * This does not perform any validation whatsoever, including validating that this field is
      * unstable or that it had already been marked present.
      */
-    void markUnstableFieldPresent(StringData unstableFieldName) {
+    void markUnstableFieldPresent(std::string_view unstableFieldName) {
         _unstableField = unstableFieldName;
     }
 
@@ -588,15 +589,15 @@ public:
     }
 
 private:
-    boost::optional<StringData> _unstableField;
+    boost::optional<std::string_view> _unstableField;
 };
 
 /**
  * Throw an error when a user calls a setter and it fails the comparison.
  */
 template <typename T>
-MONGO_MOD_NEEDS_REPLACEMENT void throwComparisonError(StringData fieldName,
-                                                      StringData op,
+MONGO_MOD_NEEDS_REPLACEMENT void throwComparisonError(std::string_view fieldName,
+                                                      std::string_view op,
                                                       T actualValue,
                                                       T expectedValue) {
     uasserted(ErrorCodes::BadValue,
@@ -608,8 +609,11 @@ MONGO_MOD_NEEDS_REPLACEMENT void throwComparisonError(StringData fieldName,
  * Throw an error when BSON validation fails during parse.
  */
 template <typename T>
-void throwComparisonError(
-    IDLParserContext& ctxt, StringData fieldName, StringData op, T actualValue, T expectedValue) {
+void throwComparisonError(IDLParserContext& ctxt,
+                          std::string_view fieldName,
+                          std::string_view op,
+                          T actualValue,
+                          T expectedValue) {
     std::string path = ctxt.getElementPath(fieldName);
     throwComparisonError(path, op, actualValue, expectedValue);
 }
@@ -619,8 +623,8 @@ void throwComparisonError(
  *
  * Used by the IDL generated code to transform between vectors of view, and non-view types.
  */
-std::vector<StringData> transformVector(const std::vector<std::string>& input);
-std::vector<std::string> transformVector(const std::vector<StringData>& input);
+std::vector<std::string_view> transformVector(const std::vector<std::string>& input);
+std::vector<std::string> transformVector(const std::vector<std::string_view>& input);
 std::vector<ConstDataRange> transformVector(const std::vector<std::vector<std::uint8_t>>& input);
 std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDataRange>& input);
 
@@ -663,7 +667,7 @@ MONGO_MOD_PUBLIC T parseCommandRequest(const OpMsgRequest& req, const IDLParserC
 
 template <typename E>
 concept EnumWithStringSerializer = requires(E e) {
-    { idlSerialize(e) } -> std::same_as<StringData>;
+    { idlSerialize(e) } -> std::same_as<std::string_view>;
 };
 
 template <typename E>
@@ -672,9 +676,10 @@ concept EnumWithIntSerializer = requires(E e) {
 };
 
 template <typename E>
-concept EnumWithStringDeserializer = requires(E e, StringData sv, const IDLParserContext& ctxt) {
-    { idlDeserialize(e, sv, ctxt) } -> std::same_as<void>;
-};
+concept EnumWithStringDeserializer =
+    requires(E e, std::string_view sv, const IDLParserContext& ctxt) {
+        { idlDeserialize(e, sv, ctxt) } -> std::same_as<void>;
+    };
 
 template <typename E>
 concept EnumWithIntDeserializer = requires(E e, std::int32_t i, const IDLParserContext& ctxt) {
@@ -685,7 +690,7 @@ concept EnumWithIntDeserializer = requires(E e, std::int32_t i, const IDLParserC
  * Serialize an IDL-defined enum of type "string".
  */
 template <EnumWithStringSerializer E>
-MONGO_MOD_PUBLIC StringData serialize(E en) {
+MONGO_MOD_PUBLIC std::string_view serialize(E en) {
     return idlSerialize(en);
 }
 
@@ -703,7 +708,7 @@ MONGO_MOD_PUBLIC std::int32_t serialize(E en) {
  */
 template <EnumWithStringDeserializer E>
 MONGO_MOD_PUBLIC E
-deserialize(StringData sd,
+deserialize(std::string_view sd,
             const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
     E ret;
     idlDeserialize(ret, sd, ctxt);

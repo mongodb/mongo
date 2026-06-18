@@ -40,6 +40,7 @@
 #include "mongo/util/str.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -51,27 +52,28 @@ namespace mongo {
 namespace repl {
 
 namespace apply_ops_command_info_details {
+using namespace std::literals::string_view_literals;
 
 /**
  * Return true iff the applyOpsCmd can be executed in a single WriteUnitOfWork.
  */
 bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
     for (const auto& elem : applyOpCmd.firstElement().Obj()) {
-        StringData opType = elem.Obj().getStringField("op");
+        std::string_view opType = elem.Obj().getStringField("op");
 
-        if (opType == "i"_sd) {
+        if (opType == "i"sv) {
             continue;
-        } else if (opType == "ci"_sd) {
+        } else if (opType == "ci"sv) {
             continue;
-        } else if (opType == "d"_sd) {
+        } else if (opType == "d"sv) {
             continue;
-        } else if (opType == "cd"_sd) {
+        } else if (opType == "cd"sv) {
             continue;
-        } else if (opType == "u"_sd) {
+        } else if (opType == "u"sv) {
             continue;
-        } else if (opType == "cu"_sd) {
+        } else if (opType == "cu"sv) {
             continue;
-        } else if (opType == "n"_sd) {
+        } else if (opType == "n"sv) {
             continue;
         } else {
             return false;
@@ -145,7 +147,7 @@ std::vector<ElementReference> getCommonElementReferences(const BSONObj& obj, uin
         // Furthermore, excluding 'o', 'nss', and 'op' from the common elements means we will always
         // catch (during the final parse) operations which do not have those fields, without the
         // necessity of doing another expensive parse.
-        StringData fieldName = el.fieldNameStringData();
+        std::string_view fieldName = el.fieldNameStringData();
         if (fieldName == OplogEntry::kObjectFieldName || fieldName == OplogEntry::kNssFieldName ||
             fieldName == OplogEntry::kOpTypeFieldName ||
             fieldName == OplogEntry::kUpsertFieldName ||
@@ -202,7 +204,7 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
             while (it.more()) {
                 BSONElement e = it.next();
                 builder.append(e);
-                StringData fieldName = e.fieldNameStringData();
+                std::string_view fieldName = e.fieldNameStringData();
                 auto commonElementIter = commonNamesMap.find(fieldName);
                 if (commonElementIter != commonNamesMap.end()) {
                     commonElementIter->second->second = applyOpsIdx;

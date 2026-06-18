@@ -29,6 +29,8 @@
 
 #include "mongo/db/repl/oplog_constraint_violation_logger.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 
@@ -44,7 +46,7 @@ namespace repl {
 // Default interval set to 10 minutes.
 const Seconds OplogConstraintViolationLogger::kPeriodicLogTimeout(60 * 10);
 
-StringData toString(OplogConstraintViolationEnum type) {
+std::string_view toString(OplogConstraintViolationEnum type) {
     switch (type) {
         case OplogConstraintViolationEnum::kInsertOnExistingDoc:
             return kInsertOnExistingDocMsg;

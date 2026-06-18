@@ -56,6 +56,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <string_view>
 
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/optional/optional.hpp>
@@ -626,9 +627,8 @@ void AsyncResultsMerger::_removeRemoteFromPromisedMinSortKeys(WithLock,
     }
 }
 
-void AsyncResultsMerger::_ensureHighWaterMarkIsMonotonicallyIncreasing(const BSONObj& current,
-                                                                       const BSONObj& proposed,
-                                                                       StringData context) const {
+void AsyncResultsMerger::_ensureHighWaterMarkIsMonotonicallyIncreasing(
+    const BSONObj& current, const BSONObj& proposed, std::string_view context) const {
     tassert(10359104,
             str::stream() << "Cannot make high watermark go backwards (in " << context
                           << "()). Current: " << current << ", proposed: " << proposed,

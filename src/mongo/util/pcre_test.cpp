@@ -36,11 +36,13 @@
 
 #include <array>
 #include <initializer_list>
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo::pcre {
 namespace {
+using namespace std::literals::string_view_literals;
 using namespace std::string_literals;
 using namespace unittest::match;
 
@@ -57,13 +59,13 @@ std::string buildAnchoredRepeatedPattern(const std::string& fragment, size_t rep
 
 /**
  * In C++20, u8 literals yield char8_t[N].
- * These require explicit conversion to `std::string` and `StringData`.
+ * These require explicit conversion to `std::string` and `std::string_view`.
  */
 template <typename Out, typename Ch, size_t N>
 Out u8Cast(const Ch (&in)[N]) {
     const Ch* inp = in;
     auto cp = reinterpret_cast<const char*>(inp);
-    if constexpr (std::is_same_v<Out, StringData>) {
+    if constexpr (std::is_same_v<Out, std::string_view>) {
         return Out{cp, N - 1};
     } else {
         return Out{cp, cp + N - 1};
@@ -169,8 +171,8 @@ TEST(PcreTest, MatchDataInputStorage) {
 TEST(PcreTest, StartPos) {
     Regex hiRe{"hi"};
     Regex hiRePrefix{"^hi"};
-    StringData ohi = "ohi"_sd;
-    StringData hi = ohi.substr(1);
+    std::string_view ohi = "ohi"sv;
+    std::string_view hi = ohi.substr(1);
 
     ASSERT_TRUE(hiRe.matchView(hi, {}, 0));
     ASSERT_FALSE(hiRe.matchView(hi, {}, 1));
@@ -230,7 +232,7 @@ TEST(PcreTest, CaptureCount) {
 TEST(PcreTest, Captures) {
     Regex re("a(b*)c");
     ASSERT_EQ(re.captureCount(), 1);
-    auto subject = "123abbbc456"_sd;
+    auto subject = "123abbbc456"sv;
     auto m = re.matchView(subject);
     ASSERT_EQ(m.captureCount(), 1);
     ASSERT_TRUE(!!m);
@@ -260,7 +262,7 @@ TEST(PcreTest, UnusedLastCapture) {
 }
 
 TEST(PcreTest, NullCapture) {
-    static constexpr auto sb = "b"_sd;
+    static constexpr auto sb = "b"sv;
     ASSERT_THAT(Regex("(a*)b").matchView(sb)[1].data(), Eq(sb.data())) << "Empty";
     ASSERT_THAT(Regex("(?:b|(a))").matchView(sb)[1].data(), Eq(nullptr)) << "Null";
 }
@@ -268,7 +270,7 @@ TEST(PcreTest, NullCapture) {
 TEST(PcreTest, CapturesByName) {
     Regex re("a(?P<bees>b*)c");
     ASSERT_EQ(re.captureCount(), 1);
-    auto subject = "123abbbc456"_sd;
+    auto subject = "123abbbc456"sv;
     auto m = re.matchView(subject);
     ASSERT_TRUE(!!m);
     ASSERT_EQ(m[1], "bbb");
@@ -319,8 +321,8 @@ TEST(PcreTest, TooDeepNesting) {
 }
 
 TEST(PcreTest, Utf) {
-    StringData subject = u8Cast<StringData>(u8"é");
-    ASSERT_EQ(subject, "\xc3\xa9"_sd);
+    std::string_view subject = u8Cast<std::string_view>(u8"é");
+    ASSERT_EQ(subject, "\xc3\xa9"sv);
     ASSERT_TRUE(Regex("^..$").matchView(subject)) << "é is 2 bytes";
     ASSERT_TRUE(Regex("^.$", UTF).matchView(subject)) << "é is 1 UTF-8 character";
 }
@@ -371,7 +373,10 @@ TEST(PcreTest, BadUtfEncoding) {
     }
 }
 
-std::string subst(std::string re, StringData rep, std::string subject, MatchOptions options = {}) {
+std::string subst(std::string re,
+                  std::string_view rep,
+                  std::string subject,
+                  MatchOptions options = {}) {
     Regex{std::move(re)}.substitute(rep, &subject, options);
     return subject;
 }
@@ -386,7 +391,7 @@ TEST(PcreTest, Substitute) {
 
 TEST(PcreTest, SubstituteFlags) {
     std::string re = R"re(\[(\w+):(\w+):(\w+)\])re";
-    StringData repl = "$3 $2 $1";
+    std::string_view repl = "$3 $2 $1";
     std::string str = "The [fox:brown:quick] jumped over [dog:lazy:the].";
     ASSERT_EQ(subst(re, repl, str),  //
               "The quick brown fox jumped over [dog:lazy:the].");

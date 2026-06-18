@@ -30,7 +30,6 @@
 #include "mongo/db/auth/privilege.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -42,6 +41,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -50,14 +50,15 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
-void uassertNoConflict(StringData resource, StringData found, bool cond) {
+void uassertNoConflict(std::string_view resource, std::string_view found, bool cond) {
     uassert(ErrorCodes::BadValue,
             fmt::format("{} conflicts with resource type '{}'", resource, found),
             cond);
 }
 
-bool isValidCollectionName(StringData db, StringData coll) {
+bool isValidCollectionName(std::string_view db, std::string_view coll) {
     if (NamespaceString::validCollectionName(coll)) {
         return true;
     }
@@ -65,7 +66,7 @@ bool isValidCollectionName(StringData db, StringData coll) {
     // local.oplog.$main is a real collection that the server will create. But, collection
     // names with a '$' character are illegal. We must make an exception for this collection
     // here so we can grant users access to it.
-    if ((db == "local"_sd) && (coll == "oplog.$main"_sd)) {
+    if ((db == "local"sv) && (coll == "oplog.$main"sv)) {
         return true;
     }
 
@@ -108,7 +109,7 @@ Privilege Privilege::resolvePrivilegeWithTenant(const boost::optional<TenantId>&
 
     if (auto cluster = rsrc.getCluster()) {
         // { cluster: 1 }
-        constexpr StringData kClusterRsrc = "resource: {cluster: true}"_sd;
+        constexpr std::string_view kClusterRsrc = "resource: {cluster: true}"sv;
         uassert(ErrorCodes::BadValue, "resource: {cluster: false} must be true", cluster.get());
         uassertNoConflict(kClusterRsrc, PR::kAnyResourceFieldName, !rsrc.getAnyResource());
         uassertNoConflict(kClusterRsrc, PR::kDbFieldName, !rsrc.getDb());
@@ -117,7 +118,7 @@ Privilege Privilege::resolvePrivilegeWithTenant(const boost::optional<TenantId>&
         ret._resource = ResourcePattern::forClusterResource(tenantId);
     } else if (auto any = rsrc.getAnyResource()) {
         // { anyResource: 1 }
-        constexpr StringData kAnyRsrc = "resource: {anyResource: true}"_sd;
+        constexpr std::string_view kAnyRsrc = "resource: {anyResource: true}"sv;
         uassert(ErrorCodes::BadValue, "resource: {anyResource: false} must be true", any.get());
         uassertNoConflict(kAnyRsrc, PR::kDbFieldName, !rsrc.getDb());
         uassertNoConflict(kAnyRsrc, PR::kCollectionFieldName, !rsrc.getCollection());
@@ -258,17 +259,17 @@ auth::ParsedPrivilege Privilege::toParsedPrivilege() const {
         case MatchTypeEnum::kMatchDatabaseName:
             // { db: '...', collection: '' }
             rsrc.setDb(_resource.dbNameToMatch().serializeWithoutTenantPrefix_UNSAFE());
-            rsrc.setCollection(""_sd);
+            rsrc.setCollection(""sv);
             break;
         case MatchTypeEnum::kMatchCollectionName:
             // { db: '', collection: '...' }
-            rsrc.setDb(""_sd);
+            rsrc.setDb(""sv);
             rsrc.setCollection(_resource.collectionToMatch());
             break;
         case MatchTypeEnum::kMatchAnyNormalResource:
             // { db: '', collection: '' }
-            rsrc.setDb(""_sd);
-            rsrc.setCollection(""_sd);
+            rsrc.setDb(""sv);
+            rsrc.setCollection(""sv);
             break;
 
         case MatchTypeEnum::kMatchExactSystemBucketResource:
@@ -283,11 +284,11 @@ auth::ParsedPrivilege Privilege::toParsedPrivilege() const {
         case MatchTypeEnum::kMatchAnySystemBucketInDBResource:
             // { db: '...', system_buckets: '' }
             rsrc.setDb(_resource.dbNameToMatch().serializeWithoutTenantPrefix_UNSAFE());
-            rsrc.setSystemBuckets(""_sd);
+            rsrc.setSystemBuckets(""sv);
             break;
         case MatchTypeEnum::kMatchAnySystemBucketResource:
             // { system_buckets: '' }
-            rsrc.setSystemBuckets(""_sd);
+            rsrc.setSystemBuckets(""sv);
             break;
 
         default:

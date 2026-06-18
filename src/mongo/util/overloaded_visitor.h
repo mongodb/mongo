@@ -31,6 +31,8 @@
 
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUBLIC mongo {
 
 /**
@@ -40,7 +42,7 @@ namespace MONGO_MOD_PUBLIC mongo {
  *
  * auto r = visit(OverloadedVisitor{
  *                         [](int v) { return intStuff(v); },
- *                         [](StringData v) { return stringStuff(v); },
+ *                         [](std::string_view v) { return stringStuff(v); },
  *                      },
  *                      someStdxVariant);
  */

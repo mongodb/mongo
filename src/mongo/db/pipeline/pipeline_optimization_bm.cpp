@@ -43,6 +43,8 @@
 #include "mongo/logv2/log_manager.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 #include <benchmark/benchmark.h>
 #include <fmt/format.h>
 

@@ -30,7 +30,6 @@
 #include "mongo/db/repl/oplog_buffer_collection.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -54,6 +53,7 @@
 #include <iterator>
 #include <mutex>
 #include <numeric>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -68,11 +68,12 @@ namespace mongo {
 namespace repl {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-const StringData kOplogEntryFieldName = "entry"_sd;
-const StringData kIdFieldName = "_id"_sd;
-const StringData kTimestampFieldName = "ts"_sd;
-const StringData kIdIdxName = IndexConstants::kIdIndexName;
+const std::string_view kOplogEntryFieldName = "entry"sv;
+const std::string_view kIdFieldName = "_id"sv;
+const std::string_view kTimestampFieldName = "ts"sv;
+const std::string_view kIdIdxName = IndexConstants::kIdIndexName;
 
 const Timestamp kInvalidLastPushedTimestamp(0, 1);
 }  // namespace

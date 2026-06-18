@@ -48,6 +48,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
@@ -384,7 +385,7 @@ TEST_F(CommandServiceTest, PartiallyValidMetadataDocumentBSON) {
         CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
         StringBuilder builder;
         BSONObj clientDoc = makeClientMetadataDocument();
-        builder << StringData(clientDoc.objdata(), clientDoc.objsize()) << "Not BSON";
+        builder << std::string_view(clientDoc.objdata(), clientDoc.objsize()) << "Not BSON";
         ctx.AddMetadata(std::string{util::constants::kClientMetadataKey},
                         base64::encode(builder.str()));
     };
@@ -698,16 +699,16 @@ TEST_F(CommandServiceTest, Shutdown) {
 }
 
 TEST(GRPCInteropTest, SharedBufferDeserialize) {
-    auto deserializationTest = [](std::vector<::grpc::Slice> slices, StringData expected) {
+    auto deserializationTest = [](std::vector<::grpc::Slice> slices, std::string_view expected) {
         SharedBuffer out;
         ::grpc::ByteBuffer buffer(&slices[0], slices.size());
         auto status = ::grpc::SerializationTraits<SharedBuffer>::Deserialize(&buffer, &out);
         ASSERT_TRUE(status.ok()) << "expected deserialization to succeed: "
                                  << status.error_message();
-        ASSERT_EQ(StringData(out.get(), expected.size()), expected);
+        ASSERT_EQ(std::string_view(out.get(), expected.size()), expected);
     };
 
-    StringData expected{"foobar"};
+    std::string_view expected{"foobar"};
     deserializationTest({std::string{"foobar"}}, expected);
     deserializationTest({std::string{"foo"}, std::string{"bar"}}, expected);
 }

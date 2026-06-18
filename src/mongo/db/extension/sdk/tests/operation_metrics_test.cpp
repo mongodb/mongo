@@ -33,13 +33,14 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo::extension {
 namespace {
 
 class TestExtensionMetrics : public sdk::OperationMetricsBase {
 public:
-    static constexpr StringData kStageName = "$testExtensionMetrics";
+    static constexpr std::string_view kStageName = "$testExtensionMetrics";
     BSONObj serialize() const override {
         return BSON(kStageName << _counter);
     }

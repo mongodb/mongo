@@ -32,10 +32,12 @@
 #include "mongo/db/session/logical_session_id.h"  // for StmtId.
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace repl {
 void zeroOneManyStmtIdAppend(const std::vector<StmtId>& stmtIds,
-                             StringData fieldName,
+                             std::string_view fieldName,
                              BSONObjBuilder* bob);
 
 std::vector<StmtId> parseZeroOneManyStmtId(const BSONElement& element);

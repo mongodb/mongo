@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <filesystem>
@@ -36,6 +37,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/container_hash/hash.hpp>
@@ -48,7 +50,6 @@
 #include <unistd.h>
 #endif
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 
 namespace mongo::query_tester {
@@ -83,7 +84,7 @@ inline bool isTerminal() {
 
 class ConditionalColor {
 public:
-    explicit ConditionalColor(StringData colorCode) : _colorCode(colorCode) {}
+    explicit ConditionalColor(std::string_view colorCode) : _colorCode(colorCode) {}
 
     friend std::ostream& operator<<(std::ostream& os, const ConditionalColor& cc) {
         if (isTerminal()) {
@@ -93,7 +94,7 @@ public:
     }
 
 private:
-    StringData _colorCode;
+    std::string_view _colorCode;
 };
 
 template <typename T, bool Multiline>

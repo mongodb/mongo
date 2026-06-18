@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
@@ -41,6 +40,7 @@
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/procparser.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -52,14 +52,15 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using otel::metrics::Counter;
 using otel::metrics::DynamicMetricNameMaker;
 using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
 
-constexpr StringData kDiskStatsPath = "/proc/diskstats"_sd;
-constexpr StringData kSysBlockPath = "/sys/block"_sd;
+constexpr std::string_view kDiskStatsPath = "/proc/diskstats"sv;
+constexpr std::string_view kSysBlockPath = "/sys/block"sv;
 
 struct DiskCounters {
     Counter<int64_t>* reads{nullptr};
@@ -75,7 +76,7 @@ struct DiskCounters {
 struct DiskMetricsState {
     std::unique_ptr<DiskMetrics> metrics;
     std::vector<std::string> diskNames;
-    std::vector<StringData> diskViews;
+    std::vector<std::string_view> diskViews;
     PeriodicJobAnchor job;
 };
 
@@ -90,12 +91,13 @@ public:
 
         for (size_t i = 0; i < _disks.size(); ++i) {
             const std::string& disk = _disks[i];
-            const auto makeCounter =
-                [&](StringData field, std::string desc, MetricUnit unit) -> Counter<int64_t>* {
+            const auto makeCounter = [&](std::string_view field,
+                                         std::string desc,
+                                         MetricUnit unit) -> Counter<int64_t>* {
                 std::string fullName = fmt::format("systemMetrics.disks.{}.{}", disk, field);
                 auto passkey = DiskMetrics::dyn_metric_passkey();
                 return &MetricsService::instance().createInt64Counter(
-                    DynamicMetricNameMaker::make(StringData{fullName}, passkey),
+                    DynamicMetricNameMaker::make(std::string_view{fullName}, passkey),
                     std::move(desc),
                     unit);
             };
@@ -142,7 +144,7 @@ public:
 
 private:
     void addDeltas(DiskCounters& instr, const BSONObj& prev, const BSONObj& curr) {
-        const auto delta = [&](StringData field) {
+        const auto delta = [&](std::string_view field) {
             return std::max(0LL, curr[field].safeNumberLong() - prev[field].safeNumberLong());
         };
 

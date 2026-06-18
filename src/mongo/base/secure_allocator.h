@@ -46,6 +46,7 @@
 #include <memory>
 #include <new>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -105,7 +106,7 @@ template <typename NameTrait>
 struct TraitNamedDomain {
     static bool peg() {
         const auto& dsmd = serverGlobalParams.disabledSecureAllocatorDomains;
-        const auto contains = [&](StringData dt) {
+        const auto contains = [&](std::string_view dt) {
             return std::find(dsmd.begin(), dsmd.end(), dt) != dsmd.end();
         };
         static const bool ret = !(contains("*"_sd) || contains(NameTrait::DomainType));
@@ -381,7 +382,7 @@ struct SecureAllocatorDefaultDomainTrait {
 };
 
 struct SecureAllocatorAuthDomainTrait {
-    static constexpr StringData DomainType = "auth"_sd;
+    static constexpr std::string_view DomainType = "auth"_sd;
 };
 
 using SecureAllocatorAuthDomain = SecureAllocatorDomain<

@@ -39,6 +39,8 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -170,7 +172,7 @@ bool ShardingCatalogClientMock::runUserManagementReadCommand(OperationContext* o
 }
 
 StatusWith<BSONObj> ShardingCatalogClientMock::getGlobalSettings(OperationContext* opCtx,
-                                                                 StringData key) {
+                                                                 std::string_view key) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -222,14 +224,14 @@ Status ShardingCatalogClientMock::removeConfigDocuments(OperationContext* opCtx,
 }
 
 Status ShardingCatalogClientMock::createDatabase(OperationContext* opCtx,
-                                                 StringData dbName,
+                                                 std::string_view dbName,
                                                  ShardId primaryShard) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNewInternalKeys(
     OperationContext* opCtx,
-    StringData purpose,
+    std::string_view purpose,
     const LogicalTime& newerThanThis,
     repl::ReadConcernLevel readConcernLevel) {
     return {ErrorCodes::InternalError, "Method not implemented"};
@@ -237,7 +239,7 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNe
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
 ShardingCatalogClientMock::getAllExternalKeys(OperationContext* opCtx,
-                                              StringData purpose,
+                                              std::string_view purpose,
                                               repl::ReadConcernLevel readConcernLevel) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }

@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <utility>
 
 #include <jsapi.h>
@@ -122,7 +122,7 @@ struct MONGO_MOD_PUB MozJSCommonRuntimeInterface {
 
     virtual bool requiresOwnedObjects() const = 0;
 
-    virtual void newFunction(StringData code, JS::MutableHandleValue out) = 0;
+    virtual void newFunction(std::string_view code, JS::MutableHandleValue out) = 0;
 
     // Pointer tracking for ASAN
     virtual void trackNewPointer(void* ptr) = 0;

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -49,6 +48,7 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <vm/PosixNSPR.h>
 
@@ -167,7 +167,7 @@ public:
     JSRegEx getRegEx(const char* field) override;
 
     void setNumber(const char* field, double val) override;
-    void setString(const char* field, StringData val) override;
+    void setString(const char* field, std::string_view val) override;
     void setBoolean(const char* field, bool val) override;
     void setElement(const char* field, const BSONElement& e, const BSONObj& parent) override;
     void setObject(const char* field, const BSONObj& obj, bool readOnly) override;
@@ -185,7 +185,7 @@ public:
                bool readOnlyArgs = false,
                bool readOnlyRecv = false) override;
 
-    bool exec(StringData code,
+    bool exec(std::string_view code,
               const std::string& name,
               bool printResult,
               bool reportError,

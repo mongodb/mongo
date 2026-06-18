@@ -30,13 +30,13 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <fmt/format.h>
 
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -98,7 +98,7 @@ TEST(FTSIndexFormat, ExtraBack1) {
     auto key = key_string::toBson(*keys.begin(), Ordering::make(BSONObj()));
     ASSERT_EQUALS(3, key.nFields());
     BSONObjIterator i(key);
-    ASSERT_EQUALS(StringData("cat"), i.next().valueStringDataSafe());
+    ASSERT_EQUALS(std::string_view("cat"), i.next().valueStringDataSafe());
     ASSERT(i.next().numberDouble() > 0);
     ASSERT_EQUALS(5, i.next().numberInt());
 }
@@ -121,7 +121,7 @@ TEST(FTSIndexFormat, ExtraFront1) {
     ASSERT_EQUALS(3, key.nFields());
     BSONObjIterator i(key);
     ASSERT_EQUALS(5, i.next().numberInt());
-    ASSERT_EQUALS(StringData("cat"), i.next().valueStringDataSafe());
+    ASSERT_EQUALS(std::string_view("cat"), i.next().valueStringDataSafe());
     ASSERT(i.next().numberDouble() > 0);
 }
 

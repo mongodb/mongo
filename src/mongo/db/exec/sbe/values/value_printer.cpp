@@ -45,6 +45,7 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -209,7 +210,7 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
 }
 
 template <typename T>
-void ValuePrinter<T>::writeStringDataToStream(StringData sd, bool addQuotes) {
+void ValuePrinter<T>::writeStringDataToStream(std::string_view sd, bool addQuotes) {
     if (addQuotes) {
         stream << '"';
     }
@@ -510,7 +511,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
 
             // If the BinData is a correctly sized newUUID, display it as such.
             if (type == newUUID && len == kNewUUIDLength) {
-                StringData sd(data, len);
+                std::string_view sd(data, len);
                 // 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
                 stream << fmt::format("UUID(\"{}-{}-{}-{}-{}\")",
                                       hexblob::encodeLower(sd.substr(0, 4)),

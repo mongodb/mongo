@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -50,6 +49,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo::query_settings {
@@ -64,17 +65,18 @@ static bool operator==(const QueryShapeConfigurationsWithTimestamp& lhs,
 }
 
 namespace {
+using namespace std::literals::string_view_literals;
 static auto const kSerializationContext =
     SerializationContext{SerializationContext::Source::Command,
                          SerializationContext::CallerType::Request,
                          SerializationContext::Prefix::ExcludePrefix};
 
-auto makeDbName(StringData dbName) {
+auto makeDbName(std::string_view dbName) {
     return DatabaseNameUtil::deserialize(
         boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
 }
 
-NamespaceSpec makeNsSpec(StringData collName) {
+NamespaceSpec makeNsSpec(std::string_view collName) {
     NamespaceSpec ns;
     ns.setDb(makeDbName("testDbA"));
     ns.setColl(collName);
@@ -253,9 +255,9 @@ TEST_F(QuerySettingsClusterParameterTest,
         QuerySettingsService::getQuerySettingsClusterParameterName(),
         ServerParameterType::kClusterWide);
     IndexHintSpecs initialIndexHintSpec{
-        IndexHintSpec(makeNsSpec("testCollC"_sd),
+        IndexHintSpec(makeNsSpec("testCollC"sv),
                       {IndexHint(BSON("a" << 1 << "$natural" << 1)), IndexHint(BSONObj{})}),
-        IndexHintSpec(makeNsSpec("testCollD"_sd),
+        IndexHintSpec(makeNsSpec("testCollD"sv),
                       {IndexHint(BSON("b" << "some-string"
                                           << "a" << 1))})};
 
@@ -291,13 +293,13 @@ TEST_F(QuerySettingsClusterParameterTest, SetValidClusterParameterAndAssertResul
  */
 TEST_F(QuerySettingsClusterParameterTest, SetClusterParameterAndAssertResultIsSanitized) {
     IndexHintSpecs initialIndexHintSpec{
-        IndexHintSpec(makeNsSpec("testCollA"_sd),
+        IndexHintSpec(makeNsSpec("testCollA"sv),
                       {IndexHint(BSON("a" << 1.0)), IndexHint(BSON("b" << "-1.0"))}),
-        IndexHintSpec(makeNsSpec("testCollB"_sd),
+        IndexHintSpec(makeNsSpec("testCollB"sv),
                       {IndexHint(BSON("a" << 2)), IndexHint(BSONObj{})})};
     IndexHintSpecs expectedIndexHintSpec{
-        IndexHintSpec(makeNsSpec("testCollA"_sd), {IndexHint(BSON("a" << 1))}),
-        IndexHintSpec(makeNsSpec("testCollB"_sd), {IndexHint(BSON("a" << 2))})};
+        IndexHintSpec(makeNsSpec("testCollA"sv), {IndexHint(BSON("a" << 1))}),
+        IndexHintSpec(makeNsSpec("testCollB"sv), {IndexHint(BSON("a" << 2))})};
 
     ASSERT_THROWS_CODE(service().validateQuerySettings(makeQuerySettings(initialIndexHintSpec)),
                        DBException,
@@ -312,25 +314,24 @@ TEST_F(QuerySettingsClusterParameterTest, SetClusterParameterAndAssertResultIsSa
 TEST_F(QuerySettingsClusterParameterTest, SetClusterParameterAndAssertResultIsSanitizedMultipleQS) {
     // First pair of index hints.
     IndexHintSpecs initialIndexHintSpec1{
-        IndexHintSpec(makeNsSpec("testCollA"_sd),
-                      {IndexHint(BSON("a" << 2)), IndexHint(BSONObj{})}),
-        IndexHintSpec(makeNsSpec("testCollB"_sd),
+        IndexHintSpec(makeNsSpec("testCollA"sv), {IndexHint(BSON("a" << 2)), IndexHint(BSONObj{})}),
+        IndexHintSpec(makeNsSpec("testCollB"sv),
                       {IndexHint(BSON("a" << 1.0)),
                        IndexHint(BSON("b" << 3)),
                        IndexHint("a_1"),
                        IndexHint(NaturalOrderHint(NaturalOrderHint::Direction::kForward))})};
     IndexHintSpecs expectedIndexHintSpec1{
-        IndexHintSpec(makeNsSpec("testCollA"_sd), {IndexHint(BSON("a" << 2.0))}),
-        IndexHintSpec(makeNsSpec("testCollB"_sd),
+        IndexHintSpec(makeNsSpec("testCollA"sv), {IndexHint(BSON("a" << 2.0))}),
+        IndexHintSpec(makeNsSpec("testCollB"sv),
                       {IndexHint(BSON("a" << 1.0)),
                        IndexHint(BSON("b" << 3)),
                        IndexHint("a_1"),
                        IndexHint(NaturalOrderHint(NaturalOrderHint::Direction::kForward))})};
     // Second pair of index hints.
     IndexHintSpecs initialIndexHintSpec2{
-        IndexHintSpec(makeNsSpec("testCollC"_sd),
+        IndexHintSpec(makeNsSpec("testCollC"sv),
                       {IndexHint(BSON("a" << 1 << "$natural" << 1)), IndexHint(BSONObj{})}),
-        IndexHintSpec(makeNsSpec("testCollD"_sd),
+        IndexHintSpec(makeNsSpec("testCollD"sv),
                       {IndexHint(BSON("b" << "some-string"
                                           << "a" << 1)),
                        IndexHint(BSONObj{})})};

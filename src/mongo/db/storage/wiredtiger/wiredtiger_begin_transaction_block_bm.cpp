@@ -29,7 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -44,6 +43,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -54,7 +54,8 @@ namespace {
 
 class WiredTigerConnectionTest {
 public:
-    WiredTigerConnectionTest(StringData dbpath, StringData extraStrings) : _conn(nullptr) {
+    WiredTigerConnectionTest(std::string_view dbpath, std::string_view extraStrings)
+        : _conn(nullptr) {
         std::stringstream ss;
         ss << "create,";
         ss << extraStrings;

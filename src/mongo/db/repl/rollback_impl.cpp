@@ -30,7 +30,6 @@
 #include "mongo/db/repl/rollback_impl.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -110,6 +109,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -134,6 +134,7 @@ MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeTransitioningToRollback);
 MONGO_FAIL_POINT_DEFINE(hangBeforeResettingOpTimesAfterRollback);
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Used to set RollbackImpl::_newCounts to force a collection scan to fix count.
 constexpr long long kCollectionScanRequired = -1;
@@ -141,12 +142,12 @@ constexpr long long kCollectionScanRequired = -1;
 RollbackImpl::Listener kNoopListener;
 
 // The name of the insert, update and delete commands as found in oplog command entries.
-constexpr auto kInsertCmdName = "insert"_sd;
-constexpr auto kUpdateCmdName = "update"_sd;
-constexpr auto kDeleteCmdName = "delete"_sd;
-constexpr auto kNumRecordsFieldName = "numRecords"_sd;
-constexpr auto kToFieldName = "to"_sd;
-constexpr auto kDropTargetFieldName = "dropTarget"_sd;
+constexpr auto kInsertCmdName = "insert"sv;
+constexpr auto kUpdateCmdName = "update"sv;
+constexpr auto kDeleteCmdName = "delete"sv;
+constexpr auto kNumRecordsFieldName = "numRecords"sv;
+constexpr auto kToFieldName = "to"sv;
+constexpr auto kDropTargetFieldName = "dropTarget"sv;
 
 /**
  * Parses the o2 field of a drop or rename oplog entry for the count of the collection that was
@@ -154,7 +155,7 @@ constexpr auto kDropTargetFieldName = "dropTarget"_sd;
  */
 boost::optional<long long> _parseDroppedCollectionCount(const OplogEntry& oplogEntry) {
     auto commandType = oplogEntry.getCommandType();
-    auto desc = OplogEntry::CommandType::kDrop == commandType ? "drop"_sd : "rename"_sd;
+    auto desc = OplogEntry::CommandType::kDrop == commandType ? "drop"sv : "rename"sv;
 
     auto obj2 = oplogEntry.getObject2();
     if (!obj2) {
@@ -726,7 +727,7 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
 
     // Log the total number of insert and update operations that have been rolled back as a
     // result of recovering to the stable timestamp.
-    auto getCommandCount = [&](StringData key) {
+    auto getCommandCount = [&](std::string_view key) {
         const auto& m = _observerInfo.rollbackCommandCounts;
         auto it = m.find(key);
         return (it == m.end()) ? 0 : it->second;

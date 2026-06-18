@@ -40,6 +40,7 @@
 
 #include <future>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -297,7 +298,7 @@ protected:
 
     // Runs `fn` while a side client is active. The side opCtx is passed to `fn`.
     template <typename Fn>
-    void withSideClient(StringData name, Fn&& fn) {
+    void withSideClient(std::string_view name, Fn&& fn) {
         auto client = getServiceContext()->getService()->makeClient(std::string{name});
         AlternativeClientRegion acr(client);
         auto sideOpCtx = cc().makeOperationContext();

@@ -38,6 +38,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <string_view>
 
 namespace mongo {
 
@@ -115,7 +116,7 @@ public:
     /**
      * Returns an empty string if `initialize` hasn't been called.
      */
-    StringData getIdent() const;
+    std::string_view getIdent() const;
 
     bool isRunning_forTest() const {
         std::lock_guard lk(_oplogVisibilityStateMutex);

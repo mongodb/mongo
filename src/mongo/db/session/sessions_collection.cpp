@@ -48,6 +48,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -137,7 +138,7 @@ BulkResult runBulkGeneric(TFactory makeT,
 }
 
 template <typename InitBatchFn, typename AddLineFn, typename SendBatchFn, typename Container>
-BulkResult runBulkCmd(StringData label,
+BulkResult runBulkCmd(std::string_view label,
                       InitBatchFn&& initBatch,
                       AddLineFn&& addLine,
                       SendBatchFn&& sendBatch,
@@ -166,7 +167,7 @@ BulkResult runBulkCmd(StringData label,
 
 }  // namespace
 
-constexpr StringData SessionsCollection::kSessionsTTLIndex;
+constexpr std::string_view SessionsCollection::kSessionsTTLIndex;
 
 SessionsCollection::SessionsCollection() = default;
 

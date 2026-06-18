@@ -29,26 +29,27 @@
 
 #include "mongo/idl/command_generic_argument.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
 
+#include <string_view>
+
 namespace mongo {
 
-bool isGenericArgument(StringData arg) {
+bool isGenericArgument(std::string_view arg) {
     return GenericArguments::hasField(arg) || arg == IDLParserContext::kOpMsgDollarDB;
 }
 
-bool isGenericReply(StringData arg) {
+bool isGenericReply(std::string_view arg) {
     return GenericReplyFields::hasField(arg);
 }
 
-bool shouldForwardToShards(StringData arg) {
+bool shouldForwardToShards(std::string_view arg) {
     return GenericArguments::shouldForwardToShards(arg) && arg != IDLParserContext::kOpMsgDollarDB;
 }
 
-bool shouldForwardFromShards(StringData replyField) {
+bool shouldForwardFromShards(std::string_view replyField) {
     return GenericReplyFields::shouldForwardFromShards(replyField);
 }
 }  // namespace mongo

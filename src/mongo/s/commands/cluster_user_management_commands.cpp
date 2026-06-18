@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -61,6 +60,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -75,6 +75,7 @@ using std::string;
 using std::stringstream;
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 template <typename Request>
 void uassertEmptyReply(BSONObj obj) {
@@ -123,7 +124,7 @@ template <typename T>
 using HasGetCmdParamOp = std::remove_cv_t<decltype(std::declval<T>().getCommandParameter())>;
 template <typename T>
 constexpr bool hasGetCmdParamStringData =
-    stdx::is_detected_exact_v<StringData, HasGetCmdParamOp, T>;
+    stdx::is_detected_exact_v<std::string_view, HasGetCmdParamOp, T>;
 
 /**
  * Most user management commands follow a very predictable pattern:
@@ -197,8 +198,8 @@ public:
 
 class CmdCreateUser : public CmdUMCPassthrough<CreateUserCommand, UserCacheInvalidatorNOOP> {
 public:
-    static constexpr StringData kPwdField = "pwd"_sd;
-    std::set<StringData> sensitiveFieldNames() const final {
+    static constexpr std::string_view kPwdField = "pwd"sv;
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {kPwdField};
     }
 };
@@ -206,8 +207,8 @@ MONGO_REGISTER_COMMAND(CmdCreateUser).forRouter();
 
 class CmdUpdateUser : public CmdUMCPassthrough<UpdateUserCommand, UserCacheInvalidatorUser> {
 public:
-    static constexpr StringData kPwdField = "pwd"_sd;
-    std::set<StringData> sensitiveFieldNames() const final {
+    static constexpr std::string_view kPwdField = "pwd"sv;
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {kPwdField};
     }
 };

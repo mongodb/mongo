@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
@@ -46,6 +45,7 @@
 #include "mongo/util/str.h"
 
 #include <cerrno>
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -76,7 +76,7 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
     WiredTigerUtil::fetchTypeAndSourceURI(*ru.getSessionNoTxn(), uri, &type, &sourceURI);
     StatusWith<std::string> metadataResult =
         WiredTigerUtil::getMetadataCreate(*ru.getSessionNoTxn(), sourceURI);
-    StringData creationStringName("creationString");
+    std::string_view creationStringName("creationString");
     if (!metadataResult.isOK()) {
         BSONObjBuilder creationString(output->subobjStart(creationStringName));
         creationString.append("error", "unable to retrieve creation config");

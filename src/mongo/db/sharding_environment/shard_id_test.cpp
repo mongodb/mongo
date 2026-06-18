@@ -29,11 +29,11 @@
 
 #include "mongo/db/sharding_environment/shard_id.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
 #include <compare>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -60,7 +60,7 @@ TEST(ShardId, Roundtrip) {
 TEST(ShardId, ToStringData) {
     string shard_id_str("my_shard_id");
     ShardId shardId(shard_id_str);
-    StringData stringData(shardId);
+    std::string_view stringData(shardId);
     ASSERT(stringData == shard_id_str);
 }
 

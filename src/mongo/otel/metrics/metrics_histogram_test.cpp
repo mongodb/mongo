@@ -32,10 +32,13 @@
 #include "mongo/unittest/unittest.h"
 
 #ifdef MONGO_CONFIG_OTEL
+#include <string_view>
+
 #include <opentelemetry/metrics/provider.h>
 #endif  // MONGO_CONFIG_OTEL
 
 namespace mongo::otel::metrics {
+using namespace std::literals::string_view_literals;
 
 namespace {
 // Builds the expected BSON for a histogram using kDefaultBucketBoundaries.
@@ -309,7 +312,7 @@ TEST(HistogramImplWithAttributesTest, ThrowsOnDuplicateAttributeValues) {
 
 TEST(HistogramImplWithAttributesTest, ThrowsOnEmptyAttributeValues) {
     ASSERT_THROWS_CODE(createHistogramWithDefs<int64_t>(
-                           AttributeDefinition<StringData>{.name = "type", .values = {}}),
+                           AttributeDefinition<std::string_view>{.name = "type", .values = {}}),
                        DBException,
                        ErrorCodes::BadValue);
 }
@@ -318,16 +321,17 @@ TEST(HistogramImplWithAttributesTest, ThrowsOnDuplicateAttributeNames) {
     ASSERT_THROWS_CODE(
         (createHistogramWithDefs<int64_t>(
             AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}},
-            AttributeDefinition<StringData>{.name = "is_internal", .values = {"foo", "bar"}})),
+            AttributeDefinition<std::string_view>{.name = "is_internal",
+                                                  .values = {"foo", "bar"}})),
         DBException,
         ErrorCodes::BadValue);
 }
 
 TEST(HistogramImplWithAttributesTest, ThrowsOnInvalidAttributes) {
     auto histogram = createHistogramWithDefs<int64_t>(
-        AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
-    histogram->record(10, {"foo"_sd});
-    ASSERT_THROWS_CODE(histogram->record(10, {"x"_sd}), DBException, ErrorCodes::BadValue);
+        AttributeDefinition<std::string_view>{.name = "type", .values = {"foo", "bar"}});
+    histogram->record(10, {"foo"sv});
+    ASSERT_THROWS_CODE(histogram->record(10, {"x"sv}), DBException, ErrorCodes::BadValue);
 }
 
 TEST(HistogramImplWithAttributesTest, StringDataAttributeValueIsCopied) {
@@ -335,12 +339,12 @@ TEST(HistogramImplWithAttributesTest, StringDataAttributeValueIsCopied) {
     // copies and remain valid. Sanitizer builds will catch use-after-free if it does not.
     auto sourceValues = std::make_unique<std::vector<std::string>>(
         std::initializer_list<std::string>{"foo", "bar"});
-    auto histogram = createHistogramWithDefs<int64_t>(AttributeDefinition<StringData>{
+    auto histogram = createHistogramWithDefs<int64_t>(AttributeDefinition<std::string_view>{
         .name = "type", .values = {(*sourceValues)[0], (*sourceValues)[1]}});
     sourceValues = nullptr;
 
-    histogram->record(10, {"foo"_sd});
-    histogram->record(20, {"bar"_sd});
+    histogram->record(10, {"foo"sv});
+    histogram->record(20, {"bar"sv});
 }
 
 TEST(HistogramImplWithAttributesTest, SpanAttributeValueIsCopied) {

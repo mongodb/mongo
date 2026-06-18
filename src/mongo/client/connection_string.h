@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
@@ -42,6 +41,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -73,7 +73,7 @@ public:
     /**
      * Constructs a connection string representing a replica set.
      */
-    static ConnectionString forReplicaSet(StringData replicaSetName,
+    static ConnectionString forReplicaSet(std::string_view replicaSetName,
                                           std::vector<HostAndPort> servers);
 
     /**
@@ -150,7 +150,7 @@ public:
     bool operator!=(const ConnectionString& other) const;
 
     StatusWith<std::unique_ptr<DBClientBase>> connect(
-        StringData applicationName,
+        std::string_view applicationName,
         double socketTimeout = 0,
         const MongoURI* uri = nullptr,
         const ClientAPIVersionParameters* apiParameters = nullptr,
@@ -162,7 +162,7 @@ public:
      * Deserialize a ConnectionString object from a string. Used by the IDL parser for the
      * connectionstring type. Essentially just a throwing wrapper around ConnectionString::parse.
      */
-    static ConnectionString deserialize(StringData url);
+    static ConnectionString deserialize(std::string_view url);
 
     static std::string typeToString(ConnectionType type);
 
@@ -207,7 +207,7 @@ private:
     /**
      * Creates a replica set connection string with the specified name and servers.
      */
-    ConnectionString(StringData replicaSetName, std::vector<HostAndPort> servers);
+    ConnectionString(std::string_view replicaSetName, std::vector<HostAndPort> servers);
 
     /**
      * Creates a connection string with the specified type.

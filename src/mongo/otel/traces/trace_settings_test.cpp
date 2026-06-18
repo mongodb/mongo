@@ -35,11 +35,15 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/optional.hpp>
 #include <gmock/gmock.h>
 
 namespace mongo::otel::traces {
 namespace {
+
+using namespace std::literals::string_view_literals;
 
 using mongo::unittest::match::BSONObjUnorderedEQ;
 using mongo::unittest::match::IsBSONElement;
@@ -180,11 +184,11 @@ TEST_F(ResourceAttributesTest, AppendRoundTrip) {
         setAttrs(BSON("deployment.environment" << "staging" << "service.version" << "2.0.0")));
 
     BSONObjBuilder out;
-    attrs.append(nullptr, &out, "attrs"_sd, /*tenantId=*/boost::none);
+    attrs.append(nullptr, &out, "attrs"sv, /*tenantId=*/boost::none);
     BSONObj result = out.obj();
 
     EXPECT_THAT(result["attrs"],
-                IsBSONElement("attrs"_sd,
+                IsBSONElement("attrs"sv,
                               BSONType::object,
                               Matcher<BSONObj>(BSONObjUnorderedEQ(BSON("deployment.environment"
                                                                        << "staging"

@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/secure_allocator.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/shell/kms_gen.h"
@@ -42,6 +41,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -61,7 +61,7 @@ public:
     /**
      * Return name of KMS service for use in error messages.
      */
-    virtual StringData name() const = 0;
+    virtual std::string_view name() const = 0;
 
     /**
      * Decrypt an encrypted blob and return the plaintext.
@@ -80,7 +80,7 @@ public:
      *   }
      * }
      */
-    virtual BSONObj encryptDataKeyByString(ConstDataRange cdr, StringData keyId);
+    virtual BSONObj encryptDataKeyByString(ConstDataRange cdr, std::string_view keyId);
 
     /**
      * Encrypt a data key with the specified key object and return a BSONObj that describes what
@@ -123,7 +123,7 @@ public:
     /**
      * Creates a KMS Service for the specified provider with the config.
      */
-    static std::unique_ptr<KMSService> createFromClient(StringData kmsProvider,
+    static std::unique_ptr<KMSService> createFromClient(std::string_view kmsProvider,
                                                         const BSONObj& config);
 
     /**

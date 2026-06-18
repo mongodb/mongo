@@ -45,6 +45,7 @@
 
 namespace mongo {
 namespace expression_evaluation_test {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
@@ -105,7 +106,7 @@ TEST(ExpressionAddTest, String) {
     /** String type unsupported. */
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<ExpressionNary> expression = new ExpressionAdd(&expCtx);
-    expression->addOperand(ExpressionConstant::create(&expCtx, Value("a"_sd)));
+    expression->addOperand(ExpressionConstant::create(&expCtx, Value("a"sv)));
     ASSERT_THROWS(expression->evaluate({}, &expCtx.variables), AssertionException);
 }
 
@@ -409,7 +410,7 @@ TEST(ExpressionAddTest, Assertions) {
         16612);
 
     // Only numeric types are allowed in a $add.
-    ASSERT_THROWS_CODE(evaluateExpression("$add", {1, 2, "not numeric!"_sd, 3}),
+    ASSERT_THROWS_CODE(evaluateExpression("$add", {1, 2, "not numeric!"sv, 3}),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
 }
@@ -559,11 +560,11 @@ TEST(ExpressionIsNumberTest, WithDoubleValue) {
 }
 
 TEST(ExpressionIsNumberTest, WithStringValue) {
-    assertExpectedResults("$isNumber", {{{Value("stringValue"_sd)}, Value(false)}});
+    assertExpectedResults("$isNumber", {{{Value("stringValue"sv)}, Value(false)}});
 }
 
 TEST(ExpressionIsNumberTest, WithNumericStringValue) {
-    assertExpectedResults("$isNumber", {{{Value("5"_sd)}, Value(false)}});
+    assertExpectedResults("$isNumber", {{{Value("5"sv)}, Value(false)}});
 }
 
 TEST(ExpressionIsNumberTest, WithObjectValue) {

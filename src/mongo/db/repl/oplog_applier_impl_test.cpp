@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -127,6 +126,7 @@
 #include <ostream>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/cstdint.hpp>
@@ -136,6 +136,7 @@
 namespace mongo {
 namespace repl {
 namespace {
+using namespace std::literals::string_view_literals;
 
 CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
     return acquireCollection(
@@ -1416,7 +1417,7 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
     return opApplied.isForCappedCollection();
 }
 
-NamespaceString makeNamespace(StringData prefix, StringData suffix = "") {
+NamespaceString makeNamespace(std::string_view prefix, std::string_view suffix = "") {
     return NamespaceString::createNamespaceString_forTest(fmt::format(
         "{}.{}_{}{}", prefix, unittest::getSuiteName(), unittest::getTestName(), suffix));
 }
@@ -1634,7 +1635,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentInclud
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorrectTenantId) {
     setServerParameter("multitenancySupport", true);
     setServerParameter("featureFlagRequireTenantID", true);
-    const auto commonNss("test.t"_sd);
+    const auto commonNss("test.t"sv);
     const TenantId tid1(OID::gen());
     const TenantId tid2(OID::gen());
     const NamespaceString nssTenant1 =
@@ -1679,7 +1680,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentInclud
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncorrectTenantId) {
     setServerParameter("multitenancySupport", true);
     setServerParameter("featureFlagRequireTenantID", true);
-    const auto commonNss("test.t"_sd);
+    const auto commonNss("test.t"sv);
     const TenantId tid1(OID::gen());
     const TenantId tid2(OID::gen());
     const NamespaceString nssTenant1 =
@@ -1707,7 +1708,7 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsUuidIncludesTenantId) {
     setServerParameter("multitenancySupport", true);
     setServerParameter("featureFlagRequireTenantID", true);
-    const auto commonNss("test.t"_sd);
+    const auto commonNss("test.t"sv);
     const TenantId tid1(OID::gen());
     const TenantId tid2(OID::gen());
     const NamespaceString nssTenant1 =
@@ -1760,7 +1761,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentInclud
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorrectTenantId) {
     setServerParameter("multitenancySupport", true);
     setServerParameter("featureFlagRequireTenantID", true);
-    const auto commonNss("test.t"_sd);
+    const auto commonNss("test.t"sv);
     const TenantId tid1(OID::gen());
     const TenantId tid2(OID::gen());
     const NamespaceString nssTenant1 =

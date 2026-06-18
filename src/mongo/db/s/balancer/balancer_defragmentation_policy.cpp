@@ -75,6 +75,7 @@
 #include <limits>
 #include <list>
 #include <map>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <variant>
@@ -1406,8 +1407,8 @@ MigrateInfoVector BalancerDefragmentationPolicy::selectChunksToMove(
     return chunksToMove;
 }
 
-StringData BalancerDefragmentationPolicy::getName() const {
-    return StringData(kPolicyName);
+std::string_view BalancerDefragmentationPolicy::getName() const {
+    return std::string_view(kPolicyName);
 }
 
 boost::optional<BalancerStreamAction> BalancerDefragmentationPolicy::getNextStreamingAction(

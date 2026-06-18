@@ -58,6 +58,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -77,8 +78,8 @@ inline const int kProgressMeterCheckInterval = 128;
 class CollectionCloner final : public InitialSyncBaseCloner {
 public:
     struct Stats {
-        static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopy"_sd;
-        static constexpr StringData kDocumentsCopiedFieldName = "documentsCopied"_sd;
+        static constexpr std::string_view kDocumentsToCopyFieldName = "documentsToCopy"_sd;
+        static constexpr std::string_view kDocumentsCopiedFieldName = "documentsCopied"_sd;
 
         NamespaceString nss;
         Date_t start;

@@ -31,7 +31,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/secure_allocator.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/aead_encryption.h"
@@ -46,13 +45,15 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kLocalKms = "local"_sd;
+constexpr auto kLocalKms = "local"sv;
 
 /**
  * Manages Local KMS Information
@@ -61,7 +62,7 @@ class LocalKMSService final : public KMSService {
 public:
     LocalKMSService(SymmetricKey key) : _key(std::move(key)) {}
 
-    StringData name() const override {
+    std::string_view name() const override {
         return kLocalKms;
     }
 
@@ -69,21 +70,21 @@ public:
 
     SecureVector<uint8_t> decrypt(ConstDataRange cdr, BSONObj masterKey) final;
 
-    BSONObj encryptDataKeyByString(ConstDataRange cdr, StringData keyId) final;
+    BSONObj encryptDataKeyByString(ConstDataRange cdr, std::string_view keyId) final;
 
     SymmetricKey& getMasterKey() final {
         return _key;
     }
 
 private:
-    std::vector<uint8_t> encrypt(ConstDataRange cdr, StringData kmsKeyId);
+    std::vector<uint8_t> encrypt(ConstDataRange cdr, std::string_view kmsKeyId);
 
 private:
     // Key that wraps all KMS encrypted data
     SymmetricKey _key;
 };
 
-std::vector<uint8_t> LocalKMSService::encrypt(ConstDataRange cdr, StringData kmsKeyId) {
+std::vector<uint8_t> LocalKMSService::encrypt(ConstDataRange cdr, std::string_view kmsKeyId) {
     std::vector<std::uint8_t> ciphertext(crypto::aeadCipherOutputLength(cdr.length()));
 
     uassertStatusOK(crypto::aeadEncryptLocalKMS(_key, cdr, {ciphertext}));
@@ -91,7 +92,7 @@ std::vector<uint8_t> LocalKMSService::encrypt(ConstDataRange cdr, StringData kms
     return ciphertext;
 }
 
-BSONObj LocalKMSService::encryptDataKeyByString(ConstDataRange cdr, StringData keyId) {
+BSONObj LocalKMSService::encryptDataKeyByString(ConstDataRange cdr, std::string_view keyId) {
     auto dataKey = encrypt(cdr, keyId);
 
     LocalMasterKey masterKey;

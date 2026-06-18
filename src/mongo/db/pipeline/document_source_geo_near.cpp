@@ -60,6 +60,7 @@
 #include <cmath>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -72,10 +73,11 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
-constexpr StringData DocumentSourceGeoNear::kKeyFieldName;
+constexpr std::string_view DocumentSourceGeoNear::kKeyFieldName;
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(geoNear,
                                      GeoNearLiteParsed::parse,
@@ -219,7 +221,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
             exprStatus.isOK());
     tassert(5860204,
             "Unexpected GeoNearExpression field name after asNearQuery(): " + nearExpr.field,
-            nearExpr.field == ""_sd);
+            nearExpr.field == ""sv);
 
     DocumentSourceContainer replacement;
     // 1. $geoWithin maxDistance
@@ -466,7 +468,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
     }
 }
 
-BSONObj DocumentSourceGeoNear::asNearQuery(StringData nearFieldName) {
+BSONObj DocumentSourceGeoNear::asNearQuery(std::string_view nearFieldName) {
     BSONObjBuilder queryBuilder;
     queryBuilder.appendElements(getQuery());
 

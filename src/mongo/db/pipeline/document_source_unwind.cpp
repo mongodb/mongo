@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <iterator>
 #include <list>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -73,7 +74,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(unwind, DocumentSourceUnwind,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(unwind, DocumentSourceUnwind::id)
 
-StringData DocumentSourceUnwind::getSourceName() const {
+std::string_view DocumentSourceUnwind::getSourceName() const {
     return kStageName;
 }
 

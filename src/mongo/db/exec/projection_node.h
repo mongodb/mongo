@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/projection_executor.h"
@@ -50,6 +49,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -220,7 +220,9 @@ protected:
     virtual Value transformSkippedValueForOutput(const Value&) const = 0;
 
     // Writes the given value to the output doc, replacing the existing value of 'field' if present.
-    virtual void outputProjectedField(StringData field, Value val, MutableDocument* outDoc) const;
+    virtual void outputProjectedField(std::string_view field,
+                                      Value val,
+                                      MutableDocument* outDoc) const;
 
     // Used to determine if the node is an inclusion or exclusion node.
     virtual bool isIncluded() const = 0;

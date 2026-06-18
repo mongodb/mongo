@@ -34,7 +34,6 @@
 #include "mongo/db/exec/classic/spool.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/mock_stage.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"

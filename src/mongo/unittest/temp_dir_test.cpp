@@ -29,7 +29,6 @@
 
 #include "mongo/unittest/temp_dir.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <fstream>  // IWYU pragma: keep

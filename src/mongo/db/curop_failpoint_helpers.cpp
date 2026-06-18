@@ -30,7 +30,6 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
@@ -42,12 +41,14 @@
 #include "mongo/util/time_support.h"
 
 #include <mutex>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 std::string CurOpFailpointHelpers::updateCurOpFailPointMsg(OperationContext* opCtx,
                                                            const std::string& newMsg) {
@@ -100,7 +101,7 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
             if (data.hasField("comment") && opCtx->getComment()) {
                 return opCtx->getComment()->String() == data.getStringField("comment");
             }
-            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"sv);
             return nss.isEmpty() || fpNss.isEmpty() || fpNss == nss;
         });
 }

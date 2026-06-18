@@ -48,6 +48,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <s2cellid.h>
 
@@ -65,11 +66,11 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalComputeGeoNearDistance);
  */
 class DocumentSourceInternalGeoNearDistance final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalComputeGeoNearDistance"_sd;
-    static constexpr StringData kNearFieldName = "near"_sd;
-    static constexpr StringData kKeyFieldName = "key"_sd;
-    static constexpr StringData kDistanceFieldFieldName = "distanceField"_sd;
-    static constexpr StringData kDistanceMultiplierFieldName = "distanceMultiplier"_sd;
+    static constexpr std::string_view kStageName = "$_internalComputeGeoNearDistance"_sd;
+    static constexpr std::string_view kNearFieldName = "near"_sd;
+    static constexpr std::string_view kKeyFieldName = "key"_sd;
+    static constexpr std::string_view kDistanceFieldFieldName = "distanceField"_sd;
+    static constexpr std::string_view kDistanceMultiplierFieldName = "distanceMultiplier"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -81,7 +82,7 @@ public:
                                           std::string distanceField,
                                           double distanceMultiplier);
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     }
 

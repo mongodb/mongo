@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -53,7 +53,7 @@ public:
      */
     MONGO_MOD_PRIVATE virtual StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
-        StringData purpose,
+        std::string_view purpose,
         const LogicalTime& newerThanThis,
         bool tryUseMajority) = 0;
 
@@ -62,7 +62,7 @@ public:
      * given purpose.
      */
     MONGO_MOD_PRIVATE virtual StatusWith<std::vector<ExternalKeysCollectionDocument>>
-    getAllExternalKeys(OperationContext* opCtx, StringData purpose) = 0;
+    getAllExternalKeys(OperationContext* opCtx, std::string_view purpose) = 0;
 
     /**
      * Directly inserts a key document to the storage

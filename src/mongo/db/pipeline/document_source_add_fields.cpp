@@ -40,6 +40,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -60,7 +61,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(addFields,
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
     BSONObj addFieldsSpec,
     const intrusive_ptr<ExpressionContext>& expCtx,
-    StringData userSpecifiedName) {
+    std::string_view userSpecifiedName) {
 
     const bool isIndependentOfAnyCollection = false;
     intrusive_ptr<DocumentSourceSingleDocumentTransformation> addFields(

@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <span>
+#include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
 
@@ -55,7 +55,7 @@ void registerReplicatedFastCountOpObserver(ServiceContext* svcCtx);
  * delete ops).
  */
 void recordContainerWriteForFastCountTimestamp(OperationContext* opCtx,
-                                               StringData ident,
+                                               std::string_view ident,
                                                std::span<const char> valueBytes);
 
 }  // namespace MONGO_MOD_PUBLIC mongo

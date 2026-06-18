@@ -34,6 +34,8 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/sharding_state.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
@@ -61,7 +63,7 @@ void ReplicaSetDDLTracker::registerHook(std::unique_ptr<ReplicaSetDDLHook> hook)
     LOGV2_INFO(10898001, "Successfully registered replica set DDL hook", "hook"_attr = name);
 }
 
-ReplicaSetDDLHook* ReplicaSetDDLTracker::lookupHookByName(const StringData hookName) const {
+ReplicaSetDDLHook* ReplicaSetDDLTracker::lookupHookByName(const std::string_view hookName) const {
     auto it = _ddlHooksByName.find(hookName);
     invariant(it != _ddlHooksByName.end());
     auto servicePtr = it->second.get();
@@ -72,7 +74,7 @@ ReplicaSetDDLHook* ReplicaSetDDLTracker::lookupHookByName(const StringData hookN
 ReplicaSetDDLTracker::ScopedReplicaSetDDL::ScopedReplicaSetDDL(
     OperationContext* opCtx,
     const std::vector<NamespaceString>& namespaces,
-    StringData ddlName,
+    std::string_view ddlName,
     const ReplicaSetDDLOptions& options)
     : _ddlTracker(ReplicaSetDDLTracker::get(opCtx->getServiceContext())),
       _opCtx(opCtx),
@@ -99,7 +101,7 @@ ReplicaSetDDLTracker::ScopedReplicaSetDDL::~ScopedReplicaSetDDL() {
 }
 
 void ReplicaSetDDLTracker::ScopedReplicaSetDDL::acquireDDLLocks(OperationContext* opCtx,
-                                                                StringData reason) {
+                                                                std::string_view reason) {
     // (Ignore FCV check): DDL locks are currently only acquired to serialize timeseries DDLs,
     // so don't acquire them if viewless timeseries is not enabled to minimize risk before release.
     if (!gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe()) {

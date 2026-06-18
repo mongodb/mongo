@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 #include "mongo/db/extension/shared/get_next_result.h"
+
+#include <string_view>
 
 class LimitExecStage : public sdk::TestExecStage {
 public:

@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
+
+#include <string_view>
 
 namespace mongo::query_settings {
 class IndexHintSpec;
@@ -47,7 +48,7 @@ using IndexHintSpecs = absl::InlinedVector<IndexHintSpec, 1>;
 
 namespace index_hints {
 void serialize(const IndexHintSpecs& indexHints,
-               StringData fieldName,
+               std::string_view fieldName,
                BSONObjBuilder* builder,
                const SerializationContext& context);
 

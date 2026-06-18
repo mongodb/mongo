@@ -32,6 +32,8 @@
 
 #include "mongo/rpc/get_status_from_command_result.h"
 
+#include <string_view>
+
 namespace mongo::executor {
 
 RemoteCommandRequest ExecutorIntegrationTestFixture::makeTestCommand(
@@ -72,7 +74,7 @@ RemoteCommandResponse ExecutorIntegrationTestFixture::assertOK(
 }
 
 ExecutorIntegrationTestFixture::FailPointGuard ExecutorIntegrationTestFixture::configureFailPoint(
-    StringData fp, BSONObj data) {
+    std::string_view fp, BSONObj data) {
     auto resp = runSetupCommandSync(DatabaseName::kAdmin,
                                     BSON("configureFailPoint" << fp << "mode"
                                                               << "alwaysOn"
@@ -81,7 +83,7 @@ ExecutorIntegrationTestFixture::FailPointGuard ExecutorIntegrationTestFixture::c
 }
 
 ExecutorIntegrationTestFixture::FailPointGuard ExecutorIntegrationTestFixture::configureFailCommand(
-    StringData failCommand,
+    std::string_view failCommand,
     boost::optional<ErrorCodes::Error> errorCode,
     boost::optional<Milliseconds> blockTime) {
     auto data = BSON("failCommands" << BSON_ARRAY(failCommand));

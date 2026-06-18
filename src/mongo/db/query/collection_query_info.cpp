@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/collection_query_info.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/aggregated_index_usage_tracker.h"

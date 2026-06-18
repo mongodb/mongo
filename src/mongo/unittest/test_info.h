@@ -32,8 +32,9 @@
 // IWYU pragma: private, include "mongo/unittest/unittest.h"
 // IWYU pragma: friend "mongo/unittest/.*"
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo::unittest {
 /**
@@ -41,9 +42,9 @@ namespace mongo::unittest {
  */
 class MONGO_MOD_NEEDS_REPLACEMENT TestInfo {
 public:
-    constexpr TestInfo(StringData suiteName,
-                       StringData testName,
-                       StringData file,
+    constexpr TestInfo(std::string_view suiteName,
+                       std::string_view testName,
+                       std::string_view file,
                        unsigned int line,
                        const std::type_info* baseTypeInfo = nullptr)
         : _suiteName(suiteName),
@@ -52,13 +53,13 @@ public:
           _line(line),
           _baseTypeInfo(baseTypeInfo) {}
 
-    constexpr StringData suiteName() const {
+    constexpr std::string_view suiteName() const {
         return _suiteName;
     }
-    constexpr StringData testName() const {
+    constexpr std::string_view testName() const {
         return _testName;
     }
-    constexpr StringData file() const {
+    constexpr std::string_view file() const {
         return _file;
     }
     constexpr unsigned int line() const {
@@ -69,9 +70,9 @@ public:
     }
 
 private:
-    StringData _suiteName;
-    StringData _testName;
-    StringData _file;
+    std::string_view _suiteName;
+    std::string_view _testName;
+    std::string_view _file;
     unsigned int _line;
     const std::type_info* _baseTypeInfo{};
 };

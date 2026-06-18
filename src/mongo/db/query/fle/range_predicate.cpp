@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr.hpp>
@@ -101,7 +102,7 @@ RangeOp validateRangeOp(const Expression* expr) {
 }  // namespace
 
 std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayload(
-    StringData path, ParsedFindRangePayload payload) const {
+    std::string_view path, ParsedFindRangePayload payload) const {
     auto* expCtx = _rewriter->getExpressionContext();
     return fleBetweenFromPayload(ExpressionFieldPath::createPathFromString(
                                      expCtx, std::string{path}, expCtx->variablesParseState),

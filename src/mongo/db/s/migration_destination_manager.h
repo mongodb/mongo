@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -70,6 +69,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -257,15 +257,15 @@ private:
      * Set state to Fail without Logging.
      * Under lock, move msg to _errmsg and set the state to FAIL.
      */
-    void _setStateFailNoLog(StringData msg);
+    void _setStateFailNoLog(std::string_view msg);
 
     /**
      * These log the argument msg; then call _setStateFailNoLog, which
      * under lock, moves msg to _errmsg and sets the state to FAIL.
      * The setStateWailWarn version logs with "warning() << msg".
      */
-    void _setStateFail(StringData msg);
-    void _setStateFailWarn(StringData msg);
+    void _setStateFail(std::string_view msg);
+    void _setStateFailWarn(std::string_view msg);
 
     void _setState(State newState);
 

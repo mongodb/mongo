@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +47,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -55,11 +55,12 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 constexpr auto kEmptyPipelineSize = 0;
 const auto kTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "test");
-constexpr auto kFooName = "foo"_sd;
-constexpr auto kBarName = "bar"_sd;
-constexpr auto kQuxName = "qux"_sd;
+constexpr auto kFooName = "foo"sv;
+constexpr auto kBarName = "bar"sv;
+constexpr auto kQuxName = "qux"sv;
 const auto kFooNamespace = NamespaceString::createNamespaceString_forTest(kTestDb, kFooName);
 const auto kBarNamespace = NamespaceString::createNamespaceString_forTest(kTestDb, kBarName);
 const auto kQuxNamespace = NamespaceString::createNamespaceString_forTest(kTestDb, kQuxName);
@@ -81,8 +82,8 @@ public:
     }
 
     ViewDefinition makeViewDefinition(const DatabaseName& dbName,
-                                      StringData view,
-                                      StringData viewOn,
+                                      std::string_view view,
+                                      std::string_view viewOn,
                                       BSONArray pipeline,
                                       BSONObj collatorSpec) const {
         auto collator = std::unique_ptr<CollatorInterface>(nullptr);
@@ -231,13 +232,13 @@ TEST_F(ViewGraphFixture, DroppingViewPreservesNodeInGraphIfDependedOnByOtherView
     // Inserts baz into the graph so that qux has another namespace that depends on it. This way,
     // the node for qux won't be destroyed when baz is removed.
     const auto bazView =
-        makeViewDefinition(kTestDb, "baz"_sd, kQuxName, kEmptyPipeline, kBinaryCollation);
+        makeViewDefinition(kTestDb, "baz"sv, kQuxName, kEmptyPipeline, kBinaryCollation);
     ASSERT_OK(viewGraph()->insertAndValidate(bazView, {kQuxNamespace}, kEmptyPipelineSize));
     ASSERT_EQ(viewGraph()->size(), 4UL);
 
     // Inserting a view that depends on bar but has a different collation should fail.
-    const auto viewWithDifferentCollation = makeViewDefinition(
-        kTestDb, "badCollation"_sd, kBarName, kEmptyPipeline, kFilipinoCollation);
+    const auto viewWithDifferentCollation =
+        makeViewDefinition(kTestDb, "badCollation"sv, kBarName, kEmptyPipeline, kFilipinoCollation);
     ASSERT_EQ(viewGraph()->insertAndValidate(
                   viewWithDifferentCollation, {kBarNamespace}, kEmptyPipelineSize),
               ErrorCodes::OptionNotSupportedOnView);

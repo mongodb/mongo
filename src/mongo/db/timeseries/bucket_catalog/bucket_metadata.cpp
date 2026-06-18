@@ -33,11 +33,13 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/timeseries/metadata.h"
 
+#include <string_view>
+
 namespace mongo::timeseries::bucket_catalog {
 
 BucketMetadata::BucketMetadata(tracking::Context& trackingContext,
                                BSONElement elem,
-                               boost::optional<StringData> trueMetaFieldName)
+                               boost::optional<std::string_view> trueMetaFieldName)
     : _metadata([&] {
           if (!elem) {
               return allocator_aware::SharedBuffer<tracking::Allocator<void>>{
@@ -66,7 +68,7 @@ BSONElement BucketMetadata::element() const {
     return _metadataElement;
 }
 
-boost::optional<StringData> BucketMetadata::getMetaField() const {
+boost::optional<std::string_view> BucketMetadata::getMetaField() const {
     return _metadataElement ? boost::make_optional(_metadataElement.fieldNameStringData())
                             : boost::none;
 }

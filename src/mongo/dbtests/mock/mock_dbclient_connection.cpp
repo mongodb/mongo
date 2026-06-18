@@ -48,6 +48,7 @@
 #include "mongo/util/time_support.h"
 
 #include <mutex>
+#include <string_view>
 
 using mongo::BSONObj;
 
@@ -55,6 +56,7 @@ using std::string;
 using std::vector;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect)
     : DBClientConnection(autoReconnect),
       _remoteServer(remoteServer),
@@ -68,7 +70,7 @@ MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer,
 MockDBClientConnection::~MockDBClientConnection() {}
 
 bool MockDBClientConnection::connect(const char* hostName,
-                                     StringData applicationName,
+                                     std::string_view applicationName,
                                      std::string& errmsg) {
     _serverAddress = _remoteServer->getServerHostAndPort();
     if (_remoteServer->isRunning()) {
@@ -222,8 +224,7 @@ Message MockDBClientConnection::_call(Message& toSend, string* actualServer) {
         } catch (...) {
             // Any exceptions in parsing fall through to unsupported case.
         }
-        if (!parsedMsg.body.isEmpty() &&
-            parsedMsg.body.firstElement().fieldName() == "getMore"_sd) {
+        if (!parsedMsg.body.isEmpty() && parsedMsg.body.firstElement().fieldName() == "getMore"sv) {
             auto reply = runCommandWithTarget(*_lastCursorMessage).first;
             return reply.releaseMessage();
         }

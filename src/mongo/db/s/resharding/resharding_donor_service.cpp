@@ -108,6 +108,7 @@
 #include <algorithm>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 
 #include <absl/container/node_hash_map.h>
@@ -121,6 +122,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorBeforeCatalogCacheRefresh);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorAfterBlockingReads);
@@ -809,7 +811,8 @@ void ReshardingDonorService::DonorStateMachine::
 
     reshardingDonorFailsBeforeObtainingTimestamp.execute([&](const BSONObj& data) {
         auto errmsgElem = data["errmsg"];
-        StringData errmsg = errmsgElem ? errmsgElem.checkAndGetStringData() : "Failing for test"_sd;
+        std::string_view errmsg =
+            errmsgElem ? errmsgElem.checkAndGetStringData() : "Failing for test"sv;
         uasserted(ErrorCodes::InternalError, errmsg);
     });
 
@@ -871,8 +874,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
             reshardingDonorFailsAfterTransitionToDonatingOplogEntries.execute(
                 [&](const BSONObj& data) {
                     auto errmsgElem = data["errmsg"];
-                    StringData errmsg =
-                        errmsgElem ? errmsgElem.checkAndGetStringData() : "Failing for test"_sd;
+                    std::string_view errmsg =
+                        errmsgElem ? errmsgElem.checkAndGetStringData() : "Failing for test"sv;
                     uasserted(ErrorCodes::InternalError, errmsg);
                 });
             return status;

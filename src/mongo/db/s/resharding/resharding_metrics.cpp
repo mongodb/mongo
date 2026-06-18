@@ -46,6 +46,7 @@
 #include "mongo/util/duration.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -85,7 +86,7 @@ boost::optional<Milliseconds> readCoordinatorEstimate(const AtomicWord<Milliseco
 
 template <typename T>
 void appendOptionalMillisecondsFieldAs(BSONObjBuilder& builder,
-                                       StringData fieldName,
+                                       std::string_view fieldName,
                                        const boost::optional<Milliseconds> value) {
     if (!value) {
         return;
@@ -100,12 +101,12 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj shardKey) {
     using Arr = std::vector<Value>;
     using V = Value;
 
-    return Doc{
-        {"reshardCollection",
-         V{StringData{NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())}}},
-        {"key", std::move(shardKey)},
-        {"unique", V{StringData{"false"}}},
-        {"collation", V{Doc{{"locale", V{StringData{"simple"}}}}}}}
+    return Doc{{"reshardCollection",
+                V{std::string_view{
+                    NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())}}},
+               {"key", std::move(shardKey)},
+               {"unique", V{std::string_view{"false"}}},
+               {"collation", V{Doc{{"locale", V{std::string_view{"simple"}}}}}}}
         .toBson();
 }
 
@@ -472,14 +473,15 @@ boost::optional<Milliseconds> ReshardingMetrics::getMaxAverageTimeToFetchAndAppl
 
     auto shouldLog = logOption == CalculationLogOption::Show;
     auto summaryBuilder = shouldLog ? boost::make_optional(BSONObjBuilder{}) : boost::none;
-    auto appendOptionalTime =
-        [](BSONObjBuilder* builder, StringData fieldName, boost::optional<Milliseconds> time) {
-            if (time.has_value()) {
-                builder->append(fieldName, time->count());
-            } else {
-                builder->appendNull(fieldName);
-            }
-        };
+    auto appendOptionalTime = [](BSONObjBuilder* builder,
+                                 std::string_view fieldName,
+                                 boost::optional<Milliseconds> time) {
+        if (time.has_value()) {
+            builder->append(fieldName, time->count());
+        } else {
+            builder->appendNull(fieldName);
+        }
+    };
 
     boost::optional<Milliseconds> maxAvgTimeToFetchAndApply;
     bool incomplete = false;
@@ -657,7 +659,7 @@ std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance_forTest(
                                                ReshardingProvenanceEnum::kReshardCollection);
 }
 
-StringData ReshardingMetrics::getStateString() const {
+std::string_view ReshardingMetrics::getStateString() const {
     return visit(OverloadedVisitor{[](CoordinatorStateEnum state) { return idl::serialize(state); },
                                    [](RecipientStateEnum state) { return idl::serialize(state); },
                                    [](DonorStateEnum state) {

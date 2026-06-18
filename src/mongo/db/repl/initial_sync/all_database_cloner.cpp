@@ -33,7 +33,6 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/client.h"
@@ -60,11 +59,13 @@
 
 #include <algorithm>
 #include <mutex>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 AllDatabaseCloner::AllDatabaseCloner(InitialSyncSharedData* sharedData,
                                      const HostAndPort& source,
@@ -73,7 +74,7 @@ AllDatabaseCloner::AllDatabaseCloner(InitialSyncSharedData* sharedData,
                                      ThreadPool* dbPool,
                                      std::shared_ptr<InitialSyncSummaryStats> summaryStats)
     : InitialSyncBaseCloner(
-          "AllDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+          "AllDatabaseCloner"sv, sharedData, source, client, storageInterface, dbPool),
       _connectStage("connect", this, &AllDatabaseCloner::connectStage),
       _getInitialSyncIdStage("getInitialSyncId", this, &AllDatabaseCloner::getInitialSyncIdStage),
       _listDatabasesStage("listDatabases", this, &AllDatabaseCloner::listDatabasesStage),
@@ -138,7 +139,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
             [this](const executor::RemoteCommandResponse& helloReply) {
                 return ensurePrimaryOrSecondary(helloReply);
             });
-        client->connect(getSource(), "InitialSyncCloner"_sd, boost::none);
+        client->connect(getSource(), "InitialSyncCloner"sv, boost::none);
     } else {
         client->ensureConnection();
     }

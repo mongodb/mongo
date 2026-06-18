@@ -30,7 +30,6 @@
 #include "mongo/util/functional.h"
 
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>

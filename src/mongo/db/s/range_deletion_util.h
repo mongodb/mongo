@@ -43,13 +43,15 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
+
 #include <boost/optional.hpp>
 
 namespace mongo {
 
 namespace rangedeletionutil {
 
-constexpr auto kRangeDeletionThreadName = "range-deleter"_sd;
+inline constexpr std::string_view kRangeDeletionThreadName{"range-deleter"};
 
 /**
  * Delete the range in a sequence of batches until there are no more documents to delete or deletion

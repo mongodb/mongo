@@ -30,7 +30,6 @@
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/type_traits.h"
 #include "mongo/base/data_range.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -43,9 +42,11 @@
 #include <cmath>
 #include <limits>
 #include <ostream>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 
 TEST(BSONElement, BinDataToString) {
@@ -72,7 +73,7 @@ TEST(BSONElement, BinDataToString) {
                                     0x64,
                                     0xff};  // Valid RFC4122v4 UUID, but with extra byte added.
     unsigned char zeroLength[1] = {0};      // Not truly zero because Windows doesn't support that.
-    StringData unknownType = "binary data\000with an unknown type"_sd;  // No terminating zero
+    std::string_view unknownType = "binary data\000with an unknown type"sv;  // No terminating zero
     const BinDataType unknownBinDataType = BinDataType(42);
     builder.appendBinData("bintype0", sizeof(bintype0), BinDataGeneral, bintype0);
     validUUID.appendToBuilder(&builder, "validUUID");
@@ -109,10 +110,10 @@ TEST(BSONElement, BinDataCleanWithByteArrayDeprecatedTooSmall) {
 
 std::string vecStr(std::vector<uint8_t> v) {
     std::string r = "[";
-    StringData sep;
+    std::string_view sep;
     for (const uint8_t& b : v) {
         r += fmt::format("{}{:02x}", sep, (unsigned)b);
-        sep = ","_sd;
+        sep = ","sv;
     }
     r += "]";
     return r;
@@ -474,7 +475,7 @@ TEST(BSONElementTrustedInitTag, EOOElement) {
     BSONElement eoo(buffer, 0, BSONElement::TrustedInitTag{});
     ASSERT_EQ(BSONType::eoo, eoo.type());
     ASSERT_EQ(0, eoo.fieldNameSize());
-    ASSERT_EQ(""_sd, eoo.fieldNameStringData());
+    ASSERT_EQ(""sv, eoo.fieldNameStringData());
 }
 
 TEST(BSONElementTrustedInitTag, EmptyFieldName) {
@@ -484,7 +485,7 @@ TEST(BSONElementTrustedInitTag, EmptyFieldName) {
     ASSERT_EQ(BSONType::string, elem.type());
     // 'fieldNameSize()' includes the NUL-terminator.
     ASSERT_EQ(1, elem.fieldNameSize());
-    ASSERT_EQ(""_sd, elem.fieldNameStringData());
+    ASSERT_EQ(""sv, elem.fieldNameStringData());
 }
 
 TEST(BSONElementTrustedInitTag, NonEmptyFieldName) {
@@ -495,7 +496,7 @@ TEST(BSONElementTrustedInitTag, NonEmptyFieldName) {
     ASSERT_EQ(BSONType::string, elem.type());
     // 'fieldNameSize()' includes the NUL-terminator.
     ASSERT_EQ(5, elem.fieldNameSize());
-    ASSERT_EQ("foxx"_sd, elem.fieldNameStringData());
+    ASSERT_EQ("foxx"sv, elem.fieldNameStringData());
 }
 
 }  // namespace

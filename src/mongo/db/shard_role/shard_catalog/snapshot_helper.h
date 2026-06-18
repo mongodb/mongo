@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -63,7 +64,7 @@ enum class ReadSourceReason {
     kAllowReadFromLatest,
 };
 
-StringData toString(ReadSourceReason reason);
+std::string_view toString(ReadSourceReason reason);
 
 /**
  * Captured state of the replication-driven read-source decision: the chosen ReadSource, the

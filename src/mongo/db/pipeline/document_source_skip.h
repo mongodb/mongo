@@ -44,6 +44,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -75,7 +76,7 @@ public:
 
 class DocumentSourceSkip final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$skip"_sd;
+    static constexpr std::string_view kStageName = "$skip"_sd;
 
     /**
      * Convenience method for creating a $skip stage.
@@ -102,7 +103,7 @@ public:
                 UnionRequirement::kAllowed};
     }
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

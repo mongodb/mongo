@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/platform/decimal128.h"
@@ -39,6 +38,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <type_traits>
 
 namespace mongo::query_stats {
@@ -126,7 +126,7 @@ public:
         sumOfSquares = sumOfSquares.add(Decimal128(val).multiply(Decimal128(val)));
     }
 
-    void appendTo(BSONObjBuilder& builder, StringData fieldName) const {
+    void appendTo(BSONObjBuilder& builder, std::string_view fieldName) const {
         BSONObjBuilder{builder.subobjStart(fieldName)}
             .append("sum", bsonValue(sum))
             .append("max", bsonValue(max))
@@ -134,7 +134,7 @@ public:
             .append("sumOfSquares", bsonValue(sumOfSquares));
     }
 
-    void appendToIfNonNegative(BSONObjBuilder& builder, StringData fieldName) const {
+    void appendToIfNonNegative(BSONObjBuilder& builder, std::string_view fieldName) const {
         if (sum >= 0) {
             appendTo(builder, fieldName);
         }
@@ -153,7 +153,7 @@ private:
 };
 
 extern template void AggregatedMetric<uint64_t>::appendTo(BSONObjBuilder& builder,
-                                                          StringData fieldName) const;
+                                                          std::string_view fieldName) const;
 
 }  // namespace agg_metric_detail
 
@@ -184,7 +184,7 @@ struct AggregatedBool {
         }
     }
 
-    void appendTo(BSONObjBuilder& builder, StringData fieldName) const;
+    void appendTo(BSONObjBuilder& builder, std::string_view fieldName) const;
 
     uint32_t trueCount{0};
     uint32_t falseCount{0};
@@ -213,7 +213,7 @@ struct AggregatedCardinalityEstimationMethods {
      * Appends the counter data to a BSON builder as a sub-object.
      * For query stats observability, always emits all fields including zeros.
      */
-    void appendTo(BSONObjBuilder& builder, StringData fieldName) const;
+    void appendTo(BSONObjBuilder& builder, std::string_view fieldName) const;
 
     CardinalityEstimationMethods counts;
 };

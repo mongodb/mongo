@@ -41,6 +41,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -177,12 +178,12 @@ public:
      * This will never return a cursor from the cursor cache, and these cursors should *never* be
      * released into the cache by calling releaseCursor(). Use closeCursor() instead.
      */
-    WT_CURSOR* getNewCursor(StringData uri, const char* config);
+    WT_CURSOR* getNewCursor(std::string_view uri, const char* config);
 
     /**
      * Wrapper for getNewCursor() without a config string.
      */
-    WT_CURSOR* getNewCursor(StringData uri) {
+    WT_CURSOR* getNewCursor(std::string_view uri) {
         return getNewCursor(uri, nullptr);
     }
 
@@ -304,7 +305,7 @@ private:
     typedef std::list<CachedCursor> CursorCache;
 
     void _openCursor(WT_SESSION* session,
-                     StringData uri,
+                     std::string_view uri,
                      const char* config,
                      WT_CURSOR** cursorOut);
 

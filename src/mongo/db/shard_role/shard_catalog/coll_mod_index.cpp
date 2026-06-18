@@ -30,7 +30,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/coll_mod_index.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"

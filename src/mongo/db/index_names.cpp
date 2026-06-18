@@ -34,11 +34,13 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/string_map.h"
 
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 std::string toString(IndexType indexType) {
     switch (indexType) {
@@ -105,12 +107,12 @@ string IndexNames::findPluginName(const BSONObj& keyPattern) {
     string indexTypeStr = "";
     while (i.more()) {
         BSONElement e = i.next();
-        StringData fieldName(e.fieldNameStringData());
+        std::string_view fieldName(e.fieldNameStringData());
         if (e.type() == BSONType::string) {
             indexTypeStr = e.String();
         } else if (WildcardNames::isWildcardFieldName(fieldName)) {
             if (keyPattern.firstElement().type() == BSONType::string &&
-                keyPattern.firstElement().fieldNameStringData() == "columnstore"_sd) {
+                keyPattern.firstElement().fieldNameStringData() == "columnstore"sv) {
                 return IndexNames::COLUMN;
             } else {
                 // Returns IndexNames::WILDCARD directly here because we rely on the caller to
@@ -130,7 +132,7 @@ bool IndexNames::isKnownName(const string& name) {
 }
 
 // static
-IndexType IndexNames::nameToType(StringData accessMethod) {
+IndexType IndexNames::nameToType(std::string_view accessMethod) {
     auto typeIt = kIndexNameToType.find(accessMethod);
     if (typeIt == kIndexNameToType.end()) {
         return INDEX_BTREE;

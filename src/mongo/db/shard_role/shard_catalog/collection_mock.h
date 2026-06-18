@@ -34,6 +34,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -363,21 +365,25 @@ public:
     }
 
     void updateTTLSetting(OperationContext* opCtx,
-                          StringData idxName,
+                          std::string_view idxName,
                           long long newExpireSeconds) override {
         MONGO_UNREACHABLE;
     }
 
-    void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) override {
+    void updateHiddenSetting(OperationContext* opCtx,
+                             std::string_view idxName,
+                             bool hidden) override {
         MONGO_UNREACHABLE;
     }
 
-    void updateUniqueSetting(OperationContext* opCtx, StringData idxName, bool unique) override {
+    void updateUniqueSetting(OperationContext* opCtx,
+                             std::string_view idxName,
+                             bool unique) override {
         MONGO_UNREACHABLE;
     }
 
     void updatePrepareUniqueSetting(OperationContext* opCtx,
-                                    StringData idxName,
+                                    std::string_view idxName,
                                     bool prepareUnique) override {
         MONGO_UNREACHABLE;
     }
@@ -391,23 +397,23 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void removeIndex(OperationContext* opCtx, StringData indexName) override {
+    void removeIndex(OperationContext* opCtx, std::string_view indexName) override {
         MONGO_UNREACHABLE;
     }
 
     Status prepareForIndexBuild(OperationContext* opCtx,
                                 const IndexDescriptor* spec,
-                                StringData indexIdent,
+                                std::string_view indexIdent,
                                 boost::optional<UUID> buildUUID) override {
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<UUID> getIndexBuildUUID(StringData indexName) const override {
+    boost::optional<UUID> getIndexBuildUUID(std::string_view indexName) const override {
         MONGO_UNREACHABLE;
     }
 
     bool isIndexMultikey(OperationContext* opCtx,
-                         StringData indexName,
+                         std::string_view indexName,
                          MultikeyPaths* multikeyPaths,
                          int indexOffset) const override {
         MONGO_UNREACHABLE;
@@ -435,7 +441,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj getIndexSpec(StringData indexName, bool expandSimpleCollation) const override {
+    BSONObj getIndexSpec(std::string_view indexName, bool expandSimpleCollation) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -447,11 +453,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool isIndexPresent(StringData indexName) const override {
+    bool isIndexPresent(std::string_view indexName) const override {
         MONGO_UNREACHABLE;
     }
 
-    bool isIndexReady(StringData indexName) const override {
+    bool isIndexReady(std::string_view indexName) const override {
         return true;
     }
 

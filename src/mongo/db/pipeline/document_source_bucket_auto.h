@@ -46,6 +46,7 @@
 
 #include <cstdint>
 #include <set>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -63,15 +64,14 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(BucketAuto);
  */
 class DocumentSourceBucketAuto final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$bucketAuto"_sd;
-    Value serialize(const query_shape::SerializationOptions& opts =
-                        query_shape::SerializationOptions{}) const final;
+    static constexpr std::string_view kStageName{"$bucketAuto"};
+    Value serialize(const query_shape::SerializationOptions& opts = {}) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize();
 
     static const Id& id;

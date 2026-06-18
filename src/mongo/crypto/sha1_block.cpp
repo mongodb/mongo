@@ -29,8 +29,10 @@
 
 #include "mongo/crypto/sha1_block.h"
 
+#include <string_view>
+
 namespace mongo {
 
-constexpr StringData SHA1BlockTraits::name;
+constexpr std::string_view SHA1BlockTraits::name;
 
 }  // namespace mongo

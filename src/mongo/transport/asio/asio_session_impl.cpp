@@ -54,11 +54,14 @@
 #include "mongo/util/future_util.h"
 #include "mongo/util/net/socket_utils.h"
 
+#include <string_view>
+
 #include <asio/detail/socket_option.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerShortOpportunisticReadWrite);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerSessionPauseBeforeSetSocketOption);
@@ -579,8 +582,8 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
                    peekASIOStream(_socket, asio::buffer(buffer->data(), buffer->size()));
                MessageHooks::onProxyHeaderReceived(
                    *this, buffer->data(), bytesRead, isConnectedToProxyUnixSocket());
-               return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead),
-                                                          isConnectedToProxyUnixSocket());
+               return transport::parseProxyProtocolHeader(
+                   std::string_view(buffer->data(), bytesRead), isConnectedToProxyUnixSocket());
            })
         .until([deadline, proxyHeaderTimeout, reactor](
                    StatusWith<boost::optional<ParserResults>> sw) {
@@ -611,7 +614,7 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
                 // origin client IP addresses, then the session's auth restriction environment
                 // should be reset to apply against the source address advertised in the proxy
                 // protocol header.
-                if (clientSourceAuthenticationRestrictionMode == "origin"_sd) {
+                if (clientSourceAuthenticationRestrictionMode == "origin"sv) {
                     _restrictionEnvironment =
                         RestrictionEnvironment(_proxiedSrcRemoteAddr.value(), _localAddr);
                 }
@@ -936,7 +939,7 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
     }();
 
     if (maybeProxyProtocolHeader(
-            StringData(static_cast<const char*>(buffer.data()), buffer.size()))) {
+            std::string_view(static_cast<const char*>(buffer.data()), buffer.size()))) {
         // Protocol requirements mean that neither raw mongorpc nor TLS client hello will look
         // like Proxy.
         return Future<bool>::makeReady(
@@ -1040,8 +1043,8 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
 template <typename Buffer>
 bool CommonAsioSession::checkForHTTPRequest(const Buffer& buffers) {
     invariant(buffers.size() >= 4);
-    const StringData bufferAsStr(static_cast<const char*>(buffers.data()), 4);
-    return (bufferAsStr == "GET "_sd);
+    const std::string_view bufferAsStr(static_cast<const char*>(buffers.data()), 4);
+    return (bufferAsStr == "GET "sv);
 }
 
 bool CommonAsioSession::isExemptedByCIDRList(const CIDRList& exemptions) const {

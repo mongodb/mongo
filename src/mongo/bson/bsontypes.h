@@ -32,7 +32,6 @@
 #include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/utility.h"
@@ -42,6 +41,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <limits>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/optional.hpp>
@@ -124,7 +124,7 @@ inline auto format_as(BSONType t) {
  * Maps from the set of type aliases accepted by the $type query operator to the corresponding BSON
  * types. Excludes "number", since this alias maps to a set of BSON types.
  */
-boost::optional<BSONType> findBSONTypeAlias(StringData key);
+boost::optional<BSONType> findBSONTypeAlias(std::string_view key);
 
 /**
  * returns the name of the argument's type
@@ -135,7 +135,7 @@ const char* typeName(BSONType type);
  * Reverse mapping of typeName(). Throws an exception with error code BadValue when passed in
  * invalid type name.
  */
-BSONType typeFromName(StringData name);
+BSONType typeFromName(std::string_view name);
 
 /**
  * Prints the name of the argument's type to the given stream.
@@ -150,7 +150,7 @@ bool isValidBSONType(int type);
 /**
  * IDL callback validator
  */
-Status isValidBSONTypeName(StringData typeName);
+Status isValidBSONTypeName(std::string_view typeName);
 
 
 inline bool isNumericBSONType(BSONType type) {

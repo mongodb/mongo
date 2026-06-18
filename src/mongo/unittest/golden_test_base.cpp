@@ -30,7 +30,6 @@
 #include "mongo/unittest/golden_test_base.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
@@ -39,6 +38,7 @@
 
 #include <cstddef>
 #include <fstream>  // IWYU pragma: keep
+#include <string_view>
 
 #include <boost/core/addressof.hpp>
 #include <boost/filesystem.hpp>
@@ -63,6 +63,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::unittest {
+using namespace std::literals::string_view_literals;
 
 namespace fs = ::boost::filesystem;
 namespace po = ::boost::program_options;
@@ -89,7 +90,7 @@ void writeFile(const fs::path& path, const std::string& contents) {
 GoldenTestConfig GoldenTestConfig::parseFromBson(const BSONObj& obj) {
     boost::optional<std::string> relativePath;
     for (auto&& elem : obj) {
-        if (elem.fieldNameStringData() == "relativePath"_sd) {
+        if (elem.fieldNameStringData() == "relativePath"sv) {
             uassert(6741504,
                     "GoldenTestConfig relativePath must be a string",
                     elem.type() == BSONType::string);

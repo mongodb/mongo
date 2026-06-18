@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -38,12 +37,14 @@
 #include "mongo/util/assert_util.h"
 
 #include <cmath>
+#include <string_view>
 
 
 namespace mongo {
 
 
 namespace {
+using namespace std::literals::string_view_literals;
 const double DELTA = 0.0001;
 
 void testEquals(Value actual, Value expected, double delta = DELTA) {
@@ -228,7 +229,7 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNonNumericValues) {
         GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     // Make sure that each GranularityRounder fails when rounding a non-numeric value.
-    Value stringValue = Value("test"_sd);
+    Value stringValue = Value("test"sv);
     ASSERT_THROWS_CODE(rounder->roundUp(stringValue), AssertionException, 40265);
     ASSERT_THROWS_CODE(rounder->roundDown(stringValue), AssertionException, 40265);
 }

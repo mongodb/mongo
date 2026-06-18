@@ -31,7 +31,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -40,10 +39,12 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 SortedMergeStage::SortedMergeStage(PlanStage::Vector inputStages,
                                    std::vector<value::SlotVector> inputKeys,
                                    std::vector<value::SortDirection> dirs,
@@ -51,7 +52,7 @@ SortedMergeStage::SortedMergeStage(PlanStage::Vector inputStages,
                                    value::SlotVector outputVals,
                                    PlanNodeId planNodeId,
                                    bool participateInTrialRunTracking)
-    : PlanStage("smerge"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("smerge"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _inputKeys(std::move(inputKeys)),
       _dirs(std::move(dirs)),
       _inputVals(std::move(inputVals)),

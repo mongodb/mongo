@@ -33,7 +33,6 @@
 
 #include "mongo/db/auth/builtin_roles.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/auth_name.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_set.h>
@@ -51,11 +51,12 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const auto kAdminDB = DatabaseName::kAdmin;
 const auto kAdminRsrc = ResourcePattern::forDatabaseName(kAdminDB);
 const auto kAdminSystemJSNSS =
-    NamespaceString::createNamespaceString_forTest(kAdminDB, "system.js"_sd);
+    NamespaceString::createNamespaceString_forTest(kAdminDB, "system.js"sv);
 const auto kAdminSystemJSRsrc = ResourcePattern::forExactNamespace(kAdminSystemJSNSS);
 
 TEST(BuiltinRoles, BuiltinRolesOnlyOnAppropriateDatabases) {

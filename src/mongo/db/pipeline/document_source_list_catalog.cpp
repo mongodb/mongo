@@ -44,9 +44,12 @@
 #include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
@@ -60,7 +63,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listCatalog,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(listCatalog, DocumentSourceListCatalog::id)
 
-StringData DocumentSourceListCatalog::getSourceName() const {
+std::string_view DocumentSourceListCatalog::getSourceName() const {
     return kStageName;
 }
 
@@ -76,7 +79,7 @@ PrivilegeVector DocumentSourceListCatalog::LiteParsed::requiredPrivileges(
         return {Privilege(ResourcePattern::forClusterResource(tenantId), ActionType::listDatabases),
                 Privilege(ResourcePattern::forAnyNormalResource(tenantId),
                           listCollectionsAndIndexesActions),
-                Privilege(ResourcePattern::forCollectionName(tenantId, "system.js"_sd),
+                Privilege(ResourcePattern::forCollectionName(tenantId, "system.js"sv),
                           listCollectionsAndIndexesActions),
                 Privilege(ResourcePattern::forAnySystemBuckets(tenantId),
                           listCollectionsAndIndexesActions)};

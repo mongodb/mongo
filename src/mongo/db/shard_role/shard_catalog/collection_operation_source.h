@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -48,5 +49,5 @@ enum class OperationSource {
     kTimeseriesDelete,
 };
 
-StringData toString(OperationSource source);
+std::string_view toString(OperationSource source);
 }  // namespace mongo

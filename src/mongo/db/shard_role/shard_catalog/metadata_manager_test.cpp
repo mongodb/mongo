@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/metadata_manager.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"

@@ -57,6 +57,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <system_error>
 
 namespace mongo {
@@ -88,7 +89,7 @@ public:
 
 protected:
     void checkRequestMetadata(executor::RemoteCommandRequest request,
-                              StringData expectedCmd,
+                              std::string_view expectedCmd,
                               bool expectStartTxnFields,
                               bool expectStartOrContinueTxnFields) {
         ASSERT(request.cmdObj.hasField(expectedCmd));

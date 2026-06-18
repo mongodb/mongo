@@ -34,6 +34,8 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/vector_search_helper.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceVectorSearchToStageFn(
@@ -78,7 +80,7 @@ private:
 }  // namespace
 
 VectorSearchStage::VectorSearchStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::shared_ptr<executor::TaskExecutor>& taskExecutor,
     BSONObj originalSpec,

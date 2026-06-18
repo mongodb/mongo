@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -36,6 +35,7 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -91,7 +91,7 @@ public:
 private:
     virtual uint32_t generateInteger() = 0;
 
-    StringData generateStringData(uint32_t i) {
+    std::string_view generateStringData(uint32_t i) {
         if (!_mem.get()) {
             // Use a very large buffer to store string keys contiguously so fetching the key memory
             // doesn't interfere with the actual test.
@@ -100,7 +100,7 @@ private:
             _current = _mem.get();
         }
         sprintf(_current, "%u", i);
-        StringData sd(_current);
+        std::string_view sd(_current);
         _current += sd.size();
         return sd;
     }
@@ -115,13 +115,13 @@ uint32_t BaseGenerator::generate<uint32_t>() {
 }
 
 template <>
-StringData BaseGenerator::generate<StringData>() {
+std::string_view BaseGenerator::generate<std::string_view>() {
     return generateStringData(generate<uint32_t>());
 }
 
 template <>
 std::string BaseGenerator::generate<std::string>() {
-    return std::string{generate<StringData>()};
+    return std::string{generate<std::string_view>()};
 }
 
 class Sequence : public BaseGenerator {

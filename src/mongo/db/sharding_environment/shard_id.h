@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
@@ -39,6 +38,7 @@
 #include <iostream>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 MONGO_MOD_PUBLIC;
@@ -56,8 +56,8 @@ public:
 
     ShardId() = default;
 
-    operator StringData() const {
-        return StringData(_shardId);
+    operator std::string_view() const {
+        return std::string_view(_shardId);
     }
 
     template <size_t N>

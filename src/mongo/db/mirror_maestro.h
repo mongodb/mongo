@@ -40,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {

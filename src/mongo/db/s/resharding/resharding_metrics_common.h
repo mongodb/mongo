@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 namespace mongo {
 
@@ -40,7 +40,7 @@ class ReshardingMetricsCommon {
 public:
     static constexpr size_t kRoleCount = 3;
     enum class Role { kCoordinator, kDonor, kRecipient };
-    static StringData getRoleName(Role role);
+    static std::string_view getRoleName(Role role);
 };
 
 }  // namespace mongo

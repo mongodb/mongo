@@ -36,17 +36,18 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
-StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>
+StatusWith<std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>>
 parsedUpdateArrayFilters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const std::vector<BSONObj>& rawArrayFiltersIn,
                          const NamespaceString& nss) {
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFiltersOut;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFiltersOut;
     for (const auto& rawArrayFilter : rawArrayFiltersIn) {
         auto parsedArrayFilter =
             MatchExpressionParser::parse(rawArrayFilter,

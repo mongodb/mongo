@@ -28,7 +28,6 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
@@ -41,6 +40,7 @@
 #include <algorithm>
 #include <mutex>
 #include <ostream>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -85,13 +85,13 @@ enum class MONGO_MOD_PUBLIC FaultFacetType {
     kDns,
     kConfigServer
 };
-static const StringData FaultFacetTypeStrings[] = {
+static const std::string_view FaultFacetTypeStrings[] = {
     "systemObserver", "mock1", "mock2", "testObserver", "LDAP", "DNS", "configServer"};
 
 FaultFacetType toFaultFacetType(HealthObserverTypeEnum type);
 
 
-static StringData FaultFacetType_serializer(const FaultFacetType value) {
+static std::string_view FaultFacetType_serializer(const FaultFacetType value) {
     return FaultFacetTypeStrings[static_cast<int>(value)];
 }
 

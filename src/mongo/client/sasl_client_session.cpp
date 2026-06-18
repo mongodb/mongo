@@ -35,6 +35,7 @@
 
 #include <cstddef>
 #include <limits>
+#include <string_view>
 #include <type_traits>
 
 namespace mongo {
@@ -44,7 +45,7 @@ SaslClientSession::SaslClientSession() {}
 
 SaslClientSession::~SaslClientSession() {}
 
-void SaslClientSession::setParameter(Parameter id, StringData value) {
+void SaslClientSession::setParameter(Parameter id, std::string_view value) {
     fassert(16807, id >= 0 && id < numParameters);
     fassert(28583, value.size() < std::numeric_limits<std::size_t>::max());
 
@@ -67,12 +68,12 @@ bool SaslClientSession::hasParameter(Parameter id) {
     return static_cast<bool>(_parameters[id].data);
 }
 
-StringData SaslClientSession::getParameter(Parameter id) {
+std::string_view SaslClientSession::getParameter(Parameter id) {
     if (!hasParameter(id))
-        return StringData();
+        return std::string_view();
 
     DataBuffer& buffer = _parameters[id];
-    return StringData(buffer.data.get(), buffer.size);
+    return std::string_view(buffer.data.get(), buffer.size);
 }
 
 }  // namespace mongo

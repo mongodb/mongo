@@ -49,6 +49,7 @@
 #endif
 #else
 #include <charconv>
+#include <string_view>
 
 #include <mstcpip.h>
 #include <winsock2.h>
@@ -188,8 +189,12 @@ void setSocketOption(int sock, int level, int option, const T& val) {
  * not attempt the set operation.
  */
 template <typename T>
-void applyMax(
-    int sock, int level, int optnum, T maxVal, StringData optName, logv2::LogSeverity severity) {
+void applyMax(int sock,
+              int level,
+              int optnum,
+              T maxVal,
+              std::string_view optName,
+              logv2::LogSeverity severity) {
     T val;
     try {
         getSocketOption(sock, level, optnum, val);
@@ -240,7 +245,7 @@ void setSocketKeepAliveParams(int sock,
 #endif  // _WIN32
 }
 
-std::string makeUnixSockPath(int port, StringData label) {
+std::string makeUnixSockPath(int port, std::string_view label) {
     str::stream stream;
     stream << serverGlobalParams.socket << "/mongodb-";
     if (!label.empty()) {
@@ -249,19 +254,19 @@ std::string makeUnixSockPath(int port, StringData label) {
     return stream << port << ".sock";
 }
 
-std::string makeProxyUnixSockPath(int port, StringData prefix) {
+std::string makeProxyUnixSockPath(int port, std::string_view prefix) {
     return fmt::format("{}/proxy-mongodb-{}.sock", prefix, port);
 }
 
-int parsePortFromUnixSockPath(StringData path) {
-    constexpr StringData extension = ".sock";
+int parsePortFromUnixSockPath(std::string_view path) {
+    constexpr std::string_view extension = ".sock";
     if (!path.ends_with(extension)) {
         return -1;
     }
     path.remove_suffix(extension.size());
 
     const auto lastHyphenIndex = path.rfind('-');
-    if (lastHyphenIndex == StringData::npos) {
+    if (lastHyphenIndex == std::string_view::npos) {
         return -1;
     }
     path.remove_prefix(lastHyphenIndex + 1);

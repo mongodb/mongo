@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
+#include <iosfwd>
 #include <string>
+#include <string_view>
 #include <variant>
+#include <vector>
 
 #pragma once
 namespace mongo::sbe::value {
@@ -84,7 +86,7 @@ struct PathRequest {
 
     std::string toString() const;
 
-    StringData getTopLevelField() const;
+    std::string_view getTopLevelField() const;
 
     std::string getFullPath() const;
 };

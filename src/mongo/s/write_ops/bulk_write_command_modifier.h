@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"

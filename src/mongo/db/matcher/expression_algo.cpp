@@ -64,6 +64,7 @@
 #include <iterator>
 #include <queue>
 #include <set>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/move/utility_core.hpp>
@@ -71,6 +72,7 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using std::unique_ptr;
 
@@ -496,7 +498,7 @@ splitExprMatchExpression(std::unique_ptr<ExprMatchExpression> expr,
         // The entire expression is independent.
         if (res.requiresRename) {
             // The second part of the pair is not used for $expr.
-            renameables.emplace_back(expr.get(), ""_sd);
+            renameables.emplace_back(expr.get(), ""sv);
         }
         return {std::move(expr), nullptr};
     }
@@ -539,7 +541,7 @@ splitExprMatchExpression(std::unique_ptr<ExprMatchExpression> expr,
 
     if (independentPartRequiresRename) {
         // The second part of the pair is not used for $expr.
-        renameables.emplace_back(independentPart.get(), ""_sd);
+        renameables.emplace_back(independentPart.get(), ""sv);
     }
 
     return {std::move(independentPart), std::move(dependentPart)};
@@ -647,13 +649,13 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     }
 }
 
-bool pathDependenciesAreExact(StringData key, const MatchExpression* expr) {
+bool pathDependenciesAreExact(std::string_view key, const MatchExpression* expr) {
     DepsTracker columnDeps;
     dependency_analysis::addDependencies(expr, &columnDeps);
     return !columnDeps.needWholeDocument && columnDeps.fields == OrderedPathSet{std::string{key}};
 }
 
-void addExpr(StringData path,
+void addExpr(std::string_view path,
              std::unique_ptr<MatchExpression> me,
              StringMap<std::unique_ptr<MatchExpression>>& out) {
     // In order for this to be correct, the dependencies of the filter by column must be exactly
@@ -679,7 +681,7 @@ void addExpr(StringData path,
     }
 }
 
-std::unique_ptr<MatchExpression> tryAddExpr(StringData path,
+std::unique_ptr<MatchExpression> tryAddExpr(std::string_view path,
                                             const MatchExpression* me,
                                             StringMap<std::unique_ptr<MatchExpression>>& out) {
     if (FieldRef(path).hasNumericPathComponents())
@@ -877,12 +879,12 @@ bool containsDependencyHelper(const std::set<T, PathComparator>& testSet,
 bool hasPredicateOnPathsHelper(const MatchExpression& expr,
                                mongo::MatchExpression::MatchType searchType,
                                const OrderedPathSet& paths,
-                               boost::optional<StringData> parentPath) {
+                               boost::optional<std::string_view> parentPath) {
     // Accumulate the path components from any ancestors with partial paths (eg. $elemMatch) through
     // the tree to the leaves. Leaf expressions as children of these partial-path expressions will
     // sometimes have no path and would otherwise fail to be considered here.
     std::string ownedPath;
-    boost::optional<StringData> fullPath;
+    boost::optional<std::string_view> fullPath;
     if (expr.fieldRef()) {
         if (parentPath) {
             ownedPath = fmt::format("{}.{}", *parentPath, expr.fieldRef()->dottedField());
@@ -896,7 +898,7 @@ bool hasPredicateOnPathsHelper(const MatchExpression& expr,
 
     if (expr.getCategory() == MatchExpression::MatchCategory::kLeaf && fullPath) {
         return ((expr.matchType() == searchType) &&
-                containsDependencyHelper<StringData>({*fullPath}, paths));
+                containsDependencyHelper<std::string_view>({*fullPath}, paths));
     }
     for (size_t i = 0; i < expr.numChildren(); i++) {
         MatchExpression* child = expr.getChild(i);
@@ -1101,7 +1103,7 @@ bool hasOnlyRenameableMatchExpressionChildrenImpl(E&& expr,
                             checked_cast<MaybeMutablePtr<mutating, ExprMatchExpression>>(&expr);
                         if (renames.size() > 0 && exprExpr->hasRenameablePath(renames)) {
                             // The second element is ignored for $expr.
-                            (renameables.emplace_back(exprExpr, ""_sd), ...);
+                            (renameables.emplace_back(exprExpr, ""sv), ...);
                         }
                     }
 
@@ -1119,7 +1121,7 @@ bool hasOnlyRenameableMatchExpressionChildrenImpl(E&& expr,
                     if constexpr (mutating) {
                         if (renames.size() > 0 && hasOnlyRenameableMatchExpressions) {
                             // The second element is ignored for $internalSchemaCond.
-                            (renameables.emplace_back(condExpr, ""_sd), ...);
+                            (renameables.emplace_back(condExpr, ""sv), ...);
                         }
                     }
                     return hasOnlyRenameableMatchExpressions;
@@ -1369,7 +1371,7 @@ bool isIndependentOfImpl(E&& expr,
     } else {
         // All paths must diverge on the first component.
         OrderedPathSet truncated;
-        for (StringData path : pathSet) {
+        for (std::string_view path : pathSet) {
             if (size_t dotPos = path.find('.'); dotPos != std::string::npos) {
                 path = path.substr(0, dotPos);
             }
@@ -1661,7 +1663,7 @@ std::unique_ptr<MatchExpression> assumeImpreciseInternalExprNodesReturnTrue(
     }
 }
 
-bool isPathPrefixOf(StringData first, StringData second) {
+bool isPathPrefixOf(std::string_view first, std::string_view second) {
     if (first.size() >= second.size()) {
         return false;
     }

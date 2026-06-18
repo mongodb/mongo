@@ -40,6 +40,8 @@
 #include "mongo/db/query/util/scoped_timer_metric.h"
 #include "mongo/db/stats/counters.h"
 
+#include <string_view>
+
 namespace mongo {
 
 using ExecTimeDuration = Microseconds;
@@ -80,7 +82,7 @@ REGISTER_AGG_STAGE_MAPPING(extensionStage,
                            DocumentSourceExtensionOptimizable::id,
                            documentSourceExtensionToStageFn);
 
-ExtensionStage::ExtensionStage(StringData name,
+ExtensionStage::ExtensionStage(std::string_view name,
                                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                extension::ExecAggStageHandle execAggStageHandle)
     : Stage(name, pExpCtx),

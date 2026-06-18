@@ -45,6 +45,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -60,7 +61,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListClusterCatalog);
  */
 namespace DocumentSourceListClusterCatalog {
 
-static constexpr StringData kStageName = "$listClusterCatalog"_sd;
+static constexpr std::string_view kStageName = "$listClusterCatalog"_sd;
 
 class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
 public:

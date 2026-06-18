@@ -30,7 +30,6 @@
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -52,18 +51,20 @@
 #include <iterator>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using timeseries::BucketSpec;
 using timeseries::BucketUnpacker;
 
-constexpr auto kUserDefinedTimeName = "time"_sd;
-constexpr auto kUserDefinedMetaName = "myMeta"_sd;
+constexpr auto kUserDefinedTimeName = "time"sv;
+constexpr auto kUserDefinedMetaName = "myMeta"sv;
 
 /**
  * A fixture to test the BucketUnpacker
@@ -112,24 +113,24 @@ public:
         ASSERT_BSONOBJ_EQ(unpacker.getNextBson(), expected);
     }
 
-    std::pair<BSONObj, StringData> buildUncompressedBucketForMeasurementCount(int num) {
+    std::pair<BSONObj, std::string_view> buildUncompressedBucketForMeasurementCount(int num) {
         BSONObjBuilder root;
         {
-            BSONObjBuilder builder(root.subobjStart("control"_sd));
-            builder.append("version"_sd, timeseries::kTimeseriesControlUncompressedVersion);
+            BSONObjBuilder builder(root.subobjStart("control"sv));
+            builder.append("version"sv, timeseries::kTimeseriesControlUncompressedVersion);
         }
         {
-            BSONObjBuilder data(root.subobjStart("data"_sd));
+            BSONObjBuilder data(root.subobjStart("data"sv));
             {
                 DecimalCounter<uint32_t> fieldNameCounter;
-                BSONObjBuilder builder(data.subobjStart("time"_sd));
+                BSONObjBuilder builder(data.subobjStart("time"sv));
                 for (int i = 0; i < num; ++i, ++fieldNameCounter) {
                     builder.append(fieldNameCounter, Date_t::now());
                 }
             }
         }
         BSONObj obj = root.obj();
-        return {obj, "time"_sd};
+        return {obj, "time"sv};
     }
 
     // Modifies the 'control.count' field for a v2 compressed bucket. Zero delta removes the
@@ -137,21 +138,21 @@ public:
     BSONObj modifyCompressedBucketElementCount(BSONObj compressedBucket, int delta) {
         BSONObjBuilder root;
         for (auto&& elem : compressedBucket) {
-            if (elem.fieldNameStringData() != "control"_sd) {
+            if (elem.fieldNameStringData() != "control"sv) {
                 root.append(elem);
                 continue;
             }
 
-            BSONObjBuilder controlBuilder(root.subobjStart("control"_sd));
+            BSONObjBuilder controlBuilder(root.subobjStart("control"sv));
             for (auto&& controlElem : elem.Obj()) {
-                if (controlElem.fieldNameStringData() != "count"_sd) {
+                if (controlElem.fieldNameStringData() != "count"sv) {
                     controlBuilder.append(controlElem);
                     continue;
                 }
 
                 if (delta != 0) {
                     int count = controlElem.Number();
-                    controlBuilder.append("count"_sd, count + delta);
+                    controlBuilder.append("count"sv, count + delta);
                 }
             }
         }
@@ -161,15 +162,15 @@ public:
     // Modifies the 'data.<fieldName>' field for a v2 compressed bucket. Rebuilds the compressed
     // column with the last element removed.
     BSONObj modifyCompressedBucketRemoveLastInField(BSONObj compressedBucket,
-                                                    StringData fieldName) {
+                                                    std::string_view fieldName) {
         BSONObjBuilder root;
         for (auto&& elem : compressedBucket) {
-            if (elem.fieldNameStringData() != "data"_sd) {
+            if (elem.fieldNameStringData() != "data"sv) {
                 root.append(elem);
                 continue;
             }
 
-            BSONObjBuilder dataBuilder(root.subobjStart("data"_sd));
+            BSONObjBuilder dataBuilder(root.subobjStart("data"sv));
             for (auto&& dataElem : elem.Obj()) {
                 if (dataElem.fieldNameStringData() != fieldName) {
                     dataBuilder.append(dataElem);
@@ -247,7 +248,7 @@ TEST_F(BucketUnpackerTest, ExcludeASingleField) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, EmptyIncludeGetsEmptyMeasurements) {
@@ -273,7 +274,7 @@ TEST_F(BucketUnpackerTest, EmptyIncludeGetsEmptyMeasurements) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, EmptyExcludeMaterializesAllFields) {
@@ -302,7 +303,7 @@ TEST_F(BucketUnpackerTest, EmptyExcludeMaterializesAllFields) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther) {
@@ -330,7 +331,7 @@ TEST_F(BucketUnpackerTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther)
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, UnpackBasicIncludeWithDollarPrefix) {
@@ -360,7 +361,7 @@ TEST_F(BucketUnpackerTest, UnpackBasicIncludeWithDollarPrefix) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, BucketsWithMetadataOnly) {
@@ -385,7 +386,7 @@ TEST_F(BucketUnpackerTest, BucketsWithMetadataOnly) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, UnorderedRowKeysDoesntAffectMaterialization) {
@@ -444,7 +445,7 @@ TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadata) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadataUnorderedKeys) {
@@ -500,7 +501,7 @@ TEST_F(BucketUnpackerTest, ExcludedMetaFieldDoesntMaterializeMetadataWhenBucketH
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUndefinedMeta) {
@@ -519,7 +520,7 @@ TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUndefinedMeta) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUnexpectedMeta) {
@@ -539,7 +540,7 @@ TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUnexpectedMeta) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, NullMetaInBucketMaterializesAsNull) {
@@ -567,7 +568,7 @@ TEST_F(BucketUnpackerTest, NullMetaInBucketMaterializesAsNull) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, GetNextHandlesMissingMetaInBucket) {
@@ -599,7 +600,7 @@ TEST_F(BucketUnpackerTest, GetNextHandlesMissingMetaInBucket) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
+    test(*timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, EmptyDataRegionInBucketIsTolerated) {
@@ -709,7 +710,7 @@ TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithInclusiveProje
                                        std::string{kUserDefinedMetaName});
 
     // Add fields to '_computedMetaProjFields'.
-    unpacker.addComputedMetaProjFields({"hello"_sd, "bye"_sd});
+    unpacker.addComputedMetaProjFields({"hello"sv, "bye"sv});
     ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("hello"));
     ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("bye"));
 
@@ -742,7 +743,7 @@ TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithExclusiveProje
                                        std::string{kUserDefinedMetaName});
 
     // Add fields to '_computedMetaProjFields'.
-    unpacker.addComputedMetaProjFields({"hello"_sd, "bye"_sd});
+    unpacker.addComputedMetaProjFields({"hello"sv, "bye"sv});
     ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("hello"));
     ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("bye"));
 
@@ -972,7 +973,7 @@ TEST_F(BucketUnpackerTest, ExtractSingleMeasurementV2ExcludeTimeField) {
 
     // Compress to a V2 bucket.
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
     ASSERT(compressedBucket);
 
     // Inclusion projection that omits the time field.
@@ -1010,7 +1011,7 @@ TEST_F(BucketUnpackerTest, SimpleGetNextBson) {
 
     // The compressed bucket is now a v2 bucket.
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
 
     auto bson0 = fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}");
     auto bson1 = fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}");
@@ -1075,7 +1076,7 @@ DEATH_TEST_REGEX_F(BucketUnpackerTestDeathTest,
         "a:[1]}}");
 
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
 
     auto unpacker = makeBucketUnpacker(std::move(fields),
                                        BucketSpec::Behavior::kInclude,
@@ -1103,7 +1104,7 @@ DEATH_TEST_REGEX_F(BucketUnpackerTestDeathTest,
         "a:[1]}}");
 
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
 
     auto unpacker = makeBucketUnpacker(std::move(fields),
                                        BucketSpec::Behavior::kInclude,
@@ -1128,7 +1129,7 @@ DEATH_TEST_REGEX_F(BucketUnpackerTestDeathTest,
         "a:[1]}}");
 
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
 
     auto unpacker = makeBucketUnpacker(std::move(fields),
                                        BucketSpec::Behavior::kInclude,
@@ -1209,7 +1210,7 @@ TEST_F(BucketUnpackerTest, GetNextWithMetadataFields) {
 
     BucketUnpacker unpacker{std::move(spec)};
 
-    unpacker.addComputedMetaProjFields({"hello"_sd});
+    unpacker.addComputedMetaProjFields({"hello"sv});
     unpacker.setIncludeMaxTimeAsMetadata();
     unpacker.setIncludeMinTimeAsMetadata();
 
@@ -1238,7 +1239,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountLess) {
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
     // Reduce the count by one to be 1.
     auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, -1);
 
@@ -1274,7 +1275,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountMore) {
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
     // Increase the count by one to be 3.
     auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, 1);
 
@@ -1310,7 +1311,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountMissing) {
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
     // Remove the count field
     auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, 0);
 
@@ -1347,10 +1348,10 @@ TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchDataField) {
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
     // Remove an element in the "a" field.
     auto modifiedCompressedBucket =
-        modifyCompressedBucketRemoveLastInField(*compressedBucket, "a"_sd);
+        modifyCompressedBucketRemoveLastInField(*compressedBucket, "a"sv);
 
     auto unpacker = makeBucketUnpacker(std::move(fields),
                                        BucketSpec::Behavior::kInclude,
@@ -1382,10 +1383,10 @@ TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchTimeField) {
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
-        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+        timeseries::compressBucket(bucket, "time"sv, {}, false).compressedBucket;
     // Remove an element in the time field
     auto modifiedCompressedBucket =
-        modifyCompressedBucketRemoveLastInField(*compressedBucket, "time"_sd);
+        modifyCompressedBucketRemoveLastInField(*compressedBucket, "time"sv);
 
     auto unpacker = makeBucketUnpacker(std::move(fields),
                                        BucketSpec::Behavior::kInclude,

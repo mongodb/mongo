@@ -36,6 +36,7 @@
 #include "mongo/util/mock_periodic_runner.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <thread>
 
 namespace mongo::workload_simulation {
@@ -47,7 +48,7 @@ namespace mongo::workload_simulation {
  */
 class ThroughputProbing : public Simulation {
 public:
-    ThroughputProbing(StringData workloadName);
+    ThroughputProbing(std::string_view workloadName);
 
     void setup() override;
     void teardown() override;

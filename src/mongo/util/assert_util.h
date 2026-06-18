@@ -34,7 +34,6 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/source_location.h"
@@ -50,6 +49,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
@@ -94,11 +94,11 @@ public:
         return reason().c_str();
     }
 
-    virtual void addContext(StringData context) {
+    virtual void addContext(std::string_view context) {
         _status.addContext(context);
     }
 
-    Status toStatus(StringData context) const {
+    Status toStatus(std::string_view context) const {
         return _status.withContext(context);
     }
     const Status& toStatus() const {
@@ -385,7 +385,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T check(
 }
 
 /** Reject anything stringlike from being used as a bool cond by mistake. */
-template <typename T, std::enable_if_t<std::is_convertible_v<T, StringData>, int> = 0>
+template <typename T, std::enable_if_t<std::is_convertible_v<T, std::string_view>, int> = 0>
 void check(MsgId msgid, T&& cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) = delete;
 
 MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void checkNoTrace(
@@ -396,7 +396,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void checkNoTrace(
 }
 
 /** Reject anything stringlike from being used as a bool cond by mistake. */
-template <typename T, std::enable_if_t<std::is_convertible_v<T, StringData>, int> = 0>
+template <typename T, std::enable_if_t<std::is_convertible_v<T, std::string_view>, int> = 0>
 void checkNoTrace(MsgId msgid, T&& cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) = delete;
 
 MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void checkNoTrace(
@@ -876,7 +876,7 @@ public:
     struct Rec {
         virtual ~Rec() = default;
         virtual std::string toString() const = 0;
-        virtual StringData label() const = 0;
+        virtual std::string_view label() const = 0;
     };
 
     ScopedDebugInfoStack() {
@@ -964,10 +964,10 @@ inline ScopedDebugInfoStack& scopedDebugInfoStack() {
 template <typename T>
 class ScopedDebugInfo {
 public:
-    ScopedDebugInfo(StringData label, T v)
+    ScopedDebugInfo(std::string_view label, T v)
         : ScopedDebugInfo{label, std::move(v), _defaultStack()} {}
 
-    ScopedDebugInfo(StringData label, T v, error_details::ScopedDebugInfoStack* stack)
+    ScopedDebugInfo(std::string_view label, T v, error_details::ScopedDebugInfoStack* stack)
         : label(label), v(std::move(v)), stack(stack) {
         if (stack) {
             stack->push(&rec);
@@ -990,7 +990,7 @@ private:
         std::string toString() const override {
             return fmt::format("{}: {}", owner->label, owner->v);
         }
-        StringData label() const override {
+        std::string_view label() const override {
             return owner->label;
         }
         const ScopedDebugInfo* owner;
@@ -1002,14 +1002,14 @@ private:
         return &error_details::scopedDebugInfoStack();
     }
 
-    StringData label;
+    std::string_view label;
     T v;
     error_details::ScopedDebugInfoStack* stack;
     ThisRec rec{this};
 };
 
 /** Convert string-likes, exceptions, and Status to formatted "caused by" strings. */
-std::string causedBy(StringData e);
+std::string causedBy(std::string_view e);
 
 inline std::string causedBy(const std::exception& e) {
     return causedBy(e.what());

@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <span>
+#include <string_view>
 
 namespace mongo::bsoncolumn::internal {
 
@@ -103,7 +104,7 @@ private:
                                        BSONType type,
                                        int64_t value,
                                        BSONElement lastLiteral,
-                                       StringData fieldName) const;
+                                       std::string_view fieldName) const;
 
             template <class Buffer>
             void appendToBuffers(BufferVector<Buffer*>& buffers,
@@ -126,7 +127,7 @@ private:
                                        BSONType type,
                                        int128_t value,
                                        BSONElement lastLiteral,
-                                       StringData fieldName) const;
+                                       std::string_view fieldName) const;
 
             template <class Buffer>
             void appendToBuffers(BufferVector<Buffer*>& buffers,
@@ -204,7 +205,7 @@ private:
     const char* decompressFast(
         absl::flat_hash_map<const void*, BufferVector<Buffer*>>&& elemToBuffer);
 
-    void writeToElementStorage(BSONElement bsonElem, StringData fieldName);
+    void writeToElementStorage(BSONElement bsonElem, std::string_view fieldName);
 
     template <class Buffer>
     static void appendToBuffers(BufferVector<Buffer*>& buffers, BSONElement bsonElem);
@@ -273,7 +274,7 @@ const char* BlockBasedInterleavedDecompressor::decompress(
         BSONObjTraversal findScalar{
             _traverseArrays,
             _rootType,
-            [](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
+            [](std::string_view fieldName, const BSONObj& obj, BSONType type) { return true; },
             [&scalarElems](const BSONElement& elem) {
                 scalarElems.insert(elem.value());
                 // keep traversing to find every scalar field.
@@ -374,7 +375,7 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
         BSONObjTraversal trInit{
             _traverseArrays,
             _rootType,
-            [&](StringData fieldName, const BSONObj& obj, BSONType type) {
+            [&](std::string_view fieldName, const BSONObj& obj, BSONType type) {
                 if (auto it = elemToBuffer.find(obj.objdata()); it != elemToBuffer.end()) {
                     if constexpr (Buffer::kCollectsPositionInfo) {
                         for (auto&& buf : it->second) {
@@ -438,7 +439,7 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
     BSONObjTraversal trDecompress{
         _traverseArrays,
         _rootType,
-        [&](StringData fieldName, const BSONObj& obj, BSONType type) -> OptionalSOAlloc {
+        [&](std::string_view fieldName, const BSONObj& obj, BSONType type) -> OptionalSOAlloc {
             auto& buffers = posToBuffers[nodeIdx];
             ++nodeIdx;
 
@@ -944,7 +945,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
         case BSONType::string:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::
-                    decompressAllDelta<StringData, int128_t, Buffer>(
+                    decompressAllDelta<std::string_view, int128_t, Buffer>(
                         control,
                         end,
                         *buffer,
@@ -953,7 +954,8 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         state._refElem,
                         [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
                             auto string = Simple8bTypeUtil::decodeString(v);
-                            buffer.append(StringData((const char*)string.str.data(), string.size));
+                            buffer.append(
+                                std::string_view((const char*)string.str.data(), string.size));
                         },
                         finish128);
             }
@@ -998,8 +1000,8 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         state._refElem,
                         [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
                             auto string = Simple8bTypeUtil::decodeString(v);
-                            buffer.append(
-                                BSONCode(StringData((const char*)string.str.data(), string.size)));
+                            buffer.append(BSONCode(
+                                std::string_view((const char*)string.str.data(), string.size)));
                         },
                         finish128);
             }
@@ -1063,7 +1065,7 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
     BSONObjTraversal trInit{
         _traverseArrays,
         _rootType,
-        [&](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
+        [&](std::string_view fieldName, const BSONObj& obj, BSONType type) { return true; },
         [&](const BSONElement& elem) {
             if (auto it = elemToBuffer.find(elem.value()); it != elemToBuffer.end()) {
                 heap.emplace_back(scalarIdx, elem, std::move(it->second));
@@ -1192,13 +1194,13 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::appendToBuffe
     switch (type) {
         case BSONType::string: {
             auto string = Simple8bTypeUtil::decodeString(value);
-            appendEncodedToBuffers<Buffer, StringData>(
-                buffers, StringData((const char*)string.str.data(), string.size));
+            appendEncodedToBuffers<Buffer, std::string_view>(
+                buffers, std::string_view((const char*)string.str.data(), string.size));
         } break;
         case BSONType::code: {
             auto string = Simple8bTypeUtil::decodeString(value);
             appendEncodedToBuffers<Buffer, BSONCode>(
-                buffers, BSONCode(StringData((const char*)string.str.data(), string.size)));
+                buffers, BSONCode(std::string_view((const char*)string.str.data(), string.size)));
         } break;
         case BSONType::binData: {
             char data[16];

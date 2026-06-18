@@ -43,6 +43,7 @@
 
 namespace mongo {
 namespace expression_evaluation_test {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
@@ -123,7 +124,7 @@ TEST(ExpressionAllAnyElementsTest, FalseViaInt) {
 
 TEST(ExpressionAllAnyElementsTest, Null) {
     runTest(DOC("input" << DOC_ARRAY(BSONNULL) << "error"
-                        << DOC_ARRAY("$allElementsTrue"_sd << "$anyElementTrue"_sd)));
+                        << DOC_ARRAY("$allElementsTrue"sv << "$anyElementTrue"sv)));
 }
 
 }  // namespace all_any_elements
@@ -345,7 +346,7 @@ TEST(ExpressionBitNotTest, OtherNumerics) {
 
 TEST(ExpressionBitNotTest, NonNumerics) {
     ASSERT_THROWS_CODE(
-        evaluateUnregisteredExpression<ExpressionBitNot>({"hi"_sd}), AssertionException, 28765);
+        evaluateUnregisteredExpression<ExpressionBitNot>({"hi"sv}), AssertionException, 28765);
     ASSERT_THROWS_CODE(
         evaluateUnregisteredExpression<ExpressionBitNot>({true}), AssertionException, 28765);
 }

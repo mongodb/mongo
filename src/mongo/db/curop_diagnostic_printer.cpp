@@ -34,6 +34,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/redaction.h"
 
+#include <string_view>
+
 namespace mongo::diagnostic_printers {
 
 namespace {
@@ -54,7 +56,7 @@ BSONObj serializeOpDebug(OperationContext* opCtx, CurOp& curOp) {
 }
 }  // namespace
 
-boost::optional<StringData> isIneligibleForDiagnosticPrinting(OperationContext* opCtx) {
+boost::optional<std::string_view> isIneligibleForDiagnosticPrinting(OperationContext* opCtx) {
     // All operations have an OperationContext, and all OpContexts are decorated with a
     // CurOpStack. This access should always be valid while 'opCtx' is a valid pointer.
     if (!opCtx) {

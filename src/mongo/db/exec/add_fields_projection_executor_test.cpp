@@ -41,12 +41,14 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor {
 namespace {
+using namespace std::literals::string_view_literals;
 using std::vector;
 
 // These AddFieldsProjectionExecutor spec tests are a subset of the ProjectionExecutor creation
@@ -119,13 +121,13 @@ TEST(AddFieldsProjectionExecutorSpec, ThrowsOnCreationWithInvalidObjectsOrExpres
 TEST(AddFieldsProjectionExecutorSpec, EmbeddedNullBytes) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Literals with embedded nulls are allowed as values.
-    AddFieldsProjectionExecutor::create(expCtx, BSON("a" << BSON("b" << "a\0b"_sd)));
+    AddFieldsProjectionExecutor::create(expCtx, BSON("a" << BSON("b" << "a\0b"sv)));
     // Embedded nulls are not allowed in field path expressions.
-    ASSERT_THROWS(AddFieldsProjectionExecutor::create(expCtx, BSON("a" << BSON("b" << "$a\0b"_sd))),
+    ASSERT_THROWS(AddFieldsProjectionExecutor::create(expCtx, BSON("a" << BSON("b" << "$a\0b"sv))),
                   AssertionException);
     // It's not possible to construct a BSONObj with embedded nulls in field names, so such objects
     // are not possible inputs to 'AddFieldsProjectionExecutor::create()'.
-    ASSERT_THROWS(BSON("a\0b"_sd << 1), AssertionException);
+    ASSERT_THROWS(BSON("a\0b"sv << 1), AssertionException);
 }
 
 TEST(AddFieldsProjectionExecutor, DoesNotErrorOnEmptySpec) {
@@ -397,7 +399,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest,
                                  << "first"
                                  << "FIRST"));
     auto result = addition.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}}, {});
-    auto expectedResult = Document{{"first", "FIRST"_sd}, {"second", "SECOND"_sd}, {"third", 2}};
+    auto expectedResult = Document{{"first", "FIRST"sv}, {"second", "SECOND"sv}, {"third", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -412,8 +414,8 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AddsNewFieldsAfterExistingFieldsI
     auto expectedResult = Document{{"first", 0},
                                    {"second", 1},
                                    {"third", 2},
-                                   {"firstComputed", "FIRST"_sd},
-                                   {"secondComputed", "SECOND"_sd}};
+                                   {"firstComputed", "FIRST"sv},
+                                   {"secondComputed", "SECOND"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -427,8 +429,8 @@ TEST(AddFieldsProjectionExecutorExecutionTest,
                                         << "second"
                                         << "SECOND"));
     auto result = addition.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}}, {});
-    auto expectedResult = Document{
-        {"first", 0}, {"second", "SECOND"_sd}, {"third", 2}, {"firstComputed", "FIRST"_sd}};
+    auto expectedResult =
+        Document{{"first", 0}, {"second", "SECOND"sv}, {"third", 2}, {"firstComputed", "FIRST"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -438,12 +440,12 @@ TEST(AddFieldsProjectionExecutorExecutionTest, IdFieldIsKeptInOrderItAppearsInIn
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddFieldsProjectionExecutor addition(expCtx);
     addition.parse(BSON("newField" << "computedVal"));
-    auto result = addition.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}}, {});
-    auto expectedResult = Document{{"_id", "ID"_sd}, {"a", 1}, {"newField", "computedVal"_sd}};
+    auto result = addition.applyProjection(Document{{"_id", "ID"sv}, {"a", 1}}, {});
+    auto expectedResult = Document{{"_id", "ID"sv}, {"a", 1}, {"newField", "computedVal"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
-    result = addition.applyProjection(Document{{"a", 1}, {"_id", "ID"_sd}}, {});
-    expectedResult = Document{{"a", 1}, {"_id", "ID"_sd}, {"newField", "computedVal"_sd}};
+    result = addition.applyProjection(Document{{"a", 1}, {"_id", "ID"sv}}, {});
+    expectedResult = Document{{"a", 1}, {"_id", "ID"sv}, {"newField", "computedVal"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -452,16 +454,16 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ShouldReplaceIdWithComputedId) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddFieldsProjectionExecutor addition(expCtx);
     addition.parse(BSON("_id" << "newId"));
-    auto result = addition.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}}, {});
-    auto expectedResult = Document{{"_id", "newId"_sd}, {"a", 1}};
+    auto result = addition.applyProjection(Document{{"_id", "ID"sv}, {"a", 1}}, {});
+    auto expectedResult = Document{{"_id", "newId"sv}, {"a", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
-    result = addition.applyProjection(Document{{"a", 1}, {"_id", "ID"_sd}}, {});
-    expectedResult = Document{{"a", 1}, {"_id", "newId"_sd}};
+    result = addition.applyProjection(Document{{"a", 1}, {"_id", "ID"sv}}, {});
+    expectedResult = Document{{"a", 1}, {"_id", "newId"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     result = addition.applyProjection(Document{{"a", 1}}, {});
-    expectedResult = Document{{"a", 1}, {"_id", "newId"_sd}};
+    expectedResult = Document{{"a", 1}, {"_id", "newId"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -509,7 +511,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, CreatesSubDocIfDottedAddedFieldDo
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should replace the second part of the path if that part already exists.
-    result = addition.applyProjection(Document{{"sub", "notADocument"_sd}}, {});
+    result = addition.applyProjection(Document{{"sub", "notADocument"sv}}, {});
     expectedResult = Document{{"sub", Document{{"target", true}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -550,11 +552,11 @@ TEST(AddFieldsProjectionExecutorExecutionTest, CreatesNestedSubDocumentsAllTheWa
     // Should add the path if it doesn't exist.
     auto result = addition.applyProjection(Document{}, {});
     auto expectedResult =
-        Document{{"a", Document{{"b", Document{{"c", Document{{"d", "computedVal"_sd}}}}}}}};
+        Document{{"a", Document{{"b", Document{{"c", Document{{"d", "computedVal"sv}}}}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should replace non-documents with documents.
-    result = addition.applyProjection(Document{{"a", Document{{"b", "other"_sd}}}}, {});
+    result = addition.applyProjection(Document{{"a", Document{{"b", "other"sv}}}}, {});
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -565,7 +567,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AddsSubFieldsOfId) {
     addition.parse(BSON("_id.X" << true << "_id.Z"
                                 << "NEW"));
     auto result = addition.applyProjection(Document{{"_id", Document{{"X", 1}, {"Y", 2}}}}, {});
-    auto expectedResult = Document{{"_id", Document{{"X", true}, {"Y", 2}, {"Z", "NEW"_sd}}}};
+    auto expectedResult = Document{{"_id", Document{{"X", true}, {"Y", 2}, {"Z", "NEW"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -587,19 +589,18 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ShouldAllowMixedNestedAndDottedFi
                                           << "Z")));
     auto result = addition.applyProjection(
         Document{
-            {"a",
-             Document{{"b", "b"_sd}, {"c", "c"_sd}, {"d", "d"_sd}, {"e", "e"_sd}, {"f", "f"_sd}}}},
+            {"a", Document{{"b", "b"sv}, {"c", "c"sv}, {"d", "d"sv}, {"e", "e"sv}, {"f", "f"sv}}}},
         {});
     auto expectedResult = Document{{"a",
                                     Document{{"b", true},
                                              {"c", true},
                                              {"d", true},
                                              {"e", true},
-                                             {"f", "f"_sd},
-                                             {"W", "W"_sd},
-                                             {"X", "X"_sd},
-                                             {"Y", "Y"_sd},
-                                             {"Z", "Z"_sd}}}};
+                                             {"f", "f"sv},
+                                             {"W", "W"sv},
+                                             {"X", "X"sv},
+                                             {"Y", "Y"sv},
+                                             {"Z", "Z"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -611,7 +612,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AddsNestedAddedFieldsInOrderSpeci
                               << "b.c"
                               << "SECOND"));
     auto result = addition.applyProjection(Document{}, {});
-    auto expectedResult = Document{{"b", Document{{"d", "FIRST"_sd}, {"c", "SECOND"_sd}}}};
+    auto expectedResult = Document{{"b", Document{{"d", "FIRST"sv}, {"c", "SECOND"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -643,7 +644,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ExtractComputedProjections) {
     AddFieldsProjectionExecutor addFields(expCtx);
     addFields.parse(BSON("meta1" << BSON("$toUpper" << "$myMeta.x")));
 
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [extractedAddFields, deleteFlag] =
         addFields.extractComputedProjections("myMeta", "meta", reservedNames);
 
@@ -661,7 +662,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ExtractComputedProjectionsPrefix)
     addFields.parse(BSON("meta1" << BSON("$toUpper" << "$myMeta.x") << "computed2"
                                  << BSON("$add" << BSON_ARRAY("$c" << 1))));
 
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [extractedAddFields, deleteFlag] =
         addFields.extractComputedProjections("myMeta", "meta", reservedNames);
 
@@ -680,7 +681,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, DoNotExtractComputedProjectionsSu
     addFields.parse(BSON("computed1" << BSON("$add" << BSON_ARRAY("$c" << 1)) << "meta2"
                                      << BSON("$toUpper" << "$myMeta.x")));
 
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [extractedAddFields, deleteFlag] =
         addFields.extractComputedProjections("myMeta", "meta", reservedNames);
 
@@ -698,7 +699,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, DoNotExtractComputedProjectionWit
     addFields.parse(BSON("meta1" << BSON("$toUpper" << "$myMeta.x") << "data"
                                  << BSON("$toUpper" << "$myMeta.y")));
 
-    const std::set<StringData> reservedNames{"data"};
+    const std::set<std::string_view> reservedNames{"data"};
     auto [extractedAddFields, deleteFlag] =
         addFields.extractComputedProjections("myMeta", "meta", reservedNames);
 
@@ -718,7 +719,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest,
     addFields.parse(BSON("obj" << "$myMeta"
                                << "b" << BSON("$add" << BSON_ARRAY("$obj.a" << 1))));
 
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [extractedAddFields, deleteFlag] =
         addFields.extractComputedProjections("myMeta", "meta", reservedNames);
 
@@ -738,7 +739,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest,
                              << "c.b"
                              << "$a.x"));
 
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [extractedAddFields, deleteFlag] =
         addFields.extractComputedProjections("myMeta", "meta", reservedNames);
 
@@ -754,7 +755,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ExtractComputedProjectionShouldNo
     AddFieldsProjectionExecutor addFields(expCtx);
     addFields.parse(BSON("a" << BSON("$sum" << BSON_ARRAY("$myMeta" << "$_id"))));
 
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [extractedAddFields, deleteFlag] =
         addFields.extractComputedProjections("myMeta", "meta", reservedNames);
 
@@ -772,7 +773,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ProjectionSpecNameHasOldFieldName
         fromjson("{myMeta: {$sum: ['$myMeta.first', '$myMeta.second']}, otherField: {$sum: "
                  "['$someOtherField', 1]}}"));
 
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [extractedAddFields, deleteFlag] =
         addFields.extractComputedProjections("myMeta", "meta", reservedNames);
 
@@ -791,7 +792,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest,
         "{$const: 1}]}}");
     addFields.parse(inputProjection);
 
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [extractedAddFields, deleteFlag] =
         addFields.extractComputedProjections("myMeta", "meta", reservedNames);
 

@@ -38,6 +38,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/filesystem/directory.hpp>
@@ -63,22 +64,22 @@ enum class FileNrKey {
  *
  * Returns Status errors on file reading issues.
  */
-Status parseProcStatFile(StringData filename,
-                         const std::vector<StringData>& keys,
+Status parseProcStatFile(std::string_view filename,
+                         const std::vector<std::string_view>& keys,
                          BSONObjBuilder* builder);
 
 /**
  * Read from file, and write the specified list of keys in builder.
  */
-Status parseProcMemInfoFile(StringData filename,
-                            const std::vector<StringData>& keys,
+Status parseProcMemInfoFile(std::string_view filename,
+                            const std::vector<std::string_view>& keys,
                             BSONObjBuilder* builder);
 
 /**
  * Read from file, and write the keys found in that file into builder.
  */
-Status parseProcNetstatFile(const std::vector<StringData>& keys,
-                            StringData filename,
+Status parseProcNetstatFile(const std::vector<std::string_view>& keys,
+                            std::string_view filename,
                             BSONObjBuilder* builder);
 
 /**
@@ -86,48 +87,50 @@ Status parseProcNetstatFile(const std::vector<StringData>& keys,
  * See the above parseProcSockStats for details on the arguments and format
  * of the BSONObj written into builder.
  */
-Status parseProcSockstatFile(const std::map<StringData, std::set<StringData>>& keys,
-                             StringData filename,
+Status parseProcSockstatFile(const std::map<std::string_view, std::set<std::string_view>>& keys,
+                             std::string_view filename,
                              BSONObjBuilder* builder);
 
 /**
  * Read from file, and write the specified list of disks in builder.
  */
-Status parseProcDiskStatsFile(StringData filename,
-                              const std::vector<StringData>& disks,
+Status parseProcDiskStatsFile(std::string_view filename,
+                              const std::vector<std::string_view>& disks,
                               BSONObjBuilder* builder);
 
 /**
  * Read from file, and write the used/free space data for available mounts.
  */
-Status parseProcSelfMountStatsFile(StringData filename, BSONObjBuilder* builder);
+Status parseProcSelfMountStatsFile(std::string_view filename, BSONObjBuilder* builder);
 
 /**
  * Get a vector of disks to monitor by enumerating the specified directory.
  *
  * If the directory does not exist, or otherwise permission is denied, returns an empty vector.
  */
-std::vector<std::string> findPhysicalDisks(StringData directory);
+std::vector<std::string> findPhysicalDisks(std::string_view directory);
 
 /**
  * Read from file, and write the specified list of keys in builder.
  */
-Status parseProcVMStatFile(StringData filename,
-                           const std::vector<StringData>& keys,
+Status parseProcVMStatFile(std::string_view filename,
+                           const std::vector<std::string_view>& keys,
                            BSONObjBuilder* builder);
 
-static const StringData kFileHandlesInUseKey = "sys_file_handles_in_use"_sd;
-static const StringData kMaxFileHandlesKey = "sys_max_file_handles"_sd;
+static const std::string_view kFileHandlesInUseKey = "sys_file_handles_in_use"_sd;
+static const std::string_view kMaxFileHandlesKey = "sys_max_file_handles"_sd;
 
 /**
  * Read from file, and write the specified keys in builder.
  */
-Status parseProcSysFsFileNrFile(StringData filename, FileNrKey key, BSONObjBuilder* builder);
+Status parseProcSysFsFileNrFile(std::string_view filename, FileNrKey key, BSONObjBuilder* builder);
 
 /**
  * Read from file, and write the specified keys in builder.
  */
-Status parseProcPressureFile(StringData key, StringData filename, BSONObjBuilder* builder);
+Status parseProcPressureFile(std::string_view key,
+                             std::string_view filename,
+                             BSONObjBuilder* builder);
 
 /**
  * Procfs files such as the files parsed by this component should be just a small to moderate amount
@@ -154,8 +157,8 @@ namespace MONGO_MOD_FILE_PRIVATE detail {
  * ticksPerSecond - USER_HZ value
  * builder - BSON output
  */
-Status parseProcStat(const std::vector<StringData>& keys,
-                     StringData data,
+Status parseProcStat(const std::vector<std::string_view>& keys,
+                     std::string_view data,
                      int64_t ticksPerSecond,
                      BSONObjBuilder* builder);
 
@@ -166,8 +169,8 @@ Status parseProcStat(const std::vector<StringData>& keys,
  * data - string to parsee
  * builder - BSON output
  */
-Status parseProcMemInfo(const std::vector<StringData>& keys,
-                        StringData data,
+Status parseProcMemInfo(const std::vector<std::string_view>& keys,
+                        std::string_view data,
                         BSONObjBuilder* builder);
 
 /**
@@ -177,8 +180,8 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
  * data - string to parse
  * builder - BSON output
  */
-Status parseProcNetstat(const std::vector<StringData>& keys,
-                        StringData data,
+Status parseProcNetstat(const std::vector<std::string_view>& keys,
+                        std::string_view data,
                         BSONObjBuilder* builder);
 
 /**
@@ -212,8 +215,8 @@ Status parseProcNetstat(const std::vector<StringData>& keys,
  *        }
  *    }
  */
-Status parseProcSockstat(const std::map<StringData, std::set<StringData>>& keys,
-                         StringData data,
+Status parseProcSockstat(const std::map<std::string_view, std::set<std::string_view>>& keys,
+                         std::string_view data,
                          BSONObjBuilder* builder);
 
 /**
@@ -227,8 +230,8 @@ Status parseProcSockstat(const std::map<StringData, std::set<StringData>>& keys,
  * data - string to parsee
  * builder - BSON output
  */
-Status parseProcDiskStats(const std::vector<StringData>& disks,
-                          StringData data,
+Status parseProcDiskStats(const std::vector<std::string_view>& disks,
+                          std::string_view data,
                           BSONObjBuilder* builder);
 
 /**
@@ -240,7 +243,7 @@ Status parseProcDiskStats(const std::vector<StringData>& disks,
  * argument to return any errors. Disk space information is returned
  */
 Status parseProcSelfMountStatsImpl(
-    StringData data,
+    std::string_view data,
     BSONObjBuilder* builder,
     std::function<boost::filesystem::space_info(const boost::filesystem::path&,
                                                 boost::system::error_code&)> getSpace);
@@ -255,7 +258,7 @@ Status parseProcSelfMountStatsImpl(
  * data - string to parse
  * builder - BSON output
  */
-Status parseProcSysFsFileNr(FileNrKey key, StringData data, BSONObjBuilder* builder);
+Status parseProcSysFsFileNr(FileNrKey key, std::string_view data, BSONObjBuilder* builder);
 
 /**
  * Read a string matching /proc/vmstat format, and write the specified list of keys in builder.
@@ -264,12 +267,12 @@ Status parseProcSysFsFileNr(FileNrKey key, StringData data, BSONObjBuilder* buil
  * data - string to parsee
  * builder - BSON output
  */
-Status parseProcVMStat(const std::vector<StringData>& keys,
-                       StringData data,
+Status parseProcVMStat(const std::vector<std::string_view>& keys,
+                       std::string_view data,
                        BSONObjBuilder* builder);
 
-static const StringData kPressureSomeTime = "some"_sd;
-static const StringData kPressureFullTime = "full"_sd;
+static const std::string_view kPressureSomeTime = "some"_sd;
+static const std::string_view kPressureFullTime = "full"_sd;
 
 /**
  * Read a string matching /proc/pressure/<cpu|io|memory> format and write the specified keys in
@@ -279,7 +282,7 @@ static const StringData kPressureFullTime = "full"_sd;
  * data - string to parsee
  * builder - BSON output
  */
-Status parseProcPressure(StringData data, BSONObjBuilder* builder);
+Status parseProcPressure(std::string_view data, BSONObjBuilder* builder);
 
 }  // namespace MONGO_MOD_FILE_PRIVATE detail
 

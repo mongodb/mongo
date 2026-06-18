@@ -43,6 +43,7 @@
 #include "mongo/util/modules.h"
 
 #include <concepts>
+#include <string_view>
 
 #include <boost/container/small_vector.hpp>
 
@@ -53,8 +54,12 @@ namespace mongo::bsoncolumn {
  * BSONColumn decompression.
  */
 template <class T>
-concept Appendable MONGO_MOD_PUBLIC = requires(
-    T& t, StringData strVal, BSONBinData binVal, BSONCode codeVal, BSONElement bsonVal, int32_t n) {
+concept Appendable MONGO_MOD_PUBLIC = requires(T& t,
+                                               std::string_view strVal,
+                                               BSONBinData binVal,
+                                               BSONCode codeVal,
+                                               BSONElement bsonVal,
+                                               int32_t n) {
     t.append(true);
     t.append((int32_t)1);
     t.append((int64_t)1);
@@ -79,7 +84,7 @@ concept Appendable MONGO_MOD_PUBLIC = requires(
     t.template append<Timestamp>(bsonVal);
     t.template append<Date_t>(bsonVal);
     t.template append<OID>(bsonVal);
-    t.template append<StringData>(bsonVal);
+    t.template append<std::string_view>(bsonVal);
     t.template append<BSONBinData>(bsonVal);
     t.template append<BSONCode>(bsonVal);
     t.template append<BSONElement>(bsonVal);
@@ -104,7 +109,7 @@ concept Appendable MONGO_MOD_PUBLIC = requires(
  * inlineable, and avoid branching and memory allocations when possible.
  *
  * The data types passed to the materialize() methods could be referencing memory on the stack
- * (e.g., the pointer in a StringData instance) and so implementors should assume this data is
+ * (e.g., the pointer in a std::string_view instance) and so implementors should assume this data is
  * ephemeral. The provided BSONElementStorage can be used to allocate memory with the lifetime of
  * the BSONColumn instance.
  *
@@ -119,7 +124,7 @@ concept Appendable MONGO_MOD_PUBLIC = requires(
 template <class T>
 concept Materializer MONGO_MOD_PUBLIC = requires(T& t,
                                                  BSONElementStorage& alloc,
-                                                 StringData strVal,
+                                                 std::string_view strVal,
                                                  BSONBinData binVal,
                                                  BSONCode codeVal,
                                                  BSONElement bsonVal) {
@@ -147,7 +152,9 @@ concept Materializer MONGO_MOD_PUBLIC = requires(T& t,
     { T::template materialize<Date_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
     { T::template materialize<OID>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
 
-    { T::template materialize<StringData>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    {
+        T::template materialize<std::string_view>(alloc, bsonVal)
+    } -> std::same_as<typename T::Element>;
     { T::template materialize<BSONBinData>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
     { T::template materialize<BSONCode>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
 
@@ -751,7 +758,7 @@ public:
     static BSONElement materialize(BSONElementStorage& allocator, const Decimal128& val);
     static BSONElement materialize(BSONElementStorage& allocator, const Date_t& val);
     static BSONElement materialize(BSONElementStorage& allocator, const Timestamp& val);
-    static BSONElement materialize(BSONElementStorage& allocator, StringData val);
+    static BSONElement materialize(BSONElementStorage& allocator, std::string_view val);
     static BSONElement materialize(BSONElementStorage& allocator, const BSONBinData& val);
     static BSONElement materialize(BSONElementStorage& allocator, const BSONCode& val);
     static BSONElement materialize(BSONElementStorage& allocator, const OID& val);
@@ -769,7 +776,7 @@ public:
     static T get(const Element& elem) {
         if constexpr (std::is_same_v<T, double>) {
             return BSONElementValue(elem.value()).Double();
-        } else if constexpr (std::is_same_v<T, StringData>) {
+        } else if constexpr (std::is_same_v<T, std::string_view>) {
             return BSONElementValue(elem.value()).String();
         } else if constexpr (std::is_same_v<T, BSONObj>) {
             return BSONElementValue(elem.value()).Obj();
@@ -835,7 +842,7 @@ private:
      */
     static BSONElement writeStringData(BSONElementStorage& allocator,
                                        BSONType bsonType,
-                                       StringData val);
+                                       std::string_view val);
 };
 
 template <>
@@ -893,7 +900,7 @@ inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<Tim
 }
 
 template <>
-inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<StringData>(
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<std::string_view>(
     BSONElementStorage& allocator, BSONElement val) {
     dassert(val.type() == BSONType::string, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.valueStringData());

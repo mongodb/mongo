@@ -31,10 +31,12 @@
 
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 
+#include <string_view>
+
 namespace mongo::query_settings::index_hints {
 
 void serialize(const IndexHintSpecs& indexHints,
-               StringData fieldName,
+               std::string_view fieldName,
                BSONObjBuilder* builder,
                const SerializationContext& context) {
     BSONArrayBuilder arrayBuilder(builder->subarrayStart(fieldName));

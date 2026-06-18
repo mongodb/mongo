@@ -36,6 +36,8 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalConvertBucketIndexStatsToStageFn(
@@ -118,7 +120,7 @@ BSONObj makeTimeseriesIndexStats(const TimeseriesIndexConversionOptions& bucketS
 }  // namespace
 
 InternalConvertBucketIndexStatsStage::InternalConvertBucketIndexStatsStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesIndexConversionOptions& timeseriesOptions)
     : Stage(stageName, expCtx), _timeseriesOptions(timeseriesOptions) {}

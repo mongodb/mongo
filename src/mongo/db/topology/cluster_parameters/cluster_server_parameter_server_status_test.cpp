@@ -32,6 +32,8 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_test_gen.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
@@ -41,7 +43,10 @@ using TestParameter = ClusterParameterWithStorage<ClusterServerParameterTest>;
 using ParameterStorage = TenantIdMap<ClusterServerParameterTest>;
 
 struct StorageAndParameter {
-    StorageAndParameter(StringData name, LogicalTime time, int intValue, StringData stringValue)
+    StorageAndParameter(std::string_view name,
+                        LogicalTime time,
+                        int intValue,
+                        std::string_view stringValue)
         : parameter(std::make_unique<TestParameter>(name, storage)) {
         ClusterServerParameter base;
         base.set_id(name);

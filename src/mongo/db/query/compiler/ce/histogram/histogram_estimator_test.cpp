@@ -34,6 +34,7 @@
 
 namespace mongo::ce {
 namespace {
+using namespace std::literals::string_view_literals;
 
 namespace value = sbe::value;
 
@@ -761,7 +762,7 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
     const auto ceHist = CEHistogram::make(
         hist, stats::TypeCounts{{StringSmall, strCnt.toDouble()}}, strCnt.toDouble());
 
-    auto [tagLow, valLow] = value::makeNewString("TTV"_sd);
+    auto [tagLow, valLow] = value::makeNewString("TTV"sv);
     value::ValueGuard vgLow(tagLow, valLow);
 
     {  // {a: "TTV"}
@@ -781,7 +782,7 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
     }
 
     {  // {a: {$gte: "TTV", $lte: "YtzS"}}
-        auto [tagHigh, valHigh] = value::makeNewString("YtzS"_sd);
+        auto [tagHigh, valHigh] = value::makeNewString("YtzS"sv);
         value::ValueGuard vgHigh(tagHigh, valHigh);
         Interval interval(BSON("" << "TTV"
                                   << ""
@@ -807,7 +808,7 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
     }
 
     {  // {a: {$gte: "TTV", $lte: "VtzSlajdkajda"}} (tests for memory leaks for a large string)
-        auto [tagHigh, valHigh] = value::makeNewString("VtzSlajdkajda"_sd);
+        auto [tagHigh, valHigh] = value::makeNewString("VtzSlajdkajda"sv);
         value::ValueGuard vgHigh(tagHigh, valHigh);
         Interval interval(BSON("" << "TTV"
                                   << ""
@@ -897,7 +898,7 @@ TEST(HistogramPredicateEstimationTest, IntStrHistogramIntervalEstimation) {
     }
 
     {  // {a: "04e"}
-        auto [tag, value] = sbe::value::makeNewString("04e"_sd);
+        auto [tag, value] = sbe::value::makeNewString("04e"sv);
         sbe::value::ValueGuard vg(tag, value);
         Interval interval(BSON("" << "04e"
                                   << ""
@@ -931,8 +932,8 @@ TEST(HistogramPredicateEstimationTest, IntStrHistogramIntervalEstimation) {
     }
 
     {  // {$match: {a: {$lt: '04e'}}}
-        auto [tagLow, valLow] = sbe::value::makeNewString(""_sd);
-        auto [tagHigh, valHigh] = sbe::value::makeNewString("04e"_sd);
+        auto [tagLow, valLow] = sbe::value::makeNewString(""sv);
+        auto [tagHigh, valHigh] = sbe::value::makeNewString("04e"sv);
         sbe::value::ValueGuard vgLow(tagLow, valLow);
         sbe::value::ValueGuard vgHigh(tagHigh, valHigh);
         Interval interval(BSON("" << ""

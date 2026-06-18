@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -65,12 +64,15 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/hash/hash.h>
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+using namespace std::literals::string_view_literals;
 
 namespace mongo::query_stats {
 
@@ -838,7 +840,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     // Note that this ExpressionContext will not have the let variables defined - we expect the
     // 'makeQueryStatsKey' call to do that.
     auto opCtx = makeOperationContext();
-    auto tenantId = "010203040506070809AABBCC"_sd;
+    auto tenantId = "010203040506070809AABBCC"sv;
     auto fcr = std::make_unique<FindCommandRequest>(
         NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest(
             TenantId::parseFromString(tenantId), "testDB.testColl")));
@@ -1842,7 +1844,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
 class AggregatedMetricTest : public unittest::Test {
 public:
     template <typename T>
-    BSONObj toBSON(StringData name, const AggregatedMetric<T>& m) {
+    BSONObj toBSON(std::string_view name, const AggregatedMetric<T>& m) {
         BSONObjBuilder bob;
         m.appendTo(bob, name);
         return bob.obj();

@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -44,15 +43,17 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the cluster abortTransaction command on mongod.
  */
 struct ClusterAbortTransactionCmdD {
-    static constexpr StringData kName = "clusterAbortTransaction"_sd;
+    static constexpr std::string_view kName = "clusterAbortTransaction"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;

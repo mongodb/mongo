@@ -41,6 +41,7 @@
 #include <algorithm>
 #include <iterator>
 #include <sstream>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -56,17 +57,18 @@
 
 namespace mongo {
 namespace stacktrace_details {
+using namespace std::literals::string_view_literals;
 namespace {
 
 template <size_t base>
-StringData kDigits;
+std::string_view kDigits;
 template <>
-constexpr StringData kDigits<16> = "0123456789ABCDEF"_sd;
+constexpr std::string_view kDigits<16> = "0123456789ABCDEF"sv;
 template <>
-constexpr StringData kDigits<10> = "0123456789"_sd;
+constexpr std::string_view kDigits<10> = "0123456789"sv;
 
 template <size_t base, typename Buf>
-StringData toNumericBase(uint64_t x, Buf& buf, bool showBase) {
+std::string_view toNumericBase(uint64_t x, Buf& buf, bool showBase) {
     auto it = buf.rbegin();
     if (!x) {
         *it++ = '0';
@@ -77,26 +79,26 @@ StringData toNumericBase(uint64_t x, Buf& buf, bool showBase) {
         }
         // base is prepended only when x is nonzero (matching printf)
         if (base == 16 && showBase) {
-            static const auto kPrefix = "0x"_sd;
+            static const auto kPrefix = "0x"sv;
             it = std::reverse_copy(kPrefix.begin(), kPrefix.end(), it);
         }
     }
     size_t n = std::distance(it.base(), buf.end());
     const char* p = buf.data() + buf.size() - n;
-    return StringData(p, n);
+    return std::string_view(p, n);
 }
 
 }  // namespace
 
-StringData Dec::toDec(uint64_t x, Buf& buf) {
+std::string_view Dec::toDec(uint64_t x, Buf& buf) {
     return toNumericBase<10>(x, buf, false);
 }
 
-StringData Hex::toHex(uint64_t x, Buf& buf, bool showBase) {
+std::string_view Hex::toHex(uint64_t x, Buf& buf, bool showBase) {
     return toNumericBase<16>(x, buf, showBase);
 }
 
-uint64_t Hex::fromHex(StringData s) {
+uint64_t Hex::fromHex(std::string_view s) {
     uint64_t x = 0;
     for (char c : s) {
         char uc = ctype::toUpper(c);
@@ -130,7 +132,7 @@ void printCppTrace(StackTraceSink* sink) {
             .symbols(cpptrace::formatter::symbol_mode::pretty)
             .transform([](cpptrace::stacktrace_frame f) {
                 // Strip off bazel prefix to make filenames clickable.
-                constexpr auto prefix = "./"_sd;
+                constexpr auto prefix = "./"sv;
                 if (f.filename.starts_with(prefix)) {
                     f.filename.erase(0, prefix.size());
                 }

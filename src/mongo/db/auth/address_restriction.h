@@ -46,6 +46,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -87,7 +88,7 @@ public:
     /**
      * Construct an AddressRestriction based on a human readable subnet spec
      */
-    explicit AddressRestriction(const StringData range) : _ranges({CIDR(range)}) {}
+    explicit AddressRestriction(const std::string_view range) : _ranges({CIDR(range)}) {}
 
     /**
      * Construct an AddressRestriction based on several human readable subnet specs
@@ -207,7 +208,7 @@ public:
     }
 
     friend void appendToBson(BSONObjBuilder& bob,
-                             StringData fieldName,
+                             std::string_view fieldName,
                              const AddressRestriction& ar) {
         BSONObjBuilder sub{bob.subobjStart(fieldName)};
         ar.appendToBuilder(&sub);

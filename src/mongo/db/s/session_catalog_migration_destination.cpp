@@ -75,6 +75,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -569,7 +570,7 @@ std::string SessionCatalogMigrationDestination::getErrMsg() {
     return _errMsg;
 }
 
-void SessionCatalogMigrationDestination::_errorOccurred(StringData errMsg) {
+void SessionCatalogMigrationDestination::_errorOccurred(std::string_view errMsg) {
     LOGV2(5087102,
           "Recipient failed to copy oplog entries for retryable writes and transactions from donor",
           logAttrs(_nss),
@@ -592,7 +593,7 @@ SessionCatalogMigrationDestination::State SessionCatalogMigrationDestination::ge
     return _state;
 }
 
-void SessionCatalogMigrationDestination::forceFail(StringData errMsg) {
+void SessionCatalogMigrationDestination::forceFail(std::string_view errMsg) {
     _errorOccurred(errMsg);
 }
 

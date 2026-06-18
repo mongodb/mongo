@@ -41,7 +41,6 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -59,6 +58,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -126,7 +126,7 @@ private:
 public:
     using Map = std::map<std::string, std::unique_ptr<ServerParameter>, std::less<>>;
 
-    ServerParameter(StringData name, ServerParameterType spt);
+    ServerParameter(std::string_view name, ServerParameterType spt);
     ServerParameter(const ServerParameter& rhs);
     virtual ~ServerParameter() = default;
 
@@ -165,7 +165,7 @@ public:
 
     virtual void append(OperationContext* opCtx,
                         BSONObjBuilder* b,
-                        StringData name,
+                        std::string_view name,
                         const boost::optional<TenantId>& tenantId) = 0;
 
     virtual void appendDetails(OperationContext* opCtx,
@@ -174,7 +174,7 @@ public:
 
     virtual void appendSupportingRoundtrip(OperationContext* opCtx,
                                            BSONObjBuilder* b,
-                                           StringData name,
+                                           std::string_view name,
                                            const boost::optional<TenantId>& tenantId) {
         append(opCtx, b, name, tenantId);
     }
@@ -221,7 +221,8 @@ public:
         return set(BSON("" << newValueObj).firstElement(), tenantId);
     }
 
-    virtual Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) = 0;
+    virtual Status setFromString(std::string_view str,
+                                 const boost::optional<TenantId>& tenantId) = 0;
 
     /**
      * Simply returns the uninitialized/default-constructed LogicalTime by default.
@@ -288,7 +289,7 @@ public:
      * function does nothing. Implementations are expected to ensure
      * that such warnings are emitted only once per server parameter.
      */
-    virtual void warnIfDeprecated(StringData action);
+    virtual void warnIfDeprecated(std::string_view action);
 
     void disable(bool permanent);
 
@@ -442,7 +443,7 @@ public:
     void disableTestParameters();
 
     template <typename T = ServerParameter>
-    T* getIfExists(StringData name) const {
+    T* getIfExists(std::string_view name) const {
         const auto& it = _map.find(name);
         if (it == _map.end()) {
             return nullptr;
@@ -451,7 +452,7 @@ public:
     }
 
     template <typename T = ServerParameter>
-    T* get(StringData name) const {
+    T* get(std::string_view name) const {
         T* ret = getIfExists<T>(name);
         uassert(ErrorCodes::NoSuchKey, str::stream() << "Unknown server parameter: " << name, ret);
         return ret;
@@ -489,21 +490,21 @@ MONGO_MOD_PUB void registerServerParameter(std::unique_ptr<ServerParameter>);
  */
 class MONGO_MOD_PUB IDLServerParameterDeprecatedAlias : public ServerParameter {
 public:
-    IDLServerParameterDeprecatedAlias(StringData name, ServerParameter* sp);
+    IDLServerParameterDeprecatedAlias(std::string_view name, ServerParameter* sp);
 
     void append(OperationContext* opCtx,
                 BSONObjBuilder* b,
-                StringData name,
+                std::string_view name,
                 const boost::optional<TenantId>& tenantId) final;
     Status reset(const boost::optional<TenantId>& tenantId) final;
     Status set(const BSONElement& newValueElement, const boost::optional<TenantId>& tenantId) final;
-    Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) final;
+    Status setFromString(std::string_view str, const boost::optional<TenantId>& tenantId) final;
 
     /**
      * This function generates "deprecated" warning log message.
      * Once per server parameter.
      */
-    void warnIfDeprecated(StringData action) final;
+    void warnIfDeprecated(std::string_view action) final;
 
 private:
     std::once_flag _warnOnce;
@@ -511,7 +512,7 @@ private:
 };
 
 template <typename T>
-MONGO_MOD_PUB inline StatusWith<T> coerceFromString(StringData str) {
+MONGO_MOD_PUB inline StatusWith<T> coerceFromString(std::string_view str) {
     T value;
     Status status = NumberParser{}(str, &value);
     if (!status.isOK()) {
@@ -521,7 +522,7 @@ MONGO_MOD_PUB inline StatusWith<T> coerceFromString(StringData str) {
 }
 
 template <>
-MONGO_MOD_PUB inline StatusWith<bool> coerceFromString<bool>(StringData str) {
+MONGO_MOD_PUB inline StatusWith<bool> coerceFromString<bool>(std::string_view str) {
     if ((str == "1") || (str == "true")) {
         return true;
     }
@@ -532,13 +533,13 @@ MONGO_MOD_PUB inline StatusWith<bool> coerceFromString<bool>(StringData str) {
 }
 
 template <>
-MONGO_MOD_PUB inline StatusWith<std::string> coerceFromString<std::string>(StringData str) {
+MONGO_MOD_PUB inline StatusWith<std::string> coerceFromString<std::string>(std::string_view str) {
     return std::string{str};
 }
 
 template <>
 MONGO_MOD_PUB inline StatusWith<std::vector<std::string>>
-coerceFromString<std::vector<std::string>>(StringData str) {
+coerceFromString<std::vector<std::string>>(std::string_view str) {
     std::vector<std::string> v;
     str::splitStringDelim(std::string{str}, &v, ',');
     return v;

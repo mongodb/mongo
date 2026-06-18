@@ -71,6 +71,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -79,6 +80,8 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
+
+using namespace std::literals::string_view_literals;
 
 namespace mongo {
 namespace {
@@ -116,7 +119,7 @@ public:
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 class DocumentSourceGroupTest : public AggregationContextFixture {
 public:
-    auto makePlanCtx(StringData pipelineJson, OrderedPathSet shardKeys) {
+    auto makePlanCtx(std::string_view pipelineJson, OrderedPathSet shardKeys) {
         auto bson = fromjson(pipelineJson);
         std::vector<BSONObj> rawPipeline;
         for (const auto& element : bson) {
@@ -526,7 +529,7 @@ TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
     std::vector<AccumulationStatement> accumulationStatements;
     auto group =
         DocumentSourceGroup::create(getExpCtx(), idExpression, accumulationStatements, false);
-    auto mock = exec::agg::MockStage::createForTest({Document{{"_id"_sd, 0}}}, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest({Document{{"_id"sv, 0}}}, getExpCtx());
     auto groupStage = exec::agg::buildStageAndStitch(group, mock);
     auto next = groupStage->getNext();
     ASSERT(next.isAdvanced());
@@ -615,14 +618,14 @@ TEST_F(DocumentSourceGroupTest, CreateCorrectlyInheritsNeedsMergeValueFromExpCtx
 TEST_F(DocumentSourceGroupTest, CorrectlyReportsTriviallyReferencedExprsFromID) {
     // Verify that DocumentSourceGroupBase::getTriviallyReferencedPaths identifies paths which are
     // used directly, without further computation - "trivially" referenced.
-    const auto getTriviallyReferenced = [&](StringData idJsonStr) {
+    const auto getTriviallyReferenced = [&](std::string_view idJsonStr) {
         auto idExpr = fromjson(idJsonStr);
         auto spec = BSON("$group" << BSON("_id" << idExpr));
         auto group = boost::dynamic_pointer_cast<DocumentSourceGroup>(
             DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()));
         return group->getTriviallyReferencedPaths();
     };
-    const auto expect = [&](StringData idJsonStr, OrderedPathSet expected) {
+    const auto expect = [&](std::string_view idJsonStr, OrderedPathSet expected) {
         auto actual = getTriviallyReferenced(idJsonStr);
         ASSERT_EQ(actual, expected) << fmt::format(
             "_id:{}, [{}] != [{}]", idJsonStr, fmt::join(actual, ", "), fmt::join(expected, ", "));
@@ -711,13 +714,13 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
         // Pause between input docs so we have a chance to check memory tracking.
         auto mock = exec::agg::MockStage::createForTest(
             {
-                Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"_sd << "bar"_sd)}},
+                Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"sv << "bar"sv)}},
                 DocumentSource::GetNextResult::makePauseExecution(),
-                Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"_sd << "mongo"_sd)}},
+                Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"sv << "mongo"sv)}},
                 DocumentSource::GetNextResult::makePauseExecution(),
-                Document{{"_id", 2}, {"k", 20}, {"arr", BSON_ARRAY("bird"_sd << "elephant"_sd)}},
+                Document{{"_id", 2}, {"k", 20}, {"arr", BSON_ARRAY("bird"sv << "elephant"sv)}},
                 DocumentSource::GetNextResult::makePauseExecution(),
-                Document{{"_id", 3}, {"k", 20}, {"arr", BSON_ARRAY("dog"_sd << "giraffe"_sd)}},
+                Document{{"_id", 3}, {"k", 20}, {"arr", BSON_ARRAY("dog"sv << "giraffe"sv)}},
             },
             expCtx);
 
@@ -800,13 +803,13 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
     // Pause between input docs so we have a chance to check memory tracking.
     auto mock = exec::agg::MockStage::createForTest(
         {
-            Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"_sd << "bar"_sd)}},
+            Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"sv << "bar"sv)}},
             DocumentSource::GetNextResult::makePauseExecution(),
-            Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"_sd << "mongo"_sd)}},
+            Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"sv << "mongo"sv)}},
             DocumentSource::GetNextResult::makePauseExecution(),
-            Document{{"_id", 2}, {"k", 20}, {"arr", BSON_ARRAY("bird"_sd << "elephant"_sd)}},
+            Document{{"_id", 2}, {"k", 20}, {"arr", BSON_ARRAY("bird"sv << "elephant"sv)}},
             DocumentSource::GetNextResult::makePauseExecution(),
-            Document{{"_id", 3}, {"k", 20}, {"arr", BSON_ARRAY("dog"_sd << "giraffe"_sd)}},
+            Document{{"_id", 3}, {"k", 20}, {"arr", BSON_ARRAY("dog"sv << "giraffe"sv)}},
         },
         expCtx);
 
@@ -903,10 +906,10 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
     // Pause between input docs so we have a chance to check memory tracking.
     auto mock = exec::agg::MockStage::createForTest(
         {
-            Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"_sd << "bar"_sd)}},
-            Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"_sd << "mongo"_sd)}},
-            Document{{"_id", 2}, {"k", 20}, {"arr", BSON_ARRAY("bird"_sd << "elephant"_sd)}},
-            Document{{"_id", 3}, {"k", 20}, {"arr", BSON_ARRAY("dog"_sd << "giraffe"_sd)}},
+            Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"sv << "bar"sv)}},
+            Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"sv << "mongo"sv)}},
+            Document{{"_id", 2}, {"k", 20}, {"arr", BSON_ARRAY("bird"sv << "elephant"sv)}},
+            Document{{"_id", 3}, {"k", 20}, {"arr", BSON_ARRAY("dog"sv << "giraffe"sv)}},
         },
         expCtx);
 
@@ -986,7 +989,7 @@ public:
           _groupStageType(groupStageType) {}
 
 protected:
-    StringData getStageName() const {
+    std::string_view getStageName() const {
         switch (_groupStageType) {
             case GroupStageType::Default:
                 return DocumentSourceGroup::kStageName;
@@ -1534,20 +1537,20 @@ class GroupNullUndefinedIds : public CheckResultsBase {
 /** A complex _id expression. */
 class ComplexId : public CheckResultsBase {
     std::deque<DocumentSource::GetNextResult> inputData() override {
-        return {DOC("a" << "de"_sd
+        return {DOC("a" << "de"sv
                         << "b"
-                        << "ad"_sd
+                        << "ad"sv
                         << "c"
-                        << "beef"_sd
+                        << "beef"sv
                         << "d"
-                        << ""_sd),
-                DOC("a" << "d"_sd
+                        << ""sv),
+                DOC("a" << "d"sv
                         << "b"
-                        << "eadbe"_sd
+                        << "eadbe"sv
                         << "c"
-                        << ""_sd
+                        << ""sv
                         << "d"
-                        << "ef"_sd)};
+                        << "ef"sv)};
     }
     BSONObj groupSpec() override {
         return BSON("_id" << BSON("$concat" << BSON_ARRAY("$a" << "$b"

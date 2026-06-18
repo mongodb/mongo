@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
@@ -71,6 +70,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -174,7 +174,7 @@ public:
                         option.getDataSources().size() > 0);
             }
 
-            auto findCollNameInExternalDataSourceOption = [&](StringData collName) {
+            auto findCollNameInExternalDataSourceOption = [&](std::string_view collName) {
                 return std::find_if(externalDataSources->begin(),
                                     externalDataSources->end(),
                                     [&](const ExternalDataSourceOption& externalDataSourceOption) {

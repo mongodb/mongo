@@ -30,8 +30,10 @@
 #include "mongo/logv2/log_component.h"
 
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
 
-#include <type_traits>
+#include <ostream>
+#include <string_view>
 
 namespace mongo::logv2 {
 
@@ -39,8 +41,8 @@ namespace {
 
 struct {
     LogComponent value;
-    StringData shortName;
-    StringData logName;
+    std::string_view shortName;
+    std::string_view logName;
     LogComponent parent;
 } constexpr kTable[] = {
 #define X_(id, val, shortName, logName, parent) \
@@ -75,11 +77,11 @@ LogComponent LogComponent::parent() const {
     return kTable[_value].parent;
 }
 
-StringData LogComponent::toStringData() const {
+std::string_view LogComponent::toStringData() const {
     return kTable[_value].shortName;
 }
 
-StringData LogComponent::getNameForLog() const {
+std::string_view LogComponent::getNameForLog() const {
     return kTable[_value].logName;
 }
 
@@ -93,7 +95,7 @@ void _appendDottedName(LogComponent id, std::string* out) {
         _appendDottedName(id.parent(), out);
         out->append(".");
     }
-    StringData shortName = id.toStringData();
+    std::string_view shortName = id.toStringData();
     out->append(shortName.begin(), shortName.end());
 }
 }  // namespace

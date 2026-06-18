@@ -56,6 +56,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using ExpressionContextTest = ServiceContextTest;
 
@@ -68,7 +69,7 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
         const auto expCtx =
             ExpressionContextBuilder{}
                 .opCtx(opCtx.get())
-                .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd))
+                .ns(NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv))
                 .runtimeConstants(LegacyRuntimeConstants{Date_t::now(), {}})
                 .build();
         // LegacyRuntimeConstants is passed to the constructor of ExpressionContext and should make
@@ -81,7 +82,7 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
         auto expCtx =
             ExpressionContextBuilder{}
                 .opCtx(opCtx.get())
-                .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd))
+                .ns(NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv))
                 .runtimeConstants(LegacyRuntimeConstants{{}, Timestamp(1, 0)})
                 .build();
         // LegacyRuntimeConstants is passed to the constructor of ExpressionContext and should
@@ -98,7 +99,7 @@ TEST_F(ExpressionContextTest, ParametersCanContainExpressionsWhichAreFolded) {
     const auto expCtx =
         ExpressionContextBuilder{}
             .opCtx(opCtx.get())
-            .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd))
+            .ns(NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv))
             .letParameters(BSON("atan2" << BSON("$atan2" << BSON_ARRAY(0 << 1))))
             .build();
     ASSERT_EQUALS(
@@ -111,7 +112,7 @@ TEST_F(ExpressionContextTest, ParametersCanReferToAlreadyDefinedParameters) {
     const auto expCtx =
         mongo::ExpressionContextBuilder{}
             .opCtx(opCtx.get())
-            .ns(mongo::NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd))
+            .ns(mongo::NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv))
             .letParameters(BSON("a" << 12 << "b"
                                     << "$$a"
                                     << "c"
@@ -137,12 +138,12 @@ TEST_F(ExpressionContextTest, ParametersCanOverwriteInLeftToRightOrder) {
 TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfNonConstant) {
     auto opCtx = makeOperationContext();
     ASSERT_THROWS_CODE(
-        static_cast<void>(mongo::ExpressionContextBuilder{}
-                              .opCtx(opCtx.get())
-                              .ns(mongo::NamespaceString::createNamespaceString_forTest(
-                                  "test"_sd, "namespace"_sd))
-                              .letParameters(BSON("a" << "$b"))
-                              .build()),
+        static_cast<void>(
+            mongo::ExpressionContextBuilder{}
+                .opCtx(opCtx.get())
+                .ns(mongo::NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv))
+                .letParameters(BSON("a" << "$b"))
+                .build()),
         mongo::DBException,
         4890500);
 }
@@ -150,12 +151,12 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfNonConstant) {
 TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfUppercase) {
     auto opCtx = makeOperationContext();
     ASSERT_THROWS_CODE(
-        static_cast<void>(mongo::ExpressionContextBuilder{}
-                              .opCtx(opCtx.get())
-                              .ns(mongo::NamespaceString::createNamespaceString_forTest(
-                                  "test"_sd, "namespace"_sd))
-                              .letParameters(BSON("A" << 12))
-                              .build()),
+        static_cast<void>(
+            mongo::ExpressionContextBuilder{}
+                .opCtx(opCtx.get())
+                .ns(mongo::NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv))
+                .letParameters(BSON("A" << 12))
+                .build()),
         mongo::DBException,
         ErrorCodes::FailedToParse);
 }
@@ -194,7 +195,7 @@ TEST_F(ExpressionContextTest, CanBuildWithoutView) {
     auto expCtxWithoutView =
         mongo::ExpressionContextBuilder{}
             .opCtx(opCtx.get())
-            .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd))
+            .ns(NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv))
             .build();
 
     ASSERT_FALSE(expCtxWithoutView->getView().has_value());
@@ -203,8 +204,8 @@ TEST_F(ExpressionContextTest, CanBuildWithoutView) {
 TEST_F(ExpressionContextTest, CanBuildWithView) {
     auto opCtx = makeOperationContext();
 
-    auto viewNss = NamespaceString::createNamespaceString_forTest("test"_sd, "view"_sd);
-    auto collNss = NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd);
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test"sv, "view"sv);
+    auto collNss = NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv);
     std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
 
     auto view =
@@ -217,7 +218,7 @@ TEST_F(ExpressionContextTest, CanBuildWithView) {
 
     // expCtx namespace isn't affected by the view namespace.
     ASSERT_EQUALS(expCtxWithView->getNamespaceString(),
-                  NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd));
+                  NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv));
 
     ASSERT_TRUE(expCtxWithView->getView().has_value());
     ASSERT_EQUALS(expCtxWithView->getView()->getNamespace(), viewNss);
@@ -232,8 +233,8 @@ TEST_F(ExpressionContextTest, CanBuildWithView) {
 TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
     auto opCtx = makeOperationContext();
 
-    auto viewNss = NamespaceString::createNamespaceString_forTest("test"_sd, "view"_sd);
-    auto coll1Nss = NamespaceString::createNamespaceString_forTest("test"_sd, "coll1"_sd);
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test"sv, "view"sv);
+    auto coll1Nss = NamespaceString::createNamespaceString_forTest("test"sv, "coll1"sv);
     std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
 
     auto view =
@@ -244,7 +245,7 @@ TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
                               .view(std::move(view))
                               .build();
 
-    auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"_sd, "coll2"_sd);
+    auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"sv, "coll2"sv);
     auto expCtxCopy = makeCopyFromExpressionContext(expCtxOriginal, namespaceCopy);
 
     // expCtxCopy doesn't have a view initialized.
@@ -264,8 +265,8 @@ TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
 TEST_F(ExpressionContextTest, CopyWithInitializesViewWhenSpecified) {
     auto opCtx = makeOperationContext();
 
-    auto viewNss = NamespaceString::createNamespaceString_forTest("test"_sd, "view"_sd);
-    auto coll1Nss = NamespaceString::createNamespaceString_forTest("test"_sd, "coll1"_sd);
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test"sv, "view"sv);
+    auto coll1Nss = NamespaceString::createNamespaceString_forTest("test"sv, "coll1"sv);
     std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
 
     auto view =
@@ -276,7 +277,7 @@ TEST_F(ExpressionContextTest, CopyWithInitializesViewWhenSpecified) {
                               .view(std::move(view))
                               .build();
 
-    auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"_sd, "coll2"_sd);
+    auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"sv, "coll2"sv);
     auto viewForCopy =
         boost::make_optional(ResolvedNamespace::makeForView(viewNss, coll1Nss, viewPipeline));
     auto expCtxCopy = makeCopyFromExpressionContext(
@@ -372,14 +373,14 @@ TEST_F(ExpressionContextTest, IfrContextIsSharedWithSubPipeline) {
     auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx.get())
-                      .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd))
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
                       .ifrContext(ifrContext)
                       .build();
 
     ASSERT_EQ(ifrContext.get(), expCtx->getIfrContext().get());
 
     auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
-        expCtx, NamespaceString::createNamespaceString_forTest("test"_sd, "subColl"_sd));
+        expCtx, NamespaceString::createNamespaceString_forTest("test"sv, "subColl"sv));
 
     // Verify that 'expCtx' and 'subExpCtx' share the same IFRContext.
     ASSERT_EQ(ifrContext.get(), subExpCtx->getIfrContext().get());

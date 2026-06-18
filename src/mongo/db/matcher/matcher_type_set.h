@@ -45,13 +45,14 @@
 #include <functional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-using findBSONTypeAliasFun = std::function<boost::optional<BSONType>(StringData)>;
+using findBSONTypeAliasFun = std::function<boost::optional<BSONType>(std::string_view)>;
 
 /**
  * Represents a set of types or of type aliases in the match language. The set consists of the BSON
@@ -59,14 +60,14 @@ using findBSONTypeAliasFun = std::function<boost::optional<BSONType>(StringData)
  * and so on).
  */
 struct MatcherTypeSet {
-    static constexpr StringData kMatchesAllNumbersAlias = "number"_sd;
+    static constexpr std::string_view kMatchesAllNumbersAlias = "number"_sd;
 
     // Maps from the set of JSON Schema primitive types to the corresponding BSON types. Excludes
     // "number" since this alias maps to a set of BSON types, and "integer" since it is not
     // supported.
     static const StringMap<BSONType> kJsonSchemaTypeAliasMap;
 
-    static boost::optional<BSONType> findJsonSchemaTypeAlias(StringData key);
+    static boost::optional<BSONType> findJsonSchemaTypeAlias(std::string_view key);
 
     /**
      * Given a set of string type alias and a mapping from string alias to BSON type, returns the
@@ -74,7 +75,7 @@ struct MatcherTypeSet {
      *
      * Returns an error if any of the string aliases are unknown.
      */
-    static StatusWith<MatcherTypeSet> fromStringAliases(std::set<StringData> typeAliases,
+    static StatusWith<MatcherTypeSet> fromStringAliases(std::set<std::string_view> typeAliases,
                                                         const findBSONTypeAliasFun& aliasMapFind);
 
     /**
@@ -137,7 +138,7 @@ struct MatcherTypeSet {
  *
  * Returns a non-OK status if 'typeAlias' does not represent a valid type.
  */
-Status addAliasToTypeSet(StringData typeAlias,
+Status addAliasToTypeSet(std::string_view typeAlias,
                          const findBSONTypeAliasFun& aliasMapFind,
                          MatcherTypeSet* typeSet);
 }  // namespace mongo

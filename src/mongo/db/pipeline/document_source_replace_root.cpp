@@ -52,6 +52,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
@@ -98,14 +99,14 @@ boost::intrusive_ptr<DocumentSourceMatch> ReplaceRootTransformation::createTypeN
         MatcherTypeSet typeSet;
         typeSet.bsonTypes.insert(BSONType::array);
         auto typeIsArrayExpr =
-            std::make_unique<TypeMatchExpression>(StringData(expression), typeSet);
+            std::make_unique<TypeMatchExpression>(std::string_view(expression), typeSet);
         matchExpr->add(std::move(typeIsArrayExpr));
     }
     {
         MatcherTypeSet typeSet;
         typeSet.bsonTypes.insert(BSONType::object);
         auto typeIsObjectExpr =
-            std::make_unique<TypeMatchExpression>(StringData(expression), typeSet);
+            std::make_unique<TypeMatchExpression>(std::string_view(expression), typeSet);
         auto typeIsNotObjectExpr =
             std::make_unique<NotMatchExpression>(std::move(typeIsObjectExpr));
         matchExpr->add(std::move(typeIsNotObjectExpr));

@@ -30,7 +30,6 @@
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_refresher.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -39,6 +38,8 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
+
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -123,7 +124,7 @@ protected:
 };
 
 TEST_F(ClusterServerParameterRefresherTest, RefresherConcurrency) {
-    auto runRefreshTestIteration = [&](StringData blockingFPName, Status expectedStatus) {
+    auto runRefreshTestIteration = [&](std::string_view blockingFPName, Status expectedStatus) {
         ASSERT_EQ(refreshPromise(), nullptr);
         // Set up failpoints and get their initial times entered.
         auto blockFp = globalFailPointRegistry().find(blockingFPName);

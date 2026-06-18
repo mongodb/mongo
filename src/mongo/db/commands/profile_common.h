@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
@@ -98,7 +98,7 @@ struct ObjectOrUnset {
 };
 ObjectOrUnset parseObjectOrUnset(const BSONElement& element);
 void serializeObjectOrUnset(const ObjectOrUnset& obj,
-                            StringData fieldName,
+                            std::string_view fieldName,
                             BSONObjBuilder* builder);
 
 }  // namespace mongo

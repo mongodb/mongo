@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/window_function/window_function_exec_min_max_scaler_non_removable.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -46,6 +45,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -54,6 +54,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 class WindowFunctionExecMinMaxScalerNonRemovableTest : public AggregationContextFixture {
 public:
     WindowFunctionExecMinMaxScalerNonRemovable createForFieldPath(
@@ -157,7 +158,7 @@ DEATH_TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTestDeathTest,
              GetWindowValueThrowsWithNonNumericInput,
              "10487003") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
-        Document{{"a", Value("invalid_string"_sd)}, {"key", 1}}, Document{{"a", 2}, {"key", 1}}};
+        Document{{"a", Value("invalid_string"sv)}, {"key", 1}}, Document{{"a", 2}, {"key", 1}}};
     auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
@@ -173,12 +174,12 @@ DEATH_TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTestDeathTest,
                                                           WindowBounds::Unbounded{},
                                                           &_tracker["output"],
                                                           {Value(0), Value(1)});
-    mgr.getWindowValue(Document{{"a", Value("invalid_string"_sd)}, {"key", 1}});
+    mgr.getWindowValue(Document{{"a", Value("invalid_string"sv)}, {"key", 1}});
 }
 
 TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTest, UpdateWindowValueThrowsWithNonNumericInput) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
-        Document{{"a", Value("invalid_string"_sd)}, {"key", 1}}, Document{{"a", 2}, {"key", 1}}};
+        Document{{"a", Value("invalid_string"sv)}, {"key", 1}}, Document{{"a", 2}, {"key", 1}}};
     auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
@@ -194,7 +195,7 @@ TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTest, UpdateWindowValueThrowsWi
                                                           WindowBounds::Unbounded{},
                                                           &_tracker["output"],
                                                           {Value(0), Value(1)});
-    ASSERT_THROWS_CODE(mgr.getNext(Document{{"a", Value("invalid_string"_sd)}, {"key", 1}}),
+    ASSERT_THROWS_CODE(mgr.getNext(Document{{"a", Value("invalid_string"sv)}, {"key", 1}}),
                        AssertionException,
                        10487001);
 }

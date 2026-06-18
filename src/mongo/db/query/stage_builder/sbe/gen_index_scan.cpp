@@ -30,7 +30,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
@@ -68,6 +67,7 @@
 #include <deque>
 #include <iterator>
 #include <map>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -76,6 +76,7 @@
 
 
 namespace mongo::stage_builder {
+using namespace std::literals::string_view_literals;
 namespace {
 
 
@@ -379,8 +380,8 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
     // bind the keys to the 'lowKeySlot' and 'highKeySlot'.
     auto [project, outSlots] =
         b.makeProject(std::move(unwind),
-                      b.makeFunction(sbe::EFn::kGetField, unwindSlot, b.makeStrConstant("l"_sd)),
-                      b.makeFunction(sbe::EFn::kGetField, unwindSlot, b.makeStrConstant("h"_sd)));
+                      b.makeFunction(sbe::EFn::kGetField, unwindSlot, b.makeStrConstant("l"sv)),
+                      b.makeFunction(sbe::EFn::kGetField, unwindSlot, b.makeStrConstant("h"sv)));
 
     auto lowKeySlot = outSlots[0];
     auto highKeySlot = outSlots[1];
@@ -700,7 +701,7 @@ PlanStageReqs computeReqsForIndexScan(const PlanStageReqs& reqs,
             dependency_analysis::addDependencies(filter, &deps);
             for (auto&& elt : keyPattern) {
                 if (deps.fields.count(elt.fieldName())) {
-                    StringData name = elt.fieldNameStringData();
+                    std::string_view name = elt.fieldNameStringData();
                     ixScanReqs.set(std::pair(PlanStageSlots::kField, name));
                 }
             }
@@ -724,7 +725,7 @@ PlanStageReqs computeReqsForIndexScan(const PlanStageReqs& reqs,
     // If 'reqAllKeyPatternParts' is true, then we need to get all parts of the index key pattern.
     if (reqAllKeyPatternParts) {
         for (const auto& elt : keyPattern) {
-            StringData name = elt.fieldNameStringData();
+            std::string_view name = elt.fieldNameStringData();
             ixScanReqs.set(std::pair(PlanStageSlots::kField, name));
         }
     }
@@ -751,7 +752,7 @@ std::pair<SbStage, PlanStageSlots> setResultAndAdditionalFieldSlots(SbStage stag
     if (reqs.hasResult() || !additionalFields.empty()) {
         SbSlotVector indexKeySlots;
         for (auto&& elem : keyPattern) {
-            StringData name = elem.fieldNameStringData();
+            std::string_view name = elem.fieldNameStringData();
             indexKeySlots.emplace_back(outputs.get(std::pair(PlanStageSlots::kField, name)));
         }
 
@@ -783,7 +784,7 @@ std::pair<SbStage, PlanStageSlots> setResultAndAdditionalFieldSlots(SbStage stag
     if (reqs.has(PlanStageSlots::kReturnKey)) {
         SbExpr::Vector args;
         for (auto&& elem : keyPattern) {
-            StringData name = elem.fieldNameStringData();
+            std::string_view name = elem.fieldNameStringData();
             args.emplace_back(b.makeStrConstant(name));
             args.emplace_back(outputs.get(std::pair(PlanStageSlots::kField, name)));
         }
@@ -1002,10 +1003,10 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
         sbe::value::TagValueOwned guard{sbe::value::makeNewObject()};
         auto obj = sbe::value::getObjectView(guard.value());
         obj->reserve(2);
-        obj->push_back_raw("l"_sd,
+        obj->push_back_raw("l"sv,
                            sbe::value::TypeTags::keyString,
                            sbe::value::makeKeyString(std::move(lowKey)).second);
-        obj->push_back_raw("h"_sd,
+        obj->push_back_raw("h"sv,
                            sbe::value::TypeTags::keyString,
                            sbe::value::makeKeyString(std::move(highKey)).second);
         arr->push_back_raw(guard.releaseToRaw());

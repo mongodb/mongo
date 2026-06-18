@@ -30,7 +30,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -63,6 +62,7 @@
 #include "mongo/util/version/releases.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/cstdint.hpp>
@@ -248,7 +248,7 @@ TEST_F(OplogEntryTest, CreateWithCatalogIdentifier) {
     std::string identUniqueTag = "collection_ident";
     std::string idIndexIdentUniqueTag = "id_index_ident";
     const auto oplogEntryObject2Doc = MutableOplogEntry::makeCreateCollObject2(
-        catalogId, identUniqueTag, StringData(idIndexIdentUniqueTag));
+        catalogId, identUniqueTag, std::string_view(idIndexIdentUniqueTag));
     ASSERT_BSONOBJ_EQ(oplogEntryObject2Doc,
                       BSON("catalogId" << 1 << "ident" << identUniqueTag << "idIndexIdent"
                                        << idIndexIdentUniqueTag));
@@ -278,7 +278,7 @@ TEST_F(OplogEntryTest, CreateO2RoundTrip) {
     std::string identUniqueTag = "collection_ident";
     std::string idIndexIdentUniqueTag = "id_index_ident";
     const auto rawO2 = MutableOplogEntry::makeCreateCollObject2(
-        catalogId, identUniqueTag, StringData(idIndexIdentUniqueTag));
+        catalogId, identUniqueTag, std::string_view(idIndexIdentUniqueTag));
 
     // Test parsing of 'o2' BSON.
     const auto parsedO2 = CreateOplogEntryO2::parse(rawO2, IDLParserContext("createOplogEntryO2"));
@@ -387,7 +387,7 @@ TEST_F(OplogEntryTest, IndexBuildO2RoundTrip) {
 }
 
 TEST_F(OplogEntryTest, ContainerInsert) {
-    StringData containerIdent = "container_ident";
+    std::string_view containerIdent = "container_ident";
     auto key = BSONBinData("k", 1, BinDataType::BinDataGeneral);
     auto value = BSONBinData("v", 1, BinDataType::BinDataGeneral);
     auto entry = makeContainerInsertOplogEntry(entryOpTime, containerIdent, key, value);
@@ -406,7 +406,7 @@ TEST_F(OplogEntryTest, ContainerInsert) {
 }
 
 TEST_F(OplogEntryTest, ContainerDelete) {
-    StringData containerIdent = "container_ident";
+    std::string_view containerIdent = "container_ident";
     auto key = BSONBinData("k", 1, BinDataType::BinDataGeneral);
     auto entry = makeContainerDeleteOplogEntry(entryOpTime, containerIdent, key);
 
@@ -1771,7 +1771,7 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
 
 void assertIndexBuildSkipsO2WhenParseO2False(OperationContext* opCtx,
                                              const OpTime& opTime,
-                                             StringData commandName,
+                                             std::string_view commandName,
                                              OplogEntry::CommandType expectedCommandType) {
     const std::string ns = "test.coll";
     const auto nss = NamespaceString::createNamespaceString_forTest(ns);
@@ -1833,7 +1833,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                                << "indexBuildUUID" << UUID::gen() << "indexes"
                                << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
                                                       << "x_1")));
-    auto setField = [&](StringData name, auto value) {
+    auto setField = [&](std::string_view name, auto value) {
         return baseObj.addFields(BSON(name << value));
     };
 

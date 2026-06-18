@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/stage.h"
@@ -39,6 +38,7 @@
 #include "mongo/s/query/exec/merge_cursors_stage.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -51,7 +51,7 @@ namespace mongo::exec::agg {
  */
 class ChangeStreamHandleTopologyChangeStage final : public Stage {
 public:
-    ChangeStreamHandleTopologyChangeStage(StringData stageName,
+    ChangeStreamHandleTopologyChangeStage(std::string_view stageName,
                                           const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:

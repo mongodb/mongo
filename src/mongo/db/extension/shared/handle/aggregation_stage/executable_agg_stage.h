@@ -34,6 +34,8 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::extension {
 
 class ExecAggStageAPI;

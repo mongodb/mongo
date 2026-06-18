@@ -35,6 +35,8 @@
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -65,7 +67,7 @@ value::TagValueView ByteCode::getField(value::TagValueView obj, value::TagValueV
     return getField(obj, value::getStringView(field.tag, field.value));
 }
 
-value::TagValueView ByteCode::getField(value::TagValueView obj, StringData fieldStr) {
+value::TagValueView ByteCode::getField(value::TagValueView obj, std::string_view fieldStr) {
     if (MONGO_likely(obj.tag == value::TypeTags::bsonObject)) {
         auto be = value::bitcastTo<const char*>(obj.value);
         return bson::getField(be, fieldStr);
@@ -559,7 +561,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggLast(value::TypeTags
 }
 
 
-bool hasSeparatorAt(size_t idx, StringData input, StringData separator) {
+bool hasSeparatorAt(size_t idx, std::string_view input, std::string_view separator) {
     return (idx + separator.size() <= input.size()) &&
         input.substr(idx, separator.size()) == separator;
 }

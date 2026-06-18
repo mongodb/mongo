@@ -51,6 +51,7 @@
 #include <list>
 #include <memory>
 #include <queue>
+#include <string_view>
 #include <system_error>
 #include <type_traits>
 
@@ -114,6 +115,7 @@ bool shouldInvariantOnPoolCorrectness() {
 }  // namespace
 
 namespace executor {
+using namespace std::literals::string_view_literals;
 
 void ConnectionPool::ConnectionInterface::indicateUsed() {
     // It is illegal to attempt to use a connection after calling indicateFailure().
@@ -257,8 +259,8 @@ public:
         return getPool()->_options.maxConnections;
     }
 
-    StringData name() const override {
-        return "LimitController"_sd;
+    std::string_view name() const override {
+        return "LimitController"sv;
     }
 
     void updateConnectionPoolStats(ConnectionPoolStats* cps) const override {}

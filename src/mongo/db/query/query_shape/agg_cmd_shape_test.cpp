@@ -37,6 +37,11 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
+using namespace std::literals::string_view_literals;
+
+using namespace std::literals::string_view_literals;
 namespace mongo::query_shape {
 
 namespace {
@@ -52,9 +57,9 @@ public:
     }
 
     std::unique_ptr<AggregateCommandRequest> makeAggregateCommandRequest(
-        std::vector<StringData> stagesJson,
-        boost::optional<StringData> letJson = boost::none,
-        boost::optional<StringData> collationJson = boost::none) {
+        std::vector<std::string_view> stagesJson,
+        boost::optional<std::string_view> letJson = boost::none,
+        boost::optional<std::string_view> collationJson = boost::none) {
         std::vector<BSONObj> pipeline;
         for (auto&& stage : stagesJson) {
             pipeline.push_back(fromjson(stage));
@@ -72,9 +77,9 @@ public:
     }
 
     std::unique_ptr<AggCmdShape> makeShapeFromPipeline(
-        std::vector<StringData> stagesJson,
-        boost::optional<StringData> letJson = boost::none,
-        boost::optional<StringData> collationJson = boost::none) {
+        std::vector<std::string_view> stagesJson,
+        boost::optional<std::string_view> letJson = boost::none,
+        boost::optional<std::string_view> collationJson = boost::none) {
 
         auto aggRequest = makeAggregateCommandRequest(
             std::move(stagesJson), std::move(letJson), std::move(collationJson));
@@ -89,7 +94,7 @@ public:
     }
 
     std::unique_ptr<AggCmdShapeComponents> makeShapeComponentsFromPipeline(
-        std::vector<StringData> stagesJson, OptionalBool allowDiskUse = {}) {
+        std::vector<std::string_view> stagesJson, OptionalBool allowDiskUse = {}) {
         auto aggRequest = makeAggregateCommandRequest(std::move(stagesJson));
 
         auto parsedPipeline = pipeline_factory::makePipeline(
@@ -110,7 +115,7 @@ public:
 
 TEST_F(AggCmdShapeTest, BasicPipelineShape) {
     auto shape =
-        makeShapeFromPipeline({R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
+        makeShapeFromPipeline({R"({$match: {x: 3, y: {$lte: 3}}})"sv,
                                R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -155,8 +160,8 @@ TEST_F(AggCmdShapeTest, BasicPipelineShape) {
 }
 
 TEST_F(AggCmdShapeTest, IncludesLet) {
-    auto shape = makeShapeFromPipeline({R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd},
-                                       R"({x: 4, y: "str"})"_sd);
+    auto shape = makeShapeFromPipeline({R"({$match: {x: 3}})"sv, R"({$limit: 2})"sv},
+                                       R"({x: 4, y: "str"})"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -221,8 +226,8 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
 // Verifies that "aggregate" command shape hash value is stable (does not change between the
 // versions of the server).
 TEST_F(AggCmdShapeTest, StableQueryShapeHashValue) {
-    auto shape = makeShapeFromPipeline({R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd},
-                                       R"({x: 4, y: "str"})"_sd);
+    auto shape = makeShapeFromPipeline({R"({$match: {x: 3}})"sv, R"({$limit: 2})"sv},
+                                       R"({x: 4, y: "str"})"sv);
 
     auto serializationContext = SerializationContext::stateCommandRequest();
     const auto hash = shape->sha256Hash(_operationContext.get(), serializationContext);
@@ -232,7 +237,7 @@ TEST_F(AggCmdShapeTest, StableQueryShapeHashValue) {
 
 TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeComponents) {
     auto aggComponents = makeShapeComponentsFromPipeline(
-        {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
+        {R"({$match: {x: 3, y: {$lte: 3}}})"sv,
          R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
         false /*allowDiskUse*/);
 
@@ -253,11 +258,11 @@ TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeComponents) {
 
 TEST_F(AggCmdShapeTest, EquivalentAggCmdShapeComponentSizes) {
     auto aggComponentsDiskUseFalse = makeShapeComponentsFromPipeline(
-        {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
+        {R"({$match: {x: 3, y: {$lte: 3}}})"sv,
          R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
         false /*allowDiskUse*/);
     auto aggComponentsDiskUseTrue = makeShapeComponentsFromPipeline(
-        {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
+        {R"({$match: {x: 3, y: {$lte: 3}}})"sv,
          R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
         true /*allowDiskUse*/);
     ASSERT_EQ(aggComponentsDiskUseFalse->size(), aggComponentsDiskUseTrue->size());
@@ -267,24 +272,24 @@ TEST_F(AggCmdShapeTest, DifferentAggCmdShapeComponentSizes) {
     auto smallAggComponents = makeShapeComponentsFromPipeline({R"({$match: {x: 3, y: {$lte: 3}}})"},
                                                               false /*allowDiskUse*/);
     auto largeAggComponents = makeShapeComponentsFromPipeline(
-        {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
+        {R"({$match: {x: 3, y: {$lte: 3}}})"sv,
          R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
         false /*allowDiskUse*/);
     ASSERT_LT(smallAggComponents->size(), largeAggComponents->size());
 }
 
 TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeWithAndWithoutLet) {
-    auto shapeWithoutLet = makeShapeFromPipeline({R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd});
-    auto shapeWithLet = makeShapeFromPipeline({R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd},
-                                              R"({x: 4, y: "str"})"_sd);
+    auto shapeWithoutLet = makeShapeFromPipeline({R"({$match: {x: 3}})"sv, R"({$limit: 2})"sv});
+    auto shapeWithLet = makeShapeFromPipeline({R"({$match: {x: 3}})"sv, R"({$limit: 2})"sv},
+                                              R"({x: 4, y: "str"})"sv);
     ASSERT_LT(shapeWithoutLet->size(), shapeWithLet->size());
 }
 
 TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeWithAndWithoutCollation) {
     auto shapeWithoutCollation =
-        makeShapeFromPipeline({R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd});
+        makeShapeFromPipeline({R"({$match: {x: 3}})"sv, R"({$limit: 2})"sv});
     auto shapeWithCollation = makeShapeFromPipeline(
-        {R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd}, boost::none, R"({locale: "en_US"})"_sd);
+        {R"({$match: {x: 3}})"sv, R"({$limit: 2})"sv}, boost::none, R"({locale: "en_US"})"sv);
     ASSERT_LT(shapeWithoutCollation->size(), shapeWithCollation->size());
 }
 }  // namespace

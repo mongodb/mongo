@@ -40,6 +40,7 @@
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -60,7 +61,7 @@ public:
      * The name for the database version information field, which shard-aware commands should
      * include if they want to convey database version.
      */
-    static constexpr StringData kDatabaseVersionField = "databaseVersion"_sd;
+    static constexpr std::string_view kDatabaseVersionField = "databaseVersion"_sd;
 
     using DatabaseVersionBase::getTimestamp;
 

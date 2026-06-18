@@ -39,6 +39,7 @@
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/static_immortal.h"
 
+#include <string_view>
 #include <tuple>
 
 #include <fmt/format.h>
@@ -278,7 +279,8 @@ void AuthCounter::EgressMechanismCounterHandle::incEgressAuthenticateSuccessful(
     _data->egress.authenticate.successful.fetchAndAddRelaxed(1);
 }
 
-auto AuthCounter::getEgressMechanismCounter(StringData mechanism) -> EgressMechanismCounterHandle {
+auto AuthCounter::getEgressMechanismCounter(std::string_view mechanism)
+    -> EgressMechanismCounterHandle {
     auto it = _mechanisms.find(mechanism);
     uassert(ErrorCodes::MechanismUnavailable,
             fmt::format("Egress authentication using mechanism {} which is not known", mechanism),
@@ -288,7 +290,7 @@ auto AuthCounter::getEgressMechanismCounter(StringData mechanism) -> EgressMecha
     return EgressMechanismCounterHandle(&data);
 }
 
-auto AuthCounter::getIngressMechanismCounter(StringData mechanism)
+auto AuthCounter::getIngressMechanismCounter(std::string_view mechanism)
     -> IngressMechanismCounterHandle {
     auto it = _mechanisms.find(mechanism);
     uassert(ErrorCodes::MechanismUnavailable,
@@ -302,7 +304,8 @@ auto AuthCounter::getIngressMechanismCounter(StringData mechanism)
     return IngressMechanismCounterHandle(&data);
 }
 
-void AuthCounter::SuccessCounter::appendAsSubobj(BSONObjBuilder& bob, StringData fieldName) const {
+void AuthCounter::SuccessCounter::appendAsSubobj(BSONObjBuilder& bob,
+                                                 std::string_view fieldName) const {
     BSONObjBuilder subBob(bob.subobjStart(fieldName));
     subBob.append("total", total.load());
     subBob.append("successful", successful.load());
@@ -370,8 +373,8 @@ DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 
 namespace {
 otel::metrics::Counter<int64_t>& makeOperationsCounter(otel::metrics::MetricName name,
-                                                       StringData description,
-                                                       StringData dottedPath,
+                                                       std::string_view description,
+                                                       std::string_view dottedPath,
                                                        bool skipPathValidation = false) {
     return MetricsService::instance().createInt64Counter(
         name,

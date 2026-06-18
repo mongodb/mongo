@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
@@ -40,7 +42,7 @@ class LiteParsedLookUpTest : public AggregationContextFixture {
 protected:
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.local");
 
-    std::unique_ptr<LiteParsedLookUp> parse(StringData json,
+    std::unique_ptr<LiteParsedLookUp> parse(std::string_view json,
                                             LiteParserOptions options = LiteParserOptions{}) {
         auto spec = fromjson(json);
         auto result = LiteParsedLookUp::parse(nss, spec.firstElement(), options);
@@ -48,7 +50,7 @@ protected:
         return result;
     }
 
-    LookUpStageParams* parseAndGetParams(StringData json,
+    LookUpStageParams* parseAndGetParams(std::string_view json,
                                          LiteParserOptions options = LiteParserOptions{}) {
         _lastParsed = parse(json, options);
         _lastParams = _lastParsed->getStageParams();

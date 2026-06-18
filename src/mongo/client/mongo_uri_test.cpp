@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -50,6 +49,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <memory>
+#include <string_view>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
@@ -62,6 +62,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 using transport::ConnectSSLMode;
 constexpr auto kEnableSSL = ConnectSSLMode::kEnableSSL;
 constexpr auto kDisableSSL = ConnectSSLMode::kDisableSSL;
@@ -92,7 +93,7 @@ struct InvalidURITestCase {
 };
 
 void compareOptions(size_t lineNumber,
-                    StringData uri,
+                    std::string_view uri,
                     const MongoURI::OptionsMap& connection,
                     const MongoURI::OptionsMap& expected) {
     std::vector<std::pair<MongoURI::CaseInsensitiveString, std::string>> options(begin(connection),
@@ -692,7 +693,7 @@ TEST_F(URIConnectionTest, ValidButBadURIsFailToConnect) {
     ASSERT_TRUE(uri.isValid());
 
     std::string errmsg;
-    auto dbclient = uri.connect(StringData(), errmsg);
+    auto dbclient = uri.connect(std::string_view(), errmsg);
     ASSERT_EQ(dbclient, static_cast<decltype(dbclient)>(nullptr));
 }
 
@@ -709,7 +710,7 @@ TEST(MongoURI, CloneURIForServer) {
     auto& uriOptions = uri.getOptions();
     ASSERT_EQ(uriOptions.at("ssl"), "true");
 
-    auto clonedURI = uri.cloneURIForServer(HostAndPort{"localhost:27020"}, StringData());
+    auto clonedURI = uri.cloneURIForServer(HostAndPort{"localhost:27020"}, std::string_view());
 
     ASSERT_EQ(clonedURI.type(), kMaster);
     ASSERT_TRUE(clonedURI.getReplicaSetName().empty());
@@ -1077,16 +1078,16 @@ TEST(MongoURI, srvRecordTest) {
  * Also checks that SRV URI's don't turn into non-SRV URIs after redaction.
  */
 TEST(MongoURI, Redact) {
-    constexpr auto goodWithDBName = "mongodb://admin@localhost/admin"_sd;
-    constexpr auto goodWithoutDBName = "mongodb://admin@localhost"_sd;
-    constexpr auto goodWithOnlyDBAndHost = "mongodb://localhost/admin"_sd;
-    const std::initializer_list<std::pair<StringData, StringData>> testCases = {
-        {"mongodb://admin:password@localhost/admin"_sd, goodWithDBName},
-        {"mongodb://admin@localhost/admin?secretConnectionOption=foo"_sd, goodWithDBName},
-        {"mongodb://admin:password@localhost/admin?secretConnectionOptions"_sd, goodWithDBName},
-        {"mongodb://admin@localhost/admin"_sd, goodWithDBName},
+    constexpr auto goodWithDBName = "mongodb://admin@localhost/admin"sv;
+    constexpr auto goodWithoutDBName = "mongodb://admin@localhost"sv;
+    constexpr auto goodWithOnlyDBAndHost = "mongodb://localhost/admin"sv;
+    const std::initializer_list<std::pair<std::string_view, std::string_view>> testCases = {
+        {"mongodb://admin:password@localhost/admin"sv, goodWithDBName},
+        {"mongodb://admin@localhost/admin?secretConnectionOption=foo"sv, goodWithDBName},
+        {"mongodb://admin:password@localhost/admin?secretConnectionOptions"sv, goodWithDBName},
+        {"mongodb://admin@localhost/admin"sv, goodWithDBName},
         {"mongodb://admin@localhost/admin?secretConnectionOptions", goodWithDBName},
-        {"mongodb://admin:password@localhost"_sd, goodWithoutDBName},
+        {"mongodb://admin:password@localhost"sv, goodWithoutDBName},
         {"mongodb://admin@localhost", goodWithoutDBName},
         {"mongodb://localhost/admin?socketTimeoutMS=5", goodWithOnlyDBAndHost},
         {"mongodb://localhost/admin", goodWithOnlyDBAndHost},
@@ -1097,8 +1098,8 @@ TEST(MongoURI, Redact) {
         ASSERT_EQ(MongoURI::redact(testCase.first), testCase.second);
     }
 
-    const auto toRedactSRV = "mongodb+srv://admin:password@localhost/admin?secret=foo"_sd;
-    const auto redactedSRV = "mongodb+srv://admin@localhost/admin"_sd;
+    const auto toRedactSRV = "mongodb+srv://admin:password@localhost/admin?secret=foo"sv;
+    const auto redactedSRV = "mongodb+srv://admin@localhost/admin"sv;
     ASSERT_EQ(MongoURI::redact(toRedactSRV), redactedSRV);
 }
 

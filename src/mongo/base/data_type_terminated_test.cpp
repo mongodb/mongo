@@ -32,10 +32,10 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -102,7 +102,8 @@ namespace {
  */
 
 TEST(DataTypeTerminated, StringDataNormalStore) {
-    const StringData writes[] = {StringData("a"), StringData("bb"), StringData("ccc")};
+    const std::string_view writes[] = {
+        std::string_view("a"), std::string_view("bb"), std::string_view("ccc")};
     std::string buf(100, '\xff');
     char* const bufBegin = &*buf.begin();
     char* ptr = bufBegin;
@@ -110,8 +111,8 @@ TEST(DataTypeTerminated, StringDataNormalStore) {
     std::string expected;
     for (const auto& w : writes) {
         size_t adv;
-        ASSERT_OK(
-            DataType::store(Terminated<'\0', StringData>(w), ptr, avail, &adv, ptr - bufBegin));
+        ASSERT_OK(DataType::store(
+            Terminated<'\0', std::string_view>(w), ptr, avail, &adv, ptr - bufBegin));
         ASSERT_EQ(adv, w.size() + 1);
         ptr += adv;
         avail -= adv;
@@ -122,7 +123,8 @@ TEST(DataTypeTerminated, StringDataNormalStore) {
 }
 
 TEST(DataTypeTerminated, StringDataNormalLoad) {
-    const StringData writes[] = {StringData("a"), StringData("bb"), StringData("ccc")};
+    const std::string_view writes[] = {
+        std::string_view("a"), std::string_view("bb"), std::string_view("ccc")};
     std::string buf;
     for (const auto& w : writes) {
         buf += std::string{w};
@@ -134,7 +136,7 @@ TEST(DataTypeTerminated, StringDataNormalLoad) {
 
     for (const auto& w : writes) {
         size_t adv;
-        auto term = Terminated<'\0', StringData>{};
+        auto term = Terminated<'\0', std::string_view>{};
         ASSERT_OK(DataType::load(&term, ptr, avail, &adv, ptr - bufBegin));
         ASSERT_EQ(adv, term.value.size() + 1);
         ptr += adv;
@@ -159,14 +161,14 @@ TEST(DataTypeTerminated, StoreStatusOkAdvanced) {
     size_t advanced = 123;  // should be overwritten
     Status s = DataType::store(Terminated<'\0', Dummy<3>>(), buf, sizeof(buf), &advanced, 0);
     ASSERT_OK(s);
-    ASSERT_EQ(StringData(buf, 4), StringData(std::string{'d', 'd', 'd', '\0'}));
+    ASSERT_EQ(std::string_view(buf, 4), std::string_view(std::string{'d', 'd', 'd', '\0'}));
     ASSERT_EQUALS(advanced, 4u);  // OK must overwrite advanced
 }
 
 TEST(DataTypeTerminated, ErrorUnterminatedRead) {
     const char buf[] = {'h', 'e', 'l', 'l', 'o'};
     size_t advanced = 123;
-    auto x = Terminated<'\0', StringData>();
+    auto x = Terminated<'\0', std::string_view>();
     Status s = DataType::load(&x, buf, sizeof(buf), &advanced, 0);
     ASSERT_EQ(s.codeString(), "Overflow");
     ASSERT_STRING_CONTAINS(s.reason(), "couldn't locate");

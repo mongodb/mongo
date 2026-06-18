@@ -36,7 +36,6 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -49,6 +48,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -61,7 +61,7 @@ namespace mongo {
 class ArrayMatchingMatchExpression : public PathMatchExpression {
 public:
     ArrayMatchingMatchExpression(MatchType matchType,
-                                 boost::optional<StringData> path,
+                                 boost::optional<std::string_view> path,
                                  clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : PathMatchExpression(matchType,
                               path,
@@ -78,7 +78,7 @@ public:
 
 class ElemMatchObjectMatchExpression final : public ArrayMatchingMatchExpression {
 public:
-    ElemMatchObjectMatchExpression(boost::optional<StringData> path,
+    ElemMatchObjectMatchExpression(boost::optional<std::string_view> path,
                                    std::unique_ptr<MatchExpression> sub,
                                    clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
@@ -138,10 +138,10 @@ private:
 
 class ElemMatchValueMatchExpression final : public ArrayMatchingMatchExpression {
 public:
-    ElemMatchValueMatchExpression(boost::optional<StringData> path,
+    ElemMatchValueMatchExpression(boost::optional<std::string_view> path,
                                   std::unique_ptr<MatchExpression> sub,
                                   clonable_ptr<ErrorAnnotation> annotation = nullptr);
-    explicit ElemMatchValueMatchExpression(boost::optional<StringData> path,
+    explicit ElemMatchValueMatchExpression(boost::optional<std::string_view> path,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     void add(std::unique_ptr<MatchExpression> sub);
@@ -198,7 +198,7 @@ private:
 
 class SizeMatchExpression : public ArrayMatchingMatchExpression {
 public:
-    SizeMatchExpression(boost::optional<StringData> path,
+    SizeMatchExpression(boost::optional<std::string_view> path,
                         int size,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 

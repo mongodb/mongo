@@ -31,8 +31,10 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
+
 namespace mongo {
-constexpr StringData InternalSchemaXorMatchExpression::kName;
+constexpr std::string_view InternalSchemaXorMatchExpression::kName;
 
 void InternalSchemaXorMatchExpression::debugString(StringBuilder& debug,
                                                    int indentationLevel) const {

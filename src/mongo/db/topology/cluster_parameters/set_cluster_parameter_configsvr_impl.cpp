@@ -30,7 +30,6 @@
 #include "mongo/db/topology/cluster_parameters/set_cluster_parameter_configsvr_impl.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -63,6 +62,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -85,7 +85,7 @@ std::shared_ptr<SetClusterParameterCoordinator> makeSetClusterParameterCoordinat
     DBDirectClient dbClient(opCtx);
     ClusterParameterDBClientService dbService(dbClient);
     BSONObj cmdParamObj = request.getCommandParameter();
-    StringData parameterName = cmdParamObj.firstElement().fieldName();
+    std::string_view parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = sps->get(parameterName);
 
     SetClusterParameterInvocation invocation{std::move(sps), dbService};

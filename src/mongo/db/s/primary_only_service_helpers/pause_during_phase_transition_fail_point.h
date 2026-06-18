@@ -32,6 +32,8 @@
 #include "mongo/db/s/primary_only_service_helpers/phase_transition_progress_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUB mongo {
 
 namespace primary_only_service_helpers {
@@ -52,7 +54,7 @@ template <typename Phase>
 class PauseDuringPhaseTransitionFailPoint {
 public:
     using FailPoints = std::vector<std::reference_wrapper<FailPoint>>;
-    using ParseFunction = std::function<Phase(StringData)>;
+    using ParseFunction = std::function<Phase(std::string_view)>;
 
     PauseDuringPhaseTransitionFailPoint(FailPoint& failpoint, ParseFunction parse)
         : PauseDuringPhaseTransitionFailPoint{FailPoints{failpoint}, std::move(parse)} {}

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -42,6 +41,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -52,9 +52,9 @@ public:
     using Validator = std::function<bool(int)>;
 
     InternalSchemaStrLengthMatchExpression(MatchType type,
-                                           boost::optional<StringData> path,
+                                           boost::optional<std::string_view> path,
                                            long long strLen,
-                                           StringData name,
+                                           std::string_view name,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     ~InternalSchemaStrLengthMatchExpression() override {}
@@ -69,7 +69,7 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
-    StringData getName() const {
+    std::string_view getName() const {
         return _name;
     }
 
@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    StringData _name;
+    std::string_view _name;
     long long _strLen = 0;
 };
 

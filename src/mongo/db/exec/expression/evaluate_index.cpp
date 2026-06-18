@@ -33,6 +33,8 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/storage/key_string/key_string.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace exec::expression {
@@ -74,7 +76,7 @@ Value evaluate(const ExpressionInternalKeyStringValue& expr,
 
     key_string::HeapBuilder ksBuilder(key_string::Version::V1);
     if (collator) {
-        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](StringData str) {
+        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](std::string_view str) {
             return collator->getComparisonString(str);
         });
     } else {

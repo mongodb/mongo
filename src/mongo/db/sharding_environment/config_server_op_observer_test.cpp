@@ -30,7 +30,6 @@
 #include "mongo/db/sharding_environment/config_server_op_observer.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/logical_time.h"

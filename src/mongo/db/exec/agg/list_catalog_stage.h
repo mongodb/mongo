@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
 #include <deque>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -49,7 +49,8 @@ namespace mongo::exec::agg {
  */
 class ListCatalogStage final : public Stage {
 public:
-    ListCatalogStage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    ListCatalogStage(std::string_view stageName,
+                     const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
     GetNextResult doGetNext() final;

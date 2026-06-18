@@ -34,6 +34,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <ostream>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -62,7 +63,7 @@ std::string toString(const ServerType serverType) {
     }
 }
 
-StatusWith<ServerType> parseServerType(StringData strServerType) {
+StatusWith<ServerType> parseServerType(std::string_view strServerType) {
     if (strServerType == "Standalone") {
         return ServerType::kStandalone;
     } else if (strServerType == "Mongos") {
@@ -122,7 +123,7 @@ std::string toString(const TopologyType topologyType) {
     }
 }
 
-StatusWith<TopologyType> parseTopologyType(StringData strTopologyType) {
+StatusWith<TopologyType> parseTopologyType(std::string_view strTopologyType) {
     if (strTopologyType == "ReplicaSetNoPrimary") {
         return TopologyType::kReplicaSetNoPrimary;
     } else if (strTopologyType == "ReplicaSetWithPrimary") {

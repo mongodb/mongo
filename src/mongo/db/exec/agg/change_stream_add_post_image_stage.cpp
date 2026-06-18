@@ -35,14 +35,19 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace exec::agg {
+using namespace std::literals::string_view_literals;
 
 namespace {
 constexpr auto makePostImageNotFoundErrorMsg =
     &ChangeStreamAddPreImageStage::makePreImageNotFoundErrorMsg;
 
-Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType expectedType) {
+Value assertFieldHasType(const Document& fullDoc,
+                         std::string_view fieldName,
+                         BSONType expectedType) {
     auto val = fullDoc[fieldName];
     uassert(40578,
             str::stream() << "failed to look up post image after change: expected \"" << fieldName
@@ -55,7 +60,7 @@ Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType
 }  // namespace
 
 ChangeStreamAddPostImageStage::ChangeStreamAddPostImageStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const FullDocumentModeEnum& fullDocumentMode)
     : Stage(stageName, pExpCtx), _fullDocumentMode(fullDocumentMode) {}
@@ -143,7 +148,7 @@ boost::optional<Document> ChangeStreamAddPostImageStage::generatePostImage(
     // Compute post-image.
     mutablebson::Document postImage(preImage->toBson());
     uassertStatusOK(updateDriver.update(pExpCtx->getOperationContext(),
-                                        StringData(),
+                                        std::string_view(),
                                         &postImage,
                                         false /* validateForStorage */,
                                         FieldRefSet(),

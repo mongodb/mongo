@@ -29,6 +29,8 @@
 
 #include "mongo/watchdog/watchdog_register.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
@@ -37,7 +39,7 @@ std::vector<std::string> watchdogPaths;
 
 }  // namespace
 
-void registerWatchdogPath(StringData path) {
+void registerWatchdogPath(std::string_view path) {
     if (!path.empty()) {
         watchdogPaths.push_back(std::string{path});
     }

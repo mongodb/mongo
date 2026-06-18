@@ -31,7 +31,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -57,6 +56,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -74,7 +74,10 @@ std::unique_ptr<DBClientBase> getIntegrationTestConnection() {
     return std::move(swConn.getValue());
 }
 
-Message makeUnsupportedOpUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
+Message makeUnsupportedOpUpdateMessage(std::string_view ns,
+                                       BSONObj query,
+                                       BSONObj update,
+                                       int flags) {
     return makeMessage(dbUpdate, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
@@ -86,7 +89,7 @@ Message makeUnsupportedOpUpdateMessage(StringData ns, BSONObj query, BSONObj upd
     });
 }
 
-Message makeUnsupportedOpRemoveMessage(StringData ns, BSONObj query, int flags) {
+Message makeUnsupportedOpRemoveMessage(std::string_view ns, BSONObj query, int flags) {
     return makeMessage(dbDelete, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
@@ -105,7 +108,7 @@ Message makeUnsupportedOpKillCursorsMessage(long long cursorId) {
     });
 }
 
-Message makeUnsupportedOpQueryMessage(StringData ns,
+Message makeUnsupportedOpQueryMessage(std::string_view ns,
                                       BSONObj query,
                                       int nToReturn,
                                       int nToSkip,
@@ -122,7 +125,7 @@ Message makeUnsupportedOpQueryMessage(StringData ns,
     });
 }
 
-Message makeUnsupportedOpGetMoreMessage(StringData ns,
+Message makeUnsupportedOpGetMoreMessage(std::string_view ns,
                                         long long cursorId,
                                         int nToReturn,
                                         int flags) {
@@ -188,7 +191,7 @@ TEST(OpLegacy, UnsupportedWriteOps) {
     ASSERT_THROWS(conn->call(opDelete), ExceptionFor<ErrorCategory::NetworkError>);
 }
 
-void assertFailure(const Message response, StringData expectedErr) {
+void assertFailure(const Message response, std::string_view expectedErr) {
     QueryResult::ConstView qr = response.singleData().view2ptr();
     BufReader responseData(qr.data(), qr.dataLen());
     BSONObj responseBody = responseData.read<BSONObj>();

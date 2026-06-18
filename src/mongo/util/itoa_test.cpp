@@ -29,7 +29,6 @@
 
 #include "mongo/util/itoa.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
@@ -38,6 +37,7 @@
 #include <ostream>
 #include <random>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -107,7 +107,7 @@ TEST(ItoA, StringDataEquality) {
     for (const auto& i : cases) {
         ItoA a{i};
         std::string expected = std::to_string(i);
-        ASSERT_EQ(StringData(a), expected) << ", i=" << i;
+        ASSERT_EQ(std::string_view(a), expected) << ", i=" << i;
         ASSERT_EQ(a.toStringData(), expected) << ", i=" << i;
     }
 }

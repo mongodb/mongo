@@ -66,6 +66,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -106,6 +107,7 @@ MONGO_COMPILER_NOINLINE int recurseWithLinkage(RecursionParam& p, std::uint64_t 
 }  // namespace stacktrace_test_detail
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace std::literals::chrono_literals;
 
@@ -136,13 +138,13 @@ private:
 template <typename T>
 class LogVec : public LogAdapter {
 public:
-    explicit LogVec(const T& v, StringData sep = ","_sd) : v(v), sep(sep) {}
+    explicit LogVec(const T& v, std::string_view sep = ","sv) : v(v), sep(sep) {}
 
 private:
     void doPrint(std::ostream& os) const override {
         os << std::hex;
         os << "{";
-        StringData s;
+        std::string_view s;
         for (auto&& e : v) {
             os << s << e;
             s = sep;
@@ -151,14 +153,14 @@ private:
         os << std::dec;
     }
     const T& v;
-    StringData sep = ","_sd;
+    std::string_view sep = ","sv;
 };
 
 uintptr_t fromHex(const std::string& s) {
     return static_cast<uintptr_t>(std::stoull(s, nullptr, 16));
 }
 
-bool consume(const pcre::Regex& re, StringData* in, std::string* out) {
+bool consume(const pcre::Regex& re, std::string_view* in, std::string* out) {
     auto m = re.matchView(*in);
     if (!m)
         return false;
@@ -188,7 +190,7 @@ TEST(StackTrace, PosixFormat) {
     // Each "Frame:" line holds a full json object, but we only examine its "a" field here.
     std::string jsonLine;
     std::vector<uintptr_t> humanAddrs;
-    StringData in{trace};
+    std::string_view in{trace};
     static const pcre::Regex jsonLineRE(R"re(^BACKTRACE: (\{.*\})\n?)re");
     ASSERT_TRUE(consume(jsonLineRE, &in, &jsonLine)) << "\"" << in << "\"";
     while (true) {
@@ -569,10 +571,10 @@ public:
 };
 
 TEST_F(JsonTest, Hex) {
-    ASSERT_EQ(StringData(Hex(static_cast<void*>(0))), "0");
-    ASSERT_EQ(StringData(Hex(0xffff)), "FFFF");
-    ASSERT_EQ(StringData(Hex(0xfff0)), "FFF0");
-    ASSERT_EQ(StringData(Hex(0x8000'0000'0000'0000)), "8000000000000000");
+    ASSERT_EQ(std::string_view(Hex(static_cast<void*>(0))), "0");
+    ASSERT_EQ(std::string_view(Hex(0xffff)), "FFFF");
+    ASSERT_EQ(std::string_view(Hex(0xfff0)), "FFF0");
+    ASSERT_EQ(std::string_view(Hex(0x8000'0000'0000'0000)), "8000000000000000");
     ASSERT_EQ(Hex::fromHex("FFFF"), 0xffff);
     ASSERT_EQ(Hex::fromHex("0"), 0);
     ASSERT_EQ(Hex::fromHex("FFFFFFFFFFFFFFFF"), 0xffff'ffff'ffff'ffff);

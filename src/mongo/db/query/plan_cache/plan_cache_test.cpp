@@ -33,7 +33,6 @@
 
 #include "mongo/db/query/plan_cache/plan_cache.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"

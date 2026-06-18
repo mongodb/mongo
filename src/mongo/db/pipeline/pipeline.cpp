@@ -78,6 +78,7 @@
 #include <exception>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -86,6 +87,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Performs validation checking specific to top-level pipelines. Throws an assertion if the
@@ -105,7 +107,7 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
         return;
     }
 
-    if ("$mergeCursors"_sd != sources.front()->getSourceName()) {
+    if ("$mergeCursors"sv != sources.front()->getSourceName()) {
         // The $mergeCursors stage can take {aggregate: 1} or a normal namespace. Aside from this,
         // {aggregate: 1} is only valid for collectionless sources, and vice-versa.
         const auto firstStageConstraints = sources.front()->constraints();
@@ -140,7 +142,7 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
                                   << " can only be used in a $changeStream pipeline",
                     !(source->constraints().requiresChangeStream() && !isChangeStream));
             // Check whether this is a change stream split stage.
-            if ("$changeStreamSplitLargeEvent"_sd == source->getSourceName()) {
+            if ("$changeStreamSplitLargeEvent"sv == source->getSourceName()) {
                 hasChangeStreamSplitLargeEventStage = true;
             }
         }
@@ -295,7 +297,7 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
             static_cast<int>(_sources.size()) <= internalPipelineLengthLimit.load());
 
     // Keep track of stages which can only appear once.
-    std::set<StringData> singleUseStages;
+    std::set<std::string_view> singleUseStages;
 
     for (auto sourceIter = _sources.begin(); sourceIter != _sources.end(); ++sourceIter) {
         auto& stage = *sourceIter;
@@ -829,7 +831,7 @@ DocumentSource* Pipeline::peekFront() const {
     return _sources.empty() ? nullptr : _sources.front().get();
 }
 
-boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithName(StringData targetStageName) {
+boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithName(std::string_view targetStageName) {
     tassert(10706507,
             "attempting to modify a frozen pipeline in 'Pipeline::popFrontWithName()'",
             !_frozen);

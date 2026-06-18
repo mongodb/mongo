@@ -38,8 +38,11 @@
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::query_shape {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using write_ops::DeleteCommandRequest;
 
@@ -85,7 +88,7 @@ public:
         _expCtx = make_intrusive<ExpressionContextForTest>();
     }
 
-    DeleteCmdShape makeOneShapeFromDelete(StringData deleteCmd) {
+    DeleteCmdShape makeOneShapeFromDelete(std::string_view deleteCmd) {
         auto shapes = makeShapesFromDelete(fromjson(deleteCmd));
         ASSERT_EQ(shapes.size(), 1U);
         return shapes.front();
@@ -131,7 +134,7 @@ TEST_F(DeleteCmdShapeTest, EmptyQueryDeleteShape) {
         delete: "testColl",
         deletes: [ { q: {}, limit: 0 } ],
         "$db": "testDB" 
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -170,7 +173,7 @@ TEST_F(DeleteCmdShapeTest, SingleDocumentDeleteShapeWithQuery) {
         delete: "testColl",
         deletes: [ { q: { x: 1 }, limit: 1 } ],
         "$db": "testDB" 
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -208,7 +211,7 @@ TEST_F(DeleteCmdShapeTest, MultiDocumentDeleteShapeWithQuery) {
         delete: "testColl",
         deletes: [ { q: { x: 1 }, limit: 0 } ],
         "$db": "testDB" 
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -246,7 +249,7 @@ TEST_F(DeleteCmdShapeTest, ComplexDeleteQuery) {
         delete: "testColl",
         deletes: [ { q: { $and: [ { age: { $gt: 18 } }, { status: "active" } ] }, limit: 0 } ],
         "$db": "testDB" 
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -287,7 +290,7 @@ TEST_F(DeleteCmdShapeTest, DeleteWithIdQuery) {
         delete: "testColl",
         deletes: [ { q: { _id: 5 }, limit: 1 } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -332,7 +335,7 @@ TEST_F(DeleteCmdShapeTest, AllDeleteFieldsAllSerializationOptions) {
         deletes: [ { q: { $expr: { $eq: ["$x", "$$myVar"] } }, limit: 1, collation: { locale: "en", strength: 2 } } ],
         let: { myVar: "hello" },
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -429,7 +432,7 @@ TEST_F(DeleteCmdShapeTest, SizeCalculation) {
         delete: "testColl",
         deletes: [ { q: { x: 1 }, limit: 0 } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     const auto& components =
         static_cast<const DeleteCmdShapeComponents&>(shape.specificComponents());
@@ -449,7 +452,7 @@ TEST_F(DeleteCmdShapeTest, StableQueryShapeHashValue) {
     deleteCmd.limit = 0;
     auto serializationContext = SerializationContext::stateCommandRequest();
 
-    auto verifyHash = [&](StringData expectedHash, const DeleteCmdBuilder& deleteCmd) {
+    auto verifyHash = [&](std::string_view expectedHash, const DeleteCmdBuilder& deleteCmd) {
         auto shapes = makeShapesFromDelete(deleteCmd.toBSON());
         ASSERT_EQ(shapes.size(), 1);
         const DeleteCmdShape& shape = shapes.front();

@@ -53,6 +53,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -162,9 +163,9 @@ inline bool mustAbortAtShutdown(IndexBuildProtocol protocol) {
 /**
  * Returns a string representation of IndexBuildProtocol.
  */
-StringData indexBuildProtocolToString(IndexBuildProtocol protocol);
+std::string_view indexBuildProtocolToString(IndexBuildProtocol protocol);
 
-IndexBuildProtocol parseIndexBuildProtocol(StringData);
+IndexBuildProtocol parseIndexBuildProtocol(std::string_view);
 
 // Indicates the type of abort or commit signal that will be received by primary and secondaries.
 enum class IndexBuildAction {

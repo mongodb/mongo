@@ -32,7 +32,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -53,6 +52,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -64,8 +64,8 @@ const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOn
 
 class BalancerControlCommand : public BasicCommand {
 public:
-    BalancerControlCommand(StringData name,
-                           StringData configsvrCommandName,
+    BalancerControlCommand(std::string_view name,
+                           std::string_view configsvrCommandName,
                            ActionType authorizationAction,
                            bool logCommand)
         : BasicCommand(name),
@@ -127,7 +127,7 @@ public:
     }
 
 private:
-    const StringData _configsvrCommandName;
+    const std::string_view _configsvrCommandName;
     const ActionType _authorizationAction;
     const bool _logCommand;
 };

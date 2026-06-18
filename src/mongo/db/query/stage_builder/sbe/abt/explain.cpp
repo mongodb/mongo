@@ -35,7 +35,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
@@ -49,6 +48,7 @@
 #include <iterator>
 #include <map>
 #include <sstream>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -129,7 +129,7 @@ public:
         return *this;
     }
 
-    ExplainPrinterImpl& print(StringData s) {
+    ExplainPrinterImpl& print(std::string_view s) {
         print(s.empty() ? "<empty>" : s.data());
         return *this;
     }
@@ -460,7 +460,7 @@ public:
         return *this;
     }
 
-    ExplainPrinterImpl& print(StringData s) {
+    ExplainPrinterImpl& print(std::string_view s) {
         printStringInternal(s);
         return *this;
     }
@@ -544,7 +544,7 @@ public:
     }
 
 private:
-    ExplainPrinterImpl& printStringInternal(StringData s) {
+    ExplainPrinterImpl& printStringInternal(std::string_view s) {
         auto [tag, val] = sbe::value::makeNewString(s);
         addValue(tag, val);
         return *this;

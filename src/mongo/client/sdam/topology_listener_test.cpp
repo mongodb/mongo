@@ -29,7 +29,6 @@
 
 #include "mongo/client/sdam/topology_listener.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"

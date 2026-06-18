@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
@@ -65,6 +64,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -576,7 +576,7 @@ private:
                          TxnNumber txnNumber,
                          boost::optional<bool> startTransaction);
 
-    SemiFuture<BSONObj> _commitOrAbort(const DatabaseName& dbName, StringData cmdName);
+    SemiFuture<BSONObj> _commitOrAbort(const DatabaseName& dbName, std::string_view cmdName);
 
     /**
      * Extracts transaction options from Operation Context and infers the internal transaction’s

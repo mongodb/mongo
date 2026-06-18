@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
@@ -37,6 +36,7 @@
 #include "mongo/util/serialization_context.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -55,7 +55,7 @@ public:
      * This method should only be used in authentication code to deserialize `authDB` (which can be
      * any value and doesn't have a tenant). All other cases should use `DatabaseNameUtil`.
      */
-    static DatabaseName deserialize(StringData db) {
+    static DatabaseName deserialize(std::string_view db) {
         return DatabaseName(boost::none, db);
     }
 };
@@ -84,7 +84,7 @@ public:
     static std::string serialize(const DatabaseName& dbName, const SerializationContext& context);
 
     /**
-     * Deserializes StringData dbName to a DatabaseName object.
+     * Deserializes std::string_view dbName to a DatabaseName object.
      *
      * If multitenancySupport is enabled and featureFlagRequireTenantID is enabled, then a
      * DatabaseName object is constructed using the tenantId passed in to the constructor. The
@@ -108,35 +108,37 @@ public:
      * eg. deserialize(boost::none, "foo") -> DatabaseName(boost::none, "foo")
      */
     static DatabaseName deserialize(boost::optional<TenantId> tenantId,
-                                    StringData db,
+                                    std::string_view db,
                                     const SerializationContext& context);
 
     /**
      * To be used with Failpoints since they can be database specific. Parses the `data` BSONObj to
      * find an existing `dbFieldName` and returns a DatabaseName object from it.
      */
-    static DatabaseName parseFailPointData(const BSONObj& data, StringData dbFieldName);
+    static DatabaseName parseFailPointData(const BSONObj& data, std::string_view dbFieldName);
 
     /**
      * To be used only for deserializing a DatabaseName object from a db string in error messages.
      */
-    static DatabaseName deserializeForErrorMsg(StringData dbInErrMsg);
+    static DatabaseName deserializeForErrorMsg(std::string_view dbInErrMsg);
 
 private:
-    static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
+    static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(std::string_view dbName);
 
     static std::string serializeForStorage(const DatabaseName& dbName);
 
     static std::string serializeForCommands(const DatabaseName& dbName,
                                             const SerializationContext& context);
 
-    static DatabaseName deserializeForStorage(boost::optional<TenantId> tenantId, StringData db);
+    static DatabaseName deserializeForStorage(boost::optional<TenantId> tenantId,
+                                              std::string_view db);
 
     static DatabaseName deserializeForCommands(boost::optional<TenantId> tenantId,
-                                               StringData db,
+                                               std::string_view db,
                                                const SerializationContext& context);
 
-    static DatabaseName deserializeForCatalog(boost::optional<TenantId> tenantId, StringData db);
+    static DatabaseName deserializeForCatalog(boost::optional<TenantId> tenantId,
+                                              std::string_view db);
 };
 
 }  // namespace mongo

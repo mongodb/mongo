@@ -28,7 +28,6 @@
  */
 #include "mongo/db/change_stream_pre_image_id_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -46,6 +45,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -54,7 +54,8 @@ namespace mongo {
 
 namespace change_stream_pre_image_id_util {
 namespace {
-static constexpr auto kTopLevelFieldName = "ridAsBSON"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr auto kTopLevelFieldName = "ridAsBSON"sv;
 
 // Number of valid bits for 'applyOpsIndex' value. The highest (64th) bit would be the sign bit, but
 // 'applyOpsIndex' values must always be >= 0.

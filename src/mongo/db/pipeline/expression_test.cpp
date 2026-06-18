@@ -62,9 +62,13 @@
 #include <climits>
 #include <cmath>
 #include <limits>
+#include <string_view>
+
+using namespace std::literals::string_view_literals;
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
+using namespace std::literals::string_view_literals;
 namespace mongo {
 namespace ExpressionTests {
 
@@ -200,7 +204,7 @@ TEST(ExpressionConstantTest, ConstantRedaction) {
 
     // Test that a constant is replaced.
     auto expCtx = ExpressionContextForTest{};
-    intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value("my_ssn"_sd));
+    intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value("my_ssn"sv));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"field":"?string"})",
         BSON("field" << expression->serialize(options)));
@@ -677,8 +681,8 @@ TEST(ParseExpression, ShouldParseExpressionWithMultipleArguments) {
     auto resultExpression = parseExpression(BSON("$strcasecmp" << BSON_ARRAY("foo" << "FOO")));
     auto strCaseCmpExpression = dynamic_cast<ExpressionStrcasecmp*>(resultExpression.get());
     ASSERT_TRUE(strCaseCmpExpression);
-    vector<Value> arguments = {Value(Document{{"$const", "foo"_sd}}),
-                               Value(Document{{"$const", "FOO"_sd}})};
+    vector<Value> arguments = {Value(Document{{"$const", "foo"sv}}),
+                               Value(Document{{"$const", "FOO"sv}})};
     ASSERT_VALUE_EQ(strCaseCmpExpression->serialize(), Value(Document{{"$strcasecmp", arguments}}));
 }
 
@@ -751,22 +755,22 @@ TEST(ParseOperand, ShouldRecognizeFieldPath) {
     auto resultExpression = parseOperand(BSON("" << "$field"));
     auto fieldPathExpression = dynamic_cast<ExpressionFieldPath*>(resultExpression.get());
     ASSERT_TRUE(fieldPathExpression);
-    ASSERT_VALUE_EQ(fieldPathExpression->serialize(), Value("$field"_sd));
+    ASSERT_VALUE_EQ(fieldPathExpression->serialize(), Value("$field"sv));
 }
 
 TEST(ParseOperand, ShouldRecognizeStringLiteral) {
     auto resultExpression = parseOperand(BSON("" << "foo"));
     auto constantExpression = dynamic_cast<ExpressionConstant*>(resultExpression.get());
     ASSERT_TRUE(constantExpression);
-    ASSERT_VALUE_EQ(constantExpression->serialize(), Value(Document{{"$const", "foo"_sd}}));
+    ASSERT_VALUE_EQ(constantExpression->serialize(), Value(Document{{"$const", "foo"sv}}));
 }
 
 TEST(ParseOperand, ShouldRecognizeNestedArray) {
     auto resultExpression = parseOperand(BSON("" << BSON_ARRAY("foo" << "$field")));
     auto arrayExpression = dynamic_cast<ExpressionArray*>(resultExpression.get());
     ASSERT_TRUE(arrayExpression);
-    vector<Value> expectedSerializedArray = {Value(Document{{"$const", "foo"_sd}}),
-                                             Value("$field"_sd)};
+    vector<Value> expectedSerializedArray = {Value(Document{{"$const", "foo"sv}}),
+                                             Value("$field"sv)};
     ASSERT_VALUE_EQ(arrayExpression->serialize(), Value(expectedSerializedArray));
 }
 
@@ -1165,9 +1169,9 @@ TEST(ExpressionToHashedIndexKeyTest, DoesAddInputDependencies) {
 TEST(ExpressionGetFieldTest, GetFieldTestNullByte) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
-    StringData str("fo\0o", 4);
+    std::string_view str("fo\0o", 4);
     BSONObjBuilder b;
-    b.append("$meta"_sd, str);
+    b.append("$meta"sv, str);
     BSONObj expr{b.obj()};
     auto expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
     BSONObj expr1 = fromjson("{$meta: \"foo\"}");
@@ -1797,7 +1801,7 @@ TEST(ExpressionSetFieldTest, SetFieldSerializesCorrectly) {
 
 TEST(ExpressionSetFieldTest, SetFieldRejectsNullCharInFieldArgument) {
     auto expCtx = ExpressionContextForTest{};
-    auto fieldExpr = make_intrusive<ExpressionConstant>(&expCtx, Value("ab\0c"_sd));
+    auto fieldExpr = make_intrusive<ExpressionConstant>(&expCtx, Value("ab\0c"sv));
     auto inputExpr = make_intrusive<ExpressionConstant>(&expCtx, Value(BSON("a" << 1)));
     auto valueExpr = make_intrusive<ExpressionConstant>(&expCtx, Value(true));
     ASSERT_THROWS_CODE(
@@ -1824,7 +1828,7 @@ TEST(ExpressionIfNullTest,
     auto expr = fromjson("{$ifNull: [null, \"$a\"]}");
     auto exprIfNull = ExpressionIfNull::parse(&expCtx, expr.firstElement(), vps);
     auto optimizedNullRemoved = exprIfNull->optimize();
-    ASSERT_VALUE_EQ(optimizedNullRemoved->serialize(), Value("$a"_sd));
+    ASSERT_VALUE_EQ(optimizedNullRemoved->serialize(), Value("$a"sv));
 }
 
 TEST(ExpressionIfNullTest, OptimizedExpressionIfNullShouldRemoveAllNullConstantsButLast) {

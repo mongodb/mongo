@@ -41,6 +41,8 @@
 // IWYU pragma: no_include "bits/types/siginfo_t.h"
 
 #ifdef __linux__
+#include <string_view>
+
 #include <ucontext.h>
 #endif
 
@@ -48,7 +50,6 @@
 #include "mongo/util/exception_filter_win32.h"
 #endif
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/exception.h"
 #include "mongo/util/active_exception_witness.h"
@@ -72,6 +73,7 @@ namespace mongo {
 Atomic<bool> shouldLogScopedDebugInfoInSignalHandlers{true};
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 std::function<void()> gSynchronousSignalHandlerCb;
 
@@ -109,8 +111,8 @@ public:
         setp(_buffer, _buffer + maxLogLineSize);
     }
 
-    StringData str() const {
-        return StringData(pbase(), pptr() - pbase());
+    std::string_view str() const {
+        return std::string_view(pbase(), pptr() - pbase());
     }
     void rewind() {
         setp(pbase(), epptr());
@@ -174,7 +176,7 @@ private:
     std::unique_lock<std::mutex> _lk;
 };
 
-void logNoRecursion(StringData message) {
+void logNoRecursion(std::string_view message) {
     // If we were within a log call when we hit a signal, don't call back into the logging
     // subsystem.
     if (logv2::loggingInProgress()) {
@@ -215,10 +217,10 @@ void dumpScopedDebugInfo(std::ostream& os) {
     if (diagStack.empty())
         return;
     os << "ScopedDebugInfo: [";
-    StringData sep;
+    std::string_view sep;
     for (const auto& s : diagStack) {
         os << sep << '"' << s << '"';
-        sep = ", "_sd;
+        sep = ", "sv;
     }
     os << "]\n";
 }

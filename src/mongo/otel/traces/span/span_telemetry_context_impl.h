@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/otel/telemetry_context.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <opentelemetry/context/propagation/text_map_propagator.h>
@@ -81,7 +82,7 @@ public:
         return opentelemetry::trace::GetSpan(_ctx);
     }
 
-    StringData type() const override {
+    std::string_view type() const override {
         return "SpanTelemetryContextImpl";
     }
 

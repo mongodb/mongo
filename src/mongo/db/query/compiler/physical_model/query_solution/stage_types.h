@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace mongo {
 /**
@@ -176,6 +176,6 @@ inline bool isSortStageType(StageType stageType) {
 
 struct QuerySolutionNode;
 
-StringData nodeStageTypeToString(const QuerySolutionNode* node);
+std::string_view nodeStageTypeToString(const QuerySolutionNode* node);
 
 }  // namespace mongo

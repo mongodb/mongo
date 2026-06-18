@@ -36,6 +36,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
+#include <string_view>
+
 #include <wiredtiger.h>
 
 namespace mongo {
@@ -71,7 +73,7 @@ TEST_F(WiredTigerSizeStorerTest, Store) {
     auto sizeStorer1 = makeSizeStorer();
     auto sizeStorer2 = makeSizeStorer();
     auto sizeInfo = std::make_shared<WiredTigerSizeStorer::SizeInfo>(1, 10);
-    StringData uri{"uri1"};
+    std::string_view uri{"uri1"};
 
     sizeStorer1.store(uri, sizeInfo);
 
@@ -105,7 +107,7 @@ TEST_F(WiredTigerSizeStorerTest, Store) {
 TEST_F(WiredTigerSizeStorerTest, RemoveBeforeFlush) {
     auto sizeStorer = makeSizeStorer();
     auto sizeInfo = std::make_shared<WiredTigerSizeStorer::SizeInfo>(1, 10);
-    StringData uri{"uri1"};
+    std::string_view uri{"uri1"};
 
     sizeStorer.store(uri, sizeInfo);
 
@@ -135,7 +137,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveBeforeFlush) {
 TEST_F(WiredTigerSizeStorerTest, RemoveAfterFlush) {
     auto sizeStorer = makeSizeStorer();
     auto sizeInfo = std::make_shared<WiredTigerSizeStorer::SizeInfo>(1, 10);
-    StringData uri{"uri1"};
+    std::string_view uri{"uri1"};
 
     sizeStorer.store(uri, sizeInfo);
     sizeStorer.flush(false);
@@ -166,7 +168,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveAfterFlush) {
 TEST_F(WiredTigerSizeStorerTest, RemoveNonexistent) {
     auto sizeStorer = makeSizeStorer();
     auto sizeInfo = std::make_shared<WiredTigerSizeStorer::SizeInfo>(1, 10);
-    StringData uri{"uri1"};
+    std::string_view uri{"uri1"};
 
     sizeStorer.remove(uri);
 

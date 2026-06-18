@@ -34,6 +34,7 @@
 
 #include <limits>
 #include <sstream>
+#include <string_view>
 
 namespace mongo {
 
@@ -160,7 +161,7 @@ bool SafeNum::isIdentical(const SafeNum& rhs) const {
     }
 }
 
-void SafeNum::toBSON(StringData fieldName, BSONObjBuilder* bob) const {
+void SafeNum::toBSON(std::string_view fieldName, BSONObjBuilder* bob) const {
     switch (_type) {
         case BSONType::numberInt:
             bob->append(fieldName, _value.int32Val);

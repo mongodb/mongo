@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_visitor.h"
@@ -41,6 +40,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -207,7 +207,7 @@ public:
         return cloneNode;
     }
 
-    ASTNode* getChild(StringData fieldName) const {
+    ASTNode* getChild(std::string_view fieldName) const {
         tassert(7858000,
                 "Expected the same number of field names as children, and either not using the "
                 "internal field name to child map or the map should have the same size.",
@@ -231,7 +231,7 @@ public:
         }
     }
 
-    void addChild(StringData fieldName, std::unique_ptr<ASTNode> node) {
+    void addChild(std::string_view fieldName, std::unique_ptr<ASTNode> node) {
         auto rawPtrNode = node.get();
         addChildToInternalVector(std::move(node));
         _fieldNames.push_back(std::string{fieldName});
@@ -254,7 +254,7 @@ public:
      * Remove a node which is a direct child of this tree. Returns true if anything was removed,
      * false otherwise.
      */
-    bool removeChild(StringData fieldName) {
+    bool removeChild(std::string_view fieldName) {
         if (auto it = std::find(_fieldNames.begin(), _fieldNames.end(), fieldName);
             it != _fieldNames.end()) {
             _children.erase(_children.begin() + std::distance(_fieldNames.begin(), it));

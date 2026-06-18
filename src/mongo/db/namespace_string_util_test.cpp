@@ -45,6 +45,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 TEST(AuthNamespaceStringUtil, Deserialize) {
     {
@@ -548,13 +549,13 @@ TEST(NamespaceStringUtilTest, ParseFailPointData) {
     {
         BSONObjBuilder bob;
         bob.append("nss", "myDb.myColl");
-        const auto fpNss = NamespaceStringUtil::parseFailPointData(bob.obj(), "nss"_sd);
+        const auto fpNss = NamespaceStringUtil::parseFailPointData(bob.obj(), "nss"sv);
         ASSERT_EQ(NamespaceString::createNamespaceString_forTest(boost::none, "myDb.myColl"),
                   fpNss);
     }
     // Test fail point data is empty.
     {
-        auto fpNss = NamespaceStringUtil::parseFailPointData(BSONObj(), "nss"_sd);
+        auto fpNss = NamespaceStringUtil::parseFailPointData(BSONObj(), "nss"sv);
         ASSERT_EQ(NamespaceString(), fpNss);
     }
 }

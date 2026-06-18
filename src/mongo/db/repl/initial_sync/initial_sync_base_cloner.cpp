@@ -49,6 +49,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -69,7 +70,7 @@ namespace repl {
 MONGO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint1);
 MONGO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint2);
 
-InitialSyncBaseCloner::InitialSyncBaseCloner(StringData clonerName,
+InitialSyncBaseCloner::InitialSyncBaseCloner(std::string_view clonerName,
                                              InitialSyncSharedData* sharedData,
                                              const HostAndPort& source,
                                              DBClientConnection* client,

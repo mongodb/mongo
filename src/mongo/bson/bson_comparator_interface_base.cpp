@@ -40,6 +40,7 @@
 
 #include <cmath>
 #include <limits>
+#include <string_view>
 
 #include <boost/functional/hash.hpp>
 
@@ -72,7 +73,7 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
     const StringDataComparator* stringComparator) {
     boost::hash_combine(hash, elemToHash.canonicalType());
 
-    const StringData fieldName = elemToHash.fieldNameStringData();
+    const std::string_view fieldName = elemToHash.fieldNameStringData();
     if ((rules & ComparisonRules::kConsiderFieldName) && !fieldName.empty()) {
         simpleStringDataComparator.hash_combine(hash, fieldName);
     }
@@ -165,7 +166,7 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
         case mongo::BSONType::binData:
             // All bytes of the value are required to be identical.
             simpleStringDataComparator.hash_combine(
-                hash, StringData(elemToHash.value(), elemToHash.valuesize()));
+                hash, std::string_view(elemToHash.value(), elemToHash.valuesize()));
             break;
 
         case mongo::BSONType::regEx:
@@ -175,7 +176,8 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
 
         case mongo::BSONType::codeWScope: {
             simpleStringDataComparator.hash_combine(
-                hash, StringData(elemToHash.codeWScopeCode(), elemToHash.codeWScopeCodeLen()));
+                hash,
+                std::string_view(elemToHash.codeWScopeCode(), elemToHash.codeWScopeCodeLen()));
             hashCombineBSONObj(hash,
                                elemToHash.codeWScopeObject(),
                                rules | ComparisonRules::kConsiderFieldName,

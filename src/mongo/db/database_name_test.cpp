@@ -37,6 +37,8 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -46,6 +48,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(DatabaseNameTest, MultitenancySupportDisabled) {
     DatabaseName dbnWithoutTenant1 = DatabaseName::createDatabaseName_forTest(boost::none, "a");
@@ -156,7 +159,7 @@ TEST(DatabaseNameTest, DatabaseValidNames) {
     ASSERT(!DatabaseName::validDBName("foo.bar", DatabaseName::DollarInDbNameBehavior::Allow));
     ASSERT(!DatabaseName::validDBName("foo\\bar", DatabaseName::DollarInDbNameBehavior::Allow));
     ASSERT(!DatabaseName::validDBName("foo\"bar", DatabaseName::DollarInDbNameBehavior::Allow));
-    ASSERT(!DatabaseName::validDBName("a\0b"_sd, DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("a\0b"sv, DatabaseName::DollarInDbNameBehavior::Allow));
 #ifdef _WIN32
     ASSERT(!DatabaseName::validDBName("foo*bar", DatabaseName::DollarInDbNameBehavior::Allow));
     ASSERT(!DatabaseName::validDBName("foo<bar", DatabaseName::DollarInDbNameBehavior::Allow));
@@ -173,7 +176,7 @@ TEST(DatabaseNameTest, DatabaseValidNames) {
     ASSERT(!DatabaseName::validDBName("foo.bar"));
     ASSERT(!DatabaseName::validDBName("foo\\bar"));
     ASSERT(!DatabaseName::validDBName("foo\"bar"));
-    ASSERT(!DatabaseName::validDBName("a\0b"_sd));
+    ASSERT(!DatabaseName::validDBName("a\0b"sv));
 #ifdef _WIN32
     ASSERT(!DatabaseName::validDBName("foo*bar"));
     ASSERT(!DatabaseName::validDBName("foo<bar"));
@@ -212,7 +215,7 @@ TEST(DatabaseNameTest, EmptyDbString) {
     ASSERT_EQ(empty.toStringWithTenantId_forTest(), "");
 
     DatabaseName emptyFromStringData =
-        DatabaseName::createDatabaseName_forTest(boost::none, StringData());
+        DatabaseName::createDatabaseName_forTest(boost::none, std::string_view());
     ASSERT_FALSE(emptyFromStringData.tenantId());
     ASSERT_EQ(emptyFromStringData.toString_forTest(), "");
     ASSERT_EQ(emptyFromStringData.toStringWithTenantId_forTest(), "");

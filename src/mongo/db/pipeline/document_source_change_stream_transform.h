@@ -46,6 +46,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -59,7 +60,7 @@ using ChangeStreamTransformLiteParsed =
 
 class DocumentSourceChangeStreamTransform final : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamTransform"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamTransform"_sd;
 
     /**
      * Creates a new transformation stage from the given specification.
@@ -96,7 +97,7 @@ public:
         return boost::none;
     }
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

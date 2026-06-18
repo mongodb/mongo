@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/index/index_access_method.h"
@@ -55,6 +54,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -404,7 +404,7 @@ private:
 
     Status _failPointHangDuringBuild(OperationContext* opCtx,
                                      FailPoint* fp,
-                                     StringData where,
+                                     std::string_view where,
                                      const BSONObj& doc,
                                      unsigned long long iteration) const;
 

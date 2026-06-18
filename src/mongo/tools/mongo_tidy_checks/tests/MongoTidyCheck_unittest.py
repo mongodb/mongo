@@ -293,36 +293,6 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
-    def test_MongoStringDataConstRefCheck1(self):
-        self.expected_output = [
-            "Prefer passing StringData by value.",
-        ]
-
-        self.run_clang_tidy()
-
-    def test_MongoStringDataConstRefCheck2(self):
-        self.expected_output = [
-            "Prefer passing StringData by value.",
-        ]
-
-        self.run_clang_tidy()
-
-    def test_MongoStringDataConstRefCheck3(self):
-        self.expected_output = [
-            "",
-        ]
-
-        self.run_clang_tidy()
-
-    def test_MongoStringDataStringViewApiCheck(self):
-        self.expected_output = [
-            "replace 'rawData' with 'data'",
-            "replace 'startsWith' with 'starts_with'",
-            "replace 'endsWith' with 'ends_with'",
-        ]
-
-        self.run_clang_tidy()
-
     def test_MongoInvariantStatusIsOKCheck(self):
         self.expected_output = [
             "Found invariant(status.isOK()) or dassert(status.isOK()), use invariant(status) for better diagnostics",

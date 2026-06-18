@@ -29,18 +29,19 @@
 
 #include "mongo/db/query/plan_cache/plan_cache_bm_fixture.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/util/assert_util.h"
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 #include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 BSONArray buildArray(int size) {
     BSONArrayBuilder builder;
     for (int i = 0; i < size; i++) {
@@ -50,7 +51,7 @@ BSONArray buildArray(int size) {
 }
 
 std::string getField(int index) {
-    static constexpr StringData kViableChars = "abcdefghijklmnopqrstuvwxyz"_sd;
+    static constexpr std::string_view kViableChars = "abcdefghijklmnopqrstuvwxyz"sv;
     invariant(size_t(index) < kViableChars.size());
     return std::string(1, kViableChars[index]);
 }

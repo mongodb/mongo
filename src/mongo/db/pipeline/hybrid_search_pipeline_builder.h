@@ -38,6 +38,7 @@
 #include "mongo/util/modules.h"
 
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -66,20 +67,20 @@ public:
 
 protected:
     const StringMap<double> _weights;
-    const StringData _stageInternalFieldsName;
-    const StringData _stageInternalDocsName;
+    const std::string_view _stageInternalFieldsName;
+    const std::string_view _stageInternalDocsName;
     const bool _includeScoreDetails;
-    const StringData _scoreDetailsDescription;
+    const std::string_view _scoreDetailsDescription;
 
     StringMap<double> getWeights() const {
         return _weights;
     }
 
-    StringData getInternalFieldsName() const {
+    std::string_view getInternalFieldsName() const {
         return _stageInternalFieldsName;
     }
 
-    StringData getInternalDocsName() const {
+    std::string_view getInternalDocsName() const {
         return _stageInternalDocsName;
     }
 
@@ -87,7 +88,7 @@ protected:
         return _includeScoreDetails;
     }
 
-    StringData getScoreDetailsDescription() const {
+    std::string_view getScoreDetailsDescription() const {
         return _scoreDetailsDescription;
     }
 
@@ -124,10 +125,10 @@ protected:
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     HybridSearchPipelineBuilder(StringMap<double> weights,
-                                StringData stageInternalFieldsName,
-                                StringData stageInternalDocsName,
+                                std::string_view stageInternalFieldsName,
+                                std::string_view stageInternalDocsName,
                                 bool includeScoreDetails,
-                                StringData scoreDetailsDescription)
+                                std::string_view scoreDetailsDescription)
         : _weights(weights),
           _stageInternalFieldsName(stageInternalFieldsName),
           _stageInternalDocsName(stageInternalDocsName),
@@ -138,7 +139,7 @@ private:
     // Prefix applied to flat field names in the $group stage output. Because $group cannot
     // output dotted-path field names, all accumulated per-pipeline values are stored under
     // "__hs_"-prefixed flat names so they can later be referenced.
-    static constexpr StringData kHsFlatFieldPrefix = "__hs_"_sd;
+    static constexpr std::string_view kHsFlatFieldPrefix = "__hs_"_sd;
 
     /**
      * Build a $group and $replaceRoot that aggregate scores across input pipelines and restore
@@ -174,7 +175,7 @@ private:
      * user enabled it).
      */
     virtual std::list<boost::intrusive_ptr<DocumentSource>> buildInputPipelineDesugaringStages(
-        StringData firstInputPipelineName,
+        std::string_view firstInputPipelineName,
         double weight,
         const std::unique_ptr<Pipeline>& pipeline,
         bool inputGeneratesScoreDetails,
@@ -194,13 +195,13 @@ private:
      * Returns the name of the per-pipeline scalar field that carries stage-specific metadata
      * needed for scoreDetails output. Only called when shouldIncludeScoreDetails() is true.
      */
-    virtual std::string getScoreDetailsScalarFieldName(StringData pipelineName) const = 0;
+    virtual std::string getScoreDetailsScalarFieldName(std::string_view pipelineName) const = 0;
 
     /**
      * Construct the stage-specific fields for each input pipeline to add to the final scoreDetails.
      */
     virtual void constructCalculatedFinalScoreDetailsStageSpecificScoreDetails(
-        BSONObjBuilder& bob, StringData pipelineName, double weight) = 0;
+        BSONObjBuilder& bob, std::string_view pipelineName, double weight) = 0;
 };
 
 }  // namespace mongo

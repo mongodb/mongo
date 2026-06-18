@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/expression_walker.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -52,6 +51,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <typeinfo>
 #include <vector>
@@ -62,7 +62,7 @@ namespace {
 
 class ExpressionWalkerTest : public AggregationContextFixture {
 protected:
-    auto jsonToPipeline(StringData jsonArray) {
+    auto jsonToPipeline(std::string_view jsonArray) {
         const auto inputBson = fromjson("{pipeline: " + std::string{jsonArray} + "}");
 
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);

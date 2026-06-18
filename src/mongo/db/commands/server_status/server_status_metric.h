@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/counter.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/topology/cluster_role.h"
@@ -44,6 +43,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <variant>
@@ -84,7 +84,7 @@ public:
      * Appends this metric to the current `b` as name `leafName`.
      * Metrics do not know the name to appear under: `leafName` tells them.
      */
-    virtual void appendTo(BSONObjBuilder& b, StringData leafName) const = 0;
+    virtual void appendTo(BSONObjBuilder& b, std::string_view leafName) const = 0;
 
     /**
      * If the predicate has been set, is is consulted when appending the metric.
@@ -113,7 +113,7 @@ private:
  *
  *     p.appendTo(bob, leafName)
  *         A customization point, whereby this metric specifies how it will
- *         append itself as a field `StringData leafName` to the
+ *         append itself as a field `std::string_view leafName` to the
  *         `BSONObjBuilder& bob`.
  *
  *     T& p.value()
@@ -139,7 +139,7 @@ public:
         return status_metric_detail::voidlessValue(_policy);
     }
 
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
+    void appendTo(BSONObjBuilder& b, std::string_view leafName) const override {
         if (!isEnabled())
             return;
         _policy.appendTo(b, leafName);
@@ -186,7 +186,7 @@ public:
 
     using ChildMap = std::map<std::string, TreeNode, std::less<>>;
 
-    void add(StringData path, std::unique_ptr<ServerStatusMetric> metric);
+    void add(std::string_view path, std::unique_ptr<ServerStatusMetric> metric);
 
     void appendTo(BSONObjBuilder& b, const BSONObj& excludePaths = {}) const;
 
@@ -201,14 +201,14 @@ public:
      * without a leading '.' is implicitly rooted under "metrics.". Does nothing if `path` is
      * empty or does not exist in the tree. Intended for use in tests only.
      */
-    void removeForTests(StringData path);
+    void removeForTests(std::string_view path);
 
     void freeze() {
         _frozen = true;
     }
 
 private:
-    void _add(StringData path, std::unique_ptr<ServerStatusMetric> metric);
+    void _add(std::string_view path, std::unique_ptr<ServerStatusMetric> metric);
 
     /**
      * The helper for `removeForTests`. Removes the node at `path` (a dot-separated absolute path
@@ -216,7 +216,7 @@ private:
      * after the removal. Silently returns without modifying the tree when any component of
      * `path` is missing or when an intermediate component is a leaf metric rather than a subtree.
      */
-    void _removeForTests(StringData path);
+    void _removeForTests(std::string_view path);
 
     ChildMap _children;
     bool _frozen = false;
@@ -324,7 +324,7 @@ public:
         return _v;
     }
 
-    void appendTo(BSONObjBuilder& b, StringData leafName) const {
+    void appendTo(BSONObjBuilder& b, std::string_view leafName) const {
         b.append(leafName, _v);
     }
 
@@ -370,7 +370,7 @@ struct ServerStatusMetricPolicySelection<synchronized_value<T>> {
             return _v;
         }
 
-        void appendTo(BSONObjBuilder& b, StringData leafName) const {
+        void appendTo(BSONObjBuilder& b, std::string_view leafName) const {
             b.append(leafName, **_v);
         }
 
@@ -387,7 +387,7 @@ public:
         return _v;
     }
 
-    void appendTo(BSONObjBuilder& b, StringData leafName) const {
+    void appendTo(BSONObjBuilder& b, std::string_view leafName) const {
         b.append(leafName, static_cast<long long>(_v.get()));
     }
 

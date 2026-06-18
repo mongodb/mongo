@@ -68,6 +68,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -399,7 +400,7 @@ void performAtomicWritesForUpdate(
                                       bucketIds);
 }
 
-BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, StringData viewNss) {
+BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, std::string_view viewNss) {
     BSONObjBuilder b;
     for (auto&& e : cmd) {
         if (e.fieldNameStringData() == cmdName) {

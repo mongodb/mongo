@@ -36,6 +36,8 @@
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/transport/transport_options_gen.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace transport {
 namespace {
@@ -48,7 +50,7 @@ thread_local VersionedValue<CIDRList>::Snapshot maxEstablishingConnsOverrideSnap
 // TODO: SERVER-106468 Define CIDRRangeListParameter and remove this glue code
 void MaxEstablishingConnectionsOverrideServerParameter::append(OperationContext*,
                                                                BSONObjBuilder* bob,
-                                                               StringData name,
+                                                               std::string_view name,
                                                                const boost::optional<TenantId>&) {
     appendCIDRRangeListParameter(maxEstablishingConnsOverride, bob, name);
 }
@@ -59,7 +61,7 @@ Status MaxEstablishingConnectionsOverrideServerParameter::set(const BSONElement&
 }
 
 Status MaxEstablishingConnectionsOverrideServerParameter::setFromString(
-    StringData str, const boost::optional<TenantId>&) {
+    std::string_view str, const boost::optional<TenantId>&) {
     return setCIDRRangeListParameter(maxEstablishingConnsOverride, fromjson(str));
 }
 

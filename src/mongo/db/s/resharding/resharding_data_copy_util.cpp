@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -80,6 +79,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <boost/cstdint.hpp>
@@ -92,6 +92,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo::resharding::data_copy {
+using namespace std::literals::string_view_literals;
 
 void ensureCollectionExists(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -212,7 +213,7 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
                                   opCtx, metadata.getSourceNss(), AcquisitionPrerequisites::kRead),
                               MODE_IS);
         auto errmsg =
-            "Temporary resharding collection doesn't exist and hasn't already been renamed"_sd;
+            "Temporary resharding collection doesn't exist and hasn't already been renamed"sv;
         uassert(ErrorCodes::NamespaceNotFound, errmsg, sourceColl.exists());
         uassert(ErrorCodes::InvalidUUID, errmsg, sourceColl.uuid() == metadata.getReshardingUUID());
         return;
@@ -234,7 +235,7 @@ bool isCollectionCapped(OperationContext* opCtx, const NamespaceString& nss) {
         CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
         MODE_IS);
     uassert(ErrorCodes::NamespaceNotFound,
-            "Temporary resharding collection doesn't exist."_sd,
+            "Temporary resharding collection doesn't exist."sv,
             coll.exists());
     return coll.getCollectionPtr()->isCapped();
 }

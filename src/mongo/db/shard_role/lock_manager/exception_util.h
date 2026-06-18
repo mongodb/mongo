@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <utility>
 
 MONGO_MOD_PUBLIC;
@@ -68,8 +68,8 @@ void recordTemporarilyUnavailableErrors(OperationContext* opCtx, int64_t n = 1);
  * @param operation - e.g. "update"
  */
 void logWriteConflictAndBackoff(size_t attempt,
-                                StringData operation,
-                                StringData reason,
+                                std::string_view operation,
+                                std::string_view reason,
                                 const NamespaceStringOrUUID& nssOrUUID);
 
 /**
@@ -81,8 +81,8 @@ void logWriteConflictAndBackoff(size_t attempt,
  */
 void logAndRecordWriteConflictAndBackoff(OperationContext* opCtx,
                                          size_t attempt,
-                                         StringData operation,
-                                         StringData reason,
+                                         std::string_view operation,
+                                         std::string_view reason,
                                          const NamespaceStringOrUUID& nssOrUUID);
 
 /**
@@ -95,14 +95,14 @@ void logAndRecordWriteConflictAndBackoff(OperationContext* opCtx,
  */
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            size_t tempUnavailAttempts,
-                                           StringData opStr,
+                                           std::string_view opStr,
                                            const NamespaceStringOrUUID& nssOrUUID,
                                            const Status& e,
                                            size_t& writeConflictAttempts);
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            RecoveryUnit& ru,
                                            size_t tempUnavailAttempts,
-                                           StringData opStr,
+                                           std::string_view opStr,
                                            const NamespaceStringOrUUID& nssOrUUID,
                                            const Status& e,
                                            size_t& writeConflictAttempts);
@@ -111,7 +111,7 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
  * Convert `e` into a `WriteConflictException` and throw it.
  */
 void convertToWCEAndRethrow(OperationContext* opCtx,
-                            StringData opStr,
+                            std::string_view opStr,
                             const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e);
 
 /** Stateful object for executing the `writeConflictRetry` function below. */
@@ -122,7 +122,7 @@ public:
 
     WriteConflictRetryAlgorithm(OperationContext* opCtx,
                                 RecoveryUnit& ru,
-                                StringData opStr,
+                                std::string_view opStr,
                                 const NamespaceStringOrUUID& nssOrUUID,
                                 boost::optional<size_t> retryLimit,
                                 int dumpStateRetryCount)
@@ -141,7 +141,7 @@ public:
     }
     WriteConflictRetryAlgorithm(OperationContext* opCtx,
                                 std::function<RecoveryUnit&()> ru,
-                                StringData opStr,
+                                std::string_view opStr,
                                 const NamespaceStringOrUUID& nssOrUUID,
                                 boost::optional<size_t> retryLimit,
                                 int dumpStateRetryCount)
@@ -207,7 +207,7 @@ private:
             throw;
         }
     }
-    void _emitLog(StringData reason);
+    void _emitLog(std::string_view reason);
     void _assertRetryLimit() const;
     void _handleStorageUnavailable(const Status& e);
     void _handleWriteConflictException(const Status& e);
@@ -224,7 +224,7 @@ private:
 
     OperationContext* const _opCtx;
     std::variant<std::reference_wrapper<RecoveryUnit>, std::function<RecoveryUnit&()>> _ru;
-    const StringData _opStr;
+    const std::string_view _opStr;
     const NamespaceStringOrUUID& _nssOrUUID;
     const boost::optional<size_t> _retryLimit;
     const int _dumpStateRetryCount = 0;
@@ -257,7 +257,7 @@ template <typename F>
 auto writeConflictRetry(
     OperationContext* opCtx,
     RecoveryUnit& ru,
-    StringData opStr,
+    std::string_view opStr,
     const NamespaceStringOrUUID& nssOrUUID,
     F&& f,
     boost::optional<size_t> retryLimit = boost::none,
@@ -269,7 +269,7 @@ auto writeConflictRetry(
 template <typename F>
 auto writeConflictRetry(
     OperationContext* opCtx,
-    StringData opStr,
+    std::string_view opStr,
     const NamespaceStringOrUUID& nssOrUUID,
     F&& f,
     boost::optional<size_t> retryLimit = boost::none,

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -43,6 +42,7 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -240,7 +240,7 @@ MONGO_MOD_PRIVATE constexpr const char* resourceGlobalIdName(ResourceGlobalId id
     return ResourceGlobalIdNames[static_cast<uint8_t>(id)];
 }
 
-MONGO_MOD_FILE_PRIVATE uint64_t hashStringDataForResourceId(StringData str,
+MONGO_MOD_FILE_PRIVATE uint64_t hashStringDataForResourceId(std::string_view str,
                                                             const std::array<std::byte, 16>& salt);
 
 /**

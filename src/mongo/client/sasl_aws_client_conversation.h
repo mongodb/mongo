@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_aws_protocol_common.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_client_session.h"
@@ -39,6 +38,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -54,7 +54,7 @@ public:
 
     ~SaslAWSClientConversation() override = default;
 
-    StatusWith<bool> step(StringData inputData, std::string* outputData) override;
+    StatusWith<bool> step(std::string_view inputData, std::string* outputData) override;
 
     boost::optional<std::uint32_t> currentStep() const override {
         return _step;
@@ -88,10 +88,10 @@ private:
     /**
      * Get AWS credentials from ECS Instance metadata HTTP server.
      */
-    awsIam::AWSCredentials _getEcsCredentials(StringData relativeUri) const;
+    awsIam::AWSCredentials _getEcsCredentials(std::string_view relativeUri) const;
 
     StatusWith<bool> _firstStep(std::string* outputData);
-    StatusWith<bool> _secondStep(StringData inputData, std::string* outputData);
+    StatusWith<bool> _secondStep(std::string_view inputData, std::string* outputData);
 
 private:
     // Step of protocol - either 1 or 2

@@ -41,6 +41,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -51,7 +52,7 @@ Status TaskExecutorTest::getDetectableErrorStatus() {
 }
 
 RemoteCommandRequest TaskExecutorTest::assertRemoteCommandNameEquals(
-    StringData cmdName, const RemoteCommandRequest& request) {
+    std::string_view cmdName, const RemoteCommandRequest& request) {
     auto&& cmdObj = request.cmdObj;
     ASSERT_FALSE(cmdObj.isEmpty());
     if (cmdName != cmdObj.firstElementFieldName()) {

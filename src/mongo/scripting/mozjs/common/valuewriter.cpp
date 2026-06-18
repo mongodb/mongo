@@ -58,6 +58,7 @@
 #include "mongo/util/time_support.h"
 
 #include <new>
+#include <string_view>
 
 #include <jsapi.h>
 #include <jsfriendapi.h>
@@ -225,7 +226,7 @@ std::string ValueWriter::toString() {
     return std::string{toStringData(&jsstr)};
 }
 
-StringData ValueWriter::toStringData(JSStringWrapper* jsstr) {
+std::string_view ValueWriter::toStringData(JSStringWrapper* jsstr) {
     *jsstr = JSStringWrapper(_context, JS::ToString(_context, _value));
     return jsstr->toStringData();
 }
@@ -363,7 +364,7 @@ JSRegEx ValueWriter::toRegEx() {
 }
 
 void ValueWriter::writeThis(BSONObjBuilder* b,
-                            StringData sd,
+                            std::string_view sd,
                             ObjectWrapper::WriteFieldRecursionFrames* frames) {
     uassert(17279,
             str::stream() << "Exceeded depth limit of " << ObjectWrapper::kMaxWriteFieldDepth
@@ -411,7 +412,7 @@ void ValueWriter::writeThis(BSONObjBuilder* b,
 }
 
 void ValueWriter::_writeObject(BSONObjBuilder* b,
-                               StringData sd,
+                               std::string_view sd,
                                ObjectWrapper::WriteFieldRecursionFrames* frames) {
     auto runtime = getCommonRuntime(_context);
 

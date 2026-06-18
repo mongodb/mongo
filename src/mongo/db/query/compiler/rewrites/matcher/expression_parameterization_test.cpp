@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -52,12 +51,14 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 void walkExpression(MatchExpressionParameterizationVisitorContext* context,
                     MatchExpression* expression) {
@@ -232,7 +233,7 @@ TEST(MatchExpressionParameterizationVisitor, AlwaysTrueMatchExpressionSetsNoPara
 
 TEST(MatchExpressionParameterizationVisitor, BitsAllClearMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions;
-    BitsAllClearMatchExpression expr{"a"_sd, bitPositions};
+    BitsAllClearMatchExpression expr{"a"sv, bitPositions};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
@@ -241,7 +242,7 @@ TEST(MatchExpressionParameterizationVisitor, BitsAllClearMatchExpressionSetsTwoP
 
 TEST(MatchExpressionParameterizationVisitor, BitsAllSetMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions;
-    BitsAllSetMatchExpression expr{"a"_sd, bitPositions};
+    BitsAllSetMatchExpression expr{"a"sv, bitPositions};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
@@ -250,7 +251,7 @@ TEST(MatchExpressionParameterizationVisitor, BitsAllSetMatchExpressionSetsTwoPar
 
 TEST(MatchExpressionParameterizationVisitor, BitsAnyClearMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions{0, 1, 8};
-    BitsAnyClearMatchExpression expr{"a"_sd, bitPositions};
+    BitsAnyClearMatchExpression expr{"a"sv, bitPositions};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
@@ -259,7 +260,7 @@ TEST(MatchExpressionParameterizationVisitor, BitsAnyClearMatchExpressionSetsTwoP
 
 TEST(MatchExpressionParameterizationVisitor, BitsAnySetMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions{0, 1, 8};
-    BitsAnySetMatchExpression expr{"a"_sd, bitPositions};
+    BitsAnySetMatchExpression expr{"a"sv, bitPositions};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
@@ -269,7 +270,7 @@ TEST(MatchExpressionParameterizationVisitor, BitsAnySetMatchExpressionSetsTwoPar
 TEST(MatchExpressionParameterizationVisitor,
      EqualityMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("a" << 5);
-    EqualityMatchExpression eq("a"_sd, query["a"]);
+    EqualityMatchExpression eq("a"sv, query["a"]);
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
@@ -278,7 +279,7 @@ TEST(MatchExpressionParameterizationVisitor,
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithNullSetsNoParamIds) {
     BSONObj query = BSON("a" << BSONNULL);
-    EqualityMatchExpression eq{"a"_sd, query["a"]};
+    EqualityMatchExpression eq{"a"sv, query["a"]};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
@@ -287,7 +288,7 @@ TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithNullSets
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithArraySetsNoParamIds) {
     BSONObj query = BSON("a" << BSON_ARRAY(1 << 2));
-    EqualityMatchExpression eq{"a"_sd, query["a"]};
+    EqualityMatchExpression eq{"a"sv, query["a"]};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
@@ -296,7 +297,7 @@ TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithArraySet
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithMinKeySetsNoParamIds) {
     BSONObj query = BSON("a" << MINKEY);
-    EqualityMatchExpression eq{"a"_sd, query["a"]};
+    EqualityMatchExpression eq{"a"sv, query["a"]};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
@@ -305,7 +306,7 @@ TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithMinKeySe
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithMaxKeySetsNoParamIds) {
     BSONObj query = BSON("a" << MAXKEY);
-    EqualityMatchExpression eq{"a"_sd, query["a"]};
+    EqualityMatchExpression eq{"a"sv, query["a"]};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     eq.acceptVisitor(&visitor);
@@ -314,12 +315,12 @@ TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithMaxKeySe
 
 TEST(MatchExpressionParameterizationVisitor, EqualityMatchExpressionWithUndefinedThrows) {
     BSONObj query = BSON("a" << BSONUndefined);
-    ASSERT_THROWS((EqualityMatchExpression{"a"_sd, query["a"]}), DBException);
+    ASSERT_THROWS((EqualityMatchExpression{"a"sv, query["a"]}), DBException);
 }
 
 TEST(MatchExpressionParameterizationVisitor, GTEMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("$gte" << 5);
-    GTEMatchExpression expr{"a"_sd, query["$gte"]};
+    GTEMatchExpression expr{"a"sv, query["$gte"]};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
@@ -328,12 +329,12 @@ TEST(MatchExpressionParameterizationVisitor, GTEMatchExpressionWithScalarParamet
 
 TEST(MatchExpressionParameterizationVisitor, GTEMatchExpressionWithUndefinedThrows) {
     BSONObj query = BSON("a" << BSONUndefined);
-    ASSERT_THROWS((EqualityMatchExpression{"a"_sd, query["a"]}), DBException);
+    ASSERT_THROWS((EqualityMatchExpression{"a"sv, query["a"]}), DBException);
 }
 
 TEST(MatchExpressionParameterizationVisitor, GTMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("$gte" << 5);
-    GTMatchExpression expr{"a"_sd, query["$gte"]};
+    GTMatchExpression expr{"a"sv, query["$gte"]};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
@@ -342,7 +343,7 @@ TEST(MatchExpressionParameterizationVisitor, GTMatchExpressionWithScalarParamete
 
 TEST(MatchExpressionParameterizationVisitor, LTEMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("$lte" << 5);
-    LTEMatchExpression expr("a"_sd, query["$lte"]);
+    LTEMatchExpression expr("a"sv, query["$lte"]);
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
@@ -351,7 +352,7 @@ TEST(MatchExpressionParameterizationVisitor, LTEMatchExpressionWithScalarParamet
 
 TEST(MatchExpressionParameterizationVisitor, LTMatchExpressionWithScalarParameterSetsOneParamId) {
     BSONObj query = BSON("$lt" << 5);
-    LTMatchExpression expr{"a"_sd, query["$lt"]};
+    LTMatchExpression expr{"a"sv, query["$lt"]};
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
@@ -362,15 +363,14 @@ TEST(MatchExpressionParameterizationVisitor, ComparisonMatchExpressionsWithNaNSe
     std::vector<std::unique_ptr<MatchExpression>> expressions;
 
     BSONObj doubleNaN = BSON("$lt" << std::numeric_limits<double>::quiet_NaN());
-    expressions.emplace_back(std::make_unique<LTMatchExpression>("a"_sd, doubleNaN["$lt"]));
+    expressions.emplace_back(std::make_unique<LTMatchExpression>("a"sv, doubleNaN["$lt"]));
 
     BSONObj decimalNegativeNaN = BSON("$gt" << Decimal128::kNegativeNaN);
-    expressions.emplace_back(
-        std::make_unique<GTMatchExpression>("b"_sd, decimalNegativeNaN["$gt"]));
+    expressions.emplace_back(std::make_unique<GTMatchExpression>("b"sv, decimalNegativeNaN["$gt"]));
 
     BSONObj decimalPositiveNaN = BSON("c" << Decimal128::kPositiveNaN);
     expressions.emplace_back(
-        std::make_unique<EqualityMatchExpression>("c"_sd, decimalPositiveNaN["c"]));
+        std::make_unique<EqualityMatchExpression>("c"sv, decimalPositiveNaN["c"]));
 
     OrMatchExpression expr{std::move(expressions)};
 
@@ -382,11 +382,11 @@ TEST(MatchExpressionParameterizationVisitor, ComparisonMatchExpressionsWithNaNSe
 
 TEST(MatchExpressionParameterizationVisitor, ComparisonMatchExpressionsWithBooleanSetsNoParamIds) {
     std::vector<std::unique_ptr<MatchExpression>> expressions;
-    expressions.emplace_back(std::make_unique<LTMatchExpression>("a"_sd, Value(false)));
-    expressions.emplace_back(std::make_unique<GTMatchExpression>("b"_sd, Value(true)));
-    expressions.emplace_back(std::make_unique<EqualityMatchExpression>("c"_sd, Value(false)));
-    expressions.emplace_back(std::make_unique<LTEMatchExpression>("d"_sd, Value(true)));
-    expressions.emplace_back(std::make_unique<GTEMatchExpression>("e"_sd, Value(false)));
+    expressions.emplace_back(std::make_unique<LTMatchExpression>("a"sv, Value(false)));
+    expressions.emplace_back(std::make_unique<GTMatchExpression>("b"sv, Value(true)));
+    expressions.emplace_back(std::make_unique<EqualityMatchExpression>("c"sv, Value(false)));
+    expressions.emplace_back(std::make_unique<LTEMatchExpression>("d"sv, Value(true)));
+    expressions.emplace_back(std::make_unique<GTEMatchExpression>("e"sv, Value(false)));
 
     OrMatchExpression expr{std::move(expressions)};
 
@@ -399,11 +399,11 @@ TEST(MatchExpressionParameterizationVisitor, ComparisonMatchExpressionsWithBoole
 TEST(MatchExpressionParameterizationVisitor,
      ComparisonMatchExpressionsWithEmptyStringSetsNoParamIds) {
     std::vector<std::unique_ptr<MatchExpression>> expressions;
-    expressions.emplace_back(std::make_unique<LTMatchExpression>("a"_sd, Value(""_sd)));
-    expressions.emplace_back(std::make_unique<GTMatchExpression>("b"_sd, Value(""_sd)));
-    expressions.emplace_back(std::make_unique<EqualityMatchExpression>("c"_sd, Value(""_sd)));
-    expressions.emplace_back(std::make_unique<LTEMatchExpression>("d"_sd, Value(""_sd)));
-    expressions.emplace_back(std::make_unique<GTEMatchExpression>("e"_sd, Value(""_sd)));
+    expressions.emplace_back(std::make_unique<LTMatchExpression>("a"sv, Value(""sv)));
+    expressions.emplace_back(std::make_unique<GTMatchExpression>("b"sv, Value(""sv)));
+    expressions.emplace_back(std::make_unique<EqualityMatchExpression>("c"sv, Value(""sv)));
+    expressions.emplace_back(std::make_unique<LTEMatchExpression>("d"sv, Value(""sv)));
+    expressions.emplace_back(std::make_unique<GTEMatchExpression>("e"sv, Value(""sv)));
 
     OrMatchExpression expr{std::move(expressions)};
 
@@ -415,7 +415,7 @@ TEST(MatchExpressionParameterizationVisitor,
 
 TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithScalarsSetsOneParamId) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << 1.1);
-    InMatchExpression expr{"a"_sd};
+    InMatchExpression expr{"a"sv};
     std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
     ASSERT_OK(expr.setEqualities(std::move(equalities)));
 
@@ -427,7 +427,7 @@ TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithScalarsSetsOne
 
 TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithScalarsReusesOneParamId) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << 1.1);
-    InMatchExpression expr{"a"_sd};
+    InMatchExpression expr{"a"sv};
     std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
     ASSERT_OK(expr.setEqualities(std::move(equalities)));
 
@@ -436,7 +436,7 @@ TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithScalarsReusesO
     expr.acceptVisitor(&visitor);
     ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
 
-    InMatchExpression expr2{"a"_sd};
+    InMatchExpression expr2{"a"sv};
     std::vector<BSONElement> equalities2{operand[0], operand[1], operand[2], operand[3]};
     ASSERT_OK(expr.setEqualities(std::move(equalities2)));
     expr.acceptVisitor(&visitor);
@@ -447,7 +447,7 @@ TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithScalarsReusesO
 
 TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithNullSetsNoParamIds) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << BSONNULL);
-    InMatchExpression expr{"a"_sd};
+    InMatchExpression expr{"a"sv};
     std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
     ASSERT_OK(expr.setEqualities(std::move(equalities)));
 
@@ -470,7 +470,7 @@ TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithRegexSetsNoPar
 }
 
 TEST(MatchExpressionParameterizationVisitor, ModMatchExpressionSetsTwoParamIds) {
-    ModMatchExpression expr{"a"_sd, 1, 2};
+    ModMatchExpression expr{"a"sv, 1, 2};
 
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
@@ -479,7 +479,7 @@ TEST(MatchExpressionParameterizationVisitor, ModMatchExpressionSetsTwoParamIds) 
 }
 
 TEST(MatchExpressionParameterizationVisitor, RegexMatchExpressionSetsTwoParamIds) {
-    RegexMatchExpression expr{""_sd, "b", ""};
+    RegexMatchExpression expr{""sv, "b", ""};
 
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
@@ -489,7 +489,7 @@ TEST(MatchExpressionParameterizationVisitor, RegexMatchExpressionSetsTwoParamIds
 }
 
 TEST(MatchExpressionParameterizationVisitor, SizeMatchExpressionSetsOneParamId) {
-    SizeMatchExpression expr{"a"_sd, 2};
+    SizeMatchExpression expr{"a"sv, 2};
 
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
@@ -499,7 +499,7 @@ TEST(MatchExpressionParameterizationVisitor, SizeMatchExpressionSetsOneParamId) 
 }
 
 TEST(MatchExpressionParameterizationVisitor, TypeMatchExpressionWithStringSetsOneParamId) {
-    TypeMatchExpression expr{"a"_sd, BSONType::string};
+    TypeMatchExpression expr{"a"sv, BSONType::string};
 
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
@@ -509,7 +509,7 @@ TEST(MatchExpressionParameterizationVisitor, TypeMatchExpressionWithStringSetsOn
 }
 
 TEST(MatchExpressionParameterizationVisitor, TypeMatchExpressionWithArraySetsNoParamIds) {
-    TypeMatchExpression expr{"a"_sd, BSONType::array};
+    TypeMatchExpression expr{"a"sv, BSONType::array};
 
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
@@ -567,7 +567,7 @@ TEST(MatchExpressionParameterizationVisitor,
         for (size_t i = 0; i < expectedSize; i++) {
             BSONObj gt = BSON("$gt" << static_cast<int>(i));
             expressionBSONs.push_back(gt);
-            expressions.emplace_back(std::make_unique<GTMatchExpression>("a"_sd, gt["$gt"]));
+            expressions.emplace_back(std::make_unique<GTMatchExpression>("a"sv, gt["$gt"]));
         }
     };
 
@@ -600,7 +600,7 @@ TEST(MatchExpressionParameterizationVisitor,
         for (size_t i = 0; i < expectedSize; i++) {
             BSONObj gt = BSON("$gt" << static_cast<int>(i));
             expressionBSONs.push_back(gt);
-            expressions.emplace_back(std::make_unique<GTMatchExpression>("a"_sd, gt["$gt"]));
+            expressions.emplace_back(std::make_unique<GTMatchExpression>("a"sv, gt["$gt"]));
         }
     };
 

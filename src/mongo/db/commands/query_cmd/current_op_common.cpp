@@ -46,9 +46,10 @@
 
 namespace mongo {
 namespace {
-static constexpr auto kAll = "$all"_sd;
-static constexpr auto kOwnOps = "$ownOps"_sd;
-static constexpr auto kTruncateOps = "$truncateOps"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr auto kAll = "$all"sv;
+static constexpr auto kOwnOps = "$ownOps"sv;
+static constexpr auto kTruncateOps = "$truncateOps"sv;
 static const StringDataSet kCurOpCmdParams = {kAll, kOwnOps, kTruncateOps};
 }  // namespace
 

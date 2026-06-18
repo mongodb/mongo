@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/fle/equality_predicate.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -53,6 +52,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
@@ -66,7 +66,8 @@ REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE(MATCH_IN, EqualityPredicate);
 REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE(ExpressionCompare, EqualityPredicate);
 REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE(ExpressionIn, EqualityPredicate);
 
-std::vector<PrfBlock> EqualityPredicate::generateTags(BSONValue payload, StringData path) const {
+std::vector<PrfBlock> EqualityPredicate::generateTags(BSONValue payload,
+                                                      std::string_view path) const {
     ParsedFindEqualityPayload tokens = parseFindPayload<ParsedFindEqualityPayload>(
         payload, path, _rewriter->getEncryptedFieldConfigForValidation());
 
@@ -125,7 +126,7 @@ std::unique_ptr<MatchExpression> EqualityPredicate::rewriteToTagDisjunction(
 namespace {
 template <typename PayloadT>
 boost::intrusive_ptr<ExpressionInternalFLEEqual> generateFleEqualMatch(
-    StringData path,
+    std::string_view path,
     const PayloadT& ffp,
     ExpressionContext* expCtx,
     boost::optional<const EncryptedFieldConfig&> efc) {
@@ -142,7 +143,7 @@ boost::intrusive_ptr<ExpressionInternalFLEEqual> generateFleEqualMatch(
 
 template <typename PayloadT>
 std::unique_ptr<ExpressionInternalFLEEqual> generateFleEqualMatchUnique(
-    StringData path,
+    std::string_view path,
     const PayloadT& ffp,
     ExpressionContext* expCtx,
     boost::optional<const EncryptedFieldConfig&> efc) {
@@ -157,7 +158,7 @@ std::unique_ptr<ExpressionInternalFLEEqual> generateFleEqualMatchUnique(
 }
 
 std::unique_ptr<MatchExpression> generateFleEqualMatchAndExpr(
-    StringData path,
+    std::string_view path,
     const BSONElement ffp,
     ExpressionContext* expCtx,
     boost::optional<const EncryptedFieldConfig&> efc) {

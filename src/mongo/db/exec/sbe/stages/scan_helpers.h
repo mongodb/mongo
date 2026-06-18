@@ -35,12 +35,14 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/string_listset.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace sbe {
 MONGO_COMPILER_ALWAYS_INLINE inline value::OwnedValueAccessor* getFieldAccessor(
     const StringListSet& scanFieldNames,
     absl::InlinedVector<value::OwnedValueAccessor, 4>& scanFieldAccessors,
-    StringData name) {
+    std::string_view name) {
     if (size_t pos = scanFieldNames.findPos(name); pos != StringListSet::npos) {
         return &scanFieldAccessors[pos];
     }

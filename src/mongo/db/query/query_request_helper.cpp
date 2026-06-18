@@ -53,6 +53,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -88,7 +90,7 @@ void addShowRecordIdMetaProj(FindCommandRequest* findCommand) {
 }
 
 
-Status validateGetMoreCollectionName(StringData collectionName) {
+Status validateGetMoreCollectionName(std::string_view collectionName) {
     if (collectionName.empty()) {
         return Status(ErrorCodes::InvalidNamespace, "Collection names cannot be empty");
     }

@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
@@ -40,6 +39,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -69,7 +70,7 @@ public:
 
     class FailPointGuard {
     public:
-        FailPointGuard(StringData fpName,
+        FailPointGuard(std::string_view fpName,
                        ExecutorIntegrationTestFixture* fixture,
                        int initalTimesEntered)
             : _fpName(fpName), _fixture(fixture), _initialTimesEntered(initalTimesEntered) {}
@@ -93,9 +94,9 @@ public:
     };
 
 
-    FailPointGuard configureFailPoint(StringData fp, BSONObj data);
+    FailPointGuard configureFailPoint(std::string_view fp, BSONObj data);
 
-    FailPointGuard configureFailCommand(StringData failCommand,
+    FailPointGuard configureFailCommand(std::string_view failCommand,
                                         boost::optional<ErrorCodes::Error> errorCode = boost::none,
                                         boost::optional<Milliseconds> blockTime = boost::none);
 

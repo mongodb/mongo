@@ -40,6 +40,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -233,7 +235,7 @@ private:
      */
     Status _getExtraIndexKeysBatchAndRunReverseLookup(
         OperationContext* opCtx,
-        StringData indexName,
+        std::string_view indexName,
         const boost::optional<key_string::Value>& nextKeyToSeekWithRecordId,
         DbCheckExtraIndexKeysBatchStats& batchStats);
 
@@ -255,7 +257,7 @@ private:
      */
     Status _getCatalogSnapshotAndRunReverseLookup(
         OperationContext* opCtx,
-        StringData indexName,
+        std::string_view indexName,
         const boost::optional<key_string::Value>& snapshotFirstKeyWithRecordId,
         DbCheckExtraIndexKeysBatchStats& batchStats);
 
@@ -281,7 +283,7 @@ private:
      * entry.
      */
     void _reverseLookup(OperationContext* opCtx,
-                        StringData indexName,
+                        std::string_view indexName,
                         DbCheckExtraIndexKeysBatchStats& batchStats,
                         const CollectionPtr& collection,
                         const KeyStringEntry& keyStringEntryWithRecordId,
@@ -306,7 +308,7 @@ private:
 
     StatusWith<const IndexCatalogEntry*> _acquireIndex(OperationContext* opCtx,
                                                        const CollectionPtr& collection,
-                                                       StringData indexName);
+                                                       std::string_view indexName);
 
     std::pair<bool, boost::optional<UUID>> _shouldLogOplogBatch(DbCheckOplogBatch& batch);
 

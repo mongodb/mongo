@@ -37,6 +37,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class UsersInfoCommand;
@@ -60,7 +62,7 @@ public:
 
     virtual void notifyDDLOperation(OperationContext* opCtx,
                                     AuthorizationRouter* router,
-                                    StringData op,
+                                    std::string_view op,
                                     const NamespaceString& nss,
                                     const BSONObj& o,
                                     const BSONObj* o2) = 0;

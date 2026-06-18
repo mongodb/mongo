@@ -32,6 +32,7 @@
 #include "mongo/db/extension/sdk/test_extension_factory.h"
 
 #include <chrono>
+#include <string_view>
 #include <thread>
 
 namespace sdk = mongo::extension::sdk;

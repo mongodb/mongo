@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
@@ -41,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <functional>
+#include <string_view>
 #include <tuple>
 
 namespace mongo {
@@ -99,7 +99,7 @@ using RequestMetadataWriter =
  * TODO: would it be a layering violation if this hook took an OperationContext* ?
  */
 using ReplyMetadataReader = std::function<Status(
-    OperationContext* opCtx, const BSONObj& replyMetadata, StringData sourceHost)>;
+    OperationContext* opCtx, const BSONObj& replyMetadata, std::string_view sourceHost)>;
 
 }  // namespace MONGO_MOD_PUBLIC rpc
 }  // namespace mongo

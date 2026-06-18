@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,6 +48,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -95,7 +95,7 @@ public:
     }
 
 private:
-    StringData operatorName() const final {
+    std::string_view operatorName() const final {
         return "$unset";
     }
 

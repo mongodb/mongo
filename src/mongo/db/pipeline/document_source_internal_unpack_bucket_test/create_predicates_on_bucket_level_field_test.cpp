@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -59,10 +58,12 @@
 #include <initializer_list>
 #include <list>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using InternalUnpackBucketPredicateMappingOptimizationTest = AggregationContextFixture;
 
@@ -934,7 +935,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
-            ASSERT_EQ(idPred->path(), "_id"_sd);
+            ASSERT_EQ(idPred->path(), "_id"sv);
             ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             // As ObjectId holds time at a second granularity, the rewrite value used for a $lt/$lte
@@ -1002,7 +1003,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
-            ASSERT_EQ(idPred->path(), "_id"_sd);
+            ASSERT_EQ(idPred->path(), "_id"sv);
             ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             OID oid;
@@ -1067,7 +1068,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[4].get());
 
-            ASSERT_EQ(idPred->path(), "_id"_sd);
+            ASSERT_EQ(idPred->path(), "_id"sv);
             ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             OID oid;
@@ -1076,7 +1077,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
 
             idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[5].get());
 
-            ASSERT_EQ(idPred->path(), "_id"_sd);
+            ASSERT_EQ(idPred->path(), "_id"sv);
             ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             ASSERT_TRUE(oid.compare(idPred->getData().OID()) > 0);
@@ -1134,7 +1135,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
-            ASSERT_EQ(idPred->path(), "_id"_sd);
+            ASSERT_EQ(idPred->path(), "_id"sv);
             ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             OID oid;
@@ -1194,7 +1195,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
 
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
-            ASSERT_EQ(idPred->path(), "_id"_sd);
+            ASSERT_EQ(idPred->path(), "_id"sv);
             ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             OID oid;

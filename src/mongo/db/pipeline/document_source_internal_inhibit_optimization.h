@@ -40,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -77,7 +78,7 @@ public:
  */
 class DocumentSourceInternalInhibitOptimization final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalInhibitOptimization"_sd;
+    static constexpr std::string_view kStageName = "$_internalInhibitOptimization"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
@@ -85,7 +86,7 @@ public:
     DocumentSourceInternalInhibitOptimization(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {}
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

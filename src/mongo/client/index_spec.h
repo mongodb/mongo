@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -71,7 +71,7 @@ public:
     //
 
     /** Add a new component, by default ascending, field to index. */
-    IndexSpec& addKey(StringData field, IndexType type = kIndexTypeAscending);
+    IndexSpec& addKey(std::string_view field, IndexType type = kIndexTypeAscending);
 
     /** Add a component to this index. The field name of the element is used as the field
      *  name to index. The value of the element is the index type. This method exists to
@@ -109,7 +109,7 @@ public:
 
 
     /** Set the name for this index. If not set, a name will be automatically generated. */
-    IndexSpec& name(StringData name);
+    IndexSpec& name(std::string_view name);
 
     /** Sets whether duplicates detected while indexing should be dropped. By default,
      *  duplicates are not dropped.
@@ -142,10 +142,10 @@ public:
     IndexSpec& textWeights(const BSONObj& value);
 
     /** Sets the default language for a text index. */
-    IndexSpec& textDefaultLanguage(StringData value);
+    IndexSpec& textDefaultLanguage(std::string_view value);
 
     /** Sets the name of the field containing the language override in a text index. */
-    IndexSpec& textLanguageOverride(StringData value);
+    IndexSpec& textLanguageOverride(std::string_view value);
 
     /** Sets the version of the text index to use. MongoDB 2.4 only supports version
      *  '1'. If not otherwise specified, MongoDB 2.6 defaults to version 2.

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/update/array_culling_node.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -64,7 +64,7 @@ public:
     }
 
 private:
-    StringData operatorName() const final {
+    std::string_view operatorName() const final {
         return "$pull";
     }
 

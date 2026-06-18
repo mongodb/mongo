@@ -31,12 +31,14 @@
 
 #include "mongo/util/errno_util.h"
 
+#include <string_view>
 #include <system_error>
 
 #include <fmt/format.h>
 
 namespace mongo {
-inline std::string getLastSystemErrorMessageFormatted(StringData op, const std::string& path) {
+inline std::string getLastSystemErrorMessageFormatted(std::string_view op,
+                                                      const std::string& path) {
     std::error_code ec = lastSystemError();
     return fmt::format(
         "Failed to {} {}: error code = {}, {}", op, path, ec.value(), errorMessage(ec));

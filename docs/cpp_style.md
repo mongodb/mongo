@@ -383,12 +383,9 @@ what C++ does.
 
 ### Strings
 
-- We do not use `std::string_view`. Use `StringData` from `base/string_data.h` instead. For
-  interoperability with functions that accept or return `std::string_view` (e.g. `std::string`), use
-  the pair of conversion functions `toStdStringViewForInterop` and `toStringDataForInterop`.
-
-- Working with `char*` strings can be notoriously error-prone. Convert such data to `StringData` or
-  `std::string` for safety, or use utilities in `util/str.h` for this sort of thing.
+- Working with `char*` strings can be notoriously error-prone. Convert such data to
+  `std::string_view` or `std::string` for safety, or use utilities in `util/str.h` for this sort of
+  thing.
 
 ### Performing String Formatting
 

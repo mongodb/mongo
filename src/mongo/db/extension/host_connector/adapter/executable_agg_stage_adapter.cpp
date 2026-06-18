@@ -33,6 +33,8 @@
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo::extension::host_connector {
 
 ::MongoExtensionStatus* HostExecAggStageAdapter::_hostGetNext(
@@ -82,7 +84,7 @@ namespace mongo::extension::host_connector {
 ::MongoExtensionByteView HostExecAggStageAdapter::_hostGetName(
     const ::MongoExtensionExecAggStage* execAggStage) noexcept {
     auto sv = static_cast<const HostExecAggStageAdapter*>(execAggStage)->getImpl().getName();
-    StringData sd{sv.data(), sv.length()};
+    std::string_view sd{sv.data(), sv.length()};
     return stringDataAsByteView(sd);
 }
 

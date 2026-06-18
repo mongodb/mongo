@@ -49,6 +49,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/server_parameter_guard.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::classic_runtime_planner_for_sbe {
@@ -198,7 +200,7 @@ protected:
                                       std::move(iceStorage)));
     }
 
-    BSONObj makeIndexSpec(BSONObj index, StringData indexName) {
+    BSONObj makeIndexSpec(BSONObj index, std::string_view indexName) {
         return BSON("v" << IndexConfig::kLatestIndexVersion << "key" << index << "name"
                         << indexName);
     }

@@ -37,8 +37,10 @@
 #include <bitset>
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 ActionSet::ActionSet(std::initializer_list<ActionType> actions) {
     for (auto& action : actions) {
@@ -94,7 +96,7 @@ bool ActionSet::isSupersetOf(const ActionSet& other) const {
     return (_actions & other._actions) == other._actions;
 }
 
-ActionSet ActionSet::parseFromStringVector(const std::vector<StringData>& actions,
+ActionSet ActionSet::parseFromStringVector(const std::vector<std::string_view>& actions,
                                            std::vector<std::string>* unrecognizedActions) {
     ActionSet ret;
 
@@ -124,25 +126,25 @@ std::string ActionSet::toString() const {
         return toString(ActionType::anyAction);
     }
     std::string str;
-    StringData sep;
+    std::string_view sep;
     for (size_t i = 0; i < kNumActionTypes; ++i) {
         auto action = static_cast<ActionType>(i);
         if (contains(action)) {
-            StringData name = toStringData(action);
+            std::string_view name = toStringData(action);
             str.append(sep.data(), sep.size());
             str.append(name.data(), name.size());
-            sep = ","_sd;
+            sep = ","sv;
         }
     }
     return str;
 }
 
-std::vector<StringData> ActionSet::getActionsAsStringDatas() const {
+std::vector<std::string_view> ActionSet::getActionsAsStringDatas() const {
     if (contains(ActionType::anyAction)) {
         return {idl::serialize(ActionType::anyAction)};
     }
 
-    std::vector<StringData> result;
+    std::vector<std::string_view> result;
     for (size_t i = 0; i < kNumActionTypes; ++i) {
         auto action = static_cast<ActionType>(i);
         if (contains(action)) {

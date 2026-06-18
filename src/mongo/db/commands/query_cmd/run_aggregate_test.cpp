@@ -44,9 +44,12 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/server_parameter_guard.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This class is declared as a friend of OperationMemoryUsageTracker so it can access private
@@ -97,7 +100,7 @@ protected:
                                       boost::optional<size_t> errorOffset = boost::none) {
         BSONObjBuilder builder;
         BSONArrayBuilder arrayBuilder{builder.subarrayStart("$trackingMock")};
-        StringData stringVal = "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd;
+        std::string_view stringVal = "aaaaaaaaaaaaaaaaaaaaaaaaaaa"sv;
         for (size_t i = 0; i < nDocs; ++i) {
             if (!errorOffset || *errorOffset != i) {
                 arrayBuilder.append(BSON("a" << static_cast<int64_t>(i) << "b" << stringVal));
@@ -174,7 +177,7 @@ protected:
                     int64_t expectedA = docCount * nConsumers + consumerId;
                     ASSERT_BSONOBJ_EQ(
                         doc.Obj(),
-                        BSON("a" << expectedA << "b" << "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd));
+                        BSON("a" << expectedA << "b" << "aaaaaaaaaaaaaaaaaaaaaaaaaaa"sv));
                     docCount++;
                 }
             } else {
@@ -321,6 +324,7 @@ protected:
 };
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * This is a subclass of DocumentSourceMock that will track the memory of each document it produces,
@@ -330,7 +334,7 @@ namespace {
  */
 class DocumentSourceTrackingMock : public DocumentSourceMock {
 public:
-    static constexpr StringData kStageName = "$trackingMock"_sd;
+    static constexpr std::string_view kStageName = "$trackingMock"sv;
 
     /**
      * Give this mock stage a syntax like this:
@@ -356,7 +360,7 @@ public:
         return id;
     }
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     }
 
@@ -402,7 +406,7 @@ class TrackingMockStage : public mongo::exec::agg::MockStage {
     using GetNextResult = exec::agg::GetNextResult;
 
 public:
-    TrackingMockStage(StringData stageName,
+    TrackingMockStage(std::string_view stageName,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       std::deque<GetNextResult> results)
         : mongo::exec::agg::MockStage(stageName, expCtx, std::move(results)),

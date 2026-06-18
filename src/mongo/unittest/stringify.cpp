@@ -29,18 +29,18 @@
 
 #include "mongo/unittest/stringify.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/demangle.h"
 #include "mongo/util/hex.h"
 
 #include <string>
+#include <string_view>
 #include <typeinfo>
 
 #include <fmt/format.h>
 
 namespace mongo::unittest::stringify {
 
-std::string formatTypedObj(const std::type_info& ti, StringData s) {
+std::string formatTypedObj(const std::type_info& ti, std::string_view s) {
     return fmt::format("[{}={}]", demangleName(ti), s);
 }
 

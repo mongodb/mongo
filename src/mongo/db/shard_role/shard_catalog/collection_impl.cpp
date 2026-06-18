@@ -30,6 +30,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_impl.h"
 
 #include <mutex>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/container/flat_set.hpp>
@@ -119,6 +120,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 // This fail point allows collections to be given malformed validator. A malformed validator
@@ -130,7 +132,7 @@ MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 // and clear the new durable flag which is stored inside the collection options.
 MONGO_FAIL_POINT_DEFINE(simulateLegacyTimeseriesMixedSchemaFlag);
 
-bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
+bool indexTypeSupportsPathLevelMultikeyTracking(std::string_view accessMethod) {
     return accessMethod == IndexNames::BTREE || accessMethod == IndexNames::GEO_2DSPHERE;
 }
 
@@ -177,7 +179,7 @@ StatusWith<bool> doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj
 StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opCtx,
                                                            StorageEngine* storageEngine,
                                                            const Collection* collection,
-                                                           StringData ident) {
+                                                           std::string_view ident) {
     // First check the index catalog of the existing collection for the index entry.
     auto latestEntry = [&]() -> std::shared_ptr<Ident> {
         if (!collection)
@@ -487,7 +489,7 @@ bool CollectionImpl::requiresIdIndex() const {
     }
 
     if (_ns.isSystem()) {
-        StringData shortName = _ns.coll().substr(_ns.coll().find('.') + 1);
+        std::string_view shortName = _ns.coll().substr(_ns.coll().find('.') + 1);
         if (shortName == "indexes" || shortName == "namespaces" || shortName == "profile") {
             return false;
         }
@@ -605,7 +607,7 @@ std::pair<Collection::DocumentValidationResult, Status> CollectionImpl::checkVal
 
         BSONObj generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
 
-        static constexpr auto kValidationFailureErrorStr = "Document failed validation"_sd;
+        static constexpr auto kValidationFailureErrorStr = "Document failed validation"sv;
         status = Status(doc_validation_error::DocumentValidationFailureInfo(generatedError),
                         kValidationFailureErrorStr);
 
@@ -1445,7 +1447,7 @@ StatusWith<int> CollectionImpl::checkMetaDataForIndex(const std::string& indexNa
 }
 
 void CollectionImpl::updateTTLSetting(OperationContext* opCtx,
-                                      StringData idxName,
+                                      std::string_view idxName,
                                       long long newExpireSeconds) {
     int offset = _metadata->findIndexOffset(idxName);
     invariant(offset >= 0,
@@ -1456,7 +1458,9 @@ void CollectionImpl::updateTTLSetting(OperationContext* opCtx,
     });
 }
 
-void CollectionImpl::updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) {
+void CollectionImpl::updateHiddenSetting(OperationContext* opCtx,
+                                         std::string_view idxName,
+                                         bool hidden) {
     int offset = _metadata->findIndexOffset(idxName);
     invariant(offset >= 0);
 
@@ -1465,7 +1469,9 @@ void CollectionImpl::updateHiddenSetting(OperationContext* opCtx, StringData idx
     });
 }
 
-void CollectionImpl::updateUniqueSetting(OperationContext* opCtx, StringData idxName, bool unique) {
+void CollectionImpl::updateUniqueSetting(OperationContext* opCtx,
+                                         std::string_view idxName,
+                                         bool unique) {
     int offset = _metadata->findIndexOffset(idxName);
     invariant(offset >= 0);
 
@@ -1475,7 +1481,7 @@ void CollectionImpl::updateUniqueSetting(OperationContext* opCtx, StringData idx
 }
 
 void CollectionImpl::updatePrepareUniqueSetting(OperationContext* opCtx,
-                                                StringData idxName,
+                                                std::string_view idxName,
                                                 bool prepareUnique) {
     int offset = _metadata->findIndexOffset(idxName);
     invariant(offset >= 0);
@@ -1522,7 +1528,7 @@ void CollectionImpl::setIsTemp(OperationContext* opCtx, bool isTemp) {
                    [&](durable_catalog::CatalogEntryMetaData& md) { md.options.temp = isTemp; });
 }
 
-void CollectionImpl::removeIndex(OperationContext* opCtx, StringData indexName) {
+void CollectionImpl::removeIndex(OperationContext* opCtx, std::string_view indexName) {
     if (_metadata->findIndexOffset(indexName) < 0)
         return;  // never had the index so nothing to do.
 
@@ -1532,7 +1538,7 @@ void CollectionImpl::removeIndex(OperationContext* opCtx, StringData indexName) 
 
 Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                                             const IndexDescriptor* spec,
-                                            StringData ident,
+                                            std::string_view ident,
                                             boost::optional<UUID> buildUUID) {
     durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
     imd.spec = spec->infoObj();
@@ -1591,7 +1597,7 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
     return status;
 }
 
-boost::optional<UUID> CollectionImpl::getIndexBuildUUID(StringData indexName) const {
+boost::optional<UUID> CollectionImpl::getIndexBuildUUID(std::string_view indexName) const {
     int offset = _metadata->findIndexOffset(indexName);
     invariant(offset >= 0,
               str::stream() << "cannot get build UUID for index " << indexName << " @ "
@@ -1600,7 +1606,7 @@ boost::optional<UUID> CollectionImpl::getIndexBuildUUID(StringData indexName) co
 }
 
 bool CollectionImpl::isIndexMultikey(OperationContext* opCtx,
-                                     StringData indexName,
+                                     std::string_view indexName,
                                      MultikeyPaths* multikeyPaths,
                                      int indexOffset) const {
     int offset = indexOffset;
@@ -1666,7 +1672,8 @@ bool CollectionImpl::isIndexMultikey(OperationContext* opCtx,
     return index.multikey;
 }
 
-int CollectionImpl::_getIndexOffsetForMultikeyUpdate(StringData indexName, int indexOffset) const {
+int CollectionImpl::_getIndexOffsetForMultikeyUpdate(std::string_view indexName,
+                                                     int indexOffset) const {
     int offset = indexOffset;
     if (offset < 0) {
         offset = _metadata->findIndexOffset(indexName);
@@ -1968,7 +1975,7 @@ int CollectionImpl::getCompletedIndexCount() const {
     return num;
 }
 
-BSONObj CollectionImpl::getIndexSpec(StringData indexName, bool expandSimpleCollation) const {
+BSONObj CollectionImpl::getIndexSpec(std::string_view indexName, bool expandSimpleCollation) const {
     int offset = _metadata->findIndexOffset(indexName);
     invariant(offset >= 0,
               str::stream() << "cannot get index spec for " << indexName << " @ " << getCatalogId()
@@ -2024,12 +2031,12 @@ void CollectionImpl::getReadyIndexes(std::vector<std::string>* names) const {
     }
 }
 
-bool CollectionImpl::isIndexPresent(StringData indexName) const {
+bool CollectionImpl::isIndexPresent(std::string_view indexName) const {
     int offset = _metadata->findIndexOffset(indexName);
     return offset >= 0;
 }
 
-bool CollectionImpl::isIndexReady(StringData indexName) const {
+bool CollectionImpl::isIndexReady(std::string_view indexName) const {
     int offset = _metadata->findIndexOffset(indexName);
     invariant(offset >= 0,
               str::stream() << "cannot get ready status for index " << indexName << " @ "

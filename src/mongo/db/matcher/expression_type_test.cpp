@@ -42,11 +42,12 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(ExpressionTypeTest, Equivalent) {
-    TypeMatchExpression e1("a"_sd, BSONType::string);
-    TypeMatchExpression e2("a"_sd, BSONType::numberDouble);
-    TypeMatchExpression e3("b"_sd, BSONType::string);
+    TypeMatchExpression e1("a"sv, BSONType::string);
+    TypeMatchExpression e2("a"sv, BSONType::numberDouble);
+    TypeMatchExpression e3("b"sv, BSONType::string);
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
@@ -54,7 +55,7 @@ TEST(ExpressionTypeTest, Equivalent) {
 }
 
 TEST(ExpressionTypeTest, RedactsTypesCorrectly) {
-    TypeMatchExpression type(""_sd, BSONType::string);
+    TypeMatchExpression type(""sv, BSONType::string);
     auto opts = query_shape::SerializationOptions{
         query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -63,9 +64,9 @@ TEST(ExpressionTypeTest, RedactsTypesCorrectly) {
 }
 
 TEST(ExpressionBinDataSubTypeTest, Equivalent) {
-    InternalSchemaBinDataSubTypeExpression e1("a"_sd, BinDataType::newUUID);
-    InternalSchemaBinDataSubTypeExpression e2("a"_sd, BinDataType::MD5Type);
-    InternalSchemaBinDataSubTypeExpression e3("b"_sd, BinDataType::newUUID);
+    InternalSchemaBinDataSubTypeExpression e1("a"sv, BinDataType::newUUID);
+    InternalSchemaBinDataSubTypeExpression e2("a"sv, BinDataType::MD5Type);
+    InternalSchemaBinDataSubTypeExpression e3("b"sv, BinDataType::newUUID);
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
@@ -73,7 +74,7 @@ TEST(ExpressionBinDataSubTypeTest, Equivalent) {
 }
 
 TEST(ExpressionBinDataSubTypeTest, RedactsCorrectly) {
-    InternalSchemaBinDataSubTypeExpression e("b"_sd, BinDataType::newUUID);
+    InternalSchemaBinDataSubTypeExpression e("b"sv, BinDataType::newUUID);
     auto opts = query_shape::SerializationOptions{
         query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

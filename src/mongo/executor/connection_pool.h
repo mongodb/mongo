@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/executor/connection_pool_state.h"
@@ -64,6 +63,7 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -573,7 +573,7 @@ public:
      *
      * This function is intended to provide increased visibility into which controller is in use
      */
-    virtual StringData name() const = 0;
+    virtual std::string_view name() const = 0;
 
     const ConnectionPool* getPool() const {
         return _pool;

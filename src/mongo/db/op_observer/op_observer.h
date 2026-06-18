@@ -59,6 +59,7 @@
 #include <cstdint>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -301,29 +302,31 @@ public:
                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     virtual void onContainerInsert(OperationContext* opCtx,
-                                   StringData ident,
+                                   std::string_view ident,
                                    int64_t key,
                                    std::span<const char> value) = 0;
 
     virtual void onContainerInsert(OperationContext* opCtx,
-                                   StringData ident,
+                                   std::string_view ident,
                                    std::span<const char> key,
                                    std::span<const char> value) = 0;
 
     virtual void onContainerUpdate(OperationContext* opCtx,
-                                   StringData ident,
+                                   std::string_view ident,
                                    int64_t key,
                                    std::span<const char> value) = 0;
 
     virtual void onContainerUpdate(OperationContext* opCtx,
-                                   StringData ident,
+                                   std::string_view ident,
                                    std::span<const char> key,
                                    std::span<const char> value) = 0;
 
-    virtual void onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) = 0;
+    virtual void onContainerDelete(OperationContext* opCtx,
+                                   std::string_view ident,
+                                   int64_t key) = 0;
 
     virtual void onContainerDelete(OperationContext* opCtx,
-                                   StringData ident,
+                                   std::string_view ident,
                                    std::span<const char> key) = 0;
 
     /**

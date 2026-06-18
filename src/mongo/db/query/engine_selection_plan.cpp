@@ -32,6 +32,8 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/fail_point.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -617,7 +619,7 @@ static_assert(HasPreVisit<HashedIndexScanPatternRule, IndexScanNode>);
  */
 class IndexNameRule_ForTest {
 public:
-    explicit IndexNameRule_ForTest(StringData targetIndexName)
+    explicit IndexNameRule_ForTest(std::string_view targetIndexName)
         : _targetIndexName(targetIndexName) {}
 
     void preVisit(RuleEngine& engine, const IndexScanNode& node, size_t) {
@@ -627,7 +629,7 @@ public:
     }
 
 private:
-    StringData _targetIndexName;
+    std::string_view _targetIndexName;
 };
 static_assert(HasPreVisit<IndexNameRule_ForTest, IndexScanNode>);
 
@@ -683,7 +685,7 @@ EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
 }
 
 bool indexHasHashedPathPrefixOfNonHashedPath(const BSONObj& keyPattern) {
-    boost::optional<StringData> hashedPath;
+    boost::optional<std::string_view> hashedPath;
     for (const auto& elt : keyPattern) {
         if (elt.valueStringDataSafe() == "hashed") {
             // Indexes may only contain one hashed field.

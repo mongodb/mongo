@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
@@ -76,6 +75,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <wiredtiger.h>
@@ -287,27 +287,27 @@ public:
     BlindWritePolicy chooseBlindWritePolicy(OperationContext* opCtx) override;
 
     Status insertIntoIdent(RecoveryUnit& ru,
-                           StringData ident,
+                           std::string_view ident,
                            IdentKey key,
                            std::span<const char> value,
                            BlindWritePolicy policy) override;
 
     Status updateInIdent(RecoveryUnit& ru,
-                         StringData ident,
+                         std::string_view ident,
                          IdentKey key,
                          std::span<const char> value,
                          BlindWritePolicy policy) override;
 
     StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
-                                          StringData ident,
+                                          std::string_view ident,
                                           IdentKey key) override;
 
     Status deleteFromIdent(RecoveryUnit& ru,
-                           StringData ident,
+                           std::string_view ident,
                            IdentKey key,
                            BlindWritePolicy policy) override;
 
-    virtual Status alterMetadata(StringData uri, StringData config) {
+    virtual Status alterMetadata(std::string_view uri, std::string_view config) {
         MONGO_UNREACHABLE;
     }
 
@@ -369,7 +369,7 @@ public:
      * schemaEpoch.
      */
     virtual void publishIdent(WiredTigerRecoveryUnit& ru,
-                              StringData ident,
+                              std::string_view ident,
                               uint64_t schemaEpoch) = 0;
 
 protected:
@@ -386,7 +386,7 @@ protected:
     /**
      * Returns the table id for the given ident, generating one if it hasn't already been assigned.
      */
-    uint64_t _getTableIdForIdent(StringData ident);
+    uint64_t _getTableIdForIdent(std::string_view ident);
 
     // Configuration parameters to configure the WiredTiger instance.
     WiredTigerConfig _wtConfig;
@@ -468,7 +468,7 @@ public:
     Status createRecordStore(const rss::PersistenceProvider& provider,
                              RecoveryUnit& ru,
                              const NamespaceString& ns,
-                             StringData ident,
+                             std::string_view ident,
                              const RecordStore::Options& options) override {
         // Parameters required for a standard WiredTigerRecordStore.
         return _createRecordStore(provider,
@@ -482,16 +482,16 @@ public:
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,
-                                                StringData ident,
+                                                std::string_view ident,
                                                 const RecordStore::Options& options,
                                                 boost::optional<UUID> uuid) override;
 
     std::unique_ptr<RecordStore> getInternalRecordStore(RecoveryUnit& ru,
-                                                        StringData ident,
+                                                        std::string_view ident,
                                                         KeyFormat keyFormat) override;
 
     std::unique_ptr<RecordStore> makeInternalRecordStore(RecoveryUnit& ru,
-                                                         StringData ident,
+                                                         std::string_view ident,
                                                          KeyFormat keyFormat) override;
 
     Status createSortedDataInterface(
@@ -499,7 +499,7 @@ public:
         RecoveryUnit&,
         const NamespaceString& nss,
         const UUID& uuid,
-        StringData ident,
+        std::string_view ident,
         const IndexConfig& indexConfig,
         const boost::optional<mongo::BSONObj>& storageEngineIndexOptions) override;
 
@@ -507,7 +507,7 @@ public:
                                                                 RecoveryUnit& ru,
                                                                 const NamespaceString& nss,
                                                                 const UUID& uuid,
-                                                                StringData ident,
+                                                                std::string_view ident,
                                                                 const IndexConfig& config,
                                                                 KeyFormat keyFormat) override;
 
@@ -522,13 +522,13 @@ public:
      * absolutely required to ensure the import succeeds
      */
     Status importRecordStore(RecoveryUnit& ru,
-                             StringData ident,
+                             std::string_view ident,
                              const BSONObj& storageMetadata,
                              bool panicOnCorruptWtMetadata,
                              bool repair) override;
 
     Status importSortedDataInterface(RecoveryUnit&,
-                                     StringData ident,
+                                     std::string_view ident,
                                      const BSONObj& storageMetadata,
                                      bool panicOnCorruptWtMetadata,
                                      bool repair) override;
@@ -536,22 +536,22 @@ public:
     /**
      * Drops the specified ident for resumable index builds.
      */
-    Status dropSortedDataInterface(RecoveryUnit&, StringData ident) override;
+    Status dropSortedDataInterface(RecoveryUnit&, std::string_view ident) override;
 
     Status dropIdent(RecoveryUnit& ru,
-                     StringData ident,
+                     std::string_view ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr,
                      boost::optional<uint64_t> schemaEpoch = boost::none) override;
 
-    void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override;
+    void dropIdentForImport(Interruptible&, RecoveryUnit&, std::string_view ident) override;
 
     void alterIdentMetadata(RecoveryUnit&,
-                            StringData ident,
+                            std::string_view ident,
                             const IndexConfig& config,
                             bool isForceUpdateMetadata) override;
 
-    Status alterMetadata(StringData uri, StringData config) override;
+    Status alterMetadata(std::string_view uri, std::string_view config) override;
 
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
@@ -570,17 +570,17 @@ public:
 
     StatusWith<std::deque<std::string>> extendBackupCursor() override;
 
-    int64_t getIdentSize(RecoveryUnit&, StringData ident) override;
+    int64_t getIdentSize(RecoveryUnit&, std::string_view ident) override;
 
-    Status repairIdent(RecoveryUnit& ru, StringData ident) override;
+    Status repairIdent(RecoveryUnit& ru, std::string_view ident) override;
 
     Status recoverOrphanedIdent(const rss::PersistenceProvider&,
                                 RecoveryUnit& ru,
                                 const NamespaceString& nss,
-                                StringData ident,
+                                std::string_view ident,
                                 const RecordStore::Options& options) override;
 
-    bool hasIdent(RecoveryUnit&, StringData ident) const override;
+    bool hasIdent(RecoveryUnit&, std::string_view ident) const override;
 
     std::vector<std::string> getAllIdents(RecoveryUnit&) const override;
 
@@ -598,7 +598,7 @@ public:
 
     void setLastMaterializedLsn(uint64_t lsn) final;
 
-    void setRecoveryCheckpointMetadata(StringData checkpointMetadata) final;
+    void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) final;
 
     void promoteToLeader() final;
 
@@ -642,7 +642,9 @@ public:
     uint64_t getRawAllDurableTimestamp() const override;
     void pinAllDurableTimestamp(uint64_t ts) override;
     void unpinAllDurableTimestamp(uint64_t ts) override;
-    void publishIdent(WiredTigerRecoveryUnit& ru, StringData ident, uint64_t schemaEpoch) override;
+    void publishIdent(WiredTigerRecoveryUnit& ru,
+                      std::string_view ident,
+                      uint64_t schemaEpoch) override;
 
     bool usesSchemaEpochs() const override {
         return _usesSchemaEpochs;
@@ -741,7 +743,7 @@ public:
      * file can not be found. This will attempt to locate a file even if the storage engine's own
      * metadata is not aware of the ident. This is intended for database repair purposes only.
      */
-    boost::optional<boost::filesystem::path> getDataFilePathForIdent(StringData ident) const;
+    boost::optional<boost::filesystem::path> getDataFilePathForIdent(std::string_view ident) const;
 
     /**
      * Returns the minimum possible Timestamp value in the oplog that replication may need for
@@ -794,9 +796,9 @@ public:
 
     void dump() const override;
 
-    StatusWith<BSONObj> getStorageMetadata(StringData ident) const override;
+    StatusWith<BSONObj> getStorageMetadata(std::string_view ident) const override;
 
-    KeyFormat getKeyFormat(RecoveryUnit&, StringData ident) const override;
+    KeyFormat getKeyFormat(RecoveryUnit&, std::string_view ident) const override;
 
     /**
      * As part of the periodic runner cache pressure rollback thread, this function will
@@ -809,11 +811,11 @@ public:
     bool underCachePressure(int concurrentOpOuts) override;
 
     BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
-                                    StringData flagName,
+                                    std::string_view flagName,
                                     boost::optional<bool> flagValue) const override;
 
     boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
-                                                    StringData flagName) const override;
+                                                    std::string_view flagName) const override;
 
     [[nodiscard]] BSONObj setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
                                                          StorageTierLevelEnum value) const override;
@@ -854,7 +856,7 @@ private:
     Status _createRecordStore(const rss::PersistenceProvider& provider,
                               RecoveryUnit& ru,
                               const NamespaceString& ns,
-                              StringData ident,
+                              std::string_view ident,
                               KeyFormat keyFormat,
                               const BSONObj& storageEngineCollectionOptions,
                               boost::optional<std::string> customBlockCompressor);
@@ -877,7 +879,7 @@ private:
     // Guarantees that the necessary directories exist in case the ident lives in a subdirectory of
     // the database (i.e. because of --directoryPerDb). The caller should hold the lock until
     // whatever they were doing with the ident has been persisted to disk.
-    [[nodiscard]] std::unique_lock<std::mutex> _ensureIdentPath(StringData ident);
+    [[nodiscard]] std::unique_lock<std::mutex> _ensureIdentPath(std::string_view ident);
 
     /**
      * Recreates a WiredTiger ident from the provided URI by dropping and recreating the ident.
@@ -925,7 +927,7 @@ private:
 
     // Removes empty directories associated with ident (or subdirectories, when startPos is set).
     // Returns true if directories were removed (or there weren't any to remove).
-    bool _removeIdentDirectoryIfEmpty(StringData ident, size_t startPos = 0);
+    bool _removeIdentDirectoryIfEmpty(std::string_view ident, size_t startPos = 0);
 
     // Wrapped method call to WT_SESSION::drop that handles sub-level error codes if applicable.
     Status _drop(WiredTigerSession& session, const char* uri, const char* config);
@@ -1044,8 +1046,8 @@ private:
  */
 MONGO_MOD_USE_REPLACEMENT(jstest)
 std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerConfig& wtConfig,
-                                       StringData extensionsConfig,
-                                       StringData providerConfig);
+                                       std::string_view extensionsConfig,
+                                       std::string_view providerConfig);
 
 /**
  * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at

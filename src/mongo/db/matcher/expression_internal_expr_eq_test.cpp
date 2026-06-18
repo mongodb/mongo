@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,6 +48,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -57,6 +57,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(InternalExprEqMatchExpression, NodesWithDifferentCollationsAreNotEquivalent) {
     auto operand = BSON("a" << 5);
@@ -103,15 +104,15 @@ TEST(InternalExprEqMatchExpression, NodesNotEquivalentWhenQueryDataDiffersByFiel
 TEST(InternalExprEqMatchExpression, NodesAreEquivalentWhenTopLevelElementFieldNameDiffers) {
     auto operand1 = BSON("b" << BSON("a" << 5));
     auto operand2 = BSON("c" << BSON("a" << 5));
-    InternalExprEqMatchExpression eq1("path"_sd, operand1.firstElement());
-    InternalExprEqMatchExpression eq2("path"_sd, operand2.firstElement());
+    InternalExprEqMatchExpression eq1("path"sv, operand1.firstElement());
+    InternalExprEqMatchExpression eq2("path"sv, operand2.firstElement());
     ASSERT_TRUE(eq1.equivalent(&eq2));
 }
 
 TEST(InternalExprEqMatchExpression, NodesNotEquivalentWhenPathDiffers) {
     auto operand = BSON("a" << 5);
-    InternalExprEqMatchExpression eq1("path1"_sd, operand.firstElement());
-    InternalExprEqMatchExpression eq2("path2"_sd, operand.firstElement());
+    InternalExprEqMatchExpression eq1("path1"sv, operand.firstElement());
+    InternalExprEqMatchExpression eq2("path2"sv, operand.firstElement());
     ASSERT_FALSE(eq1.equivalent(&eq2));
 }
 
@@ -190,7 +191,7 @@ DEATH_TEST_REGEX(InternalExprEqMatchExpressionDeathTest,
 DEATH_TEST_REGEX(InternalExprEqMatchExpressionDeathTest,
                  CannotCompareToMissing,
                  "Tripwire assertion.*11052407") {
-    InternalExprEqMatchExpression eq("a"_sd, BSONElement());
+    InternalExprEqMatchExpression eq("a"sv, BSONElement());
 }
 }  // namespace
 }  // namespace mongo

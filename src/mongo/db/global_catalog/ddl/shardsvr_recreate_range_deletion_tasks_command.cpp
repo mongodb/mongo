@@ -45,13 +45,16 @@
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kLockReason = "RecreateRangeDeletionTasks"_sd;
+constexpr std::string_view kLockReason = "RecreateRangeDeletionTasks"sv;
 
 class ShardSvrRecreateRangeDeletionTasksCommand final
     : public TypedCommand<ShardSvrRecreateRangeDeletionTasksCommand> {

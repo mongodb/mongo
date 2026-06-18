@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/record_id.h"
@@ -52,6 +51,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -69,7 +69,7 @@ namespace mongo {
 class EphemeralForTestRecordStore : public RecordStoreBase {
 public:
     explicit EphemeralForTestRecordStore(boost::optional<UUID> uuid,
-                                         StringData identName,
+                                         std::string_view identName,
                                          std::shared_ptr<void>* dataInOut,
                                          bool isCapped = false,
                                          bool isOplog = false);

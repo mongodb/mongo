@@ -38,6 +38,7 @@
 #include "mongo/util/time_support.h"
 
 #include <mutex>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
@@ -54,7 +55,7 @@ using executor::TaskExecutor;
 
 namespace repl {
 
-BaseCloner::BaseCloner(StringData clonerName,
+BaseCloner::BaseCloner(std::string_view clonerName,
                        ReplSyncSharedData* sharedData,
                        HostAndPort source,
                        DBClientConnection* client,

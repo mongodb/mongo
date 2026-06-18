@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -94,7 +95,7 @@ public:
      * IMPORTANT: The method should not be modified, as API version input/output guarantees could
      * break because of it.
      */
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
         if (_value) {
             builder->appendBool(fieldName, *_value);
         }
@@ -152,7 +153,7 @@ public:
      * IMPORTANT: The method should not be modified, as API version input/output guarantees could
      * break because of it.
      */
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
         builder->appendAs(_element, fieldName);
     }
 

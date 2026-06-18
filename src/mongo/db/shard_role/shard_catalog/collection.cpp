@@ -31,6 +31,8 @@
 
 #include "mongo/db/shard_role/transaction_resources.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -167,7 +169,7 @@ ConsistentCollection& ConsistentCollection::operator=(ConsistentCollection&& oth
 
 void ConsistentCollection::checkNoCollectionsInUse(OperationContext* opCtx,
                                                    RecoveryUnit& ru,
-                                                   StringData message) {
+                                                   std::string_view message) {
     if (disableConsistentCollectionChecks(opCtx) > 0) {
         disableConsistentCollectionChecks(opCtx)--;
         return;

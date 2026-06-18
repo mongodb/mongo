@@ -29,7 +29,6 @@
 
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -49,6 +48,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -57,6 +57,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class ConfigCollectionBalancingCmd final : public TypedCommand<ConfigCollectionBalancingCmd> {
 public:
@@ -66,7 +67,7 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        StringData kStatusField = "status"_sd;
+        std::string_view kStatusField = "status"sv;
 
         void typedRun(OperationContext* opCtx) {
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

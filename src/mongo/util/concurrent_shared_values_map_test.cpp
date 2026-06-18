@@ -29,7 +29,6 @@
 
 #include "mongo/util/concurrent_shared_values_map.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"

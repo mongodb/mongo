@@ -31,7 +31,6 @@
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,6 +55,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -69,10 +69,11 @@
 
 
 namespace mongo::timeseries {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
-bool isIndexOnControl(StringData field) {
+bool isIndexOnControl(std::string_view field) {
     return field.starts_with(timeseries::kControlMinFieldNamePrefix) ||
         field.starts_with(timeseries::kControlMaxFieldNamePrefix);
 }
@@ -81,7 +82,7 @@ bool isIndexOnControl(StringData field) {
  * Takes the index specification field name, such as 'control.max.x.y', or 'control.min.z' and
  * returns a pair of the prefix ('control.min.' or 'control.max.') and key ('x.y' or 'z').
  */
-std::pair<std::string, std::string> extractControlPrefixAndKey(StringData field) {
+std::pair<std::string, std::string> extractControlPrefixAndKey(std::string_view field) {
     // Can't use rfind() due to dotted fields such as 'control.max.x.y'.
     size_t numDotsFound = 0;
     auto fieldIt = std::find_if(field.begin(), field.end(), [&numDotsFound](const char c) {
@@ -107,10 +108,10 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
                                                         const BSONObj& timeseriesIndexSpecBSON,
                                                         bool isShardKeySpec) {
     if (timeseriesIndexSpecBSON.isEmpty()) {
-        return {ErrorCodes::BadValue, "Empty object is not a valid index spec"_sd};
+        return {ErrorCodes::BadValue, "Empty object is not a valid index spec"sv};
     }
-    if (timeseriesIndexSpecBSON.firstElement().fieldNameStringData() == "$hint"_sd ||
-        timeseriesIndexSpecBSON.firstElement().fieldNameStringData() == "$natural"_sd) {
+    if (timeseriesIndexSpecBSON.firstElement().fieldNameStringData() == "$hint"sv ||
+        timeseriesIndexSpecBSON.firstElement().fieldNameStringData() == "$natural"sv) {
         return {
             ErrorCodes::BadValue,
             str::stream() << "Invalid index spec (perhaps it's a valid hint, that was incorrectly "
@@ -388,8 +389,8 @@ boost::optional<BSONObj> createBucketsIndexSpecFromBucketsShardKeySpec(
         return {};
     }
 
-    if (bucketShardKeySpecBSON.firstElement().fieldNameStringData() == "$hint"_sd ||
-        bucketShardKeySpecBSON.firstElement().fieldNameStringData() == "$natural"_sd) {
+    if (bucketShardKeySpecBSON.firstElement().fieldNameStringData() == "$hint"sv ||
+        bucketShardKeySpecBSON.firstElement().fieldNameStringData() == "$natural"sv) {
         return {};
     }
 
@@ -572,7 +573,7 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
         << timeseries::kControlMaxFieldNamePrefix << timeField;
     static const std::string idField = "_id";
 
-    auto isMeasurementField = [&](StringData name) -> bool {
+    auto isMeasurementField = [&](std::string_view name) -> bool {
         if (name == controlMinTimeField || name == controlMaxTimeField) {
             return false;
         }
@@ -630,10 +631,10 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
 bool isHintIndexKey(const BSONObj& obj) {
     if (obj.isEmpty())
         return false;
-    StringData fieldName = obj.firstElement().fieldNameStringData();
-    if (fieldName == "$hint"_sd)
+    std::string_view fieldName = obj.firstElement().fieldNameStringData();
+    if (fieldName == "$hint"sv)
         return false;
-    if (fieldName == "$natural"_sd)
+    if (fieldName == "$natural"sv)
         return false;
 
     return true;

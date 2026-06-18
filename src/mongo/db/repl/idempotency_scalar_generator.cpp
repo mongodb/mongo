@@ -29,7 +29,6 @@
 
 #include "mongo/db/repl/idempotency_scalar_generator.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/util/assert_util.h"
@@ -37,8 +36,10 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 Value TrivialScalarGenerator::generateScalar() const {
     return Value(0);
@@ -70,11 +71,11 @@ Value RandomizedScalarGenerator::generateScalar() const {
 
 std::string RandomizedScalarGenerator::_generateRandomString() const {
     const std::size_t kMaxStrLength = 500;
-    const StringData kViableChars =
+    const std::string_view kViableChars =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"
         "0123456789"
-        "$.\0"_sd;
+        "$.\0"sv;
     std::size_t randomStrLength = this->_random.nextInt32(kMaxStrLength);
     std::string randomStr(randomStrLength, '\0');
     for (std::size_t i = 0; i < randomStrLength; i++) {

@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/query_shape/serialization_options.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/time_support.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -53,48 +53,49 @@
 namespace mongo::query_shape {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 // We'll pre-declare all of these strings so that we can avoid the allocations when we reference
 // them later.
-static constexpr StringData kUndefinedTypeString = "?undefined"_sd;
-static constexpr StringData kStringTypeString = "?string"_sd;
-static constexpr StringData kNumberTypeString = "?number"_sd;
-static constexpr StringData kMinKeyTypeString = "?minKey"_sd;
-static constexpr StringData kObjectTypeString = "?object"_sd;
-static constexpr StringData kArrayTypeString = "?array"_sd;
-static constexpr StringData kBinDataTypeString = "?binData"_sd;
-static constexpr StringData kObjectIdTypeString = "?objectId"_sd;
-static constexpr StringData kBoolTypeString = "?bool"_sd;
-static constexpr StringData kDateTypeString = "?date"_sd;
-static constexpr StringData kNullTypeString = "?null"_sd;
-static constexpr StringData kRegexTypeString = "?regex"_sd;
-static constexpr StringData kDbPointerTypeString = "?dbPointer"_sd;
-static constexpr StringData kJavascriptTypeString = "?javascript"_sd;
-static constexpr StringData kJavascriptWithScopeTypeString = "?javascriptWithScope"_sd;
-static constexpr StringData kTimestampTypeString = "?timestamp"_sd;
-static constexpr StringData kMaxKeyTypeString = "?maxKey"_sd;
+static constexpr std::string_view kUndefinedTypeString = "?undefined"sv;
+static constexpr std::string_view kStringTypeString = "?string"sv;
+static constexpr std::string_view kNumberTypeString = "?number"sv;
+static constexpr std::string_view kMinKeyTypeString = "?minKey"sv;
+static constexpr std::string_view kObjectTypeString = "?object"sv;
+static constexpr std::string_view kArrayTypeString = "?array"sv;
+static constexpr std::string_view kBinDataTypeString = "?binData"sv;
+static constexpr std::string_view kObjectIdTypeString = "?objectId"sv;
+static constexpr std::string_view kBoolTypeString = "?bool"sv;
+static constexpr std::string_view kDateTypeString = "?date"sv;
+static constexpr std::string_view kNullTypeString = "?null"sv;
+static constexpr std::string_view kRegexTypeString = "?regex"sv;
+static constexpr std::string_view kDbPointerTypeString = "?dbPointer"sv;
+static constexpr std::string_view kJavascriptTypeString = "?javascript"sv;
+static constexpr std::string_view kJavascriptWithScopeTypeString = "?javascriptWithScope"sv;
+static constexpr std::string_view kTimestampTypeString = "?timestamp"sv;
+static constexpr std::string_view kMaxKeyTypeString = "?maxKey"sv;
 
-static const StringMap<StringData> kArrayTypeStringConstants{
-    {kUndefinedTypeString.data(), "?array<?undefined>"_sd},
-    {kStringTypeString.data(), "?array<?string>"_sd},
-    {kNumberTypeString.data(), "?array<?number>"_sd},
-    {kMinKeyTypeString.data(), "?array<?minKey>"_sd},
-    {kObjectTypeString.data(), "?array<?object>"_sd},
-    {kArrayTypeString.data(), "?array<?array>"_sd},
-    {kBinDataTypeString.data(), "?array<?binData>"_sd},
-    {kObjectIdTypeString.data(), "?array<?objectId>"_sd},
-    {kBoolTypeString.data(), "?array<?bool>"_sd},
-    {kDateTypeString.data(), "?array<?date>"_sd},
-    {kNullTypeString.data(), "?array<?null>"_sd},
-    {kRegexTypeString.data(), "?array<?regex>"_sd},
-    {kDbPointerTypeString.data(), "?array<?dbPointer>"_sd},
-    {kJavascriptTypeString.data(), "?array<?javascript>"_sd},
-    {kJavascriptWithScopeTypeString.data(), "?array<?javascriptWithScope>"_sd},
-    {kTimestampTypeString.data(), "?array<?timestamp>"_sd},
-    {kMaxKeyTypeString.data(), "?array<?maxKey>"_sd},
+static const StringMap<std::string_view> kArrayTypeStringConstants{
+    {kUndefinedTypeString.data(), "?array<?undefined>"sv},
+    {kStringTypeString.data(), "?array<?string>"sv},
+    {kNumberTypeString.data(), "?array<?number>"sv},
+    {kMinKeyTypeString.data(), "?array<?minKey>"sv},
+    {kObjectTypeString.data(), "?array<?object>"sv},
+    {kArrayTypeString.data(), "?array<?array>"sv},
+    {kBinDataTypeString.data(), "?array<?binData>"sv},
+    {kObjectIdTypeString.data(), "?array<?objectId>"sv},
+    {kBoolTypeString.data(), "?array<?bool>"sv},
+    {kDateTypeString.data(), "?array<?date>"sv},
+    {kNullTypeString.data(), "?array<?null>"sv},
+    {kRegexTypeString.data(), "?array<?regex>"sv},
+    {kDbPointerTypeString.data(), "?array<?dbPointer>"sv},
+    {kJavascriptTypeString.data(), "?array<?javascript>"sv},
+    {kJavascriptWithScopeTypeString.data(), "?array<?javascriptWithScope>"sv},
+    {kTimestampTypeString.data(), "?array<?timestamp>"sv},
+    {kMaxKeyTypeString.data(), "?array<?maxKey>"sv},
 };
 
-static constexpr auto kRepresentativeString = "?"_sd;
+static constexpr auto kRepresentativeString = "?"sv;
 static constexpr auto kRepresentativeNumber = 1;
 static const auto kRepresentativeObject = BSON("?" << "?");
 static const auto kRepresentativeArray = BSONArray();
@@ -111,7 +112,7 @@ static const auto kRepresentativeTimestamp = Timestamp::min();
 /**
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
-std::string applyHmacForTest(StringData s) {
+std::string applyHmacForTest(std::string_view s) {
     // Avoid ending in a parenthesis since the results will occur in a raw string where the )"
     // sequence will accidentally terminate the string.
     return str::stream() << "HASH<" << s << ">";
@@ -121,7 +122,7 @@ std::string applyHmacForTest(StringData s) {
  * Computes a debug string meant to represent "any value of type t", where "t" is the type of the
  * provided argument. For example "?number" for any number (int, double, etc.).
  */
-StringData debugTypeString(BSONType t) {
+std::string_view debugTypeString(BSONType t) {
     // This is tightly coupled with 'canonicalizeBSONType' and therefore also with
     // sorting/comparison semantics.
     switch (t) {
@@ -279,7 +280,7 @@ ArraySubtypeInfo determineArraySubType(const std::vector<Value>& values) {
 }
 
 template <typename ValueType>
-StringData debugTypeString(
+std::string_view debugTypeString(
     const ValueType& v,
     GetTypeFn<ValueType> getTypeCallback,
     std::function<ArraySubtypeInfo(ValueType)> determineArraySubTypeCallback) {
@@ -289,7 +290,7 @@ StringData debugTypeString(
         auto typeInfo = determineArraySubTypeCallback(v);
         switch (typeInfo.nTypes) {
             case ArraySubtypeInfo::NTypes::kEmpty:
-                return "[]"_sd;
+                return "[]"sv;
             case ArraySubtypeInfo::NTypes::kOneType:
                 return kArrayTypeStringConstants.at(debugTypeString(*typeInfo.singleType));
             case ArraySubtypeInfo::NTypes::kMixed:
@@ -319,7 +320,7 @@ ImplicitValue defaultLiteralOfType(
                 // for mixed type scenarios - we wish to collapse all "mixed type" arrays to one
                 // canonical mix. The choice of int and string is mostly arbitrary - hopefully
                 // somewhat comprehensible at a glance.
-                return std::vector<Value>{Value(2), Value("or more types"_sd)};
+                return std::vector<Value>{Value(2), Value("or more types"sv)};
             default:
                 MONGO_UNREACHABLE_TASSERT(7539805);
         }
@@ -336,7 +337,7 @@ ArraySubtypeInfo getSubTypeFromValueArray(const Value& arrayVal) {
     return determineArraySubType(arrayVal.getArray());
 }
 
-void appendDefaultOfNonArrayType(BSONObjBuilder* bob, StringData name, const BSONElement& e) {
+void appendDefaultOfNonArrayType(BSONObjBuilder* bob, std::string_view name, const BSONElement& e) {
     switch (e.type()) {
         case BSONType::eoo:
         case BSONType::undefined:
@@ -418,10 +419,10 @@ const SerializationOptions SerializationOptions::kDebugShapeAndMarkIdentifiers_F
                          .transformIdentifiersCallback = applyHmacForTest};
 
 // Overloads for BSONElem and Value.
-StringData debugTypeString(BSONElement e) {
+std::string_view debugTypeString(BSONElement e) {
     return debugTypeString<BSONElement>(e, getBSONElementType, getSubTypeFromBSONElemArray);
 }
-StringData debugTypeString(const Value& v) {
+std::string_view debugTypeString(const Value& v) {
     return debugTypeString<Value>(v, getValueType, getSubTypeFromValueArray);
 }
 
@@ -437,7 +438,7 @@ void SerializationOptions::appendLiteral(BSONObjBuilder* bob, const BSONElement&
     appendLiteral(bob, e.fieldNameStringData(), e);
 }
 void SerializationOptions::appendLiteral(BSONObjBuilder* bob,
-                                         StringData name,
+                                         std::string_view name,
                                          const BSONElement& e) const {
     // The first two cases are particularly performance sensitive. We could answer everything here
     // with the code inside the 'kToDebugTypeString' branch, but there are some relatively easy ways
@@ -465,7 +466,7 @@ void SerializationOptions::appendLiteral(BSONObjBuilder* bob,
 }
 
 void SerializationOptions::appendLiteral(BSONObjBuilder* bob,
-                                         StringData fieldName,
+                                         std::string_view fieldName,
                                          const ImplicitValue& v,
                                          const boost::optional<Value>& representativeValue) const {
     serializeLiteral(v, representativeValue).addToBsonObj(bob, fieldName);
@@ -499,7 +500,7 @@ Value SerializationOptions::serializeLiteral(
     }
 }
 
-std::string SerializationOptions::serializeFieldPathFromString(StringData path) const {
+std::string SerializationOptions::serializeFieldPathFromString(std::string_view path) const {
     if (transformIdentifiers) {
         try {
             return serializeFieldPath(FieldPath(path, false, false));
@@ -522,7 +523,7 @@ std::string SerializationOptions::serializeFieldRef(const FieldRef& fieldRef) co
             if (i > 0) {
                 hmaced << ".";
             }
-            StringData part = fieldRef.getPart(i);
+            std::string_view part = fieldRef.getPart(i);
             hmaced << transformIdentifier(part);
         }
         return hmaced.str();

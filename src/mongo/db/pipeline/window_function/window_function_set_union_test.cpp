@@ -35,6 +35,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WindowFunctionSetUnionTest : public AggregationContextFixture {
 public:
@@ -89,8 +90,8 @@ TEST_F(WindowFunctionSetUnionTest, SingleInsertionShouldReturnAVector) {
     ASSERT_EXPECTED_SET(Value{std::vector<Value>({Value(1)})});
 
     setUnion.reset();
-    setUnion.add(Value{std::vector<Value>({Value("str"_sd)})});
-    ASSERT_EXPECTED_SET(Value{std::vector<Value>({Value("str"_sd)})});
+    setUnion.add(Value{std::vector<Value>({Value("str"sv)})});
+    ASSERT_EXPECTED_SET(Value{std::vector<Value>({Value("str"sv)})});
 }
 
 TEST_F(WindowFunctionSetUnionTest, ComplexWindow) {
@@ -148,8 +149,8 @@ TEST_F(WindowFunctionSetUnionTest, TracksMemoryUsageOnAddAndRemove) {
     size_t trackingSize = sizeof(WindowFunctionSetUnion);
     ASSERT_EQ(setUnion.getApproximateSize(), trackingSize);
 
-    auto largeStr1 = Value("$setUnion is a great window function"_sd);
-    auto largeStr2 = Value("$setUnion is still a great window function"_sd);
+    auto largeStr1 = Value("$setUnion is a great window function"sv);
+    auto largeStr2 = Value("$setUnion is still a great window function"sv);
 
     setUnion.add(Value(std::vector<Value>({largeStr1})));
     trackingSize += largeStr1.getApproximateSize();
@@ -177,11 +178,11 @@ TEST_F(WindowFunctionSetUnionTest, TracksMemoryUsageOnAddAndRemove) {
 }
 
 TEST_F(WindowFunctionSetUnionTest, WindowFunctionSetUnionRespectsCollation) {
-    std::vector<Value> values = {Value("AAA"_sd), Value("aaa"_sd)};
+    std::vector<Value> values = {Value("AAA"sv), Value("aaa"sv)};
     ASSERT(expCtx->getValueComparator().getEqualTo()(values[0], values[1]));
     setUnion.add(Value(values));
 
-    ASSERT_EXPECTED_SET(Value(std::vector<Value>({Value("AAA"_sd)})));
+    ASSERT_EXPECTED_SET(Value(std::vector<Value>({Value("AAA"sv)})));
 }
 
 }  // namespace

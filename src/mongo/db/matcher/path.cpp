@@ -34,6 +34,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -152,7 +154,8 @@ void BSONElementIterator::ArrayIterationState::reset(const FieldRef& ref, int st
     }
 }
 
-bool BSONElementIterator::ArrayIterationState::isArrayOffsetMatch(StringData fieldName) const {
+bool BSONElementIterator::ArrayIterationState::isArrayOffsetMatch(
+    std::string_view fieldName) const {
     if (!nextPieceOfPathIsNumber)
         return false;
     return nextPieceOfPath == fieldName;
@@ -374,7 +377,7 @@ ElementIterator::Context BSONElementIterator::next() {
 
 BSONElementSubIterator::BSONElementSubIterator(
     const BSONObj& objectToIterate,
-    StringData pathToIterate,
+    std::string_view pathToIterate,
     ElementPath::LeafArrayBehavior leafArrayBehavior,
     ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior)
     : path(pathToIterate, leafArrayBehavior, nonLeafArrayBehavior),

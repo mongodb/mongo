@@ -30,7 +30,6 @@
 #include "mongo/db/repl/primary_only_service_util.h"
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -48,6 +47,7 @@
 #include "mongo/util/fail_point.h"
 
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -62,9 +62,10 @@ using namespace mongo::repl;
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace {
-constexpr auto kTestPrimaryOnlyServiceName = "TestService"_sd;
-constexpr auto kTestPrimaryOnlyServiceInstanceName = "TestServiceInstance"_sd;
-constexpr auto kTestPrimaryOnlyServiceStateDocumentNss = "config.test_primary_only_service"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kTestPrimaryOnlyServiceName = "TestService"sv;
+constexpr auto kTestPrimaryOnlyServiceInstanceName = "TestServiceInstance"sv;
+constexpr auto kTestPrimaryOnlyServiceStateDocumentNss = "config.test_primary_only_service"sv;
 
 // Hangs the 'TestDefaultPrimaryOnlyServiceInstance' after inserting the state document.
 MONGO_FAIL_POINT_DEFINE(HangTestPrimaryOnlyServiceAfterStateDocInsertion);
@@ -95,7 +96,7 @@ PrimaryOnlyServiceStateStore<TestStateDocument> gStateDocStore{
  */
 class TestDefaultPrimaryOnlyServiceInstance : public DefaultPrimaryOnlyServiceInstance {
 public:
-    StringData getInstanceName() final {
+    std::string_view getInstanceName() final {
         return kTestPrimaryOnlyServiceInstanceName;
     }
 
@@ -140,7 +141,7 @@ public:
 
     ~TestDefaultPrimaryOnlyService() override = default;
 
-    StringData getServiceName() const final {
+    std::string_view getServiceName() const final {
         return kTestPrimaryOnlyServiceName;
     }
 

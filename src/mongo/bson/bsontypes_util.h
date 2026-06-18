@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -42,30 +43,31 @@ namespace mongo {
 // Utility class to allow adding a std::string to BSON as a Symbol
 struct BSONSymbol {
     BSONSymbol() = default;
-    explicit BSONSymbol(StringData sym) : symbol(sym) {}
-    StringData symbol = "";
+    explicit BSONSymbol(std::string_view sym) : symbol(sym) {}
+    std::string_view symbol = "";
 };
 
 // Utility class to allow adding a std::string to BSON as Code
 struct BSONCode {
     BSONCode() = default;
-    explicit BSONCode(StringData str) : code(str) {}
-    StringData code = "";
+    explicit BSONCode(std::string_view str) : code(str) {}
+    std::string_view code = "";
 };
 
 // Utility class to allow adding CodeWScope to BSON
 struct BSONCodeWScope {
     BSONCodeWScope() = default;
-    explicit BSONCodeWScope(StringData str, const BSONObj& obj) : code(str), scope(obj) {}
-    StringData code = "";
+    explicit BSONCodeWScope(std::string_view str, const BSONObj& obj) : code(str), scope(obj) {}
+    std::string_view code = "";
     BSONObj scope = {};
 };
 
 // Utility class to allow adding a RegEx to BSON
 struct BSONRegEx {
-    explicit BSONRegEx(StringData pat = "", StringData f = "") : pattern(pat), flags(f) {}
-    StringData pattern;
-    StringData flags;
+    explicit BSONRegEx(std::string_view pat = "", std::string_view f = "")
+        : pattern(pat), flags(f) {}
+    std::string_view pattern;
+    std::string_view flags;
 };
 
 // Utility class to allow adding binary data to BSON
@@ -80,8 +82,8 @@ struct BSONBinData {
 // Utility class to allow adding deprecated DBRef type to BSON
 struct BSONDBRef {
     BSONDBRef() = default;
-    BSONDBRef(StringData nameSpace, const OID& o) : ns(nameSpace), oid(o) {}
-    StringData ns = "";
+    BSONDBRef(std::string_view nameSpace, const OID& o) : ns(nameSpace), oid(o) {}
+    std::string_view ns = "";
     OID oid;
 };
 

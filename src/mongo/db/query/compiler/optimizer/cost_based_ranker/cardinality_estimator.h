@@ -46,6 +46,8 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::cost_based_ranker {
 
 using CEResult = StatusWith<CardinalityEstimate>;
@@ -163,7 +165,7 @@ protected:
      * 'nodes' to an Interval, intersecting all the intervals and finally invoking histogram
      * estimation. This function assumes that 'path' is non-multikey.
      */
-    CEResult estimateConjWithHistogram(StringData path,
+    CEResult estimateConjWithHistogram(std::string_view path,
                                        const std::vector<const MatchExpression*>& nodes);
 
     CEResult scanCard(const QuerySolutionNode* node, const CardinalityEstimate& card);
@@ -232,7 +234,7 @@ protected:
 
     // Get the path of the given node. This function consults the '_elemMatchPathStack' to check if
     // this node is under an $elemMatch, if so it will return that path.
-    StringData getPath(const MatchExpression* node);
+    std::string_view getPath(const MatchExpression* node);
 
     const CardinalityEstimate _collCard;
 
@@ -276,7 +278,7 @@ protected:
     // Keep track of the path associated with the current node in $elemMatch contexts. For example,
     // ElemMatchValueMatchExpression may have a child which looks like GTMatchExpression with an
     // empty path.
-    std::stack<StringData> _elemMatchPathStack;
+    std::stack<std::string_view> _elemMatchPathStack;
 
     // Cache cardinality estimates of logically equivalent MatchExpressions and IndexBounds.
     CECache<false /* disable logging */> _ceCache;

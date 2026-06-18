@@ -42,7 +42,7 @@ int getColumnWidth(UChar32 codepoint, bool ambiguousAsFullWidth) {
 // This is a modified version of GetStringWidth from node. We don't currently support wide strings
 // in the test runner, so it has been converted to use the U8 cursor API. For more details on
 // string width calculation see: https://www.unicode.org/reports/tr11/
-int icuGetStringWidth(StringData value, bool ambiguousAsFullWidth, bool expandEmojiSequence) {
+int icuGetStringWidth(std::string_view value, bool ambiguousAsFullWidth, bool expandEmojiSequence) {
     const uint8_t* str = reinterpret_cast<const uint8_t*>(value.data());
     UChar32 output = 0;
     UChar32 previous;

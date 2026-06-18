@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -43,6 +42,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -51,7 +52,7 @@
 namespace mongo {
 namespace {
 
-size_t getValue(const BSONElement& newValueElement, StringData tag) {
+size_t getValue(const BSONElement& newValueElement, std::string_view tag) {
     long long newVal;
     bool success = newValueElement.coerce(&newVal);
     uassert(ErrorCodes::BadValue,
@@ -64,7 +65,7 @@ size_t getValue(const BSONElement& newValueElement, StringData tag) {
     return static_cast<size_t>(newVal);
 }
 
-size_t getValueFromString(StringData strVal, StringData tag) {
+size_t getValueFromString(std::string_view strVal, std::string_view tag) {
     long long newVal;
     auto status = NumberParser{}(strVal, &newVal);
     uassert(ErrorCodes::BadValue,
@@ -81,7 +82,7 @@ size_t getValueFromString(StringData strVal, StringData tag) {
 
 void RedactEncryptedFields::append(OperationContext* opCtx,
                                    BSONObjBuilder* b,
-                                   StringData name,
+                                   std::string_view name,
                                    const boost::optional<TenantId>&) {
     *b << name << logv2::shouldRedactBinDataEncrypt();
 }
@@ -98,7 +99,8 @@ Status RedactEncryptedFields::set(const BSONElement& newValueElement,
     return Status::OK();
 }
 
-Status RedactEncryptedFields::setFromString(StringData str, const boost::optional<TenantId>&) {
+Status RedactEncryptedFields::setFromString(std::string_view str,
+                                            const boost::optional<TenantId>&) {
     if (str == "true" || str == "1") {
         logv2::setShouldRedactBinDataEncrypt(true);
     } else if (str == "false" || str == "0") {
@@ -112,7 +114,7 @@ Status RedactEncryptedFields::setFromString(StringData str, const boost::optiona
 
 void RamLogMaxLines::append(OperationContext* opCtx,
                             BSONObjBuilder* b,
-                            StringData name,
+                            std::string_view name,
                             const boost::optional<TenantId>&) {
     *b << name << static_cast<long long>(logv2::RamLog::getGlobalMaxLines());
 }
@@ -125,7 +127,7 @@ Status RamLogMaxLines::set(const BSONElement& newValueElement,
     return ex.toStatus();
 }
 
-Status RamLogMaxLines::setFromString(StringData str, const boost::optional<TenantId>&) try {
+Status RamLogMaxLines::setFromString(std::string_view str, const boost::optional<TenantId>&) try {
     logv2::RamLog::setGlobalMaxLines(getValueFromString(str, "ramLogMaxLines"));
     return Status::OK();
 } catch (const DBException& ex) {
@@ -134,7 +136,7 @@ Status RamLogMaxLines::setFromString(StringData str, const boost::optional<Tenan
 
 void RamLogMaxSizeBytes::append(OperationContext* opCtx,
                                 BSONObjBuilder* b,
-                                StringData name,
+                                std::string_view name,
                                 const boost::optional<TenantId>&) {
     *b << name << static_cast<long long>(logv2::RamLog::getGlobalMaxSizeBytes());
 }
@@ -147,7 +149,8 @@ Status RamLogMaxSizeBytes::set(const BSONElement& newValueElement,
     return ex.toStatus();
 }
 
-Status RamLogMaxSizeBytes::setFromString(StringData str, const boost::optional<TenantId>&) try {
+Status RamLogMaxSizeBytes::setFromString(std::string_view str,
+                                         const boost::optional<TenantId>&) try {
     logv2::RamLog::setGlobalMaxSizeBytes(getValueFromString(str, "ramLogMaxSizeBytes"));
     return Status::OK();
 } catch (const DBException& ex) {

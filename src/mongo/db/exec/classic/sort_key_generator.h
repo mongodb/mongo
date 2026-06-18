@@ -40,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -71,7 +72,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "SORT_KEY_GENERATOR"_sd;
+    static constexpr std::string_view kStageType = "SORT_KEY_GENERATOR"_sd;
 
 protected:
     StageState doWork(WorkingSetID* out) final;

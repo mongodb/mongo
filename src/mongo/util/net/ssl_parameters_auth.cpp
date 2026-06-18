@@ -37,16 +37,18 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_auth_gen.h"
 
+#include <string_view>
+
 namespace mongo {
 void ClusterAuthModeServerParameter::append(OperationContext*,
                                             BSONObjBuilder* builder,
-                                            StringData fieldName,
+                                            std::string_view fieldName,
                                             const boost::optional<TenantId>&) {
     const auto clusterAuthMode = ClusterAuthMode::get(getGlobalServiceContext());
     builder->append(fieldName, clusterAuthMode.toString());
 }
 
-Status ClusterAuthModeServerParameter::setFromString(StringData strMode,
+Status ClusterAuthModeServerParameter::setFromString(std::string_view strMode,
                                                      const boost::optional<TenantId>&) try {
     auto mode = uassertStatusOK(ClusterAuthMode::parse(strMode));
 

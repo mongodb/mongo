@@ -29,7 +29,6 @@
 
 #include "mongo/s/query/exec/cluster_cursor_cleanup_job.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
 #include "mongo/db/service_context.h"

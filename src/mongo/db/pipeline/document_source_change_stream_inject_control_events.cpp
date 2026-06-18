@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
@@ -41,12 +40,14 @@
 #include "mongo/util/str.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using boost::intrusive_ptr;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamInjectControlEvents,
                                               ChangeStreamInjectControlEventsLiteParsed::parse);
@@ -60,7 +61,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamInjectControlEvents,
 
 namespace {
 
-constexpr StringData kActionsName = "actions"_sd;
+constexpr std::string_view kActionsName = "actions"sv;
 
 }  // namespace
 
@@ -69,7 +70,7 @@ DocumentSourceChangeStreamInjectControlEvents::ActionsHelper::parseFromBSON(
     const BSONObj& actions) {
     ActionsMap result;
 
-    auto getActionFromName = [](StringData actionName) {
+    auto getActionFromName = [](std::string_view actionName) {
         if (actionName == kActionNameInjectControlEvent) {
             return Action::kInjectControlEvent;
         }
@@ -93,7 +94,7 @@ DocumentSourceChangeStreamInjectControlEvents::ActionsHelper::parseFromBSON(
 BSONObj DocumentSourceChangeStreamInjectControlEvents::ActionsHelper::serializeToBSON(
     const DocumentSourceChangeStreamInjectControlEvents::ActionsMap& actions) {
     // Copy field names into a get to have a deterministic order of fields for serialization.
-    std::set<StringData> keys;
+    std::set<std::string_view> keys;
     for (const auto& action : actions) {
         keys.insert(action.first);
     }
@@ -104,7 +105,7 @@ BSONObj DocumentSourceChangeStreamInjectControlEvents::ActionsHelper::serializeT
         auto it = actions.find(key);
         tassert(10384003, "key must exist in actions map", it != actions.end());
         const auto& action = *it;
-        StringData actionName = action.second == Action::kTransformToControlEvent
+        std::string_view actionName = action.second == Action::kTransformToControlEvent
             ? kActionNameTransformToControlEvent
             : kActionNameInjectControlEvent;
         bob.append(action.first /* event name */, actionName);
@@ -171,7 +172,7 @@ DocumentSourceChangeStreamInjectControlEvents::createFromBson(
         expCtx, ActionsHelper::parseFromBSON(parsed.getActions()));
 }
 
-StringData DocumentSourceChangeStreamInjectControlEvents::getSourceName() const {
+std::string_view DocumentSourceChangeStreamInjectControlEvents::getSourceName() const {
     return kStageName;
 }
 
@@ -184,7 +185,7 @@ Value DocumentSourceChangeStreamInjectControlEvents::doSerialize(
     BSONObjBuilder builder;
     if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
-        sub.append("stage"_sd, kStageName);
+        sub.append("stage"sv, kStageName);
         sub << kActionsName << ActionsHelper::serializeToBSON(_actions);
         sub.done();
     } else {

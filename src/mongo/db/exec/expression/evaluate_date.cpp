@@ -30,6 +30,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
 
+#include <string_view>
+
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(sleepBeforeCurrentDateEvaluation);
@@ -50,7 +52,7 @@ namespace {
  */
 bool evaluateNumberWithDefault(const Document& root,
                                const Expression* field,
-                               StringData fieldName,
+                               std::string_view fieldName,
                                long long defaultValue,
                                long long* returnValue,
                                Variables* variables,
@@ -84,7 +86,7 @@ bool evaluateNumberWithDefault(const Document& root,
  */
 bool evaluateNumberWithDefaultAndBounds(const Document& root,
                                         const Expression* field,
-                                        StringData fieldName,
+                                        std::string_view fieldName,
                                         long long defaultValue,
                                         long long* returnValue,
                                         Variables* variables,
@@ -133,7 +135,9 @@ boost::optional<int> evaluateIso8601Flag(const Expression* iso8601,
 /**
  * Converts 'value' to Date_t type for $dateDiff expression for parameter 'parameterName'.
  */
-Date_t convertDate(const Value& value, StringData expressionName, StringData parameterName) {
+Date_t convertDate(const Value& value,
+                   std::string_view expressionName,
+                   std::string_view parameterName) {
     uassert(5166307,
             str::stream() << expressionName << " requires '" << parameterName
                           << "' to be a date, but got " << typeName(value.getType()),
@@ -144,8 +148,9 @@ Date_t convertDate(const Value& value, StringData expressionName, StringData par
 }  // namespace
 
 namespace exec::expression {
+using namespace std::literals::string_view_literals;
 
-TimeUnit parseTimeUnit(const Value& value, StringData expressionName) {
+TimeUnit parseTimeUnit(const Value& value, std::string_view expressionName) {
     uassert(5439013,
             str::stream() << expressionName << " requires 'unit' to be a string, but got "
                           << typeName(value.getType()),
@@ -153,10 +158,12 @@ TimeUnit parseTimeUnit(const Value& value, StringData expressionName) {
     return addContextToAssertionException(
         [&]() { return mongo::parseTimeUnit(value.getStringData()); },
         expressionName,
-        " parameter 'unit' value parsing failed"_sd);
+        " parameter 'unit' value parsing failed"sv);
 }
 
-DayOfWeek parseDayOfWeek(const Value& value, StringData expressionName, StringData parameterName) {
+DayOfWeek parseDayOfWeek(const Value& value,
+                         std::string_view expressionName,
+                         std::string_view parameterName) {
     uassert(5439015,
             str::stream() << expressionName << " requires '" << parameterName
                           << "' to be a string, but got " << typeName(value.getType()),
@@ -214,13 +221,13 @@ Value evaluate(const ExpressionDateFromParts& expr,
     long long hour, minute, second, millisecond;
 
     if (!evaluateNumberWithDefaultAndBounds(
-            root, expr.getHour(), "hour"_sd, 0, &hour, variables, ctx) ||
+            root, expr.getHour(), "hour"sv, 0, &hour, variables, ctx) ||
         !evaluateNumberWithDefaultAndBounds(
-            root, expr.getMinute(), "minute"_sd, 0, &minute, variables, ctx) ||
+            root, expr.getMinute(), "minute"sv, 0, &minute, variables, ctx) ||
         !evaluateNumberWithDefault(
-            root, expr.getSecond(), "second"_sd, 0, &second, variables, ctx) ||
+            root, expr.getSecond(), "second"sv, 0, &second, variables, ctx) ||
         !evaluateNumberWithDefault(
-            root, expr.getMillisecond(), "millisecond"_sd, 0, &millisecond, variables, ctx)) {
+            root, expr.getMillisecond(), "millisecond"sv, 0, &millisecond, variables, ctx)) {
         // One of the evaluated inputs in nullish.
         return Value(BSONNULL);
     }
@@ -241,11 +248,11 @@ Value evaluate(const ExpressionDateFromParts& expr,
         long long year, month, day;
 
         if (!evaluateNumberWithDefault(
-                root, expr.getYear(), "year"_sd, 1970, &year, variables, ctx) ||
+                root, expr.getYear(), "year"sv, 1970, &year, variables, ctx) ||
             !evaluateNumberWithDefaultAndBounds(
-                root, expr.getMonth(), "month"_sd, 1, &month, variables, ctx) ||
+                root, expr.getMonth(), "month"sv, 1, &month, variables, ctx) ||
             !evaluateNumberWithDefaultAndBounds(
-                root, expr.getDay(), "day"_sd, 1, &day, variables, ctx)) {
+                root, expr.getDay(), "day"sv, 1, &day, variables, ctx)) {
             // One of the evaluated inputs in nullish.
             return Value(BSONNULL);
         }
@@ -262,22 +269,12 @@ Value evaluate(const ExpressionDateFromParts& expr,
     if (expr.getIsoWeekYear()) {
         long long isoWeekYear, isoWeek, isoDayOfWeek;
 
-        if (!evaluateNumberWithDefault(root,
-                                       expr.getIsoWeekYear(),
-                                       "isoWeekYear"_sd,
-                                       1970,
-                                       &isoWeekYear,
-                                       variables,
-                                       ctx) ||
+        if (!evaluateNumberWithDefault(
+                root, expr.getIsoWeekYear(), "isoWeekYear"sv, 1970, &isoWeekYear, variables, ctx) ||
             !evaluateNumberWithDefaultAndBounds(
-                root, expr.getIsoWeek(), "isoWeek"_sd, 1, &isoWeek, variables, ctx) ||
-            !evaluateNumberWithDefaultAndBounds(root,
-                                                expr.getIsoDayOfWeek(),
-                                                "isoDayOfWeek"_sd,
-                                                1,
-                                                &isoDayOfWeek,
-                                                variables,
-                                                ctx)) {
+                root, expr.getIsoWeek(), "isoWeek"sv, 1, &isoWeek, variables, ctx) ||
+            !evaluateNumberWithDefaultAndBounds(
+                root, expr.getIsoDayOfWeek(), "isoDayOfWeek"sv, 1, &isoDayOfWeek, variables, ctx)) {
             // One of the evaluated inputs in nullish.
             return Value(BSONNULL);
         }
@@ -493,7 +490,7 @@ Value evaluate(const ExpressionDateDiff& expr,
         if (unitValue.nullish()) {
             return Value(BSONNULL);
         }
-        unit = parseTimeUnit(unitValue, "$dateDiff"_sd);
+        unit = parseTimeUnit(unitValue, "$dateDiff"sv);
     }
 
     DayOfWeek startOfWeek = kStartOfWeekDefault;
@@ -505,7 +502,7 @@ Value evaluate(const ExpressionDateDiff& expr,
             if (startOfWeekValue.nullish()) {
                 return Value(BSONNULL);
             }
-            startOfWeek = parseDayOfWeek(startOfWeekValue, "$dateDiff"_sd, "startOfWeek"_sd);
+            startOfWeek = parseDayOfWeek(startOfWeekValue, "$dateDiff"sv, "startOfWeek"sv);
         }
     }
 
@@ -519,14 +516,14 @@ Value evaluate(const ExpressionDateDiff& expr,
                                     variables,
                                     ctx);
             },
-            "$dateDiff parameter 'timezone' value parsing failed"_sd);
+            "$dateDiff parameter 'timezone' value parsing failed"sv);
         if (!timezone) {
             return Value(BSONNULL);
         }
     }
 
-    const Date_t startDate = convertDate(startDateValue, "$dateDiff"_sd, "startDate"_sd);
-    const Date_t endDate = convertDate(endDateValue, "$dateDiff"_sd, "endDate"_sd);
+    const Date_t startDate = convertDate(startDateValue, "$dateDiff"sv, "startDate"sv);
+    const Date_t endDate = convertDate(endDateValue, "$dateDiff"sv, "endDate"sv);
     return Value{dateDiff(startDate, endDate, unit, *timezone, startOfWeek)};
 }
 
@@ -651,7 +648,7 @@ Value evaluate(const ExpressionDateTrunc& expr,
         if (unitValue.nullish()) {
             return Value(BSONNULL);
         }
-        unit = parseTimeUnit(unitValue, "$dateTrunc"_sd);
+        unit = parseTimeUnit(unitValue, "$dateTrunc"sv);
     }
 
     DayOfWeek startOfWeek = kStartOfWeekDefault;
@@ -663,7 +660,7 @@ Value evaluate(const ExpressionDateTrunc& expr,
             if (startOfWeekValue.nullish()) {
                 return Value(BSONNULL);
             }
-            startOfWeek = parseDayOfWeek(startOfWeekValue, "$dateTrunc"_sd, "startOfWeek"_sd);
+            startOfWeek = parseDayOfWeek(startOfWeekValue, "$dateTrunc"sv, "startOfWeek"sv);
         }
     }
 
@@ -677,14 +674,14 @@ Value evaluate(const ExpressionDateTrunc& expr,
                                     variables,
                                     ctx);
             },
-            "$dateTrunc parameter 'timezone' value parsing failed"_sd);
+            "$dateTrunc parameter 'timezone' value parsing failed"sv);
         if (!timezone) {
             return Value(BSONNULL);
         }
     }
 
     // Convert parameter values.
-    const Date_t date = convertDate(dateValue, "$dateTrunc"_sd, "date"_sd);
+    const Date_t date = convertDate(dateValue, "$dateTrunc"sv, "date"sv);
     return Value{truncateDate(date, unit, binSize, *timezone, startOfWeek)};
 }
 

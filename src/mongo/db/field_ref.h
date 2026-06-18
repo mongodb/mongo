@@ -32,7 +32,6 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/optional.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/container_size_helper.h"
@@ -46,6 +45,7 @@
 #include <iosfwd>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -69,7 +69,7 @@ MONGO_STATIC_ASSERT(BSONObjMaxInternalSize < std::numeric_limits<std::uint32_t>:
  * embedded null byte.
  *
  * Any field part may be replaced, after the "original" field reference was parsed. Any
- * part can be accessed through a StringData object.
+ * part can be accessed through a std::string_view object.
  *
  * The class is not thread safe.
  */
@@ -82,7 +82,7 @@ public:
      */
     class FieldRefTempAppend {
     public:
-        FieldRefTempAppend(FieldRef& fieldRef, StringData part) : _fieldRef(fieldRef) {
+        FieldRefTempAppend(FieldRef& fieldRef, std::string_view part) : _fieldRef(fieldRef) {
             _fieldRef.appendPart(part);
         }
 
@@ -98,7 +98,7 @@ public:
      * Returns true if the argument is a numeric string which is eligible to act as the key name for
      * an element in a BSON array; in other words, the string matches the regex ^(0|[1-9]+[0-9]*)$.
      */
-    static bool isNumericPathComponentStrict(StringData component);
+    static bool isNumericPathComponentStrict(std::string_view component);
 
     /**
      * Checks whether document path 'path' overlaps with a path of an indexed field 'indexedPath'.
@@ -115,34 +115,34 @@ public:
      * Returns whether the provided path component can be included in the canonicalized index form
      * of a path.
      */
-    static bool isComponentPartOfCanonicalizedIndexPath(StringData pathComponent);
+    static bool isComponentPartOfCanonicalizedIndexPath(std::string_view pathComponent);
 
     /**
      * Similar to the function above except strings that contain leading zero's are considered
      * numeric. For instance, the above function would return false for an input "01" however this
      * function will return true.
      */
-    static bool isNumericPathComponentLenient(StringData component);
+    static bool isNumericPathComponentLenient(std::string_view component);
 
     FieldRef() = default;
 
-    explicit FieldRef(StringData path);
+    explicit FieldRef(std::string_view path);
 
     /**
      * Builds a field path out of each field part in 'dottedField'.
      */
-    void parse(StringData dottedField);
+    void parse(std::string_view dottedField);
 
     /**
      * Sets the 'i-th' field part to point to 'part'. Assumes i < size(). Behavior is undefined
      * otherwise.
      */
-    void setPart(FieldIndex i, StringData part);
+    void setPart(FieldIndex i, std::string_view part);
 
     /**
      * Adds a new field to the end of the path, increasing its size by 1.
      */
-    void appendPart(StringData part);
+    void appendPart(std::string_view part);
 
     /**
      * Removes the last part from the path, decreasing its size by 1. Has no effect on a FieldRef
@@ -159,7 +159,7 @@ public:
     /**
      * Returns the 'i-th' field part. Assumes i < size(). Behavior is undefined otherwise.
      */
-    StringData getPart(FieldIndex i) const MONGO_COMPILER_LIFETIME_BOUND;
+    std::string_view getPart(FieldIndex i) const MONGO_COMPILER_LIFETIME_BOUND;
 
     /**
      * Returns true when 'this' FieldRef is a prefix of 'other'. Equality is not considered
@@ -206,22 +206,23 @@ public:
     std::set<FieldIndex> getNumericPathComponents(FieldIndex startPart = 0) const;
 
     /**
-     * Returns a StringData of the full dotted field in its current state (i.e., some parts may have
-     * been replaced since the parse() call).
+     * Returns a std::string_view of the full dotted field in its current state (i.e., some parts
+     * may have been replaced since the parse() call).
      */
-    StringData dottedField(FieldIndex offsetFromStart = 0) const MONGO_COMPILER_LIFETIME_BOUND;
+    std::string_view dottedField(FieldIndex offsetFromStart = 0) const
+        MONGO_COMPILER_LIFETIME_BOUND;
 
     /**
-     * Returns a StringData of parts of the dotted field from startPart to endPart in its current
-     * state (i.e., some parts may have been replaced since the parse() call).
+     * Returns a std::string_view of parts of the dotted field from startPart to endPart in its
+     * current state (i.e., some parts may have been replaced since the parse() call).
      */
-    StringData dottedSubstring(FieldIndex startPart,
-                               FieldIndex endPart) const MONGO_COMPILER_LIFETIME_BOUND;
+    std::string_view dottedSubstring(FieldIndex startPart,
+                                     FieldIndex endPart) const MONGO_COMPILER_LIFETIME_BOUND;
 
     /**
      * Compares the full dotted path represented by this FieldRef to other
      */
-    bool equalsDottedField(StringData other) const;
+    bool equalsDottedField(std::string_view other) const;
 
     /**
      * Resets the internal state. See note in parse() call.
@@ -243,7 +244,7 @@ public:
         return numParts() == 0;
     }
 
-    StringData operator[](int index) const MONGO_COMPILER_LIFETIME_BOUND {
+    std::string_view operator[](int index) const MONGO_COMPILER_LIFETIME_BOUND {
         return getPart(index);
     }
 
@@ -325,16 +326,16 @@ private:
     // with allocations.
     static constexpr size_t kFewDottedFieldParts = 4;
 
-    // In order to make FieldRef copyable, we use a StringData-like type that stores an offset and
-    // length into the backing string. StringData, in contrast, holds const char* pointers that
-    // would have to be updated to point into the new string on copy.
+    // In order to make FieldRef copyable, we use a std::string_view-like type that stores an offset
+    // and length into the backing string. std::string_view, in contrast, holds const char* pointers
+    // that would have to be updated to point into the new string on copy.
     struct StringView {
         // Constructs an empty StringView.
         StringView() = default;
 
         StringView(std::uint32_t offset, std::uint32_t len) : offset(offset), len(len) {}
 
-        StringData toStringData(const std::string& viewInto) const {
+        std::string_view toStringData(const std::string& viewInto) const {
             return {viewInto.c_str() + offset, len};
         }
 
@@ -352,9 +353,9 @@ private:
 
     /**
      * Re-assemble _dotted from components, including any replacements in _replacements,
-     * and update the StringData components in _parts to refer to the parts
+     * and update the std::string_view components in _parts to refer to the parts
      * of the new _dotted. This is used to make the storage for the current value of this
-     * FieldRef contiguous so it can be returned as a StringData from the dottedField
+     * FieldRef contiguous so it can be returned as a std::string_view from the dottedField
      * method above.
      */
     void reserialize() const;

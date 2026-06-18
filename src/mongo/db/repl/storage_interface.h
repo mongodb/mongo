@@ -32,7 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -54,6 +53,7 @@
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -253,13 +253,14 @@ public:
         kForward = 1,
         kBackward = -1,
     };
-    virtual StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           boost::optional<StringData> indexName,
-                                                           ScanDirection scanDirection,
-                                                           const BSONObj& startKey,
-                                                           BoundInclusion boundInclusion,
-                                                           std::size_t limit) = 0;
+    virtual StatusWith<std::vector<BSONObj>> findDocuments(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<std::string_view> indexName,
+        ScanDirection scanDirection,
+        const BSONObj& startKey,
+        BoundInclusion boundInclusion,
+        std::size_t limit) = 0;
 
     /**
      * Deletes at most "limit" documents returned by a collection or index scan on the collection in
@@ -268,13 +269,14 @@ public:
      * will be kept open once this function returns.
      * If "indexName" is null, a collection scan is used to locate the document.
      */
-    virtual StatusWith<std::vector<BSONObj>> deleteDocuments(OperationContext* opCtx,
-                                                             const NamespaceString& nss,
-                                                             boost::optional<StringData> indexName,
-                                                             ScanDirection scanDirection,
-                                                             const BSONObj& startKey,
-                                                             BoundInclusion boundInclusion,
-                                                             std::size_t limit) = 0;
+    virtual StatusWith<std::vector<BSONObj>> deleteDocuments(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<std::string_view> indexName,
+        ScanDirection scanDirection,
+        const BSONObj& startKey,
+        BoundInclusion boundInclusion,
+        std::size_t limit) = 0;
 
     /**
      * Finds a singleton document in a collection. Returns 'CollectionIsEmpty' if the collection

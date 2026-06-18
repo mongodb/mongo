@@ -39,6 +39,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 // Need to use non-ephemeral engine to be able to test journaling options.
 class StorageEngineNonEphemeralMock : public StorageEngineMock {
     bool isEphemeral() const override {
@@ -89,7 +90,7 @@ GenericArguments makeGenericArgs(const WriteConcernIdl& wc) {
     return args;
 }
 
-constexpr auto kCommandName = "doSomeWrite"_sd;
+constexpr auto kCommandName = "doSomeWrite"sv;
 
 TEST_F(WriteConcernTest, ParseFailsOnNullBytes) {
     std::string s = "wcWithNullBytes ";

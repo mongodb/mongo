@@ -35,6 +35,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 
 #include <memory>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -47,7 +48,8 @@ using query_shape::QueryShapeHash;
  * Creates a mock QueryShapeHash and QueryInstance pair for testing purposes by creating a BSONObj
  * with a single field named 'fieldName', and then hashing it for the 'queryShapeHash'.
  */
-std::pair<QueryShapeHash, QueryInstance> makeMockQueryShapeHashAndInstance(StringData fieldName) {
+std::pair<QueryShapeHash, QueryInstance> makeMockQueryShapeHashAndInstance(
+    std::string_view fieldName) {
     auto queryInstance = BSON(fieldName << 0);
     auto queryShapeHash =
         SHA256Block::computeHash((const uint8_t*)queryInstance.objdata(), queryInstance.objsize());

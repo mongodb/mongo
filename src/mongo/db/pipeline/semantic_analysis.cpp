@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/semantic_analysis.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression_algo.h"

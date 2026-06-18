@@ -43,6 +43,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -127,7 +128,7 @@ private:
 
 class LiteParsedLookUp final : public LiteParsedDocumentSourceNestedPipelines<LiteParsedLookUp> {
 public:
-    static constexpr StringData kStageName = "$lookup"_sd;
+    static constexpr std::string_view kStageName = "$lookup"_sd;
 
     static std::unique_ptr<LiteParsedLookUp> parse(const NamespaceString& nss,
                                                    const BSONElement& spec,

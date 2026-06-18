@@ -30,7 +30,6 @@
 #include "mongo/s/load_balancer_support.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/service_context.h"

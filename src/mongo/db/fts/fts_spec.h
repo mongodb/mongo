@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_util.h"
@@ -45,6 +44,7 @@
 #include <cstddef>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -141,7 +141,7 @@ private:
      * 'raw' using 'tools', and weights term scores based on 'weight'.
      */
     void _scoreStringV2(FTSTokenizer* tokenizer,
-                        StringData raw,
+                        std::string_view raw,
                         TermFrequencyMap* term_freqs,
                         double weight) const;
 
@@ -159,11 +159,11 @@ private:
     //
 
     void _scoreStringV1(const Tools& tools,
-                        StringData raw,
+                        std::string_view raw,
                         TermFrequencyMap* docScores,
                         double weight) const;
 
-    bool _weightV1(StringData field, double* out) const;
+    bool _weightV1(std::string_view field, double* out) const;
 
     void _scoreRecurseV1(const Tools& tools,
                          const BSONObj& obj,

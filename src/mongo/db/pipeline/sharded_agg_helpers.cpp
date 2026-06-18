@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
@@ -117,6 +116,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
@@ -130,6 +130,7 @@
 
 namespace mongo {
 namespace sharded_agg_helpers {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -1576,7 +1577,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
                 .removeField(AsyncResultsMergerParams::kRemotesFieldName);
 
         // See DocumentSourceMergeCursors::serialize().
-        explainOps.insert(explainOps.begin(), Value(Document{{"$mergeCursors"_sd, armParams}}));
+        explainOps.insert(explainOps.begin(), Value(Document{{"$mergeCursors"sv, armParams}}));
 
         pipelinesDoc.addField("mergerPart", Value(explainOps));
 
@@ -1607,7 +1608,7 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
     sharding::router::CollectionRouter router(expCtx->getOperationContext(),
                                               expCtx->getNamespaceString());
     return router.routeWithRoutingContext(
-        "collecting explain from shards"_sd,
+        "collecting explain from shards"sv,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             // We must have a clone of the pipeline in case this loop is retried.
             std::unique_ptr<Pipeline> pipelineToTarget = pipeline->clone();
@@ -1877,7 +1878,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
     sharding::router::CollectionRouter router(expCtx->getOperationContext(),
                                               expCtx->getNamespaceString());
     return router.routeWithRoutingContext(
-        "targeting pipeline to attach cursors"_sd,
+        "targeting pipeline to attach cursors"sv,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             // We must have a clone of the pipeline in case this loop is retried.
             std::unique_ptr<Pipeline> pipelineToTarget = pipeline->clone();
@@ -1939,7 +1940,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                                               expCtx->getNamespaceString());
 
     return router.routeWithRoutingContext(
-        "parsing and executing subpipelines"_sd,
+        "parsing and executing subpipelines"sv,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             // We must have a clone of the pipeline in case this loop is retried.
             std::unique_ptr<Pipeline> pipelineToTarget = pipeline->clone();

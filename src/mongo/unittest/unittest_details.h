@@ -33,7 +33,6 @@
 // IWYU pragma: private
 // IWYU pragma: friend "mongo/unittest/.*"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/modules.h"
@@ -45,6 +44,8 @@
 #include <io.h>
 #include <stdio.h>
 #else
+#include <string_view>
+
 #include <unistd.h>
 
 #include <sys/resource.h>
@@ -98,7 +99,7 @@ inline bool stdoutIsTty() {
 /** Returns true when running in the bazel testing environment. */
 inline bool inBazelTest() {
     auto bazelTest = getenv("BAZEL_TEST");
-    return bazelTest && StringData{bazelTest} == "1";
+    return bazelTest && std::string_view{bazelTest} == "1";
 }
 
 /**
@@ -129,7 +130,7 @@ inline bool printExceptionInfo(FILE* file) {
     if (!std::current_exception())
         return false;
 
-    auto diag = [&](StringData info) {
+    auto diag = [&](std::string_view info) {
         fmt::println(file, "Exception encountered, extra info:");
         fmt::println(file, "{}", info);
         fmt::println(file, "");

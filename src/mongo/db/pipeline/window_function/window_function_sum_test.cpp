@@ -29,12 +29,14 @@
 
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WindowFunctionSumTest : public unittest::Test {
 public:
@@ -48,7 +50,7 @@ TEST_F(WindowFunctionSumTest, EmptyWindow) {
 }
 
 TEST_F(WindowFunctionSumTest, IgnoresNonnumeric) {
-    sum.add(Value{"not a number"_sd});
+    sum.add(Value{"not a number"sv});
     sum.add(Value{1});
     ASSERT_VALUE_EQ(sum.getValue(), Value{1});
 }

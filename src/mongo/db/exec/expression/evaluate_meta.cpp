@@ -30,6 +30,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace exec::expression {
@@ -118,7 +120,7 @@ Value evaluate(const ExpressionType& expr,
                Variables* variables,
                const EvaluationContext& ctx) {
     Value val(expr.getChildren()[0]->evaluate(root, variables, ctx));
-    return Value(StringData(typeName(val.getType())));
+    return Value(std::string_view(typeName(val.getType())));
 }
 
 Value evaluate(const ExpressionSubtype& expr,

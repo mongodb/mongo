@@ -55,6 +55,8 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/progress_meter.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
@@ -63,11 +65,12 @@
 namespace mongo {
 
 namespace {
-static constexpr StringData kKeyField = "key"_sd;
-}
+using namespace std::literals::string_view_literals;
+static constexpr std::string_view kKeyField = "key"sv;
+}  // namespace
 
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
-                                         StringData ident,
+                                         std::string_view ident,
                                          LazyRecordStore::CreateMode createMode)
     : _keyConstraintsTable(opCtx, ident, createMode) {}
 

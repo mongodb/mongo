@@ -49,6 +49,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -67,15 +68,15 @@ namespace {
  */
 static const std::unique_ptr<MatchExpression> closedBucketFilter =
     std::make_unique<NotMatchExpression>(std::make_unique<EqualityMatchExpression>(
-        StringData(std::string{timeseries::kBucketControlFieldName} + "." +
-                   std::string{timeseries::kBucketControlClosedFieldName}),
+        std::string_view(std::string{timeseries::kBucketControlFieldName} + "." +
+                         std::string{timeseries::kBucketControlClosedFieldName}),
         Value(true)));
 
 /**
  * Returns whether the given metaField is the first element of the dotted path in the given
  * field.
  */
-bool isFieldFirstElementOfDottedPathField(StringData field, StringData metaField) {
+bool isFieldFirstElementOfDottedPathField(std::string_view field, std::string_view metaField) {
     return field.substr(0, field.find('.')) == metaField;
 }
 
@@ -83,14 +84,14 @@ bool isFieldFirstElementOfDottedPathField(StringData field, StringData metaField
  * Returns a string where the substring leading up to "." in the given field is replaced with
  * "meta". If there is no "." in the given field, returns "meta".
  */
-std::string getRenamedField(StringData field) {
+std::string getRenamedField(std::string_view field) {
     size_t dotIndex = field.find('.');
     return dotIndex != std::string::npos
         ? "meta" + std::string{field.substr(dotIndex, field.size() - dotIndex)}
         : "meta";
 }
 
-void assertQueryFieldIsMetaField(bool isMetaField, StringData metaField) {
+void assertQueryFieldIsMetaField(bool isMetaField, std::string_view metaField) {
     uassert(ErrorCodes::InvalidOptions,
             fmt::format("Cannot perform an update or delete on a time-series collection "
                         "when querying on a field that is not the metaField '{}'",
@@ -98,7 +99,7 @@ void assertQueryFieldIsMetaField(bool isMetaField, StringData metaField) {
             isMetaField);
 }
 
-Status checkUpdateFieldIsMetaField(bool isMetaField, StringData metaField) {
+Status checkUpdateFieldIsMetaField(bool isMetaField, std::string_view metaField) {
     return isMetaField
         ? Status::OK()
         : Status(ErrorCodes::InvalidOptions,
@@ -114,7 +115,7 @@ Status checkUpdateFieldIsMetaField(bool isMetaField, StringData metaField) {
  * parent.
  */
 void replaceQueryMetaFieldName(mutablebson::Element elem,
-                               StringData metaField,
+                               std::string_view metaField,
                                bool isTopLevelField = true,
                                bool parentIsArray = false) {
     auto fieldName = elem.getFieldName();
@@ -168,7 +169,7 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
 }
 }  // namespace
 
-BSONObj translateQuery(const BSONObj& query, StringData metaField) {
+BSONObj translateQuery(const BSONObj& query, std::string_view metaField) {
     invariant(!metaField.empty());
 
     mutablebson::Document queryDoc(query);
@@ -181,7 +182,7 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField) {
 }
 
 StatusWith<write_ops::UpdateModification> translateUpdate(
-    const write_ops::UpdateModification& updateMod, boost::optional<StringData> metaField) {
+    const write_ops::UpdateModification& updateMod, boost::optional<std::string_view> metaField) {
     invariant(updateMod.type() != write_ops::UpdateModification::Type::kDelta);
 
     if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
@@ -250,7 +251,7 @@ StatusWith<write_ops::UpdateModification> translateUpdate(
     return write_ops::UpdateModification::parseFromClassicUpdate(updateDoc.getObject());
 }
 
-std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData timeField) {
+std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(std::string_view timeField) {
     return [timeField = std::string{timeField}](const BSONObj& bucket) {
         return BucketUnpacker::computeMeasurementCount(bucket, timeField);
     };
@@ -325,7 +326,7 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
               timeOnlyPred.get(),
               BucketSpec{
                   std::string{tsOptions.getTimeField()},
-                  metaField.map([](StringData s) { return std::string{s}; }),
+                  metaField.map([](std::string_view s) { return std::string{s}; }),
               },
               *tsOptions.getBucketMaxSpanSeconds(),
               expCtx,

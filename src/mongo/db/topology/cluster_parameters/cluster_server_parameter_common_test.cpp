@@ -29,7 +29,6 @@
 
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_common.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"

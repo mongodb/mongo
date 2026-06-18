@@ -35,7 +35,6 @@
 #include <boost/random/uniform_real_distribution.hpp>
 #include <boost/random/weibull_distribution.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
 #include "mongo/logv2/log.h"

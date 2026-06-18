@@ -50,6 +50,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <type_traits>
 
 #include <absl/container/node_hash_map.h>
@@ -80,7 +81,7 @@ Status cursorNotFoundStatus(CursorId cursorId) {
             str::stream() << "Cursor not found (id: " << cursorId << ")."};
 }
 
-Status cursorInUseStatus(CursorId cursorId, StringData commandUsingCursor) {
+Status cursorInUseStatus(CursorId cursorId, std::string_view commandUsingCursor) {
     std::string reason = str::stream() << "Cursor already in use (id: " << cursorId << ").";
     if (!commandUsingCursor.empty()) {
         return {CursorInUseInfo(commandUsingCursor), std::move(reason)};
@@ -135,14 +136,14 @@ ClusterCursorManager::checkOutCursor<AuthzCheckFnInputType>(CursorId cursorId,
                                                             OperationContext* opCtx,
                                                             AuthzCheckFn authChecker,
                                                             AuthCheck checkSessionAuth,
-                                                            StringData commandName);
+                                                            std::string_view commandName);
 
 template StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursor<
     ReleaseMemoryAuthzCheckFnInputType>(CursorId cursorId,
                                         OperationContext* opCtx,
                                         ReleaseMemoryAuthzCheckFn authChecker,
                                         AuthCheck checkSessionAuth,
-                                        StringData commandName);
+                                        std::string_view commandName);
 
 
 ClusterCursorManager::PinnedCursor::PinnedCursor(ClusterCursorManager* manager,
@@ -275,7 +276,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     OperationContext* opCtx,
     std::function<Status(T)> authChecker,
     AuthCheck checkSessionAuth,
-    StringData commandName) {
+    std::string_view commandName) {
 
     std::lock_guard<std::mutex> lk(_mutex);
 
@@ -334,7 +335,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
 }
 
 StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursorNoAuthCheck(
-    CursorId cursorId, OperationContext* opCtx, StringData commandName) {
+    CursorId cursorId, OperationContext* opCtx, std::string_view commandName) {
     std::lock_guard<std::mutex> lk(_mutex);
 
     if (_inShutdown) {

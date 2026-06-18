@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -89,6 +88,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -97,6 +97,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 std::shared_ptr<executor::TaskExecutor> _fleCrudExecutor;
@@ -167,7 +168,7 @@ private:
     bool _yielded = false;
 };
 
-void toBinData(StringData field, PrfBlock block, BSONObjBuilder* builder) {
+void toBinData(std::string_view field, PrfBlock block, BSONObjBuilder* builder) {
     builder->appendBinData(field, block.size(), BinDataType::BinDataGeneral, block.data());
 }
 
@@ -556,7 +557,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
                 ->getIndexSpec()
                 .getKey()
                 .firstElement()
-                .fieldNameStringData() == "_id"_sd) {
+                .fieldNameStringData() == "_id"sv) {
 
         StorageEngineClusteredCollectionReader reader(opCtx, docCount, nsOrUUID, cursor.get());
 

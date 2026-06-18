@@ -40,6 +40,8 @@
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/functional/hash.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -54,7 +56,7 @@ using std::vector;
 namespace {
 
 template <const auto& Fields>
-bool isAnyOf(StringData s) {
+bool isAnyOf(std::string_view s) {
     return [&]<size_t... Is>(std::index_sequence<Is...>) {
         return (... || (s == Fields[Is]));
     }(std::make_index_sequence<Fields.size()>{});
@@ -102,7 +104,7 @@ boost::optional<BSONElement> getNestedFieldHelperBSON(BSONElement elt,
 const DocumentStorage DocumentStorage::kEmptyDoc{ConstructorTag::InitApproximateSize};
 
 
-bool Document::isMetadataFieldName_cold(StringData s) {
+bool Document::isMetadataFieldName_cold(std::string_view s) {
     return isAnyOf<kAllMetadataFields>(s);
 }
 
@@ -205,7 +207,7 @@ Position DocumentStorage::findFieldInCache(T requested) const {
     // if we got here, there's no such field
     return Position();
 }
-template Position DocumentStorage::findFieldInCache<StringData>(StringData field) const;
+template Position DocumentStorage::findFieldInCache<std::string_view>(std::string_view field) const;
 template Position DocumentStorage::findFieldInCache<HashedFieldName>(HashedFieldName field) const;
 
 template <typename T>
@@ -228,7 +230,7 @@ Position DocumentStorage::findField(T field) const {
     // if we got here, there's no such field
     return Position();
 }
-template Position DocumentStorage::findField<StringData>(StringData field) const;
+template Position DocumentStorage::findField<std::string_view>(std::string_view field) const;
 template Position DocumentStorage::findField<HashedFieldName>(HashedFieldName field) const;
 
 Position DocumentStorage::constructInCache(const BSONElement& elem) {
@@ -288,7 +290,8 @@ Value& DocumentStorage::appendField(T field, ValueElement::Kind kind) {
 
     return getField(pos).val;
 }
-template Value& DocumentStorage::appendField<StringData>(StringData, ValueElement::Kind);
+template Value& DocumentStorage::appendField<std::string_view>(std::string_view,
+                                                               ValueElement::Kind);
 template Value& DocumentStorage::appendField<HashedFieldName>(HashedFieldName, ValueElement::Kind);
 
 // Call after adding field to _fields and increasing _numFields
@@ -553,7 +556,8 @@ Document::Document(const BSONObj& bson) {
     *this = md.freeze();
 }
 
-Document::Document(std::initializer_list<std::pair<StringData, ImplicitValue>> initializerList) {
+Document::Document(
+    std::initializer_list<std::pair<std::string_view, ImplicitValue>> initializerList) {
     MutableDocument mutableDoc(initializerList.size());
 
     for (auto&& pair : initializerList) {
@@ -563,7 +567,7 @@ Document::Document(std::initializer_list<std::pair<StringData, ImplicitValue>> i
     *this = mutableDoc.freeze();
 }
 
-Document::Document(const std::vector<std::pair<StringData, Value>>& fields) {
+Document::Document(const std::vector<std::pair<std::string_view, Value>>& fields) {
     MutableDocument mutableDoc(fields.size());
     for (auto&& pair : fields)
         mutableDoc.addField(pair.first, pair.second);
@@ -592,25 +596,25 @@ boost::optional<BSONObj> Document::toBsonIfTriviallyConvertible() const {
     return boost::none;
 }
 
-constexpr StringData Document::metaFieldTextScore;
-constexpr StringData Document::metaFieldRandVal;
-constexpr StringData Document::metaFieldSortKey;
-constexpr StringData Document::metaFieldGeoNearDistance;
-constexpr StringData Document::metaFieldGeoNearPoint;
-constexpr StringData Document::metaFieldSearchScore;
-constexpr StringData Document::metaFieldSearchHighlights;
-constexpr StringData Document::metaFieldSearchScoreDetails;
-constexpr StringData Document::metaFieldSearchRootDocumentId;
-constexpr StringData Document::metaFieldSearchSortValues;
-constexpr StringData Document::metaFieldVectorSearchScore;
-constexpr StringData Document::metaFieldScore;
-constexpr StringData Document::metaFieldStream;
-constexpr StringData Document::metaFieldChangeStreamControlEvent;
+constexpr std::string_view Document::metaFieldTextScore;
+constexpr std::string_view Document::metaFieldRandVal;
+constexpr std::string_view Document::metaFieldSortKey;
+constexpr std::string_view Document::metaFieldGeoNearDistance;
+constexpr std::string_view Document::metaFieldGeoNearPoint;
+constexpr std::string_view Document::metaFieldSearchScore;
+constexpr std::string_view Document::metaFieldSearchHighlights;
+constexpr std::string_view Document::metaFieldSearchScoreDetails;
+constexpr std::string_view Document::metaFieldSearchRootDocumentId;
+constexpr std::string_view Document::metaFieldSearchSortValues;
+constexpr std::string_view Document::metaFieldVectorSearchScore;
+constexpr std::string_view Document::metaFieldScore;
+constexpr std::string_view Document::metaFieldStream;
+constexpr std::string_view Document::metaFieldChangeStreamControlEvent;
 
 void Document::toBsonStrippingMetadata(BSONObjBuilder* builder) const {
     // Only strips metadata-named fields at the top level, not in nested sub-objects.
     constexpr size_t recursionLevel = 1;
-    auto warnStripped = [](StringData fieldName) {
+    auto warnStripped = [](std::string_view fieldName) {
         static StaticImmortal<logv2::SeveritySuppressor> logSeverity{
             Seconds{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
         LOGV2_DEBUG(12363300,
@@ -773,7 +777,7 @@ boost::optional<Value> Document::getNestedScalarFieldNonCachingHelper(const Fiel
         return Value();
     }
 
-    StringData fieldName = dottedField.getFieldName(level);
+    std::string_view fieldName = dottedField.getFieldName(level);
 
     // In many cases, the cache is empty and we can skip straight to reading from the backing BSON.
     if (isModified()) {
@@ -866,7 +870,7 @@ size_t Document::memUsageForSorter() const {
 
 void Document::hash_combine(size_t& seed, const StringDataComparator* stringComparator) const {
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
-        StringData name = it->nameSD();
+        std::string_view name = it->nameSD();
         boost::hash_range(seed, name.data(), name.data() + name.size());
         it->val.hash_combine(seed, stringComparator);
     }
@@ -968,7 +972,7 @@ Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeS
     const int numElems = buf.read<LittleEndian<int>>();
     MutableDocument doc(numElems);
     for (int i = 0; i < numElems; i++) {
-        StringData name = buf.readCStr();
+        std::string_view name = buf.readCStr();
         doc.addField(name, Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
     }
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -44,6 +43,7 @@
 #include <algorithm>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -54,6 +54,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using otel::metrics::DynamicMetricNameMaker;
 using otel::metrics::Gauge;
@@ -73,13 +74,13 @@ struct MountOtelMetricsState {
 
 const auto getMountOtelMetricsState = ServiceContext::declareDecoration<MountOtelMetricsState>();
 
-constexpr StringData kMountInfoPath = "/proc/self/mountinfo"_sd;
+constexpr std::string_view kMountInfoPath = "/proc/self/mountinfo"sv;
 
 // Sanitize a mount path for use as a metric name segment:
 //   "/"          -> "root"
 //   "/data"      -> "data"
 //   "/boot/efi"  -> "boot.efi"
-std::string sanitizeMountpoint(StringData path) {
+std::string sanitizeMountpoint(std::string_view path) {
     if (path == "/") {
         return "root";
     }
@@ -141,11 +142,11 @@ public:
             const auto sanitized = sanitizeMountpoint(mountpoint);
 
             const auto makeGauge =
-                [&](StringData field, std::string desc, MetricUnit unit) -> Gauge<int64_t>* {
+                [&](std::string_view field, std::string desc, MetricUnit unit) -> Gauge<int64_t>* {
                 std::string fullName = fmt::format("systemMetrics.mounts.{}.{}", sanitized, field);
                 auto passkey = SystemMountMetrics::dyn_metric_passkey();
                 return &MetricsService::instance().createInt64Gauge(
-                    DynamicMetricNameMaker::make(StringData{fullName}, passkey),
+                    DynamicMetricNameMaker::make(std::string_view{fullName}, passkey),
                     std::move(desc),
                     unit);
             };

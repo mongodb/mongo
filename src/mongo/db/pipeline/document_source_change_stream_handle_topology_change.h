@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -63,7 +63,7 @@ using ChangeStreamHandleTopologyChangeLiteParsed =
 class DocumentSourceChangeStreamHandleTopologyChange final
     : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName =
+    static constexpr std::string_view kStageName =
         change_stream_constants::stage_names::kHandleTopologyChange;
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange> createFromBson(
@@ -75,7 +75,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange> create(
         const boost::intrusive_ptr<ExpressionContext>&);
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

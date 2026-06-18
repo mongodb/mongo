@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/index/sort_key_generator.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -53,7 +53,7 @@ public:
     using SearchIdLookupMetrics = DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics;
 
     InternalSearchMongotRemoteStage(
-        StringData stageName,
+        std::string_view stageName,
         InternalSearchMongotRemoteSpec spec,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const std::shared_ptr<executor::TaskExecutor>& taskExecutor,

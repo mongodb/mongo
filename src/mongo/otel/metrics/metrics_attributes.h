@@ -32,7 +32,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -40,6 +39,7 @@
 #include <algorithm>
 #include <memory>
 #include <span>
+#include <string_view>
 #include <tuple>
 #include <typeindex>
 #include <vector>
@@ -75,19 +75,19 @@ struct TypeList {};
  * `src/third_party/opentelemetry-cpp/api/include/opentelemetry/common/attribute_value.h`, with
  * some exceptions:
  * - No unsigned ints because only uint32_t is supported (not uint64_t or other unsigned types)
- * - StringData instead of std::string_view or char* because StringData is used in mongo code rather
- *   than std::string_view and it can replace char*.
+ * - std::string_view instead of std::string_view or char* because std::string_view is used in mongo
+ * code rather than std::string_view and it can replace char*.
  */
 using AttributeTypes = TypeList<bool,
                                 int32_t,
                                 int64_t,
                                 double,
-                                StringData,
+                                std::string_view,
                                 std::span<bool>,
                                 std::span<int32_t>,
                                 std::span<int64_t>,
                                 std::span<double>,
-                                std::span<StringData>>;
+                                std::span<std::string_view>>;
 
 template <typename T, typename TList>
 struct IsInList;
@@ -126,7 +126,7 @@ using AnyAttributeType = ToVariant<AttributeTypes>::type;
  * Holds an attribute name/value pair in a very space-efficient format.
  */
 struct AttributeNameAndValue {
-    StringData name;
+    std::string_view name;
     AnyAttributeType value;
 };
 
@@ -204,14 +204,14 @@ struct AttributeOwnership {
     using OwnedType = T;
 };
 template <>
-struct AttributeOwnership<StringData> {
+struct AttributeOwnership<std::string_view> {
     using OwnedType = std::string;
 };
 template <>
-struct AttributeOwnership<std::span<StringData>> {
+struct AttributeOwnership<std::span<std::string_view>> {
     struct OwnedType {
         std::vector<std::string> strings;
-        std::vector<StringData> stringDatas;
+        std::vector<std::string_view> stringDatas;
     };
 };
 template <typename T>
@@ -232,9 +232,10 @@ struct AttributeOwnership<std::span<bool>> {
 };
 
 /**
- * Per-attribute owned storage for view-type values (StringData → std::string,
+ * Per-attribute owned storage for view-type values (std::string_view → std::string,
  * std::span<T> → std::vector<T>). Each value is heap-allocated via unique_ptr so its address
- * is stable: StringData/span views into this storage remain valid even if the owning object moves.
+ * is stable: std::string_view/span views into this storage remain valid even if the owning object
+ * moves.
  *
  * A named struct (rather than a type alias for std::tuple) so that template argument deduction
  * works when passing it to safeMakeAttributeTuples.
@@ -450,13 +451,13 @@ template <AttributeType T>
 MONGO_MOD_FILE_PRIVATE T toView(const T& owned) {
     return owned;
 }
-MONGO_MOD_FILE_PRIVATE inline StringData toView(const std::string& owned) {
+MONGO_MOD_FILE_PRIVATE inline std::string_view toView(const std::string& owned) {
     return owned;
 }
 // const_cast is safe: the data is owned and non-const; const is an artifact of the parameter.
-MONGO_MOD_FILE_PRIVATE inline std::span<StringData> toView(
-    const AttributeOwnership<std::span<StringData>>::OwnedType& owned) {
-    return {const_cast<StringData*>(owned.stringDatas.data()), owned.stringDatas.size()};
+MONGO_MOD_FILE_PRIVATE inline std::span<std::string_view> toView(
+    const AttributeOwnership<std::span<std::string_view>>::OwnedType& owned) {
+    return {const_cast<std::string_view*>(owned.stringDatas.data()), owned.stringDatas.size()};
 }
 // const_cast is safe: the data is owned and non-const; const is an artifact of map iteration.
 template <typename T>
@@ -484,18 +485,19 @@ template <AttributeType T>
 MONGO_MOD_FILE_PRIVATE T toOwned(const T& val) {
     return val;
 }
-MONGO_MOD_FILE_PRIVATE inline std::string toOwned(StringData val) {
+MONGO_MOD_FILE_PRIVATE inline std::string toOwned(std::string_view val) {
     return std::string(val);
 }
 template <typename T>
 MONGO_MOD_FILE_PRIVATE std::vector<T> toOwned(std::span<T> val) {
     return {val.begin(), val.end()};
 }
-MONGO_MOD_FILE_PRIVATE inline AttributeOwnership<std::span<StringData>>::OwnedType toOwned(
-    const std::span<StringData>& val) {
-    AttributeOwnership<std::span<StringData>>::OwnedType result{
+MONGO_MOD_FILE_PRIVATE inline AttributeOwnership<std::span<std::string_view>>::OwnedType toOwned(
+    const std::span<std::string_view>& val) {
+    AttributeOwnership<std::span<std::string_view>>::OwnedType result{
         .strings = std::vector<std::string>(val.begin(), val.end())};
-    result.stringDatas = std::vector<StringData>(result.strings.begin(), result.strings.end());
+    result.stringDatas =
+        std::vector<std::string_view>(result.strings.begin(), result.strings.end());
     return result;
 }
 MONGO_MOD_FILE_PRIVATE inline AttributeOwnership<std::span<bool>>::OwnedType toOwned(

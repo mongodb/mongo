@@ -33,6 +33,8 @@
 #include "mongo/db/exec/sbe/values/path_request.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::sbe::value {
 /**
  * Interface for extracting CellBlocks from raw BSON. Use makeExtractor(), below, to create an
@@ -60,7 +62,7 @@ public:
      * sitting in memory, materialized, and we want to avoid wrapping 'a' in a parent BSON object.
      */
     virtual std::vector<std::unique_ptr<CellBlock>> extractFromTopLevelField(
-        StringData topLevelField,
+        std::string_view topLevelField,
         const std::span<const TypeTags>& tags,
         const std::span<const Value>& vals) = 0;
 };

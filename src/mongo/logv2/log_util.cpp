@@ -40,6 +40,7 @@
 
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -52,10 +53,10 @@ namespace mongo::logv2 {
 namespace {
 AtomicWord<bool> redactionEnabled{false};
 AtomicWord<bool> redactBinDataEncrypt{true};
-std::map<StringData, LogRotateCallback> logRotateCallbacks;
+std::map<std::string_view, LogRotateCallback> logRotateCallbacks;
 }  // namespace
 
-void addLogRotator(StringData logType, LogRotateCallback cb) {
+void addLogRotator(std::string_view logType, LogRotateCallback cb) {
     logRotateCallbacks.emplace(logType, std::move(cb));
 }
 
@@ -70,7 +71,7 @@ void LogRotateErrorAppender::append(const Status& err) {
 }
 
 Status rotateLogs(bool renameFiles,
-                  boost::optional<StringData> logType,
+                  boost::optional<std::string_view> logType,
                   std::function<void(Status)> onMinorError) {
     std::string suffix = "." + terseCurrentTimeForFilename();
 

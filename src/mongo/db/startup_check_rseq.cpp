@@ -30,11 +30,12 @@
 #include "mongo/db/startup_check_rseq.h"
 
 #include "mongo/base/parse_number.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
+
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -50,7 +51,7 @@
 
 namespace mongo {
 
-bool isKernelVersionSafeForTCMallocPerCPUCache(StringData release) {
+bool isKernelVersionSafeForTCMallocPerCPUCache(std::string_view release) {
     int major = 0, minor = 0;
     const char* end = nullptr;
     if (!NumberParser::strToAny(10)(release, &major, &end).isOK() || *end != '.' ||
@@ -76,7 +77,7 @@ bool isKernelSafeForTCMallocPerCPUCache() {
                       "version compatibility");
         return true;
     }
-    StringData release{u.release};
+    std::string_view release{u.release};
     if (!isKernelVersionSafeForTCMallocPerCPUCache(release)) {
         return false;
     }

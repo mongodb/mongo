@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -47,6 +46,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -56,6 +56,7 @@ namespace ExpressionTests {
 using std::string;
 
 namespace Trim {
+using namespace std::literals::string_view_literals;
 
 TEST(ExpressionTrimParsingTest, ThrowsIfSpecIsNotAnObject) {
     auto expCtx = ExpressionContextForTest{};
@@ -113,7 +114,7 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithNoChars) {
     auto optimized = trim->optimize();
     auto constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
-    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"_sd));
+    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"sv));
 
     // Test that it optimizes to a constant if the input also optimizes to a constant.
     trim = Expression::parseExpression(
@@ -123,7 +124,7 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithNoChars) {
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
-    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"_sd));
+    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"sv));
 }
 
 TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
@@ -136,7 +137,7 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
     auto optimized = trim->optimize();
     auto constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
-    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"_sd));
+    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"sv));
 
     // Test that it optimizes to a constant if the chars argument optimizes to a constant.
     trim = Expression::parseExpression(
@@ -148,7 +149,7 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
-    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"_sd));
+    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"sv));
 
     // Test that it optimizes to a constant if both arguments optimize to a constant.
     trim = Expression::parseExpression(
@@ -159,7 +160,7 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
-    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"_sd));
+    ASSERT_VALUE_EQ(constant->getValue(), Value("abc"sv));
 }
 
 TEST(ExpressionTrimTest, DoesNotOptimizeToConstantWithFieldPaths) {
@@ -230,12 +231,12 @@ TEST(ExpressionTrimTest, DoesSerializeCorrectly) {
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
     ASSERT_VALUE_EQ(
         trim->serialize(),
-        Value(Document{{"$trim", Document{{"input", Document{{"$const", " abc "_sd}}}}}}));
+        Value(Document{{"$trim", Document{{"input", Document{{"$const", " abc "sv}}}}}}));
 
     // Make sure we can re-parse it and evaluate it.
     auto reparsedTrim = Expression::parseExpression(
         &expCtx, trim->serialize().getDocument().toBson(), expCtx.variablesParseState);
-    ASSERT_VALUE_EQ(reparsedTrim->evaluate({}, &expCtx.variables), Value("abc"_sd));
+    ASSERT_VALUE_EQ(reparsedTrim->evaluate({}, &expCtx.variables), Value("abc"sv));
 
     // Use $ltrim, and specify the 'chars' option.
     trim = Expression::parseExpression(&expCtx,
@@ -245,14 +246,14 @@ TEST(ExpressionTrimTest, DoesSerializeCorrectly) {
                                        expCtx.variablesParseState);
     ASSERT_VALUE_EQ(
         trim->serialize(),
-        Value(Document{{"$ltrim", Document{{"input", "$inputField"_sd}, {"chars", "$a"_sd}}}}));
+        Value(Document{{"$ltrim", Document{{"input", "$inputField"sv}, {"chars", "$a"sv}}}}));
 
     // Make sure we can re-parse it and evaluate it.
     reparsedTrim = Expression::parseExpression(
         &expCtx, trim->serialize().getDocument().toBson(), expCtx.variablesParseState);
-    ASSERT_VALUE_EQ(reparsedTrim->evaluate(Document{{"inputField", " , 4"_sd}, {"a", " ,"_sd}},
+    ASSERT_VALUE_EQ(reparsedTrim->evaluate(Document{{"inputField", " , 4"sv}, {"a", " ,"sv}},
                                            &expCtx.variables),
-                    Value("4"_sd));
+                    Value("4"sv));
 }
 }  // namespace Trim
 

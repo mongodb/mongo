@@ -37,6 +37,8 @@
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -77,7 +79,7 @@ public:
 
         // If there was a positional ($) element in the update expression, 'matchedField' is the
         // index of the array element that caused the query to match the document.
-        StringData matchedField;
+        std::string_view matchedField;
 
         // True if the update is being applied to a document to be inserted.
         bool insert = false;

@@ -44,6 +44,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -99,7 +100,7 @@ private:
 
     const ConfigsvrCoordinatorMetadata& metadata() const override;
 
-    StringData serializePhase(const Phase& phase) const override {
+    std::string_view serializePhase(const Phase& phase) const override {
         return idl::serialize(phase);
     }
 

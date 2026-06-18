@@ -76,6 +76,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/container/vector.hpp>
@@ -87,6 +88,7 @@
 namespace mongo {
 namespace repl {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
@@ -98,7 +100,7 @@ BSONObj makeIdIndexSpec(const NamespaceString& nss) {
 /**
  * Generates a unique namespace from the test registration agent.
  */
-NamespaceString makeNamespace(StringData suffix = "") {
+NamespaceString makeNamespace(std::string_view suffix = "") {
     std::string prefix =
         fmt::format("local.{}_{}", unittest::getSuiteName(), unittest::getTestName());
     return NamespaceString::createNamespaceString_forTest(
@@ -930,7 +932,7 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsIndexNotFoundIfIndexIsMissi
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace();
-    auto indexName = "nonexistent"_sd;
+    auto indexName = "nonexistent"sv;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_EQUALS(ErrorCodes::IndexNotFound,
                   storage
@@ -958,7 +960,7 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsIndexOptionsConflictIfIndex
         ASSERT_OK(loader->insertDocuments(docs));
         ASSERT_OK(loader->commit());
     }
-    auto indexName = "x_1"_sd;
+    auto indexName = "x_1"sv;
     ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
                   storage
                       .findDocuments(opCtx,
@@ -1403,7 +1405,7 @@ TEST_F(StorageInterfaceImplTest, DeleteDocumentsReturnsIndexNotFoundIfIndexIsMis
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace();
-    auto indexName = "nonexistent"_sd;
+    auto indexName = "nonexistent"sv;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_EQUALS(ErrorCodes::IndexNotFound,
                   storage
@@ -2077,7 +2079,7 @@ TEST_F(StorageInterfaceImplTest, ClusteredDeleteDocumentsReturnsIndexNotFoundIfI
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace();
-    auto indexName = "nonexistent"_sd;
+    auto indexName = "nonexistent"sv;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuidClustered()));
     ASSERT_EQUALS(ErrorCodes::IndexNotFound,
                   storage
@@ -2847,7 +2849,7 @@ TEST_F(StorageInterfaceImplTest,
     StorageInterfaceImpl storage;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("mydb.coll");
     NamespaceString wrongColl =
-        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"_sd);
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"sv);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     auto doc = BSON("_id" << 0 << "x" << 1);
     auto status = storage.upsertById(opCtx, wrongColl, doc["_id"], doc);
@@ -3122,7 +3124,7 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenColle
     StorageInterfaceImpl storage;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("mydb.coll");
     NamespaceString wrongColl =
-        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"_sd);
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"sv);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     auto filter = BSON("x" << 1);
     auto status = storage.deleteByFilter(opCtx, wrongColl, filter);
@@ -3291,7 +3293,7 @@ TEST_F(StorageInterfaceImplTest,
     StorageInterfaceImpl storage;
     auto nss = makeNamespace();
     NamespaceString wrongColl =
-        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"_sd);
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"sv);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   storage.getCollectionCount(opCtx, wrongColl).getStatus());
@@ -3335,7 +3337,7 @@ TEST_F(StorageInterfaceImplTest,
     StorageInterfaceImpl storage;
     auto nss = makeNamespace();
     NamespaceString wrongColl =
-        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"_sd);
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"sv);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.setCollectionCount(opCtx, wrongColl, 3));
 }
@@ -3354,7 +3356,7 @@ TEST_F(StorageInterfaceImplTest,
     StorageInterfaceImpl storage;
     auto nss = makeNamespace();
     NamespaceString wrongColl =
-        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"_sd);
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"sv);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   storage.getCollectionSize(opCtx, wrongColl).getStatus());
@@ -3398,7 +3400,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsNamespaceNotFoundForMi
     StorageInterfaceImpl storage;
     auto nss = makeNamespace();
     NamespaceString wrongColl =
-        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"_sd);
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"sv);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
     ASSERT_EQUALS(
         ErrorCodes::NamespaceNotFound,
@@ -3412,7 +3414,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyLooksUpCollectionByUUID) {
     auto options = generateOptionsWithUuid();
     ASSERT_OK(storage.createCollection(opCtx, nss, options));
     NamespaceString wrongColl =
-        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"_sd);
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "wrongColl"sv);
     ASSERT_EQUALS(ErrorCodes::IndexNotFound,
                   storage.setIndexIsMultikey(
                       opCtx, wrongColl, *options.uuid, "foo", {}, {}, Timestamp(3, 3)));

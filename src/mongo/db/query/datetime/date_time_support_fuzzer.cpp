@@ -31,6 +31,7 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 
 #include <string>
+#include <string_view>
 
 
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) try {
@@ -82,7 +83,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) try {
     }
 
     try {
-        timeZoneDatabase.fromString(str, timeZone, boost::optional<mongo::StringData>(strFormat));
+        timeZoneDatabase.fromString(str, timeZone, boost::optional<std::string_view>(strFormat));
     } catch (const mongo::AssertionException&) {
     }
 

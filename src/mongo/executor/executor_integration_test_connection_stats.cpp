@@ -29,7 +29,6 @@
 
 #include "mongo/executor/executor_integration_test_connection_stats.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_client_factory.h"
@@ -39,6 +38,8 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -65,7 +66,7 @@ void assertConnectionStats(const AsyncClientFactory& factory,
                            const HostAndPort& remote,
                            std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,
                            std::function<bool(const GRPCConnectionStats&)> gRPCTest,
-                           StringData errMsg) {
+                           std::string_view errMsg) {
     LOGV2(
         9924601, "Asserting connection stats", "usingGRPC"_attr = unittest::shouldUseGRPCEgress());
 
@@ -79,7 +80,7 @@ void assertConnectionStatsSoon(const AsyncClientFactory& factory,
                                const HostAndPort& remote,
                                std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,
                                std::function<bool(const GRPCConnectionStats&)> gRPCTest,
-                               StringData errMsg) {
+                               std::string_view errMsg) {
     auto timeout = Seconds(30);
     LOGV2(9924600,
           "Asserting connection stats will hit targets by timeout.",

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -44,6 +43,7 @@
 
 #include <map>
 #include <mutex>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -90,7 +90,7 @@ public:
         /**
          * If the command is a findAndModify, count, or distinct, increment its count.
          */
-        void gotCommand(StringData cmdName);
+        void gotCommand(std::string_view cmdName);
 
         /**
          * Replaces the OpCounters source. Intended for tests that need an isolated counter source
@@ -228,7 +228,7 @@ public:
 
     void onShutdown();
 
-    void gotCommand(StringData cmdName) {
+    void gotCommand(std::string_view cmdName) {
         std::lock_guard<std::mutex> lk(_queryStatsMutex);
         _queryStats.gotCommand(cmdName);
     }

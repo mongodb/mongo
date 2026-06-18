@@ -32,12 +32,12 @@
 #ifndef UTIL_VERSION_HEADER
 #define UTIL_VERSION_HEADER
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <vector>
 
 MONGO_MOD_PUBLIC;
@@ -54,8 +54,8 @@ class BSONObjBuilder;
 class VersionInfoInterface {
 public:
     struct BuildInfoField {
-        StringData key;
-        StringData value;
+        std::string_view key;
+        std::string_view value;
         bool inBuildInfo;  // included in buildInfo BSON
         bool inVersion;    // included in --version output
     };
@@ -107,33 +107,33 @@ public:
     /**
      * Returns a string representation of MONGO_VERSION.
      */
-    virtual StringData version() const = 0;
+    virtual std::string_view version() const = 0;
 
     /**
      * Returns a string representation of MONGO_GIT_HASH.
      */
-    virtual StringData gitVersion() const = 0;
+    virtual std::string_view gitVersion() const = 0;
 
     /**
      * Returns a vector describing the enabled modules.
      */
-    virtual std::vector<StringData> modules() const = 0;
+    virtual std::vector<std::string_view> modules() const = 0;
 
     /**
      * Returns a string describing the configured memory allocator.
      */
-    virtual StringData allocator() const = 0;
+    virtual std::string_view allocator() const = 0;
 
     /**
      * Returns a string describing the configured javascript engine.
      */
-    virtual StringData jsEngine() const = 0;
+    virtual std::string_view jsEngine() const = 0;
 
     /**
      * Returns a string describing the minimum requred OS. Note that this method is currently only
      * valid to call when running on Windows.
      */
-    virtual StringData targetMinOS() const = 0;
+    virtual std::string_view targetMinOS() const = 0;
 
     /**
      * Returns build information (e.g. LINKFLAGS, compiler, etc.).
@@ -143,12 +143,12 @@ public:
     /**
      * Returns the version of OpenSSL in use, if any, adorned with the provided prefix and suffix.
      */
-    std::string openSSLVersion(StringData prefix = "", StringData suffix = "") const;
+    std::string openSSLVersion(std::string_view prefix = "", std::string_view suffix = "") const;
 
     /**
      * Uses the provided text to make a pretty representation of the version.
      */
-    std::string makeVersionString(StringData binaryName) const;
+    std::string makeVersionString(std::string_view binaryName) const;
 
     /**
      * Logs the result of 'targetMinOS', above.
@@ -170,7 +170,7 @@ protected:
 /**
  * Returns a pretty string describing the provided binary's version.
  */
-std::string formatVersionString(StringData versioned, const VersionInfoInterface& provider);
+std::string formatVersionString(std::string_view versioned, const VersionInfoInterface& provider);
 
 /**
  * Returns a pretty string describing the current shell version.

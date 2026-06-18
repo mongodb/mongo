@@ -29,13 +29,13 @@
 
 #include "mongo/executor/remote_command_response.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -45,6 +45,7 @@
 
 namespace mongo {
 namespace executor {
+using namespace std::literals::string_view_literals;
 
 RemoteCommandResponse::RemoteCommandResponse(HostAndPort hp, Status s)
     : status(std::move(s)), target(std::move(hp)) {
@@ -79,7 +80,7 @@ std::string RemoteCommandResponse::toString() const {
         data.toString(),
         target.toString(),
         status.toString(),
-        elapsed ? StringData(elapsed->toString()) : "n/a"_sd,
+        elapsed ? std::string_view(elapsed->toString()) : "n/a"sv,
         moreToCome);
 }
 

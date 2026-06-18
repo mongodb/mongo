@@ -40,6 +40,8 @@
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Search);
@@ -90,7 +92,7 @@ public:
  */
 class DocumentSourceSearch final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$search"_sd;
+    static constexpr std::string_view kStageName = "$search"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -124,7 +126,7 @@ public:
                          }()),
           _spec(std::move(spec)) {}
 
-    StringData getSourceName() const override;
+    std::string_view getSourceName() const override;
     StageConstraints constraints(PipelineSplitState pipeState) const override;
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
         const DistributedPlanContext* ctx) final;

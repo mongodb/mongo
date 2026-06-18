@@ -58,6 +58,7 @@
 #include <list>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -69,6 +70,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
 
 namespace search_helpers {
+using namespace std::literals::string_view_literals;
 namespace {
 // Returns true if 'source' is an $_internalDocumentResultsAndMetadata stage wrapping an extension
 // search stage.
@@ -116,9 +118,9 @@ void assertSearchMetaAccessValidHelper(
     for (const auto* pipeline : pipelines) {
         for (const auto& source : *pipeline) {
             // Check if this is a stage that sets $$SEARCH_META.
-            static constexpr StringData kSetVarName =
+            static constexpr std::string_view kSetVarName =
                 DocumentSourceSetVariableFromSubPipeline::kStageName;
-            auto stageName = StringData(source->getSourceName());
+            auto stageName = std::string_view(source->getSourceName());
             if (stageName == DocumentSourceInternalSearchMongotRemote::kStageName ||
                 stageName == DocumentSourceSearch::kStageName || stageName == kSetVarName ||
                 extensionCanSetSearchMeta(source)) {
@@ -251,7 +253,7 @@ void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     // Send the planShardedSearch to the remote, retrying on network errors.
     auto response = mongot_cursor::runSearchCommandWithRetries(expCtx, cmdObj);
 
-    remoteSpec->setMetadataMergeProtocolVersion(response.data["protocolVersion"_sd].Int());
+    remoteSpec->setMetadataMergeProtocolVersion(response.data["protocolVersion"sv].Int());
     auto rawPipeline = response.data["metaPipeline"];
     LOGV2_DEBUG(
         9497009, 5, "planShardedSearch response", "mergePipeline"_attr = redact(rawPipeline));
@@ -347,14 +349,14 @@ bool isMongotStage(DocumentSource* stage) {
 
 // TODO SERVER-121094 Remove this function when the extension can do this through
 // bindResolvedNamespace().
-bool isExtensionVectorSearchStage(StringData stageName) {
+bool isExtensionVectorSearchStage(std::string_view stageName) {
     return stageName == kExtensionVectorSearchStageName ||
         stageName == DocumentSourceVectorSearch::kStageName;
 }
 
 // TODO SERVER-121094 Remove this function when the extension can do this through
 // bindResolvedNamespace().
-bool isExtensionSearchStage(StringData stageName) {
+bool isExtensionSearchStage(std::string_view stageName) {
     return stageName == kExtensionSearchStageName ||
         stageName == DocumentSourceSearch::kStageName ||
         stageName == kExtensionSearchMetaStageName ||
@@ -376,7 +378,7 @@ bool isExtensionMongotPipeline(const Pipeline* pipeline) {
 void throwIfrKickbackIfNecessary(bool kickbackCondition,
                                  const IncrementalRolloutFeatureFlag& flag,
                                  Counter64& metric,
-                                 StringData errorMsg) {
+                                 std::string_view errorMsg) {
     if (kickbackCondition) {
         metric.increment();
         uassertStatusOK(Status(IFRFlagRetryInfo(flag.getName()), errorMsg));

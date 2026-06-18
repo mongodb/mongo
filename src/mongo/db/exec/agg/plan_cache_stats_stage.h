@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -42,7 +43,7 @@
 namespace mongo::exec::agg {
 class PlanCacheStatsStage final : public Stage {
 public:
-    PlanCacheStatsStage(StringData stageName,
+    PlanCacheStatsStage(std::string_view stageName,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const boost::intrusive_ptr<DocumentSourceMatch>& absorbedMatch);
 

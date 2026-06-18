@@ -39,6 +39,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <wiredtiger.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -47,10 +49,11 @@
 namespace mongo {
 
 namespace {
-static constexpr StringData kOverwriteFalse = "overwrite=false"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr std::string_view kOverwriteFalse = "overwrite=false"sv;
 }  // namespace
 
-WiredTigerCursor::WiredTigerCursor(Params params, StringData uri, WiredTigerSession& session)
+WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTigerSession& session)
     : _tableID(params.tableID), _session(session) {
     // Passing nullptr is significantly faster for WiredTiger than passing an empty string.
     const char* configStr = nullptr;

@@ -29,7 +29,6 @@
 
 #include "mongo/db/fts/unicode/byte_vector.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>

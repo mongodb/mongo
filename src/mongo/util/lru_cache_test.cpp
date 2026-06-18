@@ -30,7 +30,6 @@
 
 #include "mongo/util/lru_cache.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"

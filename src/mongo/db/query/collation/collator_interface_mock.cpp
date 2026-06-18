@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 
@@ -56,7 +57,7 @@ std::string mockTypeToString(CollatorInterfaceMock::MockType type) {
     MONGO_UNREACHABLE;
 }
 
-Collation makeCollation(StringData locale, StringData version) {
+Collation makeCollation(std::string_view locale, std::string_view version) {
     Collation collation(std::string{locale});
     // "backwards" is optional. The ICU collator always sets it to true/false based on the locale.
     collation.setBackwards(false);
@@ -78,15 +79,15 @@ std::shared_ptr<CollatorInterface> CollatorInterfaceMock::cloneShared() const {
     return std::make_shared<CollatorInterfaceMock>(_mockType);
 }
 
-int CollatorInterfaceMock::compare(StringData left, StringData right) const {
+int CollatorInterfaceMock::compare(std::string_view left, std::string_view right) const {
     switch (_mockType) {
         case MockType::kReverseString: {
             std::string leftString = std::string{left};
             std::string rightString = std::string{right};
             std::reverse(leftString.begin(), leftString.end());
             std::reverse(rightString.begin(), rightString.end());
-            StringData leftReversed(leftString);
-            StringData rightReversed(rightString);
+            std::string_view leftReversed(leftString);
+            std::string_view rightReversed(rightString);
             return leftReversed.compare(rightReversed);
         }
         case MockType::kToLowerString:
@@ -99,7 +100,7 @@ int CollatorInterfaceMock::compare(StringData left, StringData right) const {
 }
 
 CollatorInterface::ComparisonKey CollatorInterfaceMock::getComparisonKey(
-    StringData stringData) const {
+    std::string_view stringData) const {
     switch (_mockType) {
         case MockType::kReverseString: {
             std::string keyDataString = std::string{stringData};

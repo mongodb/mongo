@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 MONGO_MOD_PUBLIC;
@@ -45,13 +45,13 @@ namespace mongo {
  * std::string can be converted to sequence of codepoints. However, it doesn't
  * guarantee that the codepoints are valid.
  */
-bool isValidUTF8(StringData s);
+bool isValidUTF8(std::string_view s);
 
 #if defined(_WIN32)
 
 std::string toUtf8String(const std::wstring& wide);
 
-std::wstring toWideStringFromStringData(StringData s);
+std::wstring toWideStringFromStringData(std::string_view s);
 std::wstring toWideString(const char* s);
 
 bool writeUtf8ToWindowsConsole(const char* utf8String, unsigned int utf8StringSize);

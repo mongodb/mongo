@@ -31,7 +31,6 @@
 #include "mongo/db/repl/oplog_buffer_collection.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,6 +55,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -114,7 +114,7 @@ Client* OplogBufferCollectionTest::getClient() const {
 /**
  * Generates a unique namespace from the test registration agent.
  */
-NamespaceString makeNamespace(StringData suffix = "") {
+NamespaceString makeNamespace(std::string_view suffix = "") {
     return NamespaceString::createNamespaceString_forTest(
         fmt::format("local.{}_{}{}", unittest::getSuiteName(), unittest::getTestName(), suffix));
 }

@@ -29,11 +29,13 @@
 
 #pragma once
 
+#include <string_view>
+
 namespace mongo {
 
 struct MONGO_MOD_NEEDS_REPLACEMENT JSFile {
     const char* name;
-    const StringData source;
+    const std::string_view source;
 };
 
 }  // namespace mongo

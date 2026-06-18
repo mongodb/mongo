@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <absl/container/btree_set.h>
 
@@ -57,7 +57,7 @@ public:
      * Register a path component.  Any update targeting a path that contains this exact
      * component will trigger a recomputation of the document's index keys.
      */
-    void addPathComponent(StringData pathComponent);
+    void addPathComponent(std::string_view pathComponent);
 
     /**
      * Register the "wildcard" path for wildcard indexes or wildcard text indexes.

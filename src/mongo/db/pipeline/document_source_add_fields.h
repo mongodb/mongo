@@ -39,6 +39,8 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -53,8 +55,8 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(AddFields);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceAddFields final {
 public:
-    static constexpr StringData kStageName = "$addFields"_sd;
-    static constexpr StringData kAliasNameSet = "$set"_sd;  // An alternate name for this stage.
+    static constexpr std::string_view kStageName{"$addFields"};
+    static constexpr std::string_view kAliasNameSet{"$set"};  // An alternate name for this stage.
 
     /**
      * Convenience method for creating a $addFields stage from 'addFieldsSpec'.
@@ -62,7 +64,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> create(
         BSONObj addFieldsSpec,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        StringData stageName = kStageName);
+        std::string_view stageName = kStageName);
 
     /**
      * Create a stage that binds an expression to a top-level field.

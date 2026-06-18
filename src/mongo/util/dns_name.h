@@ -43,6 +43,7 @@
 #include <iterator>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -89,7 +90,7 @@ public:
      * THROWS: `DBException` with `ErrorCodes::DNSRecordTypeMismatch` as the status value if the
      * name is ill formatted.
      */
-    explicit HostName(StringData dnsName) {
+    explicit HostName(std::string_view dnsName) {
         if (dnsName.empty())
             uasserted(ErrorCodes::DNSRecordTypeMismatch,
                       "A Domain Name cannot have zero characters");
@@ -350,7 +351,7 @@ private:
     // `std::ostream`.
     template <typename StreamLike>
     void streamUnqualified(StreamLike& os) const {
-        StringData sep;
+        std::string_view sep;
         std::for_each(
             rbegin(_nameComponents), rend(_nameComponents), [&sep, &os](const auto& component) {
                 os << sep << component;

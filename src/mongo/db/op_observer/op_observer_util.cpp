@@ -29,7 +29,6 @@
 
 #include "mongo/db/op_observer/op_observer_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"

@@ -37,7 +37,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -58,6 +57,7 @@
 #include <algorithm>
 #include <iterator>
 #include <set>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -66,11 +66,12 @@
 
 namespace mongo {
 namespace wildcard_planning {
+using namespace std::literals::string_view_literals;
 namespace {
 /**
  * Returns a new key pattern object with '$_path' and finds the wildcard field name.
  */
-BSONObj makeNewKeyPattern(const IndexEntry* index, StringData* wildcardFieldName) {
+BSONObj makeNewKeyPattern(const IndexEntry* index, std::string_view* wildcardFieldName) {
     BSONObjBuilder newPattern;
     size_t idx = 0;
     for (auto elem : index->keyPattern) {
@@ -372,7 +373,7 @@ bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
  * the position of the replaced wildcard field.
  */
 std::pair<BSONObj, size_t> expandWildcardIndexKeyPattern(const BSONObj& wildcardKeyPattern,
-                                                         StringData expandFieldName) {
+                                                         std::string_view expandFieldName) {
     int wildcardFieldPos = -1;
     int fieldPos = 0;
     BSONObjBuilder builder{};
@@ -492,7 +493,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
         }
         tassert(7246507,
                 "'$_path' is reserved fieldname for Wildcard Indexes",
-                "$_path"_sd != fieldName);
+                "$_path"sv != fieldName);
         out->push_back(*entry);
     }
 
@@ -571,7 +572,7 @@ void finalizeWildcardIndexScanConfiguration(
                                 MultikeyComponents{});
     bounds->fields.insert(bounds->fields.begin() + index->wildcardFieldPos, {"$_path"});
 
-    StringData wildcardFieldName;
+    std::string_view wildcardFieldName;
     index->keyPattern = makeNewKeyPattern(index, &wildcardFieldName);
 
     if (!ietBuilders->empty()) {
@@ -588,7 +589,7 @@ void finalizeWildcardIndexScanConfiguration(
     // string values and 'MinKey'. The bounds for the generic wildcard field should scan all values
     // with bounds, "[MinKey, MaxKey]". Because the wildcard field can generate multiple keys for
     // one single document, we should also instruct the IXSCAN to dedup keys.
-    if (wildcardFieldName == "$_path"_sd) {
+    if (wildcardFieldName == "$_path"sv) {
         bounds->fields[index->wildcardFieldPos - 1].intervals = makeAllValuesForPath();
         bounds->fields[index->wildcardFieldPos].intervals.push_back(
             IndexBoundsBuilder::allValues());

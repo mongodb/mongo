@@ -64,6 +64,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -109,12 +110,12 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceLookUp final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$lookup"_sd;
-    static constexpr StringData kFromField = "from"_sd;
-    static constexpr StringData kLocalField = "localField"_sd;
-    static constexpr StringData kForeignField = "foreignField"_sd;
-    static constexpr StringData kPipelineField = "pipeline"_sd;
-    static constexpr StringData kAsField = "as"_sd;
+    static constexpr std::string_view kStageName = "$lookup"_sd;
+    static constexpr std::string_view kFromField = "from"_sd;
+    static constexpr std::string_view kLocalField = "localField"_sd;
+    static constexpr std::string_view kForeignField = "foreignField"_sd;
+    static constexpr std::string_view kPipelineField = "pipeline"_sd;
+    static constexpr std::string_view kAsField = "as"_sd;
 
     /**
      * Copy constructor used for clone().
@@ -122,7 +123,7 @@ public:
     DocumentSourceLookUp(const DocumentSourceLookUp&,
                          const boost::intrusive_ptr<ExpressionContext>&);
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

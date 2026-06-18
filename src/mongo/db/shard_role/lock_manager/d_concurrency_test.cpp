@@ -32,7 +32,6 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
@@ -71,6 +70,7 @@
 #include <future>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -463,7 +463,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesTenantLock) {
         LockMode expectedTenantLockMode;
     };
 
-    StringData testDatabaseName{"test"};
+    std::string_view testDatabaseName{"test"};
     const bool tenantOwned{true};
     const bool tenantless{false};
     const boost::optional<LockMode> none;
@@ -1192,7 +1192,7 @@ TEST_F(DConcurrencyTestFixture, IsDbLockedForMode_IsCollectionLockedForMode) {
     };
 
     TenantId tenantId{OID::gen()};
-    StringData testDatabaseName{"test"};
+    std::string_view testDatabaseName{"test"};
     std::vector<TestCase> testCases{
         // Only global lock acquired.
         {MODE_X, MODE_NONE, kAll, MODE_NONE, MODE_X, true},

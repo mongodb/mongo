@@ -31,7 +31,6 @@
  * This file contains minimal tests for sbe::ScanStage.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"

@@ -29,7 +29,6 @@
 
 #include "mongo/db/validate/bson_utf8.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -41,6 +40,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string_view>
 
 namespace mongo {
 
@@ -51,7 +51,7 @@ namespace mongo {
 const std::string replacementCharacter = u8"\ufffd"_as_char_ptr;
 
 /** Repeat the `s` string, `x` times. */
-std::string repeat(StringData s, size_t x) {
+std::string repeat(std::string_view s, size_t x) {
     std::string result;
     result.reserve(x * s.size());
     auto it = std::back_inserter(result);
@@ -125,13 +125,15 @@ const std::map<std::string, std::string> scrubMap{
     {"\xf0\x9d\xdc\x80", "\xef\xbf\xbd\xef\xbf\xbd\xdc\x80"},  // Surrogate pairs are not valid
 };
 
-void unchangedStrInput(StringData fieldName, const std::string& s) {
+void unchangedStrInput(std::string_view fieldName, const std::string& s) {
     auto originalBSONObj = BSON(fieldName << s);
     auto newBSONObj = checkAndScrubInvalidUTF8(originalBSONObj);
     ASSERT_BSONOBJ_EQ(newBSONObj, BSON(fieldName << s));
 }
 
-void scrubbedStrInput(StringData fieldName, const std::string& s, const std::string& scrubbedS) {
+void scrubbedStrInput(std::string_view fieldName,
+                      const std::string& s,
+                      const std::string& scrubbedS) {
     auto originalBSONObj = BSON(fieldName << s);
     auto scrubbedBSONObj = checkAndScrubInvalidUTF8(originalBSONObj);
     ASSERT_BSONOBJ_EQ(scrubbedBSONObj, BSON(fieldName << scrubbedS));
@@ -157,7 +159,7 @@ BSONObj scrubAndAssertUTF8Valid(BSONObj obj) {
 }
 
 template <typename T>
-BSONObj makeBSONArrayObject(StringData fieldName, const std::vector<T>& values) {
+BSONObj makeBSONArrayObject(std::string_view fieldName, const std::vector<T>& values) {
     BSONObjBuilder builder;
     {
         BSONArrayBuilder arr(builder.subarrayStart(fieldName));
@@ -167,11 +169,11 @@ BSONObj makeBSONArrayObject(StringData fieldName, const std::vector<T>& values) 
     return builder.obj();
 }
 
-BSONObj makeBSONCodeObject(StringData fieldName, const std::string codeStr) {
+BSONObj makeBSONCodeObject(std::string_view fieldName, const std::string codeStr) {
     return BSON(fieldName << BSONCode(codeStr));
 }
 
-BSONObj makeBSONCodeWScopeObject(StringData fieldName,
+BSONObj makeBSONCodeWScopeObject(std::string_view fieldName,
                                  const std::string codeStr,
                                  const BSONObj codeScope) {
     return BSON(fieldName << BSONCodeWScope(codeStr, codeScope));
@@ -462,8 +464,8 @@ TEST(checkAndScrubInvalidUTF8, SimpleArrays) {
 
     // Code that is all valid UTF-8 in arrays
     // {codeSnippets: [BSONCode{"x = 0"}, BSONCode{(function(){})();}]}
-    BSONCode validCode1{StringData("(function(){})();")};
-    BSONCode validCode2{StringData("x = 0")};
+    BSONCode validCode1{std::string_view("(function(){})();")};
+    BSONCode validCode2{std::string_view("x = 0")};
     BSONObj codeSnippetArr =
         makeBSONArrayObject<BSONCode>("codeSnippets", {validCode1, validCode2});
     unchangedBSONInput(codeSnippetArr);
@@ -536,7 +538,7 @@ TEST(checkAndScrubInvalidUTF8, DoesNotScrubNestedValidUTF8) {
 
     // Test valid BSONCode.
     // {code: {code1: BSONCode{(function(){})());}}}
-    BSONCode code1{StringData("(function(){})());")};
+    BSONCode code1{std::string_view("(function(){})());")};
     BSONObj bsonCodeOneNest = BSON("code" << BSON("code1" << code1));
     unchangedBSONInput(bsonCodeOneNest);
 

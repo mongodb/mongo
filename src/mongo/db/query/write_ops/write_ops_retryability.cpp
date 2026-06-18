@@ -55,6 +55,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <boost/cstdint.hpp>
@@ -65,6 +66,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 /**
@@ -388,10 +390,10 @@ repl::OplogEntry getInnerNestedOplogEntry(const repl::OplogEntry& entry) {
 
 }  // namespace
 
-static constexpr StringData kWouldChangeOwningShardRetryContext =
+static constexpr std::string_view kWouldChangeOwningShardRetryContext =
     "Operation was converted into a distributed transaction because the modified document would "
     "move shards and succeeded but transaction history was not generated so the original reply "
-    "cannot be recreated."_sd;
+    "cannot be recreated."sv;
 
 SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry,
                                            const boost::optional<BSONElement>& upsertedId) {

@@ -40,17 +40,20 @@
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/net/hostandport.h"
 
+#include <string_view>
+
 namespace mongo::rpc {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kLocalAddr = "127.0.0.1:2000"_sd;
-constexpr auto kRemoteAddr = "127.0.0.2:27018"_sd;
-constexpr auto kProxyAddr = "10.0.0.1:8080"_sd;
-constexpr std::array<StringData, 2> kExpectedProxies = {kLocalAddr, kProxyAddr};
+constexpr auto kLocalAddr = "127.0.0.1:2000"sv;
+constexpr auto kRemoteAddr = "127.0.0.2:27018"sv;
+constexpr auto kProxyAddr = "10.0.0.1:8080"sv;
+constexpr std::array<std::string_view, 2> kExpectedProxies = {kLocalAddr, kProxyAddr};
 
-constexpr auto kUserName = "testUser"_sd;
-constexpr auto kDBName = "admin"_sd;
-constexpr auto kRoleName = "root"_sd;
+constexpr auto kUserName = "testUser"sv;
+constexpr auto kDBName = "admin"sv;
+constexpr auto kRoleName = "root"sv;
 
 class AuditMetadataTest : public ServiceContextTest {
 protected:

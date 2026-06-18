@@ -29,7 +29,6 @@
 
 #include "mongo/db/ttl/ttl.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -63,6 +62,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -271,7 +271,7 @@ public:
     }
 
     void insertTimeseriesDocs(const NamespaceString& nss,
-                              StringData timeField,
+                              std::string_view timeField,
                               Date_t now,
                               Seconds interval,
                               int numDocs) {

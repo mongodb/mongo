@@ -28,7 +28,6 @@
  */
 #include "mongo/db/query/fle/range_validator.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -50,6 +49,7 @@
 #include <initializer_list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -118,7 +118,7 @@ namespace {
  * Generate a range payload. Edges can be empty because we don't actually look at the payload's
  * contents during validation.
  */
-std::string payload(StringData path,
+std::string payload(std::string_view path,
                     int32_t payloadId,
                     Fle2RangeOperator firstOp,
                     boost::optional<Fle2RangeOperator> secondOp) {
@@ -141,7 +141,7 @@ std::string payload(StringData path,
 /**
  * Generate a range stub.
  */
-std::string stub(StringData path,
+std::string stub(std::string_view path,
                  int32_t payloadId,
                  Fle2RangeOperator firstOp,
                  boost::optional<Fle2RangeOperator> secondOp) {

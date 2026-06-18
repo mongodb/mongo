@@ -29,7 +29,6 @@
 
 #include "mongo/db/commands/feature_compatibility_version.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/repl/oplog.h"

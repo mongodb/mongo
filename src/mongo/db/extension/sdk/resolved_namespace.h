@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo::extension::sdk {

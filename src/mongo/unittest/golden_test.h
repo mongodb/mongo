@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/unittest/test_info.h"
 #include "mongo/unittest/unittest.h"

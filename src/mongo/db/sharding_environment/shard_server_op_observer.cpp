@@ -29,7 +29,6 @@
 
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"

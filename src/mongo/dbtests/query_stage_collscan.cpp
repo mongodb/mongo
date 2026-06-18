@@ -33,7 +33,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -84,6 +83,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -96,6 +96,7 @@
 
 namespace mongo {
 namespace query_stage_collection_scan {
+using namespace std::literals::string_view_literals;
 
 static const NamespaceString kNss =
     NamespaceString::createNamespaceString_forTest("unittests.QueryStageCollectionScan");
@@ -398,7 +399,7 @@ TEST_F(QueryStageCollectionScanTest,
     CollectionScanParams params;
     params.shouldReturnEofOnFilterMismatch = true;
     WorkingSet ws;
-    LTEMatchExpression filter{"foo"_sd, Value(threshold)};
+    LTEMatchExpression filter{"foo"sv, Value(threshold)};
     auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, &filter);
 
     // Scan all matching documents.

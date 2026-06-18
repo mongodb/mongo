@@ -33,16 +33,18 @@
 
 #include <array>
 #include <memory>
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo {
 namespace test {
+using namespace std::literals::string_view_literals;
 
 // A copy of the generic command arguments and reply fields from before they were moved to IDL in
 // SERVER-51848. We will test that the IDL definitions match these old C++ definitions.
 struct SpecialArgRecord {
-    StringData name;
+    std::string_view name;
     bool isGenericArgument;
     bool isGenericReply;
     bool stripFromRequest;
@@ -55,41 +57,41 @@ static constexpr std::array<SpecialArgRecord, 35> specials{{
     //                                       |  /-isGenericReply
     //                                       |  |  /-stripFromRequest
     //                                       |  |  |  /-stripFromReply
-    {"apiVersion"_sd,                        1, 0, 1, 0},
-    {"apiStrict"_sd,                         1, 0, 1, 0},
-    {"apiDeprecationErrors"_sd,              1, 0, 1, 0},
-    {"$audit"_sd,                            1, 0, 1, 0},
-    {"$client"_sd,                           1, 0, 1, 0},
-    {"$configServerState"_sd,                1, 1, 1, 1},
-    {"$db"_sd,                               1, 0, 1, 0},
-    {"$oplogQueryData"_sd,                   1, 1, 1, 1},
-    {"$queryOptions"_sd,                     1, 0, 0, 0},
-    {"$readPreference"_sd,                   1, 0, 1, 0},
-    {"$replData"_sd,                         1, 1, 1, 1},
-    {"$clusterTime"_sd,                      1, 1, 1, 1},
-    {"maxTimeMS"_sd,                         1, 0, 0, 0},
-    {"readConcern"_sd,                       1, 0, 0, 0},
-    {"databaseVersion"_sd,                   1, 0, 1, 0},
-    {"shardVersion"_sd,                      1, 0, 1, 0},
-    {"tracking_info"_sd,                     1, 0, 1, 0},
-    {"writeConcern"_sd,                      1, 0, 0, 0},
-    {"lsid"_sd,                              1, 0, 0, 0},
-    {"clientOperationKey"_sd,                1, 0, 0, 0},
-    {"txnNumber"_sd,                         1, 0, 0, 0},
-    {"autocommit"_sd,                        1, 0, 0, 0},
-    {"coordinator"_sd,                       1, 0, 0, 0},
-    {"startTransaction"_sd,                  1, 0, 0, 0},
-    {"stmtId"_sd,                            1, 0, 0, 0},
-    {"$gleStats"_sd,                         0, 1, 0, 1},
-    {"operationTime"_sd,                     0, 1, 0, 1},
-    {"lastCommittedOpTime"_sd,               0, 1, 0, 1},
-    {"readOnly"_sd,                          0, 1, 0, 1},
-    {"comment"_sd,                           1, 0, 0, 0},
-    {"maxTimeMSOpOnly"_sd,                   1, 0, 1, 0},
-    {"$configTime"_sd,                       1, 1, 1, 1},
-    {"ok"_sd,                                0, 1, 0, 0},
-    {"$topologyTime"_sd,                     1, 1, 1, 1},
-    {"$traceCtx"_sd,                         1, 0, 0, 0}}};
+    {"apiVersion"sv,                        1, 0, 1, 0},
+    {"apiStrict"sv,                         1, 0, 1, 0},
+    {"apiDeprecationErrors"sv,              1, 0, 1, 0},
+    {"$audit"sv,                            1, 0, 1, 0},
+    {"$client"sv,                           1, 0, 1, 0},
+    {"$configServerState"sv,                1, 1, 1, 1},
+    {"$db"sv,                               1, 0, 1, 0},
+    {"$oplogQueryData"sv,                   1, 1, 1, 1},
+    {"$queryOptions"sv,                     1, 0, 0, 0},
+    {"$readPreference"sv,                   1, 0, 1, 0},
+    {"$replData"sv,                         1, 1, 1, 1},
+    {"$clusterTime"sv,                      1, 1, 1, 1},
+    {"maxTimeMS"sv,                         1, 0, 0, 0},
+    {"readConcern"sv,                       1, 0, 0, 0},
+    {"databaseVersion"sv,                   1, 0, 1, 0},
+    {"shardVersion"sv,                      1, 0, 1, 0},
+    {"tracking_info"sv,                     1, 0, 1, 0},
+    {"writeConcern"sv,                      1, 0, 0, 0},
+    {"lsid"sv,                              1, 0, 0, 0},
+    {"clientOperationKey"sv,                1, 0, 0, 0},
+    {"txnNumber"sv,                         1, 0, 0, 0},
+    {"autocommit"sv,                        1, 0, 0, 0},
+    {"coordinator"sv,                       1, 0, 0, 0},
+    {"startTransaction"sv,                  1, 0, 0, 0},
+    {"stmtId"sv,                            1, 0, 0, 0},
+    {"$gleStats"sv,                         0, 1, 0, 1},
+    {"operationTime"sv,                     0, 1, 0, 1},
+    {"lastCommittedOpTime"sv,               0, 1, 0, 1},
+    {"readOnly"sv,                          0, 1, 0, 1},
+    {"comment"sv,                           1, 0, 0, 0},
+    {"maxTimeMSOpOnly"sv,                   1, 0, 1, 0},
+    {"$configTime"sv,                       1, 1, 1, 1},
+    {"ok"sv,                                0, 1, 0, 0},
+    {"$topologyTime"sv,                     1, 1, 1, 1},
+    {"$traceCtx"sv,                         1, 0, 0, 0}}};
 // clang-format on
 
 TEST(CommandGenericArgument, AllGenericArgumentsAndReplyFields) {

@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -59,6 +58,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -155,7 +155,7 @@ public:
                                                           BSONObj filter = BSONObj()) override;
 
     Status runUserManagementWriteCommand(OperationContext* opCtx,
-                                         StringData commandName,
+                                         std::string_view commandName,
                                          const DatabaseName& dbname,
                                          const BSONObj& cmdObj,
                                          BSONObjBuilder* result) override {
@@ -167,7 +167,7 @@ public:
                                       const BSONObj& cmdObj,
                                       BSONObjBuilder* result) override;
 
-    StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, StringData key) override;
+    StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, std::string_view key) override;
 
     StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
                                              repl::ReadConcernLevel readConcern) override;
@@ -198,17 +198,17 @@ public:
                                  const WriteConcernOptions& writeConcern,
                                  boost::optional<BSONObj> hint) override;
 
-    Status createDatabase(OperationContext* opCtx, StringData dbName, ShardId primaryShard);
+    Status createDatabase(OperationContext* opCtx, std::string_view dbName, ShardId primaryShard);
 
     StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
-        StringData purpose,
+        std::string_view purpose,
         const LogicalTime& newerThanThis,
         repl::ReadConcernLevel readConcernLevel) override;
 
     StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
         OperationContext* opCtx,
-        StringData purpose,
+        std::string_view purpose,
         repl::ReadConcernLevel readConcernLevel) override;
 
     bool anyShardRemovedSince(OperationContext* opCtx, const Timestamp& clusterTime) override;

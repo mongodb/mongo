@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -38,15 +37,17 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 using SBEFailTest = GoldenEExpressionTestFixture;
 
 TEST_F(SBEFailTest, SimpleFail) {
     auto& os = gctx->outStream();
 
-    auto expr = sbe::makeE<EFail>(ErrorCodes::Error::BadValue, "test"_sd);
+    auto expr = sbe::makeE<EFail>(ErrorCodes::Error::BadValue, "test"sv);
     printInputExpression(os, *expr);
 
     auto compiledExpr = compileExpression(*expr);
@@ -62,7 +63,7 @@ TEST_F(SBEFailTest, FailWithAddDecimal) {
 
     auto expr = sbe::makeE<EPrimBinary>(EPrimBinary::Op::add,
                                         makeC(value::makeCopyDecimal(Decimal128(123))),
-                                        sbe::makeE<EFail>(ErrorCodes::Error::BadValue, "test"_sd));
+                                        sbe::makeE<EFail>(ErrorCodes::Error::BadValue, "test"sv));
     printInputExpression(os, *expr);
 
     auto compiledExpr = compileExpression(*expr);
@@ -77,7 +78,7 @@ TEST_F(SBEFailTest, FailWithLocalBind) {
     FrameId frame = 10;
     auto expr = sbe::makeE<ELocalBind>(frame,
                                        makeEs(makeC(value::makeCopyDecimal(Decimal128(123)))),
-                                       sbe::makeE<EFail>(ErrorCodes::Error::BadValue, "test"_sd));
+                                       sbe::makeE<EFail>(ErrorCodes::Error::BadValue, "test"sv));
 
     printInputExpression(os, *expr);
 

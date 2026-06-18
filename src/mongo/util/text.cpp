@@ -38,6 +38,8 @@
 #include <boost/integer_traits.hpp>
 
 #ifdef _WIN32
+#include <string_view>
+
 #include <io.h>
 #endif
 
@@ -68,7 +70,7 @@ inline int leadingOnes(unsigned char c) {
     return _leadingOnes[c & 0x7f];
 }
 
-bool isValidUTF8(StringData s) {
+bool isValidUTF8(std::string_view s) {
     int left = 0;  // how many bytes are left in the current codepoint
     for (unsigned char c : s) {
         const int ones = leadingOnes(c);
@@ -128,7 +130,7 @@ std::string toUtf8String(const std::wstring& wide) {
     return "";
 }
 
-std::wstring toWideStringFromStringData(StringData utf8String) {
+std::wstring toWideStringFromStringData(std::string_view utf8String) {
     int bufferSize = MultiByteToWideChar(CP_UTF8,            // Code page
                                          0,                  // Flags
                                          utf8String.data(),  // Input string

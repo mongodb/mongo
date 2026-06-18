@@ -31,7 +31,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
@@ -46,6 +45,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -67,7 +67,7 @@ std::mutex ConnectionString::_connectHookMutex;
 ConnectionString::ConnectionHook* ConnectionString::_connectHook = nullptr;
 
 StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
-    StringData applicationName,
+    std::string_view applicationName,
     double socketTimeout,
     const MongoURI* uri,
     const ClientAPIVersionParameters* apiParameters,

@@ -35,6 +35,8 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceSingleDocumentTransformationToStageFn(
@@ -67,7 +69,7 @@ REGISTER_AGG_STAGE_MAPPING(singleDocumentTransformation,
                            documentSourceSingleDocumentTransformationToStageFn)
 
 SingleDocumentTransformationStage::SingleDocumentTransformationStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const std::shared_ptr<SingleDocumentTransformationProcessor>& transformationProcessor)
     : Stage(stageName, pExpCtx),

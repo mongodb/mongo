@@ -51,6 +51,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -93,7 +94,7 @@ public:
         }
     };
 
-    static constexpr StringData kStageName = "$_internalShardServerInfo"_sd;
+    static constexpr std::string_view kStageName = "$_internalShardServerInfo"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
@@ -103,7 +104,7 @@ public:
         return new DocumentSourceInternalShardServerInfo(expCtx);
     }
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

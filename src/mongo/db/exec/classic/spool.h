@@ -45,6 +45,7 @@
 
 #include <deque>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -60,7 +61,7 @@ namespace mongo {
  */
 class SpoolStage final : public PlanStage {
 public:
-    static constexpr StringData kStageType = "SPOOL"_sd;
+    static constexpr std::string_view kStageType = "SPOOL"_sd;
 
     SpoolStage(ExpressionContext* expCtx, WorkingSet* ws, std::unique_ptr<PlanStage> child);
 

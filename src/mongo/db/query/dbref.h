@@ -32,12 +32,14 @@
 #include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace dbref {
 
-constexpr StringData kDbFieldName = "$db"_sd;
-constexpr StringData kIdFieldName = "$id"_sd;
-constexpr StringData kRefFieldName = "$ref"_sd;
+constexpr std::string_view kDbFieldName = "$db"_sd;
+constexpr std::string_view kIdFieldName = "$id"_sd;
+constexpr std::string_view kRefFieldName = "$ref"_sd;
 
 }  // namespace dbref
 }  // namespace mongo

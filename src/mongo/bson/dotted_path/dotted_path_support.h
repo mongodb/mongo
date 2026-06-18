@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -60,7 +60,7 @@ namespace bson {
  *   Consider the document {a: [{b: 1}]} and the path "a.0.b". An element with key="b" and value=1
  *   would be returned.
  */
-BSONElement extractElementAtDottedPath(const BSONObj& obj, StringData path);
+BSONElement extractElementAtDottedPath(const BSONObj& obj, std::string_view path);
 
 /**
  * Returns the element at the specified path, or the first element with an array value encountered

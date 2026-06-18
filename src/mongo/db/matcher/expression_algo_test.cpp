@@ -53,6 +53,8 @@
 #include <initializer_list>
 #include <memory>
 #include <ostream>
+#include <string>
+#include <string_view>
 #include <tuple>
 #include <variant>
 
@@ -63,8 +65,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
-using namespace std::string_literals;
+using namespace std::literals::string_literals;
+using namespace std::literals::string_view_literals;
 
 void assertMatchesEqual(const ParsedMatchExpressionForTest& expected,
                         const std::unique_ptr<MatchExpression>& actual) {
@@ -862,7 +864,7 @@ TEST(IsIndependent, AndIsIndependentOnlyIfChildrenAre) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    std::unique_ptr<MatchExpression> expr = std::move(status.getValue());
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"b"}));
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"c"}));
 }
@@ -879,7 +881,7 @@ TEST(IsIndependent, EqNullIsIndependentOnlyIfToplevelFieldDiffers) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    std::unique_ptr<MatchExpression> expr = std::move(status.getValue());
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a.x"}));
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"x"}));
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"x.y"}));
@@ -892,7 +894,7 @@ TEST(IsIndependent, ElemMatchIsIndependent) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    std::unique_ptr<MatchExpression> expr = std::move(status.getValue());
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"x"}));
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"x.y"}));
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"y"}));
@@ -905,7 +907,7 @@ TEST(IsIndependent, NorIsIndependentOnlyIfChildrenAre) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    std::unique_ptr<MatchExpression> expr = std::move(status.getValue());
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"b"}));
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"c"}));
 }
@@ -917,7 +919,7 @@ TEST(IsIndependent, NotIsIndependentOnlyIfChildrenAre) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    std::unique_ptr<MatchExpression> expr = std::move(status.getValue());
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"b"}));
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a"}));
 }
@@ -929,7 +931,7 @@ TEST(IsIndependent, OrIsIndependentOnlyIfChildrenAre) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    std::unique_ptr<MatchExpression> expr = std::move(status.getValue());
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a"}));
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"c"}));
 }
@@ -941,7 +943,7 @@ TEST(IsIndependent, AndWithDottedFieldPathsIsNotIndependent) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    std::unique_ptr<MatchExpression> expr = std::move(status.getValue());
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a.b.c"}));
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a.b"}));
 }
@@ -953,7 +955,7 @@ TEST(IsIndependent, BallIsIndependentOfBalloon) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    std::unique_ptr<MatchExpression> expr = std::move(status.getValue());
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"a.balloon"}));
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"a.b"}));
     ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a.ball.c"}));
@@ -1034,7 +1036,7 @@ TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"b"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1052,7 +1054,7 @@ TEST(SplitMatchExpression, NorWithIndependentChildrenIsSplittable) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"b"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1070,7 +1072,7 @@ TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"y"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1086,7 +1088,7 @@ TEST(SplitMatchExpression, OrWithOnlyIndependentChildrenIsNotSplittable) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"b"}, {});
 
     ASSERT_TRUE(splitExpr.second.get());
@@ -1106,7 +1108,7 @@ TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"x"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1128,7 +1130,7 @@ TEST(SplitMatchExpression, ShouldNotExtractPrefixOfDottedPathAsIndependent) {
         MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(status.getStatus());
 
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(status.getValue()), {"a.b"}, {});
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1147,7 +1149,7 @@ TEST(SplitMatchExpression, ShouldMoveIndependentLeafPredicateAcrossRename) {
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "b"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1163,7 +1165,7 @@ TEST(SplitMatchExpression, ShouldMoveIndependentAndPredicateAcrossRename) {
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1180,7 +1182,7 @@ TEST(SplitMatchExpression, ShouldSplitPartiallyDependentAndPredicateAcrossRename
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {"b"}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1197,7 +1199,7 @@ TEST(SplitMatchExpression, ShouldSplitPartiallyDependentComplexPredicateMultiple
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"b", "d"}, {"c", "e"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {"a"}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1216,7 +1218,7 @@ TEST(SplitMatchExpression,
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"d.e.f", "x"}, {"e.f.g", "y"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {"a"}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1430,7 +1432,7 @@ TEST(SplitMatchExpression, ShouldMoveTypeAcrossRename) {
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{c: {$type: [16]}}"));
@@ -1534,7 +1536,7 @@ TEST(SplitMatchExpression, ShouldNotMoveInternalSchemaObjectMatchInLogicalExpres
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_FALSE(splitExpr.first.get());
@@ -1552,7 +1554,7 @@ TEST(SplitMatchExpression, ShouldMoveMinLengthAcrossRename) {
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1569,7 +1571,7 @@ TEST(SplitMatchExpression, ShouldMoveMaxLengthAcrossRename) {
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"a", "c"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -1587,7 +1589,7 @@ TEST(SplitMatchExpression, ShouldMoveIndependentPredicateWhenThereAreMultipleRen
     ASSERT_OK(matcher.getStatus());
 
     StringMap<std::string> renames{{"y", "x"}, {"x", "x"}};
-    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
     ASSERT_TRUE(splitExpr.first.get());
@@ -2494,7 +2496,7 @@ TEST(ApplyRenamesToExpression, ShouldApplyRenamesForInternalSchemaBinDataEncrypt
 }
 
 TEST(ApplyRenamesToExpression, ShouldApplyRenamesForInternalSchemaBinDataFLE2EncryptedType) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression matcher("a"_sd, BSONType::string);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression matcher("a"sv, BSONType::string);
     auto opts = query_shape::SerializationOptions{
         query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     matcher.getSerializedRightHandSide(opts);
@@ -2509,7 +2511,7 @@ TEST(ApplyRenamesToExpression, ShouldApplyRenamesForInternalSchemaBinDataFLE2Enc
 
 TEST(ApplyRenamesToExpression,
      ShouldApplyRenamesForInternalSchemaBinDataFLE2EncryptedTypeDottedPaths) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression matcher("a"_sd, BSONType::string);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression matcher("a"sv, BSONType::string);
     auto opts = query_shape::SerializationOptions{
         query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     matcher.getSerializedRightHandSide(opts);

@@ -44,6 +44,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using DocumentSourceInternalGeoNearDistanceTest = AggregationContextFixture;
 
@@ -61,7 +62,7 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenOverlappingPoin
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
     auto mock = exec::agg::MockStage::createForTest(
-        {DOC("loc" << DOC("type" << "Point"_sd
+        {DOC("loc" << DOC("type" << "Point"sv
                                  << "coordinates" << DOC_ARRAY(1 << 1)))},
         getExpCtx());
     auto geoDistStage = exec::agg::buildStageAndStitch(geoDist, mock);
@@ -86,7 +87,7 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, SphericalDistanceBetweenTwoPoi
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
     auto mock = exec::agg::MockStage::createForTest(
-        {DOC("loc" << DOC("type" << "Point"_sd
+        {DOC("loc" << DOC("type" << "Point"sv
                                  << "coordinates" << DOC_ARRAY(0 << 0)))},
         getExpCtx());
     auto geoDistStage = exec::agg::buildStageAndStitch(geoDist, mock);

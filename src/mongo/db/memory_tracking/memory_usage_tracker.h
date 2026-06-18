@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/noncopyable.hpp>
@@ -90,7 +90,7 @@ public:
      * Throws ExceededMemoryLimit if the current usage exceeds the limit, including a
      * name, current usage, and limit in the error message.
      */
-    void assertWithinMemoryLimit(StringData name) const;
+    void assertWithinMemoryLimit(std::string_view name) const;
 
     /**
      * Returns a new SimpleMemoryUsageTracker. The copy constructor for this class is purposefully
@@ -167,7 +167,7 @@ public:
     /**
      * Sets the new total for 'name', and updates the current total memory usage.
      */
-    void set(StringData name, int64_t total);
+    void set(std::string_view name, int64_t total);
 
     /**
      * Resets both the total memory usage as well as the per-function memory usage, but retains the
@@ -183,13 +183,13 @@ public:
     /**
      * Non-const version, creates a new element if one doesn't exist and returns a reference to it.
      */
-    SimpleMemoryUsageTracker& operator[](StringData name);
+    SimpleMemoryUsageTracker& operator[](std::string_view name);
 
     /**
      * Updates the memory usage for 'name' by adding 'diff' to the current memory usage for
      * that function. Also updates the total memory usage.
      */
-    void add(StringData name, int64_t diff);
+    void add(std::string_view name, int64_t diff);
 
     /**
      * Updates total memory usage.
@@ -205,7 +205,7 @@ public:
         return _baseTracker.peakTrackedMemoryBytes();
     }
 
-    int64_t peakTrackedMemoryBytes(StringData name) const;
+    int64_t peakTrackedMemoryBytes(std::string_view name) const;
 
     bool withinMemoryLimit() const {
         return _baseTracker.withinMemoryLimit();

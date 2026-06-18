@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <unicode/coll.h>
@@ -58,7 +59,7 @@ std::shared_ptr<CollatorInterface> CollatorInterfaceICU::cloneShared() const {
         getSpec(), std::unique_ptr<icu::Collator>(_collator->clone()));
 }
 
-int CollatorInterfaceICU::compare(StringData left, StringData right) const {
+int CollatorInterfaceICU::compare(std::string_view left, std::string_view right) const {
     UErrorCode status = U_ZERO_ERROR;
     auto compareResult = _collator->compareUTF8(icu::StringPiece(left.data(), left.size()),
                                                 icu::StringPiece(right.data(), right.size()),
@@ -82,8 +83,8 @@ int CollatorInterfaceICU::compare(StringData left, StringData right) const {
 }
 
 CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(
-    StringData stringData) const {
-    // A StringPiece is ICU's StringData. They are logically the same abstraction.
+    std::string_view stringData) const {
+    // A StringPiece is ICU's std::string_view. They are logically the same abstraction.
     const icu::StringPiece stringPiece(stringData.data(), stringData.size());
 
     UErrorCode status = U_ZERO_ERROR;

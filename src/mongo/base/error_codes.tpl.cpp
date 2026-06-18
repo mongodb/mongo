@@ -33,11 +33,13 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include <string_view>
 
 //#set $codes_with_extra = [ec for ec in $codes if ec.extra]
 //#set $codes_with_non_optional_extra = [ec for ec in $codes if ec.extra and not ec.extraIsOptional]
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 // You can think of this namespace as a compile-time map<ErrorCodes::Error, ErrorExtraInfoParser*>.
@@ -77,9 +79,9 @@ std::string ErrorCodes::errorString(Error err) {
     }
 }
 
-ErrorCodes::Error ErrorCodes::fromString(StringData name) {
+ErrorCodes::Error ErrorCodes::fromString(std::string_view name) {
     //#for $ec in $codes
-    if (name == "$ec.name"_sd)
+    if (name == "$ec.name"sv)
         return $ec.name;
     //#end for
     return UnknownError;

@@ -50,6 +50,8 @@
 
 #include <vector>
 
+using namespace std::literals::string_view_literals;
+
 namespace mongo {
 namespace {
 
@@ -346,8 +348,8 @@ TEST_F(DocumentSourceSetWindowFieldsTest, OptimizationRemovesRedundantSortStage)
     // We should have removed the redundant sort. This optimization works because the preceding and
     // succeeding sorts are the same, and setWindowFields does not change document order.
     ASSERT_EQ(pipeline.size(), 2);
-    ASSERT_EQ(std::string(pipeline.front()->getSourceName()), "$sort"_sd);
-    ASSERT_EQ(std::string(pipeline.back()->getSourceName()), "$_internalSetWindowFields"_sd);
+    ASSERT_EQ(std::string(pipeline.front()->getSourceName()), "$sort"sv);
+    ASSERT_EQ(std::string(pipeline.back()->getSourceName()), "$_internalSetWindowFields"sv);
 }
 
 PlanSummaryStats collectPipelineStats(const exec::agg::Pipeline& execPipeline) {

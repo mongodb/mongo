@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -80,6 +79,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -1272,7 +1272,7 @@ public:
      * Append a no-op to the oplog, for cases where we haven't written in this unit of work but
      * want to await a write concern.
      */
-    static void performNoopWrite(OperationContext* opCtx, StringData msg);
+    static void performNoopWrite(OperationContext* opCtx, std::string_view msg);
 
 private:
     /**

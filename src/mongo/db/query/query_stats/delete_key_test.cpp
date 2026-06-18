@@ -40,10 +40,13 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <absl/hash/hash.h>
 
 namespace mongo::query_stats {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using write_ops::DeleteCommandRequest;
 
@@ -60,7 +63,7 @@ public:
         return _opCtx.get();
     }
 
-    std::vector<std::unique_ptr<const Key>> makeDeleteKeys(StringData cmd) {
+    std::vector<std::unique_ptr<const Key>> makeDeleteKeys(std::string_view cmd) {
         auto dcr = DeleteCommandRequest::parseOwned(fromjson(cmd));
 
         std::vector<std::unique_ptr<const Key>> keys;
@@ -91,7 +94,7 @@ public:
         return keys;
     }
 
-    std::unique_ptr<const Key> makeOneDeleteKey(StringData cmd) {
+    std::unique_ptr<const Key> makeOneDeleteKey(std::string_view cmd) {
         auto keys = makeDeleteKeys(cmd);
         ASSERT_EQ(keys.size(), 1U);
         return std::move(keys.front());
@@ -138,7 +141,7 @@ TEST_F(DeleteKeyTest, SizeOfDeleteCmdComponents) {
         delete: "testColl",
         deletes: [ { q: { x: 1 }, limit: 0 } ],
         "$db": "testDB"
-    })"_sd));
+    })"sv));
 
     DeleteCmdComponents components(dcr);
 
@@ -153,7 +156,7 @@ TEST_F(DeleteKeyTest, EquivalentDeleteCmdComponentSizes) {
         delete: "testColl",
         deletes: [ { q: { x: 1 }, limit: 0 } ],
         "$db": "testDB"
-    })"_sd));
+    })"sv));
     auto deleteComponentsNoValues = std::make_unique<DeleteCmdComponents>(dcrNoSetValues);
 
     // Create a request that has all values set. None of these should affect the size.
@@ -163,7 +166,7 @@ TEST_F(DeleteKeyTest, EquivalentDeleteCmdComponentSizes) {
         bypassDocumentValidation: true,
         ordered: false,
         "$db": "testDB"
-    })"_sd));
+    })"sv));
     auto deleteComponentsAllValues = std::make_unique<DeleteCmdComponents>(dcrAllValues);
 
     // Verify their sizes are equal. This is because the optional parameters such as

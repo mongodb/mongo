@@ -53,6 +53,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -114,8 +115,8 @@ void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId = boost::none
 void remove(const boost::optional<TenantId>& tenantId = boost::none);
 BSONObj makeClusterParametersDoc(const LogicalTime& cpTime,
                                  int intValue,
-                                 StringData strValue,
-                                 StringData parameterName = kCSPTest);
+                                 std::string_view strValue,
+                                 std::string_view parameterName = kCSPTest);
 
 }  // namespace cluster_server_parameter_test_util
 }  // namespace mongo

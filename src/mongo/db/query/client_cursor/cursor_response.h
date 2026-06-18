@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -47,6 +46,7 @@
 #include "mongo/util/serialization_context.h"
 
 #include <cstddef>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -183,7 +183,7 @@ void appendCursorResponseObject(
     long long cursorId,
     const NamespaceString& cursorNamespace,
     BSONArray firstBatch,
-    boost::optional<StringData> cursorType,
+    boost::optional<std::string_view> cursorType,
     BSONObjBuilder* builder,
     const SerializationContext& serializationContext = SerializationContext::stateCommandReply());
 

@@ -32,6 +32,8 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 
+#include <string_view>
+
 namespace mongo::mozjs::wasm {
 
 

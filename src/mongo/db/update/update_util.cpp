@@ -30,7 +30,6 @@
 #include "mongo/db/update/update_util.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -66,6 +65,7 @@
 
 #include <cstddef>
 #include <map>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -74,12 +74,13 @@
 
 namespace mongo {
 namespace update {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeThrowWouldChangeOwningShard);
 
-constexpr StringData idFieldName = "_id"_sd;
+constexpr std::string_view idFieldName = "_id"sv;
 const FieldRef idFieldRef(idFieldName);
 
 }  // namespace
@@ -112,7 +113,7 @@ void generateNewDocumentFromSuppliedDoc(OperationContext* opCtx,
     invariant(request->getUpdateConstants());
 
     // Extract the supplied document from the constants and validate that it is an object.
-    auto suppliedDocElt = request->getUpdateConstants()->getField("new"_sd);
+    auto suppliedDocElt = request->getUpdateConstants()->getField("new"sv);
     invariant(suppliedDocElt.type() == BSONType::object);
     auto suppliedDoc = suppliedDocElt.embeddedObject();
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/logv2/log.h"
@@ -41,6 +40,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -82,7 +82,7 @@ struct EdgeCalcTestVector {
             }
         }
 
-        for (StringData edgeSd : edges) {
+        for (std::string_view edgeSd : edges) {
             std::string edge = std::string{edgeSd};
             if (std::all_of(expectedEdges.begin(), expectedEdges.end(), [edge](auto ee) {
                     return edge != ee;

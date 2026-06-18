@@ -36,7 +36,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -73,6 +72,7 @@
 #include <cstddef>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -312,6 +312,7 @@ bool bsonObjFieldsAreInSet(BSONObj obj, const std::set<std::string>& allowedFiel
 }  // namespace
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Looks in the children stored in the 'nodes' field of 'testSoln'
@@ -390,7 +391,7 @@ static Status childrenMatch(const BSONObj& testSoln,
 Status QueryPlannerTestLib::boundsMatch(const BSONObj& testBounds,
                                         const IndexBounds trueBounds,
                                         bool relaxBoundsCheck) {
-    if (testBounds.firstElementFieldName() == "$startKey"_sd) {
+    if (testBounds.firstElementFieldName() == "$startKey"sv) {
         if (!trueBounds.isSimpleRange) {
             return {ErrorCodes::Error{5920202}, str::stream() << "Expected bounds to be simple"};
         }

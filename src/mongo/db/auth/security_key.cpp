@@ -31,7 +31,6 @@
 #include "mongo/db/auth/security_key.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/crypto/mechanism_scram.h"
@@ -50,6 +49,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -67,7 +67,7 @@ constexpr size_t kMaxKeyLength = 1024;
 
 class CredentialsGenerator {
 public:
-    explicit CredentialsGenerator(StringData filename)
+    explicit CredentialsGenerator(std::string_view filename)
         : _salt256(scram::Presecrets<SHA256Block>::generateSecureRandomSalt()),
           _filename(filename) {}
 
@@ -120,7 +120,7 @@ private:
     }
 
     const std::vector<uint8_t> _salt256;
-    const StringData _filename;
+    const std::string_view _filename;
 };
 
 }  // namespace

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -45,6 +44,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -73,7 +73,7 @@ LogicalSessionFromClient testLsid();
 Document makeResumeToken(Timestamp ts,
                          ImplicitValue uuid,
                          ImplicitValue docKeyOrOpDesc,
-                         StringData operationType,
+                         std::string_view operationType,
                          ResumeTokenData::FromInvalidate fromInvalidate =
                              ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                          size_t txnOpIndex = 0);

@@ -31,11 +31,11 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/string_data.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/util/assert_util.h"
 
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -111,7 +111,7 @@ std::unique_ptr<mongo::DBClientBase> MockConnRegistry::MockConnHook::connect(
     const string hostName(connString.toString());
     auto conn = _registry->connect(hostName);
 
-    if (!conn->connect(hostName.c_str(), StringData(), errmsg)) {
+    if (!conn->connect(hostName.c_str(), std::string_view(), errmsg)) {
         // mimic ConnectionString::connect for kStandalone type connection to return NULL
         // if the destination is unreachable.
         return nullptr;

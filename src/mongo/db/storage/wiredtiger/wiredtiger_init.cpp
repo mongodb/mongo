@@ -30,7 +30,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
@@ -60,6 +59,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/filesystem/operations.hpp>
@@ -225,7 +225,7 @@ public:
             opCtx, std::move(kv), std::move(spillWiredTigerKVEngine), options);
     }
 
-    StringData getCanonicalName() const override {
+    std::string_view getCanonicalName() const override {
         return kWiredTigerEngineName;
     }
 

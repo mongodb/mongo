@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -59,13 +58,15 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kRawFieldName = "raw"_sd;
+constexpr auto kRawFieldName = "raw"sv;
 
 class DropIndexesCmd : public BasicCommandWithRequestParser<DropIndexesCmd> {
 public:

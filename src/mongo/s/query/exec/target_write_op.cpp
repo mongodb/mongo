@@ -30,7 +30,6 @@
 #include "mongo/s/query/exec/target_write_op.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -59,6 +58,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -70,7 +70,8 @@
 namespace mongo {
 
 namespace {
-constexpr auto kIdFieldName = "_id"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kIdFieldName = "_id"sv;
 
 const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
 

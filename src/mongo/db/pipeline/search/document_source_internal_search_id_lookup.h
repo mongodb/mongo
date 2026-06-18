@@ -39,6 +39,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -54,7 +56,7 @@ class DSInternalSearchIdLookUpCatalogResourceHandle;
  */
 class DocumentSourceInternalSearchIdLookUp final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalSearchIdLookup"_sd;
+    static constexpr std::string_view kStageName = "$_internalSearchIdLookup"_sd;
     /**
      * Creates an $_internalSearchIdLookup stage. "elem" must be an empty object.
      */
@@ -64,7 +66,7 @@ public:
     DocumentSourceInternalSearchIdLookUp(DocumentSourceIdLookupSpec spec,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

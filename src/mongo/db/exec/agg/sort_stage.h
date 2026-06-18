@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -56,7 +56,7 @@ namespace mongo::exec::agg {
  */
 class SortStage final : public Stage {
 public:
-    SortStage(StringData stageName,
+    SortStage(std::string_view stageName,
               const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
               const std::shared_ptr<SortExecutor<Document>>& sortExecutor,
               const std::shared_ptr<DocumentSourceSort::TimeSorterInterface>& timeSorter,

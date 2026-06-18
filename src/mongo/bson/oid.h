@@ -33,7 +33,6 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
@@ -44,6 +43,7 @@
 #include <cstring>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 #include <sys/types.h>
 
@@ -89,7 +89,7 @@ public:
     enum { kOIDSize = 12, kTimestampSize = 4, kInstanceUniqueSize = 5, kIncrementSize = 3 };
 
     /** init from a 24 char hex string */
-    explicit OID(StringData s) {
+    explicit OID(std::string_view s) {
         init(s);
     }
 
@@ -147,13 +147,13 @@ public:
      * This method creates and initializes an OID from a string,
      * returning a bad Status on failure.
      */
-    static StatusWith<OID> parse(StringData input);
+    static StatusWith<OID> parse(std::string_view input);
 
     /**
      * This method creates and initializes an OID from a string, throwing a BadValue exception if
      * the string is not a valid OID.
      */
-    static OID createFromString(StringData input) {
+    static OID createFromString(std::string_view input) {
         return uassertStatusOK(parse(input));
     }
 
@@ -161,7 +161,7 @@ public:
     void init();
 
     /** init from a 24 char hex std::string */
-    void init(StringData s);
+    void init(std::string_view s);
 
     /** Set to the min/max OID that could be generated at given timestamp. */
     void init(Date_t date, bool max = false);
@@ -209,7 +209,7 @@ public:
     template <typename H>
     friend H AbslHashValue(H h, const OID& oid) {
         const auto& d = oid._data;
-        return H::combine(std::move(h), StringData{d, sizeof(d)});
+        return H::combine(std::move(h), std::string_view{d, sizeof(d)});
     }
 
     /** call this after a fork to update the process id */

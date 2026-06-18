@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -35,7 +36,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -119,12 +119,14 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using executor::RemoteCommandRequest;
 using unittest::assertGet;
@@ -362,21 +364,25 @@ public:
     }
 
     void updateTTLSetting(OperationContext* opCtx,
-                          StringData idxName,
+                          std::string_view idxName,
                           long long newExpireSeconds) override {
         MONGO_UNREACHABLE;
     }
 
-    void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) override {
+    void updateHiddenSetting(OperationContext* opCtx,
+                             std::string_view idxName,
+                             bool hidden) override {
         MONGO_UNREACHABLE;
     }
 
-    void updateUniqueSetting(OperationContext* opCtx, StringData idxName, bool unique) override {
+    void updateUniqueSetting(OperationContext* opCtx,
+                             std::string_view idxName,
+                             bool unique) override {
         MONGO_UNREACHABLE;
     }
 
     void updatePrepareUniqueSetting(OperationContext* opCtx,
-                                    StringData idxName,
+                                    std::string_view idxName,
                                     bool prepareUnique) override {
         MONGO_UNREACHABLE;
     }
@@ -390,23 +396,23 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void removeIndex(OperationContext* opCtx, StringData indexName) override {
+    void removeIndex(OperationContext* opCtx, std::string_view indexName) override {
         MONGO_UNREACHABLE;
     }
 
     Status prepareForIndexBuild(OperationContext* opCtx,
                                 const IndexDescriptor* spec,
-                                StringData indexIdent,
+                                std::string_view indexIdent,
                                 boost::optional<UUID> buildUUID) override {
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<UUID> getIndexBuildUUID(StringData indexName) const override {
+    boost::optional<UUID> getIndexBuildUUID(std::string_view indexName) const override {
         return _coll->getIndexBuildUUID(indexName);
     }
 
     bool isIndexMultikey(OperationContext* opCtx,
-                         StringData indexName,
+                         std::string_view indexName,
                          MultikeyPaths* multikeyPaths,
                          int indexOffset = -1) const override {
         return _coll->isIndexMultikey(opCtx, indexName, multikeyPaths, indexOffset);
@@ -434,7 +440,7 @@ public:
         return _coll->getCompletedIndexCount();
     }
 
-    BSONObj getIndexSpec(StringData indexName, bool expandSimpleCollation) const override {
+    BSONObj getIndexSpec(std::string_view indexName, bool expandSimpleCollation) const override {
         return _coll->getIndexSpec(indexName, expandSimpleCollation);
     }
 
@@ -446,11 +452,11 @@ public:
         return _coll->getReadyIndexes(names);
     }
 
-    bool isIndexPresent(StringData indexName) const override {
+    bool isIndexPresent(std::string_view indexName) const override {
         return _coll->isIndexPresent(indexName);
     }
 
-    bool isIndexReady(StringData indexName) const override {
+    bool isIndexReady(std::string_view indexName) const override {
         return _coll->isIndexReady(indexName);
     }
 
@@ -1792,7 +1798,7 @@ TEST_F(MigrationChunkClonerSourceTest, JumboChunkIndexScanWithYielding) {
             b.append("min", *req.getMin());
             b.append("max", *req.getMax());
             b.append("shardKeyPattern", kShardKeyPattern);
-            b.append("supportsCriticalSectionDuringCatchUp"_sd, true);
+            b.append("supportsCriticalSectionDuringCatchUp"sv, true);
             b.append("state", "steady");
             b.append("sessionId", cloner.getSessionId().toString());
             return b.obj();

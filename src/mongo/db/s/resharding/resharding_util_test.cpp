@@ -84,6 +84,7 @@
 namespace mongo {
 namespace resharding {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class ReshardingUtilTest : public ConfigServerTestFixture {
 protected:
@@ -279,8 +280,8 @@ TEST(SimpleReshardingUtilTest, AssertDonorOplogIdSerialization) {
     ReshardingDonorOplogId oplogId(Timestamp::min(), Timestamp::min());
     BSONObj oplogIdObj = oplogId.toBSON();
     BSONObjIterator it(oplogIdObj);
-    ASSERT_EQ("clusterTime"_sd, it.next().fieldNameStringData()) << oplogIdObj;
-    ASSERT_EQ("ts"_sd, it.next().fieldNameStringData()) << oplogIdObj;
+    ASSERT_EQ("clusterTime"sv, it.next().fieldNameStringData()) << oplogIdObj;
+    ASSERT_EQ("ts"sv, it.next().fieldNameStringData()) << oplogIdObj;
     ASSERT_FALSE(it.more());
 }
 

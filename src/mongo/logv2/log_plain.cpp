@@ -34,9 +34,11 @@
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_severity.h"
 
+#include <string_view>
+
 namespace mongo::logv2 {
 
-void plainLogBypass(StringData message) {
+void plainLogBypass(std::string_view message) {
     LogOptions options{LogComponent::kDefault};
     // Open a record using plain formatting.
     detail::doLogImpl(0, LogSeverity::Log(), options, message, TypeErasedAttributeStorage(), true);

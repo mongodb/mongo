@@ -37,6 +37,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
+#include <string_view>
+
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional.hpp>
 
@@ -195,7 +197,7 @@ private:
 class MONGO_MOD_OPEN FCVGatedFeatureFlagBase : public ParameterGatingFeatureFlag {
 public:
     FCVGatedFeatureFlagBase(bool enabled,
-                            StringData versionString,
+                            std::string_view versionString,
                             bool enableOnTransitionalFCV = false);
 
     // Non-copyable, non-movable
@@ -358,14 +360,14 @@ enum class RolloutPhase {
 
 class MONGO_MOD_OPEN IncrementalRolloutFeatureFlag : public FeatureFlag {
 public:
-    static IncrementalRolloutFeatureFlag* findByName(StringData flagName);
+    static IncrementalRolloutFeatureFlag* findByName(std::string_view flagName);
 
     static std::vector<IncrementalRolloutFeatureFlag*> getFlagsForOutgoingRequests();
 
-    IncrementalRolloutFeatureFlag(StringData flagName,
+    IncrementalRolloutFeatureFlag(std::string_view flagName,
                                   RolloutPhase phase,
                                   bool value,
-                                  StringData serializeOnOutgoingRequestsVersion = ""_sd);
+                                  std::string_view serializeOnOutgoingRequestsVersion = ""_sd);
 
     /**
      * Returns true if the feature is currently enabled, false otherwise. Also increments the

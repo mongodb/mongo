@@ -29,7 +29,6 @@
 
 #include "mongo/db/ftdc/ftdc_mongos.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/replica_set_monitor_manager.h"

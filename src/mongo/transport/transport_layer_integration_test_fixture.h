@@ -50,6 +50,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -91,7 +92,7 @@ public:
 
     class FailPointGuard {
     public:
-        FailPointGuard(StringData fpName,
+        FailPointGuard(std::string_view fpName,
                        std::shared_ptr<AsyncDBClient> client,
                        int initalTimesEntered)
             : _fpName(fpName),
@@ -127,11 +128,11 @@ public:
     };
 
     FailPointGuard configureFailPoint(const std::shared_ptr<AsyncDBClient>& client,
-                                      StringData fp,
+                                      std::string_view fp,
                                       BSONObj data);
 
     FailPointGuard configureFailCommand(const std::shared_ptr<AsyncDBClient>& client,
-                                        StringData failCommand,
+                                        std::string_view failCommand,
                                         boost::optional<ErrorCodes::Error> errorCode = boost::none,
                                         boost::optional<Milliseconds> blockTime = boost::none);
 

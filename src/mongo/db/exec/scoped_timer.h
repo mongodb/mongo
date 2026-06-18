@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -37,6 +36,8 @@
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -183,7 +184,7 @@ enum class TimedSectionId {
 #undef X
 };
 
-StringData toString(TimedSectionId id);
+std::string_view toString(TimedSectionId id);
 
 /**
  * Appends the time elapsed since its construction to a BSON Object.

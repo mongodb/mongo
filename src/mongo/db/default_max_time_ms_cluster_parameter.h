@@ -36,6 +36,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 

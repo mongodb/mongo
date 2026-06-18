@@ -39,6 +39,7 @@
 
 #include <list>
 #include <mutex>
+#include <string_view>
 
 #include <grpcpp/impl/service_type.h>
 #include <grpcpp/support/status.h>
@@ -52,7 +53,7 @@ namespace MONGO_MOD_PARENT_PRIVATE grpc {
  */
 class Service : public ::grpc::Service {
 public:
-    virtual StringData name() const = 0;
+    virtual std::string_view name() const = 0;
 
     virtual void shutdown() = 0;
 
@@ -97,7 +98,7 @@ public:
 
     ~CommandService() override = default;
 
-    StringData name() const override {
+    std::string_view name() const override {
         return "mongodb.CommandService"_sd;
     }
 

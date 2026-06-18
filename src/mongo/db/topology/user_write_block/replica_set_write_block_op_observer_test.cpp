@@ -64,6 +64,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -83,7 +84,7 @@ private:
     Client* _client;
 };
 
-CreateCommand createCommandForTest(StringData nss) {
+CreateCommand createCommandForTest(std::string_view nss) {
     return CreateCommand(NamespaceString::createNamespaceString_forTest(nss));
 }
 

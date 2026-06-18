@@ -38,6 +38,8 @@
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_planner.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -47,7 +49,7 @@ bool isIndexSuitableForDistinct(const BSONObj& keyPattern,
                                 const MultikeyPaths& multikeyPaths,
                                 bool sparse,
                                 projection_executor::ProjectionExecutor* wildcardProj,
-                                StringData field,
+                                std::string_view field,
                                 const BSONObj& filter,
                                 bool flipDistinctScanDirection,
                                 bool strictDistinctOnly,
@@ -154,7 +156,7 @@ bool isAFullIndexScanPreferable(const IndexEntry& index,
     }
     // Skip indices where the first key is not 'field'.
     auto firstIndexField = index.keyPattern.firstElement();
-    if (firstIndexField.fieldNameStringData() != StringData(field)) {
+    if (firstIndexField.fieldNameStringData() != std::string_view(field)) {
         return true;
     }
     // Skip the index if the first key is a "plugin" such as "hashed", "2dsphere", and so on.
@@ -356,7 +358,7 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& 
 bool isAnyComponentOfPathOrProjectionMultikey(const BSONObj& indexKeyPattern,
                                               bool isMultikey,
                                               const MultikeyPaths& indexMultikeyInfo,
-                                              StringData path,
+                                              std::string_view path,
                                               const OrderedPathSet& projFields,
                                               bool hasSort) {
     if (!isMultikey) {

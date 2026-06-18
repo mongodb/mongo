@@ -34,6 +34,8 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace MONGO_MOD_PUBLIC rpc {
 
@@ -64,7 +66,7 @@ public:
         }
         return _builder.resumeBody();
     }
-    OpMsgBuilder::DocSequenceBuilder getDocSequenceBuilder(StringData name) override {
+    OpMsgBuilder::DocSequenceBuilder getDocSequenceBuilder(std::string_view name) override {
         return _builder.beginDocSequence(name);
     }
     rpc::Protocol getProtocol() const override {

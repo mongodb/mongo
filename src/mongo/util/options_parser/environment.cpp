@@ -29,7 +29,6 @@
 
 #include "mongo/util/options_parser/environment.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/options_parser/constraints.h"
 
 #include <iostream>
+#include <string_view>
 
 #include <yaml-cpp/yaml.h>
 
@@ -59,7 +59,7 @@ Status Environment::addConstraint(Constraint* constraint) {
 
 /** Get the value at Key.  Note that we should not be able to add empty values to the
  *  environment, so we don't check for that here */
-Status Environment::get(StringData get_key, Value* get_value) const {
+Status Environment::get(std::string_view get_key, Value* get_value) const {
     auto value = values.find(get_key);
     if (value == values.end()) {
         value = default_values.find(get_key);
@@ -200,7 +200,7 @@ Status Environment::validate(bool setValid) {
  *  boost::program_options::variables_map inherits the count function from std::map, which
  *  returns 1 if the value is set, and 0 if it is not set
  */
-bool Environment::count(StringData key) const {
+bool Environment::count(std::string_view key) const {
     Value value;
     Status ret = get(key, &value);
     if (ret.isOK()) {
@@ -210,7 +210,7 @@ bool Environment::count(StringData key) const {
     }
 }
 
-Value Environment::operator[](StringData key) const {
+Value Environment::operator[](std::string_view key) const {
     Value value;
     Status ret = get(key, &value);
     if (!ret.isOK()) {

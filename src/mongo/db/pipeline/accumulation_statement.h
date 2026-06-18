@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -50,6 +49,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -178,7 +178,7 @@ struct AccumulationExpression {
     AccumulationExpression(boost::intrusive_ptr<Expression> initializer,
                            boost::intrusive_ptr<Expression> argument,
                            AccumulatorState::Factory factory,
-                           StringData name)
+                           std::string_view name)
         : initializer(initializer), argument(argument), factory(factory), name(name) {
         tassert(11294828, "Expecting initializer expression", this->initializer);
         tassert(11294827, "Expecting argument expression", this->argument);
@@ -195,9 +195,9 @@ struct AccumulationExpression {
 
     // The name of the accumulator expression. It is the caller's responsibility to make sure the
     // memory this points to does not get freed. This can best be accomplished by passing in a
-    // pointer to a string constant. This StringData is always required to point to a valid
+    // pointer to a string constant. This std::string_view is always required to point to a valid
     // null-terminated string.
-    StringData name;
+    std::string_view name;
 };
 
 /**
@@ -317,7 +317,7 @@ public:
      * Retrieves the Parser for the accumulator specified by the given name, and raises an error if
      * there is no such Parser registered.
      */
-    static ParserRegistration& getParser(StringData name);
+    static ParserRegistration& getParser(std::string_view name);
 
     // The field name is used to store the results of the accumulation in a result document.
     std::string fieldName;

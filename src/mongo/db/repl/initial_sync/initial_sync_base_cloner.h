@@ -31,7 +31,6 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/repl/initial_sync/base_cloner.h"
 #include "mongo/db/repl/initial_sync/initial_sync_shared_data.h"
@@ -42,13 +41,14 @@
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace repl {
 
 class InitialSyncBaseCloner : public BaseCloner {
 public:
-    InitialSyncBaseCloner(StringData clonerName,
+    InitialSyncBaseCloner(std::string_view clonerName,
                           InitialSyncSharedData* sharedData,
                           const HostAndPort& source,
                           DBClientConnection* client,

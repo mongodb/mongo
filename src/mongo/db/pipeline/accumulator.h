@@ -48,6 +48,7 @@
 #include "mongo/util/summation.h"
 
 #include <functional>
+#include <string_view>
 #include <vector>
 
 #include <boost/intrusive_ptr.hpp>

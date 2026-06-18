@@ -35,6 +35,8 @@
 #include "mongo/db/exec/sbe/vm/vm_types.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -128,7 +130,7 @@ public:
     void appendFillEmpty();
     void appendFillEmpty(Instruction::Constants k);
     void appendGetField(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendGetField(Instruction::Parameter input, StringData fieldName);
+    void appendGetField(Instruction::Parameter input, std::string_view fieldName);
     void appendGetElement(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendCollComparisonKey(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendGetFieldOrElement(Instruction::Parameter lhs, Instruction::Parameter rhs);

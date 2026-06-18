@@ -34,6 +34,8 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {

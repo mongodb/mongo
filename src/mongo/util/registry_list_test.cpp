@@ -29,7 +29,6 @@
 
 #include "mongo/util/registry_list.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"

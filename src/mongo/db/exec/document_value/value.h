@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -57,6 +56,7 @@
 #include <initializer_list>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -125,8 +125,9 @@ public:
     explicit Value(const Decimal128& value) : _storage(BSONType::numberDecimal, value) {}
     explicit Value(const Timestamp& value) : _storage(BSONType::timestamp, value) {}
     explicit Value(const OID& value) : _storage(BSONType::oid, value) {}
-    explicit Value(StringData value) : _storage(BSONType::string, value) {}
-    explicit Value(const std::string& value) : _storage(BSONType::string, StringData(value)) {}
+    explicit Value(std::string_view value) : _storage(BSONType::string, value) {}
+    explicit Value(const std::string& value)
+        : _storage(BSONType::string, std::string_view(value)) {}
     explicit Value(const Document& doc);
     explicit Value(Document&& doc);
     explicit Value(const BSONObj& obj);
@@ -151,7 +152,7 @@ public:
                    BSONBinData(uuid.toCDR().data(), uuid.toCDR().length(), BinDataType::newUUID)) {}
 
     /**
-     *  Force the use of StringData to prevent accidental NUL-termination.
+     *  Force the use of std::string_view to prevent accidental NUL-termination.
      */
     explicit Value(const char*) = delete;
 
@@ -258,9 +259,9 @@ public:
     Decimal128 getDecimal() const;
     double getDouble() const;
     std::string getString() const;
-    // May contain embedded NUL bytes, the returned StringData is just a view into the string still
-    // owned by this Value.
-    StringData getStringData() const;
+    // May contain embedded NUL bytes, the returned std::string_view is just a view into the string
+    // still owned by this Value.
+    std::string_view getStringData() const;
     Document getDocument() const;
     OID getOid() const;
     bool getBool() const;
@@ -286,7 +287,7 @@ public:
     Value operator[](size_t index) const;
 
     /// Access a field of a subdocument. Returns Value() if missing or getType() != Object
-    Value operator[](StringData name) const;
+    Value operator[](std::string_view name) const;
 
     /**
      * Recursively serializes this value as a field in the object in 'builder' with the field name
@@ -294,7 +295,7 @@ public:
      * BSON depth limit.
      */
     void addToBsonObj(BSONObjBuilder* builder,
-                      StringData fieldName,
+                      std::string_view fieldName,
                       size_t recursionLevel = 1) const;
 
     /**
@@ -347,7 +348,9 @@ public:
                        const StringDataComparator* stringComparator);
 
     // Support BSONObjBuilder and BSONArrayBuilder "stream" API
-    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const Value& val) {
+    friend void appendToBson(BSONObjBuilder& builder,
+                             std::string_view fieldName,
+                             const Value& val) {
         val._appendToBson(builder, fieldName);
     }
 
@@ -433,20 +436,20 @@ public:
     void makeOwned() {}
 
     /// Members to support parsing/deserialization from IDL generated code.
-    void serializeForIDL(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeForIDL(std::string_view fieldName, BSONObjBuilder* builder) const;
     void serializeForIDL(BSONArrayBuilder* builder) const;
     static Value deserializeForIDL(const BSONElement& element);
 
     // Wrap a value in a BSONObj.
-    BSONObj wrap(StringData newName) const;
+    BSONObj wrap(std::string_view newName) const;
 
 private:
     explicit Value(const ValueStorage& storage) : _storage(storage) {}
 
     // May contain embedded NUL bytes, does not check the type.
-    StringData getRawData() const;
+    std::string_view getRawData() const;
 
-    void _appendToBson(BSONObjBuilder& builder, StringData fieldName) const;
+    void _appendToBson(BSONObjBuilder& builder, std::string_view fieldName) const;
 
     ValueStorage _storage;
     friend class MutableValue;  // gets and sets _storage.genericRCPtr
@@ -515,12 +518,12 @@ inline size_t Value::getArrayLength() const {
     return getArray().size();
 }
 
-inline StringData Value::getStringData() const {
+inline std::string_view Value::getStringData() const {
     MONGO_verify(getType() == BSONType::string);
     return getRawData();
 }
 
-inline StringData Value::getRawData() const {
+inline std::string_view Value::getRawData() const {
     return _storage.getString();
 }
 

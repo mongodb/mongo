@@ -30,7 +30,6 @@
 #include "mongo/db/update/pipeline_executor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/agg/queue_stage.h"
@@ -49,6 +48,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <typeinfo>
 
 #include <boost/optional/optional.hpp>
@@ -57,7 +57,8 @@
 namespace mongo {
 
 namespace {
-constexpr StringData kIdFieldName = "_id"_sd;
+using namespace std::literals::string_view_literals;
+constexpr std::string_view kIdFieldName = "_id"sv;
 }  // namespace
 
 PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,

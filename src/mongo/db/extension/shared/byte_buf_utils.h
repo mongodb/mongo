@@ -37,7 +37,8 @@
 
 /**
  * Helpers for converting between MongoExtensionByteView and host types (BSONObj, string_view,
- * StringData) and for creating empty byte containers. Used on both sides of the extension boundary.
+ * std::string_view) and for creating empty byte containers. Used on both sides of the extension
+ * boundary.
  */
 namespace mongo::extension {
 
@@ -70,7 +71,7 @@ inline MongoExtensionByteView stringViewAsByteView(std::string_view str) {
     return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(str.data()), str.size()};
 }
 
-inline MongoExtensionByteView stringDataAsByteView(mongo::StringData sd) noexcept {
+inline MongoExtensionByteView stringDataAsByteView(std::string_view sd) noexcept {
     return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(sd.data()),
                                   static_cast<size_t>(sd.size())};
 }

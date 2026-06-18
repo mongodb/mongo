@@ -28,11 +28,12 @@
  */
 
 #pragma once
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/election_reason_counter.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 namespace repl {
@@ -40,7 +41,7 @@ namespace repl {
 ElectionReasonCounter parseElectionReasonCounter(const BSONElement& element);
 
 void serializeElectionReasonCounterToBSON(ElectionReasonCounter counter,
-                                          StringData fieldName,
+                                          std::string_view fieldName,
                                           BSONObjBuilder* builder);
 
 }  // namespace repl

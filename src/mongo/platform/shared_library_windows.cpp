@@ -34,6 +34,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
+#include <string_view>
+
 #include <boost/filesystem.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -72,8 +74,8 @@ StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
         std::unique_ptr<SharedLibrary>(new SharedLibrary(handle)));
 }
 
-StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
-    // StringData is not assued to be null-terminated
+StatusWith<void*> SharedLibrary::getSymbol(std::string_view name) {
+    // std::string_view is not assued to be null-terminated
     std::string symbolName{name};
 
     void* function = GetProcAddress(static_cast<HMODULE>(_handle), symbolName.c_str());

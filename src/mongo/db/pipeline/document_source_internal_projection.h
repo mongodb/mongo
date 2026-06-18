@@ -34,6 +34,8 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 /**
  * The 'DocumentSourceInternalProjection' class (internal stage name '$_internalProjection') is used
@@ -43,7 +45,7 @@ namespace mongo {
  */
 class DocumentSourceInternalProjection final : public DocumentSource {
 public:
-    static constexpr StringData kStageNameInternal = "$_internalProjection"_sd;
+    static constexpr std::string_view kStageNameInternal = "$_internalProjection"_sd;
 
     DocumentSourceInternalProjection(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                      DocumentSourceInternalProjectionSpec spec);
@@ -54,7 +56,7 @@ public:
         : DocumentSourceInternalProjection(
               pExpCtx, DocumentSourceInternalProjectionSpec(std::move(projectionSpec), policies)) {}
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

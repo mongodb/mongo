@@ -29,13 +29,13 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_storage_options_config_string_flags_parser.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/pcre.h"
 
 #include <algorithm>
 #include <cstring>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -44,7 +44,7 @@ namespace mongo {
 const static StaticImmortal<pcre::Regex> appMetadataRegex(
     R"re((?<=^|,)\s*(?:app_metadata|\"app_metadata\")\s*[=:]\s*[({[]\s*)re");
 
-static pcre::Regex flagMatchRegex(StringData flagName) {
+static pcre::Regex flagMatchRegex(std::string_view flagName) {
     // This check is overly strict, but it suffices for now and ensures that both:
     // - The flag name is a valid WiredTiger identifier, and
     // - It can be used in the regular expression without needing to escape it
@@ -61,9 +61,9 @@ static pcre::Regex flagMatchRegex(StringData flagName) {
         flagName));
 }
 
-static std::map<StringData, boost::optional<bool>> getFlagsFromWtConfigStringAppMetadata(
-    const std::string& configString, const std::vector<StringData>& flagNames) {
-    std::map<StringData, boost::optional<bool>> flags;
+static std::map<std::string_view, boost::optional<bool>> getFlagsFromWtConfigStringAppMetadata(
+    const std::string& configString, const std::vector<std::string_view>& flagNames) {
+    std::map<std::string_view, boost::optional<bool>> flags;
 
     for (const auto& flagName : flagNames) {
         auto flagRegex = flagMatchRegex(flagName);
@@ -76,14 +76,14 @@ static std::map<StringData, boost::optional<bool>> getFlagsFromWtConfigStringApp
     return flags;
 }
 
-std::map<StringData, boost::optional<bool>> getFlagsFromWiredTigerStorageOptions(
-    const BSONObj& storageEngineOptions, const std::vector<StringData>& flagNames) {
+std::map<std::string_view, boost::optional<bool>> getFlagsFromWiredTigerStorageOptions(
+    const BSONObj& storageEngineOptions, const std::vector<std::string_view>& flagNames) {
     auto configString = WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions);
     return getFlagsFromWtConfigStringAppMetadata(configString.value_or(""), flagNames);
 }
 
 boost::optional<bool> getFlagFromWiredTigerStorageOptions(const BSONObj& storageEngineOptions,
-                                                          StringData flagName) {
+                                                          std::string_view flagName) {
     if (storageEngineOptions.isEmpty()) {
         return boost::none;
     }
@@ -113,7 +113,7 @@ static void expandRangeToIncludeSeparator(const std::string& configString,
 }
 
 static void setFlagsToWtConfigStringAppMetadata(
-    std::string& configString, const std::map<StringData, boost::optional<bool>>& flags) {
+    std::string& configString, const std::map<std::string_view, boost::optional<bool>>& flags) {
     auto metadataPos = findOrAddAppMetadataStructToConfigString(configString);
 
     for (const auto& [flagName, flagValue] : flags) {
@@ -138,7 +138,8 @@ static void setFlagsToWtConfigStringAppMetadata(
 }
 
 BSONObj setFlagsToWiredTigerStorageOptions(
-    const BSONObj& storageEngineOptions, const std::map<StringData, boost::optional<bool>>& flags) {
+    const BSONObj& storageEngineOptions,
+    const std::map<std::string_view, boost::optional<bool>>& flags) {
     auto configString =
         WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions).value_or("");
     setFlagsToWtConfigStringAppMetadata(configString, flags);
@@ -154,7 +155,7 @@ BSONObj setFlagsToWiredTigerStorageOptions(
 }
 
 BSONObj setFlagToWiredTigerStorageOptions(const BSONObj& storageEngineOptions,
-                                          StringData flagName,
+                                          std::string_view flagName,
                                           boost::optional<bool> flagValue) {
     return setFlagsToWiredTigerStorageOptions(storageEngineOptions, {{flagName, flagValue}});
 }

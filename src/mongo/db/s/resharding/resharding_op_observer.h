@@ -42,6 +42,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -51,7 +52,7 @@ namespace mongo {
 
 class MONGO_MOD_PUBLIC ReshardingHistoryHook : public DurableHistoryPin {
 public:
-    static constexpr StringData kName = "resharding"_sd;
+    static constexpr std::string_view kName = "resharding"_sd;
 
     std::string getName() override {
         return std::string{kName};

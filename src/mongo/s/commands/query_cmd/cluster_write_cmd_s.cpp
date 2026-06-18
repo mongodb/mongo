@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/write_commands_common.h"
@@ -38,12 +37,14 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 struct ClusterInsertCmdS {
-    static constexpr StringData kName = "insert"_sd;
+    static constexpr std::string_view kName = "insert"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;
@@ -66,7 +67,7 @@ struct ClusterInsertCmdS {
 MONGO_REGISTER_COMMAND(ClusterInsertCmdBase<ClusterInsertCmdS>).forRouter();
 
 struct ClusterUpdateCmdS {
-    static constexpr StringData kName = "update"_sd;
+    static constexpr std::string_view kName = "update"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;
@@ -89,7 +90,7 @@ struct ClusterUpdateCmdS {
 MONGO_REGISTER_COMMAND(ClusterUpdateCmdBase<ClusterUpdateCmdS>).forRouter();
 
 struct ClusterDeleteCmdS {
-    static constexpr StringData kName = "delete"_sd;
+    static constexpr std::string_view kName = "delete"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;

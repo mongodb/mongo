@@ -38,6 +38,7 @@
 
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -47,7 +48,7 @@ MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
-BOOST_STRONG_TYPEDEF(StringData, DDLResourceName);
+BOOST_STRONG_TYPEDEF(std::string_view, DDLResourceName);
 
 class ResourceCatalog {
 public:

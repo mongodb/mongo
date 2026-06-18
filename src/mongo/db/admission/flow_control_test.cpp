@@ -29,7 +29,6 @@
 
 #include "mongo/db/admission/flow_control.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/admission/flow_control_parameters_gen.h"
 #include "mongo/db/client.h"

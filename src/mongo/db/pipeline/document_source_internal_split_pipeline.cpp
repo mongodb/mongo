@@ -40,10 +40,12 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalSplitPipeline,
                                      InternalSplitPipelineLiteParsed::parse,
@@ -55,7 +57,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalSplitPipeline,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalSplitPipeline, DocumentSourceInternalSplitPipeline::id);
 
-constexpr StringData DocumentSourceInternalSplitPipeline::kStageName;
+constexpr std::string_view DocumentSourceInternalSplitPipeline::kStageName;
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -69,16 +71,16 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
     HostTypeRequirement mergeType = HostTypeRequirement::kNone;
     boost::optional<ShardId> mergeShardId = boost::none;
     for (auto&& elt : specObj) {
-        if (elt.fieldNameStringData() == "mergeType"_sd) {
+        if (elt.fieldNameStringData() == "mergeType"sv) {
             const auto type = elt.type();
 
             if (type == BSONType::string) {
                 auto mergeTypeString = elt.valueStringData();
-                if ("localOnly"_sd == mergeTypeString) {
+                if ("localOnly"sv == mergeTypeString) {
                     mergeType = HostTypeRequirement::kLocalOnly;
-                } else if ("anyShard"_sd == mergeTypeString) {
+                } else if ("anyShard"sv == mergeTypeString) {
                     mergeType = HostTypeRequirement::kAnyShard;
-                } else if ("router"_sd == mergeTypeString || "mongos"_sd == mergeTypeString) {
+                } else if ("router"sv == mergeTypeString || "mongos"sv == mergeTypeString) {
                     mergeType = HostTypeRequirement::kRouter;
                 } else {
                     uasserted(ErrorCodes::BadValue,
@@ -87,7 +89,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
                 }
             } else if (type == BSONType::object) {
                 auto specificShardObj = elt.Obj();
-                auto specificShardElem = specificShardObj.getField("specificShard"_sd);
+                auto specificShardElem = specificShardObj.getField("specificShard"sv);
                 uassert(7958300,
                         "Object argument to $_internalSplitPipeline must contain a single string "
                         "field named 'specificShard'",

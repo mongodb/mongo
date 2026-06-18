@@ -30,16 +30,18 @@
 #include "mongo/db/txn_retry_counter_too_old_info.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+
+#include <string_view>
 
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(TxnRetryCounterTooOldInfo);
 
-constexpr StringData kTxnRetryCounterFieldName = "txnRetryCounter"_sd;
+constexpr std::string_view kTxnRetryCounterFieldName = "txnRetryCounter"sv;
 
 }  // namespace
 

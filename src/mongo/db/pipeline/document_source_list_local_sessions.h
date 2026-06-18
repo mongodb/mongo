@@ -52,6 +52,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -63,7 +64,7 @@ namespace mongo {
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListLocalSessions);
 
-ListSessionsSpec listSessionsParseSpec(StringData stageName, const BSONElement& spec);
+ListSessionsSpec listSessionsParseSpec(std::string_view stageName, const BSONElement& spec);
 PrivilegeVector listSessionsRequiredPrivileges(const ListSessionsSpec& spec,
                                                const boost::optional<TenantId>& tenantId);
 std::vector<SHA256Block> listSessionsUsersToDigests(const std::vector<ListSessionsUser>& users);
@@ -75,7 +76,7 @@ std::vector<SHA256Block> listSessionsUsersToDigests(const std::vector<ListSessio
  */
 class DocumentSourceListLocalSessions final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$listLocalSessions"_sd;
+    static constexpr std::string_view kStageName = "$listLocalSessions"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
@@ -131,7 +132,7 @@ public:
         const PrivilegeVector _privileges;
     };
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return DocumentSourceListLocalSessions::kStageName;
     }
 

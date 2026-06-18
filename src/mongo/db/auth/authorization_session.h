@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -56,6 +55,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -174,12 +174,12 @@ public:
 
     // Removes any authenticated principals and revokes any privileges that were granted via those
     // principals. This function modifies state. Synchronizes with the Client lock.
-    virtual void logoutAllDatabases(StringData reason) = 0;
+    virtual void logoutAllDatabases(std::string_view reason) = 0;
 
     // Removes any authenticated principals whose authorization credentials came from the given
     // database, and revokes any privileges that were granted via that principal. This function
     // modifies state. Synchronizes with the Client lock.
-    virtual void logoutDatabase(const DatabaseName& dbname, StringData reason) = 0;
+    virtual void logoutDatabase(const DatabaseName& dbname, std::string_view reason) = 0;
 
     // How the active session is authenticated.
     enum class AuthenticationMode {

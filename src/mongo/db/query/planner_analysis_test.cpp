@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/planner_analysis.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
@@ -43,6 +42,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include <s2cellid.h>
@@ -51,6 +51,7 @@
 using namespace mongo;
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Make a minimal IndexEntry from just a key pattern. A dummy name will be added.
@@ -264,7 +265,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::unique_ptr<FetchNode> fetchNodePtr = std::make_unique<FetchNode>(testNss);
     std::unique_ptr<GeoMatchExpression> exprPtr =
-        std::make_unique<GeoMatchExpression>("geometry.field"_sd, nullptr, BSONObj());
+        std::make_unique<GeoMatchExpression>("geometry.field"sv, nullptr, BSONObj());
 
     GeoMatchExpression* expr = exprPtr.get();
 
@@ -450,7 +451,7 @@ TEST(QueryPlannerAnalysis, CannotTurnIndexScanAndFetchIntoCount) {
     auto fetch = std::make_unique<FetchNode>(std::move(node), testNss);
     auto operand = BSON("$lt" << 100);
     std::unique_ptr<LTMatchExpression> expPtr =
-        std::make_unique<LTMatchExpression>("a"_sd, operand["$lt"]);
+        std::make_unique<LTMatchExpression>("a"sv, operand["$lt"]);
     fetch->filter = std::move(expPtr);
 
     QuerySolution qs;

@@ -39,6 +39,7 @@
 #include "mongo/util/pcre.h"
 
 #include <fstream>
+#include <string_view>
 #include <thread>
 
 namespace mongo::query_tester {
@@ -292,7 +293,7 @@ Test Test::parseTest(std::fstream& fs,
                     expectedResult.push_back(ele.Obj().getOwned());
                 }
             } else {
-                auto sd = StringData{lineFromFile};
+                auto sd = std::string_view{lineFromFile};
                 {
                     auto endDocument = sd.rfind('}');
                     if (endDocument == std::string::npos) {

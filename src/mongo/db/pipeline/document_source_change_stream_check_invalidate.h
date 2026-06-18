@@ -47,6 +47,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -67,9 +68,9 @@ using ChangeStreamCheckInvalidateLiteParsed =
 class DocumentSourceChangeStreamCheckInvalidate final
     : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamCheckInvalidate"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamCheckInvalidate"_sd;
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         // This is used in error reporting.
         return DocumentSourceChangeStreamCheckInvalidate::kStageName;
     }

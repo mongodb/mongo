@@ -29,7 +29,6 @@
 
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_op_observer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
@@ -40,6 +39,8 @@
 #include "mongo/db/topology/cluster_parameters/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -47,9 +48,10 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kIdField = "_id"_sd;
-constexpr auto kOplog = "oplog"_sd;
+constexpr auto kIdField = "_id"sv;
+constexpr auto kOplog = "oplog"sv;
 
 bool isConfigNamespace(const NamespaceString& nss) {
     return nss == NamespaceString::makeClusterParametersNSS(nss.dbName().tenantId());

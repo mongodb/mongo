@@ -32,12 +32,13 @@
 #include "mongo/util/assert_util.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
 namespace fts {
 
-Tokenizer::Tokenizer(const FTSLanguage* language, StringData str) : _pos(0), _raw(str) {
+Tokenizer::Tokenizer(const FTSLanguage* language, std::string_view str) : _pos(0), _raw(str) {
     _english = (language->str() == "english");
     _skipWhitespace();
 }
@@ -59,7 +60,7 @@ Token Tokenizer::next() {
         while (_pos < _raw.size() && _type(_raw[_pos]) == type)
             _pos++;
 
-    StringData ret = _raw.substr(start, _pos - start);
+    std::string_view ret = _raw.substr(start, _pos - start);
     _skipWhitespace();
     return Token(type, ret, start);
 }

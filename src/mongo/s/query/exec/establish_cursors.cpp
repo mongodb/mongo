@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
@@ -64,6 +63,7 @@
 #include "mongo/util/uuid.h"
 
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -76,8 +76,9 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(throwDuringCursorResponseValidation);
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kOperationKeyField = "clientOperationKey"_sd;
+constexpr std::string_view kOperationKeyField = "clientOperationKey"sv;
 
 /**
  * This class wraps logic for establishing cursors using a MultiStatementTransactionRequestsSender.

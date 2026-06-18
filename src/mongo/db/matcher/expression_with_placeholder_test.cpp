@@ -52,6 +52,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using unittest::assertGet;
 
@@ -78,7 +79,7 @@ TEST(ExpressionWithPlaceholderTest,
     auto parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
     auto result = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT(result->getPlaceholder());
-    ASSERT_EQ(*result->getPlaceholder(), "i"_sd);
+    ASSERT_EQ(*result->getPlaceholder(), "i"sv);
 }
 
 TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesExpressionsWithTypeOther) {
@@ -88,13 +89,13 @@ TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesExpressionsWithTypeOther) 
     auto parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
     auto result = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT(result->getPlaceholder());
-    ASSERT_EQ(*result->getPlaceholder(), "a"_sd);
+    ASSERT_EQ(*result->getPlaceholder(), "a"sv);
 
     rawFilter = fromjson("{a: {$_internalSchemaType: 'string'}}");
     parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
     result = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT(result->getPlaceholder());
-    ASSERT_EQ(*result->getPlaceholder(), "a"_sd);
+    ASSERT_EQ(*result->getPlaceholder(), "a"sv);
 
     rawFilter = fromjson("{$_internalSchemaMinProperties: 1}");
     parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));

@@ -38,6 +38,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 
 namespace mongo {
 
@@ -61,7 +63,7 @@ REGISTER_AGG_STAGE_MAPPING(SequentialDocumentCacheStage,
                            documentSourceSequentialDocumentCacheToStageFn);
 
 SequentialDocumentCacheStage::SequentialDocumentCacheStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     SequentialDocumentCachePtr cache)
     : Stage(stageName, pExpCtx), _cache(std::move(cache)) {}

@@ -69,6 +69,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -83,6 +84,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class RecipientServiceExternalStateTest : public ShardCatalogCacheTestFixture {
 protected:
@@ -125,7 +127,7 @@ protected:
                                const std::vector<BSONObj>& collectionsDocs,
                                const HostAndPort& expectedHost) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listCollections"_sd);
+            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listCollections"sv);
             ASSERT_EQUALS(nss.dbName(), request.dbname);
             ASSERT_EQUALS(expectedHost, request.target);
             ASSERT_BSONOBJ_EQ(request.cmdObj["filter"].Obj(), BSON("info.uuid" << uuid));
@@ -147,7 +149,7 @@ protected:
                            const std::vector<BSONObj>& indexDocs,
                            const HostAndPort& expectedHost) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listIndexes"_sd);
+            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listIndexes"sv);
             ASSERT_EQUALS(nss.dbName(), request.dbname);
             ASSERT_EQUALS(expectedHost, request.target);
             ASSERT_EQ(request.cmdObj.firstElement().checkAndGetStringData(), nss.coll());
@@ -240,7 +242,7 @@ protected:
         }());
     }
 
-    void expectStaleDbVersionError(const NamespaceString& nss, StringData expectedCmdName) {
+    void expectStaleDbVersionError(const NamespaceString& nss, std::string_view expectedCmdName) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.cmdObj.firstElementFieldNameStringData(), expectedCmdName);
             return createErrorCursorResponse(Status(
@@ -250,7 +252,7 @@ protected:
         });
     }
 
-    void expectStaleEpochError(const NamespaceString& nss, StringData expectedCmdName) {
+    void expectStaleEpochError(const NamespaceString& nss, std::string_view expectedCmdName) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.cmdObj.firstElementFieldNameStringData(), expectedCmdName);
             return createErrorCursorResponse(

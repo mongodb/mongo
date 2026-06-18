@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -68,6 +67,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -320,7 +320,7 @@ public:
      * number of databases on a single connection. The "admin" database is special and once
      * authenticated provides access to all databases on the server.
      */
-    void auth(const DatabaseName& dbname, StringData username, StringData pwd);
+    void auth(const DatabaseName& dbname, std::string_view username, std::string_view pwd);
 
     /**
      * Logs out the connection for the given database.

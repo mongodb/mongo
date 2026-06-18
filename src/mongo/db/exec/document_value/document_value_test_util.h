@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -37,6 +36,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 
 /**
  * Use to compare two instances of type Value under the default ValueComparator in unit tests.
@@ -69,12 +69,12 @@
 namespace mongo {
 namespace unittest {
 
-#define _DECLARE_DOCVAL_CMP_FUNC(DOCVAL, NAME)                       \
-    void assertComparison_##DOCVAL##NAME(const std::string& theFile, \
-                                         unsigned theLine,           \
-                                         StringData aExpression,     \
-                                         StringData bExpression,     \
-                                         const DOCVAL& aValue,       \
+#define _DECLARE_DOCVAL_CMP_FUNC(DOCVAL, NAME)                         \
+    void assertComparison_##DOCVAL##NAME(const std::string& theFile,   \
+                                         unsigned theLine,             \
+                                         std::string_view aExpression, \
+                                         std::string_view bExpression, \
+                                         const DOCVAL& aValue,         \
                                          const DOCVAL& bValue);
 
 _DECLARE_DOCVAL_CMP_FUNC(Value, EQ);

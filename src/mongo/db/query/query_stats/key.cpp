@@ -34,6 +34,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 
 namespace mongo::query_stats {
+using namespace std::literals::string_view_literals;
 
 namespace {
 BSONObj scrubHighCardinalityFields(const ClientMetadata* clientMetadata) {
@@ -50,7 +51,7 @@ BSONObj shapifyReadPreference(boost::optional<BSONObj> readPreference) {
 
     BSONObjBuilder builder;
     for (const auto& elem : *readPreference) {
-        if (elem.fieldNameStringData() != "tags"_sd) {
+        if (elem.fieldNameStringData() != "tags"sv) {
             builder.append(elem);
             continue;
         }
@@ -62,7 +63,7 @@ BSONObj shapifyReadPreference(boost::optional<BSONObj> readPreference) {
             sortedTags.insert(tag.Obj());
         }
 
-        BSONArrayBuilder arrBuilder(builder.subarrayStart("tags"_sd));
+        BSONArrayBuilder arrBuilder(builder.subarrayStart("tags"sv));
         for (const auto& tag : sortedTags) {
             arrBuilder.append(tag);
         }
@@ -188,7 +189,7 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob,
     }
 
     if (_hasField.tenantId) {
-        bob.append("tenantId"_sd, opts.serializeIdentifier(_tenantId.toString()));
+        bob.append("tenantId"sv, opts.serializeIdentifier(_tenantId.toString()));
     }
 
     if (_hasField.readPreference) {

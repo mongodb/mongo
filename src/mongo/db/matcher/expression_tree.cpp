@@ -43,8 +43,10 @@
 #include <algorithm>
 #include <iterator>
 #include <string>
+#include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 PathMatchExpression* getEligiblePathMatchForNotSerialization(MatchExpression* expr) {
@@ -314,7 +316,7 @@ void NotMatchExpression::serialize(BSONObjBuilder* out,
             if (childType == MatchExpression::EXISTS) {
                 pathBob.append("$exists", false);
             } else {
-                StringData op = (childType == MatchExpression::EQ) ? "$ne"_sd : "$nin"_sd;
+                std::string_view op = (childType == MatchExpression::EQ) ? "$ne"sv : "$nin"sv;
                 pathBob.appendAs(pathMatch->getSerializedRightHandSide(opts).firstElement(), op);
             }
             return;
@@ -325,7 +327,7 @@ void NotMatchExpression::serialize(BSONObjBuilder* out,
     // delegate the path serialization to lower in the tree where we have the information on-hand.
     // However, for legibility we preserve a $not with a single path-accepting child as a $not.
     if (auto pathMatch = getEligiblePathMatchForNotSerialization(expressionToNegate)) {
-        auto append = [&](StringData path) {
+        auto append = [&](std::string_view path) {
             BSONObjBuilder pathBob(out->subobjStart(path));
             pathBob.append("$not", pathMatch->getSerializedRightHandSide(opts));
         };

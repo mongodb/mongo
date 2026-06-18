@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -107,6 +106,7 @@
 
 #include <limits>
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -687,7 +687,7 @@ enum class FindDeleteMode { kFind, kDelete };
 StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    boost::optional<StringData> indexName,
+    boost::optional<std::string_view> indexName,
     StorageInterface::ScanDirection scanDirection,
     const BSONObj& startKey,
     const BSONObj& endKey,
@@ -918,7 +918,7 @@ StatusWith<BSONObj> _findOrDeleteById(OperationContext* opCtx,
 StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::findDocuments(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    boost::optional<StringData> indexName,
+    boost::optional<std::string_view> indexName,
     ScanDirection scanDirection,
     const BSONObj& startKey,
     BoundInclusion boundInclusion,
@@ -937,7 +937,7 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::findDocuments(
 StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::deleteDocuments(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    boost::optional<StringData> indexName,
+    boost::optional<std::string_view> indexName,
     ScanDirection scanDirection,
     const BSONObj& startKey,
     BoundInclusion boundInclusion,

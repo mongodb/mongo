@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/namespace_string.h"
@@ -49,6 +48,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -178,9 +178,9 @@ public:
      * return ConflictingOperationInProgress until the unlock() method is called.
      */
     void lock(OperationContext* opCtx,
-              StringData reason,
+              std::string_view reason,
               boost::optional<BypassRecoveryWait> bypass = boost::none);
-    void unlock(StringData reason);
+    void unlock(std::string_view reason);
 
     /**
      * If there are no migrations or split/merges running on this shard, registers an active

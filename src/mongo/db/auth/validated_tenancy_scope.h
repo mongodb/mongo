@@ -34,6 +34,7 @@
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -95,7 +96,7 @@ public:
                      _tenantOrUser);
     }
 
-    StringData getOriginalToken() const {
+    std::string_view getOriginalToken() const {
         return _originalToken;
     }
 
@@ -126,7 +127,7 @@ private:
      * ValidatedTenancyScope.
      */
     ValidatedTenancyScope(Client* client,
-                          StringData securityToken,
+                          std::string_view securityToken,
                           const std::variant<std::monostate, UserName, TenantId>& tenantOrUser,
                           Date_t expiration,
                           TenantProtocol tenantProtocol)

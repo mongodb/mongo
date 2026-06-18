@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/repl/initial_sync/repl_sync_shared_data.h"
@@ -47,6 +46,7 @@
 
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -60,7 +60,7 @@ namespace repl {
 
 class BaseCloner {
 public:
-    BaseCloner(StringData clonerName,
+    BaseCloner(std::string_view clonerName,
                ReplSyncSharedData* sharedData,
                HostAndPort source,
                DBClientConnection* client,
@@ -170,7 +170,7 @@ protected:
 
     mutable std::mutex _mutex;
 
-    StringData getClonerName() const {
+    std::string_view getClonerName() const {
         return _clonerName;
     }
 

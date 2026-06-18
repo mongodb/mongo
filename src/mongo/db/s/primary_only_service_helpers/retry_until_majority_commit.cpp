@@ -33,13 +33,15 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace primary_only_service_helpers {
 
 RetryUntilMajorityCommit::RetryUntilMajorityCommit(
-    StringData serviceName,
+    std::string_view serviceName,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelState* cancelState,
     BSONObj metadata)

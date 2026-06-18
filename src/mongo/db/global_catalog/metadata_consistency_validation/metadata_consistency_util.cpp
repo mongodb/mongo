@@ -84,6 +84,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -93,6 +94,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace metadata_consistency_util {
 
 namespace {
@@ -100,8 +102,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(insertFakeInconsistencies);
 MONGO_FAIL_POINT_DEFINE(simulateCatalogTopLevelMetadataInconsistency);
 
-static constexpr StringData kInMemoryShardCatalogSourceScope = "inMemoryShardCatalog"_sd;
-static constexpr StringData kDurableShardCatalogSourceScope = "durableShardCatalog"_sd;
+static constexpr std::string_view kInMemoryShardCatalogSourceScope = "inMemoryShardCatalog"sv;
+static constexpr std::string_view kDurableShardCatalogSourceScope = "durableShardCatalog"sv;
 
 
 /*
@@ -548,7 +550,7 @@ void validateShardCatalogEntries(const ShardCatalogCollectionTypeBase& shardCata
                                  const CollectionType& globalCatalogCollection,
                                  const std::vector<ChunkType>& globalCatalogChunks,
                                  const ShardId& shardId,
-                                 StringData sourceName,
+                                 std::string_view sourceName,
                                  std::vector<MetadataInconsistencyItem>& inconsistencies) {
 
     if (shardCatalogCollection.getComparableFields() !=
@@ -1023,8 +1025,8 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
             const ShardId& shardId,
             const BSONObj& shardOptions,
             const BSONObj& configOptions) {
-            constexpr StringData kShardsFieldName = "shards"_sd;
-            constexpr StringData kOptionsFieldName = "options"_sd;
+            constexpr std::string_view kShardsFieldName = "shards"sv;
+            constexpr std::string_view kOptionsFieldName = "options"sv;
             const auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
             const auto severity =
                 boost::make_optional(nss == NamespaceString::kLogicalSessionsNamespace,
@@ -1190,7 +1192,7 @@ bool _collectionMustExistLocallyButDoesnt(OperationContext* opCtx,
 std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                AggregateCommandRequest& aggRequest,
-                                               StringData reason) {
+                                               std::string_view reason) {
     const auto logMetadataInconsistency = [](const NamespaceString& nss,
                                              const DBException& exception) {
         LOGV2(8739100,
@@ -1776,7 +1778,7 @@ std::vector<MetadataInconsistencyItem> checkIndexesConsistencyAcrossShards(
                                << tolerateExpireAfterSecondsTypeMismatch));
 
         std::vector<BSONObj> results = _runExhaustiveAggregation(
-            opCtx, nss, aggRequest, "Check sharded indexes consistency across shards"_sd);
+            opCtx, nss, aggRequest, "Check sharded indexes consistency across shards"sv);
 
         indexIncons.reserve(results.size());
         for (auto&& rawIndexIncon : results) {
@@ -1945,7 +1947,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossS
         AggregateCommandRequest aggRequest{nss, getRawPipelineStages(nss)};
 
         std::vector<BSONObj> facetedResult = _runExhaustiveAggregation(
-            opCtx, nss, aggRequest, "Check collection metadata consistency across shards"_sd);
+            opCtx, nss, aggRequest, "Check collection metadata consistency across shards"sv);
 
         // Even though the last stage of the aggregation is a $facet, the aggregation runner will
         // return an empty vector if aggregation fails due to an inconsistency reported elsewhere.

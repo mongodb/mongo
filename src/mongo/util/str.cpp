@@ -37,6 +37,7 @@
 
 #include <cstdio>
 #include <memory>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -68,7 +69,7 @@ void joinStringDelim(const std::vector<std::string>& strs, std::string* res, cha
 
 LexNumCmp::LexNumCmp(bool lexOnly) : _lexOnly(lexOnly) {}
 
-int LexNumCmp::cmp(StringData sd1, StringData sd2, bool lexOnly) {
+int LexNumCmp::cmp(std::string_view sd1, std::string_view sd2, bool lexOnly) {
     bool startWord = true;
 
     size_t s1 = 0;
@@ -166,14 +167,14 @@ int LexNumCmp::cmp(StringData sd1, StringData sd2, bool lexOnly) {
     return 0;
 }
 
-int LexNumCmp::cmp(StringData s1, StringData s2) const {
+int LexNumCmp::cmp(std::string_view s1, std::string_view s2) const {
     return cmp(s1, s2, _lexOnly);
 }
-bool LexNumCmp::operator()(StringData s1, StringData s2) const {
+bool LexNumCmp::operator()(std::string_view s1, std::string_view s2) const {
     return cmp(s1, s2) < 0;
 }
 
-std::string escape(StringData sd, bool escape_slash) {
+std::string escape(std::string_view sd, bool escape_slash) {
     StringBuilder ret;
     ret.reset(sd.size());
     for (const auto& c : sd) {
@@ -214,7 +215,7 @@ std::string escape(StringData sd, bool escape_slash) {
     return ret.str();
 }
 
-boost::optional<size_t> parseUnsignedBase10Integer(StringData fieldName) {
+boost::optional<size_t> parseUnsignedBase10Integer(std::string_view fieldName) {
     // Do not accept positions like '-4' or '+4'
     if (!ctype::isDigit(fieldName[0])) {
         return boost::none;

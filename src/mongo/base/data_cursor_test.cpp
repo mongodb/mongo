@@ -30,7 +30,6 @@
 #include "mongo/base/data_cursor.h"
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>

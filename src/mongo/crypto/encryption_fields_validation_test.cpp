@@ -29,15 +29,16 @@
 
 #include "mongo/crypto/encryption_fields_validation.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(FLEValidationUtils, ValidateDoublePrecisionRange) {
     ASSERT(validateDoublePrecisionRange(3.000, 0));
@@ -112,7 +113,7 @@ Status validateRangeIndexTest(int trimFactor,
     indexConfig.setTrimFactor(trimFactor);
     indexConfig.setSparsity(1);
     try {
-        validateRangeIndex(fieldType, "rangeField"_sd, indexConfig);
+        validateRangeIndex(fieldType, "rangeField"sv, indexConfig);
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -441,7 +442,7 @@ TEST(FLEValidationUtils, parseQueryTypeConfig) {
 }
 
 QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
-    constexpr StringData field = "foo"_sd;
+    constexpr std::string_view field = "foo"sv;
     constexpr int32_t kMin = 2, kMax = 8;
     QueryTypeConfig qtc;
     qtc.setQueryType(qtype);
@@ -541,7 +542,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
     // Missing max length
     qtc.setStrMaxLength(boost::none);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::string, "foo"_sd, qtc, boost::none, boost::none, boost::none),
+                           BSONType::string, "foo"sv, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783407);
     // max query length > max length
@@ -549,7 +550,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
     qtc.setStrMaxQueryLength(10);
     qtc.setStrMinQueryLength(2);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::string, "foo"_sd, qtc, boost::none, boost::none, boost::none),
+                           BSONType::string, "foo"sv, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783408);
     // Make sure valid configuration passes.
@@ -599,7 +600,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexBadQueryType) {
         qtc.setQueryType(qtype);
         ASSERT_THROWS_CODE(
             validateTextSearchIndex(
-                BSONType::string, "foo"_sd, qtc, boost::none, boost::none, boost::none),
+                BSONType::string, "foo"sv, qtc, boost::none, boost::none, boost::none),
             AssertionException,
             9783401);
     }

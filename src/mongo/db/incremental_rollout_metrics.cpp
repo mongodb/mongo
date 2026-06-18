@@ -32,6 +32,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 class IncrementalRolloutServerStatusSection : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;
@@ -43,7 +44,7 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder builder;
-        BSONArrayBuilder arrayBuilder(builder.subarrayStart("featureFlags"_sd));
+        BSONArrayBuilder arrayBuilder(builder.subarrayStart("featureFlags"sv));
         IncrementalRolloutFeatureFlag::appendFlagsStats(arrayBuilder);
 
         arrayBuilder.doneFast();

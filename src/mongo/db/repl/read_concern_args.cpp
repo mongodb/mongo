@@ -40,6 +40,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -291,7 +292,7 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
     rcBuilder.done();
 }
 
-StringData readConcernLevels::toString(ReadConcernLevel level) {
+std::string_view readConcernLevels::toString(ReadConcernLevel level) {
     return idl::serialize(level);
 }
 

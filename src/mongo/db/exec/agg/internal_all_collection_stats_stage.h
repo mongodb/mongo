@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats_gen.h"
@@ -38,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <deque>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -52,7 +52,7 @@ namespace mongo::exec::agg {
 class InternalAllCollectionStatsStage final : public Stage {
 public:
     InternalAllCollectionStatsStage(
-        StringData stageName,
+        std::string_view stageName,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         DocumentSourceInternalAllCollectionStatsSpec internalAllCollectionStatsSpec,
         const boost::intrusive_ptr<DocumentSourceMatch>& absorbedMatch,

@@ -38,6 +38,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -45,7 +46,7 @@ class ReshardingCoordinator;
 
 class MONGO_MOD_PUBLIC ReshardingCoordinatorService : public repl::PrimaryOnlyService {
 public:
-    static constexpr StringData kServiceName = "ReshardingCoordinatorService"_sd;
+    static constexpr std::string_view kServiceName = "ReshardingCoordinatorService"_sd;
 
     explicit ReshardingCoordinatorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
@@ -53,7 +54,7 @@ public:
 
     friend ReshardingCoordinator;
 
-    MONGO_MOD_PRIVATE StringData getServiceName() const override {
+    MONGO_MOD_PRIVATE std::string_view getServiceName() const override {
         return kServiceName;
     }
 

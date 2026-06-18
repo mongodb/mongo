@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -76,6 +75,7 @@
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -533,25 +533,29 @@ public:
      * that field and newExpireSecs must both be numeric.
      */
     virtual void updateTTLSetting(OperationContext* opCtx,
-                                  StringData idxName,
+                                  std::string_view idxName,
                                   long long newExpireSeconds) = 0;
 
     /*
      * Hide or unhide the given index. A hidden index will not be considered for use by the
      * query planner.
      */
-    virtual void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) = 0;
+    virtual void updateHiddenSetting(OperationContext* opCtx,
+                                     std::string_view idxName,
+                                     bool hidden) = 0;
 
     /*
      * Converts the given index to be unique or non-unique.
      */
-    virtual void updateUniqueSetting(OperationContext* opCtx, StringData idxName, bool unique) = 0;
+    virtual void updateUniqueSetting(OperationContext* opCtx,
+                                     std::string_view idxName,
+                                     bool unique) = 0;
 
     /*
      * Disallows or allows new duplicates in the given index.
      */
     virtual void updatePrepareUniqueSetting(OperationContext* opCtx,
-                                            StringData idxName,
+                                            std::string_view idxName,
                                             bool prepareUnique) = 0;
 
     /**
@@ -579,7 +583,7 @@ public:
      * Removes the index 'indexName' from the persisted collection catalog entry identified by
      * 'catalogId'.
      */
-    virtual void removeIndex(OperationContext* opCtx, StringData indexName) = 0;
+    virtual void removeIndex(OperationContext* opCtx, std::string_view indexName) = 0;
 
     /**
      * Updates the persisted catalog entry for 'ns' with the new index and creates the index on
@@ -589,13 +593,13 @@ public:
      */
     virtual Status prepareForIndexBuild(OperationContext* opCtx,
                                         const IndexDescriptor* spec,
-                                        StringData indexIdent,
+                                        std::string_view indexIdent,
                                         boost::optional<UUID> buildUUID) = 0;
 
     /**
      * Returns a UUID if the index is being built with the two-phase index build procedure.
      */
-    virtual boost::optional<UUID> getIndexBuildUUID(StringData indexName) const = 0;
+    virtual boost::optional<UUID> getIndexBuildUUID(std::string_view indexName) const = 0;
 
     /**
      * Returns true if the index identified by 'indexName' is multikey, and returns false otherwise.
@@ -609,7 +613,7 @@ public:
      * number of elements in the index key pattern of empty sets.
      */
     virtual bool isIndexMultikey(OperationContext* opCtx,
-                                 StringData indexName,
+                                 std::string_view indexName,
                                  MultikeyPaths* multikeyPaths,
                                  int indexOffset = -1) const = 0;
 
@@ -647,16 +651,16 @@ public:
 
     virtual int getCompletedIndexCount() const = 0;
 
-    virtual BSONObj getIndexSpec(StringData indexName,
+    virtual BSONObj getIndexSpec(std::string_view indexName,
                                  bool expandSimpleCollation = false) const = 0;
 
     virtual void getAllIndexes(std::vector<std::string>* names) const = 0;
 
     virtual void getReadyIndexes(std::vector<std::string>* names) const = 0;
 
-    virtual bool isIndexPresent(StringData indexName) const = 0;
+    virtual bool isIndexPresent(std::string_view indexName) const = 0;
 
-    virtual bool isIndexReady(StringData indexName) const = 0;
+    virtual bool isIndexReady(std::string_view indexName) const = 0;
 
     virtual void replaceMetadata(OperationContext* opCtx,
                                  std::shared_ptr<durable_catalog::CatalogEntryMetaData> md) = 0;
@@ -876,7 +880,7 @@ public:
 #ifdef MONGO_CONFIG_DEBUG_BUILD
     static void checkNoCollectionsInUse(OperationContext* opCtx,
                                         RecoveryUnit& ru,
-                                        StringData message);
+                                        std::string_view message);
 #endif
 
 private:

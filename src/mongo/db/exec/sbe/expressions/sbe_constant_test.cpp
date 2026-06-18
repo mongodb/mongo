@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -41,9 +40,11 @@
 #include <cstdint>
 #include <iosfwd>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 class SBEConstantTest : public GoldenEExpressionTestFixture {
 public:
@@ -80,15 +81,15 @@ TEST_F(SBEConstantTest, SbeConstants) {
     verifyConstantExpression(os, value::TypeTags::MaxKey, 0);
 
     verifyConstantExpression(os, value::makeCopyDecimal(Decimal128(123.0)));
-    verifyConstantExpression(os, value::makeSmallString("abc"_sd));
-    verifyConstantExpression(os, value::makeBigString("abcdefghijklmnop"_sd));
+    verifyConstantExpression(os, value::makeSmallString("abc"sv));
+    verifyConstantExpression(os, value::makeBigString("abcdefghijklmnop"sv));
     verifyConstantExpression(os, value::makeNewRecordId(123));
     verifyConstantExpression(
         os, value::makeCopyObjectId(std::array<uint8_t, 12>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}));
 
     verifyConstantExpression(os, makeArray(BSON_ARRAY(1 << 2 << 3)));
     verifyConstantExpression(os, makeArraySet(BSON_ARRAY(2 << 1 << 3)));
-    verifyConstantExpression(os, makeObject(BSON("a"_sd << 1 << "b"_sd << 2)));
+    verifyConstantExpression(os, makeObject(BSON("a"sv << 1 << "b"sv << 2)));
 }
 
 }  // namespace mongo::sbe

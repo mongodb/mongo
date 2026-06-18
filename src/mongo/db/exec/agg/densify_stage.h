@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
@@ -41,6 +40,7 @@
 
 #include <cstddef>
 #include <list>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>
@@ -102,7 +102,7 @@ public:
         size_t* _counter;
     };
 
-    InternalDensifyStage(StringData stageName,
+    InternalDensifyStage(std::string_view stageName,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          FieldPath field,
                          std::list<FieldPath> partitions,

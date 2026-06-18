@@ -41,14 +41,17 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 namespace {
-constexpr StringData kType = "$type"_sd;
-constexpr StringData kDate = "date"_sd;
-constexpr StringData kTimestamp = "timestamp"_sd;
+using namespace std::literals::string_view_literals;
+constexpr std::string_view kType = "$type"sv;
+constexpr std::string_view kDate = "date"sv;
+constexpr std::string_view kTimestamp = "timestamp"sv;
 
 void setValue(ServiceContext* service, mutablebson::Element* element, bool typeIsDate) {
     if (typeIsDate) {
@@ -71,7 +74,7 @@ Status CurrentDateNode::init(BSONElement modExpr,
         for (auto&& elem : modExpr.Obj()) {
             if (elem.fieldNameStringData() == kType) {
                 if (elem.type() == BSONType::string) {
-                    StringData valueString = elem.valueStringData();
+                    std::string_view valueString = elem.valueStringData();
                     if (valueString == kDate) {
                         _typeIsDate = true;
                         foundValidType = true;

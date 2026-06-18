@@ -40,6 +40,8 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::stage_builder {
 inline void makeSbExprOptSbSlotVecHelper(SbExprOptSlotVector& result) {}
 
@@ -168,7 +170,7 @@ public:
     SbExpr makeInt64Constant(int64_t num);
     SbExpr makeDoubleConstant(double num);
     SbExpr makeDecimalConstant(const Decimal128& num);
-    SbExpr makeStrConstant(StringData str);
+    SbExpr makeStrConstant(std::string_view str);
     SbExpr makeUndefinedConstant();
 
     SbExpr makeFunction(sbe::EFn fn, SbExpr::Vector args);
@@ -187,7 +189,7 @@ public:
 
     SbExpr makeNumericConvert(SbExpr expr, sbe::value::TypeTags tag);
 
-    SbExpr makeFail(ErrorCodes::Error error, StringData errorMessage);
+    SbExpr makeFail(ErrorCodes::Error error, std::string_view errorMessage);
 
     /**
      * Check if expression returns Nothing and return 'altExpr' if so. Otherwise, return the
@@ -348,7 +350,7 @@ public:
     std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> makeSimpleIndexScan(
         UUID collectionUuid,
         DatabaseName dbName,
-        StringData indexName,
+        std::string_view indexName,
         const BSONObj& keyPattern,
         bool forward = true,
         SbExpr lowKeyExpr = SbExpr{},
@@ -371,7 +373,7 @@ public:
         const VariableTypes& varTypes,
         UUID collectionUuid,
         DatabaseName dbName,
-        StringData indexName,
+        std::string_view indexName,
         const BSONObj& keyPattern,
         bool forward = true,
         SbExpr lowKeyExpr = SbExpr{},
@@ -382,7 +384,7 @@ public:
     std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> makeGenericIndexScan(
         UUID collectionUuid,
         DatabaseName dbName,
-        StringData indexName,
+        std::string_view indexName,
         const BSONObj& keyPattern,
         bool forward,
         SbExpr boundsExpr,
@@ -407,7 +409,7 @@ public:
         const VariableTypes& varTypes,
         UUID collectionUuid,
         DatabaseName dbName,
-        StringData indexName,
+        std::string_view indexName,
         const BSONObj& keyPattern,
         bool forward,
         SbExpr boundsExpr,

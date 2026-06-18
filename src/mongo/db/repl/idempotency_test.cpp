@@ -29,7 +29,6 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -59,6 +58,7 @@
 #include <cstdint>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -211,7 +211,7 @@ void RandomizedIdempotencyTest::runUpdateV2IdempotencyTestCase() {
 
     this->seed = SecureRandom().nextInt64();
     PseudoRandom seedGenerator(this->seed);
-    std::set<StringData> fields{"f00", "f10", "f01", "f11", "f02", "f20"};
+    std::set<std::string_view> fields{"f00", "f10", "f01", "f11", "f02", "f20"};
 
     auto generateDocWithId = [&seedGenerator](int id) {
         MutableDocument doc;

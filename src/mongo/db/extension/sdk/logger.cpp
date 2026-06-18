@@ -31,6 +31,8 @@
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 
+#include <string_view>
+
 namespace mongo::extension::sdk {
 
 namespace {

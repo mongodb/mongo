@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"

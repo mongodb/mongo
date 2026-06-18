@@ -30,7 +30,6 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -63,6 +62,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
@@ -71,6 +71,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class _shardsvrCleanupStructuredEncryptionDataCommand final
     : public TypedCommand<_shardsvrCleanupStructuredEncryptionDataCommand> {
@@ -79,7 +80,7 @@ public:
     using Reply = typename Request::Reply;
 
     _shardsvrCleanupStructuredEncryptionDataCommand()
-        : TypedCommand("_shardsvrCleanupStructuredEncryptionData"_sd) {}
+        : TypedCommand("_shardsvrCleanupStructuredEncryptionData"sv) {}
 
     bool skipApiVersionCheck() const final {
         // Internal command (server to server).
@@ -98,7 +99,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {CleanupStructuredEncryptionData::kCleanupTokensFieldName};
     }
 

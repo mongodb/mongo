@@ -38,6 +38,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -54,7 +55,8 @@ const char kFieldName[] = "sessionId";
 
 }  // namespace
 
-MigrationSessionId MigrationSessionId::generate(StringData donor, StringData recipient) {
+MigrationSessionId MigrationSessionId::generate(std::string_view donor,
+                                                std::string_view recipient) {
     invariant(!donor.empty());
     invariant(!recipient.empty());
 

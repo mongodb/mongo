@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -68,6 +67,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -167,7 +167,7 @@ boost::optional<IndexBounds> collapseQuerySolution(const QuerySolutionNode* node
     return bounds;
 }
 
-BSONElement extractKeyElementFromDoc(const BSONObj& obj, StringData pathStr) {
+BSONElement extractKeyElementFromDoc(const BSONObj& obj, std::string_view pathStr) {
     // Any arrays found get immediately returned. We are equipped up the call stack to
     // specifically deal with array values.
     size_t idxPath;
@@ -185,7 +185,7 @@ BSONElement findEqualityElement(const EqualityMatches& equalities, const FieldRe
     if (parentEl.type() != BSONType::object)
         return BSONElement();
 
-    StringData suffixStr = path.dottedSubstring(parentPathPart, path.numParts());
+    std::string_view suffixStr = path.dottedSubstring(parentPathPart, path.numParts());
     return extractKeyElementFromDoc(parentEl.Obj(), suffixStr);
 }
 
@@ -317,7 +317,7 @@ boost::optional<BoundList> flattenBounds(const ShardKeyPattern& shardKeyPattern,
     for (size_t i = 0; i < indexBounds.fields.size(); ++i) {
         BSONElement e = keyIter.next();
 
-        StringData fieldName = e.fieldNameStringData();
+        std::string_view fieldName = e.fieldNameStringData();
 
         // Get the relevant intervals for this field, but we may have to transform the list of
         // what's relevant according to the expression for this field

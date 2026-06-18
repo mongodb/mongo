@@ -30,13 +30,13 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/processinfo.h"
 
 #include <algorithm>
+#include <string_view>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -59,7 +59,7 @@ MemorySize MemorySize::parseFromBSON(const BSONElement& element) {
     }
 }
 
-void MemorySize::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+void MemorySize::serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
     builder->append(fieldName, static_cast<long long>(convertToSizeInBytes(*this)));
 }
 

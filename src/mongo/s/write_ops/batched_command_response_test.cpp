@@ -29,7 +29,6 @@
 
 #include "mongo/s/write_ops/batched_command_response.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
@@ -43,12 +42,16 @@
 #include "mongo/unittest/unittest.h"
 
 #include <ostream>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
+using namespace std::literals::string_view_literals;
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(BatchedCommandResponseTest, Basic) {
     BSONArray writeErrorsArray(
@@ -136,7 +139,7 @@ TEST(BatchedCommandResponseTest, TooManySmallErrors) {
         if (i < 1024) {
             ASSERT_EQ(errDetail["errmsg"].String(), bigstr) << i;
         } else {
-            ASSERT_EQ(errDetail["errmsg"].String(), ""_sd) << i;
+            ASSERT_EQ(errDetail["errmsg"].String(), ""sv) << i;
         }
     }
 }
@@ -166,7 +169,7 @@ TEST(BatchedCommandResponseTest, TooManyBigErrors) {
         if (i < 2) {
             ASSERT_EQ(errDetail["errmsg"].String(), bigstr) << i;
         } else {
-            ASSERT_EQ(errDetail["errmsg"].String(), ""_sd) << i;
+            ASSERT_EQ(errDetail["errmsg"].String(), ""sv) << i;
         }
     }
 }

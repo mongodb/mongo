@@ -29,7 +29,6 @@
 
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_initializer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"

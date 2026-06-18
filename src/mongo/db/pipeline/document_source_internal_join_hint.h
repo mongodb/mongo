@@ -41,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -58,7 +59,7 @@ DEFINE_LITE_PARSED_STAGE_NO_TIMESERIES_DERIVED(InternalJoinHint);
  */
 class DocumentSourceInternalJoinHint final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalJoinHint"_sd;
+    static constexpr std::string_view kStageName = "$_internalJoinHint"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
@@ -67,7 +68,7 @@ public:
                                    join_ordering::EnumerationStrategy&& strategy)
         : DocumentSource(kStageName, expCtx), _joinStrategy(std::move(strategy)) {}
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

@@ -31,12 +31,12 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
 
@@ -47,9 +47,9 @@ class CursorInUseInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CursorInUse;
 
-    CursorInUseInfo(StringData commandName) : _commandName(std::string{commandName}) {}
+    CursorInUseInfo(std::string_view commandName) : _commandName(std::string{commandName}) {}
 
-    StringData commandName() const {
+    std::string_view commandName() const {
         return _commandName;
     }
 

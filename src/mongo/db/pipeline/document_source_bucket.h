@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -47,7 +48,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Bucket);
  */
 class DocumentSourceBucket final {
 public:
-    static constexpr StringData kStageName = "$bucket"_sd;
+    static constexpr std::string_view kStageName = "$bucket"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

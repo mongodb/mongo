@@ -30,7 +30,6 @@
 #include "mongo/s/query/exec/store_possible_cursor.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"

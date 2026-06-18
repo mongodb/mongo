@@ -36,6 +36,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 
 MONGO_MOD_PUBLIC;
@@ -66,17 +67,17 @@ class AdmissionsHistogram {
 public:
     static constexpr size_t kNumBuckets = 11;
 
-    static constexpr std::array<StringData, kNumBuckets> kBucketNames = {"1-2"_sd,
-                                                                         "3-4"_sd,
-                                                                         "5-8"_sd,
-                                                                         "9-16"_sd,
-                                                                         "17-32"_sd,
-                                                                         "33-64"_sd,
-                                                                         "65-128"_sd,
-                                                                         "129-256"_sd,
-                                                                         "257-512"_sd,
-                                                                         "513-1024"_sd,
-                                                                         "1025+"_sd};
+    static constexpr std::array<std::string_view, kNumBuckets> kBucketNames = {"1-2"_sd,
+                                                                               "3-4"_sd,
+                                                                               "5-8"_sd,
+                                                                               "9-16"_sd,
+                                                                               "17-32"_sd,
+                                                                               "33-64"_sd,
+                                                                               "65-128"_sd,
+                                                                               "129-256"_sd,
+                                                                               "257-512"_sd,
+                                                                               "513-1024"_sd,
+                                                                               "1025+"_sd};
 
     AdmissionsHistogram() = default;
 

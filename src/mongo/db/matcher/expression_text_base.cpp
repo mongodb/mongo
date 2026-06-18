@@ -34,6 +34,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/fts/fts_query.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -42,7 +44,7 @@ namespace mongo {
 const bool TextMatchExpressionBase::kCaseSensitiveDefault = false;
 const bool TextMatchExpressionBase::kDiacriticSensitiveDefault = false;
 
-TextMatchExpressionBase::TextMatchExpressionBase(StringData path)
+TextMatchExpressionBase::TextMatchExpressionBase(std::string_view path)
     : LeafMatchExpression(TEXT, path) {}
 
 void TextMatchExpressionBase::debugString(StringBuilder& debug, int indentationLevel) const {

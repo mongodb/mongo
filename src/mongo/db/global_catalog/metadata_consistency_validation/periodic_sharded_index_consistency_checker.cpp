@@ -30,7 +30,6 @@
 
 #include "mongo/db/global_catalog/metadata_consistency_validation/periodic_sharded_index_consistency_checker.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -65,6 +64,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -74,6 +74,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 static const int shardedTimeseriesShardkeyCheckIntervalMS{12 * 60 * 60 * 1000};  // 12 hours
@@ -198,7 +199,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                         PrivilegeVector(),
                         boost::none /* verbosity */,
                         &responseBuilder,
-                        "pipeline to detect inconsistent sharded indexes"_sd);
+                        "pipeline to detect inconsistent sharded indexes"sv);
 
                     // Stop counting if the agg command failed for one of the
                     // collections to avoid recording a false count.

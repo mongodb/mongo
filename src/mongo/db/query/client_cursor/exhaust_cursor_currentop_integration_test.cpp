@@ -34,7 +34,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -72,6 +71,7 @@
 #include <future>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -90,13 +90,13 @@ auto* const clock = SystemClockSource::get();
 const NamespaceString testNSS =
     NamespaceString::createNamespaceString_forTest("exhaust_cursor_currentop.testColl");
 
-const StringData testAppName = "curop_exhaust_cursor_test";
-std::unique_ptr<DBClientBase> connect(StringData appName = testAppName) {
+const std::string_view testAppName = "curop_exhaust_cursor_test";
+std::unique_ptr<DBClientBase> connect(std::string_view appName = testAppName) {
     auto swConn = unittest::getFixtureConnectionString().connect(std::string{appName});
     uassertStatusOK(swConn.getStatus());
     return std::move(swConn.getValue());
 }
-const StringData testBackgroundAppName = "curop_exhaust_cursor_test_bg";
+const std::string_view testBackgroundAppName = "curop_exhaust_cursor_test_bg";
 
 void initTestCollection(DBClientBase* conn) {
     // Drop and recreate the test namespace.

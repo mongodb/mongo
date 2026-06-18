@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -43,9 +45,9 @@ class DocumentSourceListSearchIndexesSpec;
 
 class DocumentSourceListSearchIndexes final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$listSearchIndexes"_sd;
-    static constexpr StringData kCursorFieldName = "cursor"_sd;
-    static constexpr StringData kFirstBatchFieldName = "firstBatch"_sd;
+    static constexpr std::string_view kStageName = "$listSearchIndexes"_sd;
+    static constexpr std::string_view kCursorFieldName = "cursor"_sd;
+    static constexpr std::string_view kFirstBatchFieldName = "firstBatch"_sd;
 
     /**
      * A 'LiteParsed' representation of the $listSearchIndexes stage.
@@ -104,7 +106,7 @@ public:
                                     BSONObj cmdObj)
         : DocumentSource(kStageName, pExpCtx), _cmdObj(cmdObj.getOwned()) {}
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     }
 

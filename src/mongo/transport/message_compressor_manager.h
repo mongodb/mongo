@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/rpc/message.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -93,7 +93,7 @@ public:
      * If no compressors are configured that match those requested by the client, then it will
      * not append anything to the BSONObjBuilder output.
      */
-    void serverNegotiate(const boost::optional<std::vector<StringData>>& clientCompressors,
+    void serverNegotiate(const boost::optional<std::vector<std::string_view>>& clientCompressors,
                          BSONObjBuilder*);
 
     /*

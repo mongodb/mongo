@@ -51,6 +51,8 @@
 #include <sys/uio.h>
 #endif
 #else
+#include <string_view>
+
 #include <mstcpip.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -99,7 +101,7 @@ bool setBlock(int fd, bool block) {
 }
 
 void networkWarnWithDescription(const Socket& socket,
-                                StringData call,
+                                std::string_view call,
                                 std::error_code ec = lastSocketError()) {
     LOGV2_WARNING(23190,
                   "Failed to connect to remote host",

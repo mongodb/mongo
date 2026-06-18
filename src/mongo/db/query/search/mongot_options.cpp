@@ -39,6 +39,8 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/text.h"
 
+#include <string_view>
+
 namespace moe = mongo::optionenvironment;
 
 namespace mongo {
@@ -54,7 +56,7 @@ Status MongotParams::onSetHost(const std::string&) {
     return Status::OK();
 }
 
-Status MongotParams::onValidateHost(StringData str, const boost::optional<TenantId>&) {
+Status MongotParams::onValidateHost(std::string_view str, const boost::optional<TenantId>&) {
     // Unset value is OK
     if (str.empty()) {
         return Status::OK();

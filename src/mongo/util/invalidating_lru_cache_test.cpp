@@ -30,7 +30,6 @@
 
 #include "mongo/util/invalidating_lru_cache.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"

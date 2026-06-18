@@ -43,6 +43,7 @@
 #include <deque>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
@@ -79,7 +80,7 @@ private:
 public:
     explicit SharedState(RunTaskInline runTaskInline) : _runTaskInline(runTaskInline) {}
 
-    void schedule(Task task, StringData name);
+    void schedule(Task task, std::string_view name);
 
     bool isRunning() const {
         return _isRunning.loadRelaxed();
@@ -133,7 +134,7 @@ public:
     std::deque<Task> queue;
 };
 
-void ServiceExecutorSyncImpl::SharedState::schedule(Task task, StringData name) {
+void ServiceExecutorSyncImpl::SharedState::schedule(Task task, std::string_view name) {
     if (!isRunning()) {
         task(Status(ErrorCodes::ShutdownInProgress, fmt::format("{} is not running", name)));
         return;

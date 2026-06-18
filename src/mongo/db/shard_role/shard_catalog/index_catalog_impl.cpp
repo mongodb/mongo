@@ -107,6 +107,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -879,13 +880,13 @@ StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj) {
     return obj;
 }
 
-Status reportInvalidOption(StringData optionName, StringData pluginName) {
+Status reportInvalidOption(std::string_view optionName, std::string_view pluginName) {
     return Status(ErrorCodes::CannotCreateIndex,
                   str::stream() << "Index type '" << pluginName << "' does not support the '"
                                 << optionName << "' option");
 }
 
-Status reportInvalidVersion(StringData pluginName, IndexVersion indexVersion) {
+Status reportInvalidVersion(std::string_view pluginName, IndexVersion indexVersion) {
     return Status(ErrorCodes::CannotCreateIndex,
                   str::stream() << "Index type '" << pluginName
                                 << "' is not allowed with index version v: "
@@ -964,7 +965,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     if (nameElem.type() != BSONType::string)
         return Status(ErrorCodes::CannotCreateIndex, "index name must be specified as a string");
 
-    const StringData name = nameElem.valueStringData();
+    const std::string_view name = nameElem.valueStringData();
     if (name.find('\0') != std::string::npos)
         return Status(ErrorCodes::CannotCreateIndex, "index name cannot contain NUL bytes");
 
@@ -1135,8 +1136,8 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(
     const CollectionPtr& collection,
     const BSONObj& spec,
     InclusionPolicy inclusionPolicy,
-    const std::map<StringData, std::set<IndexType>>* allowedFieldNames) const {
-    StringData name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+    const std::map<std::string_view, std::set<IndexType>>* allowedFieldNames) const {
+    std::string_view name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
     invariant(name[0]);
 
     const BSONObj key = spec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
@@ -1571,7 +1572,7 @@ const IndexCatalogEntry* IndexCatalogImpl::findIdIndex(OperationContext* opCtx) 
 }
 
 const IndexCatalogEntry* IndexCatalogImpl::findIndexByName(OperationContext* opCtx,
-                                                           StringData name,
+                                                           std::string_view name,
                                                            InclusionPolicy inclusionPolicy) const {
     auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
@@ -1631,7 +1632,7 @@ void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,
 }
 
 const IndexCatalogEntry* IndexCatalogImpl::findIndexByIdent(OperationContext* opCtx,
-                                                            StringData ident,
+                                                            std::string_view ident,
                                                             InclusionPolicy inclusionPolicy) const {
     auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
@@ -1644,7 +1645,7 @@ const IndexCatalogEntry* IndexCatalogImpl::findIndexByIdent(OperationContext* op
 }
 
 IndexCatalogEntry* IndexCatalogImpl::getWritableEntryByName(OperationContext* opCtx,
-                                                            StringData name,
+                                                            std::string_view name,
                                                             InclusionPolicy inclusionPolicy) {
     return _getWritableEntry(findIndexByName(opCtx, name, inclusionPolicy));
 }
@@ -2217,7 +2218,7 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
     BSONObj key = fixIndexKey(o["key"].Obj());
     b.append("key", key);
 
-    StringData name = o["name"].checkAndGetStringData();
+    std::string_view name = o["name"].checkAndGetStringData();
     if (IndexDescriptor::isIdIndexPattern(key)) {
         name = IndexConstants::kIdIndexName;
     }

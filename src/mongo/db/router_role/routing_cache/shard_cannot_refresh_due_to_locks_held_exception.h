@@ -39,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -69,7 +70,7 @@ public:
     static ShardCannotRefreshDueToLocksHeldInfo parseFromCommandError(const BSONObj& obj);
 
 private:
-    static constexpr auto kNssFieldName = "nss"_sd;
+    static constexpr std::string_view kNssFieldName{"nss"};
 
     const NamespaceString _nss;
 };

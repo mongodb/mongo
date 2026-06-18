@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_lookup.h"

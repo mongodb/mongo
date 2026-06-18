@@ -50,6 +50,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <typeindex>
 #include <variant>
 #include <vector>
@@ -82,7 +83,7 @@ using BSONValue = std::variant<BSONElement, std::reference_wrapper<Value>>;
  */
 template <typename T>
 T parseFindPayload(BSONValue payload,
-                   StringData path,
+                   std::string_view path,
                    boost::optional<const EncryptedFieldConfig&> efc) {
     return visit(OverloadedVisitor{[&](BSONElement payload) { return T(payload, path, efc); },
                                    [&](Value payload) {
@@ -217,7 +218,7 @@ protected:
      * Value so that it can be used in both the MatchExpression and Aggregation contexts. Virtual
      * functions can't also be templated, which is why we need the runtime dispatch on the variant.
      */
-    virtual std::vector<PrfBlock> generateTags(BSONValue payload, StringData path) const = 0;
+    virtual std::vector<PrfBlock> generateTags(BSONValue payload, std::string_view path) const = 0;
 
     /**
      * Rewrite to a tag disjunction on the __safeContent__ field.

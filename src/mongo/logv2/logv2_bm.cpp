@@ -46,7 +46,6 @@
 #include <boost/log/core/core.hpp>
 // IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -55,6 +54,8 @@
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/text_formatter.h"
 #include "mongo/util/assert_util.h"
+
+#include <string_view>
 
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
@@ -65,6 +66,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 boost::shared_ptr<std::ostream> makeNullStream() {
     namespace bios = boost::iostreams;
@@ -161,11 +163,11 @@ void BM_EnabledLogV2ManySmallArg(benchmark::State& state) {
               "3"_attr = "3",
               "4"_attr = 4.0,
               "5"_attr = "5",
-              "6"_attr = "6"_sd,
+              "6"_attr = "6"sv,
               "7"_attr = 7,
               "8"_attr = 8,
               "9"_attr = "9",
-              "10"_attr = "10"_sd);
+              "10"_attr = "10"sv);
     }
 }
 

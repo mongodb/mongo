@@ -35,6 +35,8 @@
 #include "mongo/db/extension/sdk/test_extension_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::extension::sdk {
 
 /**

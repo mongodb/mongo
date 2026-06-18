@@ -76,6 +76,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -84,8 +85,8 @@ namespace mongo {
 namespace {
 
 StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
-                                                       StringData collection,
-                                                       StringData keyPath,
+                                                       std::string_view collection,
+                                                       std::string_view keyPath,
                                                        boost::optional<double> sampleRate,
                                                        boost::optional<int> numBuckets) {
     // Build a pipeline that accomplishes the analyze request. The building code constructs a

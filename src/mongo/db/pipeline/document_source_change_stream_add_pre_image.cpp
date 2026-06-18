@@ -36,12 +36,15 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamAddPreImage,
                                               ChangeStreamAddPreImageLiteParsed::parse);
@@ -53,8 +56,9 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalChangeStreamAddPreIm
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamAddPreImage,
                             DocumentSourceChangeStreamAddPreImage::id)
 
-constexpr StringData DocumentSourceChangeStreamAddPreImage::kStageName;
-constexpr StringData DocumentSourceChangeStreamAddPreImage::kFullDocumentBeforeChangeFieldName;
+constexpr std::string_view DocumentSourceChangeStreamAddPreImage::kStageName;
+constexpr std::string_view
+    DocumentSourceChangeStreamAddPreImage::kFullDocumentBeforeChangeFieldName;
 
 boost::intrusive_ptr<DocumentSourceChangeStreamAddPreImage>
 DocumentSourceChangeStreamAddPreImage::create(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -80,8 +84,8 @@ Value DocumentSourceChangeStreamAddPreImage::doSerialize(
     const query_shape::SerializationOptions& opts) const {
     return opts.isSerializingForExplain()
         ? Value(Document{{DocumentSourceChangeStream::kStageName,
-                          Document{{"stage"_sd, "internalAddPreImage"_sd},
-                                   {"fullDocumentBeforeChange"_sd,
+                          Document{{"stage"sv, "internalAddPreImage"sv},
+                                   {"fullDocumentBeforeChange"sv,
                                     idl::serialize(_fullDocumentBeforeChangeMode)}}}})
         : Value(Document{
               {kStageName,

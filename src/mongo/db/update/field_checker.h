@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 namespace mongo {
 
@@ -52,7 +52,7 @@ Status isUpdatable(const FieldRef& field);
 /**
  * Returns true iff 'field' is the position element (which is "$").
  */
-bool isPositionalElement(StringData field);
+bool isPositionalElement(std::string_view field);
 
 /**
  * Returns true, the position 'pos' of the first $-sign if present in 'fieldRef', and
@@ -67,7 +67,7 @@ bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count = nullptr
 /**
  * Returns true iff 'field' is an array filter (matching the regular expression /\$\[.*\]/).
  */
-bool isArrayFilterIdentifier(StringData field);
+bool isArrayFilterIdentifier(std::string_view field);
 
 /**
  * Returns true if isArrayFilterIdentifier is true for any component in 'fieldRef' or returns false

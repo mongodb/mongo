@@ -34,6 +34,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -117,7 +119,8 @@ public:
      * @param fieldName The name of the field to serialize (typically "_secondaryThrottle").
      * @param builder The BSON object builder to append the field to.
      */
-    void serializeToBalancerConfigElement(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeToBalancerConfigElement(std::string_view fieldName,
+                                          BSONObjBuilder* builder) const;
 
     /**
      * Extracts the secondary throttle settings from a balancer configuration document, which can

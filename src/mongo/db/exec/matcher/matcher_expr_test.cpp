@@ -38,6 +38,8 @@
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::evaluate_expr_matcher_test {
 
 const double kNaN = std::numeric_limits<double>::quiet_NaN();
@@ -62,7 +64,7 @@ public:
         }
     }
 
-    void setVariable(StringData name, Value val) {
+    void setVariable(std::string_view name, Value val) {
         auto varId = _expCtx->variablesParseState.defineVariable(name);
         _expCtx->variables.setValue(varId, val);
     }

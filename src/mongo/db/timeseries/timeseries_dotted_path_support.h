@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/column/bsoncolumn.h"
@@ -37,6 +36,7 @@
 #include "mongo/util/modules.h"
 
 #include <iosfwd>
+#include <string_view>
 
 #include <boost/any.hpp>
 #include <boost/optional/optional.hpp>
@@ -72,7 +72,7 @@ namespace mongo::timeseries::dotted_path_support {
  */
 [[nodiscard]] boost::optional<BSONColumn> extractAllElementsAlongBucketPath(
     const BSONObj& obj,
-    StringData path,
+    std::string_view path,
     BSONElementSet& elements,
     bool expandArrayOnTrailingField = true,
     MultikeyComponents* arrayComponents = nullptr);
@@ -92,7 +92,7 @@ namespace mongo::timeseries::dotted_path_support {
  * In the example above, with 'data.a.b', the function will return true if any individual
  * measurement contained in the bucket has an array value for 'a' or for 'a.b', and false otherwise.
  */
-bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path);
+bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, std::string_view path);
 
 // Indicates the truthy outcome of a decision-making process. The 'Undecided' value is for internal
 // use only, and should not be returned to a caller outside this namespace.
@@ -111,5 +111,5 @@ std::ostream& operator<<(std::ostream& s, const Decision& i);
  * user defines an index on 'a.b.c', 'userField' should be 'a.b.c' and not 'data.a.b.c',
  * 'control.min.a.b.c', etc.
  */
-Decision fieldContainsArrayData(const BSONObj& bucketObj, StringData userField);
+Decision fieldContainsArrayData(const BSONObj& bucketObj, std::string_view userField);
 }  // namespace mongo::timeseries::dotted_path_support

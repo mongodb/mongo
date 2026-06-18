@@ -31,7 +31,6 @@
 #include "mongo/db/exec/classic/working_set_common.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -64,6 +63,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/container/flat_set.hpp>
@@ -74,6 +74,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 std::string indexKeyVectorDebugString(const std::vector<IndexKeyDatum>& keyData) {
@@ -129,9 +130,8 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                 BSONObjBuilder builder;
                 // Rehydrate the index key fields to prevent duplicate "" fields from being logged.
                 builder.append(
-                    "key"_sd,
-                    redact(IndexKeyEntry::rehydrateKey(ikd.indexKeyPattern, ikd.keyData)));
-                builder.append("pattern"_sd, ikd.indexKeyPattern);
+                    "key"sv, redact(IndexKeyEntry::rehydrateKey(ikd.indexKeyPattern, ikd.keyData)));
+                builder.append("pattern"sv, ikd.indexKeyPattern);
                 return builder.obj();
             };
 
@@ -187,7 +187,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             // index to be multikey when ensuring the keyData is still valid.
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
-            const StringData indexIdent = workingSet->retrieveIndexIdent(memberKey.indexId);
+            const std::string_view indexIdent = workingSet->retrieveIndexIdent(memberKey.indexId);
             auto entry = collection->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
             invariant(entry,
                       str::stream() << "Index entry not found for index with ident " << indexIdent

@@ -29,7 +29,6 @@
 
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/column/binary_reopen.h"
 #include "mongo/bson/column/bsoncolumn.h"
@@ -48,6 +47,7 @@
 #include <cstring>
 #include <iterator>
 #include <memory>
+#include <string_view>
 #include <tuple>
 
 #include <absl/numeric/int128.h>
@@ -57,6 +57,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 using namespace bsoncolumn;
 
 namespace {
@@ -261,7 +262,7 @@ bool _mergeObj(allocator_aware::BSONObjBuilder<Allocator>* builder,
 
     // Iterate until we reach end of any of the two objects.
     while (refIt != refEnd && it != end) {
-        StringData name = refIt->fieldNameStringData();
+        std::string_view name = refIt->fieldNameStringData();
         if (name == it->fieldNameStringData()) {
             bool refIsObjOrArray =
                 refIt->type() == BSONType::object || refIt->type() == BSONType::array;
@@ -763,7 +764,7 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen64BitTypes(
             return lastUncompressed;
         }
 
-        return d64.materialize(*allocator, lastUncompressed, ""_sd);
+        return d64.materialize(*allocator, lastUncompressed, ""sv);
     }());
     // 6. Store the previous encoded state, this is typically a copy from the decoder. We cannot use
     // Encoder64::initialize() as it overwrites more members already set by this reopen procedure.
@@ -859,7 +860,7 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen128BitTypes(
             !(lastLiteralUnencodable && lastUncompressedEncoded128 != 0)) {
             return lastUncompressed;
         }
-        return d128.materialize(*allocator, lastUncompressed, ""_sd);
+        return d128.materialize(*allocator, lastUncompressed, ""sv);
     }());
     // 6. Initialize our encoder with the previous value.
     encoder.initialize(regular._previous());

@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/change_stream_pre_image_util.h"
@@ -106,6 +105,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -382,7 +382,7 @@ void clearTempFilesExceptForResumableBuilds(const std::vector<ResumeIndexInfo>& 
     for (const auto& resumeInfo : indexBuildsToResume) {
         const auto& indexes = resumeInfo.getIndexes();
         for (const auto& index : indexes) {
-            boost::optional<StringData> indexFilename = index.getStorageIdentifier();
+            boost::optional<std::string_view> indexFilename = index.getStorageIdentifier();
             if (indexFilename) {
                 resumableIndexFiles.insert(std::string{*indexFilename});
             }

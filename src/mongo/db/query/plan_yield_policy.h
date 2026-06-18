@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/restore_context.h"
@@ -46,6 +45,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -135,7 +135,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    static YieldPolicy parseFromBSON(StringData element) {
+    static YieldPolicy parseFromBSON(std::string_view element) {
         const std::string& yieldPolicy = std::string{element};
         if (yieldPolicy == "YIELD_AUTO") {
             return YieldPolicy::YIELD_AUTO;

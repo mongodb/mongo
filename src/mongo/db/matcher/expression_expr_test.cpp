@@ -31,7 +31,6 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -52,6 +51,7 @@
 
 #include <functional>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -83,7 +83,7 @@ public:
         }
     }
 
-    void setVariable(StringData name, Value val) {
+    void setVariable(std::string_view name, Value val) {
         auto varId = _expCtx->variablesParseState.defineVariable(name);
         _expCtx->variables.setValue(varId, val);
     }

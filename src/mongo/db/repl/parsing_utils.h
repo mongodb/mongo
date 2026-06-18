@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -47,6 +47,6 @@ namespace repl {
  * Example: `mySet/host1:10001,host2:10002`
  */
 MONGO_MOD_PUB std::tuple<std::string, std::vector<HostAndPort>> parseReplSetSeedList(
-    ReplicationCoordinatorExternalState* externalState, StringData replSetString);
+    ReplicationCoordinatorExternalState* externalState, std::string_view replSetString);
 }  // namespace repl
 }  // namespace mongo

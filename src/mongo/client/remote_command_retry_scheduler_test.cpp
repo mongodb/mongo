@@ -32,7 +32,6 @@
 #include "mongo/client/remote_command_retry_scheduler.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -54,6 +53,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -61,6 +61,7 @@
 
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace mongo;
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
@@ -243,7 +244,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryStrategy) {
         if (ErrorCodes::mustHaveExtraInfo(error)) {
             continue;
         }
-        const auto status = Status(error, ""_sd);
+        const auto status = Status(error, ""sv);
         ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
     }
 }

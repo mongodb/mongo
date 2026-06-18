@@ -34,6 +34,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace fts {
@@ -56,7 +57,9 @@ class UnicodeFTSPhraseMatcher final : public FTSPhraseMatcher {
 public:
     UnicodeFTSPhraseMatcher(const std::string& language);
 
-    bool phraseMatches(StringData phrase, StringData haystack, Options options) const override;
+    bool phraseMatches(std::string_view phrase,
+                       std::string_view haystack,
+                       Options options) const override;
 
 private:
     unicode::CaseFoldMode _caseFoldMode;

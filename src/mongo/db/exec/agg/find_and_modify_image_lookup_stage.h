@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -41,7 +42,7 @@
 namespace mongo::exec::agg {
 class FindAndModifyImageLookupStage final : public Stage {
 public:
-    FindAndModifyImageLookupStage(StringData stageName,
+    FindAndModifyImageLookupStage(std::string_view stageName,
                                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                   bool includeCommitTransactionTimestamp);
 

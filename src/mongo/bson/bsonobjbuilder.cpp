@@ -33,13 +33,14 @@
 #include "mongo/logv2/log.h"
 
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 
 template <class Derived, class B>
-Derived& BSONObjBuilderBase<Derived, B>::appendMinForType(StringData fieldName, int t) {
+Derived& BSONObjBuilderBase<Derived, B>::appendMinForType(std::string_view fieldName, int t) {
     switch (t) {
         // Shared canonical types
         case stdx::to_underlying(BSONType::numberInt):
@@ -109,7 +110,7 @@ Derived& BSONObjBuilderBase<Derived, B>::appendMinForType(StringData fieldName, 
 }
 
 template <class Derived, class B>
-Derived& BSONObjBuilderBase<Derived, B>::appendMaxForType(StringData fieldName, int t) {
+Derived& BSONObjBuilderBase<Derived, B>::appendMaxForType(std::string_view fieldName, int t) {
     switch (t) {
         // Shared canonical types
         case stdx::to_underlying(BSONType::numberInt):
@@ -178,7 +179,7 @@ Derived& BSONObjBuilderBase<Derived, B>::appendMaxForType(StringData fieldName, 
 }
 
 template <class Derived, class B>
-Derived& BSONObjBuilderBase<Derived, B>::appendDate(StringData fieldName, Date_t dt) {
+Derived& BSONObjBuilderBase<Derived, B>::appendDate(std::string_view fieldName, Date_t dt) {
     _b.appendNum((char)BSONType::date);
     _b.appendCStr(fieldName);
     _b.appendNum(dt.toMillisSinceEpoch());
@@ -241,7 +242,7 @@ BSONObjIterator BSONObjBuilderBase<Derived, B>::iterator() const {
 }
 
 template <class Derived, class B>
-bool BSONObjBuilderBase<Derived, B>::hasField(StringData name) const {
+bool BSONObjBuilderBase<Derived, B>::hasField(std::string_view name) const {
     BSONObjIterator i = iterator();
     while (i.more())
         if (name == i.next().fieldName())

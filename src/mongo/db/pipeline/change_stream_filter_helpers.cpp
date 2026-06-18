@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -51,6 +50,7 @@
 #include <cstdint>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -99,6 +99,7 @@ void appendCommonTransactionFilter(BSONObjBuilder& applyOpsBuilder) {
 }  // namespace
 
 namespace change_stream_filter {
+using namespace std::literals::string_view_literals;
 
 std::unique_ptr<MatchExpression> buildTsFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -501,18 +502,18 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     //   - reshardBegin: A resharding operation begins.
     //   - reshardDoneCatchUp: "Catch up" phase of reshard operation completes.
     //   - shardCollection: A shardCollection operation has completed.
-    std::vector<StringData> internalOpTypes = {
-        "reshardBegin"_sd, "reshardDoneCatchUp"_sd, "shardCollection"_sd};
+    std::vector<std::string_view> internalOpTypes = {
+        "reshardBegin"sv, "reshardDoneCatchUp"sv, "shardCollection"sv};
 
     // Only return the 'migrateLastChunkFromShard' event and the 'reshardBlockingWrites' event if
     // 'showSystemEvents' is set.
     if (expCtx->getChangeStreamSpec()->getShowSystemEvents()) {
-        internalOpTypes.push_back("migrateLastChunkFromShard"_sd);
-        internalOpTypes.push_back("reshardBlockingWrites"_sd);
+        internalOpTypes.push_back("migrateLastChunkFromShard"sv);
+        internalOpTypes.push_back("reshardBlockingWrites"sv);
     }
 
-    internalOpTypes.push_back("refineCollectionShardKey"_sd);
-    internalOpTypes.push_back("reshardCollection"_sd);
+    internalOpTypes.push_back("refineCollectionShardKey"sv);
+    internalOpTypes.push_back("reshardCollection"sv);
 
     // Build the oplog filter to match the required internal op types.
     BSONArrayBuilder internalOpTypeOrBuilder;

@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_options_gen.h"
@@ -79,6 +78,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -374,7 +374,7 @@ public:
         return false;
     }
 
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
     }
 

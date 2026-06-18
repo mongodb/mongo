@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
@@ -57,6 +56,7 @@
 #include <iterator>
 #include <map>
 #include <set>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -158,7 +158,7 @@ protected:
     }
 
     const CollectionRoutingInfoTargeter& _targeter;
-    const StringData _firstShardKeyFieldName;
+    const std::string_view _firstShardKeyFieldName;
 
     int64_t _numSingleShard = 0;
     int64_t _numMultiShard = 0;

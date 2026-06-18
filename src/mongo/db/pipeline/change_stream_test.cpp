@@ -36,6 +36,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 TEST(ChangeStreamTest, ReadModes) {
     for (auto readMode :
@@ -174,19 +175,19 @@ DEATH_TEST_REGEX(ChangeStreamTestDeathTest,
 }
 
 TEST(ChangeStreamTest, ChangeStreamGetTypeCollection) {
-    auto nss = NamespaceString::createNamespaceString_forTest("unittest"_sd, "someCollection"_sd);
+    auto nss = NamespaceString::createNamespaceString_forTest("unittest"sv, "someCollection"sv);
     ASSERT_EQ(ChangeStreamType::kCollection, ChangeStream::getChangeStreamType(nss));
 }
 
 TEST(ChangeStreamTest, ChangeStreamGetTypeDatabase) {
     auto nss = NamespaceString::makeCollectionlessAggregateNSS(
-        NamespaceString::createNamespaceString_forTest("unittest"_sd).dbName());
+        NamespaceString::createNamespaceString_forTest("unittest"sv).dbName());
     ASSERT_TRUE(nss.isCollectionlessAggregateNS());
     ASSERT_EQ(ChangeStreamType::kDatabase, ChangeStream::getChangeStreamType(nss));
 }
 
 TEST(ChangeStreamTest, ChangeStreamGetTypeAllDatabases) {
-    auto nss = NamespaceString::createNamespaceString_forTest("admin"_sd);
+    auto nss = NamespaceString::createNamespaceString_forTest("admin"sv);
     ASSERT_TRUE(nss.isAdminDB());
     ASSERT_EQ(ChangeStreamType::kAllDatabases, ChangeStream::getChangeStreamType(nss));
 }

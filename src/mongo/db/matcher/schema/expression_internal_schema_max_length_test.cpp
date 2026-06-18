@@ -44,19 +44,20 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(InternalSchemaMaxLengthMatchExpression, SameMaxLengthTreatedEquivalent) {
-    InternalSchemaMaxLengthMatchExpression maxLength1("a"_sd, 2);
-    InternalSchemaMaxLengthMatchExpression maxLength2("a"_sd, 2);
-    InternalSchemaMaxLengthMatchExpression maxLength3("a"_sd, 3);
+    InternalSchemaMaxLengthMatchExpression maxLength1("a"sv, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength2("a"sv, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength3("a"sv, 3);
 
     ASSERT_TRUE(maxLength1.equivalent(&maxLength2));
     ASSERT_FALSE(maxLength1.equivalent(&maxLength3));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, MinLengthAndMaxLengthAreNotEquivalent) {
-    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
-    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
+    InternalSchemaMinLengthMatchExpression minLength("a"sv, 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"sv, 2);
 
     ASSERT_FALSE(maxLength.equivalent(&minLength));
 }

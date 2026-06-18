@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
@@ -44,6 +43,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -61,56 +61,57 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-static const std::vector<StringData> kCpuKeys{
-    "btime"_sd, "cpu"_sd, "ctxt"_sd, "processes"_sd, "procs_blocked"_sd, "procs_running"_sd};
+static const std::vector<std::string_view> kCpuKeys{
+    "btime"sv, "cpu"sv, "ctxt"sv, "processes"sv, "procs_blocked"sv, "procs_running"sv};
 
-static const std::vector<StringData> kMemKeys{
-    "MemAvailable"_sd,
-    "MemTotal"_sd,
-    "MemFree"_sd,
-    "Cached"_sd,
-    "Dirty"_sd,
-    "Buffers"_sd,
-    "SwapTotal"_sd,
-    "SwapCached"_sd,
-    "SwapFree"_sd,
-    "Active"_sd,
-    "Inactive"_sd,
-    "Active(anon)"_sd,
-    "Inactive(anon)"_sd,
-    "Active(file)"_sd,
-    "Inactive(file)"_sd,
-    "AnonHugePages"_sd,
+static const std::vector<std::string_view> kMemKeys{
+    "MemAvailable"sv,
+    "MemTotal"sv,
+    "MemFree"sv,
+    "Cached"sv,
+    "Dirty"sv,
+    "Buffers"sv,
+    "SwapTotal"sv,
+    "SwapCached"sv,
+    "SwapFree"sv,
+    "Active"sv,
+    "Inactive"sv,
+    "Active(anon)"sv,
+    "Inactive(anon)"sv,
+    "Active(file)"sv,
+    "Inactive(file)"sv,
+    "AnonHugePages"sv,
 };
 
-static const std::vector<StringData> kNetstatKeys{
-    "Tcp:"_sd,
-    "Ip:"_sd,
-    "TcpExt:"_sd,
-    "IpExt:"_sd,
+static const std::vector<std::string_view> kNetstatKeys{
+    "Tcp:"sv,
+    "Ip:"sv,
+    "TcpExt:"sv,
+    "IpExt:"sv,
 };
 
-static const std::vector<StringData> kVMKeys{
-    "balloon_deflate"_sd,
-    "balloon_inflate"_sd,
-    "nr_mlock"_sd,
-    "numa_pages_migrated"_sd,
-    "pgfault"_sd,
-    "pgmajfault"_sd,
-    "pswpin"_sd,
-    "pswpout"_sd,
-    "nr_anon_transparent_hugepages"_sd,
-    "thp_fault_alloc"_sd,
-    "thp_collapse_alloc"_sd,
-    "thp_fault_fallback"_sd,
-    "thp_swpout"_sd,
+static const std::vector<std::string_view> kVMKeys{
+    "balloon_deflate"sv,
+    "balloon_inflate"sv,
+    "nr_mlock"sv,
+    "numa_pages_migrated"sv,
+    "pgfault"sv,
+    "pgmajfault"sv,
+    "pswpin"sv,
+    "pswpout"sv,
+    "nr_anon_transparent_hugepages"sv,
+    "thp_fault_alloc"sv,
+    "thp_collapse_alloc"sv,
+    "thp_fault_fallback"sv,
+    "thp_swpout"sv,
 };
 
 // Keys the system stats collector wants to collect out of the /proc/net/sockstat file.
-static const std::map<StringData, std::set<StringData>> kSockstatKeys{
-    {"sockets"_sd, {"used"_sd}},
-    {"TCP"_sd, {"inuse"_sd, "orphan"_sd, "tw"_sd, "alloc"_sd}},
+static const std::map<std::string_view, std::set<std::string_view>> kSockstatKeys{
+    {"sockets"sv, {"used"sv}},
+    {"TCP"sv, {"inuse"sv, "orphan"sv, "tw"sv, "alloc"sv}},
 };
 
 /**
@@ -118,7 +119,7 @@ static const std::map<StringData, std::set<StringData>> kSockstatKeys{
  */
 class EthTool {
 public:
-    static std::unique_ptr<EthTool> create(StringData interface) {
+    static std::unique_ptr<EthTool> create(std::string_view interface) {
         int fd = socket(AF_INET, SOCK_DGRAM, 0);
         if (fd == -1) {
             auto ec = lastPosixError();
@@ -177,7 +178,7 @@ public:
     }
 
     // Get a list of stats names for a given interface
-    std::vector<StringData>& get_strings() {
+    std::vector<std::string_view>& get_strings() {
         if (!_names.has_value()) {
             auto drvinfo = get_info();
             _get_strings(drvinfo.has_value() ? drvinfo->n_stats : 0);
@@ -209,12 +210,13 @@ public:
     }
 
     // Name of the interface this class monitors
-    StringData name() const {
+    std::string_view name() const {
         return _interface;
     }
 
 private:
-    explicit EthTool(StringData interface, int fd) : _fd(fd), _interface(std::string(interface)) {}
+    explicit EthTool(std::string_view interface, int fd)
+        : _fd(fd), _interface(std::string(interface)) {}
 
     void _get_strings(size_t count) {
         _gstrings = static_cast<ethtool_gstrings*>(
@@ -224,7 +226,7 @@ private:
         _gstrings->string_set = ETH_SS_STATS;
         _gstrings->len = count;
 
-        _names.emplace(std::vector<StringData>());
+        _names.emplace(std::vector<std::string_view>());
 
         if (_ioctlNoThrow("get_strings", _gstrings)) {
             return;
@@ -232,7 +234,7 @@ private:
 
         char* ptr = reinterpret_cast<char*>(_gstrings) + sizeof(ethtool_gstrings);
         for (size_t i = 0; i < count; i++) {
-            auto s = StringData(ptr);
+            auto s = std::string_view(ptr);
 
             _names->push_back(s);
 
@@ -260,7 +262,7 @@ private:
     }
 
     // Returns non-zero on error
-    int _ioctlNoThrow(StringData name, void* cmd) {
+    int _ioctlNoThrow(std::string_view name, void* cmd) {
         ifreq ifr;
 
         strcpy(ifr.ifr_name, _interface.c_str());
@@ -287,7 +289,7 @@ private:
 
     ethtool_gstrings* _gstrings{nullptr};
 
-    boost::optional<std::vector<StringData>> _names;
+    boost::optional<std::vector<std::string_view>> _names;
 
     std::string _interface;
 
@@ -300,7 +302,7 @@ private:
  */
 class LinuxSystemMetricsCollector final : public SystemMetricsCollector {
 public:
-    LinuxSystemMetricsCollector() : _disks(procparser::findPhysicalDisks("/sys/block"_sd)) {
+    LinuxSystemMetricsCollector() : _disks(procparser::findPhysicalDisks("/sys/block"sv)) {
         for (const auto& disk : _disks) {
             _disksStringData.emplace_back(disk);
         }
@@ -318,7 +320,7 @@ public:
 
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("cpu"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("cpu"sv));
 
             // Include the number of cpus to simplify client calculations
             ProcessInfo p;
@@ -331,15 +333,15 @@ public:
             }
 
             processStatusErrors(
-                procparser::parseProcStatFile("/proc/stat"_sd, kCpuKeys, &subObjBuilder),
+                procparser::parseProcStatFile("/proc/stat"sv, kCpuKeys, &subObjBuilder),
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
 
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("memory"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("memory"sv));
             processStatusErrors(
-                procparser::parseProcMemInfoFile("/proc/meminfo"_sd, kMemKeys, &subObjBuilder),
+                procparser::parseProcMemInfoFile("/proc/meminfo"sv, kMemKeys, &subObjBuilder),
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
@@ -353,20 +355,20 @@ public:
         }
 
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("netstat"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("netstat"sv));
             processStatusErrors(procparser::parseProcNetstatFile(
-                                    kNetstatKeys, "/proc/net/netstat"_sd, &subObjBuilder),
+                                    kNetstatKeys, "/proc/net/netstat"sv, &subObjBuilder),
                                 &subObjBuilder);
             processStatusErrors(
-                procparser::parseProcNetstatFile(kNetstatKeys, "/proc/net/snmp"_sd, &subObjBuilder),
+                procparser::parseProcNetstatFile(kNetstatKeys, "/proc/net/snmp"sv, &subObjBuilder),
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
 
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("sockstat"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("sockstat"sv));
             processStatusErrors(procparser::parseProcSockstatFile(
-                                    kSockstatKeys, "/proc/net/sockstat"_sd, &subObjBuilder),
+                                    kSockstatKeys, "/proc/net/sockstat"sv, &subObjBuilder),
                                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
@@ -374,33 +376,33 @@ public:
         // Skip the disks section if we could not find any disks.
         // This can happen when we do not have permission to /sys/block for instance.
         if (!_disksStringData.empty()) {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("disks"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("disks"sv));
             processStatusErrors(procparser::parseProcDiskStatsFile(
-                                    "/proc/diskstats"_sd, _disksStringData, &subObjBuilder),
+                                    "/proc/diskstats"sv, _disksStringData, &subObjBuilder),
                                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
 
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("mounts"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("mounts"sv));
             processStatusErrors(
-                procparser::parseProcSelfMountStatsFile("/proc/self/mountinfo"_sd, &subObjBuilder),
+                procparser::parseProcSelfMountStatsFile("/proc/self/mountinfo"sv, &subObjBuilder),
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
 
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("vmstat"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("vmstat"sv));
             processStatusErrors(
-                procparser::parseProcVMStatFile("/proc/vmstat"_sd, kVMKeys, &subObjBuilder),
+                procparser::parseProcVMStatFile("/proc/vmstat"sv, kVMKeys, &subObjBuilder),
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
 
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("files"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("files"sv));
             processStatusErrors(
-                procparser::parseProcSysFsFileNrFile("/proc/sys/fs/file-nr"_sd,
+                procparser::parseProcSysFsFileNrFile("/proc/sys/fs/file-nr"sv,
                                                      procparser::FileNrKey::kFileHandlesInUse,
                                                      &subObjBuilder),
                 &subObjBuilder);
@@ -408,23 +410,23 @@ public:
         }
 
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("pressure"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("pressure"sv));
             processStatusErrors(
-                procparser::parseProcPressureFile("cpu", "/proc/pressure/cpu"_sd, &subObjBuilder),
+                procparser::parseProcPressureFile("cpu", "/proc/pressure/cpu"sv, &subObjBuilder),
                 &subObjBuilder);
 
             processStatusErrors(procparser::parseProcPressureFile(
-                                    "memory", "/proc/pressure/memory"_sd, &subObjBuilder),
+                                    "memory", "/proc/pressure/memory"sv, &subObjBuilder),
                                 &subObjBuilder);
 
             processStatusErrors(
-                procparser::parseProcPressureFile("io", "/proc/pressure/io"_sd, &subObjBuilder),
+                procparser::parseProcPressureFile("io", "/proc/pressure/io"sv, &subObjBuilder),
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
 
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("ethtool"_sd));
+            BSONObjBuilder subObjBuilder(builder.subobjStart("ethtool"sv));
 
             for (auto& tool : _ethtools) {
                 BSONObjBuilder subNICBuilder(subObjBuilder.subobjStart(tool->name()));
@@ -451,15 +453,16 @@ private:
     // List of physical disks to collect stats from as string from findPhysicalDisks.
     std::vector<std::string> _disks;
 
-    // List of physical disks to collect stats from as StringData to pass to parseProcDiskStatsFile.
-    std::vector<StringData> _disksStringData;
+    // List of physical disks to collect stats from as std::string_view to pass to
+    // parseProcDiskStatsFile.
+    std::vector<std::string_view> _disksStringData;
 
     std::vector<std::unique_ptr<EthTool>> _ethtools;
 };
 
 class SimpleFunctionCollector final : public FTDCCollectorInterface {
 public:
-    SimpleFunctionCollector(StringData name,
+    SimpleFunctionCollector(std::string_view name,
                             unique_function<void(OperationContext*, BSONObjBuilder&)> collectFn)
         : _name(std::string{name}), _collectFn(std::move(collectFn)) {}
 
@@ -477,7 +480,7 @@ private:
 };
 
 
-void collectUlimit(int resource, StringData resourceName, BSONObjBuilder& builder) {
+void collectUlimit(int resource, std::string_view resourceName, BSONObjBuilder& builder) {
 
     struct rlimit rlim;
 
@@ -494,18 +497,18 @@ void collectUlimit(int resource, StringData resourceName, BSONObjBuilder& builde
 }
 
 void collectUlimits(OperationContext*, BSONObjBuilder& builder) {
-    collectUlimit(RLIMIT_CPU, "cpuTime_secs"_sd, builder);
-    collectUlimit(RLIMIT_FSIZE, "fileSize_blocks"_sd, builder);
-    collectUlimit(RLIMIT_DATA, "dataSegSize_kb"_sd, builder);
-    collectUlimit(RLIMIT_STACK, "stackSize_kb"_sd, builder);
-    collectUlimit(RLIMIT_CORE, "coreFileSize_blocks"_sd, builder);
-    collectUlimit(RLIMIT_RSS, "residentSize_kb"_sd, builder);
-    collectUlimit(RLIMIT_NOFILE, "fileDescriptors"_sd, builder);
-    collectUlimit(RLIMIT_AS, "addressSpace_kb"_sd, builder);
-    collectUlimit(RLIMIT_NPROC, "processes"_sd, builder);
-    collectUlimit(RLIMIT_MEMLOCK, "memLock_kb"_sd, builder);
-    collectUlimit(RLIMIT_LOCKS, "fileLocks"_sd, builder);
-    collectUlimit(RLIMIT_SIGPENDING, "pendingSignals"_sd, builder);
+    collectUlimit(RLIMIT_CPU, "cpuTime_secs"sv, builder);
+    collectUlimit(RLIMIT_FSIZE, "fileSize_blocks"sv, builder);
+    collectUlimit(RLIMIT_DATA, "dataSegSize_kb"sv, builder);
+    collectUlimit(RLIMIT_STACK, "stackSize_kb"sv, builder);
+    collectUlimit(RLIMIT_CORE, "coreFileSize_blocks"sv, builder);
+    collectUlimit(RLIMIT_RSS, "residentSize_kb"sv, builder);
+    collectUlimit(RLIMIT_NOFILE, "fileDescriptors"sv, builder);
+    collectUlimit(RLIMIT_AS, "addressSpace_kb"sv, builder);
+    collectUlimit(RLIMIT_NPROC, "processes"sv, builder);
+    collectUlimit(RLIMIT_MEMLOCK, "memLock_kb"sv, builder);
+    collectUlimit(RLIMIT_LOCKS, "fileLocks"sv, builder);
+    collectUlimit(RLIMIT_SIGPENDING, "pendingSignals"sv, builder);
 }
 
 }  // namespace

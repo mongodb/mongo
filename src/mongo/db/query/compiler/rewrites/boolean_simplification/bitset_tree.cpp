@@ -31,6 +31,8 @@
 
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo::boolean_simplification {
 namespace {
 boost::optional<Maxterm> convertToDNF(const BitsetTreeNode& node,
@@ -208,7 +210,7 @@ BitsetTreeNode convertToBitsetTree(const Maxterm& maxterm) {
 std::ostream& operator<<(std::ostream& os, const BitsetTreeNode& tree) {
     os << tree.type << ":" << tree.isNegated << "--" << tree.leafChildren << " ";
     os << "[";
-    StringData sep;
+    std::string_view sep;
     for (auto&& node : tree.internalChildren)
         os << std::exchange(sep, ", ") << node;
     os << "]";

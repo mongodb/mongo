@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_domain.h"
@@ -44,6 +43,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo::logv2 {
 class MONGO_MOD_PUBLIC LogDomainGlobal : public LogDomain::Internal {
@@ -74,7 +74,9 @@ public:
     LogSource& source() override;
 
     Status configure(ConfigurationOptions const& options);
-    Status rotate(bool rename, StringData renameSuffix, std::function<void(Status)> onMinorError);
+    Status rotate(bool rename,
+                  std::string_view renameSuffix,
+                  std::function<void(Status)> onMinorError);
 
     const ConfigurationOptions& config() const;
 

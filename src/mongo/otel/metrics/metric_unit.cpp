@@ -31,11 +31,13 @@
 
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 namespace mongo::otel::metrics {
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-StringData toString(MetricUnit unit) {
+std::string_view toString(MetricUnit unit) {
     switch (unit) {
         // Generic
         case MetricUnit::kEvents:

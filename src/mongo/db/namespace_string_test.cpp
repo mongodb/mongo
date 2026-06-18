@@ -39,6 +39,7 @@
 #include "mongo/util/duration.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -51,7 +52,7 @@ namespace mongo {
 
 class NamespaceStringTest : public unittest::Test {
 protected:
-    NamespaceString makeNamespaceString(boost::optional<TenantId> tenantId, StringData ns) {
+    NamespaceString makeNamespaceString(boost::optional<TenantId> tenantId, std::string_view ns) {
         return NamespaceString(tenantId, ns);
     }
 
@@ -59,22 +60,23 @@ protected:
         return NamespaceString(dbName);
     }
 
-    NamespaceString makeNamespaceString(const DatabaseName& dbName, StringData coll) {
+    NamespaceString makeNamespaceString(const DatabaseName& dbName, std::string_view coll) {
         return NamespaceString(dbName, coll);
     }
 
-    NamespaceString makeNamespaceString(StringData dbName, StringData coll) {
+    NamespaceString makeNamespaceString(std::string_view dbName, std::string_view coll) {
         return NamespaceString(boost::none, dbName, coll);
     }
 
     NamespaceString makeNamespaceString(boost::optional<TenantId> tenantId,
-                                        StringData db,
-                                        StringData coll) {
+                                        std::string_view db,
+                                        std::string_view coll) {
         return NamespaceString(tenantId, db, coll);
     }
 };
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 
 TEST_F(NamespaceStringTest, createNamespaceString_forTest) {
@@ -219,7 +221,7 @@ TEST_F(NamespaceStringTest, CollectionValidNames) {
     ASSERT(!NamespaceString::validCollectionName("$a"));
     ASSERT(!NamespaceString::validCollectionName("a$b"));
     ASSERT(!NamespaceString::validCollectionName(""));
-    ASSERT(!NamespaceString::validCollectionName("a\0b"_sd));
+    ASSERT(!NamespaceString::validCollectionName("a\0b"sv));
 }
 
 TEST_F(NamespaceStringTest, DbForSharding) {
@@ -279,18 +281,18 @@ TEST_F(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
 TEST_F(NamespaceStringTest, EmptyNSStringReturnsEmptyColl) {
     NamespaceString nss{};
     ASSERT_TRUE(nss.isEmpty());
-    ASSERT_EQ(nss.coll(), StringData{});
+    ASSERT_EQ(nss.coll(), std::string_view{});
 }
 
 TEST_F(NamespaceStringTest, EmptyNSStringReturnsEmptyDb) {
     NamespaceString nss{};
     ASSERT_TRUE(nss.isEmpty());
-    ASSERT_EQ(nss.db_forTest(), StringData{});
+    ASSERT_EQ(nss.db_forTest(), std::string_view{});
 }
 
 TEST_F(NamespaceStringTest, EmptyDbWithColl) {
     NamespaceString nss = makeNamespaceString(boost::none, "", "coll");
-    ASSERT_EQ(nss.db_forTest(), StringData{});
+    ASSERT_EQ(nss.db_forTest(), std::string_view{});
     ASSERT_EQ(nss.coll(), "coll");
     ASSERT_EQ(nss.dbName(), DatabaseName::kEmpty);
     ASSERT_EQ(nss.dbName().compare(DatabaseName::kEmpty), 0);
@@ -557,9 +559,9 @@ TEST_F(NamespaceStringTest, ConstRefAssignmentOperator) {
 // Verify we can create a new NamespaceString with a DatabaseName created by ns.dbName(). We must
 // ensure we discard the collection from `ns` and we don't end up with `db.collection.collection`.
 TEST_F(NamespaceStringTest, NamespaceToDatabaseRoundtrip) {
-    auto dbName = "test"_sd;
-    auto collName = "foo"_sd;
-    auto otherCollName = "othername"_sd;
+    auto dbName = "test"sv;
+    auto collName = "foo"sv;
+    auto otherCollName = "othername"sv;
 
     NamespaceString ns = makeNamespaceString(boost::none, dbName, collName);
     NamespaceString nsDbOnly =

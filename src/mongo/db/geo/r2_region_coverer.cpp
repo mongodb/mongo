@@ -30,7 +30,6 @@
 
 #include <boost/core/checked_delete.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/std_fwd.hpp"
-#include "mongo/base/string_data.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/logv2/log.h"

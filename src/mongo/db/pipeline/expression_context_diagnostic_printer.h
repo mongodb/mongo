@@ -34,6 +34,8 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
@@ -53,7 +55,7 @@ struct ExpressionContextPrinter {
         }
 
         out = fmt::format_to(out, "{{");
-        auto field = [&, sep = ""_sd](StringData name, auto&& value) mutable {
+        auto field = [&, sep = ""_sd](std::string_view name, auto&& value) mutable {
             out = fmt::format_to(out, "{}{}: {}", std::exchange(sep, ", "_sd), name, value);
         };
         field("collator", expCtx->getCollatorBSON().toString());

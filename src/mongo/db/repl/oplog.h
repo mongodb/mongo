@@ -56,6 +56,7 @@
 #include <iosfwd>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -198,13 +199,14 @@ using IncrementOpsAppliedStatsFn = std::function<void(int64_t)>;
  */
 class OplogApplication {
 public:
-    static constexpr StringData kInitialSyncOplogApplicationMode = "InitialSync"_sd;
+    static constexpr std::string_view kInitialSyncOplogApplicationMode = "InitialSync"_sd;
     // This only being used in 'applyOps' command when sent by client.
-    static constexpr StringData kRecoveringOplogApplicationMode = "Recovering"_sd;
-    static constexpr StringData kStableRecoveringOplogApplicationMode = "StableRecovering"_sd;
-    static constexpr StringData kUnstableRecoveringOplogApplicationMode = "UnstableRecovering"_sd;
-    static constexpr StringData kSecondaryOplogApplicationMode = "Secondary"_sd;
-    static constexpr StringData kApplyOpsCmdOplogApplicationMode = "ApplyOps"_sd;
+    static constexpr std::string_view kRecoveringOplogApplicationMode = "Recovering"_sd;
+    static constexpr std::string_view kStableRecoveringOplogApplicationMode = "StableRecovering"_sd;
+    static constexpr std::string_view kUnstableRecoveringOplogApplicationMode =
+        "UnstableRecovering"_sd;
+    static constexpr std::string_view kSecondaryOplogApplicationMode = "Secondary"_sd;
+    static constexpr std::string_view kApplyOpsCmdOplogApplicationMode = "ApplyOps"_sd;
 
     enum class Mode {
         // Used during the oplog application phase of the initial sync process.
@@ -231,7 +233,7 @@ public:
         return mode == Mode::kUnstableRecovering || mode == Mode::kStableRecovering;
     }
 
-    static StringData modeToString(Mode mode);
+    static std::string_view modeToString(Mode mode);
 
     static StatusWith<Mode> parseMode(const std::string& mode);
 
@@ -347,7 +349,7 @@ void registerApplyImportCollectionFn(ApplyImportCollectionFn func);
 
 template <typename F>
 auto writeConflictRetryWithLimit(OperationContext* opCtx,
-                                 StringData opStr,
+                                 std::string_view opStr,
                                  const NamespaceStringOrUUID& nssOrUUID,
                                  F&& f,
                                  bool dump = false) {

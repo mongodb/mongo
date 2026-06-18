@@ -32,7 +32,6 @@
 #include "mongo/transport/service_executor_reserved.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor_utils.h"
@@ -43,6 +42,7 @@
 
 #include <algorithm>
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
@@ -51,13 +51,14 @@
 namespace mongo {
 namespace transport {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kExecutorName = "reserved"_sd;
+constexpr auto kExecutorName = "reserved"sv;
 
-constexpr auto kThreadsRunning = "threadsRunning"_sd;
-constexpr auto kClientsInTotal = "clientsInTotal"_sd;
-constexpr auto kClientsRunning = "clientsRunning"_sd;
-constexpr auto kClientsWaiting = "clientsWaitingForData"_sd;
+constexpr auto kThreadsRunning = "threadsRunning"sv;
+constexpr auto kClientsInTotal = "clientsInTotal"sv;
+constexpr auto kClientsRunning = "clientsRunning"sv;
+constexpr auto kClientsWaiting = "clientsWaitingForData"sv;
 
 const auto getServiceExecutorReserved =
     ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorReserved>>();

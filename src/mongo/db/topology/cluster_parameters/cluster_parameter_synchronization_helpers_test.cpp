@@ -29,7 +29,6 @@
 
 #include "mongo/db/topology/cluster_parameters/cluster_parameter_synchronization_helpers.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_test_util.h"
 #include "mongo/unittest/log_test.h"

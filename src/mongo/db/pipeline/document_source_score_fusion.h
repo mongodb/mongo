@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/lite_parsed_score_fusion.h"
 
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -59,7 +60,7 @@ namespace mongo {
  */
 class DocumentSourceScoreFusion final {
 public:
-    static constexpr StringData kStageName = "$scoreFusion"_sd;
+    static constexpr std::string_view kStageName = "$scoreFusion"_sd;
 
     /**
      * Returns a list of stages to execute hybrid scoring with score fusion.

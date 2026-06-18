@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceSortToStageFn(
@@ -56,7 +58,7 @@ REGISTER_AGG_STAGE_MAPPING(sort, DocumentSourceSort::id, documentSourceSortToSta
     tasserted(10358905, "sort does not support control events");
 }
 
-SortStage::SortStage(StringData stageName,
+SortStage::SortStage(std::string_view stageName,
                      const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                      const std::shared_ptr<SortExecutor<Document>>& sortExecutor,
                      const std::shared_ptr<DocumentSourceSort::TimeSorterInterface>& timeSorter,
@@ -320,7 +322,7 @@ void SortStage::loadingDone() {
 
 std::pair<Date_t, Document> SortStage::extractTime(Document&& doc) const {
     const auto& fullPath = _sortExecutor->sortPattern().back().fieldPath->fullPath();
-    auto time = doc.getField(StringData{fullPath});
+    auto time = doc.getField(std::string_view{fullPath});
     uassert(6369909,
             "$_internalBoundedSort only handles BSONType::date values",
             time.getType() == BSONType::date);

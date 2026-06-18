@@ -32,6 +32,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/idl/idl_parser.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace repl {
 
@@ -44,7 +46,7 @@ ElectionReasonCounter parseElectionReasonCounter(const BSONElement& element) {
 }
 
 void serializeElectionReasonCounterToBSON(ElectionReasonCounter counter,
-                                          StringData fieldName,
+                                          std::string_view fieldName,
                                           BSONObjBuilder* builder) {
     builder->append(fieldName, counter.toBSON());
 }

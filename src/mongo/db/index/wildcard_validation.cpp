@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -38,7 +39,6 @@
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
@@ -46,7 +46,7 @@
 
 namespace mongo {
 namespace {
-static const StringData idFieldName = "_id";
+static const std::string_view idFieldName = "_id";
 /*
  * Validate that wildcardProjection fields do not overlap. It takes a sorted list of the
  * projection fields.

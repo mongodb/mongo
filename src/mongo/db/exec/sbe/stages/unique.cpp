@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/unique.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -39,6 +38,7 @@
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/stats/counters.h"
 
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_set.h>
@@ -46,6 +46,7 @@
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 namespace {
 
 template <typename T, typename H, typename E>
@@ -67,7 +68,7 @@ UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
                          value::SlotVector keys,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
-    : PlanStage("unique"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("unique"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _keySlots(keys),
       _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
           [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
@@ -204,10 +205,8 @@ UniqueRoaringStage::UniqueRoaringStage(std::unique_ptr<PlanStage> input,
                                        value::SlotId key,
                                        PlanNodeId planNodeId,
                                        bool participateInTrialRunTracking)
-    : PlanStage("unique_roaring"_sd,
-                nullptr /* yieldPolicy */,
-                planNodeId,
-                participateInTrialRunTracking),
+    : PlanStage(
+          "unique_roaring"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _keySlot(key),
       _seen(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
             static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),

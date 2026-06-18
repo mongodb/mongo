@@ -53,6 +53,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -70,7 +71,7 @@ namespace MONGO_MOD_PUBLIC transport {
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
 enum class TransportProtocol { MongoRPC, GRPC };
 
-inline StringData connectSSLModeToString(ConnectSSLMode mode) {
+inline std::string_view connectSSLModeToString(ConnectSSLMode mode) {
     switch (mode) {
         case kGlobalSSLMode:
             return "global"_sd;
@@ -160,7 +161,7 @@ public:
     /** Allows a `TransportLayer` to contribute to a FTDC readout. */
     virtual void appendStatsForFTDC(BSONObjBuilder& bob) const {}
 
-    virtual StringData getNameForLogging() const = 0;
+    virtual std::string_view getNameForLogging() const = 0;
 
     enum WhichReactor { kIngress, kEgress, kNewReactor };
     virtual ReactorHandle getReactor(WhichReactor which) = 0;

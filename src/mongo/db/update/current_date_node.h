@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/mutable_bson/element.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -78,7 +78,7 @@ protected:
     }
 
 private:
-    StringData operatorName() const final {
+    std::string_view operatorName() const final {
         return "$currentDate";
     }
 

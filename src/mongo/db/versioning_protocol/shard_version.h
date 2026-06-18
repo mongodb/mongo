@@ -40,6 +40,7 @@
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -62,7 +63,7 @@ public:
      * The name for the shard version information field, which shard-aware commands should include
      * if they want to convey shard version.
      */
-    static constexpr StringData kShardVersionField = "shardVersion"_sd;
+    static constexpr std::string_view kShardVersionField = "shardVersion"_sd;
 
     ShardVersion() : _chunkVersion(ChunkVersion()) {}
 
@@ -109,7 +110,7 @@ public:
     }
 
     static ShardVersion parse(const BSONElement& element);
-    void serialize(StringData field, BSONObjBuilder* builder) const;
+    void serialize(std::string_view field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
     BSONObj toBSON() const;

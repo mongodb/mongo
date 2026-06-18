@@ -36,6 +36,8 @@
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -85,10 +87,10 @@ boost::intrusive_ptr<DocumentSourceLookUp> makeLookUpFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 boost::intrusive_ptr<DocumentSourceLookUp> makeLookUpFromJson(
-    StringData json, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    std::string_view json, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 BSONObj sequentialCacheStageObj(
-    StringData status = "kBuilding"_sd,
+    std::string_view status = "kBuilding"_sd,
     long long maxSizeBytes = loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes));
 
 boost::intrusive_ptr<mongo::exec::agg::LookUpStage> buildLookUpStage(

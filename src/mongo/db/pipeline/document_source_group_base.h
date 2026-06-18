@@ -55,6 +55,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -228,12 +229,12 @@ public:
                            const boost::optional<OrderedPathSet>& initialShardKeyPaths) const;
 
 protected:
-    DocumentSourceGroupBase(StringData stageName,
+    DocumentSourceGroupBase(std::string_view stageName,
                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
 
     void initializeFromBson(BSONElement elem);
-    virtual bool isSpecFieldReserved(StringData fieldName) = 0;
+    virtual bool isSpecFieldReserved(std::string_view fieldName) = 0;
 
     virtual void serializeAdditionalFields(MutableDocument& out,
                                            const query_shape::SerializationOptions& opts =
@@ -254,8 +255,8 @@ protected:
     std::shared_ptr<GroupProcessor> _groupProcessor;
 
 private:
-    static constexpr StringData kDoingMergeSpecField = "$doingMerge"_sd;
-    static constexpr StringData kWillBeMergedSpecField = "$willBeMerged"_sd;
+    static constexpr std::string_view kDoingMergeSpecField = "$doingMerge"_sd;
+    static constexpr std::string_view kWillBeMergedSpecField = "$willBeMerged"_sd;
 
     /**
      * Returns true if 'dottedPath' is one of the group keys present in '_idExpressions'.

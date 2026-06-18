@@ -29,7 +29,6 @@
 #include "mongo/db/commands/oplog_application_checks.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -57,6 +56,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -65,6 +65,7 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 void checkBSONType(BSONType type, const BSONElement& elem) {
     uassert(elem.type() == BSONType::eoo ? ErrorCodes::NoSuchKey : ErrorCodes::TypeMismatch,
@@ -86,9 +87,9 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
                                                            AuthorizationSession* authSession) {
     BSONElement opTypeElem = oplogEntry["op"];
     checkBSONType(BSONType::string, opTypeElem);
-    const StringData opType = opTypeElem.checkAndGetStringData();
+    const std::string_view opType = opTypeElem.checkAndGetStringData();
 
-    if (opType == "n"_sd) {
+    if (opType == "n"sv) {
         // oplog notes require cluster permissions, and may not have a ns
         if (!authSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(dbName.tenantId()),
@@ -104,7 +105,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
     NamespaceString nss = NamespaceStringUtil::deserialize(
         tid, nsElem.checkAndGetStringData(), SerializationContext::stateDefault());
 
-    if (oplogEntry.hasField("ui"_sd)) {
+    if (oplogEntry.hasField("ui"sv)) {
         // ns by UUID overrides the ns specified if they are different.
         auto catalog = CollectionCatalog::get(opCtx);
         boost::optional<NamespaceString> uuidCollNS =
@@ -118,8 +119,8 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
     checkBSONType(BSONType::object, oElem);
     BSONObj o = oElem.Obj();
 
-    if (opType == "c"_sd) {
-        StringData commandName = o.firstElement().fieldNameStringData();
+    if (opType == "c"sv) {
+        std::string_view commandName = o.firstElement().fieldNameStringData();
         Command* commandInOplogEntry = CommandHelpers::findCommand(opCtx, commandName);
         if (!commandInOplogEntry) {
             // Some oplog entries are internal-only and not registered in the global command
@@ -127,7 +128,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
             // TODO(SERVER-114573): Remove upgradeDowngradeViewlessTimeseries from this list once
             // 9.0 becomes last-lts, as the oplog entry will no longer exist.
             static const StringDataSet kInternalOplogCommands{
-                "upgradeDowngradeViewlessTimeseries"_sd,
+                "upgradeDowngradeViewlessTimeseries"sv,
             };
             if (kInternalOplogCommands.contains(commandName)) {
                 if (!authSession->isAuthorizedForActionsOnResource(
@@ -141,7 +142,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         }
 
         auto dbNameForAuthCheck = nss.dbName();
-        if (commandName == "renameCollection"_sd) {
+        if (commandName == "renameCollection"sv) {
             // renameCollection commands must be run on the 'admin' database. Its arguments are
             // fully qualified namespaces. Catalog internals don't know the op produced by running
             // renameCollection was originally run on 'admin', so we must restore this.
@@ -170,9 +171,9 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         }();
     }
 
-    if (opType == "i"_sd) {
+    if (opType == "i"sv) {
         return auth::checkAuthForInsert(authSession, opCtx, nss);
-    } else if (opType == "u"_sd) {
+    } else if (opType == "u"sv) {
         BSONElement o2Elem = oplogEntry["o2"];
         checkBSONType(BSONType::object, o2Elem);
         BSONObj o2 = o2Elem.Obj();
@@ -192,9 +193,9 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
                                         write_ops::UpdateModification::parseFromOplogEntry(
                                             o, write_ops::UpdateModification::DiffOptions{}),
                                         upsert);
-    } else if (opType == "d"_sd) {
+    } else if (opType == "d"sv) {
         return auth::checkAuthForDelete(authSession, opCtx, nss, o);
-    } else if (opType == "db"_sd) {
+    } else if (opType == "db"sv) {
         // It seems that 'db' isn't used anymore. Require all actions to prevent casual use.
         ActionSet allActions;
         allActions.addAllActions();
@@ -203,17 +204,17 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
-    } else if (opType == "ci"_sd) {
+    } else if (opType == "ci"sv) {
         if (!authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::containerInsert)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
-    } else if (opType == "cd"_sd) {
+    } else if (opType == "cd"sv) {
         if (!authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::containerDelete)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
-    } else if (opType == "cu"_sd) {
+    } else if (opType == "cu"sv) {
         if (!authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::containerUpdate)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -256,7 +257,7 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
                 str::stream() << "\"op\" field is not a string: " << e.fieldName()};
     }
     // operation type -- see logOp() comments for types
-    StringData opType = opElement.valueStringDataSafe();
+    std::string_view opType = opElement.valueStringDataSafe();
     if (opType.empty()) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "\"op\" field value cannot be empty: " << e.fieldName()};
@@ -277,7 +278,7 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "namespaces cannot have embedded null characters"};
     }
-    if (opType != "n"_sd && nsElement.String().empty()) {
+    if (opType != "n"sv && nsElement.String().empty()) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "\"ns\" field value cannot be empty when op type is not 'n': "
                               << e.fieldName()};

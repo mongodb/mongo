@@ -35,27 +35,30 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::sbe {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Every canonical name round-trips through fromString -> toString.
 TEST(SbeFnNamesTest, RoundTrip) {
     for (size_t i = 0; i < static_cast<size_t>(EFn::kNumFunctions); ++i) {
         auto fn = static_cast<EFn>(i);
-        StringData name = toString(fn);
+        std::string_view name = toString(fn);
         ASSERT_EQUALS(fn, fromString(name)) << "round-trip failed for EFn(" << i << ") = " << name;
     }
 }
 
 // Dollar-prefixed ABT aliases resolve to the correct canonical enum values.
 TEST(SbeFnNamesTest, Aliases) {
-    ASSERT_EQUALS(EFn::kAddToArray, fromString("$push"_sd));
-    ASSERT_EQUALS(EFn::kAddToSet, fromString("$addToSet"_sd));
-    ASSERT_EQUALS(EFn::kFirst, fromString("$first"_sd));
-    ASSERT_EQUALS(EFn::kLast, fromString("$last"_sd));
-    ASSERT_EQUALS(EFn::kMax, fromString("$max"_sd));
-    ASSERT_EQUALS(EFn::kMin, fromString("$min"_sd));
-    ASSERT_EQUALS(EFn::kSum, fromString("$sum"_sd));
+    ASSERT_EQUALS(EFn::kAddToArray, fromString("$push"sv));
+    ASSERT_EQUALS(EFn::kAddToSet, fromString("$addToSet"sv));
+    ASSERT_EQUALS(EFn::kFirst, fromString("$first"sv));
+    ASSERT_EQUALS(EFn::kLast, fromString("$last"sv));
+    ASSERT_EQUALS(EFn::kMax, fromString("$max"sv));
+    ASSERT_EQUALS(EFn::kMin, fromString("$min"sv));
+    ASSERT_EQUALS(EFn::kSum, fromString("$sum"sv));
 }
 
 // EFunction::debugPrint() must emit the canonical string name of its EFn value.
@@ -72,7 +75,7 @@ TEST(SbeFnNamesTest, DebugPrintEmitsFunctionName) {
 
 // An unrecognised name must trigger a tassert (death test).
 DEATH_TEST_REGEX(SbeFnNamesDeathTest, UnknownNameTasserts, "8026700") {
-    fromString("noSuchFunction"_sd);
+    fromString("noSuchFunction"sv);
 }
 
 // Compiling an EFunction whose EFn is absent from both dispatch tables must uassert 4822847.

@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"

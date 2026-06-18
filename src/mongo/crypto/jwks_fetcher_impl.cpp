@@ -46,12 +46,13 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo::crypto {
 
-JWKSFetcherImpl::JWKSFetcherImpl(ClockSource* clock, StringData issuer)
+JWKSFetcherImpl::JWKSFetcherImpl(ClockSource* clock, std::string_view issuer)
     : _issuer(issuer), _clock(clock), _lastAttemptedFetchTime(Date_t::min()) {}
 
 JWKSet JWKSFetcherImpl::fetch() {
@@ -71,8 +72,8 @@ JWKSet JWKSFetcherImpl::fetch() {
         auto getJWKs = makeHTTPClient()->get(jwksUri);
 
         ConstDataRange cdr = getJWKs.getCursor();
-        StringData str;
-        cdr.readInto<StringData>(&str);
+        std::string_view str;
+        cdr.readInto<std::string_view>(&str);
 
         return JWKSet::parseOwned(fromjson(str), IDLParserContext("JWKSet"));
     } catch (DBException& ex) {

@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/accumulator_for_bucket_auto.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -42,12 +41,14 @@
 
 #include <iterator>
 #include <map>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 using FirstLastSense = AccumulatorFirstLastN::Sense;
 using FactoryFnMap = StringMap<std::function<AccumulatorState::Factory(ExpressionContext* const)>>;
 
@@ -78,18 +79,18 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
-    static constexpr StringData getName() {
+    static constexpr std::string_view getName() {
         if constexpr (single) {
             if constexpr (sense == Sense::kFirst) {
-                return "$first"_sd;
+                return "$first"sv;
             } else {
-                return "$last"_sd;
+                return "$last"sv;
             }
         } else {
             if constexpr (sense == Sense::kFirst) {
-                return "$firstN"_sd;
+                return "$firstN"sv;
             } else {
-                return "$lastN"_sd;
+                return "$lastN"sv;
             }
         }
     }
@@ -142,7 +143,7 @@ private:
  */
 class AccumulatorMergeObjectsForBucketAuto : public AccumulatorState {
 public:
-    static constexpr auto kName = "$mergeObjects"_sd;
+    static constexpr auto kName = "$mergeObjects"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -230,7 +231,7 @@ protected:
 
 class AccumulatorPushForBucketAuto : public AccumulatorPushConcatArraysCommonForBucketAuto {
 public:
-    static constexpr auto kName = "$push"_sd;
+    static constexpr auto kName = "$push"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -258,7 +259,7 @@ public:
 
 class AccumulatorConcatArraysForBucketAuto : public AccumulatorPushConcatArraysCommonForBucketAuto {
 public:
-    static constexpr auto kName = "$concatArrays"_sd;
+    static constexpr auto kName = "$concatArrays"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -571,7 +572,7 @@ void AccumulatorConcatArraysForBucketAuto::addToMap(long long inputPosition, Val
 }
 
 
-bool isPositionalAccumulator(StringData opName) {
+bool isPositionalAccumulator(std::string_view opName) {
     return factoryFnMap.contains(opName);
 }
 

@@ -48,7 +48,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/geo/big_polygon.h"
@@ -61,6 +60,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kGeo
@@ -69,6 +69,7 @@
 #define BAD_VALUE(error) Status(ErrorCodes::BadValue, str::stream() << error)
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace dps = ::mongo::bson;
 
@@ -882,7 +883,7 @@ GeoParser::GeoSpecifier GeoParser::parseGeoSpecifier(const BSONElement& type) {
     if (!type.isABSONObj()) {
         return GeoParser::UNKNOWN;
     }
-    StringData fieldName = type.fieldNameStringData();
+    std::string_view fieldName = type.fieldNameStringData();
     if (fieldName == kBoxField) {
         return GeoParser::BOX;
     } else if (fieldName == kCenterField) {
@@ -918,7 +919,7 @@ void GeoParser::assertValidGeoJSONType(const BSONObj& obj) {
             geoJSONTypeStringToEnum(str) != GeoParser::GEOJSON_UNKNOWN);
 }
 
-GeoParser::GeoJSONType GeoParser::geoJSONTypeStringToEnum(StringData type) {
+GeoParser::GeoJSONType GeoParser::geoJSONTypeStringToEnum(std::string_view type) {
     if (GEOJSON_TYPE_POINT == type) {
         return GeoParser::GEOJSON_POINT;
     } else if (GEOJSON_TYPE_LINESTRING == type) {
@@ -937,10 +938,10 @@ GeoParser::GeoJSONType GeoParser::geoJSONTypeStringToEnum(StringData type) {
     return GeoParser::GEOJSON_UNKNOWN;
 }
 
-StringData GeoParser::geoJSONTypeEnumToString(GeoParser::GeoJSONType type) {
+std::string_view GeoParser::geoJSONTypeEnumToString(GeoParser::GeoJSONType type) {
     switch (type) {
         case GEOJSON_UNKNOWN:
-            return "unknown"_sd;
+            return "unknown"sv;
         case GEOJSON_POINT:
             return GEOJSON_TYPE_POINT;
         case GEOJSON_LINESTRING:

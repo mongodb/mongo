@@ -36,10 +36,13 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::query_stats {
 namespace {
 
 using write_ops::InsertCommandRequest;
+using namespace std::literals::string_view_literals;
 
 class InsertKeyTest : public ServiceContextTest {
 public:
@@ -51,7 +54,7 @@ public:
         return _opCtx.get();
     }
 
-    std::unique_ptr<InsertKey> makeInsertKey(StringData cmd) {
+    std::unique_ptr<InsertKey> makeInsertKey(std::string_view cmd) {
         auto icr = InsertCommandRequest::parseOwned(fromjson(cmd));
         auto shape = std::make_unique<query_shape::InsertCmdShape>(icr);
         return std::make_unique<InsertKey>(
@@ -68,7 +71,7 @@ TEST_F(InsertKeyTest, DefaultInsertCmdComponents) {
         insert: "testColl",
         documents: [ { x: 1 } ],
         "$db": "testDB"
-    })"_sd));
+    })"sv));
 
     InsertCmdComponents components(icr);
 
@@ -86,7 +89,7 @@ TEST_F(InsertKeyTest, InsertCmdComponentsWithExplicitValues) {
         ordered: false,
         bypassDocumentValidation: true,
         "$db": "testDB"
-    })"_sd));
+    })"sv));
 
     InsertCmdComponents components(icr);
 
@@ -101,7 +104,7 @@ TEST_F(InsertKeyTest, SizeOfInsertCmdComponents) {
         insert: "testColl",
         documents: [ { x: 1 } ],
         "$db": "testDB"
-    })"_sd));
+    })"sv));
 
     InsertCmdComponents components(icr);
 
@@ -134,12 +137,12 @@ TEST_F(InsertKeyTest, InsertKeyShapeDocumentsIsAlwaysPlaceholder) {
         insert: "testColl",
         documents: [ { a: 1 } ],
         "$db": "testDB"
-    })"_sd));
+    })"sv));
     auto icr2 = InsertCommandRequest::parseOwned(fromjson(R"({
         insert: "testColl",
         documents: [ { b: "hello", c: true }, { d: 42 } ],
         "$db": "testDB"
-    })"_sd));
+    })"sv));
 
     query_shape::InsertCmdShape shape1(icr1);
     query_shape::InsertCmdShape shape2(icr2);

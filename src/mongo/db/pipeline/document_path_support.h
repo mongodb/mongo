@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <functional>
+#include <string_view>
 
 namespace mongo {
 namespace document_path_support {
@@ -66,7 +66,7 @@ template <bool PathsHaveUniqueFirstFields = false>
 void documentToBsonWithPaths(const Document& input,
                              const OrderedPathSet& paths,
                              BSONObjBuilder* builder) {
-    boost::optional<StringData> prevFirstField = boost::none;
+    boost::optional<std::string_view> prevFirstField = boost::none;
     for (auto&& path : paths) {
         // getNestedField does not handle dotted paths correctly, so instead of retrieving the
         // entire path, we just extract the first element of the path.

@@ -29,7 +29,6 @@
 
 #include "mongo/db/auth/auth_op_observer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -45,6 +44,7 @@
 #include "mongo/util/decorable.h"
 
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -131,7 +131,7 @@ void AuthOpObserver::onCreateCollection(
         auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
             createCollCatalogIdentifier->ident, collectionName.dbName());
         auto idIndexIdentUniqueTag = createCollCatalogIdentifier->idIndexIdent
-            ? boost::optional<StringData>(storageEngine->getIndexIdentUniqueTag(
+            ? boost::optional<std::string_view>(storageEngine->getIndexIdentUniqueTag(
                   *createCollCatalogIdentifier->idIndexIdent, collectionName.dbName()))
             : boost::none;
         o2 = repl::MutableOplogEntry::makeCreateCollObject2(

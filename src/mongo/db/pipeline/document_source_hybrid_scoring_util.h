@@ -33,9 +33,11 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::hybrid_scoring_util {
 
-static constexpr StringData kIsHybridSearchFlagFieldName = "$_internalIsHybridSearch"_sd;
+static constexpr std::string_view kIsHybridSearchFlagFieldName = "$_internalIsHybridSearch"_sd;
 
 /**
  * Checks if this stage is a $score stage, where it has been desugared to $setMetadata with the meta
@@ -60,7 +62,7 @@ double getPipelineWeight(const StringMap<double>& weights, const std::string& pi
 StringMap<double> validateWeights(
     const mongo::BSONObj& inputWeights,
     const std::map<std::string, std::unique_ptr<Pipeline>>& inputPipelines,
-    StringData stageName);
+    std::string_view stageName);
 
 /**
  * This function will fail the query in the case where nonexistent pipelines were referenced in the
@@ -77,7 +79,7 @@ void failWeightsValidationWithPipelineSuggestions(
     const std::map<std::string, std::unique_ptr<Pipeline>>& allPipelines,
     const stdx::unordered_set<std::string>& matchedPipelines,
     const std::vector<std::string>& invalidWeights,
-    StringData stageName);
+    std::string_view stageName);
 
 /**
  * Overload taking the unmatched pipeline names directly, for callers (such as the lite-parsed
@@ -151,7 +153,7 @@ void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
 /**
  * Returns either the name of the score field or the scorePath if includeDollarSign is true.
  */
-inline std::string getScoreFieldFromPipelineName(StringData pipelineName,
+inline std::string getScoreFieldFromPipelineName(std::string_view pipelineName,
                                                  bool includeDollarSign = false) {
     return includeDollarSign ? fmt::format("${}_score", pipelineName)
                              : fmt::format("{}_score", pipelineName);
@@ -161,8 +163,8 @@ inline std::string getScoreFieldFromPipelineName(StringData pipelineName,
  * Returns the name of the given value with the given internalFieldsName prefix concatenated to it.
  * Ex: <INTERNAL_FIELDS_NAME>.<value> // "_internal_rankFusion_internal_fields.inputPipelineRank"
  */
-inline std::string applyInternalFieldPrefixToFieldName(StringData internalFieldsName,
-                                                       StringData value) {
+inline std::string applyInternalFieldPrefixToFieldName(std::string_view internalFieldsName,
+                                                       std::string_view value) {
     return fmt::format("{}.{}", internalFieldsName, value);
 }
 

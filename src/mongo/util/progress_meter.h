@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -37,6 +36,7 @@
 
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace MONGO_MOD_PUB mongo {
@@ -82,7 +82,7 @@ public:
         return _units;
     }
 
-    void setName(StringData name) {
+    void setName(std::string_view name) {
         std::lock_guard lk(_nameMutex);
         _name = std::string{name};
     }

@@ -35,6 +35,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -54,7 +55,6 @@
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -91,7 +91,7 @@ TrafficReaderPacket readPacket(ConstDataRangeCursor cdr) {
     cdr.skip<LittleEndian<uint32_t>>();
     EventType eventType = cdr.readAndAdvance<EventType>();
     uint64_t id = cdr.readAndAdvance<LittleEndian<uint64_t>>();
-    StringData session = cdr.readAndAdvance<Terminated<'\0', StringData>>();
+    std::string_view session = cdr.readAndAdvance<Terminated<'\0', std::string_view>>();
     int64_t offsetMicrosCount = cdr.readAndAdvance<LittleEndian<uint64_t>>();
     Microseconds offset{offsetMicrosCount};
     uint64_t order = cdr.readAndAdvance<LittleEndian<uint64_t>>();

@@ -42,6 +42,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <variant>
 
 namespace MONGO_MOD_PUB mongo {
@@ -115,7 +116,7 @@ public:
     static const BSONObj Majority;
     static const BSONObj kInternalWriteDefault;
 
-    static constexpr StringData kWriteConcernField = "writeConcern"_sd;
+    static constexpr std::string_view kWriteConcernField = "writeConcern"_sd;
     static const char kMajority[];  // = "majority"
 
     WriteConcernOptions() = default;

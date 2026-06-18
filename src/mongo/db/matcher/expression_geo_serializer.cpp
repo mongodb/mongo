@@ -29,7 +29,6 @@
 
 #include "mongo/db/matcher/expression_geo_serializer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -51,7 +51,7 @@ void appendGeoNearLegacyArray(BSONObjBuilder& bob,
     } else {
         // Legacy $geoNear, $nearSphere, and $near require at minimum 2 coordinates to be
         // re-parseable, so the representative value is [1, 1].
-        StringData fieldName = e.fieldNameStringData();
+        std::string_view fieldName = e.fieldNameStringData();
         bob.appendArray(fieldName, BSON_ARRAY(1 << 1));
     }
 }
@@ -64,7 +64,7 @@ void appendShapeOperator(BSONObjBuilder& bob,
         return;
     }
 
-    StringData fieldName = e.fieldNameStringData();
+    std::string_view fieldName = e.fieldNameStringData();
     if (fieldName == kCenterField || fieldName == kCenterSphereField) {
         // $center and $centerSphere requires a pair of coordinates and a radius to be
         // re-parseable, so the representative value is [[1, 1],1].
@@ -92,7 +92,7 @@ void appendGeoJSONCoordinatesLiteral(BSONObjBuilder& bob,
         return;
     }
 
-    StringData fieldName = coordinatesElem.fieldNameStringData();
+    std::string_view fieldName = coordinatesElem.fieldNameStringData();
 
     // When a $geoNear expression is parsed (see GeoNearExpression::parseNewQuery()), a $geometry
     // object defaults to being parsed as a point, without checking the type of the geometry object.
@@ -279,7 +279,7 @@ void appendGeometryOperator(BSONObjBuilder& bob,
  * coordinates: [1,2]}, $minDistance: 10}).
  */
 void appendGeoNearOperator(BSONObjBuilder& bob,
-                           StringData fieldName,
+                           std::string_view fieldName,
                            const BSONElement& geoNearElem,
                            const query_shape::SerializationOptions& opts) {
     if (geoNearElem.type() == BSONType::array) {
@@ -356,7 +356,7 @@ void geoNearExpressionCustomSerialization(BSONObjBuilder& bob,
     while (outer_it.more()) {
         auto elem = outer_it.next();
         if (elem.isABSONObj()) {
-            StringData fieldName = elem.fieldNameStringData();
+            std::string_view fieldName = elem.fieldNameStringData();
             if (fieldName == kNearField || fieldName == kGeoNearField ||
                 fieldName == kNearSphereField) {
                 appendGeoNearOperator(bob, fieldName, elem, opts);

@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -56,7 +56,7 @@ public:
     MapReduceJavascriptCode() = default;
     MapReduceJavascriptCode(std::string&& code) : code(code) {}
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
         (*builder) << fieldName << code;
     }
 
@@ -88,7 +88,7 @@ public:
     MapReduceJavascriptCodeOrNull() = default;
     MapReduceJavascriptCodeOrNull(boost::optional<std::string> code) : code(code) {}
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
         if (code == boost::none) {
             (*builder) << fieldName << "null";
         } else {

@@ -31,11 +31,13 @@
 
 #include "mongo/base/error_codes.h"
 
+#include <string_view>
+
 namespace mongo::otel::metrics {
 
 namespace {
 
-bool isAscii(StringData s) {
+bool isAscii(std::string_view s) {
     for (size_t i = 0; i < s.size(); ++i) {
         if (static_cast<unsigned char>(s[i]) > 127) {
             return false;
@@ -44,7 +46,7 @@ bool isAscii(StringData s) {
     return true;
 }
 
-bool isCamelCaseSegment(StringData seg) {
+bool isCamelCaseSegment(std::string_view seg) {
     if (seg.empty()) {
         return false;
     }
@@ -68,7 +70,7 @@ bool isCamelCaseSegment(StringData seg) {
     return true;
 }
 
-Status validateOneSegment(StringData seg) {
+Status validateOneSegment(std::string_view seg) {
     if (seg.empty()) {
         return {ErrorCodes::InvalidOptions,
                 "serverStatus metric path cannot contain empty segments"};
@@ -81,7 +83,7 @@ Status validateOneSegment(StringData seg) {
 
 }  // namespace
 
-Status validateServerStatusMetricPath(StringData dottedPath) {
+Status validateServerStatusMetricPath(std::string_view dottedPath) {
     if (dottedPath.empty()) {
         return {ErrorCodes::InvalidOptions, "serverStatus metric path cannot be empty"};
     }
@@ -103,7 +105,7 @@ Status validateServerStatusMetricPath(StringData dottedPath) {
         if (dottedPath[i] != '.') {
             continue;
         }
-        const StringData seg = dottedPath.substr(segStart, i - segStart);
+        const std::string_view seg = dottedPath.substr(segStart, i - segStart);
         if (auto st = validateOneSegment(seg); !st.isOK()) {
             return st;
         }

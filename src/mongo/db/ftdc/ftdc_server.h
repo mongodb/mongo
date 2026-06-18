@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
@@ -45,6 +44,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include <boost/filesystem/path.hpp>
 
@@ -99,8 +99,8 @@ void registerServerCollectors(FTDCController* controller);
  */
 class FTDCSimpleInternalCommandCollector : public FTDCCollectorInterface {
 public:
-    FTDCSimpleInternalCommandCollector(StringData command,
-                                       StringData name,
+    FTDCSimpleInternalCommandCollector(std::string_view command,
+                                       std::string_view name,
                                        const DatabaseName& db,
                                        BSONObj cmdObj);
 

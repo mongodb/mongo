@@ -58,6 +58,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -88,7 +89,7 @@ MONGO_FAIL_POINT_DEFINE(skipEnforcingFastSizeAndCount);
 
 namespace collection_validation {
 
-StringData toString(FastCountType fastCountType) {
+std::string_view toString(FastCountType fastCountType) {
     switch (fastCountType) {
         case FastCountType::legacySizeStorer:
             return "legacySizeStorer";

@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/tee_buffer.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -45,7 +45,7 @@ class TeeConsumerStage final : public Stage {
 public:
     TeeConsumerStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      size_t facetId,
-                     StringData stageName);
+                     std::string_view stageName);
 
     void setTeeBuffer(const boost::intrusive_ptr<TeeBuffer>& bufferSource);
 

@@ -41,6 +41,7 @@
 
 #include <limits>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -218,12 +219,13 @@ TEST(ElemMatchProjection, ReturnsEmptyValueIfItContainsNumericSubfield) {
     ASSERT_VALUE_EQ({},
                     applyElemMatch(fromjson("{$gt: 2}"),
                                    "foo",
-                                   Document{BSON("foo" << BSON(StringData{} << 3))}));
+                                   Document{BSON("foo" << BSON(std::string_view{} << 3))}));
 
-    ASSERT_VALUE_EQ({},
-                    applyElemMatch(fromjson("{$gt: 2}"),
-                                   "foo",
-                                   Document{BSON("bar" << 1 << "foo" << BSON(StringData{} << 3))}));
+    ASSERT_VALUE_EQ(
+        {},
+        applyElemMatch(fromjson("{$gt: 2}"),
+                       "foo",
+                       Document{BSON("bar" << 1 << "foo" << BSON(std::string_view{} << 3))}));
 }
 }  // namespace elem_match_projection_tests
 

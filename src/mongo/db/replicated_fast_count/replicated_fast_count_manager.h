@@ -51,6 +51,7 @@
 #include "mongo/util/uuid.h"
 
 #include <mutex>
+#include <string_view>
 
 #include <boost/container/flat_map.hpp>
 #include <boost/optional/optional.hpp>
@@ -262,7 +263,7 @@ private:
     // one ReplicatedFastCountManager per mongod process.
     static inline ReplicatedFastCountMetrics _metrics;
 
-    StringData _threadName = "replicatedSizeCount"_sd;
+    std::string_view _threadName = "replicatedSizeCount"_sd;
     stdx::thread _backgroundThread;
     Atomic<bool> _isEnabled = false;
     stdx::condition_variable _backgroundThreadReadyForFlush;

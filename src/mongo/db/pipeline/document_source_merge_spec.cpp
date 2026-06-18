@@ -42,6 +42,8 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -82,7 +84,7 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
 }
 
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
-                                   StringData fieldName,
+                                   std::string_view fieldName,
                                    BSONObjBuilder* bob,
                                    const SerializationContext& sc,
                                    const query_shape::SerializationOptions& opts) {
@@ -126,7 +128,7 @@ std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
 }
 
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
-                                  StringData fieldName,
+                                  std::string_view fieldName,
                                   BSONObjBuilder* bob,
                                   const query_shape::SerializationOptions& opts) {
     if (fields.size() == 1) {
@@ -161,7 +163,7 @@ MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem) {
 }
 
 void mergeWhenMatchedSerializeToBSON(const MergeWhenMatchedPolicy& policy,
-                                     StringData fieldName,
+                                     std::string_view fieldName,
                                      BSONObjBuilder* bob) {
     if (policy.mode == MergeWhenMatchedModeEnum::kPipeline) {
         tassert(11282973, "Merge policy lacks the pipeline", policy.pipeline);

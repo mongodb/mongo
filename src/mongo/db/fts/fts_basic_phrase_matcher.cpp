@@ -33,12 +33,13 @@
 
 #include <algorithm>
 #include <cstring>
+#include <string_view>
 
 namespace mongo {
 namespace fts {
 
-bool BasicFTSPhraseMatcher::phraseMatches(StringData phrase,
-                                          StringData haystack,
+bool BasicFTSPhraseMatcher::phraseMatches(std::string_view phrase,
+                                          std::string_view haystack,
                                           Options options) const {
     if (options & kCaseSensitive) {
         return haystack.find(phrase) != std::string::npos;

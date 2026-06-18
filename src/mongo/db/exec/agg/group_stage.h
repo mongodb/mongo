@@ -32,13 +32,15 @@
 #include "mongo/db/exec/agg/group_base_stage.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace exec {
 namespace agg {
 
 class GroupStage final : public GroupBaseStage {
 public:
-    GroupStage(StringData stageName,
+    GroupStage(std::string_view stageName,
                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                const std::shared_ptr<GroupProcessor>& groupProcessor);
 

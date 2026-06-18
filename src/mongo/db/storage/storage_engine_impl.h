@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/database_name.h"
@@ -61,6 +60,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -132,17 +132,17 @@ public:
                                                KeyFormat keyFormat,
                                                int64_t thresholdBytes) override;
 
-    void dropSpillTable(RecoveryUnit& ru, StringData ident) override;
+    void dropSpillTable(RecoveryUnit& ru, std::string_view ident) override;
 
     std::unique_ptr<RecordStore> makeInternalRecordStore(OperationContext* opCtx,
-                                                         StringData ident,
+                                                         std::string_view ident,
                                                          KeyFormat keyFormat) override;
 
     void cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) override;
 
     void setLastMaterializedLsn(uint64_t lsn) override;
 
-    void setRecoveryCheckpointMetadata(StringData checkpointMetadata) override;
+    void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) override;
 
     void promoteToLeader() override;
 
@@ -181,7 +181,7 @@ public:
 
     bool supportsReadConcernSnapshot() const final;
 
-    Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident) final;
+    Status immediatelyCompletePendingDrop(OperationContext* opCtx, std::string_view ident) final;
 
     SnapshotManager* getSnapshotManager() const final;
 
@@ -207,19 +207,19 @@ public:
         return _spillEngine.get();
     }
 
-    void dropIdent(RecoveryUnit& ru, StringData ident) override;
+    void dropIdent(RecoveryUnit& ru, std::string_view ident) override;
     void addDropPendingIdent(const DropTime& dropTime,
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) override;
     void dropUnknownIdent(RecoveryUnit& ru,
                           const Timestamp& stableTimestamp,
-                          StringData ident) override;
+                          std::string_view ident) override;
 
     void dropIdentTimestamped(OperationContext* opCtx,
-                              StringData ident,
+                              std::string_view ident,
                               Timestamp timestamp) override;
 
-    std::shared_ptr<Ident> markIdentInUse(StringData ident) override;
+    std::shared_ptr<Ident> markIdentInUse(std::string_view ident) override;
 
     void startTimestampMonitor(
         std::initializer_list<TimestampMonitor::TimestampListener*> listeners) override;
@@ -262,20 +262,21 @@ public:
 
     std::string generateNewCollectionIdent(
         const DatabaseName& dbName,
-        const boost::optional<StringData>& optIdentUniqueTag) const override;
+        const boost::optional<std::string_view>& optIdentUniqueTag) const override;
     std::string generateNewIndexIdent(
         const DatabaseName& dbName,
-        const boost::optional<StringData>& optIdentUniqueTag) const override;
+        const boost::optional<std::string_view>& optIdentUniqueTag) const override;
 
-    StringData getCollectionIdentUniqueTag(StringData ident,
-                                           const DatabaseName& dbName) const override;
-    StringData getIndexIdentUniqueTag(StringData ident, const DatabaseName& dbName) const override;
+    std::string_view getCollectionIdentUniqueTag(std::string_view ident,
+                                                 const DatabaseName& dbName) const override;
+    std::string_view getIndexIdentUniqueTag(std::string_view ident,
+                                            const DatabaseName& dbName) const override;
 
     bool storesFilesInDbPath() const override {
         return !_options.directoryForIndexes && !_options.directoryPerDB;
     }
 
-    int64_t getIdentSize(RecoveryUnit& ru, StringData ident) const final {
+    int64_t getIdentSize(RecoveryUnit& ru, std::string_view ident) const final {
         return _engine->getIdentSize(ru, ident);
     }
 
@@ -301,11 +302,11 @@ public:
     bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) override;
 
     BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
-                                    StringData flagName,
+                                    std::string_view flagName,
                                     boost::optional<bool> flagValue) const override;
 
     boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
-                                                    StringData flagName) const override;
+                                                    std::string_view flagName) const override;
 
     [[nodiscard]] BSONObj setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
                                                          StorageTierLevelEnum value) const override;
@@ -342,7 +343,7 @@ private:
     Status _recoverOrphanedCollection(OperationContext* opCtx,
                                       RecordId catalogId,
                                       const NamespaceString& collectionName,
-                                      StringData collectionIdent);
+                                      std::string_view collectionIdent);
 
     /**
      * Throws a fatal assertion if there are any missing index idents from the storage engine for

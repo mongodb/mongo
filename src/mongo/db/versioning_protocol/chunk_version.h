@@ -46,6 +46,7 @@
 #include <iosfwd>
 #include <limits>
 #include <string>
+#include <string_view>
 
 #include <absl/hash/hash.h>
 
@@ -145,7 +146,7 @@ public:
      * The name for the chunk version information field, which ddl operations use to send only
      * the placement information. String is shardVersion for compatibility with previous versions.
      */
-    static constexpr StringData kChunkVersionField = "shardVersion"_sd;
+    static constexpr std::string_view kChunkVersionField = "shardVersion"_sd;
 
     ChunkVersion(CollectionGeneration geneneration, CollectionPlacement placement)
         : CollectionGeneration(geneneration), CollectionPlacement(placement) {}
@@ -258,7 +259,7 @@ public:
     }
 
     static ChunkVersion parse(const BSONElement& element);
-    void serialize(StringData field, BSONObjBuilder* builder) const;
+    void serialize(std::string_view field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
 

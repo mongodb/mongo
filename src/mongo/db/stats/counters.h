@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
@@ -53,6 +52,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -175,8 +175,8 @@ public:
         MechanismData* _data;
     };
 
-    IngressMechanismCounterHandle getIngressMechanismCounter(StringData mechanism);
-    EgressMechanismCounterHandle getEgressMechanismCounter(StringData mechanism);
+    IngressMechanismCounterHandle getIngressMechanismCounter(std::string_view mechanism);
+    EgressMechanismCounterHandle getEgressMechanismCounter(std::string_view mechanism);
 
     void incSaslSupportedMechanismsReceived();
 
@@ -192,7 +192,7 @@ private:
     struct SuccessCounter {
         AtomicWord<long long> total;
         AtomicWord<long long> successful;
-        void appendAsSubobj(BSONObjBuilder& bob, StringData fieldName) const;
+        void appendAsSubobj(BSONObjBuilder& bob, std::string_view fieldName) const;
     };
     struct MechanismData {
         struct {
@@ -229,7 +229,7 @@ public:
     }
 
     /** requires `name` be a metric previously added with `addMetric`. */
-    void increment(StringData name, long long n = 1) {
+    void increment(std::string_view name, long long n = 1) {
         _stages.find(name)->second->incrementRelaxed(n);
     }
 
@@ -787,7 +787,7 @@ public:
         _validatorCounterMap["collMod"] = std::make_unique<ValidatorCounter>("collMod");
     }
 
-    void incrementCounters(const StringData cmdName,
+    void incrementCounters(const std::string_view cmdName,
                            const BSONObj& validator,
                            bool parsingSucceeded) {
         if (!validator.isEmpty()) {
@@ -809,7 +809,7 @@ public:
 
 private:
     struct ValidatorCounter {
-        explicit ValidatorCounter(StringData name)
+        explicit ValidatorCounter(std::string_view name)
             : totalCounter{makeMetric(name, "total")},
               failedCounter{makeMetric(name, "failed")},
               jsonSchemaCounter{makeMetric(name, "jsonSchema")} {}
@@ -817,7 +817,7 @@ private:
         ValidatorCounter& operator=(const ValidatorCounter&) = delete;
         ValidatorCounter(const ValidatorCounter&) = delete;
 
-        static Counter64& makeMetric(StringData name, StringData leaf) {
+        static Counter64& makeMetric(std::string_view name, std::string_view leaf) {
             return *MetricBuilder<Counter64>{fmt::format("commands.{}.validator.{}", name, leaf)};
         }
 
@@ -839,7 +839,7 @@ public:
     }
 
     // Passing boost::none counts as "default" (validator present, no explicit level).
-    void increment(StringData cmdName, boost::optional<ValidationLevelEnum> level) {
+    void increment(std::string_view cmdName, boost::optional<ValidationLevelEnum> level) {
         auto it = _validationLevelCounterMap.find(cmdName);
         tassert(12371400,
                 str::stream() << "Validation level counters not supported for command: " << cmdName,
@@ -866,7 +866,7 @@ public:
 
 private:
     struct ValidationLevelCounter {
-        explicit ValidationLevelCounter(StringData name)
+        explicit ValidationLevelCounter(std::string_view name)
             : defaultLevel{makeMetric(name, "default")},
               off{makeMetric(name, "off")},
               moderate{makeMetric(name, "moderate")},
@@ -876,7 +876,7 @@ private:
         ValidationLevelCounter& operator=(const ValidationLevelCounter&) = delete;
         ValidationLevelCounter(const ValidationLevelCounter&) = delete;
 
-        static Counter64& makeMetric(StringData name, StringData level) {
+        static Counter64& makeMetric(std::string_view name, std::string_view level) {
             return *MetricBuilder<Counter64>{
                 fmt::format("commands.{}.validationLevel.{}", name, level)};
         }
@@ -904,7 +904,7 @@ extern OperatorCounters operatorCountersWindowAccumulatorExpressions;
 
 struct QueryCounters {
 private:
-    static Counter64& _makeCounter(StringData name, ClusterRole role) {
+    static Counter64& _makeCounter(std::string_view name, ClusterRole role) {
         return *MetricBuilder<Counter64>{fmt::format("query.{}", name)}.setRole(role);
     }
 
@@ -998,7 +998,7 @@ struct ServerStatusMetricPolicySelection<DurationCounter64<D>> {
             return _v;
         }
 
-        void appendTo(BSONObjBuilder& b, StringData leafName) const {
+        void appendTo(BSONObjBuilder& b, std::string_view leafName) const {
             b.append(leafName, static_cast<long long>(_v.get().count()));
         }
 

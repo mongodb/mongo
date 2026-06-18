@@ -28,8 +28,9 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -64,9 +65,9 @@ public:
      * are meant to facilitate cases where the metric names should not be visible outside some
      * module, in order to prevent leaking information related to that module.
      */
-    constexpr MetricName(StringData name, Passkey<MetricNameMaker>) : _name(name) {}
-    constexpr MetricName(StringData name, Passkey<disagg::MetricNameMaker>) : _name(name) {}
-    constexpr StringData getName() const {
+    constexpr MetricName(std::string_view name, Passkey<MetricNameMaker>) : _name(name) {}
+    constexpr MetricName(std::string_view name, Passkey<disagg::MetricNameMaker>) : _name(name) {}
+    constexpr std::string_view getName() const {
         return _name;
     }
 
@@ -75,12 +76,12 @@ public:
     }
 
 private:
-    StringData _name;
+    std::string_view _name;
 };
 
 /** Helper to create MetricName instances. */
 class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricName make(
-    StringData name){return MetricName(name, Passkey<MetricNameMaker>{});
+    std::string_view name){return MetricName(name, Passkey<MetricNameMaker>{});
 }  // namespace otel::metrics
 };  // namespace mongo
 
@@ -103,7 +104,7 @@ public:
         constexpr Passkey() = default;
     };
 
-    static MetricName make(StringData name, Passkey passkey) {
+    static MetricName make(std::string_view name, Passkey passkey) {
         return MetricNameMaker::make(name);
     }
 };

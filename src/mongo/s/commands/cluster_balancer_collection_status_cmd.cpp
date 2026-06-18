@@ -29,7 +29,6 @@
 
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -48,12 +47,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class BalancerCollectionStatusCmd final : public TypedCommand<BalancerCollectionStatusCmd> {
 public:
@@ -64,7 +65,7 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        StringData kStatusField = "status"_sd;
+        std::string_view kStatusField = "status"sv;
 
         Response typedRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();

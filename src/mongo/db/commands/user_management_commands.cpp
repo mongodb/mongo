@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -129,6 +128,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -187,8 +187,9 @@ public:
 using CmdUMCPassthrough = auth::AuthorizationBackendInterface::CmdUMCPassthrough;
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kOne = "1"_sd;
+constexpr auto kOne = "1"sv;
 
 Status useDefaultCode(const Status& status, ErrorCodes::Error defaultCode) {
     if (status.code() == ErrorCodes::UnknownError) {
@@ -582,7 +583,7 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
         return;
     }
 
-    auto haveAuthMechanism = [&](StringData mech) {
+    auto haveAuthMechanism = [&](std::string_view mech) {
         const auto& v = saslGlobalParams.authenticationMechanisms;
         return std::find(v.begin(), v.end(), mech) != v.end();
     };
@@ -659,7 +660,7 @@ class UMCTransactionClient {
 public:
     UMCTransactionClient() = delete;
 
-    UMCTransactionClient(StringData cmdName) : _cmdName(cmdName) {}
+    UMCTransactionClient(std::string_view cmdName) : _cmdName(cmdName) {}
 
     virtual BatchedCommandResponse runCRUDOp(const BatchedCommandRequest& request,
                                              std::vector<StmtId> stmtIds) = 0;
@@ -672,7 +673,7 @@ class UMCTransaction {
 public:
     UMCTransaction() = delete;
 
-    UMCTransaction(StringData cmdName) : _cmdName(cmdName) {}
+    UMCTransaction(std::string_view cmdName) : _cmdName(cmdName) {}
 
     virtual void run(OperationContext* opCtx,
                      unique_function<Status(UMCTransactionClient&)> txnOpsCallback) = 0;
@@ -691,9 +692,9 @@ class UMCTransactionStandalone : public UMCTransaction {
 private:
     class UMCTransactionClientStandalone : public UMCTransactionClient {
     public:
-        static constexpr StringData kAdminDB = "admin"_sd;
+        static constexpr std::string_view kAdminDB = "admin"sv;
 
-        explicit UMCTransactionClientStandalone(OperationContext* opCtx, StringData cmdName)
+        explicit UMCTransactionClientStandalone(OperationContext* opCtx, std::string_view cmdName)
             : UMCTransactionClient(cmdName),
               _client(opCtx->getServiceContext()->getService()->makeClient(std::string{cmdName})),
               _writeConcern(opCtx->getWriteConcern().toBSON().removeField(
@@ -761,7 +762,7 @@ private:
     };
 
 public:
-    UMCTransactionStandalone(StringData cmdName) : UMCTransaction(cmdName) {}
+    UMCTransactionStandalone(std::string_view cmdName) : UMCTransaction(cmdName) {}
 
     void run(OperationContext* opCtx,
              unique_function<Status(UMCTransactionClient&)> txnOpsCallback) final {
@@ -812,7 +813,7 @@ class UMCTransactionReplSet : public UMCTransaction {
 private:
     class UMCTransactionClientReplSet : public UMCTransactionClient {
     public:
-        explicit UMCTransactionClientReplSet(StringData cmdName,
+        explicit UMCTransactionClientReplSet(std::string_view cmdName,
                                              const txn_api::TransactionClient& client)
             : UMCTransactionClient(cmdName), _txnClient(client) {}
         UMCTransactionClientReplSet(const txn_api::TransactionClient&&) = delete;
@@ -827,7 +828,7 @@ private:
     };
 
 public:
-    UMCTransactionReplSet(StringData cmdName) : UMCTransaction(cmdName) {}
+    UMCTransactionReplSet(std::string_view cmdName) : UMCTransaction(cmdName) {}
 
     void run(OperationContext* opCtx,
              unique_function<Status(UMCTransactionClient&)> txnOpsCallback) final {
@@ -885,9 +886,9 @@ void uassertNoUnrecognizedActions(const std::vector<std::string>& unrecognizedAc
     }
 
     // Dedupe
-    std::set<StringData> actions;
+    std::set<std::string_view> actions;
     for (const auto& action : unrecognizedActions) {
-        actions.insert(StringData{action});
+        actions.insert(std::string_view{action});
     }
 
     StringBuilder sb;
@@ -953,7 +954,7 @@ template <typename T>
 using HasGetCmdParamOp = std::remove_cv_t<decltype(std::declval<T>().getCommandParameter())>;
 template <typename T>
 constexpr bool hasGetCmdParamStringData =
-    stdx::is_detected_exact_v<StringData, HasGetCmdParamOp, T>;
+    stdx::is_detected_exact_v<std::string_view, HasGetCmdParamOp, T>;
 
 
 using ResolvedRoleData = auth::AuthorizationBackendInterface::ResolvedRoleData;
@@ -1101,7 +1102,7 @@ void trimCredentials(OperationContext* opCtx,
                      const UserName& userName,
                      BSONObjBuilder* queryBuilder,
                      BSONObjBuilder* unsetBuilder,
-                     const std::vector<StringData>& mechanisms) {
+                     const std::vector<std::string_view>& mechanisms) {
     BSONObj userObj;
     auto sharedAcquisitionStats = CurOp::get(opCtx)->getUserAcquisitionStats();
     auto userReq = std::make_unique<UserRequestGeneral>(userName, boost::none);
@@ -1143,9 +1144,9 @@ void trimCredentials(OperationContext* opCtx,
 
 class CmdCreateUser : public CmdUMCTyped<CreateUserCommand> {
 public:
-    static constexpr StringData kPwdField = "pwd"_sd;
+    static constexpr std::string_view kPwdField = "pwd"sv;
 
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {kPwdField};
     }
 };
@@ -1262,9 +1263,9 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
 
 class CmdUpdateUser : public CmdUMCTyped<UpdateUserCommand> {
 public:
-    static constexpr StringData kPwdField = "pwd"_sd;
+    static constexpr std::string_view kPwdField = "pwd"sv;
 
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {kPwdField};
     }
 };
@@ -1665,8 +1666,8 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
     // Build up update modifier object to $set privileges.
     BSONObj updateBSON = [&] {
         BSONObjBuilder updateBuilder;
-        BSONObjBuilder updateSetBuilder(updateBuilder.subobjStart("$set"_sd));
-        BSONArrayBuilder privilegeBuilder(updateSetBuilder.subarrayStart("privileges"_sd));
+        BSONObjBuilder updateSetBuilder(updateBuilder.subobjStart("$set"sv));
+        BSONArrayBuilder privilegeBuilder(updateSetBuilder.subarrayStart("privileges"sv));
         Privilege::serializePrivilegeVector(privileges, &privilegeBuilder);
         privilegeBuilder.doneFast();
         updateSetBuilder.doneFast();
@@ -1724,8 +1725,8 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
     // Build up update modifier object to $set privileges.
     BSONObj updateBSON = [&] {
         BSONObjBuilder updateBuilder;
-        BSONObjBuilder updateSetBuilder(updateBuilder.subobjStart("$set"_sd));
-        BSONArrayBuilder privilegeBuilder(updateSetBuilder.subarrayStart("privileges"_sd));
+        BSONObjBuilder updateSetBuilder(updateBuilder.subobjStart("$set"sv));
+        BSONArrayBuilder privilegeBuilder(updateSetBuilder.subarrayStart("privileges"sv));
         Privilege::serializePrivilegeVector(privileges, &privilegeBuilder);
         privilegeBuilder.doneFast();
         updateSetBuilder.doneFast();
@@ -2184,7 +2185,7 @@ void _auditCreateOrUpdateUser(const BSONObj& userObj, bool create) {
  */
 void _addUser(OperationContext* opCtx,
               AuthorizationManager* authzManager,
-              StringData db,
+              std::string_view db,
               bool update,
               stdx::unordered_set<UserName>* usersToDrop,
               const BSONObj& userObj) {
@@ -2254,8 +2255,8 @@ Status queryAuthzDocument(OperationContext* opCtx,
  */
 void _processUsers(OperationContext* opCtx,
                    AuthorizationManager* authzManager,
-                   StringData usersCollName,
-                   StringData db,
+                   std::string_view usersCollName,
+                   std::string_view db,
                    const bool drop,
                    const boost::optional<TenantId>& tenantId) {
     // When the "drop" argument has been provided, we use this set to store the users
@@ -2344,7 +2345,7 @@ void _auditCreateOrUpdateRole(const BSONObj& roleObj, bool create) {
  */
 void _addRole(OperationContext* opCtx,
               AuthorizationManager* authzManager,
-              StringData db,
+              std::string_view db,
               bool update,
               stdx::unordered_set<RoleName>* rolesToDrop,
               const BSONObj roleObj) {
@@ -2383,8 +2384,8 @@ void _addRole(OperationContext* opCtx,
  */
 void _processRoles(OperationContext* opCtx,
                    AuthorizationManager* authzManager,
-                   StringData rolesCollName,
-                   StringData db,
+                   std::string_view rolesCollName,
+                   std::string_view db,
                    const bool drop,
                    const boost::optional<TenantId>& tenantId) {
     // When the "drop" argument has been provided, we use this set to store the roles

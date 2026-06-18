@@ -42,6 +42,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -92,7 +93,7 @@ public:
  */
 class DocumentSourceScore final {
 public:
-    static constexpr StringData kStageName = "$score"_sd;
+    static constexpr std::string_view kStageName = "$score"_sd;
 
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

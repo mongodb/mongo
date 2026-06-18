@@ -40,6 +40,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -92,7 +93,8 @@ std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
     }
 }
 
-DatabaseName DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName) {
+DatabaseName DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+    std::string_view dbName) {
     if (!gMultitenancySupport) {
         return DatabaseName(boost::none, dbName);
     }
@@ -115,7 +117,7 @@ DatabaseName DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(S
 }
 
 DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
-                                           StringData db,
+                                           std::string_view db,
                                            const SerializationContext& context) {
     if (!gMultitenancySupport) {
         uassert(7005302, "TenantId must not be set, but it is: ", tenantId == boost::none);
@@ -144,7 +146,7 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
 }
 
 DatabaseName DatabaseNameUtil::deserializeForStorage(boost::optional<TenantId> tenantId,
-                                                     StringData db) {
+                                                     std::string_view db) {
     // TODO SERVER-84275: Change to use isEnabled again.
     // We need to use isEnabledUseLastLTSFCVWhenUninitialized instead of isEnabled because
     // this could run during startup while the FCV is still uninitialized.
@@ -172,7 +174,7 @@ DatabaseName DatabaseNameUtil::deserializeForStorage(boost::optional<TenantId> t
 }
 
 DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> tenantId,
-                                                      StringData db,
+                                                      std::string_view db,
                                                       const SerializationContext& context) {
     // we only get here if we are processing a Command Request.  We disregard the feature flag in
     // this case, essentially letting the request dictate the state of the feature.
@@ -222,7 +224,7 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
 }
 
 DatabaseName DatabaseNameUtil::deserializeForCatalog(boost::optional<TenantId> tenantId,
-                                                     StringData db) {
+                                                     std::string_view db) {
     // Internally, CollectionCatalog still keys against DatabaseName but needs to address
     // all tenantIds when pattern matching by passing in boost::none.
     if (tenantId == boost::none) {
@@ -231,7 +233,8 @@ DatabaseName DatabaseNameUtil::deserializeForCatalog(boost::optional<TenantId> t
     return DatabaseName(std::move(tenantId), db);
 }
 
-DatabaseName DatabaseNameUtil::parseFailPointData(const BSONObj& data, StringData dbFieldName) {
+DatabaseName DatabaseNameUtil::parseFailPointData(const BSONObj& data,
+                                                  std::string_view dbFieldName) {
     const auto db = data.getStringField(dbFieldName);
     const auto tenantField = data.getField("tenantId");
     const auto tenantId = tenantField.ok()
@@ -240,7 +243,7 @@ DatabaseName DatabaseNameUtil::parseFailPointData(const BSONObj& data, StringDat
     return DatabaseNameUtil::deserialize(tenantId, db, SerializationContext::stateDefault());
 }
 
-DatabaseName DatabaseNameUtil::deserializeForErrorMsg(StringData dbInErrMsg) {
+DatabaseName DatabaseNameUtil::deserializeForErrorMsg(std::string_view dbInErrMsg) {
     // TenantId always prefix in the error message. This method returns either (tenantId,
     // nonPrefixedDb) or (none, prefixedDb) depending on gMultitenancySupport flag.
     return DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(dbInErrMsg);

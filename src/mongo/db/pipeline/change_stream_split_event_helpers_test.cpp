@@ -40,9 +40,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
+
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace change_stream_split_event;
 
@@ -66,7 +69,7 @@ public:
         minFragmentSize = static_cast<size_t>(fragment.peek().toBsonWithMetaData().objsize());
     }
 
-    size_t getFieldBsonSize(const Document& doc, StringData key) {
+    size_t getFieldBsonSize(const Document& doc, std::string_view key) {
         return static_cast<size_t>(doc.toBson<BSONObj::LargeSizeTrait>().getField(key).size());
     }
 
@@ -117,7 +120,7 @@ TEST_F(ChangeStreamSplitEventHelpersTest, ReplacesIdWithFragmentResumeToken) {
 }
 
 TEST_F(ChangeStreamSplitEventHelpersTest, OversizedFragmentThrows) {
-    doc.addField("a", Value("very_long_string"_sd));
+    doc.addField("a", Value("very_long_string"sv));
     auto fieldSize = getFieldBsonSize(doc.peek(), "a");
     ASSERT_THROWS_CODE(
         splitChangeEvent(doc.freeze(), minFragmentSize + fieldSize - 5, 0), DBException, 7182500);
@@ -137,8 +140,8 @@ TEST_F(ChangeStreamSplitEventHelpersTest, SplitEventAtMaxSizeBoundary) {
 }
 
 TEST_F(ChangeStreamSplitEventHelpersTest, SplitEventFieldsOrderedInAscendingSize) {
-    doc.addField("a", Value("unittesting"_sd));
-    doc.addField("b", Value("hello"_sd));
+    doc.addField("a", Value("unittesting"sv));
+    doc.addField("b", Value("hello"sv));
     auto fieldSize = getFieldBsonSize(doc.peek(), "a");
     auto fragments = splitChangeEvent(doc.freeze(), minFragmentSize + fieldSize, 0);
     ASSERT_EQ(2ULL, fragments.size());
@@ -152,8 +155,8 @@ TEST_F(ChangeStreamSplitEventHelpersTest, SplitEventFieldsOrderedInAscendingSize
 }
 
 TEST_F(ChangeStreamSplitEventHelpersTest, CanSkipFirstNFragments) {
-    doc.addField("a", Value("unittesting"_sd));
-    doc.addField("b", Value("hello"_sd));
+    doc.addField("a", Value("unittesting"sv));
+    doc.addField("b", Value("hello"sv));
     auto fieldSize = getFieldBsonSize(doc.peek(), "a");
     auto fragmentsSkip1 = splitChangeEvent(doc.peek(), minFragmentSize + fieldSize, 1);
     ASSERT_EQ(1ULL, fragmentsSkip1.size());

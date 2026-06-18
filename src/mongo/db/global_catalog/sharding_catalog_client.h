@@ -57,6 +57,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class ChunkType;
@@ -299,7 +301,7 @@ public:
      * Returns true on success.
      */
     virtual Status runUserManagementWriteCommand(OperationContext* opCtx,
-                                                 StringData commandName,
+                                                 std::string_view commandName,
                                                  const DatabaseName& dbname,
                                                  const BSONObj& cmdObj,
                                                  BSONObjBuilder* result) = 0;
@@ -322,7 +324,8 @@ public:
      * Returns ErrorCodes::NoMatchingDocument if no such key exists or the BSON content of the
      * setting otherwise.
      */
-    virtual StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, StringData key) = 0;
+    virtual StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx,
+                                                  std::string_view key) = 0;
 
     /**
      * Returns the contents of the config.version document - containing the current cluster schema
@@ -337,7 +340,7 @@ public:
      */
     virtual StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
-        StringData purpose,
+        std::string_view purpose,
         const LogicalTime& newerThanThis,
         repl::ReadConcernLevel readConcernLevel) = 0;
 
@@ -345,7 +348,9 @@ public:
      * Returns all external (i.e. validation-only) keys for the given purpose.
      */
     virtual StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
-        OperationContext* opCtx, StringData purpose, repl::ReadConcernLevel readConcernLevel) = 0;
+        OperationContext* opCtx,
+        std::string_view purpose,
+        repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
      * Directly inserts a document in the specified namespace on the config server. The document

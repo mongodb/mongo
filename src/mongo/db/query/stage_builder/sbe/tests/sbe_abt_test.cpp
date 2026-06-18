@@ -33,8 +33,11 @@
 #include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
 #include "mongo/db/query/stage_builder/sbe/type_checker.h"
 
+#include <string_view>
+
 namespace mongo::stage_builder::abt_lower {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace abt;
 
@@ -419,7 +422,7 @@ TEST_F(AbtToSbeExpression, LowerComparisonCollation) {
     sbe::InputParamToSlotMap inputParamToSlotMap;
 
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
-    registerSlot("collator"_sd,
+    registerSlot("collator"sv,
                  sbe::value::TypeTags::collator,
                  sbe::value::bitcastFrom<const CollatorInterface*>(&collator),
                  false);
@@ -433,7 +436,7 @@ TEST_F(AbtToSbeExpression, LowerComparisonCollation) {
     ASSERT(expr);
     auto compiledExpr = compileExpression(*expr);
 
-    auto checkCmp3w = [&](StringData lhs, StringData rhs, int result) {
+    auto checkCmp3w = [&](std::string_view lhs, std::string_view rhs, int result) {
         auto lhsStr = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString(lhs));
         lhsAccessor.reset(std::move(lhsStr));
         auto rhsStr = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString(rhs));

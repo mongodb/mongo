@@ -30,16 +30,16 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <functional>  // std::function
+#include <string_view>
 
 namespace mongo::variableValidation {
-Status isValidNameForUserWrite(StringData varName);
-void validateNameForUserWrite(StringData varName);
-void validateNameForUserRead(StringData varName);
-void validateName(StringData varName,
+Status isValidNameForUserWrite(std::string_view varName);
+void validateNameForUserWrite(std::string_view varName);
+void validateNameForUserRead(std::string_view varName);
+void validateName(std::string_view varName,
                   std::function<bool(char)> prefixPred,
                   std::function<bool(char)> suffixPred,
                   int prefixLen);

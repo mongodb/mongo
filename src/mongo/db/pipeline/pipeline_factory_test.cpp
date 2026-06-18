@@ -46,9 +46,11 @@
 #include "mongo/util/assert_util.h"
 
 #include <mutex>
+#include <string_view>
 
 namespace mongo::pipeline_factory {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using MakePipelineBSONElementTest = AggregationContextFixture;
 
@@ -98,8 +100,8 @@ TEST_F(MakePipelineBSONElementTest, SuccessfullyParsesValidArray) {
 
     auto stages = pipeline->getSources();
     ASSERT_EQ(stages.size(), 2);
-    ASSERT_EQ(StringData(stages.front()->getSourceName()), DocumentSourceMatch::kStageName);
-    ASSERT_EQ(StringData(stages.back()->getSourceName()), DocumentSourceLimit::kStageName);
+    ASSERT_EQ(std::string_view(stages.front()->getSourceName()), DocumentSourceMatch::kStageName);
+    ASSERT_EQ(std::string_view(stages.back()->getSourceName()), DocumentSourceLimit::kStageName);
 }
 
 // Two distinct lite-parsed types so the test can tell which parser the registry picked.
@@ -122,7 +124,7 @@ constexpr auto kIfrViewMockStageName = "$mockGatedViewStageForIfrTest";
 
 IncrementalRolloutFeatureFlag& getMockGatedViewStageFlag() {
     static IncrementalRolloutFeatureFlag flag{
-        "featureFlagMockGatedViewStageForIfrTest"_sd, RolloutPhase::inDevelopment, true};
+        "featureFlagMockGatedViewStageForIfrTest"sv, RolloutPhase::inDevelopment, true};
     static std::once_flag registered;
     std::call_once(registered, [] { flag.registerFlag(); });
     return flag;

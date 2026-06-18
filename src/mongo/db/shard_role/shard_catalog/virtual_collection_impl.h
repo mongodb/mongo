@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -69,6 +68,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -338,21 +338,21 @@ public:
     }
 
     void updateTTLSetting(OperationContext* opCtx,
-                          StringData idxName,
+                          std::string_view idxName,
                           long long newExpireSeconds) final {
         unimplementedTasserted();
     }
 
-    void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) final {
+    void updateHiddenSetting(OperationContext* opCtx, std::string_view idxName, bool hidden) final {
         unimplementedTasserted();
     }
 
-    void updateUniqueSetting(OperationContext* opCtx, StringData idxName, bool unique) final {
+    void updateUniqueSetting(OperationContext* opCtx, std::string_view idxName, bool unique) final {
         unimplementedTasserted();
     }
 
     void updatePrepareUniqueSetting(OperationContext* opCtx,
-                                    StringData idxName,
+                                    std::string_view idxName,
                                     bool prepareUnique) final {
         unimplementedTasserted();
     }
@@ -367,25 +367,25 @@ public:
         unimplementedTasserted();
     }
 
-    void removeIndex(OperationContext* opCtx, StringData indexName) final {
+    void removeIndex(OperationContext* opCtx, std::string_view indexName) final {
         unimplementedTasserted();
     }
 
     Status prepareForIndexBuild(OperationContext* opCtx,
                                 const IndexDescriptor* spec,
-                                StringData indexIdent,
+                                std::string_view indexIdent,
                                 boost::optional<UUID> buildUUID) final {
         unimplementedTasserted();
         return Status(ErrorCodes::UnknownError, "unknown");
     }
 
-    boost::optional<UUID> getIndexBuildUUID(StringData indexName) const final {
+    boost::optional<UUID> getIndexBuildUUID(std::string_view indexName) const final {
         unimplementedTasserted();
         return boost::none;
     }
 
     bool isIndexMultikey(OperationContext* opCtx,
-                         StringData indexName,
+                         std::string_view indexName,
                          MultikeyPaths* multikeyPaths,
                          int indexOffset) const final {
         unimplementedTasserted();
@@ -415,7 +415,7 @@ public:
         return 0;
     }
 
-    BSONObj getIndexSpec(StringData indexName, bool expandSimpleCollation) const final {
+    BSONObj getIndexSpec(std::string_view indexName, bool expandSimpleCollation) const final {
         return BSONObj();
     }
 
@@ -423,11 +423,11 @@ public:
 
     void getReadyIndexes(std::vector<std::string>* names) const final {}
 
-    bool isIndexPresent(StringData indexName) const final {
+    bool isIndexPresent(std::string_view indexName) const final {
         return false;
     }
 
-    bool isIndexReady(StringData indexName) const final {
+    bool isIndexReady(std::string_view indexName) const final {
         return false;
     }
 

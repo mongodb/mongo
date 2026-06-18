@@ -33,11 +33,13 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 
 class UnionWithStage final : public Stage {
 public:
-    UnionWithStage(StringData stageName,
+    UnionWithStage(std::string_view stageName,
                    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                    const std::shared_ptr<UnionWithSharedState>& sharedState,
                    const NamespaceString& userNss);

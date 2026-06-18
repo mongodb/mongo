@@ -35,6 +35,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/str_escape.h"
 
+#include <string_view>
+
 #include <fmt/compile.h>
 #include <fmt/format.h>
 
@@ -48,7 +50,7 @@ public:
         appendTo(buffer, R"({"$undefined":true})"_sd);
     }
 
-    void writeString(fmt::memory_buffer& buffer, StringData str) const {
+    void writeString(fmt::memory_buffer& buffer, std::string_view str) const {
         buffer.push_back('"');
         str::escapeForJSON(buffer, str);
         buffer.push_back('"');
@@ -108,7 +110,7 @@ public:
                        val.toMillisSinceEpoch());
     }
 
-    void writeDBRef(fmt::memory_buffer& buffer, StringData ref, OID id) const {
+    void writeDBRef(fmt::memory_buffer& buffer, std::string_view ref, OID id) const {
         // Collection names can unfortunately contain control characters that need to be escaped
         appendTo(buffer, R"({"$ref":")"_sd);
         str::escapeForJSON(buffer, ref);
@@ -146,7 +148,7 @@ public:
                        val.getInc());
     }
 
-    void writeBinData(fmt::memory_buffer& buffer, StringData data, BinDataType type) const {
+    void writeBinData(fmt::memory_buffer& buffer, std::string_view data, BinDataType type) const {
         if (type == newUUID && data.size() == 16) {
             fmt::format_to(
                 std::back_inserter(buffer),
@@ -176,7 +178,9 @@ public:
         }
     }
 
-    void writeRegex(fmt::memory_buffer& buffer, StringData pattern, StringData options) const {
+    void writeRegex(fmt::memory_buffer& buffer,
+                    std::string_view pattern,
+                    std::string_view options) const {
         appendTo(buffer, R"({"$regularExpression":{"pattern":")"_sd);
         str::escapeForJSON(buffer, pattern);
         appendTo(buffer, R"(","options":")"_sd);
@@ -184,19 +188,19 @@ public:
         appendTo(buffer, R"("}})"_sd);
     }
 
-    void writeSymbol(fmt::memory_buffer& buffer, StringData symbol) const {
+    void writeSymbol(fmt::memory_buffer& buffer, std::string_view symbol) const {
         appendTo(buffer, R"({"$symbol":")"_sd);
         str::escapeForJSON(buffer, symbol);
         appendTo(buffer, R"("})"_sd);
     }
 
-    void writeCode(fmt::memory_buffer& buffer, StringData code) const {
+    void writeCode(fmt::memory_buffer& buffer, std::string_view code) const {
         appendTo(buffer, R"({"$code":")"_sd);
         str::escapeForJSON(buffer, code);
         appendTo(buffer, R"("})"_sd);
     }
     void writeCodeWithScope(fmt::memory_buffer& buffer,
-                            StringData code,
+                            std::string_view code,
                             BSONObj const& scope) const {
         appendTo(buffer, R"({"$code":")"_sd);
         str::escapeForJSON(buffer, code);
@@ -213,7 +217,7 @@ public:
     void writePadding(fmt::memory_buffer& buffer) const {}
 
 protected:
-    static void appendTo(fmt::memory_buffer& buffer, StringData data) {
+    static void appendTo(fmt::memory_buffer& buffer, std::string_view data) {
         buffer.append(data.data(), data.data() + data.size());
     }
 

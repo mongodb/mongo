@@ -62,6 +62,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -104,7 +105,7 @@ class AsyncResultsMerger : public std::enable_shared_from_this<AsyncResultsMerge
 public:
     // When mongos has to do a merge in order to return results to the client in the correct sort
     // order, it requests a sortKey meta-projection using this field name.
-    static constexpr StringData kSortKeyField = "$sortKey"_sd;
+    static constexpr std::string_view kSortKeyField = "$sortKey"_sd;
 
     // The expected sort key pattern when 'compareWholeSortKey' is true.
     static const BSONObj kWholeSortKeySortPattern;
@@ -624,7 +625,7 @@ private:
      */
     void _ensureHighWaterMarkIsMonotonicallyIncreasing(const BSONObj& current,
                                                        const BSONObj& proposed,
-                                                       StringData context) const;
+                                                       std::string_view context) const;
 
     /**
      * Parses the find or getMore command response object to a CursorResponse.

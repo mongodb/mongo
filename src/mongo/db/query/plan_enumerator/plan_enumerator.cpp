@@ -35,7 +35,6 @@
 #include <boost/none.hpp>
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
@@ -54,6 +53,7 @@
 
 #include <algorithm>
 #include <set>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -200,7 +200,7 @@ bool canAssignPredToIndex(const RelevantTag* rt,
     // any changes we make to 'used' as we go.
     for (const auto multikeyComponent : multikeyComponents) {
         // 'pathPrefix' is a prefix of a queried path that causes the index to be multikey.
-        StringData pathPrefix = path.dottedSubstring(0, multikeyComponent + 1);
+        std::string_view pathPrefix = path.dottedSubstring(0, multikeyComponent + 1);
 
         auto search = used->find(pathPrefix);
         if (search == used->end()) {

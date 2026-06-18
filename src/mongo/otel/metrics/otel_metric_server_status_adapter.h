@@ -31,6 +31,8 @@
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
 
+#include <string_view>
+
 namespace mongo::otel::metrics {
 
 class Metric;
@@ -46,7 +48,7 @@ public:
     /**
      * If this metric is enabled, appends it as a BSON field named `leafName` to `b`.
      */
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override;
+    void appendTo(BSONObjBuilder& b, std::string_view leafName) const override;
 
 private:
     Metric* _metric;

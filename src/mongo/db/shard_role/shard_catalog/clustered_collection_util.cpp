@@ -41,6 +41,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -52,6 +53,7 @@
 
 namespace mongo {
 namespace clustered_util {
+using namespace std::literals::string_view_literals;
 
 void ensureClusteredIndexName(ClusteredIndexSpec& indexSpec) {
     if (!indexSpec.getName()) {
@@ -128,7 +130,7 @@ BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo,
 }
 
 bool isClusteredOnId(const boost::optional<ClusteredCollectionInfo>& collInfo) {
-    return collInfo && "_id"_sd == getClusterKeyFieldName(collInfo->getIndexSpec());
+    return collInfo && "_id"sv == getClusterKeyFieldName(collInfo->getIndexSpec());
 }
 
 bool matchesClusterKey(const BSONObj& keyPatternObj,
@@ -153,7 +155,7 @@ bool matchesClusterKey(const BSONObj& keyPatternObj,
         collInfo->getIndexSpec().getKey().firstElement().fieldNameStringData();
 }
 
-StringData getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec) {
+std::string_view getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec) {
     return indexSpec.getKey().firstElement().fieldNameStringData();
 }
 

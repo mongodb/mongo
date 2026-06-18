@@ -29,7 +29,6 @@
 
 #include "mongo/util/clock_source_mock.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

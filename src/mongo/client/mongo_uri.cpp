@@ -59,6 +59,7 @@
 #include <cstddef>
 #include <exception>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -93,7 +94,7 @@ const std::vector<std::pair<std::string, std::string>> permittedTXTOptions = {{"
  * Encode data elements in a way which will allow them to be embedded
  * into a mongodb:// URI safely.
  */
-void mongo::uriEncode(std::ostream& ss, StringData toEncode, StringData passthrough) {
+void mongo::uriEncode(std::ostream& ss, std::string_view toEncode, std::string_view passthrough) {
     for (const auto& c : toEncode) {
         if ((c == '-') || (c == '_') || (c == '.') || (c == '~') || ctype::isAlnum(c) ||
             (passthrough.find(c) != std::string::npos)) {
@@ -105,7 +106,7 @@ void mongo::uriEncode(std::ostream& ss, StringData toEncode, StringData passthro
     }
 }
 
-mongo::StatusWith<std::string> mongo::uriDecode(StringData toDecode) {
+mongo::StatusWith<std::string> mongo::uriDecode(std::string_view toDecode) {
     StringBuilder out;
     for (size_t i = 0; i < toDecode.size(); ++i) {
         char c = toDecode[i];
@@ -129,21 +130,22 @@ mongo::StatusWith<std::string> mongo::uriDecode(StringData toDecode) {
 }
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
-constexpr StringData kURIPrefix = "mongodb://"_sd;
-constexpr StringData kURISRVPrefix = "mongodb+srv://"_sd;
-constexpr StringData kDefaultMongoHost = "127.0.0.1:27017"_sd;
+constexpr std::string_view kURIPrefix = "mongodb://"sv;
+constexpr std::string_view kURISRVPrefix = "mongodb+srv://"sv;
+constexpr std::string_view kDefaultMongoHost = "127.0.0.1:27017"sv;
 
 /**
  * Helper Method for MongoURI::parse() to split a string into exactly 2 pieces by a char
  * delimiter.
  */
-std::pair<StringData, StringData> partitionForward(StringData str, const char c) {
+std::pair<std::string_view, std::string_view> partitionForward(std::string_view str, const char c) {
     const auto delim = str.find(c);
     if (delim == std::string::npos) {
-        return {str, StringData()};
+        return {str, std::string_view()};
     }
     return {str.substr(0, delim), str.substr(delim + 1)};
 }
@@ -152,10 +154,11 @@ std::pair<StringData, StringData> partitionForward(StringData str, const char c)
  * Helper method for MongoURI::parse() to split a string into exactly 2 pieces by a char
  * delimiter searching backward from the end of the string.
  */
-std::pair<StringData, StringData> partitionBackward(StringData str, const char c) {
+std::pair<std::string_view, std::string_view> partitionBackward(std::string_view str,
+                                                                const char c) {
     const auto delim = str.rfind(c);
     if (delim == std::string::npos) {
-        return {StringData(), str};
+        return {std::string_view(), str};
     }
     return {str.substr(0, delim), str.substr(delim + 1)};
 }
@@ -169,7 +172,7 @@ std::pair<StringData, StringData> partitionBackward(StringData str, const char c
  * on multiple parsed option sources.  STL setwise operations require sorted lists.  A map is used
  * instead of a vector of pairs to permit insertion-is-not-overwrite behavior.
  */
-MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
+MongoURI::OptionsMap parseOptions(std::string_view options, std::string_view url) {
     MongoURI::OptionsMap ret;
     if (options.empty()) {
         return ret;
@@ -227,7 +230,7 @@ MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
 
 MongoURI::OptionsMap addTXTOptions(MongoURI::OptionsMap options,
                                    const std::string& host,
-                                   const StringData url,
+                                   const std::string_view url,
                                    const bool isSeedlist) {
     // If there is no seedlist mode, then don't add any TXT options.
     if (!isSeedlist)
@@ -261,20 +264,20 @@ MongoURI::OptionsMap addTXTOptions(MongoURI::OptionsMap options,
     return {std::make_move_iterator(begin(options)), std::make_move_iterator(end(options))};
 }
 
-// Contains the parts of a MongoURI as unowned StringData's. Any code that needs to break up
+// Contains the parts of a MongoURI as unowned std::string_view's. Any code that needs to break up
 // URIs into their basic components without fully parsing them can use this struct.
 // Internally, MongoURI uses this to do basic parsing of the input URI string.
 struct URIParts {
-    explicit URIParts(StringData uri);
-    StringData scheme;
-    StringData username;
-    StringData password;
-    StringData hostIdentifiers;
-    StringData database;
-    StringData options;
+    explicit URIParts(std::string_view uri);
+    std::string_view scheme;
+    std::string_view username;
+    std::string_view password;
+    std::string_view hostIdentifiers;
+    std::string_view database;
+    std::string_view options;
 };
 
-URIParts::URIParts(StringData uri) {
+URIParts::URIParts(std::string_view uri) {
     // 1. Strip off the scheme ("mongo://")
     auto schemeEnd = uri.find("://");
     if (schemeEnd == std::string::npos) {
@@ -348,7 +351,7 @@ bool mechanismRequiresUsername(auth::AuthMechanism mechanism) {
 // 4. For all other mechanisms, use the URI database when present, otherwise admin.
 std::string resolveAuthSource(auth::AuthMechanism mechanism,
                               const MongoURI::OptionsMap& options,
-                              StringData database) {
+                              std::string_view database) {
     const bool isExternalDefaultDbMech = mechanism == auth::AuthMechanism::kMongoX509 ||
         mechanism == auth::AuthMechanism::kMongoAWS ||
         mechanism == auth::AuthMechanism::kMongoOIDC || mechanism == auth::AuthMechanism::kGSSAPI;
@@ -368,11 +371,11 @@ std::string resolveAuthSource(auth::AuthMechanism mechanism,
 MongoURI::CaseInsensitiveString::CaseInsensitiveString(std::string str)
     : _original(std::move(str)), _lowercase(boost::algorithm::to_lower_copy(_original)) {}
 
-bool MongoURI::isMongoURI(StringData uri) {
+bool MongoURI::isMongoURI(std::string_view uri) {
     return (uri.starts_with(kURIPrefix) || uri.starts_with(kURISRVPrefix));
 }
 
-std::string MongoURI::redact(StringData url) {
+std::string MongoURI::redact(std::string_view url) {
     uassert(50892, "String passed to MongoURI::redact wasn't a MongoURI", isMongoURI(url));
     URIParts parts(url);
     std::ostringstream out;
@@ -389,7 +392,7 @@ std::string MongoURI::redact(StringData url) {
     return out.str();
 }
 
-MongoURI MongoURI::parseImpl(StringData url) {
+MongoURI MongoURI::parseImpl(std::string_view url) {
     // 1. Validate and remove the scheme prefix `mongodb://` or `mongodb+srv://`
     const bool isSeedlist = url.starts_with(kURISRVPrefix);
     if (!(url.starts_with(kURIPrefix) || isSeedlist)) {
@@ -405,7 +408,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
     const auto connectionOptions = parts.options;
 
     // 3. URI decode and validate the username/password
-    const auto containsColonOrAt = [](StringData str) {
+    const auto containsColonOrAt = [](std::string_view str) {
         return (str.find(':') != std::string::npos) || (str.find('@') != std::string::npos);
     };
 
@@ -444,7 +447,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
             continue;
         }
 
-        if ((host.find('/') != std::string::npos) && !StringData(host).ends_with(".sock")) {
+        if ((host.find('/') != std::string::npos) && !std::string_view(host).ends_with(".sock")) {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream()
                           << "'" << host << "' in '" << url
@@ -606,7 +609,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
                     std::move(options));
 }
 
-StatusWith<MongoURI> MongoURI::parse(StringData url) try {
+StatusWith<MongoURI> MongoURI::parse(std::string_view url) try {
     return parseImpl(url);
 } catch (const std::exception&) {
     return exceptionToStatus();
@@ -638,7 +641,7 @@ std::string MongoURI::canonicalizeURIAsString() const {
             if (boost::count(hostAndPort.host(), ':') > 1) {
                 uri << delimeter << "[" << uriEncode(hostAndPort.host()) << "]"
                     << ":" << uriEncode(std::to_string(hostAndPort.port()));
-            } else if (StringData(hostAndPort.host()).ends_with(".sock")) {
+            } else if (std::string_view(hostAndPort.host()).ends_with(".sock")) {
                 uri << delimeter << uriEncode(hostAndPort.host());
             } else {
                 uri << delimeter << uriEncode(hostAndPort.host()) << ":"
@@ -667,14 +670,14 @@ std::string MongoURI::canonicalizeURIAsString() const {
 }
 
 namespace {
-constexpr auto kAuthMechanismPropertiesKey = "mechanism_properties"_sd;
+constexpr auto kAuthMechanismPropertiesKey = "mechanism_properties"sv;
 
-constexpr auto kAuthServiceName = "SERVICE_NAME"_sd;
-constexpr auto kAuthServiceRealm = "SERVICE_REALM"_sd;
-constexpr auto kAuthAwsSessionToken = "AWS_SESSION_TOKEN"_sd;
-constexpr auto kAuthOIDCAccessToken = "OIDC_ACCESS_TOKEN"_sd;
+constexpr auto kAuthServiceName = "SERVICE_NAME"sv;
+constexpr auto kAuthServiceRealm = "SERVICE_REALM"sv;
+constexpr auto kAuthAwsSessionToken = "AWS_SESSION_TOKEN"sv;
+constexpr auto kAuthOIDCAccessToken = "OIDC_ACCESS_TOKEN"sv;
 
-constexpr std::array<StringData, 4> kSupportedAuthMechanismProperties = {
+constexpr std::array<std::string_view, 4> kSupportedAuthMechanismProperties = {
     kAuthServiceName, kAuthServiceRealm, kAuthAwsSessionToken, kAuthOIDCAccessToken};
 
 BSONObj parseAuthMechanismProperties(const std::string& propStr) {
@@ -687,7 +690,7 @@ BSONObj parseAuthMechanismProperties(const std::string& propStr) {
                 str::stream() << "authMechanismProperty: " << *it << " is not supported",
                 std::count(std::begin(kSupportedAuthMechanismProperties),
                            std::end(kSupportedAuthMechanismProperties),
-                           StringData(prop)));
+                           std::string_view(prop)));
         ++it;
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "authMechanismProperty: " << prop << " must have a value",

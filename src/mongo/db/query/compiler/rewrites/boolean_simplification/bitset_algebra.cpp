@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <ostream>
+#include <string_view>
 #include <utility>
 #include <version>
 
@@ -233,7 +234,7 @@ bool operator==(const Maxterm& lhs, const Maxterm& rhs) {
 
 std::ostream& operator<<(std::ostream& os, const Maxterm& maxterm) {
     os << "[";
-    StringData sep;
+    std::string_view sep;
     for (auto&& t : maxterm.minterms)
         os << std::exchange(sep, ", ") << t;
     os << "]";

@@ -30,7 +30,6 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 

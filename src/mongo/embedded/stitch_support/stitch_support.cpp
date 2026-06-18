@@ -33,7 +33,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
@@ -73,6 +72,7 @@
 #include <mutex>
 #include <new>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -287,7 +287,7 @@ struct stitch_support_v1_update {
 
     stitch_support_v1_matcher* matcher;
 
-    std::map<mongo::StringData, std::unique_ptr<mongo::ExpressionWithPlaceholder>> parsedFilters;
+    std::map<std::string_view, std::unique_ptr<mongo::ExpressionWithPlaceholder>> parsedFilters;
     mongo::UpdateDriver updateDriver;
 };
 
@@ -670,7 +670,7 @@ uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update
         }
 
         uassertStatusOK(update->updateDriver.update(update->opCtx.get(),
-                                                    mongo::StringData() /* matchedField */,
+                                                    std::string_view() /* matchedField */,
                                                     &mutableDoc,
                                                     false /* validateForStorage */,
                                                     immutablePaths,

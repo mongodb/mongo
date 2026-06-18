@@ -44,6 +44,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
 
+#include <string_view>
+
 #include <wiredtiger.h>
 
 #include <absl/container/flat_hash_map.h>
@@ -64,7 +66,7 @@ WiredTigerSizeStorer::WiredTigerSizeStorer(WiredTigerConnection* conn,
     invariantWTOK(session.create(_storageUri.c_str(), config.c_str()), session);
 }
 
-void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeInfo) {
+void WiredTigerSizeStorer::store(std::string_view uri, std::shared_ptr<SizeInfo> sizeInfo) {
     // If the SizeInfo is still dirty, we're done.
     if (sizeInfo->_dirty.load())
         return;
@@ -88,7 +90,7 @@ void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeI
 }
 
 std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(
-    WiredTigerSession& session, StringData uri) const {
+    WiredTigerSession& session, std::string_view uri) const {
     {
         // Check if we can satisfy the read from the buffer.
         std::lock_guard<std::mutex> bufferLock(_bufferMutex);
@@ -119,7 +121,7 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(
                                       data["dataSize"].safeNumberLong());
 }
 
-void WiredTigerSizeStorer::remove(StringData uri) {
+void WiredTigerSizeStorer::remove(std::string_view uri) {
     std::lock_guard<std::mutex> bufferLock{_bufferMutex};
 
     // Insert a new nullptr entry into the buffer, or set the existing one to nullptr if there

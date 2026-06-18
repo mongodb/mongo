@@ -43,6 +43,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo::extension {
 namespace {
@@ -306,7 +307,7 @@ TEST_F(HostServicesTest, NestedFilterParseNodeRejectsInvalidPredicate2) {
 
 // Helper that assembles the full $_internalDocumentResultsAndMetadata stage BSON from an inner
 // source spec and an optional metadata variable name.
-BSONObj makeDrmStageSpec(BSONObj sourceSpec, StringData varName = StringData{}) {
+BSONObj makeDrmStageSpec(BSONObj sourceSpec, std::string_view varName = std::string_view{}) {
     BSONObjBuilder stageBuilder;
     {
         BSONObjBuilder innerBuilder(

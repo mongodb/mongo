@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -156,7 +156,7 @@ public:
     void serialize(BSONObjBuilder* bob) const final;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
     static ResolvedView parseFromBSON(const BSONElement& elem);
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
 
     void setAdditionalResolvedNamespaces(std::vector<ResolvedNamespace> additional) {
         _wrappedNamespace.setAdditionalResolvedNamespaces(std::move(additional));

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -40,6 +39,7 @@
 
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -104,7 +104,7 @@ protected:
      * Subclasses of NearStage must provide basics + a stats object which gets owned here.
      */
     NearStage(ExpressionContext* expCtx,
-              StringData typeName,
+              std::string_view typeName,
               StageType type,
               WorkingSet* workingSet,
               CollectionAcquisition collection,

@@ -36,20 +36,22 @@
 #include "mongo/db/query/stage_builder/sbe/value_lifetime.h"
 
 #include <charconv>
+#include <string_view>
 
 namespace mongo::stage_builder {
+using namespace std::literals::string_view_literals;
 using SlotId = sbe::value::SlotId;
 using FrameId = sbe::FrameId;
 
 abt::ProjectionName SbBase::makeProjectionName(SlotId slotId) {
-    constexpr StringData prefix = "__s"_sd;
+    constexpr std::string_view prefix = "__s"sv;
     str::stream varName;
     varName << prefix << slotId;
     return abt::ProjectionName{std::string(varName)};
 }
 
 abt::ProjectionName SbBase::makeProjectionName(FrameId frameId, SlotId slotId) {
-    constexpr StringData prefix = "__l"_sd;
+    constexpr std::string_view prefix = "__l"sv;
     str::stream varName;
     varName << prefix << frameId << "_" << slotId;
     return abt::ProjectionName{std::string(varName)};
@@ -57,8 +59,8 @@ abt::ProjectionName SbBase::makeProjectionName(FrameId frameId, SlotId slotId) {
 
 namespace {
 boost::optional<SlotId> decodeSlotFromProjectionName(const abt::ProjectionName& var) {
-    constexpr StringData prefix = "__s"_sd;
-    StringData name = var.value();
+    constexpr std::string_view prefix = "__s"sv;
+    std::string_view name = var.value();
 
     if (name.starts_with(prefix)) {
         const char* ptr = name.data() + prefix.size();
@@ -77,8 +79,8 @@ boost::optional<SlotId> decodeSlotFromProjectionName(const abt::ProjectionName& 
 
 boost::optional<std::pair<FrameId, SlotId>> decodeLocalVarFromProjectionName(
     const abt::ProjectionName& var) {
-    constexpr StringData prefix = "__l"_sd;
-    StringData name = var.value();
+    constexpr std::string_view prefix = "__l"sv;
+    std::string_view name = var.value();
 
     if (name.starts_with(prefix)) {
         const char* ptr = name.data() + prefix.size();

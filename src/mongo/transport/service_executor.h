@@ -45,6 +45,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC transport {
@@ -112,7 +113,7 @@ public:
      * Returns the class name of this service executor.
      * Used in logging and exception messaging.
      */
-    virtual StringData getName() const = 0;
+    virtual std::string_view getName() const = 0;
 };
 
 /**

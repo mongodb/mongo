@@ -32,11 +32,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class MONGO_MOD_PUBLIC IndexConstants {
 public:
-    static constexpr StringData kIdIndexName = "_id_"_sd;
+    static constexpr std::string_view kIdIndexName = "_id_"_sd;
 };
 
 }  // namespace mongo

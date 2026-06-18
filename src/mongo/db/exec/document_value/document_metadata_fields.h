@@ -44,6 +44,7 @@
 #include <cstddef>
 #include <iosfwd>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -96,14 +97,14 @@ public:
      *
      * Throws a user exception if the provided name is not a recognized name as argument to $meta.
      */
-    static DocumentMetadataFields::MetaType parseMetaType(StringData name);
+    static DocumentMetadataFields::MetaType parseMetaType(std::string_view name);
 
-    static StringData serializeMetaType(DocumentMetadataFields::MetaType type);
+    static std::string_view serializeMetaType(DocumentMetadataFields::MetaType type);
 
     /**
      * Returns true if this metadata value produces score metadata.
      */
-    static bool isScoreProducingMetaType(StringData name);
+    static bool isScoreProducingMetaType(std::string_view name);
 
     /**
      * Reads serialized metadata out of 'buf', and uses it to populate 'out'. Expects 'buf' to have

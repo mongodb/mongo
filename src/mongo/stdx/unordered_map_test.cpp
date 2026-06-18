@@ -29,7 +29,6 @@
 
 #include "mongo/stdx/unordered_map.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>

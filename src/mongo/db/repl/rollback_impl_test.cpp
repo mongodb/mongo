@@ -30,7 +30,6 @@
 #include "mongo/db/repl/rollback_impl.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -88,6 +87,7 @@
 #include <list>
 #include <memory>
 #include <ostream>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -105,21 +105,21 @@ NamespaceString kOplogNSS = NamespaceString::createNamespaceString_forTest("loca
 NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
 std::string kGenericUUIDStr = "b4c66a44-c1ca-4d86-8d25-12e82fa2de5b";
 
-BSONObj makeInsertOplogEntry(long long time, BSONObj obj, StringData ns, UUID uuid) {
+BSONObj makeInsertOplogEntry(long long time, BSONObj obj, std::string_view ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "i"
                      << "o" << obj << "ns" << ns << "ui" << uuid << "wall" << Date_t());
 }
 
 BSONObj makeUpdateOplogEntry(
-    long long time, BSONObj query, BSONObj update, StringData ns, UUID uuid) {
+    long long time, BSONObj query, BSONObj update, std::string_view ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "u"
                      << "ns" << ns << "ui" << uuid << "o2" << query << "o" << BSON("$set" << update)
                      << "wall" << Date_t());
 }
 
-BSONObj makeDeleteOplogEntry(long long time, BSONObj id, StringData ns, UUID uuid) {
+BSONObj makeDeleteOplogEntry(long long time, BSONObj id, std::string_view ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "d"
                      << "ns" << ns << "ui" << uuid << "o" << id << "wall" << Date_t());
@@ -2570,7 +2570,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnUnknownOplogEntryCommandType
     ASSERT_OK(_insertOplogEntry(commonOp.first));
     ASSERT_OK(_insertOplogEntry(unknownCmdOp.first));
 
-    const StringData err(
+    const std::string_view err(
         "Enumeration value 'unknownCommand' for field 'commandString' is not a valid value.");
     ASSERT_THROWS_CODE_AND_WHAT(
         _rollback->runRollback(_opCtx.get()), DBException, ErrorCodes::BadValue, err);

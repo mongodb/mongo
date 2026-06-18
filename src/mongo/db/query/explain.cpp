@@ -30,7 +30,6 @@
 #include "mongo/db/query/explain.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -62,6 +61,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -72,6 +72,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Adds the 'queryPlanner' explain section to the BSON object being built by 'out'.
@@ -191,18 +192,18 @@ void generatePlannerInfo(PlanExecutor* exec,
             BSONObjBuilder nsMetaBob(ceSamplingMetaBob.subobjStart(ns));
             nsMetaBob.append("sampleSource", meta.isPersisted ? "persisted" : "onTheFly");
             static constexpr auto techniqueToStr =
-                [](cost_based_ranker::SamplingTechnique t) -> StringData {
+                [](cost_based_ranker::SamplingTechnique t) -> std::string_view {
                 switch (t) {
                     case cost_based_ranker::SamplingTechnique::kRandom:
-                        return "random"_sd;
+                        return "random"sv;
                     case cost_based_ranker::SamplingTechnique::kChunk:
-                        return "chunk"_sd;
+                        return "chunk"sv;
                     case cost_based_ranker::SamplingTechnique::kFullCollScan:
-                        return "fullCollScan"_sd;
+                        return "fullCollScan"sv;
                     case cost_based_ranker::SamplingTechnique::kSeqScan:
-                        return "seqScan"_sd;
+                        return "seqScan"sv;
                     case cost_based_ranker::SamplingTechnique::kStrides:
-                        return "strides"_sd;
+                        return "strides"sv;
                 }
                 MONGO_UNREACHABLE;
             };

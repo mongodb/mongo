@@ -33,7 +33,6 @@
 
 #include "mongo/db/query/query_settings.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"

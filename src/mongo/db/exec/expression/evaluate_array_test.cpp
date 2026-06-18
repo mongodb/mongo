@@ -41,6 +41,7 @@
 
 namespace mongo {
 namespace expression_evaluation_test {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
@@ -269,7 +270,7 @@ TEST(ExpressionTopNTest, ReturnsMixedTypesWithNumericSort) {
     // BSON type ordering: null < numbers < strings < objects < arrays
     ASSERT_VALUE_EQ(
         val,
-        Value(BSON_ARRAY(BSONNULL << 3 << "string"_sd << BSON("a" << 1) << BSON_ARRAY(1 << 2))));
+        Value(BSON_ARRAY(BSONNULL << 3 << "string"sv << BSON("a" << 1) << BSON_ARRAY(1 << 2))));
 }
 
 TEST(ExpressionTopNTest, ReturnsTopNWithNestedArrayElements) {
@@ -477,7 +478,7 @@ TEST(ExpressionBottomNTest, ReturnsMixedTypesWithNumericSort) {
     // BSON type ordering: null < numbers < strings < objects < arrays
     ASSERT_VALUE_EQ(
         val,
-        Value(BSON_ARRAY(BSONNULL << 3 << "string"_sd << BSON("a" << 1) << BSON_ARRAY(1 << 2))));
+        Value(BSON_ARRAY(BSONNULL << 3 << "string"sv << BSON("a" << 1) << BSON_ARRAY(1 << 2))));
 }
 
 TEST(ExpressionBottomNTest, ReturnsBottomNWithNestedArrayElements) {
@@ -719,28 +720,28 @@ TEST(ExpressionSetTest, LastNull) {
     runTest(DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2) << Value(BSONNULL)) << "expected"
                         << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
                                                   << "$setDifference" << BSONNULL)
-                        << "error" << DOC_ARRAY("$setEquals"_sd << "$setIsSubset"_sd)));
+                        << "error" << DOC_ARRAY("$setEquals"sv << "$setIsSubset"sv)));
 }
 
 TEST(ExpressionSetTest, FirstNull) {
     runTest(DOC("input" << DOC_ARRAY(Value(BSONNULL) << DOC_ARRAY(1 << 2)) << "expected"
                         << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
                                                   << "$setDifference" << BSONNULL)
-                        << "error" << DOC_ARRAY("$setEquals"_sd << "$setIsSubset"_sd)));
+                        << "error" << DOC_ARRAY("$setEquals"sv << "$setIsSubset"sv)));
 }
 
 TEST(ExpressionSetTest, LeftNullAndRightEmpty) {
     runTest(DOC("input" << DOC_ARRAY(Value(BSONNULL) << std::vector<Value>()) << "expected"
                         << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
                                                   << "$setDifference" << BSONNULL)
-                        << "error" << DOC_ARRAY("$setEquals"_sd << "$setIsSubset"_sd)));
+                        << "error" << DOC_ARRAY("$setEquals"sv << "$setIsSubset"sv)));
 }
 
 TEST(ExpressionSetTest, RightNullAndLeftEmpty) {
     runTest(DOC("input" << DOC_ARRAY(std::vector<Value>() << Value(BSONNULL)) << "expected"
                         << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
                                                   << "$setDifference" << BSONNULL)
-                        << "error" << DOC_ARRAY("$setEquals"_sd << "$setIsSubset"_sd)));
+                        << "error" << DOC_ARRAY("$setEquals"sv << "$setIsSubset"sv)));
 }
 
 TEST(ExpressionSetTest, NoArg) {
@@ -748,8 +749,8 @@ TEST(ExpressionSetTest, NoArg) {
                         << DOC("$setIntersection" << std::vector<Value>() << "$setUnion"
                                                   << std::vector<Value>())
                         << "error"
-                        << DOC_ARRAY("$setEquals"_sd << "$setIsSubset"_sd
-                                                     << "$setDifference"_sd)));
+                        << DOC_ARRAY("$setEquals"sv << "$setIsSubset"sv
+                                                    << "$setDifference"sv)));
 }
 
 TEST(ExpressionSetTest, OneArg) {
@@ -757,8 +758,8 @@ TEST(ExpressionSetTest, OneArg) {
         "input" << DOC_ARRAY(DOC_ARRAY(1 << 2)) << "expected"
                 << DOC("$setIntersection" << DOC_ARRAY(1 << 2) << "$setUnion" << DOC_ARRAY(1 << 2))
                 << "error"
-                << DOC_ARRAY("$setEquals"_sd << "$setIsSubset"_sd
-                                             << "$setDifference"_sd)));
+                << DOC_ARRAY("$setEquals"sv << "$setIsSubset"sv
+                                            << "$setDifference"sv)));
 }
 
 TEST(ExpressionSetTest, EmptyArg) {
@@ -766,8 +767,8 @@ TEST(ExpressionSetTest, EmptyArg) {
                         << DOC("$setIntersection" << std::vector<Value>() << "$setUnion"
                                                   << std::vector<Value>())
                         << "error"
-                        << DOC_ARRAY("$setEquals"_sd << "$setIsSubset"_sd
-                                                     << "$setDifference"_sd)));
+                        << DOC_ARRAY("$setEquals"sv << "$setIsSubset"sv
+                                                    << "$setDifference"sv)));
 }
 
 TEST(ExpressionSetTest, LeftArgEmpty) {
@@ -788,16 +789,16 @@ TEST(ExpressionSetTest, RightArgEmpty) {
 
 TEST(ExpressionSetTest, ManyArgs) {
     runTest(
-        DOC("input" << DOC_ARRAY(DOC_ARRAY(8 << 3) << DOC_ARRAY("asdf"_sd << "foo"_sd)
+        DOC("input" << DOC_ARRAY(DOC_ARRAY(8 << 3) << DOC_ARRAY("asdf"sv << "foo"sv)
                                                    << DOC_ARRAY(80.3 << 34) << std::vector<Value>()
-                                                   << DOC_ARRAY(80.3 << "foo"_sd << 11 << "yay"_sd))
+                                                   << DOC_ARRAY(80.3 << "foo"sv << 11 << "yay"sv))
                     << "expected"
                     << DOC("$setIntersection" << std::vector<Value>() << "$setEquals" << false
                                               << "$setUnion"
-                                              << DOC_ARRAY(3 << 8 << 11 << 34 << 80.3 << "asdf"_sd
-                                                             << "foo"_sd
-                                                             << "yay"_sd))
-                    << "error" << DOC_ARRAY("$setIsSubset"_sd << "$setDifference"_sd)));
+                                              << DOC_ARRAY(3 << 8 << 11 << 34 << 80.3 << "asdf"sv
+                                                             << "foo"sv
+                                                             << "yay"sv))
+                    << "error" << DOC_ARRAY("$setIsSubset"sv << "$setDifference"sv)));
 }
 
 TEST(ExpressionSetTest, ManyArgsEqual) {
@@ -807,7 +808,7 @@ TEST(ExpressionSetTest, ManyArgsEqual) {
                         << "expected"
                         << DOC("$setIntersection" << DOC_ARRAY(1 << 2 << 4) << "$setEquals" << true
                                                   << "$setUnion" << DOC_ARRAY(1 << 2 << 4))
-                        << "error" << DOC_ARRAY("$setIsSubset"_sd << "$setDifference"_sd)));
+                        << "error" << DOC_ARRAY("$setIsSubset"sv << "$setDifference"sv)));
 }
 
 }  // namespace set

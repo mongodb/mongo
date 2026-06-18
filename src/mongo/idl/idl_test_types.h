@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -51,7 +52,7 @@ public:
     /**
      * Serialize this class as a field in a document.
      */
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
         builder->appendAs(_element, fieldName);
     }
 
@@ -130,10 +131,10 @@ public:
         builder->append("field1", _str);
     }
 
-    StringData getField1() const {
+    std::string_view getField1() const {
         return _str;
     }
-    void setField1(StringData value) {
+    void setField1(std::string_view value) {
         _str = std::string{value};
     }
 

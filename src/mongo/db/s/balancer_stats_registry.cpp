@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -58,6 +57,7 @@
 
 #include <algorithm>
 #include <mutex>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -70,6 +70,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 const auto balancerStatsRegistryDecorator =
@@ -384,8 +385,8 @@ void BalancerStatsRegistry::updateOrphansCount(const UUID& collectionUUID, long 
 }
 
 void BalancerStatsRegistry::_loadOrphansCount(OperationContext* opCtx) {
-    static constexpr auto kNumOrphanDocsLabel = "numOrphanDocs"_sd;
-    static constexpr auto kNumRangeDeletionTasksLabel = "numRangeDeletionTasks"_sd;
+    static constexpr auto kNumOrphanDocsLabel = "numOrphanDocs"sv;
+    static constexpr auto kNumRangeDeletionTasksLabel = "numRangeDeletionTasks"sv;
 
     /*
      * {

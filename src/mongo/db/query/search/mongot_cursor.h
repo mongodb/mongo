@@ -34,6 +34,8 @@
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace MONGO_MOD_PUB mongot_cursor {
 inline auto makeRetryOnNetworkErrorPolicy() {
@@ -42,32 +44,32 @@ inline auto makeRetryOnNetworkErrorPolicy() {
     };
 }
 
-static constexpr StringData kSearchField = "search"_sd;
-static constexpr StringData kVectorSearchCmd = "vectorSearch"_sd;
-static constexpr StringData kCollectionUuidField = "collectionUUID"_sd;
-static constexpr StringData kQueryField = "query"_sd;
-static constexpr StringData kViewNameField = "viewName"_sd;
-static constexpr StringData kExplainField = "explain"_sd;
-static constexpr StringData kVerbosityField = "verbosity"_sd;
-static constexpr StringData kIntermediateField = "intermediate"_sd;
-static constexpr StringData kCursorOptionsField = "cursorOptions"_sd;
-static constexpr StringData kDocsRequestedField = "docsRequested"_sd;
-static constexpr StringData kBatchSizeField = "batchSize"_sd;
-static constexpr StringData kRequiresSearchSequenceToken = "requiresSearchSequenceToken"_sd;
-static constexpr StringData kReturnStoredSourceArg = "returnStoredSource"_sd;
-static constexpr StringData kReturnScopeArg = "returnScope"_sd;
-static constexpr StringData kSlowQueryLogFieldName = "slowQueryLog"_sd;
-static constexpr StringData kScoreDetailsFieldName = "scoreDetails"_sd;
-static constexpr StringData kSearchRootDocumentIdFieldName = "searchRootDocumentId"_sd;
-static constexpr StringData kOptimizationFlagsField = "optimizationFlags"_sd;
-static constexpr StringData kOmitSearchDocumentResultsField = "omitSearchDocumentResults"_sd;
+static constexpr std::string_view kSearchField = "search"_sd;
+static constexpr std::string_view kVectorSearchCmd = "vectorSearch"_sd;
+static constexpr std::string_view kCollectionUuidField = "collectionUUID"_sd;
+static constexpr std::string_view kQueryField = "query"_sd;
+static constexpr std::string_view kViewNameField = "viewName"_sd;
+static constexpr std::string_view kExplainField = "explain"_sd;
+static constexpr std::string_view kVerbosityField = "verbosity"_sd;
+static constexpr std::string_view kIntermediateField = "intermediate"_sd;
+static constexpr std::string_view kCursorOptionsField = "cursorOptions"_sd;
+static constexpr std::string_view kDocsRequestedField = "docsRequested"_sd;
+static constexpr std::string_view kBatchSizeField = "batchSize"_sd;
+static constexpr std::string_view kRequiresSearchSequenceToken = "requiresSearchSequenceToken"_sd;
+static constexpr std::string_view kReturnStoredSourceArg = "returnStoredSource"_sd;
+static constexpr std::string_view kReturnScopeArg = "returnScope"_sd;
+static constexpr std::string_view kSlowQueryLogFieldName = "slowQueryLog"_sd;
+static constexpr std::string_view kScoreDetailsFieldName = "scoreDetails"_sd;
+static constexpr std::string_view kSearchRootDocumentIdFieldName = "searchRootDocumentId"_sd;
+static constexpr std::string_view kOptimizationFlagsField = "optimizationFlags"_sd;
+static constexpr std::string_view kOmitSearchDocumentResultsField = "omitSearchDocumentResults"_sd;
 
 static constexpr long long kMinimumMongotBatchSize = 10;
 static constexpr long long kDefaultMongotBatchSize = 101;
 
 // Default sort spec is to sort decreasing by search score.
 static const BSONObj kSortSpec = BSON("$searchScore" << -1);
-static constexpr StringData kSearchSortValuesFieldPrefix = "$searchSortValues."_sd;
+static constexpr std::string_view kSearchSortValuesFieldPrefix = "$searchSortValues."_sd;
 
 /**
  * Set of OptimizationFlags that can be passed in a mongot search request

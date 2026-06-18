@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -43,6 +42,7 @@
 
 #include <cstdint>
 #include <cstring>  // strlen
+#include <string_view>
 
 namespace mongo {
 class BSONObj;
@@ -84,9 +84,9 @@ public:
     /**
      * String (0x02)
      */
-    StringData String() const {
+    std::string_view String() const {
         // String count includes null terminator.
-        return StringData(
+        return std::string_view(
             _CString(), ConstDataView(value()).read<LittleEndian<int>>() - kStringTerminatorBytes);
     }
 
@@ -133,8 +133,8 @@ public:
     BSONRegEx Regex() const {
         const char* pattern = RegexPattern();
         const char* flags = RegexFlags();
-        return BSONRegEx(StringData(pattern, flags - pattern - kStringTerminatorBytes),
-                         StringData(flags));
+        return BSONRegEx(std::string_view(pattern, flags - pattern - kStringTerminatorBytes),
+                         std::string_view(flags));
     }
     const char* RegexPattern() const {
         return value();
@@ -148,7 +148,7 @@ public:
      * DBRef (0x0C)
      */
     BSONDBRef DBRef() const {
-        StringData ns = String();
+        std::string_view ns = String();
         return BSONDBRef(ns, mongo::OID::from(ns.data() + ns.size() + kStringTerminatorBytes));
     }
     const char* DBRefNS() const {
@@ -178,7 +178,7 @@ public:
      * CodeWScope (0x0F)
      */
     BSONCodeWScope CodeWScope() const {
-        StringData code = CodeWScopeCode();
+        std::string_view code = CodeWScopeCode();
         return BSONCodeWScope(code, _codeWScopeObj(code.size() + kStringTerminatorBytes));
     }
     const char* CodeWScopeCode() const {

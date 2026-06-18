@@ -47,6 +47,7 @@
 #include <memory>
 #include <numeric>
 #include <queue>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -124,7 +125,7 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
 void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              HmacContext* hmacCtx,
                              const NamespaceString& escNss,
-                             StringData fieldPath,
+                             std::string_view fieldPath,
                              BSONType fieldType,
                              const QueryTypeConfig& queryTypeConfig,
                              double anchorPaddingFactor,
@@ -140,7 +141,7 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
 void compactOneTextSearchFieldPad(FLEQueryInterface* queryImpl,
                                   HmacContext* hmacCtx,
                                   const NamespaceString& escNss,
-                                  StringData fieldPath,
+                                  std::string_view fieldPath,
                                   std::size_t totalMsize,
                                   std::size_t uniqueTokens,
                                   const AnchorPaddingRootToken& anchorPaddingRootToken,

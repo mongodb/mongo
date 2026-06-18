@@ -42,10 +42,12 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 constexpr int32_t kCacheSizeMB = 50;
 
@@ -172,8 +174,8 @@ TEST_F(SpillTableTest, SpillTableDroppedOnDestruction) {
     auto opCtx = makeOperationContext();
 
     constexpr int64_t kThresholdBytes = 1024;
-    const StringData kRecordId = "1"_sd;
-    const StringData kPayload = "data"_sd;
+    const std::string_view kRecordId = "1"sv;
+    const std::string_view kPayload = "data"sv;
 
     auto spillTable = makeSpillTable(opCtx.get(), KeyFormat::String, kThresholdBytes);
     auto ident = std::string(spillTable->ident());

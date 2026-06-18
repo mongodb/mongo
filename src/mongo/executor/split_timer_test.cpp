@@ -29,7 +29,6 @@
 
 #include "mongo/executor/split_timer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
@@ -37,11 +36,13 @@
 
 #include <array>
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 namespace m = unittest::match;
 
@@ -70,14 +71,14 @@ enum class SomeIntervalId : size_t {
 
 struct IDef {
     SomeIntervalId iId;
-    StringData name;
+    std::string_view name;
     SomeTimeSplitId start;
     SomeTimeSplitId end;
 };
 
 static constexpr auto iDefs = std::array{
-    IDef{SomeIntervalId::ab, "abMillis"_sd, SomeTimeSplitId::a, SomeTimeSplitId::b},
-    IDef{SomeIntervalId::ac, "acMillis"_sd, SomeTimeSplitId::a, SomeTimeSplitId::c},
+    IDef{SomeIntervalId::ab, "abMillis"sv, SomeTimeSplitId::a, SomeTimeSplitId::b},
+    IDef{SomeIntervalId::ac, "acMillis"sv, SomeTimeSplitId::a, SomeTimeSplitId::c},
 };
 
 struct SomePolicy {
@@ -94,11 +95,11 @@ struct SomePolicy {
         return static_cast<size_t>(e);
     }
 
-    static constexpr StringData getName(TimeSplitIdType e) {
-        constexpr auto arr = std::array{"a"_sd, "b"_sd, "c"_sd};
+    static constexpr std::string_view getName(TimeSplitIdType e) {
+        constexpr auto arr = std::array{"a"sv, "b"sv, "c"sv};
         return arr[toIdx(e)];
     }
-    static constexpr StringData getName(IntervalIdType e) {
+    static constexpr std::string_view getName(IntervalIdType e) {
         return iDefs[toIdx(e)].name;
     }
 

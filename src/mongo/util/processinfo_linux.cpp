@@ -51,6 +51,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <tuple>
 #include <type_traits>
@@ -77,7 +78,6 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -103,6 +103,7 @@
 #define KLF "l"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class LinuxProc {
 public:
@@ -795,11 +796,11 @@ public:
             return {};
         }
         // The entry for cgroup v2 is always in the format “0::$PATH”.
-        const StringData prefixV2 = "0::"_sd;
+        const std::string_view prefixV2 = "0::"sv;
         const size_t prefixLength = prefixV2.length();
 
         // Check if the input starts with the prefix
-        if (StringData{line}.starts_with(prefixV2)) {
+        if (std::string_view{line}.starts_with(prefixV2)) {
             // cgroup v2.
             return fmt::format("/sys/fs/cgroup{}", line.substr(prefixLength));
         } else {
@@ -861,7 +862,7 @@ public:
     }
 };
 
-void appendIfExists(BSONObjBuilder* bob, StringData key, StringData value) {
+void appendIfExists(BSONObjBuilder* bob, std::string_view key, std::string_view value) {
     if (!value.empty()) {
         bob->append(key, value);
     }
@@ -869,24 +870,25 @@ void appendIfExists(BSONObjBuilder* bob, StringData key, StringData value) {
 
 void collectPressureStallInfo(BSONObjBuilder& builder) {
 
-    auto parsePressureFile = [](StringData key, StringData filename, BSONObjBuilder& bob) {
-        BSONObjBuilder psiParseBuilder;
-        auto status = procparser::parseProcPressureFile(key, filename, &psiParseBuilder);
-        if (status.isOK()) {
-            bob.appendElements(psiParseBuilder.obj());
-        }
-        return status.isOK();
-    };
+    auto parsePressureFile =
+        [](std::string_view key, std::string_view filename, BSONObjBuilder& bob) {
+            BSONObjBuilder psiParseBuilder;
+            auto status = procparser::parseProcPressureFile(key, filename, &psiParseBuilder);
+            if (status.isOK()) {
+                bob.appendElements(psiParseBuilder.obj());
+            }
+            return status.isOK();
+        };
 
     BSONObjBuilder psiBuilder;
     bool parseStatus = false;
 
-    parseStatus |= parsePressureFile("memory", "/proc/pressure/memory"_sd, psiBuilder);
-    parseStatus |= parsePressureFile("cpu", "/proc/pressure/cpu"_sd, psiBuilder);
-    parseStatus |= parsePressureFile("io", "/proc/pressure/io"_sd, psiBuilder);
+    parseStatus |= parsePressureFile("memory", "/proc/pressure/memory"sv, psiBuilder);
+    parseStatus |= parsePressureFile("cpu", "/proc/pressure/cpu"sv, psiBuilder);
+    parseStatus |= parsePressureFile("io", "/proc/pressure/io"sv, psiBuilder);
 
     if (parseStatus) {
-        builder.append("pressure"_sd, psiBuilder.obj());
+        builder.append("pressure"sv, psiBuilder.obj());
     }
 }
 
@@ -935,11 +937,11 @@ void appendCpuCgroupV2Info(BSONObjBuilder& bob) {
     std::string cpuMax, cpuMaxBurst, cpuUclampMin, cpuUclampMax, cpuWeight;
     LinuxSysHelper::getCpuCgroupV2Info(
         ProcessId::getCurrent(), cpuMax, cpuMaxBurst, cpuUclampMin, cpuUclampMax, cpuWeight);
-    appendIfExists(&bob, "cpuMax"_sd, cpuMax);
-    appendIfExists(&bob, "cpuMaxBurst"_sd, cpuMaxBurst);
-    appendIfExists(&bob, "cpuUclampMin"_sd, cpuUclampMin);
-    appendIfExists(&bob, "cpuUclampMax"_sd, cpuUclampMax);
-    appendIfExists(&bob, "cpuWeight"_sd, cpuWeight);
+    appendIfExists(&bob, "cpuMax"sv, cpuMax);
+    appendIfExists(&bob, "cpuMaxBurst"sv, cpuMaxBurst);
+    appendIfExists(&bob, "cpuUclampMin"sv, cpuUclampMin);
+    appendIfExists(&bob, "cpuUclampMax"sv, cpuUclampMax);
+    appendIfExists(&bob, "cpuWeight"sv, cpuWeight);
 }
 
 }  // namespace
@@ -987,8 +989,8 @@ int ProcessInfo::getResidentSize() {
     return (int)((p.getResidentSizeInPages() * getPageSize()) / (1024.0 * 1024));
 }
 
-StatusWith<std::string> ProcessInfo::readTransparentHugePagesParameter(StringData parameter,
-                                                                       StringData directory) {
+StatusWith<std::string> ProcessInfo::readTransparentHugePagesParameter(std::string_view parameter,
+                                                                       std::string_view directory) {
     auto line =
         LinuxSysHelper::parseLineFromFile(fmt::format("{}/{}", directory, parameter).c_str());
     if (line.empty()) {
@@ -1011,11 +1013,11 @@ StatusWith<std::string> ProcessInfo::readTransparentHugePagesParameter(StringDat
 
     // Check against acceptable values of opMode.
     static constexpr std::array acceptableValues{
-        "always"_sd,
-        "defer"_sd,
-        "defer+madvise"_sd,
-        "madvise"_sd,
-        "never"_sd,
+        "always"sv,
+        "defer"sv,
+        "defer+madvise"sv,
+        "madvise"sv,
+        "never"sv,
     };
     if (std::find(acceptableValues.begin(), acceptableValues.end(), opMode) ==
         acceptableValues.end()) {
@@ -1035,7 +1037,7 @@ bool ProcessInfo::checkGlibcRseqTunable() {
     const char* envPtr = getenv(kGlibcTunableEnvVar);
     if (!envPtr)
         return false;
-    StringData glibcEnv = envPtr;
+    std::string_view glibcEnv = envPtr;
     auto foundIndex = glibcEnv.find(kRseqKey);
 
     if (foundIndex != std::string::npos) {
@@ -1060,12 +1062,12 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
      * Since both are system dependent, I am converting to int64_t and taking a small hit from the
      * FP processor and the BSONBuilder compression. At worst, this calls 100x/sec.
      */
-    auto appendTime = [&info](StringData fieldName, struct timeval tv) {
+    auto appendTime = [&info](std::string_view fieldName, struct timeval tv) {
         auto value = (static_cast<int64_t>(tv.tv_sec) * 1000 * 1000) + tv.tv_usec;
         info.append(fieldName, value);
     };
 
-    auto appendNumber = [&info](StringData fieldName, auto value) {
+    auto appendNumber = [&info](std::string_view fieldName, auto value) {
         info.append(fieldName, static_cast<int64_t>(value));
     };
 

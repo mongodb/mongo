@@ -32,7 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/session_catalog_test.h"
 #include "mongo/unittest/barrier.h"
@@ -48,6 +47,7 @@
 #include <future>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <system_error>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -1808,7 +1808,7 @@ TEST_F(SessionCatalogTest, MutexRegisteredWithObservableMutexRegistry) {
     catalog()->size();
 
     const BSONObj report = ObservableMutexRegistry::get().report(false);
-    const StringData name = "SessionCatalog::_mutex";
+    const std::string_view name = "SessionCatalog::_mutex";
     ASSERT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
     const BSONObj exclusive =
         report.getObjectField(name).getObjectField(ObservableMutexRegistry::kExclusiveFieldName);

@@ -44,6 +44,7 @@
 #include <cstring>
 #include <functional>
 #include <numeric>
+#include <string_view>
 
 #include <fmt/format.h>
 #include <grpcpp/grpcpp.h>
@@ -59,6 +60,7 @@
 namespace mongo::transport::grpc {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 inline Status makeShutdownTerminationStatus() {
     return Status(ErrorCodes::ShutdownInProgress, "gRPC server is shutting down");
@@ -117,7 +119,7 @@ inline Status makeShutdownTerminationStatus() {
         util::constants::kClientIdKey,
         util::constants::kClientMetadataKey,
         util::constants::kWireVersionKey};
-    static constexpr StringData kReservedMetadataKeyPrefix = "mongodb"_sd;
+    static constexpr std::string_view kReservedMetadataKeyPrefix = "mongodb"sv;
 
     for (const auto& entry : clientMetadata) {
         const auto& key = entry.first;
@@ -256,7 +258,7 @@ CommandService::CommandService(TransportLayer* tl,
         return result;
     }
 
-    boost::optional<StringData> base64EncodedClientMetadata;
+    boost::optional<std::string_view> base64EncodedClientMetadata;
     if (auto clientMetadataEntry = clientMetadata.find(util::constants::kClientMetadataKey);
         clientMetadataEntry != clientMetadata.end()) {
         base64EncodedClientMetadata = clientMetadataEntry->second;

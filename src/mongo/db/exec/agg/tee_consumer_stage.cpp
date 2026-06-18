@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceTeeConsumerToStageFn(
@@ -52,7 +54,7 @@ REGISTER_AGG_STAGE_MAPPING(teeConsumerStage,
 
 TeeConsumerStage::TeeConsumerStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    size_t facetId,
-                                   StringData stageName)
+                                   std::string_view stageName)
     : Stage(stageName, expCtx), _facetId(facetId) {}
 
 void TeeConsumerStage::setTeeBuffer(const boost::intrusive_ptr<TeeBuffer>& bufferSource) {

@@ -43,6 +43,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -54,7 +55,7 @@ namespace mongo {
  */
 class InternalSchemaXorMatchExpression final : public ListOfMatchExpression {
 public:
-    static constexpr StringData kName = "$_internalSchemaXor"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaXor"_sd;
 
     InternalSchemaXorMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(INTERNAL_SCHEMA_XOR, std::move(annotation), {}) {}

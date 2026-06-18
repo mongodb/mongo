@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -64,6 +63,7 @@
 #include <list>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -90,7 +90,7 @@ namespace mongo {
  * 3. Registers the mapping between StageParams and DocumentSource.
  *
  * Assumptions:
- * - DocSourceClass has a static member `kStageName` of type StringData.
+ * - DocSourceClass has a static member `kStageName` of type std::string_view.
  * - DocSourceClass has a static method `createFromBson(BSONElement,
  * intrusive_ptr<ExpressionContext>)`.
  * - StageParamsClass has a static member `id` of type StageParams::Id.
@@ -309,7 +309,7 @@ public:
     /**
      * Get the stage's name.
      */
-    virtual StringData getSourceName() const = 0;
+    virtual std::string_view getSourceName() const = 0;
 
     /**
      * Returns the DocumentSource::Id value of a given stage object.
@@ -393,7 +393,7 @@ public:
      * DO NOT call this method directly. Instead, use the ALLOCATE_DOCUMENT_SOURCE_ID macro defined
      * in this file.
      */
-    static Id allocateId(StringData name);
+    static Id allocateId(std::string_view name);
 
     /**
      * Notifies this stage that the metadata stream has been elided and will not produce documents.
@@ -680,7 +680,7 @@ public:
 
 protected:
     DocumentSource(
-        StringData stageName,
+        std::string_view stageName,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         SortPattern sortPattern = SortPattern(std::vector<SortPattern::SortPatternPart>{}));
 

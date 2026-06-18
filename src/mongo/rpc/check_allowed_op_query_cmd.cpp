@@ -36,27 +36,29 @@
 
 #include <algorithm>
 #include <array>
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-void checkAllowedOpQueryCommand(Client& client, StringData cmd) {
+void checkAllowedOpQueryCommand(Client& client, std::string_view cmd) {
     static constexpr std::array allowed{
-        "hello"_sd,
-        "isMaster"_sd,
-        "ismaster"_sd,
+        "hello"sv,
+        "isMaster"sv,
+        "ismaster"sv,
     };
     const bool isAllowed = (std::find(allowed.begin(), allowed.end(), cmd) != allowed.end());
 
     // The deprecated commands below are still used by some old drivers. Eventually, they should go.
     static constexpr std::array temporarilyAllowed{
-        "_isSelf"_sd,
-        "authenticate"_sd,
-        "buildinfo"_sd,
-        "buildInfo"_sd,
-        "saslContinue"_sd,
-        "saslStart"_sd,
+        "_isSelf"sv,
+        "authenticate"sv,
+        "buildinfo"sv,
+        "buildInfo"sv,
+        "saslContinue"sv,
+        "saslStart"sv,
     };
     const bool isTemporarilyAllowed =
         (std::find(temporarilyAllowed.begin(), temporarilyAllowed.end(), cmd) !=

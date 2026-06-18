@@ -50,6 +50,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <bitset>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -60,6 +61,7 @@
 
 namespace mongo::projection_executor {
 namespace {
+using namespace std::literals::string_view_literals;
 using std::vector;
 
 template <typename T>
@@ -461,12 +463,12 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldAddComputedT
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("newField" << wrapInLiteral("computedVal")));
     auto result = inclusion->applyTransformation(Document{}, {});
-    auto expectedResult = Document{{"newField", "computedVal"_sd}};
+    auto expectedResult = Document{{"newField", "computedVal"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Computed field should replace existing field.
-    result = inclusion->applyTransformation(Document{{"newField", "preExisting"_sd}}, {});
-    expectedResult = Document{{"newField", "computedVal"_sd}};
+    result = inclusion->applyTransformation(Document{{"newField", "preExisting"sv}}, {});
+    expectedResult = Document{{"newField", "computedVal"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -475,7 +477,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << true << "newField" << wrapInLiteral("computedVal")));
     auto result = inclusion->applyTransformation(Document{{"a", 1}}, {});
-    auto expectedResult = Document{{"a", 1}, {"newField", "computedVal"_sd}};
+    auto expectedResult = Document{{"a", 1}, {"newField", "computedVal"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -494,20 +496,19 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
         "firstComputed" << wrapInLiteral("FIRST") << "secondComputed" << wrapInLiteral("SECOND")));
     auto result =
         inclusion->applyTransformation(Document{{"first", 0}, {"second", 1}, {"third", 2}}, {});
-    auto expectedResult = Document{{"firstComputed", "FIRST"_sd}, {"secondComputed", "SECOND"_sd}};
+    auto expectedResult = Document{{"firstComputed", "FIRST"sv}, {"secondComputed", "SECOND"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldImplicitlyIncludeId) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << true));
-    auto result =
-        inclusion->applyTransformation(Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}}, {});
-    auto expectedResult = Document{{"_id", "ID"_sd}, {"a", 1}};
+    auto result = inclusion->applyTransformation(Document{{"_id", "ID"sv}, {"a", 1}, {"b", 2}}, {});
+    auto expectedResult = Document{{"_id", "ID"sv}, {"a", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should leave the "_id" in the same place as in the original document.
-    result = inclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}}, {});
-    expectedResult = Document{{"a", 1}, {"_id", "ID"_sd}};
+    result = inclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"sv}}, {});
+    expectedResult = Document{{"a", 1}, {"_id", "ID"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -515,8 +516,8 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldImplicitlyIncludeIdWithComputedFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("newField" << wrapInLiteral("computedVal")));
-    auto result = inclusion->applyTransformation(Document{{"_id", "ID"_sd}, {"a", 1}}, {});
-    auto expectedResult = Document{{"_id", "ID"_sd}, {"newField", "computedVal"_sd}};
+    auto result = inclusion->applyTransformation(Document{{"_id", "ID"sv}, {"a", 1}}, {});
+    auto expectedResult = Document{{"_id", "ID"sv}, {"newField", "computedVal"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -524,9 +525,9 @@ TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldIncludeIdIfExplicitlyIncluded) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << true << "_id" << true << "b" << true));
-    auto result = inclusion->applyTransformation(
-        Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}, {"c", 3}}, {});
-    auto expectedResult = Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}};
+    auto result =
+        inclusion->applyTransformation(Document{{"_id", "ID"sv}, {"a", 1}, {"b", 2}, {"c", 3}}, {});
+    auto expectedResult = Document{{"_id", "ID"sv}, {"a", 1}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -534,8 +535,7 @@ TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldExcludeIdIfExplicitlyExcluded) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("a" << true << "_id" << false));
-    auto result =
-        inclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}}, {});
+    auto result = inclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"sv}}, {});
     auto expectedResult = Document{{"a", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -543,9 +543,8 @@ TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
 TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldReplaceIdWithComputedId) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("_id" << wrapInLiteral("newId")));
-    auto result =
-        inclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}}, {});
-    auto expectedResult = Document{{"_id", "newId"_sd}};
+    auto result = inclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"sv}}, {});
+    auto expectedResult = Document{{"_id", "newId"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -588,7 +587,7 @@ TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should not replace the first part of the path if that part exists.
-    result = inclusion->applyTransformation(Document{{"sub", "notADocument"_sd}}, {});
+    result = inclusion->applyTransformation(Document{{"sub", "notADocument"sv}}, {});
     expectedResult = Document{};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -620,17 +619,17 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
     // Other fields exist in sub document, one of which is the specified field.
     auto result =
         inclusion->applyTransformation(Document{{"sub", Document{{"target", 1}, {"c", 2}}}}, {});
-    auto expectedResult = Document{{"sub", Document{{"target", "computedVal"_sd}}}};
+    auto expectedResult = Document{{"sub", Document{{"target", "computedVal"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is not present in the sub document.
     result = inclusion->applyTransformation(Document{{"sub", Document{{"c", 1}}}}, {});
-    expectedResult = Document{{"sub", Document{{"target", "computedVal"_sd}}}};
+    expectedResult = Document{{"sub", Document{{"target", "computedVal"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // There are no fields in sub document.
     result = inclusion->applyTransformation(Document{{"sub", Document{}}}, {});
-    expectedResult = Document{{"sub", Document{{"target", "computedVal"_sd}}}};
+    expectedResult = Document{{"sub", Document{{"target", "computedVal"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -641,11 +640,11 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
 
     // Should add the path if it doesn't exist.
     auto result = inclusion->applyTransformation(Document{}, {});
-    auto expectedResult = Document{{"sub", Document{{"target", "computedVal"_sd}}}};
+    auto expectedResult = Document{{"sub", Document{{"target", "computedVal"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should replace non-documents with documents.
-    result = inclusion->applyTransformation(Document{{"sub", "notADocument"_sd}}, {});
+    result = inclusion->applyTransformation(Document{{"sub", "notADocument"sv}}, {});
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -657,11 +656,11 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
     // Should add the path if it doesn't exist.
     auto result = inclusion->applyTransformation(Document{}, {});
     auto expectedResult =
-        Document{{"a", Document{{"b", Document{{"c", Document{{"d", "computedVal"_sd}}}}}}}};
+        Document{{"a", Document{{"b", Document{{"c", Document{{"d", "computedVal"sv}}}}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should replace non-documents with documents.
-    result = inclusion->applyTransformation(Document{{"a", Document{{"b", "other"_sd}}}}, {});
+    result = inclusion->applyTransformation(Document{{"a", Document{{"b", "other"sv}}}}, {});
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -680,12 +679,12 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                  {});
     auto expectedResult =
         Document{{"a",
-                  {Document{{"b", "COMPUTED"_sd}},
-                   Document{{"b", "COMPUTED"_sd}},
-                   Document{{"b", "COMPUTED"_sd}},
-                   Document{{"b", "COMPUTED"_sd}},
+                  {Document{{"b", "COMPUTED"sv}},
+                   Document{{"b", "COMPUTED"sv}},
+                   Document{{"b", "COMPUTED"sv}},
+                   Document{{"b", "COMPUTED"sv}},
                    vector<Value>{},
-                   {Document{{"b", "COMPUTED"_sd}}, Document{{"b", "COMPUTED"_sd}}}}}};
+                   {Document{{"b", "COMPUTED"sv}}, Document{{"b", "COMPUTED"sv}}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -701,20 +700,20 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
                    Document{{"inc", 1}},
                    Document{{"inc", 1}, {"c", 2}},
                    Document{{"c", 2}, {"inc", 1}},
-                   Document{{"inc", 1}, {"c", 2}, {"comp", "original"_sd}},
+                   Document{{"inc", 1}, {"c", 2}, {"comp", "original"sv}},
                    vector<Value>{},
                    {1, Document{{"inc", 1}}}}}},
         {});
     auto expectedResult = Document{
         {"a",
-         {Document{{"comp", "COMPUTED"_sd}},
-          Document{{"comp", "COMPUTED"_sd}},
-          Document{{"inc", 1}, {"comp", "COMPUTED"_sd}},
-          Document{{"inc", 1}, {"comp", "COMPUTED"_sd}},
-          Document{{"inc", 1}, {"comp", "COMPUTED"_sd}},
-          Document{{"inc", 1}, {"comp", "COMPUTED"_sd}},
+         {Document{{"comp", "COMPUTED"sv}},
+          Document{{"comp", "COMPUTED"sv}},
+          Document{{"inc", 1}, {"comp", "COMPUTED"sv}},
+          Document{{"inc", 1}, {"comp", "COMPUTED"sv}},
+          Document{{"inc", 1}, {"comp", "COMPUTED"sv}},
+          Document{{"inc", 1}, {"comp", "COMPUTED"sv}},
           vector<Value>{},
-          {Document{{"comp", "COMPUTED"_sd}}, Document{{"inc", 1}, {"comp", "COMPUTED"_sd}}}}}};
+          {Document{{"comp", "COMPUTED"sv}}, Document{{"inc", 1}, {"comp", "COMPUTED"sv}}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -723,7 +722,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldAddOrInclude
         BSON("_id.X" << true << "_id.Z" << wrapInLiteral("NEW")));
     auto result =
         inclusion->applyTransformation(Document{{"_id", Document{{"X", 1}, {"Y", 2}}}}, {});
-    auto expectedResult = Document{{"_id", Document{{"X", 1}, {"Z", "NEW"_sd}}}};
+    auto expectedResult = Document{{"_id", Document{{"X", 1}, {"Z", "NEW"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -738,18 +737,17 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
                                << wrapInLiteral("Z"))));
     auto result = inclusion->applyTransformation(
         Document{
-            {"a",
-             Document{{"b", "b"_sd}, {"c", "c"_sd}, {"d", "d"_sd}, {"e", "e"_sd}, {"f", "f"_sd}}}},
+            {"a", Document{{"b", "b"sv}, {"c", "c"sv}, {"d", "d"sv}, {"e", "e"sv}, {"f", "f"sv}}}},
         {});
     auto expectedResult = Document{{"a",
-                                    Document{{"b", "b"_sd},
-                                             {"c", "c"_sd},
-                                             {"d", "d"_sd},
-                                             {"e", "e"_sd},
-                                             {"W", "W"_sd},
-                                             {"X", "X"_sd},
-                                             {"Y", "Y"_sd},
-                                             {"Z", "Z"_sd}}}};
+                                    Document{{"b", "b"sv},
+                                             {"c", "c"sv},
+                                             {"d", "d"sv},
+                                             {"e", "e"sv},
+                                             {"W", "W"sv},
+                                             {"X", "X"sv},
+                                             {"Y", "Y"sv},
+                                             {"Z", "Z"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -758,7 +756,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << wrapInLiteral("FIRST") << "b.c" << wrapInLiteral("SECOND")));
     auto result = inclusion->applyTransformation(Document{}, {});
-    auto expectedResult = Document{{"a", "FIRST"_sd}, {"b", Document{{"c", "SECOND"_sd}}}};
+    auto expectedResult = Document{{"a", "FIRST"sv}, {"b", Document{{"c", "SECOND"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -767,7 +765,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("b.c" << wrapInLiteral("NEW") << "a" << true));
     auto result = inclusion->applyTransformation(Document{{"a", 1}}, {});
-    auto expectedResult = Document{{"a", 1}, {"b", Document{{"c", "NEW"_sd}}}};
+    auto expectedResult = Document{{"a", 1}, {"b", Document{{"c", "NEW"sv}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     result = inclusion->applyTransformation(Document{{"a", 1}, {"b", 4}}, {});
@@ -778,7 +776,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
     // document. This is inconsistent, but the expected behavior, and a consequence of
     // applying the projection recursively to each sub-document.
     result = inclusion->applyTransformation(Document{{"b", 4}, {"a", 1}}, {});
-    expectedResult = Document{{"b", Document{{"c", "NEW"_sd}}}, {"a", 1}};
+    expectedResult = Document{{"b", Document{{"c", "NEW"sv}}}, {"a", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -787,7 +785,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("b" << wrapInLiteral("NEW") << "a" << true));
     auto result = inclusion->applyTransformation(Document{{"b", 1}, {"a", 1}}, {});
-    auto expectedResult = Document{{"a", 1}, {"b", "NEW"_sd}};
+    auto expectedResult = Document{{"a", 1}, {"b", "NEW"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     result = inclusion->applyTransformation(Document{{"a", 1}, {"b", 4}}, {});
@@ -928,7 +926,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMeta
     inputDocBuilder.metadata().setTextScore(0.0);
     inputDocBuilder.metadata().setRandVal(1.0);
     inputDocBuilder.metadata().setSearchScore(2.0);
-    inputDocBuilder.metadata().setSearchHighlights(Value{"foo"_sd});
+    inputDocBuilder.metadata().setSearchHighlights(Value{"foo"sv});
     inputDocBuilder.metadata().setGeoNearDistance(3.0);
     inputDocBuilder.metadata().setGeoNearPoint(Value{BSON_ARRAY(4 << 5)});
     inputDocBuilder.metadata().setRecordId(RecordId{6});
@@ -1093,12 +1091,12 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                  {});
     auto expectedResult =
         Document{{"a",
-                  {Document{{"b", "COMPUTED"_sd}},
-                   Document{{"b", "COMPUTED"_sd}},
-                   Document{{"b", "COMPUTED"_sd}},
-                   Document{{"b", "COMPUTED"_sd}},
+                  {Document{{"b", "COMPUTED"sv}},
+                   Document{{"b", "COMPUTED"sv}},
+                   Document{{"b", "COMPUTED"sv}},
+                   Document{{"b", "COMPUTED"sv}},
                    vector<Value>{},
-                   {Document{{"b", "COMPUTED"_sd}}, Document{{"b", "COMPUTED"_sd}}}}}};
+                   {Document{{"b", "COMPUTED"sv}}, Document{{"b", "COMPUTED"sv}}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -1121,12 +1119,12 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                             {1, Document{{"c", 1}}}}}},
                                                  {});
     auto expectedResult = Document{{"a",
-                                    {Document{{"b", "COMPUTED"_sd}},
-                                     Document{{"b", "COMPUTED"_sd}},
-                                     Document{{"b", "COMPUTED"_sd}},
-                                     Document{{"b", "COMPUTED"_sd}},
-                                     Document{{"b", "COMPUTED"_sd}},
-                                     Document{{"b", "COMPUTED"_sd}}}}};
+                                    {Document{{"b", "COMPUTED"sv}},
+                                     Document{{"b", "COMPUTED"sv}},
+                                     Document{{"b", "COMPUTED"sv}},
+                                     Document{{"b", "COMPUTED"sv}},
+                                     Document{{"b", "COMPUTED"sv}},
+                                     Document{{"b", "COMPUTED"sv}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -1137,7 +1135,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ExtractComputedPro
                              << "$myMeta"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [addFields, deleteFlag] =
         r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
@@ -1161,7 +1159,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                                          << "$a"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [addFields, deleteFlag] =
         r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
@@ -1178,7 +1176,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
         BSON("a" << BSON("$sum" << BSON_ARRAY("$myMeta" << "$_id"))));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [addFields, deleteFlag] =
         r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
@@ -1196,7 +1194,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                                          << "$a.x"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [addFields, deleteFlag] =
         r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
@@ -1214,7 +1212,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                                          << "$a.x"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [addFields, deleteFlag] =
         r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
@@ -1232,16 +1230,16 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ApplyProjectionAft
                  << "$myMeta"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
-    const std::set<StringData> reservedNames{};
+    const std::set<std::string_view> reservedNames{};
     auto [addFields, deleteFlag] =
         r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
     // Assuming the document was produced by the $_internalUnpackBucket.
     auto result = inclusion->applyTransformation(
-        Document{{"a", 1}, {"c", 5}, {"computedMeta1", "XXX"_sd}, {"computedMeta3", 2}}, {});
+        Document{{"a", 1}, {"c", 5}, {"computedMeta1", "XXX"sv}, {"computedMeta3", 2}}, {});
     // Computed projections preserve the order in $project, field 'c' moves in front of them.
     auto expectedResult = Document{
-        {"a", 1}, {"c", 5}, {"computedMeta1", "XXX"_sd}, {"computed2", 6}, {"computedMeta3", 2}};
+        {"a", 1}, {"c", 5}, {"computedMeta1", "XXX"sv}, {"computed2", 6}, {"computedMeta3", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -1251,7 +1249,7 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, DoNotExtractReserv
                  << "$myMeta"));
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
-    const std::set<StringData> reservedNames{"meta", "data", "_id"};
+    const std::set<std::string_view> reservedNames{"meta", "data", "_id"};
     auto [addFields, deleteFlag] =
         r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 

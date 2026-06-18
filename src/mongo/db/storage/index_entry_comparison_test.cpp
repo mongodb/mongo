@@ -37,8 +37,10 @@
 #include "mongo/util/overloaded_visitor.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 void buildDupKeyErrorStatusProducesExpectedErrorObject(
     DuplicateKeyErrorInfo::FoundValue&& foundValue) {
@@ -124,7 +126,7 @@ void duplicateKeyErrorSerializationAndParseReturnTheSameObject(
 
 TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectWithCollation) {
     auto keyPattern = BSON("a" << 1 << "b" << 1);
-    auto str = "abc"_sd;
+    auto str = "abc"sv;
     auto keyValue = BSON("" << 10 << "" << str);
     auto collation = BSON("x" << 'y');
     auto keyValueWithFieldName = BSON("a" << 10 << "b" << str);
@@ -135,7 +137,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectW
 
 TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectForInvalidUtf8) {
     auto keyPattern = BSON("a" << 1 << "b" << 1);
-    auto str = StringData("\xc3\x28");
+    auto str = std::string_view("\xc3\x28");
     auto keyValue = BSON("" << 10 << "" << str);
     auto collation = BSONObj();
     auto keyValueWithFieldName = BSON("a" << 10 << "b" << str);
@@ -145,7 +147,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectF
 }
 
 TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncodedCollationKey) {
-    StringData mockCollationKey("bar");
+    std::string_view mockCollationKey("bar");
 
     NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
     std::string indexName("a_1");

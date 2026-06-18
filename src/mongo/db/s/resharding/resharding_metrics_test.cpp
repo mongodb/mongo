@@ -45,6 +45,7 @@
 #include <algorithm>
 #include <initializer_list>
 #include <ratio>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -83,7 +84,7 @@ public:
                                                    ReshardingProvenanceEnum::kReshardCollection);
     }
 
-    StringData getRootSectionName() override {
+    std::string_view getRootSectionName() override {
         return kResharding;
     }
 
@@ -220,7 +221,7 @@ public:
     void createMetricsAndAssertIncrementsCumulativeMetricsField(
         const std::function<void(ReshardingMetrics*)>& mutate,
         Section section,
-        StringData fieldName) {
+        std::string_view fieldName) {
         auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
         assertIncrementsCumulativeMetricsField(
             metrics.get(),

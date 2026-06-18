@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/field_ref.h"
@@ -38,13 +37,14 @@
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo {
 namespace {
 
-void assertCorrectMultikeyMetadataPathBoundsGenerated(StringData field,
+void assertCorrectMultikeyMetadataPathBoundsGenerated(std::string_view field,
                                                       const BSONObj& expectedBounds) {
     IndexBounds indexBounds;
 

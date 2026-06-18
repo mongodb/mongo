@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,6 +39,7 @@
 #include <compare>
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -531,27 +531,27 @@ TEST(DependenciesToProjectionTest, PathLessThan) {
     ASSERT_TRUE(lessThan(std::string("🌲"), std::string("🌲.b")));
     ASSERT_FALSE(lessThan(std::string("🌲.b"), std::string("🌲")));
 
-    // Test StringData type comparison.
-    ASSERT_FALSE(lessThan(StringData("a"), StringData("a")));
-    ASSERT_TRUE(lessThan(StringData("a"), StringData("aa")));
-    ASSERT_TRUE(lessThan(StringData("a"), StringData("b")));
-    ASSERT_TRUE(lessThan(StringData(""), StringData("a")));
-    ASSERT_TRUE(lessThan(StringData("Aa"), StringData("aa")));
-    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("ab")));
+    // Test std::string_view type comparison.
+    ASSERT_FALSE(lessThan(std::string_view("a"), std::string_view("a")));
+    ASSERT_TRUE(lessThan(std::string_view("a"), std::string_view("aa")));
+    ASSERT_TRUE(lessThan(std::string_view("a"), std::string_view("b")));
+    ASSERT_TRUE(lessThan(std::string_view(""), std::string_view("a")));
+    ASSERT_TRUE(lessThan(std::string_view("Aa"), std::string_view("aa")));
+    ASSERT_TRUE(lessThan(std::string_view("a.b"), std::string_view("ab")));
 
-    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("a-b")));  // SERVER-66418
-    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("a b")));  // SERVER-66418
+    ASSERT_TRUE(lessThan(std::string_view("a.b"), std::string_view("a-b")));  // SERVER-66418
+    ASSERT_TRUE(lessThan(std::string_view("a.b"), std::string_view("a b")));  // SERVER-66418
 
     // Verify the difference from the standard sort.
-    ASSERT_TRUE(StringData("a.b") > StringData("a-b"));
-    ASSERT_TRUE(StringData("a.b") > StringData("a b"));
+    ASSERT_TRUE(std::string_view("a.b") > std::string_view("a-b"));
+    ASSERT_TRUE(std::string_view("a.b") > std::string_view("a b"));
 
     // Test unicode behavior.
-    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("a🌲")));
-    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("a🌲b")));
-    ASSERT_TRUE(lessThan(StringData("🌲"), StringData("🌳")));  // U+1F332 < U+1F333
-    ASSERT_TRUE(lessThan(StringData("🌲"), StringData("🌲.b")));
-    ASSERT_FALSE(lessThan(StringData("🌲.b"), StringData("🌲")));
+    ASSERT_TRUE(lessThan(std::string_view("a.b"), std::string_view("a🌲")));
+    ASSERT_TRUE(lessThan(std::string_view("a.b"), std::string_view("a🌲b")));
+    ASSERT_TRUE(lessThan(std::string_view("🌲"), std::string_view("🌳")));  // U+1F332 < U+1F333
+    ASSERT_TRUE(lessThan(std::string_view("🌲"), std::string_view("🌲.b")));
+    ASSERT_FALSE(lessThan(std::string_view("🌲.b"), std::string_view("🌲")));
 }
 
 }  // namespace

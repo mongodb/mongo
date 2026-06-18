@@ -29,37 +29,21 @@
 
 #pragma once
 
-#include "mongo/platform/compiler.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/util/assert_util_core.h"
-#include "mongo/util/ctype.h"
-#include "mongo/util/debug_util.h"
 #include "mongo/util/modules.h"
 
-#include <algorithm>
-#include <concepts>
-#include <cstring>
-#include <functional>
-#include <iosfwd>
-#include <limits>
-#include <stdexcept>
-#include <string>
-#include <string_view>  // NOLINT
-#include <type_traits>
-
-#include <absl/hash/hash.h>
-#include <fmt/format.h>
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
-/** mongo::StringData is an alias for std::string_view. */
+/** mongo::StringData is a legacy alias for std::string_view. */
 using StringData = std::string_view;
 
 inline namespace literals {
 constexpr std::string_view operator""_sd(const char* ptr, std::size_t len) noexcept {
     return std::literals::string_view_literals::operator""sv(ptr, len);
 }
+
 }  // namespace literals
 }  // namespace mongo

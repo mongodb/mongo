@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 
 #include <cstddef>
+#include <string_view>
 
 namespace mongo {
 namespace sbe {
@@ -98,7 +99,7 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
                 break;
         }
 
-        StringData sv(b.str);
+        std::string_view sv(b.str);
         if (!sv.empty()) {
             if (*sv.begin() == '`') {
                 sv = sv.substr(1);

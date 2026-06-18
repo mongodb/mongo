@@ -35,11 +35,13 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 
+#include <string_view>
+
 namespace mongo::extension {
 
-StringData LogicalAggStageAPI::getName() const {
+std::string_view LogicalAggStageAPI::getName() const {
     auto stringView = byteViewAsStringView(_vtable().get_name(get()));
-    return StringData{stringView.data(), stringView.size()};
+    return std::string_view{stringView.data(), stringView.size()};
 }
 
 BSONObj LogicalAggStageAPI::serialize() const {
@@ -107,7 +109,7 @@ void LogicalAggStageAPI::setExtractedLimitVal_deprecated(
 }
 
 bool LogicalAggStageAPI::evaluatePipelineRewriteRulePrecondition(
-    StringData ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext) const {
+    std::string_view ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext) const {
     bool result = false;
     auto nameView = ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(ruleName.data()),
                                              ruleName.size()};
@@ -119,7 +121,7 @@ bool LogicalAggStageAPI::evaluatePipelineRewriteRulePrecondition(
 }
 
 bool LogicalAggStageAPI::evaluatePipelineRewriteRuleTransform(
-    StringData ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext) {
+    std::string_view ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext) {
     bool result = false;
     auto nameView = ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(ruleName.data()),
                                              ruleName.size()};

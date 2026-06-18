@@ -32,6 +32,8 @@
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/logv2/attribute_storage.h"
 
+#include <string_view>
+
 namespace mongo::extension::host_connector {
 
 // Initialize the static instance of LoggerAdapter.
@@ -65,7 +67,7 @@ MongoExtensionStatus* LoggerAdapter::_extLog(
 
         // Extract message from byte view.
         auto messageView = byteViewAsStringView(logMessage->message);
-        StringData message(messageView.data(), messageView.size());
+        std::string_view message(messageView.data(), messageView.size());
 
         // Extract code.
         std::int32_t code = static_cast<std::int32_t>(logMessage->code);

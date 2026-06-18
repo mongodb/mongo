@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -38,6 +39,7 @@
 #include <compare>
 #include <initializer_list>
 #include <ostream>
+#include <string_view>
 #include <type_traits>
 
 namespace mongo {
@@ -213,7 +215,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, const InlinedStorage& storage) {
-        StringData sep;
+        std::string_view sep;
         os << "[";
         for (auto& e : storage) {
             os << sep << e;

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/values/value_printer.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 VirtualScanStage::VirtualScanStage(PlanNodeId planNodeId,
                                    value::SlotId out,
                                    value::TypeTags arrTag,
@@ -40,7 +41,7 @@ VirtualScanStage::VirtualScanStage(PlanNodeId planNodeId,
                                    PlanYieldPolicySBE* yieldPolicy,
                                    bool participateInTrialRunTracking,
                                    bool owned /*=true*/)
-    : PlanStage("virtualscan"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
+    : PlanStage("virtualscan"sv, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _outField(out),
       _arr(owned, arrTag, arrVal) {
     tassert(11094700, "expect arr parameter to be an array", value::isArray(arrTag));

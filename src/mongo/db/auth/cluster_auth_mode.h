@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -68,7 +69,7 @@ public:
     /**
      * Parse a string and return either a ClusterAuthMode or a not-okay Status.
      */
-    static StatusWith<ClusterAuthMode> parse(StringData strMode);
+    static StatusWith<ClusterAuthMode> parse(std::string_view strMode);
 
     /**
      * Return a pre-constructed ClusterAuthMode for keyFile mode.
@@ -139,7 +140,7 @@ public:
     /**
      * Returns a constant string representing this mode.
      */
-    StringData toString() const;
+    std::string_view toString() const;
 
     /**
      * Returns if two separate ClusterAuthModes are equivalent.

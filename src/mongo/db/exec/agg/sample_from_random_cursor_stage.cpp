@@ -29,13 +29,13 @@
 
 #include "mongo/db/exec/agg/sample_from_random_cursor_stage.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 
 #include <cstdlib>
 #include <string>
+#include <string_view>
 
 #include <boost/math/distributions/beta.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -92,7 +92,7 @@ REGISTER_AGG_STAGE_MAPPING(sampleFromRandomCursorStage,
                            sampleFromRandomCursorStageToStageFn);
 
 SampleFromRandomCursorStage::SampleFromRandomCursorStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     long long size,
     std::string idField,
@@ -136,7 +136,7 @@ GetNextResult SampleFromRandomCursorStage::getNextNonDuplicateDocument() {
         auto nextInput = pSource->getNext();
         switch (nextInput.getStatus()) {
             case GetNextResult::ReturnStatus::kAdvanced: {
-                auto idField = nextInput.getDocument()[StringData{_idField}];
+                auto idField = nextInput.getDocument()[std::string_view{_idField}];
                 uassert(28793,
                         str::stream()
                             << "The optimized $sample stage requires all documents have a "

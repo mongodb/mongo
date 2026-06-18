@@ -39,6 +39,7 @@
 
 #include <mutex>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -53,7 +54,7 @@ public:
 
     static void create(ServiceContext* serviceContext);
 
-    inline StringData getName() const final {
+    inline std::string_view getName() const final {
         return kDirectConnectionDDLHookName;
     }
 

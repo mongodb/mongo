@@ -36,6 +36,8 @@
 #include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/container/small_vector.hpp>
 
 namespace mongo::bsoncolumn {
@@ -68,7 +70,7 @@ public:
     }
 
 private:
-    bool _traverseNoArrays(StringData fieldName, const BSONObj& obj, BSONType type) {
+    bool _traverseNoArrays(std::string_view fieldName, const BSONObj& obj, BSONType type) {
         [[maybe_unused]] auto raii = _enterFunc(fieldName, obj, type);
 
         return std::all_of(obj.begin(), obj.end(), [this, &fieldName](auto&& elem) {
@@ -78,7 +80,7 @@ private:
         });
     }
 
-    bool _traverseIntoArrays(StringData fieldName, const BSONObj& obj, BSONType type) {
+    bool _traverseIntoArrays(std::string_view fieldName, const BSONObj& obj, BSONType type) {
         [[maybe_unused]] auto raii = _enterFunc(fieldName, obj, type);
 
         return std::all_of(obj.begin(), obj.end(), [this, &fieldName](auto&& elem) {
@@ -117,7 +119,7 @@ template <typename Finisher = NoopSubObjectFinisher>
 class BSONSubObjectAllocator {
 public:
     BSONSubObjectAllocator(BSONElementStorage& allocator,
-                           StringData fieldName,
+                           std::string_view fieldName,
                            const BSONObj& obj,
                            BSONType type,
                            Finisher state = Finisher{})

@@ -29,11 +29,12 @@
 
 #include "mongo/otel/traces/tracer_provider_service.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/traces/trace_settings.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
+
+#include <string_view>
 
 #include <fmt/format.h>
 #include <opentelemetry/exporters/otlp/otlp_file_exporter_factory.h>
@@ -70,7 +71,7 @@ opentelemetry::sdk::trace::BatchSpanProcessorOptions makeBatchSpanProcessorOptio
  * "service.name" and "service.instance.id" are set with default values if no user configuration is
  * provided.
  */
-opentelemetry::sdk::resource::Resource makeResource(StringData name, StringData pid) {
+opentelemetry::sdk::resource::Resource makeResource(std::string_view name, std::string_view pid) {
     opentelemetry::sdk::resource::ResourceAttributes attrs;
     attrs["service.name"] = std::string(name);
     attrs["service.instance.id"] = std::string(pid);

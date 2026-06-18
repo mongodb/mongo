@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -51,7 +52,7 @@ namespace mongo {
 class InternalSchemaMaxItemsMatchExpression final
     : public InternalSchemaNumArrayItemsMatchExpression {
 public:
-    InternalSchemaMaxItemsMatchExpression(boost::optional<StringData> path,
+    InternalSchemaMaxItemsMatchExpression(boost::optional<std::string_view> path,
                                           long long numItems,
                                           clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : InternalSchemaNumArrayItemsMatchExpression(INTERNAL_SCHEMA_MAX_ITEMS,

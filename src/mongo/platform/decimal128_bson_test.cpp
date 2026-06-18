@@ -28,7 +28,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -43,6 +42,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -54,7 +54,7 @@ const std::string testData = initTestData();
 
 using namespace mongo;
 
-BSONObj convertHexStringToBsonObj(StringData hexString) {
+BSONObj convertHexStringToBsonObj(std::string_view hexString) {
     std::string data = hexblob::decode(hexString);
     auto buffer = SharedBuffer::allocate(data.size());
     std::copy(data.begin(), data.end(), buffer.get());
@@ -88,7 +88,7 @@ TEST(Decimal128BSONTest, TestsConstructingDecimalWithBsonDump) {
 
             LOGV2(22609, "Test - {desc_str}", "desc_str"_attr = desc.str());
 
-            StringData hexString = bson.valueStringData();
+            std::string_view hexString = bson.valueStringData();
             BSONObj d = convertHexStringToBsonObj(hexString);
             std::string outputJson = d.jsonString();
             std::string expectedJson;

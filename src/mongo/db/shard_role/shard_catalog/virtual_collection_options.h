@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -44,7 +45,7 @@ namespace mongo {
 struct MONGO_MOD_NEEDS_REPLACEMENT ExternalDataSourceMetadata {
     static constexpr auto kUrlProtocolFile = "file://"_sd;
 
-    ExternalDataSourceMetadata(StringData urlStr,
+    ExternalDataSourceMetadata(std::string_view urlStr,
                                StorageTypeEnum storageTypeEnum,
                                FileTypeEnum fileTypeEnum)
         : url(urlStr), storageType(storageTypeEnum), fileType(fileTypeEnum) {

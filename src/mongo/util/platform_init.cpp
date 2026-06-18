@@ -31,6 +31,7 @@
 #ifdef _WIN32
 #include <cstdio>
 #include <cstdlib>
+#include <string_view>
 
 #include <crtdbg.h>
 #include <mmsystem.h>
@@ -47,24 +48,25 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-StringData firstLine(const char* s) {
+std::string_view firstLine(const char* s) {
     const char* eol = s;
     while (*eol && *eol != '\n')
         ++eol;
-    return StringData(s, eol - s);
+    return std::string_view(s, eol - s);
 }
 
-StringData severity(int t) {
+std::string_view severity(int t) {
     switch (t) {
         case _CRT_WARN:
-            return "WARN"_sd;
+            return "WARN"sv;
         case _CRT_ERROR:
-            return "ERROR"_sd;
+            return "ERROR"sv;
         case _CRT_ASSERT:
-            return "ASSERT"_sd;
+            return "ASSERT"sv;
     }
-    return ""_sd;
+    return ""sv;
 }
 
 extern "C" {
@@ -76,7 +78,7 @@ int __cdecl crtDebugCallback(int nRptType, char* originalMessage, int* returnVal
           "*** C runtime debug report ***",
           "severity_nRptType"_attr = severity(nRptType),
           "firstLine_originalMessage"_attr = firstLine(originalMessage),
-          "die_terminating_sd_sd"_attr = (die ? ", terminating"_sd : ""_sd));
+          "die_terminating_sd_sd"_attr = (die ? ", terminating"sv : ""sv));
     if (die) {
         fassertFailed(17006);
     }

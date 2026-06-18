@@ -35,10 +35,12 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 class ListLocalSessionsStage final : public Stage {
 public:
-    ListLocalSessionsStage(StringData stageName,
+    ListLocalSessionsStage(std::string_view stageName,
                            const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                            const ListSessionsSpec& spec);
 

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -39,6 +38,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -167,7 +167,7 @@ public:
     /**
      * Appends contents to given BSONObjBuilder.
      */
-    void toBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void toBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
 
     //
     // accessors

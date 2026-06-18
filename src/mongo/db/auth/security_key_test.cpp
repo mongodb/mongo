@@ -30,7 +30,6 @@
 #include "mongo/db/auth/security_key.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
@@ -46,6 +45,7 @@
 #include <memory>
 #include <ostream>
 #include <set>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -66,7 +66,8 @@ class TestFile {
     TestFile& operator=(TestFile&) = delete;
 
 public:
-    TestFile(StringData contents, bool fixPerms = true) : _path(boost::filesystem::unique_path()) {
+    TestFile(std::string_view contents, bool fixPerms = true)
+        : _path(boost::filesystem::unique_path()) {
         boost::filesystem::ofstream stream(_path, std::ios_base::out | std::ios_base::trunc);
         ASSERT_TRUE(stream.good());
 
@@ -93,7 +94,7 @@ private:
 struct TestCase {
     enum class FailureMode { Success, Permissions, Parsing, SecurityKeyConstraint };
 
-    TestCase(StringData contents_,
+    TestCase(std::string_view contents_,
              std::initializer_list<std::string> expected_,
              FailureMode mode_ = FailureMode::Success)
         : fileContents(std::string{contents_}), expected(expected_), mode(mode_) {}
@@ -103,13 +104,13 @@ struct TestCase {
     FailureMode mode = FailureMode::Success;
 };
 
-StringData longKeyMaker() {
+std::string_view longKeyMaker() {
     static const auto longKey = [] {
         std::array<char, 1026> ret;
         ret.fill('a');
         return ret;
     }();
-    return StringData(longKey.data(), longKey.size());
+    return std::string_view(longKey.data(), longKey.size());
 }
 
 std::initializer_list<TestCase> testCases = {

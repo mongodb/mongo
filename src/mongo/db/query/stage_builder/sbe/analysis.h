@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -224,20 +225,20 @@ public:
     /**
      * Returns the FieldEffect for the specified field.
      */
-    FieldEffect get(StringData field) const {
+    FieldEffect get(std::string_view field) const {
         auto it = _effects.find(field);
         return it != _effects.end() ? it->second : _defaultEffect;
     }
 
-    inline bool isAllowedField(StringData field) const {
+    inline bool isAllowedField(std::string_view field) const {
         auto effect = get(field);
         return effect != FieldEffect::kDrop;
     }
-    inline bool isChangedField(StringData field) const {
+    inline bool isChangedField(std::string_view field) const {
         auto effect = get(field);
         return effect != FieldEffect::kKeep && effect != FieldEffect::kDrop;
     }
-    inline bool isCreatedField(StringData field) const {
+    inline bool isCreatedField(std::string_view field) const {
         auto effect = get(field);
         return effect != FieldEffect::kKeep && effect != FieldEffect::kDrop &&
             effect != FieldEffect::kModify;

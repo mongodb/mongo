@@ -45,6 +45,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/cstdint.hpp>
@@ -189,7 +191,7 @@ StatusWith<Schema> generateSchemaFromBucketDoc(tracking::Context& trackingContex
     }
 }
 
-StatusWith<Date_t> extractTime(const BSONObj& doc, StringData timeFieldName) {
+StatusWith<Date_t> extractTime(const BSONObj& doc, std::string_view timeFieldName) {
     auto timeElem = doc[timeFieldName];
     if (!timeElem || BSONType::date != timeElem.type()) {
         return {ErrorCodes::BadValue,
@@ -199,15 +201,15 @@ StatusWith<Date_t> extractTime(const BSONObj& doc, StringData timeFieldName) {
     return timeElem.Date();
 }
 
-BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime) {
+BSONObj buildControlMinTimestampDoc(std::string_view timeField, Date_t roundedTime) {
     BSONObjBuilder builder;
     builder.append(timeField, roundedTime);
     return builder.obj();
 }
 
 StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc,
-                                                              StringData timeFieldName,
-                                                              StringData metaFieldName) {
+                                                              std::string_view timeFieldName,
+                                                              std::string_view metaFieldName) {
     // Iterate the document once, checking for both fields.
     BSONElement timeElem;
     BSONElement metaElem;

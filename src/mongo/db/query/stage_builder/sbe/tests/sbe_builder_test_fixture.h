@@ -47,6 +47,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -183,7 +184,7 @@ public:
     void runTest(stage_builder::SbExpr sbeExpr,
                  sbe::value::TypeTags expectedTag,
                  sbe::value::Value expectedVal,
-                 StringData test);
+                 std::string_view test);
 
 protected:
     stage_builder::Environment _env;

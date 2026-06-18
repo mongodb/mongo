@@ -29,7 +29,6 @@
 
 #include "mongo/db/fts/fts_query_impl.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_query_parser.h"
@@ -38,6 +37,7 @@
 
 #include <iosfwd>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -99,7 +99,8 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
                     // end of a phrase
                     unsigned phraseStart = quoteOffset + 1;
                     unsigned phraseLength = t.offset - phraseStart;
-                    StringData phrase = StringData(getQuery()).substr(phraseStart, phraseLength);
+                    std::string_view phrase =
+                        std::string_view(getQuery()).substr(phraseStart, phraseLength);
                     if (inNegation) {
                         _negatedPhrases.push_back(std::string{phrase});
                     } else {
@@ -196,7 +197,7 @@ void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const std::string& sentenc
 
 BSONObj FTSQueryImpl::toBSON() const {
     BSONObjBuilder bob;
-    auto appendRange = [&](StringData name, const auto& seq) {
+    auto appendRange = [&](std::string_view name, const auto& seq) {
         bob.append(name, seq.begin(), seq.end());
     };
     appendRange("terms", getPositiveTerms());

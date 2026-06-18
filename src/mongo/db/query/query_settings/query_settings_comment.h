@@ -33,6 +33,7 @@
 #include "mongo/util/modules.h"
 
 #include <compare>
+#include <string_view>
 
 namespace mongo::query_settings {
 
@@ -46,7 +47,7 @@ public:
         _comment = IDLAnyTypeOwned(element);
     }
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
         _comment.serializeToBSON(fieldName, builder);
     }
 

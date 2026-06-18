@@ -31,7 +31,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/database_name.h"
@@ -66,6 +65,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -113,7 +113,7 @@ public:
     static std::pair<BSONObj, RecordId> makeCRUDOp(OpTypeEnum opType,
                                                    Timestamp ts,
                                                    UUID uuid,
-                                                   StringData nss,
+                                                   std::string_view nss,
                                                    BSONObj o,
                                                    boost::optional<BSONObj> o2,
                                                    int recordId);
@@ -135,7 +135,7 @@ public:
      */
     static std::pair<BSONObj, RecordId> makeCommandOpForApplyOps(
         boost::optional<UUID> uuid,
-        StringData nss,
+        std::string_view nss,
         BSONObj cmdObj,
         int recordId,
         boost::optional<BSONObj> o2 = boost::none);

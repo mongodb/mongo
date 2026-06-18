@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/hex.h"
@@ -43,6 +42,7 @@
 #include <ctime>
 #include <limits>
 #include <memory>
+#include <string_view>
 
 #include <boost/functional/hash.hpp>
 #include <boost/move/utility_core.hpp>
@@ -163,13 +163,13 @@ void OID::initFromInt64(int64_t val) {
     _view().write<BigEndian<int64_t>>(val, kInstanceUniqueOffset);
 }
 
-void OID::init(StringData s) {
+void OID::init(std::string_view s) {
     MONGO_verify(s.size() == (2 * kOIDSize));
     std::string blob = hexblob::decode(s.substr(0, 2 * kOIDSize));
     std::copy(blob.begin(), blob.end(), _data);
 }
 
-StatusWith<OID> OID::parse(StringData input) {
+StatusWith<OID> OID::parse(std::string_view input) {
     if (input.size() != (2 * kOIDSize)) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Invalid string length for parsing to OID, expected "

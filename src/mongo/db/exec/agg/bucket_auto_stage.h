@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
@@ -41,12 +40,13 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo::exec::agg {
 
 class BucketAutoStage final : public Stage {
 public:
-    BucketAutoStage(StringData stageName,
+    BucketAutoStage(std::string_view stageName,
                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
                     std::shared_ptr<std::vector<AccumulationStatement>> accumulatedFields,
                     std::shared_ptr<bool> populated,

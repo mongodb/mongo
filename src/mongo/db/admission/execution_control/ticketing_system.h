@@ -43,6 +43,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -252,7 +253,7 @@ private:
      * Helper function to generalize ticket holder stats report.
      */
     void _appendTicketHolderStats(BSONObjBuilder& b,
-                                  StringData fieldName,
+                                  std::string_view fieldName,
                                   bool usesPrioritization,
                                   const AdmissionContext::Priority& priority,
                                   const std::unique_ptr<TicketHolder>& holder,

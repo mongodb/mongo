@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands.h"

@@ -39,6 +39,8 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::cost_based_ranker {
 
 CardinalityEstimate makeCard(double d);
@@ -81,11 +83,11 @@ std::unique_ptr<QuerySolution> makeVirtualCollScanPlan(size_t size,
                                                        std::unique_ptr<MatchExpression> filter);
 
 OrderedIntervalList makePointInterval(double point, std::string fieldName);
-OrderedIntervalList makePointInterval(StringData str, std::string fieldName);
+OrderedIntervalList makePointInterval(std::string_view str, std::string fieldName);
 OrderedIntervalList makePointInterval(const BSONObj& obj, std::string fieldName);
 
 IndexBounds makePointIntervalBounds(double point, std::string fieldName);
-IndexBounds makePointIntervalBounds(StringData str, std::string fieldName);
+IndexBounds makePointIntervalBounds(std::string_view str, std::string fieldName);
 IndexBounds makePointIntervalBounds(const BSONObj& obj, std::string fieldName);
 
 IndexBounds makeRangeIntervalBounds(const BSONObj& range,

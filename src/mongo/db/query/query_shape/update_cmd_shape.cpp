@@ -41,10 +41,13 @@
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 
+#include <string_view>
+
 #include <absl/hash/hash.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_shape {
+using namespace std::literals::string_view_literals;
 namespace {
 
 BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate,
@@ -69,7 +72,7 @@ BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate,
     // If query is {_id: {$eq: <value>}}, get <value>.
     BSONElement valueElem = idElem;
     if (idElem.type() == BSONType::object &&
-        idElem.Obj().firstElementFieldNameStringData() == "$eq"_sd) {
+        idElem.Obj().firstElementFieldNameStringData() == "$eq"sv) {
         valueElem = idElem.Obj().firstElement();
     }
 
@@ -153,7 +156,7 @@ boost::optional<BSONObj> shapifyUpdateConstants(const ParsedUpdate& parsedUpdate
 
     // Shapify each constant value, but keep variable names unchanged.
     for (const auto& elem : constants.value()) {
-        StringData varName = elem.fieldNameStringData();
+        std::string_view varName = elem.fieldNameStringData();
         Value shapifiedValue = opts.serializeLiteral(elem);
         shapifiedValue.addToBsonObj(&shapifiedConstants,
                                     opts.serializeFieldPathFromString(varName));
@@ -187,7 +190,7 @@ UpdateCmdShapeComponents::UpdateCmdShapeComponents(const ParsedUpdate& parsedUpd
                                                    LetShapeComponent let,
                                                    const query_shape::SerializationOptions& opts)
     : representativeQ(shapifyQuery(parsedUpdate, opts)),
-      _representativeUObj(shapifyUpdateOp(parsedUpdate, opts).wrap(""_sd)),
+      _representativeUObj(shapifyUpdateOp(parsedUpdate, opts).wrap(""sv)),
       representativeC(shapifyUpdateConstants(parsedUpdate, opts)),
       representativeArrayFilters(shapifyArrayFilters(parsedUpdate, opts)),
       multi(parsedUpdate.getRequest()->getMulti()),

@@ -30,7 +30,6 @@
 #include "mongo/util/dynamic_catch.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/stdx/thread.h"

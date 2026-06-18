@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor_interface.h"
@@ -45,6 +44,7 @@
 #include <set>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 /**
@@ -108,7 +108,7 @@ private:
      * @return callback helper to safely cleanup 'ReplicaSetMonitor' and 'globalConnPool' when the
      * instance of ReplicaSetMonitor for the 'name' is being destroyed.
      */
-    static std::function<void()> _getCleanupCallback(StringData name);
+    static std::function<void()> _getCleanupCallback(std::string_view name);
 
     const std::function<void()> _cleanupCallback;
 };

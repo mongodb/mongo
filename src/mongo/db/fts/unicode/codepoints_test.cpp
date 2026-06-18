@@ -29,7 +29,6 @@
 
 #include "mongo/db/fts/unicode/codepoints.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>

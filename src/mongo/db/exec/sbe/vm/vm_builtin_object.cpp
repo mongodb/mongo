@@ -31,9 +31,12 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace sbe {
 namespace vm {
+using namespace std::literals::string_view_literals;
 value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
     auto inObj = viewFromStack(0);
 
@@ -76,7 +79,7 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
     } else if (inObj.tag == value::TypeTags::Object) {
         auto objRoot = value::getObjectView(inObj.value);
         for (size_t idx = 0; idx < objRoot->size(); ++idx) {
-            StringData sv(objRoot->field(idx));
+            std::string_view sv(objRoot->field(idx));
 
             if (restrictFieldsSet.count(sv) == 0) {
 
@@ -134,7 +137,7 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
     } else if (inObj.tag == value::TypeTags::Object) {
         auto objRoot = value::getObjectView(inObj.value);
         for (size_t idx = 0; idx < objRoot->size(); ++idx) {
-            StringData sv(objRoot->field(idx));
+            std::string_view sv(objRoot->field(idx));
 
             if (keepFieldsSet.count(sv) == 1) {
                 auto [tag, val] = objRoot->getAt(idx);
@@ -319,9 +322,9 @@ value::TagValueMaybeOwned ByteCode::builtinObjectToArray(ArityType arity) {
         auto elemObj = value::getObjectView(elemVal);
 
         // insert key and value to the object
-        elemObj->push_back_raw("k"_sd, keyTag, keyVal);
+        elemObj->push_back_raw("k"sv, keyTag, keyVal);
         keyGuard.reset();
-        elemObj->push_back_raw("v"_sd, valueCopyTag, valueCopyVal);
+        elemObj->push_back_raw("v"sv, valueCopyTag, valueCopyVal);
 
         // insert the object to array
         array->push_back_raw(elemTag, elemVal);

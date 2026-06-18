@@ -41,8 +41,11 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using UpdateObjectNodeTest = UpdateTestFixture;
 using unittest::assertGet;
@@ -50,7 +53,7 @@ using unittest::assertGet;
 TEST(SimpleUpdateObjectNodeTest, InvalidPathFailsToParse) {
     auto update = fromjson("{$set: {'': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -67,7 +70,7 @@ TEST(SimpleUpdateObjectNodeTest, InvalidPathFailsToParse) {
 TEST(SimpleUpdateObjectNodeTest, ValidIncPathParsesSuccessfully) {
     auto update = fromjson("{$inc: {'a.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -81,7 +84,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidIncPathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidMulPathParsesSuccessfully) {
     auto update = fromjson("{$mul: {'a.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -95,7 +98,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidMulPathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidRenamePathParsesSuccessfully) {
     auto update = fromjson("{$rename: {'a.b': 'c.d'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -123,7 +126,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidRenamePathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidSetPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -137,7 +140,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidSetPathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidUnsetPathParsesSuccessfully) {
     auto update = fromjson("{$unset: {'a.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -151,7 +154,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidUnsetPathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidAddToSetPathParsesSuccessfully) {
     auto update = fromjson("{$addToSet: {'a.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -165,7 +168,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidAddToSetPathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidPopPathParsesSuccessfully) {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -179,7 +182,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidPopPathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidMaxPathParsesSuccessfully) {
     auto update = fromjson("{$max: {'a.b': 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -193,7 +196,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidMaxPathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidMinPathParsesSuccessfully) {
     auto update = fromjson("{$min: {'a.b': 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -207,7 +210,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidMinPathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidCurrentDatePathParsesSuccessfully) {
     auto update = fromjson("{$currentDate: {'a.b': true}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -221,7 +224,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidCurrentDatePathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidSetOnInsertPathParsesSuccessfully) {
     auto update = fromjson("{$setOnInsert: {'a.b': true}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -235,7 +238,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidSetOnInsertPathParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ValidPushParsesSuccessfully) {
     auto update = fromjson("{$push: {'a.b': {$each: [0, 1], $sort: 1, $position: 0, $slice: 10}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -249,7 +252,7 @@ TEST(SimpleUpdateObjectNodeTest, ValidPushParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
     auto update = fromjson("{$set: {'a.$.b.$': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -267,7 +270,7 @@ TEST(SimpleUpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
 TEST(SimpleUpdateObjectNodeTest, ParsingSetsPositionalTrue) {
     auto update = fromjson("{$set: {'a.$.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -283,7 +286,7 @@ TEST(SimpleUpdateObjectNodeTest, ParsingSetsPositionalTrue) {
 TEST(SimpleUpdateObjectNodeTest, ParsingSetsPositionalFalse) {
     auto update = fromjson("{$set: {'a.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -299,7 +302,7 @@ TEST(SimpleUpdateObjectNodeTest, ParsingSetsPositionalFalse) {
 TEST(SimpleUpdateObjectNodeTest, PositionalElementFirstPositionFailsToParse) {
     auto update = fromjson("{$set: {'$': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -317,7 +320,7 @@ TEST(SimpleUpdateObjectNodeTest, PositionalElementFirstPositionFailsToParse) {
 TEST(SimpleUpdateObjectNodeTest, TwoModifiersOnSameFieldFailToParse) {
     auto update = fromjson("{$set: {a: 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -340,7 +343,7 @@ TEST(SimpleUpdateObjectNodeTest, TwoModifiersOnSameFieldFailToParse) {
 TEST(SimpleUpdateObjectNodeTest, TwoModifiersOnDifferentFieldsParseSuccessfully) {
     auto update = fromjson("{$set: {a: 5, b: 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -360,7 +363,7 @@ TEST(SimpleUpdateObjectNodeTest, TwoModifiersOnDifferentFieldsParseSuccessfully)
 TEST(SimpleUpdateObjectNodeTest, TwoModifiersWithSameDottedPathFailToParse) {
     auto update = fromjson("{$set: {'a.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -384,7 +387,7 @@ TEST(SimpleUpdateObjectNodeTest, TwoModifiersWithSameDottedPathFailToParse) {
 TEST(SimpleUpdateObjectNodeTest, FirstModifierPrefixOfSecondFailToParse) {
     auto update = fromjson("{$set: {a: 5, 'a.b': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -408,7 +411,7 @@ TEST(SimpleUpdateObjectNodeTest, FirstModifierPrefixOfSecondFailToParse) {
 TEST(SimpleUpdateObjectNodeTest, FirstModifierDottedPrefixOfSecondFailsToParse) {
     auto update = fromjson("{$set: {'a.b': 5, 'a.b.c': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -432,7 +435,7 @@ TEST(SimpleUpdateObjectNodeTest, FirstModifierDottedPrefixOfSecondFailsToParse) 
 TEST(SimpleUpdateObjectNodeTest, SecondModifierPrefixOfFirstFailsToParse) {
     auto update = fromjson("{$set: {'a.b': 5, a: 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -455,7 +458,7 @@ TEST(SimpleUpdateObjectNodeTest, SecondModifierPrefixOfFirstFailsToParse) {
 TEST(SimpleUpdateObjectNodeTest, SecondModifierDottedPrefixOfFirstFailsToParse) {
     auto update = fromjson("{$set: {'a.b.c': 5, 'a.b': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -479,7 +482,7 @@ TEST(SimpleUpdateObjectNodeTest, SecondModifierDottedPrefixOfFirstFailsToParse) 
 TEST(SimpleUpdateObjectNodeTest, ModifiersWithCommonPrefixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5, 'a.c': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -499,7 +502,7 @@ TEST(SimpleUpdateObjectNodeTest, ModifiersWithCommonPrefixParseSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, ModifiersWithCommonDottedPrefixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.b.c': 5, 'a.b.d': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -519,7 +522,7 @@ TEST(SimpleUpdateObjectNodeTest, ModifiersWithCommonDottedPrefixParseSuccessfull
 TEST(SimpleUpdateObjectNodeTest, ModifiersWithCommonPrefixDottedSuffixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.b.c': 5, 'a.d.e': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -539,7 +542,7 @@ TEST(SimpleUpdateObjectNodeTest, ModifiersWithCommonPrefixDottedSuffixParseSucce
 TEST(SimpleUpdateObjectNodeTest, TwoModifiersOnSamePositionalFieldFailToParse) {
     auto update = fromjson("{$set: {'a.$': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -563,7 +566,7 @@ TEST(SimpleUpdateObjectNodeTest, TwoModifiersOnSamePositionalFieldFailToParse) {
 TEST(SimpleUpdateObjectNodeTest, PositionalFieldsWithDifferentPrefixesParseSuccessfully) {
     auto update = fromjson("{$set: {'a.$': 5, 'b.$': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -583,7 +586,7 @@ TEST(SimpleUpdateObjectNodeTest, PositionalFieldsWithDifferentPrefixesParseSucce
 TEST(SimpleUpdateObjectNodeTest, PositionalAndNonpositionalFieldWithCommonPrefixParseSuccessfully) {
     auto update = fromjson("{$set: {'a.$': 5, 'a.0': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -603,7 +606,7 @@ TEST(SimpleUpdateObjectNodeTest, PositionalAndNonpositionalFieldWithCommonPrefix
 TEST(SimpleUpdateObjectNodeTest, TwoModifiersWithSamePositionalDottedPathFailToParse) {
     auto update = fromjson("{$set: {'a.$.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -627,7 +630,7 @@ TEST(SimpleUpdateObjectNodeTest, TwoModifiersWithSamePositionalDottedPathFailToP
 TEST(SimpleUpdateObjectNodeTest, FirstModifierPositionalPrefixOfSecondFailsToParse) {
     auto update = fromjson("{$set: {'a.$': 5, 'a.$.b': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -651,7 +654,7 @@ TEST(SimpleUpdateObjectNodeTest, FirstModifierPositionalPrefixOfSecondFailsToPar
 TEST(SimpleUpdateObjectNodeTest, SecondModifierPositionalPrefixOfFirstFailsToParse) {
     auto update = fromjson("{$set: {'a.$.b': 5, 'a.$': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -675,7 +678,7 @@ TEST(SimpleUpdateObjectNodeTest, SecondModifierPositionalPrefixOfFirstFailsToPar
 TEST(SimpleUpdateObjectNodeTest, FirstModifierFieldPrefixOfSecondParsesSuccessfully) {
     auto update = fromjson("{$set: {'a': 5, 'ab': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -695,7 +698,7 @@ TEST(SimpleUpdateObjectNodeTest, FirstModifierFieldPrefixOfSecondParsesSuccessfu
 TEST(SimpleUpdateObjectNodeTest, SecondModifierFieldPrefixOfSecondParsesSuccessfully) {
     auto update = fromjson("{$set: {'ab': 5, 'a': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -715,7 +718,7 @@ TEST(SimpleUpdateObjectNodeTest, SecondModifierFieldPrefixOfSecondParsesSuccessf
 TEST(SimpleUpdateObjectNodeTest, IdentifierWithoutArrayFilterFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i]': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -733,7 +736,7 @@ TEST(SimpleUpdateObjectNodeTest, IdentifierWithoutArrayFilterFailsToParse) {
 TEST(SimpleUpdateObjectNodeTest, IdentifierInMiddleOfPathWithoutArrayFilterFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i].b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -751,7 +754,7 @@ TEST(SimpleUpdateObjectNodeTest, IdentifierInMiddleOfPathWithoutArrayFilterFails
 TEST(SimpleUpdateObjectNodeTest, EmptyIdentifierParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[]': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -766,7 +769,7 @@ TEST(SimpleUpdateObjectNodeTest, EmptyIdentifierParsesSuccessfully) {
 TEST(SimpleUpdateObjectNodeTest, EmptyIdentifierInMiddleOfPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[].b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -782,7 +785,7 @@ TEST(SimpleUpdateObjectNodeTest, IdentifierWithArrayFilterParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.$[i]': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -801,7 +804,7 @@ TEST(SimpleUpdateObjectNodeTest, IdentifierWithArrayFilterInMiddleOfPathParsesSu
     auto update = fromjson("{$set: {'a.$[i].b': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -820,7 +823,7 @@ TEST(SimpleUpdateObjectNodeTest, IdentifierInFirstPositionFailsToParse) {
     auto update = fromjson("{$set: {'$[i]': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -842,7 +845,7 @@ TEST(SimpleUpdateObjectNodeTest, IdentifierInFirstPositionWithSuffixFailsToParse
     auto update = fromjson("{$set: {'$[i].a': 5}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -864,7 +867,7 @@ TEST(SimpleUpdateObjectNodeTest, CreateObjectNodeInSamePositionAsArrayNodeFailsT
     auto update = fromjson("{$set: {'a.$[i]': 5, 'a.0': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -893,7 +896,7 @@ TEST(SimpleUpdateObjectNodeTest, CreateArrayNodeInSamePositionAsObjectNodeFailsT
     auto update = fromjson("{$set: {'a.0': 5, 'a.$[i]': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -920,7 +923,7 @@ TEST(SimpleUpdateObjectNodeTest, CreateLeafNodeInSamePositionAsArrayNodeFailsToP
     auto update = fromjson("{$set: {'a.$[i]': 5, a: 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -948,7 +951,7 @@ TEST(SimpleUpdateObjectNodeTest, CreateArrayNodeInSamePositionAsLeafNodeFailsToP
     auto update = fromjson("{$set: {a: 5, 'a.$[i]': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -976,7 +979,7 @@ TEST(SimpleUpdateObjectNodeTest, CreateTwoChildrenOfArrayNodeParsesSuccessfully)
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
     auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx));
     auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx));
@@ -1010,7 +1013,7 @@ TEST(SimpleUpdateObjectNodeTest, ConflictAtArrayNodeChildFailsToParse) {
     auto update2 = fromjson("{$set: {'a.$[i]': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -1039,7 +1042,7 @@ TEST(SimpleUpdateObjectNodeTest, ConflictThroughArrayNodeChildFailsToParse) {
     auto update = fromjson("{$set: {'a.$[i].b': 5, 'a.$[i].b.c': 6}}");
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -1069,7 +1072,7 @@ TEST(SimpleUpdateObjectNodeTest, NoConflictDueToDifferentArrayNodeChildrenParses
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx));
     auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx));
 
@@ -1102,7 +1105,7 @@ TEST(SimpleUpdateObjectNodeTest, MultipleArrayNodesAlongPathParsesSuccessfully) 
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
     auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx));
     auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx));
@@ -1146,7 +1149,7 @@ TEST(SimpleUpdateObjectNodeTest, DistinctFieldsMergeCorrectly) {
     auto setUpdate2 = fromjson("{$set: {'ab': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1176,7 +1179,7 @@ TEST(SimpleUpdateObjectNodeTest, NestedMergeSucceeds) {
     auto setUpdate2 = fromjson("{$set: {'a.d': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1212,7 +1215,7 @@ TEST(SimpleUpdateObjectNodeTest, DoublyNestedMergeSucceeds) {
     auto setUpdate2 = fromjson("{$set: {'a.b.d': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1254,7 +1257,7 @@ TEST(SimpleUpdateObjectNodeTest, FieldAndPositionalMergeCorrectly) {
     auto setUpdate2 = fromjson("{$set: {'a.$': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1291,7 +1294,7 @@ TEST(SimpleUpdateObjectNodeTest, MergeThroughPositionalSucceeds) {
     auto setUpdate2 = fromjson("{$set: {'a.$.c': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1333,7 +1336,7 @@ TEST(SimpleUpdateObjectNodeTest, TopLevelConflictFails) {
     auto setUpdate2 = fromjson("{$set: {'a': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1362,7 +1365,7 @@ TEST(SimpleUpdateObjectNodeTest, NestedConflictFails) {
     auto setUpdate2 = fromjson("{$set: {'a.b': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1391,7 +1394,7 @@ TEST(SimpleUpdateObjectNodeTest, LeftPrefixMergeFails) {
     auto setUpdate2 = fromjson("{$set: {'a.b.c': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1420,7 +1423,7 @@ TEST(SimpleUpdateObjectNodeTest, RightPrefixMergeFails) {
     auto setUpdate2 = fromjson("{$set: {'a.b': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1449,7 +1452,7 @@ TEST(SimpleUpdateObjectNodeTest, LeftPrefixMergeThroughPositionalFails) {
     auto setUpdate2 = fromjson("{$set: {'a.$.c.d': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1478,7 +1481,7 @@ TEST(SimpleUpdateObjectNodeTest, RightPrefixMergeThroughPositionalFails) {
     auto setUpdate2 = fromjson("{$set: {'a.$.c': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1507,7 +1510,7 @@ TEST(SimpleUpdateObjectNodeTest, MergeWithConflictingPositionalFails) {
     auto setUpdate2 = fromjson("{$set: {'a.$': 6}}");
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode setRoot1, setRoot2;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&setRoot1,
@@ -1540,8 +1543,8 @@ DEATH_TEST_REGEX(UpdateObjectNodeDeathTest,
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters1;
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters2;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters1;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters2;
     auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx));
     auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx));
     arrayFilters1["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilterI)));
@@ -1570,7 +1573,7 @@ TEST(SimpleUpdateObjectNodeTest, MergingArrayNodeWithObjectNodeFails) {
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilter = fromjson("{i: 0}");
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -1602,7 +1605,7 @@ TEST(SimpleUpdateObjectNodeTest, MergingArrayNodeWithLeafNodeFails) {
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilter = fromjson("{i: 0}");
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -1635,7 +1638,7 @@ TEST(SimpleUpdateObjectNodeTest, MergingTwoArrayNodesSucceeds) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilterI = fromjson("{i: 0}");
     auto arrayFilterJ = fromjson("{j: 0}");
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
     auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx));
     auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx));
@@ -1679,7 +1682,7 @@ TEST(SimpleUpdateObjectNodeTest, MergeConflictThroughArrayNodesFails) {
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilter = fromjson("{i: 0}");
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -1711,7 +1714,7 @@ TEST(SimpleUpdateObjectNodeTest, NoMergeConflictThroughArrayNodesSucceeds) {
     FieldRef fakeFieldRef("root");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto arrayFilter = fromjson("{i: 0}");
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
@@ -1753,7 +1756,7 @@ TEST(SimpleUpdateObjectNodeTest, NoMergeConflictThroughArrayNodesSucceeds) {
 TEST_F(UpdateObjectNodeTest, ApplyCreateField) {
     auto setUpdate = fromjson("{$set: {b: 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1778,7 +1781,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateField) {
 TEST_F(UpdateObjectNodeTest, ApplyExistingField) {
     auto setUpdate = fromjson("{$set: {a: 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1803,7 +1806,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingField) {
 TEST_F(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
     auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7, d: 8}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1846,7 +1849,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
 TEST_F(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
     auto setUpdate = fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1889,7 +1892,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
 TEST_F(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
     auto setUpdate = fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1932,7 +1935,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
 TEST_F(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
     auto setUpdate = fromjson("{$set: {'a.b.c.d': 6, 'a.b.c.e': 7, 'a.f': 8}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -1969,7 +1972,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
 TEST_F(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
     auto setUpdate = fromjson("{$set: {a: 5, d: 6, c: 7, b: 8, z: 9}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2021,7 +2024,7 @@ TEST_F(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     expCtx->setCollator(std::move(collator));
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2051,7 +2054,7 @@ TEST_F(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
 TEST_F(UpdateObjectNodeTest, ApplyNoop) {
     auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2090,7 +2093,7 @@ TEST_F(UpdateObjectNodeTest, ApplyNoop) {
 TEST_F(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
     auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2129,7 +2132,7 @@ TEST_F(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
 TEST_F(UpdateObjectNodeTest, ApplyBlockingElement) {
     auto setUpdate = fromjson("{$set: {'a.b': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2151,7 +2154,7 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElement) {
 TEST_F(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
     auto setUpdate = fromjson("{$set: {'a.b': 5, b: 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2182,7 +2185,7 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
 TEST_F(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
     auto setUpdate = fromjson("{$set: {'a.$': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2205,7 +2208,7 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
 TEST_F(UpdateObjectNodeTest, ApplyMergePositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2237,7 +2240,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMergePositionalChild) {
 TEST_F(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.2': 5, 'a.1.b': 6, 'a.0': 7, 'a.$.c': 8}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2281,7 +2284,7 @@ TEST_F(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
 TEST_F(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.0': 5, 'a.$': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2310,7 +2313,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
 TEST_F(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
     auto setUpdate = fromjson("{$set: {'a.0': 5, 'a.2': 6, 'a.$': 7}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2348,7 +2351,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
 TEST_F(UpdateObjectNodeTest, ApplyPositionalChildLast) {
     auto setUpdate = fromjson("{$set: {'a.$': 5, 'a.0': 6, 'a.1': 7}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2386,7 +2389,7 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalChildLast) {
 TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2431,7 +2434,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
 TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6, 'a.1.d': 7}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2489,7 +2492,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
 TEST_F(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
     auto setUpdate = fromjson("{$set: {'a.02': 2}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2520,7 +2523,7 @@ TEST_F(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
 TEST_F(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
     auto setUpdate = fromjson("{$set: {'a.2': 2, 'a.10': 10}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2552,7 +2555,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
 TEST_F(UpdateObjectNodeTest, ApplyMultipleUpdatesToDocumentInArray) {
     auto setUpdate = fromjson("{$set: {'a.2.b': 1, 'a.2.c': 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2583,7 +2586,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleUpdatesToDocumentInArray) {
 TEST_F(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
     auto setUpdate = fromjson("{$set: {'a.b': 3}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2604,7 +2607,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
 TEST_F(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5}, $pop: {'a.c': -1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2633,11 +2636,11 @@ TEST_F(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully
 
 TEST(SimpleParseRenameTest, RenameToStringWithEmbeddedNullFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
 
     {
-        const auto embeddedNull = "a\0b"_sd;
+        const auto embeddedNull = "a\0b"sv;
         auto update = BSON("$rename" << BSON("a.b" << embeddedNull));
 
         UpdateObjectNode root;
@@ -2654,7 +2657,7 @@ TEST(SimpleParseRenameTest, RenameToStringWithEmbeddedNullFails) {
     }
 
     {
-        const auto singleNullByte = "\0"_sd;
+        const auto singleNullByte = "\0"sv;
         auto update = BSON("$rename" << BSON("a.b" << singleNullByte));
 
         UpdateObjectNode root;
@@ -2671,7 +2674,7 @@ TEST(SimpleParseRenameTest, RenameToStringWithEmbeddedNullFails) {
     }
 
     {
-        const auto leadingNullByte = "\0bbbb"_sd;
+        const auto leadingNullByte = "\0bbbb"sv;
         auto update = BSON("$rename" << BSON("a.b" << leadingNullByte));
 
         UpdateObjectNode root;
@@ -2688,7 +2691,7 @@ TEST(SimpleParseRenameTest, RenameToStringWithEmbeddedNullFails) {
     }
 
     {
-        const auto trailingNullByte = "bbbb\0"_sd;
+        const auto trailingNullByte = "bbbb\0"sv;
         auto update = BSON("$rename" << BSON("a.b" << trailingNullByte));
 
         UpdateObjectNode root;
@@ -2708,7 +2711,7 @@ TEST(SimpleParseRenameTest, RenameToStringWithEmbeddedNullFails) {
 TEST(SimpleParseRenameTest, RenameToNonUpdatablePathFails) {
     auto update = fromjson("{$rename: {'a': 'b.'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -2726,7 +2729,7 @@ TEST(SimpleParseRenameTest, RenameToNonUpdatablePathFails) {
 TEST(SimpleParseRenameTest, RenameFromNonUpdatablePathFails) {
     auto update = fromjson("{$rename: {'.a': 'b'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -2744,7 +2747,7 @@ TEST(SimpleParseRenameTest, RenameFromNonUpdatablePathFails) {
 TEST(SimpleParseRenameTest, RenameToNonStringPathFails) {
     auto update = fromjson("{$rename: {'a': 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -2768,7 +2771,7 @@ TEST(SimpleParseRenameTest, RenameToNonStringPathFails) {
 TEST(SimpleParseRenameTest, RenameWithSameNameFails) {
     auto update = fromjson("{$rename: {'a': 'a'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -2786,7 +2789,7 @@ TEST(SimpleParseRenameTest, RenameWithSameNameFails) {
 TEST(SimpleParseRenameTest, RenameUpwardFails) {
     auto update = fromjson("{$rename: {'b.a': 'b'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -2804,7 +2807,7 @@ TEST(SimpleParseRenameTest, RenameUpwardFails) {
 TEST(SimpleParseRenameTest, RenameDownwardFails) {
     auto update = fromjson("{$rename: {'b': 'b.a'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(&root,
@@ -2822,7 +2825,7 @@ TEST(SimpleParseRenameTest, RenameDownwardFails) {
 TEST(SimpleParseRenameTest, ConflictWithRenameSourceFailsToParse) {
     auto update = fromjson("{$set: {a: 5}, $rename: {a: 'b'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2845,7 +2848,7 @@ TEST(SimpleParseRenameTest, ConflictWithRenameSourceFailsToParse) {
 TEST(SimpleParseRenameTest, ConflictWithRenameDestinationFailsToParse) {
     auto update = fromjson("{$set: {b: 5}, $rename: {a: 'b'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
@@ -2870,7 +2873,7 @@ TEST(SimpleParseArrayFilterIdentifierTest, ValidIdentifier) {
     auto arrayFilter = fromjson("{i: 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     arrayFilters["validIdentifier"] =
         assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
 
@@ -2885,7 +2888,7 @@ TEST(SimpleParseArrayFilterIdentifierTest, ValidIdentifier) {
 }
 
 TEST(SimpleParseArrayFilterIdentifierTest, InvalidPosition) {
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters{};
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters{};
     std::set<std::string> foundIdentifiers;
 
     auto result = UpdateObjectNode::parseArrayFilterIdentifier(
@@ -2900,7 +2903,7 @@ TEST(SimpleParseArrayFilterIdentifierTest, InvalidPosition) {
 }
 
 TEST(SimpleParseArrayFilterIdentifierTest, ArrayFilterNotFound) {
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters{};
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters{};
     std::set<std::string> foundIdentifiers;
 
     auto result = UpdateObjectNode::parseArrayFilterIdentifier(

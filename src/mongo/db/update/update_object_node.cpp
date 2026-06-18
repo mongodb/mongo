@@ -38,6 +38,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -46,7 +47,7 @@ namespace {
 /**
  * Gets the child of 'element' named 'field', if it exists. Otherwise returns a non-ok element.
  */
-mutablebson::Element getChild(mutablebson::Element element, StringData field) {
+mutablebson::Element getChild(mutablebson::Element element, std::string_view field) {
     if (element.getType() == BSONType::object) {
         return element[field];
     } else if (element.getType() == BSONType::array) {
@@ -66,7 +67,7 @@ mutablebson::Element getChild(mutablebson::Element element, StringData field) {
  * affected indexes.
  */
 void applyChild(const UpdateNode& child,
-                StringData field,
+                std::string_view field,
                 UpdateExecutor::ApplyParams* applyParams,
                 UpdateNode::UpdateNodeApplyParams* updateNodeApplyParams,
                 UpdateExecutor::ApplyResult* applyResult) {
@@ -174,7 +175,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
     modifiertable::ModifierType type,
     BSONElement modExpr,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+    const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
     std::set<std::string>& foundIdentifiers) {
     FieldRef fieldRef;
     if (type != modifiertable::ModifierType::MOD_RENAME) {
@@ -314,10 +315,10 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
 
 // static
 StatusWith<std::string> UpdateObjectNode::parseArrayFilterIdentifier(
-    StringData field,
+    std::string_view field,
     size_t position,
     const FieldRef& fieldRef,
-    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+    const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
     std::set<std::string>& foundIdentifiers) {
     dassert(fieldchecker::isArrayFilterIdentifier(field));
 

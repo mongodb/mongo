@@ -34,12 +34,12 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -54,15 +54,15 @@ enum class PrepareVote {
     kAbort,
 };
 
-StringData toString(PrepareVote prepareVote);
+std::string_view toString(PrepareVote prepareVote);
 
 using CommitDecision = PrepareVote;
 
 /**
  * String serializer/deserializer for the commit decision enum values.
  */
-CommitDecision readCommitDecisionEnumProperty(StringData decision);
-StringData writeCommitDecisionEnumProperty(CommitDecision decision);
+CommitDecision readCommitDecisionEnumProperty(std::string_view decision);
+std::string_view writeCommitDecisionEnumProperty(CommitDecision decision);
 
 }  // namespace txn
 }  // namespace mongo

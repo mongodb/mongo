@@ -29,17 +29,19 @@
 
 #include "mongo/crypto/mongocryptbuffer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // CDR's operator== enforces identicality (same memory addresses),
 // not just equality (same contents).
 // Do a lightweight conversion to StrindData for ASSERT_EQ equality comparisons.
-StringData toString(ConstDataRange cdr) {
+std::string_view toString(ConstDataRange cdr) {
     return {cdr.data(), cdr.length()};
 }
 
@@ -50,7 +52,7 @@ TEST(MongoCryptBuffer, EmptyBuffer) {
     ASSERT_EQ(buffer.size(), 0);
 }
 
-constexpr auto kHelloWorld = "Hello World"_sd;
+constexpr auto kHelloWorld = "Hello World"sv;
 const ConstDataRange kHelloWorldCDR(kHelloWorld.data(), kHelloWorld.size());
 
 TEST(MongoCryptBuffer, HelloBufferOwned) {

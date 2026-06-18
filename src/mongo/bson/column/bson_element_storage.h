@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -109,7 +109,7 @@ public:
      * Allocates a BSONElement of provided type and value size. Field name is set to empty
      * string.
      */
-    Element allocate(BSONType type, StringData fieldName, int valueSize);
+    Element allocate(BSONType type, std::string_view fieldName, int valueSize);
 
     /**
      * Deallocates provided number of bytes. Moves back the pointer of used memory so it can be

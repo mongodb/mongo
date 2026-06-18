@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -72,6 +71,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <typeinfo>
 #include <utility>
 
@@ -412,7 +412,7 @@ query_shape::CollectionType ShardServerProcessInterface::getCollectionType(
     }
     const BSONObj& listCollectionsResult = response[0];
 
-    const StringData typeString = listCollectionsResult["type"].valueStringDataSafe();
+    const std::string_view typeString = listCollectionsResult["type"].valueStringDataSafe();
     tassert(9072002,
             "All collections returned by listCollections must have a type element",
             !typeString.empty());

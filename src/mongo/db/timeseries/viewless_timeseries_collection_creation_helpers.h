@@ -29,21 +29,22 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 MONGO_MOD_PUBLIC;
 namespace mongo::timeseries {
-BSONObj generateTimeseriesValidator(int bucketVersion, StringData timeField);
+BSONObj generateTimeseriesValidator(int bucketVersion, std::string_view timeField);
 
 /**
  * Validates that 'validator' matches one of the schemas that the server generates for the supported
  * time-series bucket format versions on 'timeField'. Throws a user-facing error when no known
  * version matches.
  */
-void validateTimeseriesValidator(const BSONObj& validator, StringData timeField);
+void validateTimeseriesValidator(const BSONObj& validator, std::string_view timeField);
 
 /**
  * Generates the index on the metaField and timeField for time-series collections. This is used for

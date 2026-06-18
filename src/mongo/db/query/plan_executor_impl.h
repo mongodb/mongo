@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/classic/multi_plan.h"
@@ -63,6 +62,7 @@
 
 #include <deque>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -81,7 +81,7 @@ namespace mongo {
  */
 template <typename F, typename H>
 [[nodiscard]] PlanStage::StageState handlePlanStageYield(ExpressionContext* expCtx,
-                                                         StringData opStr,
+                                                         std::string_view opStr,
                                                          F&& f,
                                                          H&& yieldHandler) {
     auto opCtx = expCtx->getOperationContext();

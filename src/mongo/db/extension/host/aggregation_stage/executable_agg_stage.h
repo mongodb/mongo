@@ -32,6 +32,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo::extension::host {
 

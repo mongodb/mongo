@@ -118,6 +118,7 @@
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -125,6 +126,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
@@ -4320,7 +4322,7 @@ namespace {
 /*
  * Constructs a ClientMetadata BSONObj with the given application name.
  */
-BSONObj constructClientMetadata(StringData appName) {
+BSONObj constructClientMetadata(std::string_view appName) {
     BSONObjBuilder builder;
     ASSERT_OK(ClientMetadata::serializePrivate("driverName",
                                                "driverVersion",
@@ -5527,7 +5529,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
         auto cursor = coll->getCursor(opCtx());
         while (auto record = cursor->next()) {
             auto bson = record.value().data.toBson();
-            if (bson["state"].String() != "prepared"_sd) {
+            if (bson["state"].String() != "prepared"sv) {
                 continue;
             }
 

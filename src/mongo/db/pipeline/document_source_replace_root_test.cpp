@@ -54,6 +54,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
@@ -86,7 +87,7 @@ protected:
 // in the replacement of the root with that object.
 TEST_F(ReplaceRootBasics, FieldPathAsNewRootPromotesSubdocument) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot" << "$a"));
-    Document subdoc = Document{{"b", 1}, {"c", "hello"_sd}, {"d", Document{{"e", 2}}}};
+    Document subdoc = Document{{"b", 1}, {"c", "hello"sv}, {"d", Document{{"e", 2}}}};
     auto mock = exec::agg::MockStage::createForTest(Document{{"a", subdoc}}, getExpCtx());
     exec::agg::MockStage::setSource_forTest(replaceRoot, mock.get());
 
@@ -227,7 +228,7 @@ TEST_F(ReplaceRootBasics, ErrorsWhenNewRootDoesNotEvaluateToAnObject) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot" << "$a"));
 
     // A string is not an object.
-    auto mock = exec::agg::MockStage::createForTest(Document{{"a", "hello"_sd}}, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(Document{{"a", "hello"sv}}, getExpCtx());
     exec::agg::MockStage::setSource_forTest(replaceRoot, mock.get());
     ASSERT_THROWS_CODE(replaceRoot->getNext(), AssertionException, 40228);
 

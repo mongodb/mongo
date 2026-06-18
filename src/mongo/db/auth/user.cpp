@@ -55,19 +55,20 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 // Field names used when serializing User objects to BSON for usersInfo.
-constexpr auto kIdFieldName = "_id"_sd;
-constexpr auto kUserIdFieldName = "userId"_sd;
-constexpr auto kUserFieldName = "user"_sd;
-constexpr auto kDbFieldName = "db"_sd;
-constexpr auto kMechanismsFieldName = "mechanisms"_sd;
-constexpr auto kCredentialsFieldName = "credentials"_sd;
-constexpr auto kRolesFieldName = "roles"_sd;
-constexpr auto kInheritedRolesFieldName = "inheritedRoles"_sd;
-constexpr auto kInheritedPrivilegesFieldName = "inheritedPrivileges"_sd;
+constexpr auto kIdFieldName = "_id"sv;
+constexpr auto kUserIdFieldName = "userId"sv;
+constexpr auto kUserFieldName = "user"sv;
+constexpr auto kDbFieldName = "db"sv;
+constexpr auto kMechanismsFieldName = "mechanisms"sv;
+constexpr auto kCredentialsFieldName = "credentials"sv;
+constexpr auto kRolesFieldName = "roles"sv;
+constexpr auto kInheritedRolesFieldName = "inheritedRoles"sv;
+constexpr auto kInheritedPrivilegesFieldName = "inheritedPrivileges"sv;
 constexpr auto kInheritedAuthenticationRestrictionsFieldName =
-    "inheritedAuthenticationRestrictions"_sd;
-constexpr auto kAuthenticationRestrictionsFieldName = "authenticationRestrictions"_sd;
+    "inheritedAuthenticationRestrictions"sv;
+constexpr auto kAuthenticationRestrictionsFieldName = "authenticationRestrictions"sv;
 
 SHA256Block computeDigest(const UserName& name) {
     auto fn = name.getDisplayName();

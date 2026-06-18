@@ -56,6 +56,7 @@
 #include <limits>
 #include <memory>
 #include <random>
+#include <string_view>
 #include <vector>
 
 #include <fmt/format.h>
@@ -63,6 +64,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::key_string_test {
+using namespace std::literals::string_view_literals;
 
 // This test is derived from a fuzzer suite and triggers interesting code paths and recursion
 // patterns, so including it here specifically.
@@ -89,7 +91,7 @@ TEST(InvalidKeyStringTest, FuzzedCodeWithScopeNesting) {
         "0200aaaa00aa00aafa00aa0200aa00aaaa00000000000000000000000000000000000000000000000000000000"
         "0000000000000000000000000000000000aaaa00aa00aafa00aa0200aa00aaaa00000000000000000000000000"
         "00000000000000000000000000000000000000000000000000aafa00aa0200aa00aaaa00000000000000000400"
-        "00000000000000000000000000000000"_sd,
+        "00000000000000000000000000000000"sv,
         &keyData);
     signed char typeBitsData[] = {0, 16, 0, 0, -127, 1};
     BufReader typeBitsReader(typeBitsData, sizeof(typeBitsData));
@@ -233,8 +235,8 @@ TEST_P(KeyStringBuilderTest, EmbeddedkEnd) {
     // Construct a KeyString which contains kEnd inside a string key and verify that getKeySize()
     // does not report that the size ends at that spot
     key_string::Builder ks(version, ALL_ASCENDING);
-    ks.appendString("_\0_\4_"_sd);
-    ks.appendString("abc"_sd);
+    ks.appendString("_\0_\4_"sv);
+    ks.appendString("abc"sv);
     auto buffer = ks.finishAndGetBuffer();
     EXPECT_EQ(buffer.size(), 14);
     EXPECT_EQ(key_string::getKeySize(buffer, ALL_ASCENDING, version), buffer.size());
@@ -248,7 +250,7 @@ TEST_P(KeyStringBuilderTest, EmbeddedNullString) {
 
     // No exceptions should be thrown.
     ASSERT_BSONOBJ_EQ(key_string::toBson(data, ALL_ASCENDING, typeBits),
-                      BSON("" << StringData("\x00", 1)));
+                      BSON("" << std::string_view("\x00", 1)));
 };
 
 TEST_P(KeyStringBuilderTest, ExceededBSONDepth) {
@@ -327,7 +329,7 @@ TEST_P(KeyStringBuilderTest, ActualBytesDouble) {
 
     EXPECT_EQ(10U, ks.getSize());
 
-    StringData hex = version == key_string::Version::V0
+    std::string_view hex = version == key_string::Version::V0
         ? "2B"              // kNumericPositive1ByteInt
           "0B"              // (5 << 1) | 1
           "02000000000000"  // fractional bytes of double
@@ -1057,7 +1059,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStr) {
 }
 
 TEST_P(KeyStringBuilderTest, RecordIdStrBig1SizeSegment) {
-    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    const int pad = 3;  // kStringLike CType + std::string_view terminator + RecordId len
     {
         const int size = 90;
         const auto ridStr = std::string(size, 'a');
@@ -1080,7 +1082,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBig1SizeSegment) {
 }
 
 TEST_P(KeyStringBuilderTest, RecordIdStrBig2SizeSegments) {
-    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    const int pad = 3;  // kStringLike CType + std::string_view terminator + RecordId len
     {
         // Min 2-byte encoded string size is 128B: 1B CType + ridStr + string terminator
         const int size = 126;
@@ -1113,7 +1115,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBig2SizeSegments) {
 }
 
 TEST_P(KeyStringBuilderTest, RecordIdStrBig3SizeSegments) {
-    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    const int pad = 3;  // kStringLike CType + std::string_view terminator + RecordId len
     {
         // Min 3-byte encoded string size is 16384B: 1B CType + ridStr + string terminator
         const int size = 16382;
@@ -1137,7 +1139,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBig3SizeSegments) {
 }
 
 TEST_P(KeyStringBuilderTest, RecordIdStrBig4SizeSegments) {
-    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    const int pad = 3;  // kStringLike CType + std::string_view terminator + RecordId len
     {
         // Min 4-byte encoded string size is 2097152B: 1B CType + ridStr + string terminator
         const int size = 2097150;
@@ -1161,7 +1163,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBig4SizeSegments) {
 }
 
 TEST_P(KeyStringBuilderTest, RecordIdStrBigSizeWithoutRecordIdStr) {
-    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    const int pad = 3;  // kStringLike CType + std::string_view terminator + RecordId len
     const char str[] = "keyval";
     const int padStr = 3;  // kStringLike CType + string terminator + discriminator
     {
@@ -1169,7 +1171,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBigSizeWithoutRecordIdStr) {
         const auto ridStr = std::string(ridStrlen, 'a');
         auto rid = ridFromStr(ridStr);
         key_string::Builder ks(version);
-        ks.appendString(mongo::StringData(str, strlen(str)));
+        ks.appendString(std::string_view(str, strlen(str)));
         ks.appendRecordId(rid);
         EXPECT_EQ(ks.getSize(), strlen(str) + padStr + ridStrlen + pad);
         EXPECT_EQ(key_string::decodeRecordIdStrAtEnd(ks.getView()), rid);
@@ -1180,7 +1182,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBigSizeWithoutRecordIdStr) {
         const auto ridStr = std::string(ridStrlen, 'a');
         auto rid = ridFromStr(ridStr);
         key_string::Builder ks(version);
-        ks.appendString(mongo::StringData(str, strlen(str)));
+        ks.appendString(std::string_view(str, strlen(str)));
         ks.appendRecordId(rid);
         EXPECT_EQ(ks.getSize(),
                   strlen(str) + padStr + ridStrlen + pad + 1);  // 1 0x80 cont byte

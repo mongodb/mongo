@@ -29,11 +29,13 @@
 
 #include "mongo/db/pipeline/document_source_internal_replace_root.h"
 
+#include <string_view>
+
 namespace mongo {
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalReplaceRoot, DocumentSourceInternalReplaceRoot::id)
 
-StringData DocumentSourceInternalReplaceRoot::getSourceName() const {
+std::string_view DocumentSourceInternalReplaceRoot::getSourceName() const {
     return kStageNameInternal;
 }
 

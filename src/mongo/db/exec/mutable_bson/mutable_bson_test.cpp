@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -53,6 +52,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -767,11 +767,11 @@ TEST(SafeNumType, setSafeNum) {
 
     t0.setValueString("foo bar baz").transitional_ignore();
 
-    mongo::StringData left = "foo bar baz";
-    mongo::StringData right = t0.getValueString();
+    std::string_view left = "foo bar baz";
+    std::string_view right = t0.getValueString();
     ASSERT_EQUALS(left, right);
 
-    ASSERT_EQUALS(mongo::StringData("foo bar baz"), t0.getValueString());
+    ASSERT_EQUALS(std::string_view("foo bar baz"), t0.getValueString());
     t0.setValueSafeNum(mongo::SafeNum(12345)).transitional_ignore();
     ASSERT_EQUALS(mongo::SafeNum(12345), t0.getValueSafeNum());
 }
@@ -1647,9 +1647,9 @@ TEST(Document, SetValueElementSetToOtherDocRoot) {
 
 TEST(Document, CreateElementWithEmptyFieldName) {
     mmb::Document doc;
-    mmb::Element noname = doc.makeElementObject(mongo::StringData());
+    mmb::Element noname = doc.makeElementObject(std::string_view());
     ASSERT_TRUE(noname.ok());
-    ASSERT_EQUALS(mongo::StringData(), noname.getFieldName());
+    ASSERT_EQUALS(std::string_view(), noname.getFieldName());
 }
 
 TEST(Document, CreateElementFromBSONElement) {
@@ -1689,8 +1689,8 @@ TEST(Document, toStringEphemeralArray) {
     mmb::Document doc;
     mmb::Element e = doc.makeElementArray("foo");
     ASSERT_OK(doc.root().pushBack(e));
-    ASSERT_OK(e.appendDouble(mongo::StringData(), 1.0));
-    ASSERT_OK(e.appendString(mongo::StringData(), "str"));
+    ASSERT_OK(e.appendDouble(std::string_view(), 1.0));
+    ASSERT_OK(e.appendString(std::string_view(), "str"));
     ASSERT_EQUALS(mongo::fromjson("{ foo: [ 1.0, 'str' ] }").firstElement().toString(),
                   e.toString());
 }
@@ -1701,9 +1701,7 @@ TEST(Document, ElementCloningToDifferentDocument) {
     mmb::Document source(mongo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    source.root()["d"]
-        .pushBack(source.makeElementInt(mongo::StringData(), 7))
-        .transitional_ignore();
+    source.root()["d"].pushBack(source.makeElementInt(std::string_view(), 7)).transitional_ignore();
 
     mmb::Document target;
 
@@ -1735,7 +1733,7 @@ TEST(Document, ElementCloningToSameDocument) {
     mmb::Document doc(mongo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7)).transitional_ignore();
+    doc.root()["d"].pushBack(doc.makeElementInt(std::string_view(), 7)).transitional_ignore();
 
     mmb::Element newElement = doc.makeElement(doc.root()["d"]);
     ASSERT_TRUE(newElement.ok());
@@ -1780,9 +1778,7 @@ TEST(Document, RootCloningToDifferentDocument) {
     mmb::Document source(mongo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    source.root()["d"]
-        .pushBack(source.makeElementInt(mongo::StringData(), 7))
-        .transitional_ignore();
+    source.root()["d"].pushBack(source.makeElementInt(std::string_view(), 7)).transitional_ignore();
 
     mmb::Document target;
 
@@ -1801,7 +1797,7 @@ TEST(Document, RootCloningToSameDocument) {
     mmb::Document doc(mongo::fromjson(initial));
 
     // Dirty the 'd' node and parents.
-    doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7)).transitional_ignore();
+    doc.root()["d"].pushBack(doc.makeElementInt(std::string_view(), 7)).transitional_ignore();
 
     mmb::Element newElement = doc.makeElementWithNewFieldName("X", doc.root());
     mongo::Status status = doc.root().pushBack(newElement);
@@ -1825,7 +1821,7 @@ TEST(Element, PopOpsOnEmpty) {
 TEST(Document, NameOfRootElementIsEmpty) {
     mmb::Document doc;
     // NOTE: You really shouldn't rely on this behavior; this test is mostly for coverage.
-    ASSERT_EQUALS(mongo::StringData(), doc.root().getFieldName());
+    ASSERT_EQUALS(std::string_view(), doc.root().getFieldName());
 }
 
 TEST(Document, SetValueOnRootFails) {

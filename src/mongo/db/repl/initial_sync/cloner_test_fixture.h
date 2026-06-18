@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/repl/initial_sync/base_cloner.h"
@@ -51,6 +50,7 @@
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -66,7 +66,7 @@ public:
 
     // Since the DBClient handles the cursor iterating, we assume that works for the purposes of the
     // cloner unit test and just use a single batch for all mock responses.
-    static BSONObj createCursorResponse(StringData nss, const BSONArray& docs);
+    static BSONObj createCursorResponse(std::string_view nss, const BSONArray& docs);
 
 protected:
     void setUp() override;

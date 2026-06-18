@@ -53,6 +53,7 @@
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -281,7 +282,7 @@ void QueryAnalysisCoordinator::onStepUpBegin(OperationContext* opCtx, long long 
 
 std::vector<CollectionQueryAnalyzerConfiguration>
 QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx,
-                                                         StringData samplerName,
+                                                         std::string_view samplerName,
                                                          double numQueriesExecutedPerSecond) {
     std::lock_guard<std::mutex> lk(_mutex);
 

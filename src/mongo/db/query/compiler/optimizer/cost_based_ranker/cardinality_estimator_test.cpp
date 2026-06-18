@@ -36,6 +36,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
+#include <string_view>
 
 #include <gmock/gmock.h>
 
@@ -972,7 +973,7 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
         stats::addSbeValueToBSONBuilder(stats::makeNullValue(), "$eq", builder);
         auto operand = builder.obj();
         const auto matchExpr = std::make_unique<EqualityMatchExpression>(
-            StringData(fieldName), mongo::Value(operand["$eq"]));
+            std::string_view(fieldName), mongo::Value(operand["$eq"]));
 
         // For point queries, the estimates should be identical.
         // (estimateKeysScanned: 6800 == estimateCardinality: 6800)
@@ -1001,7 +1002,7 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
         stats::addSbeValueToBSONBuilder(stats::makeInt32Value(50), "$lte", builder);
         auto operand = builder.obj();
 
-        const auto matchExpr = std::make_unique<LTEMatchExpression>(StringData(fieldName),
+        const auto matchExpr = std::make_unique<LTEMatchExpression>(std::string_view(fieldName),
                                                                     mongo::Value(operand["$lte"]));
 
         // For range queries, the estimates should be different.

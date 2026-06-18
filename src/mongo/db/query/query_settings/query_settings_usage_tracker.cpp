@@ -32,6 +32,7 @@
 #include "mongo/db/commands/server_status/server_status.h"
 
 namespace mongo::query_settings {
+using namespace std::literals::string_view_literals;
 namespace {
 
 const auto getQuerySettingsUsageTracker =
@@ -79,21 +80,21 @@ BSONObj QuerySettingsUsageTracker::generateServerStatusSection(OperationContext*
 
 void QuerySettingsUsageTracker::serializeUsageMetrics(BSONObjBuilder& bob) const {
     auto metrics = _usageMetrics.get();
-    bob.append("count"_sd, metrics.count);
-    bob.append("size"_sd, metrics.size);
-    bob.append("rejectCount"_sd, metrics.rejectCount);
+    bob.append("count"sv, metrics.count);
+    bob.append("size"sv, metrics.size);
+    bob.append("rejectCount"sv, metrics.rejectCount);
 }
 
 void QuerySettingsUsageTracker::serializeBackfillMetrics(BSONObjBuilder& bob) const {
-    bob.append("memoryUsedBytes"_sd, _backfillMetrics.memoryUsedBytes.loadRelaxed());
-    bob.append("missingRepresentativeQueries"_sd,
+    bob.append("memoryUsedBytes"sv, _backfillMetrics.memoryUsedBytes.loadRelaxed());
+    bob.append("missingRepresentativeQueries"sv,
                _backfillMetrics.missingRepresentativeQueries.loadRelaxed());
-    bob.append("bufferedRepresentativeQueries"_sd,
+    bob.append("bufferedRepresentativeQueries"sv,
                _backfillMetrics.bufferedRepresentativeQueries.loadRelaxed());
-    bob.append("insertedRepresentativeQueries"_sd,
+    bob.append("insertedRepresentativeQueries"sv,
                _backfillMetrics.insertedRepresentativeQueries.loadRelaxed());
-    bob.append("succeededBackfills"_sd, _backfillMetrics.succeededBackfills.loadRelaxed());
-    bob.append("failedBackfills"_sd, _backfillMetrics.failedBackfills.loadRelaxed());
+    bob.append("succeededBackfills"sv, _backfillMetrics.succeededBackfills.loadRelaxed());
+    bob.append("failedBackfills"sv, _backfillMetrics.failedBackfills.loadRelaxed());
 }
 
 void QuerySettingsUsageTracker::setQuerySettingsUsageMetrics(int count, int size, int rejectCount) {

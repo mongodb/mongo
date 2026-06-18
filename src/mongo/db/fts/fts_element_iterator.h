@@ -38,6 +38,7 @@
 #include <map>
 #include <stack>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -48,7 +49,7 @@ namespace fts {
  */
 class FTSIteratorValue {
 public:
-    FTSIteratorValue(StringData text, const FTSLanguage* language, double weight)
+    FTSIteratorValue(std::string_view text, const FTSLanguage* language, double weight)
         : _text(text), _language(language), _weight(weight), _valid(true) {}
 
     FTSIteratorValue() = default;
@@ -57,7 +58,7 @@ public:
         return _valid;
     }
 
-    StringData text() const {
+    std::string_view text() const {
         return _text;
     }
 
@@ -70,7 +71,7 @@ public:
     }
 
 private:
-    StringData _text;
+    std::string_view _text;
     const FTSLanguage* _language = nullptr;
     double _weight = 0.0;
     bool _valid = false;

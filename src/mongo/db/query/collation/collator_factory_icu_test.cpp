@@ -32,16 +32,17 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace mongo;
 
@@ -337,7 +338,7 @@ TEST(CollatorFactoryICUTest, ChineseTraditionalLocaleWithCollationPinyinAllowed)
 
 TEST(CollatorFactoryICUTest, LocaleStringCannotContainNullByte) {
     CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(BSON("locale" << "en_US\0"_sd));
+    auto collator = factory.makeFromBSON(BSON("locale" << "en_US\0"sv));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
@@ -1008,8 +1009,8 @@ TEST(CollatorFactoryICUTest, GermanPhonebookCollatoHasExpectedComparisonSemantic
     auto phonebookCollator = factory.makeFromBSON(BSON("locale" << "de@collation=phonebook"));
     ASSERT_OK(phonebookCollator.getStatus());
 
-    StringData withoutAccent("of");
-    StringData withAccent("öf");
+    std::string_view withoutAccent("of");
+    std::string_view withAccent("öf");
 
     ASSERT_LT(dictionaryCollator.getValue()->compare(withoutAccent, withAccent), 0);
     ASSERT_GT(phonebookCollator.getValue()->compare(withoutAccent, withAccent), 0);

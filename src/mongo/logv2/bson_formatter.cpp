@@ -30,7 +30,6 @@
 #include "mongo/logv2/bson_formatter.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -47,6 +46,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <variant>
 
 #include <boost/cstdint.hpp>
@@ -69,7 +69,7 @@ struct BSONValueExtractor {
         _builder.done();
     }
 
-    void operator()(StringData name, CustomAttributeValue const& val) {
+    void operator()(std::string_view name, CustomAttributeValue const& val) {
         try {
             // Try to format as BSON first if available. Prefer BSONAppend if available as we might
             // only want the value and not the whole element.
@@ -96,32 +96,32 @@ struct BSONValueExtractor {
     }
 
     // BSONObj is coming as a pointer, the generic one handles references
-    void operator()(StringData name, const BSONObj val) {
+    void operator()(std::string_view name, const BSONObj val) {
         _builder.append(name, val);
     }
 
-    void operator()(StringData name, const BSONArray val) {
+    void operator()(std::string_view name, const BSONArray val) {
         _builder.append(name, val);
     }
 
     // BSON is lacking unsigned types, so store unsigned int32 as signed int64
-    void operator()(StringData name, unsigned int val) {
+    void operator()(std::string_view name, unsigned int val) {
         _builder.append(name, static_cast<long long>(val));
     }
 
     // BSON is lacking unsigned types, so store unsigned int64 as signed int64, users need to deal
     // with this.
-    void operator()(StringData name, unsigned long long val) {
+    void operator()(std::string_view name, unsigned long long val) {
         _builder.append(name, static_cast<long long>(val));
     }
 
     template <typename Period>
-    void operator()(StringData name, const Duration<Period>& value) {
+    void operator()(std::string_view name, const Duration<Period>& value) {
         _builder.append(fmt::format("{}{}", name, value.mongoUnitSuffix()), value.count());
     }
 
     template <typename T>
-    void operator()(StringData name, const T& value) {
+    void operator()(std::string_view name, const T& value) {
         _builder.append(name, value);
     }
 
@@ -151,9 +151,9 @@ void BSONFormatter::operator()(boost::log::record_view const& rec, BSONObjBuilde
         builder.append(constants::kServiceFieldName,
                        getNameForLog(extract<LogService>(attributes::service(), rec).get()));
     builder.append(constants::kContextFieldName,
-                   extract<StringData>(attributes::threadName(), rec).get());
+                   extract<std::string_view>(attributes::threadName(), rec).get());
     builder.append(constants::kMessageFieldName,
-                   extract<StringData>(attributes::message(), rec).get());
+                   extract<std::string_view>(attributes::message(), rec).get());
 
     if (!attrs.get().empty()) {
         BSONValueExtractor extractor(builder);

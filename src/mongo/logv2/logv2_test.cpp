@@ -29,7 +29,6 @@
 
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -105,7 +104,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
-#include <string_view>  // NOLINT
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -155,6 +154,7 @@
 namespace mongo::logv2 {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using constants::kAttributesFieldName;
 using constants::kComponentFieldName;
@@ -207,8 +207,8 @@ struct TypeWithBSON : TypeWithoutBSON {
 
     BSONObj toBSON() const {
         BSONObjBuilder builder;
-        builder.append("x"_sd, _x);
-        builder.append("y"_sd, _y);
+        builder.append("x"sv, _x);
+        builder.append("y"sv, _y);
         return builder.obj();
     }
 };
@@ -217,9 +217,9 @@ struct TypeWithBSONSerialize : TypeWithoutBSON {
     using TypeWithoutBSON::TypeWithoutBSON;
 
     void serialize(BSONObjBuilder* builder) const {
-        builder->append("x"_sd, _x);
-        builder->append("y"_sd, _y);
-        builder->append("type"_sd, "serialize"_sd);
+        builder->append("x"sv, _x);
+        builder->append("y"sv, _y);
+        builder->append("type"sv, "serialize"sv);
     }
 };
 
@@ -227,9 +227,9 @@ struct TypeWithBothBSONFormatters : TypeWithBSON {
     using TypeWithBSON::TypeWithBSON;
 
     void serialize(BSONObjBuilder* builder) const {
-        builder->append("x"_sd, _x);
-        builder->append("y"_sd, _y);
-        builder->append("type"_sd, "serialize"_sd);
+        builder->append("x"sv, _x);
+        builder->append("y"sv, _y);
+        builder->append("type"sv, "serialize"sv);
     }
 };
 
@@ -239,8 +239,8 @@ struct TypeWithBSONArray {
     }
     BSONArray toBSONArray() const {
         BSONArrayBuilder builder;
-        builder.append("first"_sd);
-        builder.append("second"_sd);
+        builder.append("first"sv);
+        builder.append("second"sv);
         return builder.arr();
     }
 };
@@ -259,7 +259,7 @@ std::string toString(const TypeWithNonMemberFormatting&) {
 
 BSONObj toBSON(const TypeWithNonMemberFormatting&) {
     BSONObjBuilder builder;
-    builder.append("first"_sd, "TypeWithNonMemberFormatting");
+    builder.append("first"sv, "TypeWithNonMemberFormatting");
     return builder.obj();
 }
 
@@ -520,8 +520,8 @@ TEST_F(LogV2Test, Basic) {
     LOGV2(20006, "test {name}", "name"_attr = std::string("std::string"));
     ASSERT_EQUALS(lines->back(), "test std::string");
 
-    LOGV2(20007, "test {name}", "name"_attr = "StringData"_sd);
-    ASSERT_EQUALS(lines->back(), "test StringData");
+    LOGV2(20007, "test {name}", "name"_attr = "std::string_view"sv);
+    ASSERT_EQUALS(lines->back(), "test std::string_view");
 
     LOGV2_OPTIONS(20064, {LogTag::kStartupWarnings}, "test");
     ASSERT_EQUALS(lines->back(), "test");
@@ -552,7 +552,7 @@ TEST_F(LogV2Test, MismatchAttrInLogging) {
     auto lines = makeLineCapture(PlainFormatter());
     if (!kDebugBuild) {
         LOGV2(4638203, "mismatch {name}", "not_name"_attr = 1);
-        ASSERT(StringData(lines->back()).starts_with("Exception during log"_sd));
+        ASSERT(std::string_view(lines->back()).starts_with("Exception during log"sv));
     }
 }
 
@@ -560,7 +560,7 @@ TEST_F(LogV2Test, MissingAttrInLogging) {
     auto lines = makeLineCapture(PlainFormatter());
     if (!kDebugBuild) {
         LOGV2(6636803, "Log missing {attr}");
-        ASSERT(StringData(lines->back()).starts_with("Exception during log"_sd));
+        ASSERT(std::string_view(lines->back()).starts_with("Exception during log"sv));
     }
 }
 
@@ -652,7 +652,7 @@ public:
 
         ASSERT_EQUALS(obj.getField(kTenantFieldName).String(), tenant.toString());
         container = obj.getField(kAttributesFieldName).Obj();
-        return container.getField("name"_sd);
+        return container.getField("name"sv);
     }
 
     TenantId tenant = TenantId(OID::gen());
@@ -828,9 +828,9 @@ TEST_F(LogV2TypesTest, Stringlike) {
     validateJSON(str);
     ASSERT_EQUALS(lastBSONElement().String(), str);
 
-    StringData str_data = "a StringData"_sd;
-    LOGV2(20019, "StringData {name}", "name"_attr = str_data);
-    ASSERT_EQUALS(text->back(), "StringData a StringData");
+    std::string_view str_data = "a std::string_view"sv;
+    LOGV2(20019, "std::string_view {name}", "name"_attr = str_data);
+    ASSERT_EQUALS(text->back(), "std::string_view a std::string_view");
     validateJSON(std::string{str_data});
     ASSERT_EQUALS(lastBSONElement().String(), str_data);
 
@@ -845,10 +845,10 @@ TEST_F(LogV2TypesTest, Stringlike) {
 
 TEST_F(LogV2TypesTest, BSONObj) {
     BSONObj bsonObj = BSONObjBuilder()
-                          .append("int32"_sd, 1)
-                          .append("int64"_sd, std::numeric_limits<int64_t>::max())
-                          .append("double"_sd, 1.0)
-                          .append("str"_sd, "a StringData"_sd)
+                          .append("int32"sv, 1)
+                          .append("int64"sv, std::numeric_limits<int64_t>::max())
+                          .append("double"sv, 1.0)
+                          .append("str"sv, "a std::string_view"sv)
                           .obj();
     LOGV2(20020, "bson {name}", "name"_attr = bsonObj);
     ASSERT(text->back() ==
@@ -864,7 +864,7 @@ TEST_F(LogV2TypesTest, BSONObj) {
 
 TEST_F(LogV2TypesTest, BSONArray) {
     BSONArray bsonArr =
-        BSONArrayBuilder().append("first"_sd).append("second"_sd).append("third"_sd).arr();
+        BSONArrayBuilder().append("first"sv).append("second"sv).append("third"sv).arr();
     LOGV2(20021, "{name}", "name"_attr = bsonArr);
     ASSERT_EQUALS(text->back(),
                   bsonArr.jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
@@ -879,22 +879,21 @@ TEST_F(LogV2TypesTest, BSONArray) {
 
 TEST_F(LogV2TypesTest, BSONElement) {
     BSONObj bsonObj = BSONObjBuilder()
-                          .append("int32"_sd, 1)
-                          .append("int64"_sd, std::numeric_limits<int64_t>::max())
-                          .append("double"_sd, 1.0)
-                          .append("str"_sd, "a StringData"_sd)
+                          .append("int32"sv, 1)
+                          .append("int64"sv, std::numeric_limits<int64_t>::max())
+                          .append("double"sv, 1.0)
+                          .append("str"sv, "a std::string_view"sv)
                           .obj();
-    LOGV2(20022, "bson element {name}", "name"_attr = bsonObj.getField("int32"_sd));
-    ASSERT(text->back() == std::string("bson element ") + bsonObj.getField("int32"_sd).toString());
+    LOGV2(20022, "bson element {name}", "name"_attr = bsonObj.getField("int32"sv));
+    ASSERT(text->back() == std::string("bson element ") + bsonObj.getField("int32"sv).toString());
     ASSERT(mongo::fromjson(json->back())
                .getField(kAttributesFieldName)
                .Obj()
-               .getField("name"_sd)
+               .getField("name"sv)
                .Obj()
-               .getField("int32"_sd)
-               .Int() == bsonObj.getField("int32"_sd).Int());
-    ASSERT(lastBSONElement().Obj().getField("int32"_sd).Int() ==
-           bsonObj.getField("int32"_sd).Int());
+               .getField("int32"sv)
+               .Int() == bsonObj.getField("int32"sv).Int());
+    ASSERT(lastBSONElement().Obj().getField("int32"sv).Int() == bsonObj.getField("int32"sv).Int());
 }
 
 TEST_F(LogV2TypesTest, DateT) {
@@ -1194,7 +1193,7 @@ TEST_F(LogV2JsonBsonTest, Tags) {
     validate([](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "warning");
         ASSERT_EQUALS(
-            obj.getField("tags"_sd).Obj().woCompare(LogTag(LogTag::kStartupWarnings).toBSONArray()),
+            obj.getField("tags"sv).Obj().woCompare(LogTag(LogTag::kStartupWarnings).toBSONArray()),
             0);
     });
 }
@@ -1202,7 +1201,7 @@ TEST_F(LogV2JsonBsonTest, Tags) {
 TEST_F(LogV2JsonBsonTest, Component) {
     LOGV2_OPTIONS(20069, {LogComponent::kControl}, "different component");
     validate([](const BSONObj& obj) {
-        ASSERT_EQUALS(obj.getField("c"_sd).String(),
+        ASSERT_EQUALS(obj.getField("c"sv).String(),
                       LogComponent(LogComponent::kControl).getNameForLog());
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), "different component");
     });
@@ -1297,7 +1296,7 @@ TEST_F(LogV2JsonBsonTest, TypeWithNonMemberFormatting) {
 
 TEST_F(LogV2JsonBsonTest, DynamicAttributes) {
     DynamicAttributes attrs;
-    attrs.add("string data", "a string data"_sd);
+    attrs.add("string data", "a string data"sv);
     attrs.add("cstr", "a c string");
     attrs.add("int", 5);
     attrs.add("float", 3.0f);
@@ -1314,16 +1313,16 @@ TEST_F(LogV2JsonBsonTest, DynamicAttributes) {
 
     validate([](const BSONObj& obj) {
         const BSONObj& attrObj = obj.getField(kAttributesFieldName).Obj();
-        for (StringData f : {"cstr"_sd,
-                             "int"_sd,
-                             "float"_sd,
-                             "bool"_sd,
-                             "enum"_sd,
-                             "custom"_sd,
-                             "bson"_sd,
-                             "millisMillis"_sd,
-                             "stdstr"_sd,
-                             "unsafe but ok"_sd}) {
+        for (std::string_view f : {"cstr"sv,
+                                   "int"sv,
+                                   "float"sv,
+                                   "bool"sv,
+                                   "enum"sv,
+                                   "custom"sv,
+                                   "bson"sv,
+                                   "millisMillis"sv,
+                                   "stdstr"sv,
+                                   "unsafe but ok"sv}) {
             ASSERT(attrObj.hasField(f));
         }
 
@@ -1707,37 +1706,37 @@ TEST_F(LogV2Test, Unicode) {
     // JSON parsers decode escape sequences so control characters should be round-trippable.
     // Invalid UTF-8 encoded data is replaced by the Unicode Replacement Character (U+FFFD).
     // There is no way to preserve the data without introducing special semantics in how to parse.
-    std::pair<StringData, StringData> strs[] = {
+    std::pair<std::string_view, std::string_view> strs[] = {
         // Single byte characters that needs to be escaped
-        {"\a\b\f\n\r\t\v\\\0\x7f\x1b"_sd, "\a\b\f\n\r\t\v\\\0\x7f\x1b"_sd},
+        {"\a\b\f\n\r\t\v\\\0\x7f\x1b"sv, "\a\b\f\n\r\t\v\\\0\x7f\x1b"sv},
         // multi byte characters that needs to be escaped (unicode control characters)
-        {"\u0080\u009f"_sd, "\u0080\u009f"_sd},
+        {"\u0080\u009f"sv, "\u0080\u009f"sv},
         // Valid 2 Octet sequence, LATIN SMALL LETTER N WITH TILDE
-        {"\u00f1"_sd, "\u00f1"_sd},
+        {"\u00f1"sv, "\u00f1"sv},
         // Invalid 2 Octet Sequence, result is escaped
-        {"\xc3\x28"_sd, "\ufffd\x28"_sd},
+        {"\xc3\x28"sv, "\ufffd\x28"sv},
         // Invalid Sequence Identifier, result is escaped
-        {"\xa0\xa1"_sd, "\ufffd\ufffd"_sd},
+        {"\xa0\xa1"sv, "\ufffd\ufffd"sv},
         // Valid 3 Octet sequence, RUNIC LETTER TIWAZ TIR TYR T
-        {"\u16cf"_sd, "\u16cf"_sd},
+        {"\u16cf"sv, "\u16cf"sv},
         // Invalid 3 Octet Sequence (in 2nd Octet), result is escaped
-        {"\xe2\x28\xa1"_sd, "\ufffd\x28\ufffd"_sd},
+        {"\xe2\x28\xa1"sv, "\ufffd\x28\ufffd"sv},
         // Invalid 3 Octet Sequence (in 3rd Octet), result is escaped
-        {"\xe2\x82\x28"_sd, "\ufffd\ufffd\x28"_sd},
+        {"\xe2\x82\x28"sv, "\ufffd\ufffd\x28"sv},
         // Valid 4 Octet sequence, GOTHIC LETTER MANNA
-        {"\U0001033c"_sd, "\U0001033c"_sd},
+        {"\U0001033c"sv, "\U0001033c"sv},
         // Invalid 4 Octet Sequence (in 2nd Octet), result is escaped
-        {"\xf0\x28\x8c\xbc"_sd, "\ufffd\x28\ufffd\ufffd"_sd},
+        {"\xf0\x28\x8c\xbc"sv, "\ufffd\x28\ufffd\ufffd"sv},
         // Invalid 4 Octet Sequence (in 3rd Octet), result is escaped
-        {"\xf0\x90\x28\xbc"_sd, "\ufffd\ufffd\x28\ufffd"_sd},
+        {"\xf0\x90\x28\xbc"sv, "\ufffd\ufffd\x28\ufffd"sv},
         // Invalid 4 Octet Sequence (in 4th Octet), result is escaped
-        {"\xf0\x28\x8c\x28"_sd, "\ufffd\x28\ufffd\x28"_sd},
+        {"\xf0\x28\x8c\x28"sv, "\ufffd\x28\ufffd\x28"sv},
         // Valid 5 Octet Sequence (but not Unicode!), result is escaped
-        {"\xf8\xa1\xa1\xa1\xa1"_sd, "\ufffd\ufffd\ufffd\ufffd\ufffd"_sd},
+        {"\xf8\xa1\xa1\xa1\xa1"sv, "\ufffd\ufffd\ufffd\ufffd\ufffd"sv},
         // Valid 6 Octet Sequence (but not Unicode!), result is escaped
-        {"\xfc\xa1\xa1\xa1\xa1\xa1"_sd, "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"_sd},
+        {"\xfc\xa1\xa1\xa1\xa1\xa1"sv, "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"sv},
         // Invalid 3 Octet sequence, buffer ends prematurely, result is escaped
-        {"\xe2\x82"_sd, "\ufffd\ufffd"_sd},
+        {"\xe2\x82"sv, "\ufffd\ufffd"sv},
     };
 
     auto getLastMongo = [&]() {
@@ -1810,11 +1809,11 @@ public:
         TruncationInfo truncation;
         builder.append("lvl1_a", "a");
         {
-            BSONObjBuilder subobj1 = builder.subobjStart("sub1"_sd);
+            BSONObjBuilder subobj1 = builder.subobjStart("sub1"sv);
             subobj1.append("lvl2_a", 1);
             subobj1.append("lvl2_b", "small string");
             {
-                BSONObjBuilder subobj2 = subobj1.subobjStart("sub2"_sd);
+                BSONObjBuilder subobj2 = subobj1.subobjStart("sub2"sv);
                 subobj2.append("lvl3_a", 1);
                 subobj2.append("lvl3_b", "b");
                 subobj2.append("large", largeString);
@@ -1910,7 +1909,7 @@ public:
     //         }
     //     }
     //  }
-    static void validateTruncationReport(StringData attrName,
+    static void validateTruncationReport(std::string_view attrName,
                                          BSONObj report,
                                          const TestCase& test) {
         auto context =
@@ -1966,16 +1965,16 @@ public:
         ASSERT(!fieldObj.hasField("truncated"))
             << fmt::format("{} - unexpected field 'truncated' at path {}", context, currentObjPath);
 
-        ASSERT_EQUALS(fieldObj.getField("type"_sd).String(), typeName(test.truncationInfo.leafType))
+        ASSERT_EQUALS(fieldObj.getField("type"sv).String(), typeName(test.truncationInfo.leafType))
             << fmt::format("{} - bad 'type' value at path {}", context, currentObjPath);
 
-        ASSERT(fieldObj.getField("size"_sd).isNumber())
+        ASSERT(fieldObj.getField("size"sv).isNumber())
             << fmt::format("{} - bad 'size' value at path {}", context, currentObjPath);
     }
 
     // Validates the reported size of the truncated attr in the log line matches the size of the
     // original BSON object.
-    static void validateTruncationSize(StringData attrName,
+    static void validateTruncationSize(std::string_view attrName,
                                        BSONObj truncatedSize,
                                        const TestCase& test) {
         auto context = fmt::format(
@@ -2004,7 +2003,7 @@ public:
         BSONObjIterator modifiedItr(modified);
         bool foundTruncatedElement = false;
 
-        StringData truncatedFieldName = path.at(level).fieldName;
+        std::string_view truncatedFieldName = path.at(level).fieldName;
         bool leaf = (&path.at(level) == &path.back());
 
         while (originalItr.more() && modifiedItr.more()) {

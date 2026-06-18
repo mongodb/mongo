@@ -30,6 +30,7 @@
 #include "mongo/s/query/exec/shard_tag.h"
 
 #include <iostream>
+#include <string_view>
 
 namespace mongo {
 
@@ -41,8 +42,8 @@ const ShardTag ShardTag::kDefault{"default"};
 const ShardTag ShardTag::kConfigServer{"config"};
 const ShardTag ShardTag::kDataShard{"data"};
 
-StringData ShardTag::toString() const {
-    return StringData{tag};
+std::string_view ShardTag::toString() const {
+    return std::string_view{tag};
 }
 
 std::ostream& operator<<(std::ostream& os, const ShardTag& shardTag) {

@@ -55,6 +55,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
@@ -73,7 +74,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(QuerySettings);
  */
 class DocumentSourceQuerySettings final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$querySettings"_sd;
+    static constexpr std::string_view kStageName = "$querySettings"_sd;
     static const Id& id;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
@@ -148,7 +149,7 @@ public:
         return constraints;
     }
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

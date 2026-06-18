@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -91,6 +90,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -384,7 +384,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
             secondaryIndexCheckParameters->setValidateMode(invocation.getValidateMode().value());
         }
 
-        StringData indexName = "_id";
+        std::string_view indexName = "_id";
         if (invocation.getSecondaryIndex()) {
             secondaryIndexCheckParameters->setSecondaryIndex(
                 invocation.getSecondaryIndex().value());
@@ -689,7 +689,7 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
         LOGV2_DEBUG(7844908, 3, "Hanging due to hangBeforeExtraIndexKeysCheck failpoint");
         hangBeforeExtraIndexKeysCheck.pauseWhileSet(opCtx);
     }
-    StringData indexName = _info.secondaryIndexCheckParameters.get().getSecondaryIndex();
+    std::string_view indexName = _info.secondaryIndexCheckParameters.get().getSecondaryIndex();
 
     // TODO SERVER-79846: Add testing for progress meter
     // ProgressMeterHolder progress;
@@ -970,7 +970,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
 
 Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
                                         DbCheckExtraIndexKeysBatchStats* batchStats) {
-    StringData indexName = _info.secondaryIndexCheckParameters.get().getSecondaryIndex();
+    std::string_view indexName = _info.secondaryIndexCheckParameters.get().getSecondaryIndex();
     DbCheckOplogBatch oplogBatch;
     {
         // We need to release the acquisition by dbcheck before writing to the oplog. This is
@@ -1108,7 +1108,7 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
  */
 Status DbChecker::_getExtraIndexKeysBatchAndRunReverseLookup(
     OperationContext* opCtx,
-    StringData indexName,
+    std::string_view indexName,
     const boost::optional<key_string::Value>& nextKeyToSeekWithRecordId,
     DbCheckExtraIndexKeysBatchStats& batchStats) {
     bool reachedBatchEnd = false;
@@ -1173,7 +1173,7 @@ Status DbChecker::_getExtraIndexKeysBatchAndRunReverseLookup(
  */
 Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     OperationContext* opCtx,
-    StringData indexName,
+    std::string_view indexName,
     const boost::optional<key_string::Value>& snapshotFirstKeyWithRecordId,
     DbCheckExtraIndexKeysBatchStats& batchStats) {
     if (MONGO_unlikely(hangBeforeReverseLookupCatalogSnapshot.shouldFail())) {
@@ -1237,7 +1237,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     //     std::unique_lock<Client> lk(*opCtx->getClient());
     //     progress.set(lk,
     //                  CurOp::get(opCtx)->setProgress_inlock(
-    //                      StringData(curOpMessage), collection->numRecords(opCtx)),
+    //                      std::string_view(curOpMessage), collection->numRecords(opCtx)),
     //                  opCtx);
     // }
 
@@ -1539,7 +1539,7 @@ bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
 }
 
 void DbChecker::_reverseLookup(OperationContext* opCtx,
-                               StringData indexName,
+                               std::string_view indexName,
                                DbCheckExtraIndexKeysBatchStats& batchStats,
                                const CollectionPtr& collection,
                                const KeyStringEntry& keyStringEntryWithRecordId,
@@ -1778,7 +1778,7 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         progress.set(
             lk,
             CurOp::get(opCtx)->setProgress(lk,
-                                           StringData(curOpMessage),
+                                           std::string_view(curOpMessage),
                                            collAcquisition.getCollectionPtr()->numRecords(opCtx)),
             opCtx);
         retryProgressInitialization = false;
@@ -2054,7 +2054,7 @@ StatusWith<std::unique_ptr<DbCheckAcquisition>> DbChecker::_acquireDBCheckLocks(
 
 StatusWith<const IndexCatalogEntry*> DbChecker::_acquireIndex(OperationContext* opCtx,
                                                               const CollectionPtr& collection,
-                                                              StringData indexName) {
+                                                              std::string_view indexName) {
     if (indexName == IndexConstants::kIdIndexName && collection->isClustered()) {
         Status status = Status(ErrorCodes::DbCheckAttemptOnClusteredCollectionIdIndex,
                                str::stream() << "Clustered collection doesn't have an _id index.");

@@ -40,9 +40,10 @@ namespace mongo {
 namespace repl {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 std::size_t getDocumentOpCount(const BSONObj& doc) {
-    if (doc[OplogEntry::kOpTypeFieldName].String() != "c"_sd) {
+    if (doc[OplogEntry::kOpTypeFieldName].String() != "c"sv) {
         return 1U;
     }
 

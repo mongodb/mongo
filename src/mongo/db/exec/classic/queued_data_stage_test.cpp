@@ -33,7 +33,6 @@
 
 #include "mongo/db/exec/classic/queued_data_stage.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

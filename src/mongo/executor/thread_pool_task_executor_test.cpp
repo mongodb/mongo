@@ -33,7 +33,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_test_common.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"

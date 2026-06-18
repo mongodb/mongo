@@ -75,6 +75,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -392,7 +393,7 @@ NamespaceString getLocalOplogBufferNamespace(UUID existingUUID, ShardId donorSha
 
 NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorShardId);
 
-void doNoopWrite(OperationContext* opCtx, StringData opStr, const NamespaceString& nss);
+void doNoopWrite(OperationContext* opCtx, std::string_view opStr, const NamespaceString& nss);
 
 boost::optional<Milliseconds> estimateRemainingRecipientTime(bool applyingBegan,
                                                              int64_t bytesCopied,

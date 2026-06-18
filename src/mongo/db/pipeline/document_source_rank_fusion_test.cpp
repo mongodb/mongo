@@ -40,6 +40,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+using namespace std::literals::string_view_literals;
+
 namespace mongo {
 namespace {
 
@@ -5504,7 +5506,7 @@ TEST_F(DocumentSourceRankFusionTest, InternalFieldBehaviorThroughGroupAndReshape
         } else {
             auto serialized = stage->serialize();
             auto stageDoc = serialized.getDocument();
-            if (!stageDoc["$group"_sd].missing()) {
+            if (!stageDoc["$group"sv].missing()) {
                 foundGroup = true;
                 postGroupStages.push_back(stage);
             }
@@ -5523,11 +5525,11 @@ TEST_F(DocumentSourceRankFusionTest, InternalFieldBehaviorThroughGroupAndReshape
             Document{{"_internal_rankFusion_docs",
                       Document{{"_id", 1},
                                {"val", 10},
-                               {"__hs_custom", "alpha"_sd},
-                               {"_internal_rankFusion_internal_fields", "user_data"_sd}}},
+                               {"__hs_custom", "alpha"sv},
+                               {"_internal_rankFusion_internal_fields", "user_data"sv}}},
                      {"_internal_rankFusion_internal_fields", Document{{"name1_score", 3.0}}}},
             Document{{"_internal_rankFusion_docs",
-                      Document{{"_id", 2}, {"val", 20}, {"__hs_custom", "beta"_sd}}},
+                      Document{{"_id", 2}, {"val", 20}, {"__hs_custom", "beta"sv}}},
                      {"_internal_rankFusion_internal_fields", Document{{"name1_score", 7.0}}}},
         },
         getExpCtx());
@@ -5550,27 +5552,27 @@ TEST_F(DocumentSourceRankFusionTest, InternalFieldBehaviorThroughGroupAndReshape
     ASSERT_EQ(results.size(), 2u);
 
     // Results are sorted by score descending then _id ascending, so doc with score 7 comes first.
-    ASSERT_VALUE_EQ(results[0]["_id"_sd], Value(2));
-    ASSERT_VALUE_EQ(results[1]["_id"_sd], Value(1));
+    ASSERT_VALUE_EQ(results[0]["_id"sv], Value(2));
+    ASSERT_VALUE_EQ(results[1]["_id"sv], Value(1));
 
     // Verify user fields with the __hs_ prefix are preserved.
-    ASSERT_VALUE_EQ(results[0]["__hs_custom"_sd], Value("beta"_sd));
-    ASSERT_VALUE_EQ(results[1]["__hs_custom"_sd], Value("alpha"_sd));
+    ASSERT_VALUE_EQ(results[0]["__hs_custom"sv], Value("beta"sv));
+    ASSERT_VALUE_EQ(results[1]["__hs_custom"sv], Value("alpha"sv));
 
     // Verify other user fields are preserved.
-    ASSERT_VALUE_EQ(results[0]["val"_sd], Value(20));
-    ASSERT_VALUE_EQ(results[1]["val"_sd], Value(10));
+    ASSERT_VALUE_EQ(results[0]["val"sv], Value(20));
+    ASSERT_VALUE_EQ(results[1]["val"sv], Value(10));
 
     // A user field named "_internal_rankFusion_internal_fields" is lost: $mergeObjects overwrites
     // it with the repacked internal fields object, and then $project removes it.
-    ASSERT_TRUE(results[0]["_internal_rankFusion_internal_fields"_sd].missing());
-    ASSERT_TRUE(results[1]["_internal_rankFusion_internal_fields"_sd].missing());
+    ASSERT_TRUE(results[0]["_internal_rankFusion_internal_fields"sv].missing());
+    ASSERT_TRUE(results[1]["_internal_rankFusion_internal_fields"sv].missing());
 
     // All internal fields are removed from the output.
-    ASSERT_TRUE(results[0]["_internal_rankFusion_docs"_sd].missing());
-    ASSERT_TRUE(results[1]["_internal_rankFusion_docs"_sd].missing());
-    ASSERT_TRUE(results[0]["__hs_name1_score"_sd].missing());
-    ASSERT_TRUE(results[1]["__hs_name1_score"_sd].missing());
+    ASSERT_TRUE(results[0]["_internal_rankFusion_docs"sv].missing());
+    ASSERT_TRUE(results[1]["_internal_rankFusion_docs"sv].missing());
+    ASSERT_TRUE(results[0]["__hs_name1_score"sv].missing());
+    ASSERT_TRUE(results[1]["__hs_name1_score"sv].missing());
 }
 }  // namespace
 }  // namespace mongo

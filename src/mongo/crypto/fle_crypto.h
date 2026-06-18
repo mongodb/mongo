@@ -34,7 +34,6 @@
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -64,6 +63,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -515,7 +515,7 @@ public:
                                          const BSONObj& cryptdResult,
                                          const BSONObj& encryptedFieldConfigMap,
                                          FLEKeyVault* keyVault,
-                                         StringData dbName);
+                                         std::string_view dbName);
 
 
     /**
@@ -1123,10 +1123,12 @@ public:
      */
     static void validateCompactionOrCleanupTokens(const EncryptedFieldConfig& efc,
                                                   BSONObj tokens,
-                                                  StringData tokenType);
+                                                  std::string_view tokenType);
 
 private:
-    static void _validateTokens(const EncryptedFieldConfig& efc, BSONObj tokens, StringData cmd);
+    static void _validateTokens(const EncryptedFieldConfig& efc,
+                                BSONObj tokens,
+                                std::string_view cmd);
 };
 
 /**
@@ -1148,13 +1150,13 @@ struct ParsedFindEqualityPayload {
     // Parses + validates the payload's params against the Equality QueryTypeConfig at `path` in
     // `efc`. Pass efc=boost::none to opt out (only valid when no schema context is available).
     ParsedFindEqualityPayload(BSONElement fleFindPayload,
-                              StringData path,
+                              std::string_view path,
                               boost::optional<const EncryptedFieldConfig&> efc);
     ParsedFindEqualityPayload(const Value& fleFindPayload,
-                              StringData path,
+                              std::string_view path,
                               boost::optional<const EncryptedFieldConfig&> efc);
     ParsedFindEqualityPayload(ConstDataRange cdr,
-                              StringData path,
+                              std::string_view path,
                               boost::optional<const EncryptedFieldConfig&> efc);
 };
 
@@ -1182,13 +1184,13 @@ struct ParsedFindRangePayload {
     // Parses + validates the payload's params against the Range QueryTypeConfig at `path` in `efc`.
     // Pass efc=boost::none to opt out (only valid when no schema context is available).
     ParsedFindRangePayload(BSONElement fleFindRangePayload,
-                           StringData path,
+                           std::string_view path,
                            boost::optional<const EncryptedFieldConfig&> efc);
     ParsedFindRangePayload(const Value& fleFindRangePayload,
-                           StringData path,
+                           std::string_view path,
                            boost::optional<const EncryptedFieldConfig&> efc);
     ParsedFindRangePayload(ConstDataRange cdr,
-                           StringData path,
+                           std::string_view path,
                            boost::optional<const EncryptedFieldConfig&> efc);
 
     bool isStub() {
@@ -1206,13 +1208,13 @@ struct ParsedFindTextSearchPayload {
     // matching the payload's token variant. Pass efc=boost::none to opt out (only valid when no
     // schema context is available).
     ParsedFindTextSearchPayload(BSONElement fleFindPayload,
-                                StringData path,
+                                std::string_view path,
                                 boost::optional<const EncryptedFieldConfig&> efc);
     ParsedFindTextSearchPayload(const Value& fleFindPayload,
-                                StringData path,
+                                std::string_view path,
                                 boost::optional<const EncryptedFieldConfig&> efc);
     ParsedFindTextSearchPayload(ConstDataRange cdr,
-                                StringData path,
+                                std::string_view path,
                                 boost::optional<const EncryptedFieldConfig&> efc);
 
     std::int64_t maxCounter{};
@@ -1231,7 +1233,7 @@ struct ParsedFindTextSearchPayload {
 class Edges {
 public:
     Edges(std::string leaf, int sparsity, const boost::optional<int>& trimFactor);
-    std::vector<StringData> get();
+    std::vector<std::string_view> get();
     std::size_t size() const;
     const std::string& getLeaf() const {
         return _leaf;
@@ -1271,7 +1273,9 @@ std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
 
 // Equivalent to a full edges calculation without creating an intemediate vector.
 // getEdgesT(min, min, max, precision, sparsity, trimFactor).size()
-std::uint64_t getEdgesLength(BSONType fieldType, StringData fieldPath, QueryTypeConfig config);
+std::uint64_t getEdgesLength(BSONType fieldType,
+                             std::string_view fieldPath,
+                             QueryTypeConfig config);
 
 /**
  * Mincover calculator

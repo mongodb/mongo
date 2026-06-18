@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -41,6 +40,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -63,7 +63,7 @@ public:
     static const bool kCaseSensitiveDefault;
     static const bool kDiacriticSensitiveDefault;
 
-    explicit TextMatchExpressionBase(StringData path);
+    explicit TextMatchExpressionBase(std::string_view path);
     ~TextMatchExpressionBase() override {}
 
     /**

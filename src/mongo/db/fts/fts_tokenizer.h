@@ -30,10 +30,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace mongo {
 namespace fts {
@@ -80,7 +80,7 @@ public:
      * Process a new document, and discards any previous results.
      * May be called multiple times on an instance of an iterator.
      */
-    virtual void reset(StringData document, Options options) = 0;
+    virtual void reset(std::string_view document, Options options) = 0;
 
     /**
      * Moves to the next token in the iterator.
@@ -91,9 +91,9 @@ public:
     /**
      * Returns stemmed form, normalized, and lowercased depending on the parameter
      * to the reset method.
-     * Returned StringData is valid until next call to moveNext().
+     * Returned std::string_view is valid until next call to moveNext().
      */
-    virtual StringData get() const = 0;
+    virtual std::string_view get() const = 0;
 };
 
 }  // namespace fts

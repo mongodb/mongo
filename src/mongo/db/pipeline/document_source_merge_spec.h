@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/serialization_context.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -61,7 +61,7 @@ struct MergeWhenMatchedPolicy {
  * string value, or an object.
  */
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
-                                   StringData fieldName,
+                                   std::string_view fieldName,
                                    BSONObjBuilder* bob,
                                    const SerializationContext& sc,
                                    const query_shape::SerializationOptions& opts);
@@ -74,7 +74,7 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
  * value, or array of strings.
  */
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
-                                  StringData fieldName,
+                                  std::string_view fieldName,
                                   BSONObjBuilder* bob,
                                   const query_shape::SerializationOptions& opts = {});
 std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem);
@@ -84,7 +84,7 @@ std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem);
  * a string value, or an array of objects defining a custom pipeline.
  */
 void mergeWhenMatchedSerializeToBSON(const MergeWhenMatchedPolicy& policy,
-                                     StringData fieldName,
+                                     std::string_view fieldName,
                                      BSONObjBuilder* bob);
 MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem);
 }  // namespace MONGO_MOD_PUBLIC mongo

@@ -34,10 +34,13 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 class AuthzCollection {
 public:
     enum class AuthzCollectionType {
@@ -103,9 +106,9 @@ private:
     boost::optional<TenantId> _tenant;
 };
 
-constexpr auto kOpInsert = "i"_sd;
-constexpr auto kOpUpdate = "u"_sd;
-constexpr auto kOpDelete = "d"_sd;
+constexpr auto kOpInsert = "i"sv;
+constexpr auto kOpUpdate = "u"sv;
+constexpr auto kOpDelete = "d"sv;
 
 using InvalidateFn = std::function<void()>;
 
@@ -134,7 +137,7 @@ void invalidateUserCacheOnCommit(OperationContext* opCtx, InvalidateFn invalidat
 
 void _invalidateUserCache(OperationContext* opCtx,
                           AuthorizationRouter* authzRouter,
-                          StringData op,
+                          std::string_view op,
                           AuthzCollection coll,
                           const BSONObj& o,
                           const BSONObj* o2) {
@@ -185,7 +188,7 @@ StatusWith<BSONObj> AuthorizationClientHandleShard::runAuthorizationReadCommand(
 
 void AuthorizationClientHandleShard::notifyDDLOperation(OperationContext* opCtx,
                                                         AuthorizationRouter* authzRouter,
-                                                        StringData op,
+                                                        std::string_view op,
                                                         const NamespaceString& nss,
                                                         const BSONObj& o,
                                                         const BSONObj* o2) {

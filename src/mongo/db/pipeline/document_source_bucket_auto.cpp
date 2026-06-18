@@ -42,11 +42,13 @@
 
 #include <cmath>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 using std::string;
@@ -85,7 +87,7 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
 
 }  // namespace
 
-StringData DocumentSourceBucketAuto::getSourceName() const {
+std::string_view DocumentSourceBucketAuto::getSourceName() const {
     return kStageName;
 }
 
@@ -134,7 +136,7 @@ Value DocumentSourceBucketAuto::serialize(const query_shape::SerializationOption
         //"granularity" only supports some strings, so a specific representative value is used if
         // necessary.
         insides["granularity"] =
-            opts.serializeLiteral(_granularityRounder->getName(), Value("R5"_sd));
+            opts.serializeLiteral(_granularityRounder->getName(), Value("R5"sv));
     }
 
     MutableDocument outputSpec(_accumulatedFields->size());

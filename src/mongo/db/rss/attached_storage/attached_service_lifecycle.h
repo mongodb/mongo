@@ -32,6 +32,8 @@
 #include "mongo/db/rss/service_lifecycle.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::rss {
 
 class AttachedServiceLifecycle : public ServiceLifecycle {
@@ -74,7 +76,7 @@ public:
     /**
      * There are no specific persistence threads that must outlive the storage engine.
      */
-    bool shouldKeepThreadAliveUntilStorageEngineHasShutDown(StringData) const override;
+    bool shouldKeepThreadAliveUntilStorageEngineHasShutDown(std::string_view) const override;
 
 private:
     const bool _initializedUsingDefaultSyncDelay;

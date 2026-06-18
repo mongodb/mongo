@@ -29,7 +29,6 @@
 
 #include "mongo/db/process_health/fault.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/process_health/fault_facet_mock.h"
 #include "mongo/db/process_health/health_check_status.h"
 #include "mongo/db/service_context.h"

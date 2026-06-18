@@ -35,6 +35,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -62,7 +63,7 @@ public:
      *
      * If 'random' is true, every next calls will yield records in a random order.
      */
-    WiredTigerCursor(Params params, StringData uri, WiredTigerSession& session);
+    WiredTigerCursor(Params params, std::string_view uri, WiredTigerSession& session);
 
     // Prevent duplication of the logical owned-ness of the cursors via move or copy.
     WiredTigerCursor(WiredTigerCursor&&) = delete;

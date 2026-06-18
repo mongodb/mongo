@@ -36,6 +36,8 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_util.h"
 
+#include <string_view>
+
 #include <grpc/compression.h>
 #include <grpc/grpc_security_constants.h>
 #include <grpcpp/resource_quota.h>
@@ -59,8 +61,8 @@ Server::~Server() {
 }
 
 namespace {
-StatusWith<Server::Certificates> _readCertificatesFromDisk(boost::optional<StringData> tlsCAFile,
-                                                           StringData tlsCertificateKeyFile) {
+StatusWith<Server::Certificates> _readCertificatesFromDisk(
+    boost::optional<std::string_view> tlsCAFile, std::string_view tlsCertificateKeyFile) {
     Server::Certificates certs;
     if (tlsCAFile) {
         StatusWith<std::string> swCAFileContents = ssl_util::readPEMFile(tlsCAFile.get());

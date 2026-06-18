@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/util/modules.h"
@@ -39,6 +38,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -235,7 +235,7 @@ bool isOnlyDependentOn(MatchExpression& expr,
  * a is not a prefix of a
  * a.b is not a prefix of a
  */
-bool isPathPrefixOf(StringData first, StringData second);
+bool isPathPrefixOf(std::string_view first, std::string_view second);
 
 /**
  * Applies 'func' to each node of 'expr', where the first argument is a pointer to that actual node

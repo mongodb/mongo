@@ -34,6 +34,7 @@
 #include "mongo/util/modules.h"
 
 #include <functional>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -43,8 +44,8 @@ class MoveUnshardedPolicy : public ActionsStreamPolicy {
 public:
     MoveUnshardedPolicy();
 
-    StringData getName() const override {
-        static StringData name("MoveUnshardedPolicy");
+    std::string_view getName() const override {
+        static std::string_view name("MoveUnshardedPolicy");
         return name;
     };
 

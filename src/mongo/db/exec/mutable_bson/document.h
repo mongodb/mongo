@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -50,6 +49,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace mutablebson {
@@ -327,83 +327,87 @@ public:
     //
 
     /** Create a new double Element with the given value and field name. */
-    Element makeElementDouble(StringData fieldName, double value);
+    Element makeElementDouble(std::string_view fieldName, double value);
 
     /** Create a new std::string Element with the given value and field name. */
-    Element makeElementString(StringData fieldName, StringData value);
+    Element makeElementString(std::string_view fieldName, std::string_view value);
 
     /** Create a new empty object Element with the given field name. */
-    Element makeElementObject(StringData fieldName);
+    Element makeElementObject(std::string_view fieldName);
 
     /** Create a new object Element with the given field name. The data in 'value' is
      *  copied.
      */
-    Element makeElementObject(StringData fieldName, const BSONObj& value);
+    Element makeElementObject(std::string_view fieldName, const BSONObj& value);
 
     /** Create a new empty array Element with the given field name. */
-    Element makeElementArray(StringData fieldName);
+    Element makeElementArray(std::string_view fieldName);
 
     /** Create a new array Element with the given field name. The data in 'value' is
      *  copied.
      */
-    Element makeElementArray(StringData fieldName, const BSONObj& value);
+    Element makeElementArray(std::string_view fieldName, const BSONObj& value);
 
     /** Create a new binary Element with the given data and field name. */
-    Element makeElementBinary(StringData fieldName,
+    Element makeElementBinary(std::string_view fieldName,
                               uint32_t len,
                               BinDataType binType,
                               const void* data);
 
     /** Create a new undefined Element with the given field name. */
-    Element makeElementUndefined(StringData fieldName);
+    Element makeElementUndefined(std::string_view fieldName);
 
     /** Create a new OID + Element with the given field name. */
-    Element makeElementNewOID(StringData fieldName);
+    Element makeElementNewOID(std::string_view fieldName);
 
     /** Create a new OID Element with the given value and field name. */
-    Element makeElementOID(StringData fieldName, mongo::OID value);
+    Element makeElementOID(std::string_view fieldName, mongo::OID value);
 
     /** Create a new bool Element with the given value and field name. */
-    Element makeElementBool(StringData fieldName, bool value);
+    Element makeElementBool(std::string_view fieldName, bool value);
 
     /** Create a new date Element with the given value and field name. */
-    Element makeElementDate(StringData fieldName, Date_t value);
+    Element makeElementDate(std::string_view fieldName, Date_t value);
 
     /** Create a new null Element with the given field name. */
-    Element makeElementNull(StringData fieldName);
+    Element makeElementNull(std::string_view fieldName);
 
     /** Create a new regex Element with the given data and field name. */
-    Element makeElementRegex(StringData fieldName, StringData regex, StringData flags);
+    Element makeElementRegex(std::string_view fieldName,
+                             std::string_view regex,
+                             std::string_view flags);
 
     /** Create a new DBRef Element with the given data and field name. */
-    Element makeElementDBRef(StringData fieldName, StringData ns, mongo::OID oid);
+    Element makeElementDBRef(std::string_view fieldName, std::string_view ns, mongo::OID oid);
 
     /** Create a new code Element with the given value and field name. */
-    Element makeElementCode(StringData fieldName, StringData value);
+    Element makeElementCode(std::string_view fieldName, std::string_view value);
 
     /** Create a new symbol Element with the given value and field name. */
-    Element makeElementSymbol(StringData fieldName, StringData value);
+    Element makeElementSymbol(std::string_view fieldName, std::string_view value);
 
     /** Create a new scoped code Element with the given data and field name. */
-    Element makeElementCodeWithScope(StringData fieldName, StringData code, const BSONObj& scope);
+    Element makeElementCodeWithScope(std::string_view fieldName,
+                                     std::string_view code,
+                                     const BSONObj& scope);
 
     /** Create a new integer Element with the given value and field name. */
-    Element makeElementInt(StringData fieldName, int32_t value);
+    Element makeElementInt(std::string_view fieldName, int32_t value);
 
     /** Create a new timestamp Element with the given value and field name. */
-    Element makeElementTimestamp(StringData fieldName, Timestamp value);
+    Element makeElementTimestamp(std::string_view fieldName, Timestamp value);
 
     /** Create a new long integer Element with the given value and field name. */
-    Element makeElementLong(StringData fieldName, int64_t value);
+    Element makeElementLong(std::string_view fieldName, int64_t value);
 
     /** Create a new dec128 Element with the given value and field name. */
-    Element makeElementDecimal(StringData fieldName, Decimal128 value);
+    Element makeElementDecimal(std::string_view fieldName, Decimal128 value);
 
     /** Create a new min key Element with the given field name. */
-    Element makeElementMinKey(StringData fieldName);
+    Element makeElementMinKey(std::string_view fieldName);
 
     /** Create a new max key Element with the given field name. */
-    Element makeElementMaxKey(StringData fieldName);
+    Element makeElementMaxKey(std::string_view fieldName);
 
 
     //
@@ -418,12 +422,12 @@ public:
     /** Construct a new Element with the same type and value as the provided BSONElement,
      *  but with a new name. The value is copied.
      */
-    Element makeElementWithNewFieldName(StringData fieldName, const BSONElement& elt);
+    Element makeElementWithNewFieldName(std::string_view fieldName, const BSONElement& elt);
 
     /** Create a new element of the appopriate type to hold the given value, with the given
      *  field name.
      */
-    Element makeElementSafeNum(StringData fieldName, SafeNum value);
+    Element makeElementSafeNum(std::string_view fieldName, SafeNum value);
 
     /** Construct a new element with the same name, type, and value as the provided mutable
      *  Element. The data is copied from the given Element. Unlike most methods in this
@@ -436,7 +440,7 @@ public:
      *  Element. Unlike most methods in this class the provided Element may be from a
      *  different Document.
      */
-    Element makeElementWithNewFieldName(StringData fieldName, ConstElement elt);
+    Element makeElementWithNewFieldName(std::string_view fieldName, ConstElement elt);
 
     //
     // Accessors
@@ -523,7 +527,7 @@ private:
 
     MONGO_PRIVATE Element makeRootElement();
     MONGO_PRIVATE Element makeRootElement(const BSONObj& value);
-    MONGO_PRIVATE Element makeElement(ConstElement element, const StringData* fieldName);
+    MONGO_PRIVATE Element makeElement(ConstElement element, const std::string_view* fieldName);
 
     const std::unique_ptr<Impl> _impl;
 

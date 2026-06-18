@@ -74,6 +74,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -117,7 +118,7 @@ public:
 
     void shutdown(OperationContext* opCtx, BSONObjBuilder* shutdownTimeElapsedBuilder) override;
 
-    void appendDiagnosticBSON(BSONObjBuilder* bob, StringData leafName) override {}
+    void appendDiagnosticBSON(BSONObjBuilder* bob, std::string_view leafName) override {}
 
     const ReplSettings& getSettings() const override;
 

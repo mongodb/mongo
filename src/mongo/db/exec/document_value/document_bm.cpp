@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/document_value/document.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document_internal.h"
@@ -39,6 +38,7 @@
 #include <cstddef>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <benchmark/benchmark.h>
@@ -89,7 +89,7 @@ BSONObj generateSkewedBsonObj(size_t numberOfLeaves) {
  * on the leading-'$' check, while a '$' prefix forces the full set lookup (a miss, since these are
  * not real metadata names, so the fields are still serialized rather than stripped).
  */
-BSONObj generateFlatBsonObj(size_t numberOfFields, StringData fieldPrefix) {
+BSONObj generateFlatBsonObj(size_t numberOfFields, std::string_view fieldPrefix) {
     static const std::string leafValue(128, 'A');
     BSONObjBuilder bb;
     for (size_t i = 0; i < numberOfFields; ++i) {
@@ -182,7 +182,7 @@ void BM_isMetadataFieldName(benchmark::State& state) {
     }
 
     for (auto _ : state) {
-        StringData fieldName{name};
+        std::string_view fieldName{name};
         // Prevent the compiler from constant-folding the known input away.
         benchmark::DoNotOptimize(fieldName);
         bool result = Document::isMetadataFieldName(fieldName);

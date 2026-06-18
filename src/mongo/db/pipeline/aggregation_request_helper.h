@@ -52,6 +52,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -71,7 +72,7 @@ namespace aggregation_request_helper {
 /**
  * Helpers to serialize/deserialize AggregateCommandRequest.
  */
-MONGO_MOD_PUBLIC static constexpr StringData kBatchSizeField = "batchSize"_sd;
+MONGO_MOD_PUBLIC static constexpr std::string_view kBatchSizeField = "batchSize"_sd;
 MONGO_MOD_PUBLIC static constexpr long long kDefaultBatchSize = 101;
 
 /**
@@ -181,7 +182,9 @@ boost::optional<bool> parseExplainModeFromBSON(const BSONElement& explainElem);
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void serializeExplainToBSON(const bool& explain, StringData fieldName, BSONObjBuilder* builder);
+void serializeExplainToBSON(const bool& explain,
+                            std::string_view fieldName,
+                            BSONObjBuilder* builder);
 
 /**
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
@@ -194,7 +197,7 @@ mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& curso
  * break because of it.
  */
 void serializeAggregateCursorToBSON(const SimpleCursorOptions& cursor,
-                                    StringData fieldName,
+                                    std::string_view fieldName,
                                     BSONObjBuilder* builder);
 
 /**

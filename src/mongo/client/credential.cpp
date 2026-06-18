@@ -37,6 +37,7 @@
 #include "mongo/stdx/unordered_set.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -44,12 +45,13 @@ namespace mongo {
 namespace auth {
 
 namespace {
+using namespace std::literals::string_view_literals;
 // BSON field names used in auth parameter documents.
-constexpr StringData kMechField = "mechanism"_sd;
-constexpr StringData kUserDBField = "db"_sd;
-constexpr StringData kUserSourceField = "userSource"_sd;
-constexpr StringData kUserField = "user"_sd;
-constexpr StringData kPasswordField = "pwd"_sd;
+constexpr std::string_view kMechField = "mechanism"sv;
+constexpr std::string_view kUserDBField = "db"sv;
+constexpr std::string_view kUserSourceField = "userSource"sv;
+constexpr std::string_view kUserField = "user"sv;
+constexpr std::string_view kPasswordField = "pwd"sv;
 }  // namespace
 
 StatusWith<Credential> Credential::fromBSON(const BSONObj& params) {
@@ -104,7 +106,7 @@ StatusWith<Credential> Credential::fromBSON(const BSONObj& params) {
     }
 
     // Collect mechanism-specific properties (everything except the 5 core fields).
-    static const stdx::unordered_set<StringData> kCoreFields = {
+    static const stdx::unordered_set<std::string_view> kCoreFields = {
         kMechField, kUserDBField, kUserSourceField, kUserField, kPasswordField};
     BSONObjBuilder props;
     for (const auto& elem : params) {

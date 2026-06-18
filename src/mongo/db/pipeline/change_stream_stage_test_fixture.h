@@ -49,6 +49,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -190,7 +191,7 @@ public:
      * namespace.
      */
     std::unique_ptr<Pipeline> buildTestPipelineForCollection(
-        const std::vector<BSONObj>& rawPipeline, StringData ns = "a.collection");
+        const std::vector<BSONObj>& rawPipeline, std::string_view ns = "a.collection");
 
     /**
      * Helper to create a database-level change stream pipeline for testing.
@@ -199,7 +200,7 @@ public:
      * namespace.
      */
     std::unique_ptr<Pipeline> buildTestPipelineForDatabase(const std::vector<BSONObj>& rawPipeline,
-                                                           StringData ns = "test");
+                                                           std::string_view ns = "test");
 
     /**
      * Helper to create change stream pipeline for testing.

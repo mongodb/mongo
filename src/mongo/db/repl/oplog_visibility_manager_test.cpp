@@ -36,6 +36,8 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace repl {
 namespace {
@@ -68,7 +70,7 @@ void OplogVisibilityManagerTest::setUp() {
     DevNullKVEngine engine{};
     _rs = engine.getRecordStore(nullptr /* opCtx */,
                                 NamespaceString::kEmpty,
-                                StringData() /* ident */,
+                                std::string_view() /* ident */,
                                 options,
                                 boost::none /* uuid */);
 

@@ -39,12 +39,13 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo::ce {
 
-inline constexpr StringData kSamplesCollectionName = "system.stats.samples"_sd;
+inline constexpr std::string_view kSamplesCollectionName = "system.stats.samples"_sd;
 inline constexpr int kPersistentSampleSchemaVersion = 1;
 
 /**

@@ -39,6 +39,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 
@@ -46,12 +48,12 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-DocumentSource::DocumentSource(StringData stageName,
+DocumentSource::DocumentSource(std::string_view stageName,
                                const intrusive_ptr<ExpressionContext>& pCtx,
                                SortPattern sortPattern)
     : _expCtx(pCtx), _sortPattern(std::move(sortPattern)) {}
 
-DocumentSource::Id DocumentSource::allocateId(StringData name) {
+DocumentSource::Id DocumentSource::allocateId(std::string_view name) {
     static AtomicWord<Id> next{kUnallocatedId + 1};
     auto id = next.fetchAndAdd(1);
     LOGV2_DEBUG(9901900, 5, "Allocating DocumentSourceId", "id"_attr = id, "name"_attr = name);

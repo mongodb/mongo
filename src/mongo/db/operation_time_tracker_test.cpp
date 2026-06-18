@@ -29,7 +29,6 @@
 
 #include "mongo/db/operation_time_tracker.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/unittest/unittest.h"

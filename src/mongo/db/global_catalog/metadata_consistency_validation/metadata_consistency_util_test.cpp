@@ -61,6 +61,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -68,6 +69,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const ShardId kShard0{"shard0"};
 const ShardId kShard1{"shard1"};
@@ -101,7 +103,7 @@ TagsType generateZone(const NamespaceString& nss, const BSONObj& minKey, const B
 
 TimeseriesOptions generateTimeseriesOptions(
     const std::string& timeField,
-    const boost::optional<StringData> metaField = boost::none,
+    const boost::optional<std::string_view> metaField = boost::none,
     const boost::optional<BucketGranularityEnum> granularity = boost::none,
     const boost::optional<int32_t>& bucketMaxSpanSeconds = boost::none,
     const boost::optional<int32_t>& bucketRoundingSeconds = boost::none) {
@@ -557,7 +559,7 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
                            generateTimeseriesOptions("time"),
                            true);
     testTimeseriesMismatch(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl2"),
-                           generateTimeseriesOptions("time", "meta"_sd),
+                           generateTimeseriesOptions("time", "meta"sv),
                            boost::none,
                            true);
     testTimeseriesMismatch(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl3"),
@@ -566,26 +568,26 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
                            true);
     testTimeseriesMismatch(
         NamespaceString::createNamespaceString_forTest("TestDB", "TestColl4"),
-        generateTimeseriesOptions("time", "meta"_sd, BucketGranularityEnum::Minutes),
-        generateTimeseriesOptions("time", "metaDiff"_sd, BucketGranularityEnum::Minutes),
+        generateTimeseriesOptions("time", "meta"sv, BucketGranularityEnum::Minutes),
+        generateTimeseriesOptions("time", "metaDiff"sv, BucketGranularityEnum::Minutes),
         true);
     testTimeseriesMismatch(
         NamespaceString::createNamespaceString_forTest("TestDB", "TestColl5"),
-        generateTimeseriesOptions("time", "meta"_sd, BucketGranularityEnum::Minutes),
-        generateTimeseriesOptions("time", "meta"_sd, BucketGranularityEnum::Hours),
+        generateTimeseriesOptions("time", "meta"sv, BucketGranularityEnum::Minutes),
+        generateTimeseriesOptions("time", "meta"sv, BucketGranularityEnum::Hours),
         true);
     testTimeseriesMismatch(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl6"),
-                           generateTimeseriesOptions("time", "meta"_sd, boost::none, 111, 111),
-                           generateTimeseriesOptions("time", "meta"_sd, boost::none, 222, 222),
+                           generateTimeseriesOptions("time", "meta"sv, boost::none, 111, 111),
+                           generateTimeseriesOptions("time", "meta"sv, boost::none, 222, 222),
                            true);
     testTimeseriesMismatch(
         NamespaceString::createNamespaceString_forTest("TestDB", "TestColl7"),
-        generateTimeseriesOptions("time", "meta"_sd, BucketGranularityEnum::Hours),
-        generateTimeseriesOptions("time", "meta"_sd, BucketGranularityEnum::Hours),
+        generateTimeseriesOptions("time", "meta"sv, BucketGranularityEnum::Hours),
+        generateTimeseriesOptions("time", "meta"sv, BucketGranularityEnum::Hours),
         false);
     testTimeseriesMismatch(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl8"),
-                           generateTimeseriesOptions("time", "meta"_sd, boost::none, 3333, 3333),
-                           generateTimeseriesOptions("time", "meta"_sd, boost::none, 3333, 3333),
+                           generateTimeseriesOptions("time", "meta"sv, boost::none, 3333, 3333),
+                           generateTimeseriesOptions("time", "meta"sv, boost::none, 3333, 3333),
                            false);
     testTimeseriesMismatch(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl9"),
                            boost::none,
@@ -823,7 +825,7 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
         inconsistencies);
-    ASSERT_EQ("isTracked"_sd,
+    ASSERT_EQ("isTracked"sv,
               inconsistencies[0].getDetails().getObjectField("details").getStringField("field"));
 
     // Clear the filtering information and check that no inconsistency is reported for unknown
@@ -894,7 +896,7 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
         inconsistencies);
-    ASSERT_EQ("isTracked"_sd,
+    ASSERT_EQ("isTracked"sv,
               inconsistencies[0].getDetails().getObjectField("details").getStringField("field"));
 
     // Clear the filtering information and check that no inconsistency is reported for unknown
@@ -1357,7 +1359,8 @@ protected:
 
 
     size_t countInconsistenciesWithDetailField(
-        const std::vector<MetadataInconsistencyItem>& inconsistencies, StringData fieldValue) {
+        const std::vector<MetadataInconsistencyItem>& inconsistencies,
+        std::string_view fieldValue) {
         return std::count_if(
             inconsistencies.begin(),
             inconsistencies.end(),
@@ -1385,8 +1388,8 @@ protected:
 
     size_t countInconsistenciesWithDetailFieldAndSource(
         const std::vector<MetadataInconsistencyItem>& inconsistencies,
-        StringData fieldValue,
-        StringData sourceValue) {
+        std::string_view fieldValue,
+        std::string_view sourceValue) {
         return std::count_if(
             inconsistencies.begin(), inconsistencies.end(), [&](const auto& inconsistency) {
                 if (inconsistency.getType() !=
@@ -1468,9 +1471,9 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_AllMatch)
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "uuid"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "uuid"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_UuidMismatch) {
@@ -1488,7 +1491,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_UuidMisma
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardCatalogEntry"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardCatalogEntry"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_ShardKeyMismatch) {
@@ -1509,7 +1512,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_ShardKeyM
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardCatalogEntry"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardCatalogEntry"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_UuidAndShardKeyMismatch) {
@@ -1531,7 +1534,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_UuidAndSh
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardCatalogEntry"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardCatalogEntry"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_SplitChunksSameDomain) {
@@ -1550,7 +1553,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_SplitChun
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -1569,7 +1572,7 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -1588,7 +1591,7 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -1609,7 +1612,7 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -1634,7 +1637,7 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -1660,7 +1663,7 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "chunkHistory"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "chunkHistory"sv, "durableShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -1686,7 +1689,7 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -1709,7 +1712,7 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_EmptyGlobalCatalogChunks) {
@@ -1726,7 +1729,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_EmptyGlob
 
     // When the global catalog returns no chunks for this shard, the shard catalog still has chunks,
     // so a chunksDomain mismatch should be reported (extraShardCatalogChunks).
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_MaxBoundaryMismatch) {
@@ -1748,7 +1751,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_MaxBounda
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_SkipsWhenMetadataUnknown) {
@@ -1770,10 +1773,10 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_SkipsWhen
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
     // When metadata is unknown, no shard catalog inconsistencies should be reported.
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "uuid"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isTracked"_sd));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "uuid"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isTracked"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -1800,10 +1803,10 @@ TEST_F(MetadataConsistencyShardCatalogTest,
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
     // No shard catalog inconsistencies should be reported because the critical section is active.
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "uuid"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isTracked"_sd));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "uuid"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isTracked"sv));
 
     // Clean up the critical section.
     {
@@ -1830,10 +1833,10 @@ TEST_F(MetadataConsistencyShardCatalogTest,
     // in-memory path should find no issues.
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "uuid"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isTracked"_sd));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "uuid"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isTracked"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_AllMatch) {
@@ -1856,13 +1859,13 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_AllMatch) {
 
     ASSERT_EQ(0,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "uuid"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "uuid"sv, "durableShardCatalog"sv));
     ASSERT_EQ(0,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "shardKeyPattern"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "shardKeyPattern"sv, "durableShardCatalog"sv));
     ASSERT_EQ(0,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "chunksDomain"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "chunksDomain"sv, "durableShardCatalog"sv));
     ASSERT_EQ(0, countInconsistenciesWithReasonField(inconsistencies));
 }
 
@@ -1891,7 +1894,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_UuidMismatch) {
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "shardCatalogEntry"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "shardCatalogEntry"sv, "durableShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ShardKeyMismatch) {
@@ -1922,7 +1925,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ShardKeyMismatch) {
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "shardCatalogEntry"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "shardCatalogEntry"sv, "durableShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ChunksDomainMismatch) {
@@ -1948,7 +1951,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ChunksDomainMismatch) {
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "chunksDomain"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "chunksDomain"sv, "durableShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_PreviouslyOwnedChunkIgnoredInDomainCheck) {
@@ -1985,10 +1988,10 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_PreviouslyOwnedChunkIgno
     // appear to cover more of the key space than the global catalog returns for this shard.
     ASSERT_EQ(0,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "chunksDomain"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "chunksDomain"sv, "durableShardCatalog"sv));
     ASSERT_EQ(0,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "chunkHistory"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "chunkHistory"sv, "durableShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MissingCollectionInDurableCatalog) {
@@ -2159,14 +2162,14 @@ TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_NonPrimaryWithNoOwnedChun
 
     const auto inconsistencies = checkConsistency(globalCatalogColl, kShard1);
 
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isTracked"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isPrimary"_sd));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isTracked"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isPrimary"sv));
     ASSERT_EQ(0,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "ownedChunks"_sd, "inMemoryShardCatalog"_sd));
+                  inconsistencies, "ownedChunks"sv, "inMemoryShardCatalog"sv));
     ASSERT_EQ(0,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "ownedChunks"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "ownedChunks"sv, "durableShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -2180,7 +2183,7 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "isPrimary"_sd, "inMemoryShardCatalog"_sd));
+                  inconsistencies, "isPrimary"sv, "inMemoryShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_PrimaryIsReportedWhenGlobalCatalogTracked) {
@@ -2197,7 +2200,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_PrimaryIsReportedWhenGlob
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "isPrimary"_sd, "inMemoryShardCatalog"_sd));
+                  inconsistencies, "isPrimary"sv, "inMemoryShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_GlobalCatalogOwnedChunksAreReported) {
@@ -2216,7 +2219,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_GlobalCatalogOwnedChunksA
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "ownedChunks"_sd, "inMemoryShardCatalog"_sd));
+                  inconsistencies, "ownedChunks"sv, "inMemoryShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_DurableOwnedChunksAreReported) {
@@ -2236,7 +2239,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_DurableOwnedChunksAreRepo
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "ownedChunks"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "ownedChunks"sv, "durableShardCatalog"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -2301,7 +2304,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_SkippedWhenNonAuthoritat
 
     ASSERT_EQ(0,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "uuid"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "uuid"sv, "durableShardCatalog"sv));
     ASSERT_EQ(0, countInconsistenciesWithReasonField(inconsistencies));
 }
 
@@ -2325,9 +2328,9 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
-    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "ownedChunks"_sd));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"sv));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "ownedChunks"sv));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
@@ -2347,7 +2350,7 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "ownedChunks"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "ownedChunks"sv));
 }
 
 // Tests for the `severity` field on `MetadataInconsistencyItem`.

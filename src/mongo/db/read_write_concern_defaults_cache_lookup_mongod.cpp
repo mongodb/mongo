@@ -30,7 +30,6 @@
 
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbdirectclient.h"

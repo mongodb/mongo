@@ -40,6 +40,8 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 
 namespace {
 
@@ -198,7 +200,7 @@ TEST(CollatorInterfaceMockSelfTest, MockCollatorReportsMockVersionString) {
 
 TEST(CollatorInterfaceMockSelfTest, StringsAreHashedWithRespectToCollation) {
     CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
-    auto tryHash = [&](StringData s) {
+    auto tryHash = [&](std::string_view s) {
         size_t h = 0;
         toLowerCollator.hash_combine(h, s);
         return h;

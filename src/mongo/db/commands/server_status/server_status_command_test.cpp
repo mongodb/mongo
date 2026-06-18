@@ -45,6 +45,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class MockSection : public ServerStatusSection {
 public:
@@ -189,7 +190,7 @@ TEST_F(ServerStatusSlowTimingTest, TimingBreakdownSumsToTotal) {
     long long sum = 0;
     for (const auto& el : timing) {
         ASSERT_TRUE(el.isNumber()) << el;
-        if (el.fieldNameStringData() != "at end"_sd) {
+        if (el.fieldNameStringData() != "at end"sv) {
             sum += el.numberLong();
         }
     }

@@ -40,6 +40,7 @@
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -99,7 +100,7 @@ public:
      * collectionName.
      */
     static ResourcePattern forCollectionName(const boost::optional<TenantId>& tenantId,
-                                             StringData collectionName) {
+                                             std::string_view collectionName) {
         // While the namespace we create for here is not valid for use in commands/storage layer
         // since it has an empty DB, it is valid for the ResourcePattern use-case.
         return ResourcePattern(MatchTypeEnum::kMatchCollectionName,
@@ -135,7 +136,7 @@ public:
      * in any database.
      */
     static ResourcePattern forAnySystemBucketsInAnyDatabase(
-        const boost::optional<TenantId>& tenantId, StringData collectionName) {
+        const boost::optional<TenantId>& tenantId, std::string_view collectionName) {
         return ResourcePattern(MatchTypeEnum::kMatchSystemBucketInAnyDBResource,
                                AuthNamespaceStringUtil::deserialize(tenantId, "", collectionName));
     }
@@ -260,7 +261,7 @@ public:
      * Behavior is undefined unless the pattern is of type matchCollectionName or
      * matchExactNamespace or matchExactSystemBucketResource
      */
-    StringData collectionToMatch() const {
+    std::string_view collectionToMatch() const {
         return _ns.coll();
     }
 

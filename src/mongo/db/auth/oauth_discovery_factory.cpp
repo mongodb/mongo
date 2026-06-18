@@ -31,17 +31,18 @@
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
+
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
 
 namespace mongo {
 
-OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(StringData issuer) {
+OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(std::string_view issuer) {
     // RFC8414 declares that the well-known addresses defined by OpenID Connect are valid for
     // compliant clients for legacy purposes. Newer clients should use
     // '.well-known/oauth-authorization-server'. However, that endpoint uses a different URL
@@ -57,8 +58,8 @@ OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(StringData issue
     auto openIDConfiguationEndpoint = fmt::format("{}/.well-known/openid-configuration", issuer);
 
     DataBuilder results = _client->get(openIDConfiguationEndpoint);
-    StringData textResult =
-        uassertStatusOK(results.getCursor().readAndAdvanceNoThrow<StringData>());
+    std::string_view textResult =
+        uassertStatusOK(results.getCursor().readAndAdvanceNoThrow<std::string_view>());
     return OAuthAuthorizationServerMetadata::parseOwned(fromjson(textResult),
                                                         IDLParserContext("metadata"));
 }

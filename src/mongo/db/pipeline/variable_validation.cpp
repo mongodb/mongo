@@ -29,17 +29,17 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <cstddef>
 #include <functional>
+#include <string_view>
 
 namespace mongo::variableValidation {
 
 namespace {
-Status isValidName(StringData varName,
+Status isValidName(std::string_view varName,
                    std::function<bool(char)> prefixPred,
                    std::function<bool(char)> suffixPred,
                    int prefixLen) {
@@ -64,14 +64,14 @@ Status isValidName(StringData varName,
 }
 }  // namespace
 
-void validateName(StringData varName,
+void validateName(std::string_view varName,
                   std::function<bool(char)> prefixPred,
                   std::function<bool(char)> suffixPred,
                   int prefixLen) {
     uassertStatusOK(isValidName(varName, prefixPred, suffixPred, prefixLen));
 }
 
-Status isValidNameForUserWrite(StringData varName) {
+Status isValidNameForUserWrite(std::string_view varName) {
     // System variables users allowed to write to (currently just one)
     if (varName == "CURRENT") {
         return Status::OK();
@@ -88,11 +88,11 @@ Status isValidNameForUserWrite(StringData varName) {
         1);
 }
 
-void validateNameForUserWrite(StringData varName) {
+void validateNameForUserWrite(std::string_view varName) {
     uassertStatusOK(isValidNameForUserWrite(varName));
 }
 
-void validateNameForUserRead(StringData varName) {
+void validateNameForUserRead(std::string_view varName) {
     validateName(
         varName,
         [](char ch) -> bool {

@@ -37,6 +37,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 
 #include <functional>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -48,7 +49,7 @@ BSONObj ClonerTestFixture::createCountResponse(int documentCount) {
 }
 
 /* static */
-BSONObj ClonerTestFixture::createCursorResponse(StringData nss, const BSONArray& docs) {
+BSONObj ClonerTestFixture::createCursorResponse(std::string_view nss, const BSONArray& docs) {
     return BSON("cursor" << BSON("id" << CursorId(0) << "ns" << nss << "firstBatch" << docs) << "ok"
                          << 1);
 }
@@ -65,10 +66,11 @@ void ClonerTestFixture::setUp() {
         .minThreads = 1,
         .maxThreads = 1,
         .onCreateThread =
-            [](StringData threadName) {
+            [](std::string_view threadName) {
                 Client::initThread(threadName, getGlobalServiceContext()->getService());
             },
     });
+
     _dbWorkThreadPool->startup();
     _source = HostAndPort{"local:1234"};
     _mockServer = std::make_unique<MockRemoteDBServer>(_source.toString());

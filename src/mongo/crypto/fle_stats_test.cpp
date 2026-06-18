@@ -29,7 +29,6 @@
 
 #include "mongo/crypto/fle_stats.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"

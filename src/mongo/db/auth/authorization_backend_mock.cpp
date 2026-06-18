@@ -40,10 +40,12 @@
 #include "mongo/db/update/update_driver.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 
 namespace mongo::auth {
+using namespace std::literals::string_view_literals;
 
 Status AuthorizationBackendMock::insertUserDocument(OperationContext* opCtx,
                                                     const BSONObj& userObj,
@@ -118,7 +120,7 @@ Status AuthorizationBackendMock::updateOne(OperationContext* opCtx,
     namespace mmb = mutablebson;
     auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionName).build();
     UpdateDriver driver(std::move(expCtx));
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     driver.parse(write_ops::UpdateModification::parseFromClassicUpdate(updatePattern),
                  arrayFilters);
 
@@ -130,13 +132,17 @@ Status AuthorizationBackendMock::updateOne(OperationContext* opCtx,
         const bool validateForStorage = false;
         const FieldRefSet emptyImmutablePaths;
         const bool isInsert = false;
-        status = driver.update(
-            opCtx, StringData(), &document, validateForStorage, emptyImmutablePaths, isInsert);
+        status = driver.update(opCtx,
+                               std::string_view(),
+                               &document,
+                               validateForStorage,
+                               emptyImmutablePaths,
+                               isInsert);
         if (!status.isOK())
             return status;
         BSONObj newObj = document.getObject().copy();
         *iter = newObj;
-        BSONElement idQuery = newObj["_id"_sd];
+        BSONElement idQuery = newObj["_id"sv];
         BSONObj idQueryObj = idQuery.isABSONObj() ? idQuery.Obj() : BSON("_id" << idQuery);
 
         return Status::OK();
@@ -155,8 +161,12 @@ Status AuthorizationBackendMock::updateOne(OperationContext* opCtx,
         const bool validateForStorage = false;
         const FieldRefSet emptyImmutablePaths;
         const bool isInsert = false;
-        status = driver.update(
-            opCtx, StringData(), &document, validateForStorage, emptyImmutablePaths, isInsert);
+        status = driver.update(opCtx,
+                               std::string_view(),
+                               &document,
+                               validateForStorage,
+                               emptyImmutablePaths,
+                               isInsert);
         if (!status.isOK()) {
             return status;
         }

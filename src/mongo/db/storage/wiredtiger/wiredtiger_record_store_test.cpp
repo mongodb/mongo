@@ -31,7 +31,6 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -59,6 +58,7 @@
 #include <cstring>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <wiredtiger.h>
@@ -782,7 +782,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
         params);
 
-    const auto id = StringData{"1"};
+    const auto id = std::string_view{"1"};
     const auto rid = RecordId(id);
     const auto data = "data";
     {

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
@@ -44,6 +43,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/strings/str_join.h>
@@ -51,6 +51,7 @@
 
 namespace mongo {
 namespace BasicTests {
+using namespace std::literals::string_view_literals;
 
 using std::cout;
 using std::dec;
@@ -94,7 +95,7 @@ public:
 
     void roundTrip(const unsigned char* _data, int len) {
         const char* data = (const char*)_data;
-        string s = base64::encode(StringData(data, len));
+        string s = base64::encode(std::string_view(data, len));
         string out = base64::decode(s);
         ASSERT_EQUALS(out.size(), static_cast<size_t>(len));
         bool broke = false;
@@ -117,12 +118,12 @@ public:
     }
 
     void run() {
-        ASSERT_EQUALS("ZWxp", base64::encode("eli"_sd));
-        ASSERT_EQUALS("ZWxpb3Rz", base64::encode("eliots"_sd));
+        ASSERT_EQUALS("ZWxp", base64::encode("eli"sv));
+        ASSERT_EQUALS("ZWxpb3Rz", base64::encode("eliots"sv));
         ASSERT_EQUALS("ZWxpb3Rz", base64::encode("eliots"));
 
-        ASSERT_EQUALS("ZQ==", base64::encode("e"_sd));
-        ASSERT_EQUALS("ZWw=", base64::encode("el"_sd));
+        ASSERT_EQUALS("ZQ==", base64::encode("e"sv));
+        ASSERT_EQUALS("ZWw=", base64::encode("el"sv));
 
         roundTrip("e");
         roundTrip("el");

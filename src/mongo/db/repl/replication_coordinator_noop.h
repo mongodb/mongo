@@ -68,6 +68,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -326,7 +327,7 @@ public:
 
     void waitUntilSnapshotCommitted(OperationContext*, const Timestamp&) final;
 
-    void appendDiagnosticBSON(BSONObjBuilder*, StringData) final;
+    void appendDiagnosticBSON(BSONObjBuilder*, std::string_view) final;
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const final;
 

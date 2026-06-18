@@ -43,6 +43,7 @@
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/stacktrace.h"
 
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -147,7 +148,7 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime
 }
 
 void KVDropPendingIdentReaper::dropUnknownIdent(const Timestamp& stableTimestamp,
-                                                StringData ident) {
+                                                std::string_view ident) {
     std::lock_guard lock(_mutex);
 
     // There may already be drop-pending idents when we reload the catalog and drop all idents not
@@ -182,7 +183,7 @@ void KVDropPendingIdentReaper::dropUnknownIdent(const Timestamp& stableTimestamp
     _oldestTimestampDrops.insert(&info);
 }
 
-std::shared_ptr<Ident> KVDropPendingIdentReaper::markIdentInUse(StringData ident) {
+std::shared_ptr<Ident> KVDropPendingIdentReaper::markIdentInUse(std::string_view ident) {
     std::lock_guard<std::mutex> lock(_mutex);
     auto it = _dropPendingIdents.find(ident);
     if (it == _dropPendingIdents.end()) {
@@ -378,7 +379,7 @@ void KVDropPendingIdentReaper::rollbackDropsAfterStableTimestamp(Timestamp stabl
 }
 
 Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext* opCtx,
-                                                                StringData ident) {
+                                                                std::string_view ident) {
     // Acquiring _dropMutex is potentially expensive (it may involve waiting on IO being done on
     // another thread), so first check if the ident is known to the reaper without acquiring it.
     {
@@ -415,7 +416,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
 }
 
 Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(OperationContext* opCtx,
-                                                                           StringData ident,
+                                                                           std::string_view ident,
                                                                            Timestamp timestamp) {
     {
         std::lock_guard lock(_mutex);
@@ -468,7 +469,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(Opera
 
 Status KVDropPendingIdentReaper::_immediatelyAttemptToCompletePendingDrop(
     OperationContext* opCtx,
-    StringData ident,
+    std::string_view ident,
     boost::optional<Timestamp> replicatedIdentDropTimestamp) {
     std::lock_guard dropLock(_dropMutex);
     auto info = [&]() -> IdentInfo* {

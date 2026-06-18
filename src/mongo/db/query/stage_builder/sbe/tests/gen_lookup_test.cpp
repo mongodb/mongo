@@ -31,7 +31,6 @@
  * This file contains tests for building execution stages that implement $lookup operator.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -59,6 +58,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -69,6 +69,7 @@
 
 namespace mongo::sbe {
 namespace {
+using namespace std::literals::string_view_literals;
 // Set to "true" and recompile the tests to dump plans and skip asserts in favor of printing
 // more data. Because asserts are suppressed in this mode tests might pass while being broken.
 // Do not check in with 'enableDebugOutput' set to "true".
@@ -2232,7 +2233,7 @@ TEST_F(BinaryJoinStageBuilderTest, JoinFilterBase) {
     // The filter is very simple and could have been applied directly on the cs1 collection, but the
     // point is testing whether an intermediate MatchNode is supported by anti-materialization.
     auto filter = std::make_unique<MatchNode>(
-        std::move(hj), std::make_unique<EqualityMatchExpression>("x.l2key"_sd, mongo::Value(10)));
+        std::move(hj), std::make_unique<EqualityMatchExpression>("x.l2key"sv, mongo::Value(10)));
 
     auto solution = makeQuerySolution(std::make_unique<HashJoinEmbeddingNode>(
         std::move(filter),
@@ -2552,7 +2553,7 @@ TEST_F(BinaryJoinStageBuilderTest, JoinFilterOnMaterializedDocument) {
     // kField without interrupting the anti-materialization that allows the following composition
     // of the result object coming from the main collection cs3.
     auto filter =
-        std::make_unique<MatchNode>(std::move(hj), std::make_unique<ExistsMatchExpression>("x"_sd));
+        std::make_unique<MatchNode>(std::move(hj), std::make_unique<ExistsMatchExpression>("x"sv));
 
     auto solution = makeQuerySolution(std::make_unique<HashJoinEmbeddingNode>(
         std::move(filter),

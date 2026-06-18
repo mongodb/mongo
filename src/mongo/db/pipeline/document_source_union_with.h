@@ -58,6 +58,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -110,7 +111,7 @@ struct UnionWithSharedState {
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceUnionWith final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$unionWith"_sd;
+    static constexpr std::string_view kStageName = "$unionWith"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -148,7 +149,7 @@ public:
 
     ~DocumentSourceUnionWith() override;
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

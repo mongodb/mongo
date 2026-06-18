@@ -28,7 +28,6 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -36,9 +35,11 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
 #include <vector>
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace mongo;
 
@@ -502,20 +503,20 @@ TEST_F(QueryPlannerTest, FailToPlanWhenMaxHasArrayBoundaryAndCollationsDontMatch
 
 TEST_F(QueryPlannerTest, FailToPlanWhenHintingIndexIncompatibleWithMinDueToCollation) {
     CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kToLowerString);
-    addIndex(fromjson("{a: 1}"), &indexCollator, "indexToHint"_sd);
+    addIndex(fromjson("{a: 1}"), &indexCollator, "indexToHint"sv);
     addIndex(fromjson("{a: 1}"));
     runInvalidQueryAsCommand(fromjson("{find: 'testns', min: {a: 'foo'}, hint: 'indexToHint'}"));
 }
 
 TEST_F(QueryPlannerTest, FailToPlanWhenHintingIndexIncompatibleWithMaxDueToCollation) {
     CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kToLowerString);
-    addIndex(fromjson("{a: 1}"), &indexCollator, "indexToHint"_sd);
+    addIndex(fromjson("{a: 1}"), &indexCollator, "indexToHint"sv);
     addIndex(fromjson("{a: 1}"));
     runInvalidQueryAsCommand(fromjson("{find: 'testns', max: {a: 'foo'}, hint: 'indexToHint'}"));
 }
 
 TEST_F(QueryPlannerTest, SuccessWithIndexWithMatchingSimpleCollationWhenMinHasStringBoundary) {
-    addIndex(fromjson("{a: 1}"), nullptr, "noCollation"_sd);
+    addIndex(fromjson("{a: 1}"), nullptr, "noCollation"sv);
 
     runQueryAsCommand(fromjson("{find: 'testns', min: {a: 'foo'}, hint: {a: 1}}"));
 
@@ -525,7 +526,7 @@ TEST_F(QueryPlannerTest, SuccessWithIndexWithMatchingSimpleCollationWhenMinHasSt
 
 TEST_F(QueryPlannerTest, SuccessWithIndexWithMatchingNonSimpleCollationWhenMinHasStringBoundary) {
     CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
-    addIndex(fromjson("{a: 1}"), &indexCollator, "withCollation"_sd);
+    addIndex(fromjson("{a: 1}"), &indexCollator, "withCollation"sv);
 
     runQueryAsCommand(fromjson(
         "{find: 'testns', min: {a: 'foo'}, hint: {a: 1}, collation: {locale: 'reverse'}}"));
@@ -535,7 +536,7 @@ TEST_F(QueryPlannerTest, SuccessWithIndexWithMatchingNonSimpleCollationWhenMinHa
 }
 
 TEST_F(QueryPlannerTest, SuccessWithIndexWithMatchingSimpleCollationWhenMaxHasStringBoundary) {
-    addIndex(fromjson("{a: 1}"), nullptr, "noCollation"_sd);
+    addIndex(fromjson("{a: 1}"), nullptr, "noCollation"sv);
 
     runQueryAsCommand(fromjson("{find: 'testns', max: {a: 'foo'}, hint: {a: 1}}"));
 

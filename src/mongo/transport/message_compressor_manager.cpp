@@ -47,6 +47,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -231,7 +232,8 @@ void MessageCompressorManager::clientFinish(const BSONObj& input) {
 }
 
 void MessageCompressorManager::serverNegotiate(
-    const boost::optional<std::vector<StringData>>& clientCompressors, BSONObjBuilder* result) {
+    const boost::optional<std::vector<std::string_view>>& clientCompressors,
+    BSONObjBuilder* result) {
     LOGV2_DEBUG(22934, 3, "Starting server-side compression negotiation");
 
     // No advertised compressions, just asking for the last negotiated result.

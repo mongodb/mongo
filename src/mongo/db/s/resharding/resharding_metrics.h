@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
@@ -54,6 +53,7 @@
 #include <memory>
 #include <shared_mutex>
 #include <string>
+#include <string_view>
 #include <variant>
 
 #include <boost/optional/optional.hpp>
@@ -442,7 +442,7 @@ private:
 
     boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis(
         CalculationLogOption logOption) const;
-    StringData getStateString() const;
+    std::string_view getStateString() const;
 
     std::string createOperationDescription() const;
     void restoreRecipientSpecificFields(const ReshardingRecipientDocument& document);

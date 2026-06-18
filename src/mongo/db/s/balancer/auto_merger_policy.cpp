@@ -64,6 +64,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -126,7 +127,7 @@ void AutoMergerPolicy::checkInternalUpdates(OperationContext* opCtx) {
     _checkInternalUpdatesWithLock(opCtx, lk);
 }
 
-StringData AutoMergerPolicy::getName() const {
+std::string_view AutoMergerPolicy::getName() const {
     return kPolicyName;
 }
 

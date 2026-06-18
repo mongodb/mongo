@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression.h"
@@ -52,6 +51,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -147,7 +147,7 @@ protected:
     }
 
     void addIndex(BSONObj keyPattern,
-                  StringData indexName = "test_index",
+                  std::string_view indexName = "test_index",
                   bool multikey = false,
                   bool sparse = false,
                   bool unique = false,
@@ -169,7 +169,9 @@ protected:
                   MatchExpression* filterExpr,
                   const CollatorInterface* collator);
 
-    void addIndex(BSONObj keyPattern, const CollatorInterface* collator, StringData indexName);
+    void addIndex(BSONObj keyPattern,
+                  const CollatorInterface* collator,
+                  std::string_view indexName);
 
     void addIndex(const IndexEntry& ie);
 

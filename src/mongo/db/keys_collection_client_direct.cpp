@@ -45,6 +45,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -80,7 +81,7 @@ KeysCollectionClientDirect::KeysCollectionClientDirect(bool mustUseLocalReads)
 
 StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getNewInternalKeys(
     OperationContext* opCtx,
-    StringData purpose,
+    std::string_view purpose,
     const LogicalTime& newerThanThis,
     bool tryUseMajority) {
 
@@ -89,7 +90,7 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getN
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
-KeysCollectionClientDirect::getAllExternalKeys(OperationContext* opCtx, StringData purpose) {
+KeysCollectionClientDirect::getAllExternalKeys(OperationContext* opCtx, std::string_view purpose) {
     return _getNewKeys<ExternalKeysCollectionDocument>(
         opCtx,
         NamespaceString::kExternalKeysCollectionNamespace,
@@ -105,7 +106,7 @@ template <typename KeyDocumentType>
 StatusWith<std::vector<KeyDocumentType>> KeysCollectionClientDirect::_getNewKeys(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    StringData purpose,
+    std::string_view purpose,
     const LogicalTime& newerThanThis,
     bool tryUseMajority) {
     BSONObjBuilder queryBuilder;

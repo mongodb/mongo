@@ -34,7 +34,6 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -64,6 +63,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -304,14 +304,14 @@ private:
             });
     }
 
-    static BSONObj mkO(std::vector<std::pair<StringData, AnyValue>> fields) {
+    static BSONObj mkO(std::vector<std::pair<std::string_view, AnyValue>> fields) {
         BSONObjBuilder bob;
         for (auto&& [k, v] : fields)
             visit([&](auto&& alt) { bob.append(k, alt); }, v);
         return bob.obj();
     }
 
-    static BSONArray mkA(std::vector<std::pair<StringData, AnyValue>> arr) {
+    static BSONArray mkA(std::vector<std::pair<std::string_view, AnyValue>> arr) {
         return BSONArray{mkO(std::move(arr))};
     }
 

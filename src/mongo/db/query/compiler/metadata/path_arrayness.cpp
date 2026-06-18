@@ -36,6 +36,7 @@
 #include "mongo/util/fail_point.h"
 
 #include <stack>
+#include <string_view>
 
 using namespace mongo::multikey_paths;
 
@@ -107,7 +108,7 @@ bool PathArrayness::canPathBeArray(const FieldRef& path, const ExpressionContext
         return true;
     }
 
-    StringData pathString = path.dottedField(0);
+    std::string_view pathString = path.dottedField(0);
     StatusWith<FieldPath> maybeFieldPath = fieldPathWithValidationStatus(std::string(pathString));
 
     // If FieldPath validation fails, conservatively assume this path is an array.

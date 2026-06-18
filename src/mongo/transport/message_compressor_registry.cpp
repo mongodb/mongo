@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <memory>
 #include <ostream>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -49,20 +50,21 @@
 #include <boost/type_index/type_index_facade.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
-constexpr auto kDisabledConfigValue = "disabled"_sd;
+constexpr auto kDisabledConfigValue = "disabled"sv;
 }  // namespace
 
-StringData getMessageCompressorName(MessageCompressor id) {
+std::string_view getMessageCompressorName(MessageCompressor id) {
     switch (id) {
         case MessageCompressor::kNoop:
-            return "noop"_sd;
+            return "noop"sv;
         case MessageCompressor::kSnappy:
-            return "snappy"_sd;
+            return "snappy"sv;
         case MessageCompressor::kZlib:
-            return "zlib"_sd;
+            return "zlib"sv;
         case MessageCompressor::kZstd:
-            return "zstd"_sd;
+            return "zstd"sv;
         default:
             fasserted(40269);  // Invalid message compressor ID
     }
@@ -109,7 +111,7 @@ MessageCompressorBase* MessageCompressorRegistry::getCompressor(MessageCompresso
     return _compressorsByIds.at(id).get();
 }
 
-MessageCompressorBase* MessageCompressorRegistry::getCompressor(StringData name) const {
+MessageCompressorBase* MessageCompressorRegistry::getCompressor(std::string_view name) const {
     auto it = _compressorsByName.find(std::string{name});
     if (it == _compressorsByName.end())
         return nullptr;

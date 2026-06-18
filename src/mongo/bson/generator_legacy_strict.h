@@ -34,6 +34,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo {
@@ -46,11 +48,11 @@ public:
         appendTo(buffer, R"({ "$undefined" : true })"_sd);
     }
 
-    void writeString(fmt::memory_buffer& buffer, StringData str) const {
+    void writeString(fmt::memory_buffer& buffer, std::string_view str) const {
         fmt::format_to(std::back_inserter(buffer), R"("{}")", str::escape(str));
     }
 
-    void writeSymbol(fmt::memory_buffer& buffer, StringData symbol) const {
+    void writeSymbol(fmt::memory_buffer& buffer, std::string_view symbol) const {
         writeString(buffer, symbol);
     }
 
@@ -110,7 +112,7 @@ public:
         }
     }
 
-    void writeDBRef(fmt::memory_buffer& buffer, StringData ref, OID id) const {
+    void writeDBRef(fmt::memory_buffer& buffer, std::string_view ref, OID id) const {
         fmt::format_to(
             std::back_inserter(buffer), R"({{ "$ref" : "{}", "$id" : "{}" }})", ref, id.toString());
     }
@@ -119,25 +121,27 @@ public:
         fmt::format_to(std::back_inserter(buffer), R"({{ "$oid" : "{}" }})", val.toString());
     }
 
-    void writeBinData(fmt::memory_buffer& buffer, StringData data, BinDataType type) const {
+    void writeBinData(fmt::memory_buffer& buffer, std::string_view data, BinDataType type) const {
         appendTo(buffer, R"({ "$binary" : ")");
         base64::encode(buffer, data);
         fmt::format_to(std::back_inserter(buffer), R"(", "$type" : "{:02x}" }})", type);
     }
 
-    void writeRegex(fmt::memory_buffer& buffer, StringData pattern, StringData options) const {
+    void writeRegex(fmt::memory_buffer& buffer,
+                    std::string_view pattern,
+                    std::string_view options) const {
         fmt::format_to(std::back_inserter(buffer),
                        R"({{ "$regex" : "{}", "$options" : "{}" }})",
                        str::escape(pattern),
                        options);
     }
 
-    void writeCode(fmt::memory_buffer& buffer, StringData code) const {
+    void writeCode(fmt::memory_buffer& buffer, std::string_view code) const {
         fmt::format_to(std::back_inserter(buffer), R"({{ "$code" : "{}" }})", str::escape(code));
     }
 
     void writeCodeWithScope(fmt::memory_buffer& buffer,
-                            StringData code,
+                            std::string_view code,
                             BSONObj const& scope) const {
         fmt::format_to(
             std::back_inserter(buffer), R"({{ "$code" : "{}", "$scope" : )", str::escape(code));

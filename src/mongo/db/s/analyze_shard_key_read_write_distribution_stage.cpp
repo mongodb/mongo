@@ -41,6 +41,8 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 
+#include <string_view>
+
 namespace mongo {
 using namespace analyze_shard_key;
 
@@ -329,7 +331,7 @@ REGISTER_AGG_STAGE_MAPPING(analyzeShardKeyReadWriteDistributionStage,
                            documentSourceAnalyzeShardKeyReadWriteDistributionToStageFn);
 
 AnalyzeShardKeyReadWriteDistributionStage::AnalyzeShardKeyReadWriteDistributionStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     analyze_shard_key::DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec spec)
     : Stage(stageName, pExpCtx), _spec(std::move(spec)) {}

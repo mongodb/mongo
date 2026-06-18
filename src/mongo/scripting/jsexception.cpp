@@ -30,20 +30,22 @@
 #include "mongo/scripting/jsexception.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kCodeFieldName = "code"_sd;
-constexpr auto kCodeNameFieldName = "codeName"_sd;
-constexpr auto kOriginalErrorFieldName = "originalError"_sd;
-constexpr auto kReasonFieldName = "errmsg"_sd;
-constexpr auto kStackFieldName = "stack"_sd;
-constexpr auto kExtraAttrFieldName = "extraAttr"_sd;
+constexpr auto kCodeFieldName = "code"sv;
+constexpr auto kCodeNameFieldName = "codeName"sv;
+constexpr auto kOriginalErrorFieldName = "originalError"sv;
+constexpr auto kReasonFieldName = "errmsg"sv;
+constexpr auto kStackFieldName = "stack"sv;
+constexpr auto kExtraAttrFieldName = "extraAttr"sv;
 
 }  // namespace
 

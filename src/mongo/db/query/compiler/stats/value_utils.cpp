@@ -40,6 +40,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -220,10 +221,10 @@ double convertToDouble(const T& arr, const size_t maxPrecision) {
     return result;
 }
 
-double stringToDouble(StringData sd) {
+double stringToDouble(std::string_view sd) {
     constexpr size_t exponent = sizeof(double);
     const size_t maxPrecision = std::min(sd.size(), exponent);
-    return convertToDouble<StringData, char, exponent>(sd, maxPrecision);
+    return convertToDouble<std::string_view, char, exponent>(sd, maxPrecision);
 }
 
 double objectIdToDouble(const value::ObjectIdType* oid) {
@@ -247,7 +248,7 @@ double valueToDouble(value::TypeTags tag, value::Value val) {
         result = value::numericCast<double>(tag, val);
 
     } else if (value::isString(tag)) {
-        const StringData sd = value::getStringView(tag, val);
+        const std::string_view sd = value::getStringView(tag, val);
         result = stringToDouble(sd);
 
     } else if (tag == value::TypeTags::Date) {
@@ -662,7 +663,7 @@ std::pair<stats::SBEValue, bool> getMinBound(sbe::value::TypeTags tag) {
             return {sbe::value::makeValue(Value(BSONDBRef())), true};
 
         case sbe::value::TypeTags::bsonJavascript:
-            return {sbe::value::makeCopyBsonJavascript(StringData("")), true};
+            return {sbe::value::makeCopyBsonJavascript(std::string_view("")), true};
 
         case sbe::value::TypeTags::bsonCodeWScope:
             return {sbe::value::makeValue(Value(BSONCodeWScope())), true};

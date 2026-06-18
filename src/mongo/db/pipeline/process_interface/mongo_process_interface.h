@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -84,6 +83,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -288,7 +288,7 @@ public:
      */
     virtual std::vector<Document> getIndexStats(OperationContext* opCtx,
                                                 const NamespaceString& ns,
-                                                StringData host,
+                                                std::string_view host,
                                                 bool addShardName) = 0;
 
     /**

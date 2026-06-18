@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -54,6 +53,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -148,7 +148,7 @@ public:
     const IndexCatalogEntry* findIdIndex(OperationContext* opCtx) const override;
 
     const IndexCatalogEntry* findIndexByName(OperationContext* opCtx,
-                                             StringData name,
+                                             std::string_view name,
                                              InclusionPolicy inclusionPolicy) const override;
 
     const IndexCatalogEntry* findIndexByKeyPatternAndOptions(
@@ -168,7 +168,7 @@ public:
                          InclusionPolicy inclusionPolicy) const override;
 
     const IndexCatalogEntry* findIndexByIdent(OperationContext* opCtx,
-                                              StringData ident,
+                                              std::string_view ident,
                                               InclusionPolicy inclusionPolicy) const override;
 
     const IndexCatalogEntry* refreshEntry(OperationContext* opCtx,
@@ -177,7 +177,7 @@ public:
                                           CreateIndexEntryFlags flags) override;
 
     IndexCatalogEntry* getWritableEntryByName(OperationContext* opCtx,
-                                              StringData name,
+                                              std::string_view name,
                                               InclusionPolicy inclusionPolicy) override;
 
     IndexCatalogEntry* getWritableEntryByKeyPatternAndOptions(
@@ -398,7 +398,7 @@ private:
         const CollectionPtr& collection,
         const BSONObj& spec,
         InclusionPolicy inclusionPolicy,
-        const std::map<StringData, std::set<IndexType>>* allowedFieldNames = nullptr) const;
+        const std::map<std::string_view, std::set<IndexType>>* allowedFieldNames = nullptr) const;
 
     /**
      * Returns true if the replica set member's config has {buildIndexes:false} set, which means

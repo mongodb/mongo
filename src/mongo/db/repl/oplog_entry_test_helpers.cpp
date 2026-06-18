@@ -41,6 +41,8 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/unittest/assert.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -128,7 +130,7 @@ ContainerVal toContainerVal(BSONBinData binData) {
 }  // namespace
 
 OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
-                                         StringData containerIdent,
+                                         std::string_view containerIdent,
                                          int64_t key,
                                          BSONBinData value) {
     ContainerInsertOplogEntryO insertO;
@@ -145,7 +147,7 @@ OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
 }
 
 OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
-                                         StringData containerIdent,
+                                         std::string_view containerIdent,
                                          BSONBinData key,
                                          BSONBinData value) {
     ContainerInsertOplogEntryO insertO;
@@ -162,7 +164,7 @@ OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
 }
 
 OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
-                                         StringData containerIdent,
+                                         std::string_view containerIdent,
                                          int64_t key,
                                          BSONBinData value) {
     ContainerUpdateOplogEntryO updateO;
@@ -181,7 +183,7 @@ OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
 }
 
 OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
-                                         StringData containerIdent,
+                                         std::string_view containerIdent,
                                          BSONBinData key,
                                          BSONBinData value) {
     ContainerUpdateOplogEntryO updateO;
@@ -199,7 +201,9 @@ OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
     }}};
 }
 
-OplogEntry makeContainerDeleteOplogEntry(OpTime opTime, StringData containerIdent, int64_t key) {
+OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
+                                         std::string_view containerIdent,
+                                         int64_t key) {
     ContainerDeleteOplogEntryO deleteO;
     deleteO.setKey(ContainerKey(key));
     return {DurableOplogEntry{DurableOplogEntryParams{
@@ -213,7 +217,7 @@ OplogEntry makeContainerDeleteOplogEntry(OpTime opTime, StringData containerIden
 }
 
 OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
-                                         StringData containerIdent,
+                                         std::string_view containerIdent,
                                          BSONBinData key) {
     ContainerDeleteOplogEntryO deleteO;
     deleteO.setKey(toContainerKey(key));
@@ -259,7 +263,7 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const UUID& uuid,
                                          const UUID& indexBuildUUID,
                                          const IndexBuildInfo& indexBuildInfo,
-                                         StringData indexIdent) {
+                                         std::string_view indexIdent) {
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");

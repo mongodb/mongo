@@ -46,20 +46,24 @@
 #include "mongo/util/str.h"
 
 #include <initializer_list>
+#include <string_view>
 
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kWhenMatchedModeFieldName = DocumentSourceMergeSpec::kWhenMatchedFieldName;
-constexpr StringData kWhenNotMatchedModeFieldName =
+constexpr std::string_view kWhenMatchedModeFieldName =
+    DocumentSourceMergeSpec::kWhenMatchedFieldName;
+constexpr std::string_view kWhenNotMatchedModeFieldName =
     DocumentSourceMergeSpec::kWhenNotMatchedFieldName;
-constexpr StringData kIntoFieldName = DocumentSourceMergeSpec::kTargetNssFieldName;
-constexpr StringData kOnFieldName = DocumentSourceMergeSpec::kOnFieldName;
-const StringData kDefaultWhenMatchedMode = idl::serialize(MergeWhenMatchedModeEnum::kMerge);
-const StringData kDefaultWhenNotMatchedMode = idl::serialize(MergeWhenNotMatchedModeEnum::kInsert);
+constexpr std::string_view kIntoFieldName = DocumentSourceMergeSpec::kTargetNssFieldName;
+constexpr std::string_view kOnFieldName = DocumentSourceMergeSpec::kOnFieldName;
+const std::string_view kDefaultWhenMatchedMode = idl::serialize(MergeWhenMatchedModeEnum::kMerge);
+const std::string_view kDefaultWhenNotMatchedMode =
+    idl::serialize(MergeWhenNotMatchedModeEnum::kInsert);
 
 class DocumentSourceMergeTest : public AggregationContextFixture {
 public:
@@ -699,7 +703,7 @@ TEST_F(DocumentSourceMergeTest, SerializeLetVariables) {
                                                              << "z"
                                                              << "$$v3")));
 
-    const auto createAndSerializeMergeStage = [this, &pipeline](StringData whenNotMatched) {
+    const auto createAndSerializeMergeStage = [this, &pipeline](std::string_view whenNotMatched) {
         auto spec =
             BSON("$merge" << BSON(
                      "into" << "target_collection"
@@ -723,7 +727,7 @@ TEST_F(DocumentSourceMergeTest, SerializeLetVariables) {
         // insert the original document. For other 'whenNotMatched' modes, we do not serialize the
         // new document, since neither 'fail' nor 'discard' can result in an upsert.
         ASSERT_VALUE_EQ(serialized["$merge"]["let"]["new"],
-                        (whenNotMatched == "insert"_sd ? Value("$$ROOT"_sd) : Value()));
+                        (whenNotMatched == "insert"sv ? Value("$$ROOT"sv) : Value()));
 
         // The user's variables should be serialized in all cases.
         ASSERT_VALUE_EQ(serialized["$merge"]["let"]["v1"], Value(BSON("$const" << 10)));
@@ -788,7 +792,7 @@ TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariables) {
         ASSERT(mergeStage);
         auto serialized = mergeStage->serialize().getDocument();
 
-        if (whenNotMatched == "insert"_sd) {
+        if (whenNotMatched == "insert"sv) {
             ASSERT_VALUE_EQ(serialized["$merge"]["let"], Value(BSON("new" << "$$ROOT")));
         } else {
             ASSERT_TRUE(serialized["$merge"]["let"].missing());

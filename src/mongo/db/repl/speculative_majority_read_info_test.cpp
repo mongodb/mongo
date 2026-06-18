@@ -29,7 +29,6 @@
 
 #include "mongo/db/repl/speculative_majority_read_info.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 

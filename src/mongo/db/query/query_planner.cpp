@@ -39,7 +39,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -98,6 +97,7 @@
 
 #include <deque>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -126,6 +126,7 @@ auto& cbrChoseWinningPlan = *MetricBuilder<Counter64>{"query.cbr.choseWinningPla
 }  // namespace
 
 namespace {
+using namespace std::literals::string_view_literals;
 MONGO_FAIL_POINT_DEFINE(queryPlannerAlwaysFails);
 MONGO_FAIL_POINT_DEFINE(planFromCacheAlwaysFails);
 
@@ -176,11 +177,11 @@ size_t hashTaggedMatchExpression(MatchExpression* expr, const std::vector<IndexE
  * pattern (eg: {_id: 1}).
  */
 bool hintMatchesNameOrPattern(const BSONObj& hintObj,
-                              StringData indexName,
+                              std::string_view indexName,
                               BSONObj indexKeyPattern) {
 
     BSONElement firstHintElt = hintObj.firstElement();
-    if (firstHintElt.fieldNameStringData() == "$hint"_sd &&
+    if (firstHintElt.fieldNameStringData() == "$hint"sv &&
         firstHintElt.type() == BSONType::string) {
         // An index name is provided by the hint.
         return indexName == firstHintElt.valueStringData();
@@ -255,17 +256,17 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
     if (query.cqPipeline().empty()) {
         static const auto status =
             Status{ErrorCodes::InvalidOptions,
-                   "not building $search node because the query pipeline is empty"_sd};
+                   "not building $search node because the query pipeline is empty"sv};
         return status;
     }
 
     if (query.isSearchQuery()) {
         tassert(7816300,
-                "Pushing down $search into SBE but forceClassicEngine is on"_sd,
+                "Pushing down $search into SBE but forceClassicEngine is on"sv,
                 !query.getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled());
 
         tassert(7816301,
-                "Pushing down $search into SBE but featureFlagSearchInSbe is disabled."_sd,
+                "Pushing down $search into SBE but featureFlagSearchInSbe is disabled."sv,
                 feature_flags::gFeatureFlagSearchInSbe.isEnabled());
 
         // Build a SearchNode in order to retrieve the search info.
@@ -284,7 +285,7 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
 
     {
         static const auto status =
-            Status{ErrorCodes::InvalidOptions, "no search stage found at front of pipeline"_sd};
+            Status{ErrorCodes::InvalidOptions, "no search stage found at front of pipeline"sv};
         return status;
     }
 }

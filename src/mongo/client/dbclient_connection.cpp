@@ -77,6 +77,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -234,7 +235,7 @@ void DBClientConnection::setParentReplSetName(const string& replSetName) {
 }
 
 void DBClientConnection::handleNotPrimaryResponse(const BSONObj& replyBody,
-                                                  StringData errorMsgFieldName) {
+                                                  std::string_view errorMsgFieldName) {
     const BSONElement errorMsgElem = replyBody[errorMsgFieldName];
     const BSONElement codeElem = replyBody["code"];
 

@@ -41,6 +41,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -62,7 +63,7 @@ namespace mongo {
  */
 class TrialStage final : public PlanStage {
 public:
-    static constexpr StringData kStageType = "TRIAL"_sd;
+    static constexpr std::string_view kStageType = "TRIAL"_sd;
 
     /**
      * Constructor. Both 'trialPlan' and 'backupPlan' must be non-nullptr; 'maxTrialEWorks' must be

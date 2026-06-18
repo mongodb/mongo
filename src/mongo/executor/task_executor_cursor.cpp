@@ -30,7 +30,6 @@
 #include "mongo/executor/task_executor_cursor.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/query/getmore_command_gen.h"

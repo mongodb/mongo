@@ -33,6 +33,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace MONGO_MOD_PUBLIC auth {
 
@@ -60,13 +62,13 @@ enum class AuthMechanism {
 };
 
 /** Return the wire-protocol string for a mechanism (e.g. "SCRAM-SHA-256"). */
-StringData toString(AuthMechanism mechanism);
+std::string_view toString(AuthMechanism mechanism);
 
 /** Parse a wire-protocol string into an AuthMechanism, or return InvalidOptions. */
-StatusWith<AuthMechanism> authMechanismFromString(StringData s);
+StatusWith<AuthMechanism> authMechanismFromString(std::string_view s);
 
 /** Validate that a string names a supported mechanism; returns BadValue on failure. */
-Status validateAuthMechanism(StringData value);
+Status validateAuthMechanism(std::string_view value);
 
 }  // namespace MONGO_MOD_PUBLIC auth
 }  // namespace mongo

@@ -63,6 +63,7 @@
 #include <limits>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -72,9 +73,10 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 namespace mongo::index_key_validate {
+using namespace std::literals::string_view_literals;
 using IndexVersion = IndexDescriptor::IndexVersion;
 
-const std::map<StringData, std::set<IndexType>> kAllowedFieldNames = {
+const std::map<std::string_view, std::set<IndexType>> kAllowedFieldNames = {
     {IndexDescriptor::k2dIndexBitsFieldName, {IndexType::INDEX_2D}},
     {IndexDescriptor::k2dIndexMaxFieldName, {IndexType::INDEX_2D}},
     {IndexDescriptor::k2dIndexMinFieldName, {IndexType::INDEX_2D}},
@@ -109,9 +111,9 @@ const std::map<StringData, std::set<IndexType>> kAllowedFieldNames = {
     // TODO (SERVER-100328): remove after 9.0 is branched.
     // Field names are not validated to match index type. This was used for the removed
     // 'geoHaystack' index type, but users could have set it for other index types as well.
-    {"bucketSize"_sd, {}}};
+    {"bucketSize"sv, {}}};
 
-const std::map<StringData, std::set<IndexType>> kNonDeprecatedAllowedFieldNames = [] {
+const std::map<std::string_view, std::set<IndexType>> kNonDeprecatedAllowedFieldNames = [] {
     auto nonDeprecatedAllowedFieldNames = kAllowedFieldNames;
     for (const auto& name : kDeprecatedFieldNames) {
         nonDeprecatedAllowedFieldNames.erase(name);
@@ -129,7 +131,7 @@ MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 // validation for TTL index 'expireAfterSeconds' will be disabled in certain codepaths.
 MONGO_FAIL_POINT_DEFINE(skipTTLIndexExpireAfterSecondsValidation);
 
-const std::set<StringData> allowedIdIndexFieldNames = {
+const std::set<std::string_view> allowedIdIndexFieldNames = {
     IndexDescriptor::kCollationFieldName,
     IndexDescriptor::kIndexNameFieldName,
     IndexDescriptor::kIndexVersionFieldName,
@@ -139,7 +141,7 @@ const std::set<StringData> allowedIdIndexFieldNames = {
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     "_id"};
 
-const std::set<StringData> allowedClusteredIndexFieldNames = {
+const std::set<std::string_view> allowedClusteredIndexFieldNames = {
     ClusteredIndexSpec::kNameFieldName,
     ClusteredIndexSpec::kUniqueFieldName,
     ClusteredIndexSpec::kVFieldName,
@@ -167,13 +169,13 @@ Status isIndexVersionAllowedForCreation(IndexVersion indexVersion, const BSONObj
 BSONObj buildRepairedIndexSpec(
     const NamespaceString& ns,
     const BSONObj& indexSpec,
-    const std::map<StringData, std::set<IndexType>>& allowedFieldNames,
+    const std::map<std::string_view, std::set<IndexType>>& allowedFieldNames,
     std::function<void(const BSONElement&, BSONObjBuilder*)> indexSpecHandleFn) {
     const auto key = indexSpec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
     const auto indexName = IndexNames::nameToType(IndexNames::findPluginName(key));
     BSONObjBuilder builder;
     for (const auto& indexSpecElem : indexSpec) {
-        StringData fieldName = indexSpecElem.fieldNameStringData();
+        std::string_view fieldName = indexSpecElem.fieldNameStringData();
         auto it = allowedFieldNames.find(fieldName);
         if (it != allowedFieldNames.end() &&
             (it->second.empty() || it->second.count(indexName) != 0)) {
@@ -287,7 +289,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
         }
 
         for (size_t i = 0; i != numParts; ++i) {
-            const StringData part = keyField.getPart(i);
+            const std::string_view part = keyField.getPart(i);
 
             // Check if the index key path contains an empty field.
             if (part.empty()) {
@@ -326,10 +328,10 @@ BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec)
 
 BSONObj repairIndexSpec(const NamespaceString& ns,
                         const BSONObj& indexSpec,
-                        const std::map<StringData, std::set<IndexType>>& allowedFieldNames) {
+                        const std::map<std::string_view, std::set<IndexType>>& allowedFieldNames) {
     auto fixIndexSpecFn = [&indexSpec, &ns](const BSONElement& indexSpecElem,
                                             BSONObjBuilder* builder) {
-        StringData fieldName = indexSpecElem.fieldNameStringData();
+        std::string_view fieldName = indexSpecElem.fieldNameStringData();
         // The "background" field has been deprecated. Ignore its duplication here so it will be
         // repaired for new indexes in the future, and also be ignored while listing old indexes.
         if (IndexDescriptor::kBackgroundFieldName == fieldName && builder->hasField(fieldName)) {
@@ -394,7 +396,7 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
 StatusWith<BSONObj> validateIndexSpec(
     OperationContext* opCtx,
     const BSONObj& indexSpec,
-    const std::map<StringData, std::set<IndexType>>& allowedFieldNames,
+    const std::map<std::string_view, std::set<IndexType>>& allowedFieldNames,
     bool isUpgradeRepair) {
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
@@ -429,7 +431,7 @@ StatusWith<BSONObj> validateIndexSpec(
                             << "' must be an object, but got " << typeName(indexSpecElem.type())};
             }
             auto keyPattern = indexSpecElem.Obj();
-            std::vector<StringData> keys;
+            std::vector<std::string_view> keys;
             for (auto&& keyElem : keyPattern) {
                 auto keyElemFieldName = keyElem.fieldNameStringData();
                 if (std::find(keys.begin(), keys.end(), keyElemFieldName) != keys.end()) {
@@ -881,7 +883,8 @@ Status validateClusteredSpecFieldNames(const BSONObj& indexSpec) {
  * expected fields are present at creation time
  */
 Status validateIndexSpecFieldNames(
-    const BSONObj& indexSpec, const std::map<StringData, std::set<IndexType>>& allowedFieldNames) {
+    const BSONObj& indexSpec,
+    const std::map<std::string_view, std::set<IndexType>>& allowedFieldNames) {
     if (MONGO_unlikely(skipIndexCreateFieldNameValidation.shouldFail())) {
         return Status::OK();
     }
@@ -1126,7 +1129,7 @@ bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc) {
 
 BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj) {
     constexpr auto k_id_ = IndexConstants::kIdIndexName;
-    constexpr auto kStar = "*"_sd;
+    constexpr auto kStar = "*"sv;
 
     BSONObj parsedIndexSpec = indexSpecObj;
 

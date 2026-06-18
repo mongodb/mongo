@@ -46,6 +46,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -64,13 +65,14 @@ using ChangeStreamAddPostImageLiteParsed =
 class DocumentSourceChangeStreamAddPostImage final
     : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamAddPostImage"_sd;
-    static constexpr StringData kFullDocumentFieldName =
+    static constexpr std::string_view kStageName = "$_internalChangeStreamAddPostImage"_sd;
+    static constexpr std::string_view kFullDocumentFieldName =
         DocumentSourceChangeStream::kFullDocumentField;
-    static constexpr StringData kRawOplogUpdateSpecFieldName =
+    static constexpr std::string_view kRawOplogUpdateSpecFieldName =
         DocumentSourceChangeStream::kRawOplogUpdateSpecField;
-    static constexpr StringData kPreImageIdFieldName = DocumentSourceChangeStream::kPreImageIdField;
-    static constexpr StringData kFullDocumentBeforeChangeFieldName =
+    static constexpr std::string_view kPreImageIdFieldName =
+        DocumentSourceChangeStream::kPreImageIdField;
+    static constexpr std::string_view kFullDocumentBeforeChangeFieldName =
         DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
 
     /**
@@ -151,7 +153,7 @@ public:
     Value doSerialize(const query_shape::SerializationOptions& opts =
                           query_shape::SerializationOptions{}) const final;
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

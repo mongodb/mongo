@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/expression_test_feature_flags.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -39,13 +38,15 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 
 namespace mongo {
 
 using ExpressionTestFeatureFlagsTest = AggregationContextFixture;
 namespace {
-const std::vector<StringData> expressionNames = {ExpressionTestFeatureFlagLastLTS::kName,
-                                                 ExpressionTestFeatureFlagLatest::kName};
+const std::vector<std::string_view> expressionNames = {ExpressionTestFeatureFlagLastLTS::kName,
+                                                       ExpressionTestFeatureFlagLatest::kName};
 }
 
 TEST_F(ExpressionTestFeatureFlagsTest, LatestFCVParseAssertConstraints) {

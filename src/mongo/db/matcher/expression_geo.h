@@ -33,7 +33,6 @@
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +50,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 
 #include <s2cellid.h>
 
@@ -104,11 +104,11 @@ private:
 class GeoMatchExpression : public LeafMatchExpression {
 
 public:
-    GeoMatchExpression(boost::optional<StringData> path,
+    GeoMatchExpression(boost::optional<std::string_view> path,
                        const GeoExpression* query,
                        const BSONObj& rawObj,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
-    GeoMatchExpression(boost::optional<StringData> path,
+    GeoMatchExpression(boost::optional<std::string_view> path,
                        std::shared_ptr<const GeoExpression> query,
                        const BSONObj& rawObj,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
@@ -206,10 +206,10 @@ public:
 
 class GeoNearMatchExpression : public LeafMatchExpression {
 public:
-    GeoNearMatchExpression(boost::optional<StringData> path,
+    GeoNearMatchExpression(boost::optional<std::string_view> path,
                            const GeoNearExpression* query,
                            const BSONObj& rawObj);
-    GeoNearMatchExpression(boost::optional<StringData> path,
+    GeoNearMatchExpression(boost::optional<std::string_view> path,
                            std::shared_ptr<const GeoNearExpression> query,
                            const BSONObj& rawObj);
 
@@ -256,7 +256,7 @@ private:
  */
 class TwoDPtInAnnulusExpression : public LeafMatchExpression {
 public:
-    TwoDPtInAnnulusExpression(const R2Annulus& annulus, boost::optional<StringData> twoDPath)
+    TwoDPtInAnnulusExpression(const R2Annulus& annulus, boost::optional<std::string_view> twoDPath)
         : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS, twoDPath), _annulus(annulus) {}
 
     void serialize(BSONObjBuilder* out,

@@ -37,6 +37,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -66,13 +68,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
 
 boost::intrusive_ptr<DocumentSourceQueue> DocumentSourceQueue::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<StringData> stageNameOverride) {
+    boost::optional<std::string_view> stageNameOverride) {
     return new DocumentSourceQueue(std::deque<GetNextResult>{}, expCtx, stageNameOverride);
 }
 
 DocumentSourceQueue::DocumentSourceQueue(DocumentSourceQueue::DeferredQueue results,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         boost::optional<StringData> stageNameOverride,
+                                         boost::optional<std::string_view> stageNameOverride,
                                          boost::optional<Value> serializeOverride,
                                          boost::optional<StageConstraints> constraintsOverride)
     : DocumentSource(kStageName /* pass the real stage name here for execution stats */, expCtx),
@@ -81,7 +83,7 @@ DocumentSourceQueue::DocumentSourceQueue(DocumentSourceQueue::DeferredQueue resu
       _serializeOverride(std::move(serializeOverride)),
       _constraintsOverride(std::move(constraintsOverride)) {}
 
-StringData DocumentSourceQueue::getSourceName() const {
+std::string_view DocumentSourceQueue::getSourceName() const {
     return _stageNameOverride.value_or(kStageName);
 }
 

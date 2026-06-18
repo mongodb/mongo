@@ -32,7 +32,6 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>

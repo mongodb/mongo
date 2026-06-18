@@ -29,7 +29,6 @@
 
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -59,6 +58,7 @@
 
 #include <functional>
 #include <numeric>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -607,7 +607,7 @@ void TimeseriesTestFixture::_addNsToValidate(const NamespaceString& ns) {
     _collections.insert(ns);
 }
 
-long long TimeseriesTestFixture::_getExecutionStat(const UUID& uuid, StringData stat) {
+long long TimeseriesTestFixture::_getExecutionStat(const UUID& uuid, std::string_view stat) {
     BSONObjBuilder builder;
     appendExecutionStats(*_bucketCatalog, uuid, builder);
 

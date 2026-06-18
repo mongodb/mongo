@@ -32,6 +32,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalShredDocuments);
@@ -42,7 +44,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalShredDocuments);
  */
 class DocumentSourceInternalShredDocuments final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalShredDocuments"_sd;
+    static constexpr std::string_view kStageName = "$_internalShredDocuments"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -51,7 +53,7 @@ public:
 
     DocumentSourceInternalShredDocuments(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     }
 

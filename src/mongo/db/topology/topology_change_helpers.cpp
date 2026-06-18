@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -118,19 +117,22 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 MONGO_FAIL_POINT_DEFINE(hangAddShardBeforeUpdatingClusterCardinalityParameter);
 MONGO_FAIL_POINT_DEFINE(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard);
 MONGO_FAIL_POINT_DEFINE(hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer);
 
-constexpr StringData kNumDocsFieldName = "numDocs"_sd;
-constexpr StringData kNumBytesFieldName = "numBytes"_sd;
-constexpr StringData kAvgObjSizeFieldName = "avgObjSize"_sd;
-constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
+constexpr std::string_view kNumDocsFieldName = "numDocs"sv;
+constexpr std::string_view kNumBytesFieldName = "numBytes"sv;
+constexpr std::string_view kAvgObjSizeFieldName = "avgObjSize"sv;
+constexpr std::string_view kNumOrphanDocsFieldName = "numOrphanDocs"sv;
 
 const Seconds kRemoteCommandTimeout{60};
 
@@ -139,8 +141,8 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::kNoTimeout};
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
-constexpr StringData kAddOrRemoveShardInProgressRecoveryDocumentId =
-    "addOrRemoveShardInProgressRecovery"_sd;
+constexpr std::string_view kAddOrRemoveShardInProgressRecoveryDocumentId =
+    "addOrRemoveShardInProgressRecovery"sv;
 
 
 AggregateCommandRequest makeChunkCountAggregation(OperationContext* opCtx, const ShardId& shardId) {
@@ -748,10 +750,11 @@ void joinMigrations(OperationContext* opCtx) {
     uassert(8955101, "Failed to await ongoing migrations before removing catalog shard", result);
 }
 
-boost::optional<ShardType> getExistingShard(OperationContext* opCtx,
-                                            const ConnectionString& proposedShardConnectionString,
-                                            const boost::optional<StringData>& proposedShardName,
-                                            ShardingCatalogClient& localCatalogClient) {
+boost::optional<ShardType> getExistingShard(
+    OperationContext* opCtx,
+    const ConnectionString& proposedShardConnectionString,
+    const boost::optional<std::string_view>& proposedShardName,
+    ShardingCatalogClient& localCatalogClient) {
     // Check whether any host in the connection is already part of the cluster.
     const auto existingShards = [&] {
         try {
@@ -1288,7 +1291,7 @@ void getClusterTimeKeysFromReplicaSet(OperationContext* opCtx,
 std::string createShardName(OperationContext* opCtx,
                             RemoteCommandTargeter& targeter,
                             bool isConfigShard,
-                            const boost::optional<StringData>& proposedShardName,
+                            const boost::optional<std::string_view>& proposedShardName,
                             std::shared_ptr<executor::TaskExecutor> executor) {
     std::string selectedName;
 

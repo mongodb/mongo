@@ -40,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 /**
@@ -84,7 +85,7 @@ public:
     /**
      * Get the index descriptor for the provided 'index'. Asserts if index isn't found.
      */
-    const IndexCatalogEntry& getIndexEntry(const CollectionPtr& coll, StringData indexName);
+    const IndexCatalogEntry& getIndexEntry(const CollectionPtr& coll, std::string_view indexName);
 
     /**
      * A helper struct used to initialize the chunk map for the current test.

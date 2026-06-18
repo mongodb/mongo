@@ -29,7 +29,6 @@
 #include "mongo/client/sdam/server_description.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/sdam/sdam_test_base.h"

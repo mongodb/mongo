@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+
 #include <cstddef>
 #include <cstdint>
 
@@ -37,7 +39,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -75,6 +76,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -864,8 +866,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT IndexScanNode : public QuerySolutionNodeWithS
      * bounds in 'bounds' can contain strings.  This is the case if there are intervals containing
      * String, Object, or Array values.
      */
-    static std::set<StringData> getFieldsWithStringBounds(const IndexBounds& bounds,
-                                                          const BSONObj& indexKeyPattern);
+    static std::set<std::string_view> getFieldsWithStringBounds(const IndexBounds& bounds,
+                                                                const BSONObj& indexKeyPattern);
 
     void hash(absl::HashState h) const override {
         h = absl::HashState::combine(
@@ -895,7 +897,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT IndexScanNode : public QuerySolutionNodeWithS
     // empty if the index either is not multikey or does not have path-level multikeyness metadata.
     //
     // The correct set of paths is computed and stored here by computeProperties().
-    std::set<StringData> multikeyFields;
+    std::set<std::string_view> multikeyFields;
 
     /**
      * A vector of Interval Evaluation Trees (IETs) with the same ordering as the index key pattern.
@@ -1088,8 +1090,9 @@ struct ProjectionNode : public QuerySolutionNodeWithSortSet {
         // The important point here is that we are careful to construct plans where we fetch before
         // projecting if there is hashed data, collation keys, etc. So this situation does not
         // arise.
-        return proj.isFieldRetainedExactly(StringData{field}) ? FieldAvailability::kFullyProvided
-                                                              : FieldAvailability::kNotProvided;
+        return proj.isFieldRetainedExactly(std::string_view{field})
+            ? FieldAvailability::kFullyProvided
+            : FieldAvailability::kNotProvided;
     }
 
     bool sortedByDiskLoc() const override {
@@ -1108,7 +1111,7 @@ public:
     /**
      * Identify projectionImplementation type as a string.
      */
-    virtual StringData projectionImplementationTypeToString() const = 0;
+    virtual std::string_view projectionImplementationTypeToString() const = 0;
 
     // The full query tree. Needed when we have positional operators. Owned in the CanonicalQuery,
     // not here, so here this is a native pointer, not a std_unique, to avoid having to clone it.
@@ -1129,7 +1132,7 @@ struct ProjectionNodeDefault final : ProjectionNode {
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
-    StringData projectionImplementationTypeToString() const final {
+    std::string_view projectionImplementationTypeToString() const final {
         return "DEFAULT"_sd;
     }
 };
@@ -1151,7 +1154,7 @@ struct ProjectionNodeCovered final : ProjectionNode {
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
-    StringData projectionImplementationTypeToString() const final {
+    std::string_view projectionImplementationTypeToString() const final {
         return "COVERED_ONE_INDEX"_sd;
     }
 
@@ -1172,7 +1175,7 @@ struct ProjectionNodeSimple final : ProjectionNode {
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
-    StringData projectionImplementationTypeToString() const final {
+    std::string_view projectionImplementationTypeToString() const final {
         return "SIMPLE_DOC"_sd;
     }
 };
@@ -1265,7 +1268,7 @@ protected:
     void cloneSortData(SortNode* copy) const;
 
 private:
-    virtual StringData sortImplementationTypeToString() const = 0;
+    virtual std::string_view sortImplementationTypeToString() const = 0;
 
     static uint64_t _loadMaxMemoryUsageBytes();
 };
@@ -1282,7 +1285,7 @@ struct SortNodeDefault final : public SortNode {
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
-    StringData sortImplementationTypeToString() const override {
+    std::string_view sortImplementationTypeToString() const override {
         return "DEFAULT"_sd;
     }
 };
@@ -1302,7 +1305,7 @@ struct SortNodeSimple final : public SortNode {
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
-    StringData sortImplementationTypeToString() const override {
+    std::string_view sortImplementationTypeToString() const override {
         return "SIMPLE"_sd;
     }
 };
@@ -1803,7 +1806,7 @@ struct EqLookupNode : public QuerySolutionNode {
         kDynamicIndexedLoopJoin,
     };
 
-    static StringData serializeLookupStrategy(LookupStrategy strategy) {
+    static std::string_view serializeLookupStrategy(LookupStrategy strategy) {
         switch (strategy) {
             case EqLookupNode::LookupStrategy::kHashJoin:
                 return "HashJoin";

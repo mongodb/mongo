@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <string_view>
 
 #include <absl/numeric/int128.h>
 #include <boost/cstdint.hpp>
@@ -203,7 +204,7 @@ void Simple8bTypeUtil::decodeBinary(int128_t val, char* result, size_t size) {
     }
 }
 
-boost::optional<int128_t> Simple8bTypeUtil::encodeString(StringData str) {
+boost::optional<int128_t> Simple8bTypeUtil::encodeString(std::string_view str) {
     auto size = str.size();
     if (size > 16)
         return boost::none;

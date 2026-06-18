@@ -38,6 +38,7 @@
 #include <cstdint>
 #include <new>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -196,7 +197,7 @@ public:
      * This function parses out the selected setting from this file format.
      */
     static StatusWith<std::string> readTransparentHugePagesParameter(
-        StringData parameter, StringData directory = kTranparentHugepageDirectory);
+        std::string_view parameter, std::string_view directory = kTranparentHugepageDirectory);
 
     /**
      * Check whether the environment variable GLIBC_TUNABLES=glibc.pthread.rseq=0 is correctly set.

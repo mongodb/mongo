@@ -29,18 +29,20 @@
 
 #include "mongo/logv2/log_tag.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
+
 namespace mongo::logv2 {
+using namespace std::literals::string_view_literals;
 
 BSONArray LogTag::toBSONArray() {
     BSONArrayBuilder builder;
     if (_value & kStartupWarnings) {
-        builder.append("startupWarnings"_sd);
+        builder.append("startupWarnings"sv);
     }
     if (_value & kPlainShell) {
-        builder.append("plainShellOutput"_sd);
+        builder.append("plainShellOutput"sv);
     }
 
     return builder.arr();

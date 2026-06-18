@@ -48,6 +48,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/iterator/transform_iterator.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -139,7 +141,9 @@ public:
         return rs;
     }
 
-    Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, StringData indexName) {
+    Status dropIndexTable(OperationContext* opCtx,
+                          NamespaceString nss,
+                          std::string_view indexName) {
         RecordId catalogId =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)->getCatalogId();
         std::string indexIdent =
@@ -147,7 +151,7 @@ public:
         return dropIdent(*shard_role_details::getRecoveryUnit(opCtx), indexIdent, false);
     }
 
-    Status dropIdent(RecoveryUnit& ru, StringData ident, bool identHasSizeInfo) {
+    Status dropIdent(RecoveryUnit& ru, std::string_view ident, bool identHasSizeInfo) {
         return _storageEngine->getEngine()->dropIdent(ru, ident, identHasSizeInfo);
     }
 
@@ -189,12 +193,12 @@ public:
         });
     }
 
-    bool identExists(OperationContext* opCtx, StringData ident) {
+    bool identExists(OperationContext* opCtx, std::string_view ident) {
         auto idents = getAllKVEngineIdents(opCtx);
         return std::find(idents.begin(), idents.end(), ident) != idents.end();
     }
 
-    bool spillIdentExists(OperationContext* opCtx, StringData ident) {
+    bool spillIdentExists(OperationContext* opCtx, std::string_view ident) {
         auto idents = getAllSpillKVEngineIdents(opCtx);
         return std::find(idents.begin(), idents.end(), ident) != idents.end();
     }
@@ -202,7 +206,7 @@ public:
     /**
      * Create an index with a key of `{<key>: 1}` and a `name` of <key>.
      */
-    Status createIndex(OperationContext* opCtx, NamespaceString collNs, StringData key) {
+    Status createIndex(OperationContext* opCtx, NamespaceString collNs, std::string_view key) {
         auto buildUUID = UUID::gen();
         auto ret = startIndexBuild(opCtx, collNs, key, buildUUID);
         if (!ret.isOK()) {
@@ -215,7 +219,7 @@ public:
 
     Status startIndexBuild(OperationContext* opCtx,
                            NamespaceString collNs,
-                           StringData key,
+                           std::string_view key,
                            boost::optional<UUID> buildUUID) {
         BSONObjBuilder builder;
         BSONObj spec = BSON("v" << 2 << "key" << BSON(key << 1) << "name" << key);
@@ -227,7 +231,7 @@ public:
             opCtx, &descriptor, _storageEngine->generateNewIndexIdent(collNs.dbName()), buildUUID);
     }
 
-    void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, StringData key) {
+    void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string_view key) {
         CollectionWriter writer{opCtx, collNs};
         Collection* collection = writer.getWritableCollection(opCtx);
         auto writableEntry = collection->getIndexCatalog()->getWritableEntryByName(
@@ -238,7 +242,7 @@ public:
         collection->indexBuildSuccess(opCtx, writableEntry);
     }
 
-    Status removeEntry(OperationContext* opCtx, StringData collNs, MDBCatalog* catalog) {
+    Status removeEntry(OperationContext* opCtx, std::string_view collNs, MDBCatalog* catalog) {
         const Collection* collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
             opCtx, NamespaceString::createNamespaceString_forTest(collNs));
         return catalog->removeEntry(opCtx, collection->getCatalogId());

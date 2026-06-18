@@ -71,6 +71,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -83,6 +84,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 const std::set<std::string> kNoApiVersions = {};
 const std::set<std::string> kApiVersions1 = {"1"};
@@ -151,14 +153,14 @@ auto getCommandInvocationHooks =
 
 class CommandNameAtomRegistry {
 public:
-    size_t lookup(StringData s);
+    size_t lookup(std::string_view s);
 
 private:
     StringMap<size_t> _atoms;
     std::mutex _mutex;
 };
 
-size_t CommandNameAtomRegistry::lookup(StringData s) {
+size_t CommandNameAtomRegistry::lookup(std::string_view s) {
     std::lock_guard lock(_mutex);
 
     auto itr = _atoms.find(s);
@@ -282,14 +284,14 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
             }
         }
 
-        std::set<StringData> sensitiveFieldNames() const override {
+        std::set<std::string_view> sensitiveFieldNames() const override {
             if (_invocation) {
                 return _invocation->definition()->sensitiveFieldNames();
             }
             return {};
         }
 
-        StringData getName() const override {
+        std::string_view getName() const override {
             return _name;
         }
 
@@ -318,7 +320,7 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
     }
 }
 
-void CommandHelpers::uassertNoDocumentSequences(StringData commandName,
+void CommandHelpers::uassertNoDocumentSequences(std::string_view commandName,
                                                 const OpMsgRequest& request) {
     uassert(40472,
             str::stream() << "The " << commandName
@@ -561,7 +563,7 @@ bool CommandHelpers::uassertShouldAttemptParse(OperationContext* opCtx,
     }
 }
 
-void CommandHelpers::uassertCommandRunWithMajority(StringData commandName,
+void CommandHelpers::uassertCommandRunWithMajority(std::string_view commandName,
                                                    const WriteConcernOptions& writeConcern) {
     uassert(ErrorCodes::InvalidOptions,
             fmt::format("\"{}\" must be called with majority writeConcern, got: {} ",
@@ -571,7 +573,7 @@ void CommandHelpers::uassertCommandRunWithMajority(StringData commandName,
 }
 
 namespace {
-const CommandNameAtom countAtom("count"_sd);
+const CommandNameAtom countAtom("count"sv);
 }  // namespace
 
 void CommandHelpers::canUseTransactions(const std::vector<NamespaceString>& namespaces,
@@ -613,7 +615,7 @@ void CommandHelpers::canUseTransactions(const std::vector<NamespaceString>& name
     }
 }
 
-constexpr StringData CommandHelpers::kHelpFieldName;
+constexpr std::string_view CommandHelpers::kHelpFieldName;
 
 MONGO_FAIL_POINT_DEFINE(failCommand);
 MONGO_FAIL_POINT_DEFINE(waitInCommandMarkKillOnClientDisconnect);
@@ -644,7 +646,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
                                                         const NamespaceString& nss,
                                                         const Command* cmd,
                                                         Client* client) {
-    if (cmd->getName() == "configureFailPoint"_sd)  // Banned even if in failCommands.
+    if (cmd->getName() == "configureFailPoint"sv)  // Banned even if in failCommands.
         return false;
 
     if (!(data.hasField("failLocalClients") && data.getBoolField("failLocalClients")) &&
@@ -653,7 +655,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     }
 
     auto threadName = client->desc();
-    auto appName = StringData();
+    auto appName = std::string_view();
     if (auto clientMetadata = ClientMetadata::get(client)) {
         appName = clientMetadata->getApplicationName();
     }
@@ -676,7 +678,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     }
 
     if (data.hasField("namespace")) {
-        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
+        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "namespace"sv);
         if (nss != fpNss) {
             return false;
         }
@@ -1072,7 +1074,7 @@ private:
     const GenericArguments _genericArgs;
 };
 
-CommandNameAtom::CommandNameAtom(StringData s) {
+CommandNameAtom::CommandNameAtom(std::string_view s) {
     static StaticImmortal<CommandNameAtomRegistry> registry;
     _atom = registry->lookup(s);
 }
@@ -1100,7 +1102,7 @@ std::unique_ptr<CommandInvocation> BasicCommandWithReplyBuilderInterface::parse(
     return std::make_unique<Invocation>(opCtx, request, this);
 }
 
-Command::Command(StringData name, std::vector<StringData> aliases)
+Command::Command(std::string_view name, std::vector<std::string_view> aliases)
     : _name(std::string{name}), _aliases(std::move(aliases)) {}
 
 void Command::initializeClusterRole(ClusterRole role) {
@@ -1124,7 +1126,7 @@ const std::set<std::string>& Command::deprecatedApiVersions() const {
     return kNoApiVersions;
 }
 
-bool Command::hasAlias(StringData alias) const {
+bool Command::hasAlias(std::string_view alias) const {
     return getName() == alias ||
         std::find(_aliases.begin(), _aliases.end(), alias) != _aliases.end();
 }
@@ -1217,8 +1219,8 @@ const Service::ConstructorActionRegisterer prewarmCommandRegistryMetrics{
 }  // namespace
 
 void CommandRegistry::registerCommand(Command* command) {
-    StringData name = command->getName();
-    std::vector<StringData> aliases = command->getAliases();
+    std::string_view name = command->getName();
+    std::vector<std::string_view> aliases = command->getAliases();
     auto ep = std::make_unique<Entry>();
     ep->command = command;
     auto [cIt, cOk] = _commands.emplace(command, std::move(ep));
@@ -1227,7 +1229,7 @@ void CommandRegistry::registerCommand(Command* command) {
     // When a `Command*` is introduced to `_commands`, its names are introduced
     // to `_commandNames`.
     aliases.push_back(name);
-    for (StringData key : aliases) {
+    for (std::string_view key : aliases) {
         if (key.empty())
             continue;
         auto [nIt, nOk] = _commandNames.try_emplace(key, command);
@@ -1235,7 +1237,7 @@ void CommandRegistry::registerCommand(Command* command) {
     }
 }
 
-Command* CommandRegistry::findCommand(StringData name) const {
+Command* CommandRegistry::findCommand(std::string_view name) const {
     auto it = _commandNames.find(name);
     if (it == _commandNames.end()) {
         LOGV2_DEBUG(

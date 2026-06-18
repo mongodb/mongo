@@ -29,10 +29,10 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
@@ -70,19 +70,19 @@ public:
      * returns NULL if the symbol does not exist with Status::OK,
      * otherwise returns an error if the underlying OS infrastructure returns an error.
      */
-    StatusWith<void*> getSymbol(StringData name);
+    StatusWith<void*> getSymbol(std::string_view name);
 
     /**
      * A generic function version of getSymbol, see notes in getSymbol for more information
      * Callers should use getFunctionAs.
      */
-    StatusWith<void (*)()> getFunction(StringData name);
+    StatusWith<void (*)()> getFunction(std::string_view name);
 
     /**
      * A type-safe version of getFunction, see notes in getSymbol for more information
      */
     template <typename FuncT>
-    StatusWith<FuncT> getFunctionAs(StringData name) {
+    StatusWith<FuncT> getFunctionAs(std::string_view name) {
         StatusWith<void (*)()> s = getFunction(name);
 
         if (!s.isOK()) {

@@ -31,7 +31,6 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -49,13 +49,14 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-static const StringDataSet kValidMetaSorts{"textScore"_sd,
-                                           "randVal"_sd,
-                                           "geoNearDistance"_sd,
-                                           "searchScore"_sd,
-                                           "vectorSearchScore"_sd,
-                                           "score"_sd};
+static const StringDataSet kValidMetaSorts{"textScore"sv,
+                                           "randVal"sv,
+                                           "geoNearDistance"sv,
+                                           "searchScore"sv,
+                                           "vectorSearchScore"sv,
+                                           "score"sv};
 
 boost::intrusive_ptr<ExpressionMeta> parseMetaExpression(
     const BSONObj& metaDoc, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -72,8 +73,7 @@ boost::intrusive_ptr<ExpressionMeta> parseMetaExpression(
 
     const auto metaName = metaElem.valueStringDataSafe();
 
-    if (metaName == "searchScore"_sd || metaName == "vectorSearchScore"_sd ||
-        metaName == "score"_sd) {
+    if (metaName == "searchScore"sv || metaName == "vectorSearchScore"sv || metaName == "score"sv) {
         if (!bypassRankFusionFCVGate) {
             expCtx->ignoreFeatureInParserOrRejectAndThrow(
                 "Sorting by searchScore, vectorSearchScore, or score",

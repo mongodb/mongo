@@ -43,6 +43,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -76,9 +77,9 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(StreamingGroup);
  */
 class DocumentSourceStreamingGroup final : public DocumentSourceGroupBase {
 public:
-    static constexpr StringData kStageName = "$_internalStreamingGroup"_sd;
+    static constexpr std::string_view kStageName{"$_internalStreamingGroup"};
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 
@@ -110,16 +111,15 @@ public:
         boost::optional<int64_t> maxMemoryUsageBytes);
 
 protected:
-    bool isSpecFieldReserved(StringData fieldName) final;
+    bool isSpecFieldReserved(std::string_view fieldName) final;
     void serializeAdditionalFields(MutableDocument& out,
-                                   const query_shape::SerializationOptions& opts =
-                                       query_shape::SerializationOptions{}) const final;
+                                   const query_shape::SerializationOptions& opts = {}) const final;
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceStreamingGroupToStageFn(
         const boost::intrusive_ptr<DocumentSource>& documentSource);
 
-    static constexpr StringData kMonotonicIdFieldsSpecField = "$monotonicIdFields"_sd;
+    static constexpr std::string_view kMonotonicIdFieldsSpecField{"$monotonicIdFields"};
 
     explicit DocumentSourceStreamingGroup(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

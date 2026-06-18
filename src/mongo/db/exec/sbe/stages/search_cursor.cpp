@@ -29,16 +29,18 @@
 
 #include "mongo/db/exec/sbe/stages/search_cursor.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 std::unique_ptr<SearchCursorStage> SearchCursorStage::createForStoredSource(
     NamespaceString nss,
@@ -147,7 +149,7 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
                                      boost::optional<value::SlotId> collatorSlot,
                                      PlanYieldPolicySBE* yieldPolicy,
                                      PlanNodeId planNodeId)
-    : PlanStage("search_cursor"_sd, yieldPolicy, planNodeId, false),
+    : PlanStage("search_cursor"sv, yieldPolicy, planNodeId, false),
       _namespace(nss),
       _collUuid(collUuid),
       _idSlot(idSlot),

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -51,6 +50,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -73,11 +73,11 @@ public:
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         std::unique_ptr<TransformerInterface> parsedTransform,
-        StringData name,
+        std::string_view name,
         bool independentOfAnyCollection);
 
     // virtuals from DocumentSource
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 
@@ -132,9 +132,10 @@ public:
      * The function has no effect for exclusion projections, or if there are no computed
      * projections, or the computed expression depends on other fields than the oldName.
      */
-    std::pair<BSONObj, bool> extractComputedProjections(StringData oldName,
-                                                        StringData newName,
-                                                        const std::set<StringData>& reservedNames) {
+    std::pair<BSONObj, bool> extractComputedProjections(
+        std::string_view oldName,
+        std::string_view newName,
+        const std::set<std::string_view>& reservedNames) {
         return _transformationProcessor->getTransformer().extractComputedProjections(
             oldName, newName, reservedNames);
     }
@@ -145,8 +146,8 @@ public:
      * entire project is extracted. In the extracted $project, 'oldName' is renamed to 'newName'.
      * 'oldName' should not be dotted.
      */
-    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName,
-                                                            StringData newName) {
+    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(std::string_view oldName,
+                                                            std::string_view newName) {
         return _transformationProcessor->getTransformer().extractProjectOnFieldAndRename(oldName,
                                                                                          newName);
     }

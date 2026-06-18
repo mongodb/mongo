@@ -36,12 +36,13 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder {
-const StringData kAccumulatorCountName = "$count"_sd;
+const std::string_view kAccumulatorCountName = "$count"_sd;
 
 class PlanStageSlots;
 
@@ -73,11 +74,11 @@ class AccumOp {
 public:
     AccumOp(std::string opName);
 
-    AccumOp(StringData opName) : AccumOp(std::string{opName}) {}
+    AccumOp(std::string_view opName) : AccumOp(std::string{opName}) {}
 
     AccumOp(const AccumulationStatement& acc);
 
-    StringData getOpName() const {
+    std::string_view getOpName() const {
         return _opName;
     }
 

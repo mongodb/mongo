@@ -31,6 +31,7 @@
 
 #include <fstream>
 #include <ios>
+#include <string_view>
 
 #include <boost/filesystem.hpp>
 #include <fmt/format.h>
@@ -62,18 +63,19 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 
 #ifdef __linux__
 #if MONGO_CONFIG_TCMALLOC_GOOGLE
 constexpr bool kUsingGoogleTCMallocAllocator = true;
-auto kAllocatorName = "tcmalloc-google"_sd;
+auto kAllocatorName = "tcmalloc-google"sv;
 #elif MONGO_CONFIG_TCMALLOC_GPERF
 constexpr bool kUsingGoogleTCMallocAllocator = false;
-auto kAllocatorName = "tcmalloc-gperftools"_sd;
+auto kAllocatorName = "tcmalloc-gperftools"sv;
 #else
 constexpr bool kUsingGoogleTCMallocAllocator = false;
-auto kAllocatorName = "system"_sd;
+auto kAllocatorName = "system"sv;
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 
 #endif  // __linux__
@@ -145,9 +147,9 @@ void logNonWinMongodWarnings(const StorageGlobalParams& storageParams,
 #ifdef __linux__
 
 bool isSwapTotalNonZeroInProcMemInfo() {
-    const auto memInfoPath = "/proc/meminfo"_sd;
+    const auto memInfoPath = "/proc/meminfo"sv;
     BSONObjBuilder b;
-    uassertStatusOK(procparser::parseProcMemInfoFile(memInfoPath, {"SwapTotal"_sd}, &b));
+    uassertStatusOK(procparser::parseProcMemInfoFile(memInfoPath, {"SwapTotal"sv}, &b));
     BSONObj obj = b.done();
     uassert(ErrorCodes::FailedToParse,
             "SwapTotal not found in /proc/meminfo",
@@ -219,13 +221,13 @@ void checkMultipleNumaNodes() {
     }
 }
 
-std::string thpParameterPath(StringData parameter) {
+std::string thpParameterPath(std::string_view parameter) {
     return fmt::format("{}/{}", ProcessInfo::kTranparentHugepageDirectory, parameter);
 }
 
-void logIncorrectAllocatorSettings(StringData path,
-                                   StringData desiredValue,
-                                   StringData currentValue) {
+void logIncorrectAllocatorSettings(std::string_view path,
+                                   std::string_view desiredValue,
+                                   std::string_view currentValue) {
     LOGV2_WARNING_OPTIONS(
         9068900,
         {logv2::LogTag::kStartupWarnings},

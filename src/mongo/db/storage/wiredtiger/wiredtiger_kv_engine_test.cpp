@@ -28,6 +28,7 @@
  */
 
 #include <ostream>
+#include <string_view>
 #include <utility>
 
 #include <boost/filesystem/fstream.hpp>
@@ -421,7 +422,7 @@ TEST_F(WiredTigerKVEngineTest, SizeStorerFlushesAfterSyncPeriodElapses) {
 
     // A fresh size storer reads persisted fast counts directly from the size storer table,
     // bypassing the engine's in-memory buffer.
-    const StringData uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+    const std::string_view uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
     WiredTigerSizeStorer reader(&engine->getConnection(),
                                 WiredTigerUtil::buildTableUri(ident::kSizeStorer));
     WiredTigerSession session(&engine->getConnection());
@@ -1114,7 +1115,7 @@ public:
 
 protected:
     // Creates the given ident, returning the path to it.
-    StatusWith<boost::filesystem::path> createIdent(StringData ns, StringData ident) {
+    StatusWith<boost::filesystem::path> createIdent(std::string_view ns, std::string_view ident) {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         RecordStore::Options options;
         auto& provider =
@@ -1133,7 +1134,7 @@ protected:
         return *path;
     }
 
-    Status removeIdent(StringData ident) {
+    Status removeIdent(std::string_view ident) {
         return _helper->getWiredTigerKVEngine()->dropIdent(
             *shard_role_details::getRecoveryUnit(_opCtx.get()), ident, /*identHasSizeInfo=*/true);
     }

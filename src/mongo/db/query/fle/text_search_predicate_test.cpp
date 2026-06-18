@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/fle/text_search_predicate.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,9 +48,13 @@
 #include <initializer_list>
 #include <map>
 #include <set>
+#include <string_view>
 #include <variant>
 
+using namespace std::literals::string_view_literals;
 
+
+using namespace std::literals::string_view_literals;
 namespace mongo::fle {
 namespace {
 class MockTextSearchPredicate : public TextSearchPredicate {
@@ -60,10 +63,10 @@ public:
         : TextSearchPredicate(rewriter) {}
     MockTextSearchPredicate(const QueryRewriterInterface* rewriter,
                             StrTagMap tags,
-                            std::set<StringData> encryptedFields)
+                            std::set<std::string_view> encryptedFields)
         : TextSearchPredicate(rewriter) {}
 
-    void setEncryptedTags(StringData payload, std::vector<PrfBlock> tags) {
+    void setEncryptedTags(std::string_view payload, std::vector<PrfBlock> tags) {
         _exprTags[payload] = tags;
     }
 
@@ -98,7 +101,7 @@ protected:
 private:
     // Key the tags for agg expressions based on values only, since we don't have access to the
     // field name.
-    std::map<StringData, std::vector<PrfBlock>> _exprTags;
+    std::map<std::string_view, std::vector<PrfBlock>> _exprTags;
 };
 
 class TextSearchPredicateRewriteTest : public EncryptedPredicateRewriteTest {
@@ -115,7 +118,7 @@ public:
         : TextSearchPredicate(rewriter) {}
     MockTextSearchPredicateWithFFP(const QueryRewriterInterface* rewriter,
                                    StrTagMap tags,
-                                   std::set<StringData> encryptedFields)
+                                   std::set<std::string_view> encryptedFields)
         : TextSearchPredicate(rewriter) {}
 
     void setEncryptedTags(Value payload, std::vector<PrfBlock> tags) {
@@ -186,7 +189,7 @@ enum class EncryptionPlaceholderContext {
     kTextNormalizedComparison,
 };
 
-BSONObj generateFFP(StringData path, Value value, EncryptionPlaceholderContext context) {
+BSONObj generateFFP(std::string_view path, Value value, EncryptionPlaceholderContext context) {
     auto indexKey = getIndexKey();
     FLEIndexKeyAndId indexKeyAndId(indexKey.data, indexKeyId);
     auto userKey = getUserKey();
@@ -297,7 +300,7 @@ BSONObj generateFFP(StringData path, Value value, EncryptionPlaceholderContext c
 
 template <typename T>
 std::unique_ptr<Expression> makeEncStrStartsWith(ExpressionContext* const expCtx,
-                                                 StringData path,
+                                                 std::string_view path,
                                                  T value) {
     // A BSONObj corresponds to using an actual FindTextPayload, while a Value is used otherwise.
     static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
@@ -318,7 +321,7 @@ std::unique_ptr<Expression> makeEncStrStartsWith(ExpressionContext* const expCtx
 
 template <typename T>
 std::unique_ptr<Expression> makeEncStrEndsWith(ExpressionContext* const expCtx,
-                                               StringData path,
+                                               std::string_view path,
                                                T value) {
     // A BSONObj corresponds to using an actual FindTextPayload, while a Value is used otherwise.
     static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
@@ -339,7 +342,7 @@ std::unique_ptr<Expression> makeEncStrEndsWith(ExpressionContext* const expCtx,
 
 template <typename T>
 std::unique_ptr<Expression> makeEncStrContains(ExpressionContext* const expCtx,
-                                               StringData path,
+                                               std::string_view path,
                                                T value) {
     // A BSONObj corresponds to using an actual FindTextPayload, while a Value is used otherwise.
     static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
@@ -360,7 +363,7 @@ std::unique_ptr<Expression> makeEncStrContains(ExpressionContext* const expCtx,
 
 template <typename T>
 std::unique_ptr<Expression> makeEncStrNormalizedEq(ExpressionContext* const expCtx,
-                                                   StringData path,
+                                                   std::string_view path,
                                                    T value) {
     // A BSONObj corresponds to using an actual FindTextPayload, while a Value is used otherwise.
     static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
@@ -382,8 +385,8 @@ std::unique_ptr<Expression> makeEncStrNormalizedEq(ExpressionContext* const expC
 template <typename T>
 void runEncStrStartsWithTest(T& predicate,
                              ExpressionContext* const expCtx,
-                             StringData fieldName,
-                             StringData valueSD,
+                             std::string_view fieldName,
+                             std::string_view valueSD,
                              std::vector<PrfBlock> tags,
                              BSONObj expectedResult) {
     static_assert(std::is_same_v<T, MockTextSearchPredicate> ||
@@ -410,8 +413,8 @@ void runEncStrStartsWithTest(T& predicate,
 template <typename T>
 void runEncStrEndsWithTest(T& predicate,
                            ExpressionContext* const expCtx,
-                           StringData fieldName,
-                           StringData valueSD,
+                           std::string_view fieldName,
+                           std::string_view valueSD,
                            std::vector<PrfBlock> tags,
                            BSONObj expectedResult) {
     static_assert(std::is_same_v<T, MockTextSearchPredicate> ||
@@ -438,8 +441,8 @@ void runEncStrEndsWithTest(T& predicate,
 template <typename T>
 void runEncStrContainsTest(T& predicate,
                            ExpressionContext* const expCtx,
-                           StringData valueSD,
-                           StringData fieldName,
+                           std::string_view valueSD,
+                           std::string_view fieldName,
                            std::vector<PrfBlock> tags,
                            BSONObj expectedResult) {
     static_assert(std::is_same_v<T, MockTextSearchPredicate> ||
@@ -466,8 +469,8 @@ void runEncStrContainsTest(T& predicate,
 template <typename T>
 void runEncStrNormalizedEqTest(T& predicate,
                                ExpressionContext* const expCtx,
-                               StringData valueSD,
-                               StringData fieldName,
+                               std::string_view valueSD,
+                               std::string_view fieldName,
                                std::vector<PrfBlock> tags,
                                BSONObj expectedResult) {
     static_assert(std::is_same_v<T, MockTextSearchPredicate> ||
@@ -493,7 +496,7 @@ void runEncStrNormalizedEqTest(T& predicate,
 
 TEST_F(TextSearchPredicateRewriteTest, Enc_Starts_With_NoFFP_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrStartsWith(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
+        makeEncStrStartsWith(_mock.getExpressionContext(), "ssn"sv, Value("5"sv));
     ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
 }
 
@@ -519,7 +522,7 @@ TEST_F(TextSearchPredicateRewriteTest, Enc_Starts_With_Expr) {
             ]
 })");
     runEncStrStartsWithTest(
-        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+        _predicate, _mock.getExpressionContext(), "ssn"sv, "hello"sv, {{1}, {2}}, expectedResult);
 }
 
 // Testing the same scenario again with an actual payload.
@@ -545,12 +548,12 @@ TEST_F(TextSearchPredicateRewriteTestWithFFP, Enc_Starts_With_FFP_Expr) {
             ]
 })");
     runEncStrStartsWithTest(
-        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+        _predicate, _mock.getExpressionContext(), "ssn"sv, "hello"sv, {{1}, {2}}, expectedResult);
 }
 
 TEST_F(TextSearchPredicateRewriteTest, Enc_Str_Ends_With_NoFFP_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrEndsWith(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
+        makeEncStrEndsWith(_mock.getExpressionContext(), "ssn"sv, Value("5"sv));
     ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
 }
 
@@ -576,7 +579,7 @@ TEST_F(TextSearchPredicateRewriteTest, Enc_Str_Ends_With_Expr) {
         ]
 })");
     runEncStrEndsWithTest(
-        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+        _predicate, _mock.getExpressionContext(), "ssn"sv, "hello"sv, {{1}, {2}}, expectedResult);
 }
 
 // Tests same as above with an actual FindTextPayload.
@@ -602,12 +605,12 @@ TEST_F(TextSearchPredicateRewriteTestWithFFP, Enc_Str_Ends_With_Expr) {
         ]
 })");
     runEncStrEndsWithTest(
-        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+        _predicate, _mock.getExpressionContext(), "ssn"sv, "hello"sv, {{1}, {2}}, expectedResult);
 }
 
 TEST_F(TextSearchPredicateRewriteTest, Enc_Str_Contains_NoFFP_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrContains(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
+        makeEncStrContains(_mock.getExpressionContext(), "ssn"sv, Value("5"sv));
     ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
 }
 
@@ -633,7 +636,7 @@ TEST_F(TextSearchPredicateRewriteTest, Enc_Str_Contains_Expr) {
         ]
 })");
     runEncStrContainsTest(
-        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+        _predicate, _mock.getExpressionContext(), "ssn"sv, "hello"sv, {{1}, {2}}, expectedResult);
 }
 
 // Tests same as above with an actual FindTextPayload.
@@ -659,12 +662,12 @@ TEST_F(TextSearchPredicateRewriteTestWithFFP, Enc_Str_Contains_Expr) {
         ]
 })");
     runEncStrContainsTest(
-        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+        _predicate, _mock.getExpressionContext(), "ssn"sv, "hello"sv, {{1}, {2}}, expectedResult);
 }
 
 TEST_F(TextSearchPredicateRewriteTest, Enc_Str_NormalizedEq_NoFFP_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrNormalizedEq(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
+        makeEncStrNormalizedEq(_mock.getExpressionContext(), "ssn"sv, Value("5"sv));
     ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
 }
 
@@ -690,7 +693,7 @@ TEST_F(TextSearchPredicateRewriteTest, Enc_Str_NormalizedEq_Expr) {
         ]
 })");
     runEncStrNormalizedEqTest(
-        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+        _predicate, _mock.getExpressionContext(), "ssn"sv, "hello"sv, {{1}, {2}}, expectedResult);
 }
 
 // Tests same as above with an actual FindTextPayload.
@@ -716,7 +719,7 @@ TEST_F(TextSearchPredicateRewriteTestWithFFP, Enc_Str_NormalizedEq_Expr) {
         ]
 })");
     runEncStrNormalizedEqTest(
-        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+        _predicate, _mock.getExpressionContext(), "ssn"sv, "hello"sv, {{1}, {2}}, expectedResult);
 }
 
 class TextSearchPredicateCollScanRewriteTest : public EncryptedPredicateRewriteTest {
@@ -731,7 +734,7 @@ protected:
 
 TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Starts_With_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrStartsWith(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
+        makeEncStrStartsWith(_mock.getExpressionContext(), "ssn"sv, Value("hello"sv));
 
     // Serialize the expression before any rewrites occur to validate later.
     auto expressionPreRewrite = input->serialize().getDocument().toBson();
@@ -751,7 +754,7 @@ TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Starts_With_Expr) {
 
 TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Ends_With_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrEndsWith(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
+        makeEncStrEndsWith(_mock.getExpressionContext(), "ssn"sv, Value("hello"sv));
 
     // Serialize the expression before any rewrites occur to validate later.
     auto expressionPreRewrite = input->serialize().getDocument().toBson();
@@ -771,7 +774,7 @@ TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Ends_With_Expr) {
 
 TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Contains_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrContains(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
+        makeEncStrContains(_mock.getExpressionContext(), "ssn"sv, Value("hello"sv));
 
     // Serialize the expression before any rewrites occur to validate later.
     auto expressionPreRewrite = input->serialize().getDocument().toBson();
@@ -791,7 +794,7 @@ TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Contains_Expr) {
 
 TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_NormalizedEq_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrNormalizedEq(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
+        makeEncStrNormalizedEq(_mock.getExpressionContext(), "ssn"sv, Value("hello"sv));
 
     // Serialize the expression before any rewrites occur to validate later.
     auto expressionPreRewrite = input->serialize().getDocument().toBson();

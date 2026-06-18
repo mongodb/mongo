@@ -60,6 +60,7 @@
 
 #include <functional>
 #include <mutex>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -190,7 +191,7 @@ void PrimaryOnlyServiceRegistry::registerService(std::unique_ptr<PrimaryOnlyServ
         5123008, "Successfully registered PrimaryOnlyService", "service"_attr = name, logAttrs(ns));
 }
 
-PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupServiceByName(StringData serviceName) {
+PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupServiceByName(std::string_view serviceName) {
     auto it = _servicesByName.find(serviceName);
     invariant(it != _servicesByName.end());
     auto servicePtr = it->second.get();
@@ -873,7 +874,7 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInst
     return it->second.getInstance();
 }
 
-StringData PrimaryOnlyService::_getStateString(WithLock) const {
+std::string_view PrimaryOnlyService::_getStateString(WithLock) const {
     switch (_state) {
         case State::kRunning:
             return "running";

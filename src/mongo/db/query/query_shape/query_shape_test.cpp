@@ -51,6 +51,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -537,7 +538,7 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
 TEST(QueryShapeIDL, ShapifyIDLStruct) {
     query_shape::SerializationOptions options;
     options.transformIdentifiers = true;
-    options.transformIdentifiersCallback = [](StringData s) -> std::string {
+    options.transformIdentifiersCallback = [](std::string_view s) -> std::string {
         return str::stream() << "HASH<" << s << ">";
     };
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;

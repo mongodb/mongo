@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -52,6 +51,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -94,7 +94,7 @@ boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
                                           SampledCommandNameEnum cmdName);
 boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          StringData cmdName);
+                                          std::string_view cmdName);
 
 /**
  * Similar to 'tryGenerateSampleId()' but assigns the sample id to a random shard out of the given
@@ -107,7 +107,7 @@ boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* 
 
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
                                                               const NamespaceString& nss,
-                                                              StringData cmdName,
+                                                              std::string_view cmdName,
                                                               const std::set<ShardId>& shardIds);
 
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(

@@ -47,6 +47,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional/optional.hpp>
@@ -68,7 +69,7 @@ public:
      * The name of an internal variable to bind a projection post image to, which is used by the
      * '_rootReplacementExpression' to replace the content of the transformed document.
      */
-    static constexpr StringData kProjectionPostImageVarName{"INTERNAL_PROJ_POST_IMAGE"_sd};
+    static constexpr std::string_view kProjectionPostImageVarName{"INTERNAL_PROJ_POST_IMAGE"_sd};
 
     /**
      * Optimize any expressions contained within this projection.

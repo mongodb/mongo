@@ -35,6 +35,8 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::query_shape {
 
 namespace {
@@ -42,7 +44,7 @@ namespace {
  * TODO this was stolen from another test. Time for a library?
  * Simplistic redaction strategy for testing which appends the field name to the prefix "REDACT_".
  */
-std::string applyHmacForTest(StringData sd) {
+std::string applyHmacForTest(std::string_view sd) {
     return "REDACT_" + std::string{sd};
 }
 
@@ -66,7 +68,7 @@ public:
         _expCtx = make_intrusive<ExpressionContextForTest>();
     }
 
-    std::unique_ptr<FindCmdShape> makeShapeFromSort(StringData sortJson) {
+    std::unique_ptr<FindCmdShape> makeShapeFromSort(std::string_view sortJson) {
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setSort(fromjson(sortJson));
         auto&& parsedRequest =
@@ -78,7 +80,7 @@ public:
         return static_cast<const FindCmdShapeComponents&>(shape.specificComponents());
     }
 
-    BSONObj sortShape(StringData sortJson) {
+    BSONObj sortShape(std::string_view sortJson) {
         auto shape = makeShapeFromSort(sortJson);
         return getShapeComponents(*shape).sort;
     }
@@ -87,7 +89,7 @@ public:
      * Returns the shape of the input sort, or boost::none if the input shape was a natural sort
      * which got converted into a hint.
      */
-    boost::optional<BSONObj> maybeRedactedSortShape(StringData sortJson) {
+    boost::optional<BSONObj> maybeRedactedSortShape(std::string_view sortJson) {
         auto shape = makeShapeFromSort(sortJson);
         query_shape::SerializationOptions opts =
             query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions;
@@ -101,7 +103,7 @@ public:
         return boost::none;
     }
 
-    BSONObj redactedSortShape(StringData sortJson) {
+    BSONObj redactedSortShape(std::string_view sortJson) {
         return *maybeRedactedSortShape(sortJson);
     }
 

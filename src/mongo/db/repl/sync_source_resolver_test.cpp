@@ -29,7 +29,6 @@
 
 #include "mongo/db/repl/sync_source_resolver.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -57,6 +56,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -65,6 +65,7 @@
 
 namespace mongo::repl {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
 public:
@@ -281,7 +282,7 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
     ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.dbName(), request.dbname);
     ASSERT_EQUALS(Milliseconds(syncSourceResolverFindFetcherTimeoutMillis.load()), request.timeout);
     auto firstElement = request.cmdObj.firstElement();
-    ASSERT_EQUALS("find"_sd, firstElement.fieldNameStringData());
+    ASSERT_EQUALS("find"sv, firstElement.fieldNameStringData());
     ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.coll(), firstElement.String());
     ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
     ASSERT_BSONOBJ_EQ(BSON("$natural" << 1), request.cmdObj.getObjectField("sort"));

@@ -37,6 +37,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -625,7 +626,7 @@ BSONObj makeStatistics(double documents,
     return builder.obj();
 }
 
-BSONObj makeStatsPath(StringData path,
+BSONObj makeStatsPath(std::string_view path,
                       double documents,
                       double sampleRate,
                       const std::shared_ptr<const CEHistogram> ceHistogram) {

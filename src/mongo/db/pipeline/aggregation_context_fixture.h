@@ -48,6 +48,8 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 enum class Tracking { forwards, backwards };
@@ -111,7 +113,7 @@ public:
         options.verbosity = verbosity;
         if (performRedaction) {
             options.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
-            options.transformIdentifiersCallback = [](StringData s) -> std::string {
+            options.transformIdentifiersCallback = [](std::string_view s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
             };
             options.transformIdentifiers = true;
@@ -127,7 +129,7 @@ public:
         query_shape::SerializationOptions options;
         if (performRedaction) {
             options.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
-            options.transformIdentifiersCallback = [](StringData s) -> std::string {
+            options.transformIdentifiersCallback = [](std::string_view s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
             };
             options.transformIdentifiers = true;

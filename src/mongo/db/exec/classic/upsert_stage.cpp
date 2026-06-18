@@ -30,7 +30,6 @@
 #include "mongo/db/exec/classic/upsert_stage.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop_failpoint_helpers.h"

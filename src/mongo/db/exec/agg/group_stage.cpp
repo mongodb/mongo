@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_group.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceGroupToStageFn(
@@ -49,7 +51,7 @@ namespace agg {
 
 REGISTER_AGG_STAGE_MAPPING(group, DocumentSourceGroup::id, documentSourceGroupToStageFn)
 
-GroupStage::GroupStage(StringData stageName,
+GroupStage::GroupStage(std::string_view stageName,
                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                        const std::shared_ptr<GroupProcessor>& groupProcessor)
     : GroupBaseStage(stageName, pExpCtx, groupProcessor), _groupsReady(false) {};

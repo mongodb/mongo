@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/basic_types_gen.h"
@@ -39,6 +38,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -80,11 +80,11 @@ public:
         /**
          * Returns the underlying byte array represented by this ComparisonKey.
          *
-         * The returned StringData may not outlive the ComparisonKey used to create it, since the
-         * ComparisonKey owns the underlying byte array.
+         * The returned std::string_view may not outlive the ComparisonKey used to create it, since
+         * the ComparisonKey owns the underlying byte array.
          */
-        StringData getKeyData() const {
-            return StringData(_key);
+        std::string_view getKeyData() const {
+            return std::string_view(_key);
         }
 
     private:
@@ -110,25 +110,25 @@ public:
      * 0 if 'left' is greater than 'right' w.r.t. the collation, and 0 if 'left' and 'right' are
      * equal w.r.t. the collation.
      */
-    int compare(StringData left, StringData right) const override = 0;
+    int compare(std::string_view left, std::string_view right) const override = 0;
 
     /**
      * Hashes the string such that strings which are equal under this collation also have equal
      * hashes.
      */
-    void hash_combine(size_t& seed, StringData stringToHash) const final;
+    void hash_combine(size_t& seed, std::string_view stringToHash) const final;
 
     /**
      * Returns the comparison key for 'stringData', according to this collation. See ComparisonKey's
      * comments for details.
      */
-    virtual ComparisonKey getComparisonKey(StringData stringData) const = 0;
+    virtual ComparisonKey getComparisonKey(std::string_view stringData) const = 0;
 
     /**
      * Returns the comparison key string for 'stringData', according to this collation. See
      * ComparisonKey's comments for details.
      */
-    std::string getComparisonString(StringData stringData) const;
+    std::string getComparisonString(std::string_view stringData) const;
 
     /**
      * Returns whether this collation has the same matching and sorting semantics as 'other'.

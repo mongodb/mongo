@@ -33,7 +33,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
@@ -61,6 +60,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -139,25 +139,25 @@ boost::optional<UnfetchedIxscans> getUnfetchedIxscans(const QuerySolutionNode* r
 /**
  * Retrieves the accumulation op name from 'accStmt' and returns it.
  */
-StringData getAccumulationOpName(const AccumulationStatement& accStmt);
+std::string_view getAccumulationOpName(const AccumulationStatement& accStmt);
 
 /**
  * Retrieves the window function op name from 'accStmt' and returns it.
  */
-StringData getWindowFunctionOpName(const WindowFunctionStatement& wfStmt);
+std::string_view getWindowFunctionOpName(const WindowFunctionStatement& wfStmt);
 
 /**
  * Return true iff 'name', 'accStmt', or 'wfStmt' is one of $topN, $bottomN, $minN, $maxN,
  * $firstN, or $lastN.
  */
-bool isAccumulatorN(StringData name);
+bool isAccumulatorN(std::string_view name);
 bool isAccumulatorN(const AccumulationStatement& accStmt);
 bool isAccumulatorN(const WindowFunctionStatement& wfStmt);
 
 /**
  * Return true iff 'name', 'accStmt', or 'wfStmt' is $topN or $bottomN.
  */
-bool isTopBottomN(StringData name);
+bool isTopBottomN(std::string_view name);
 bool isTopBottomN(const AccumulationStatement& accStmt);
 bool isTopBottomN(const WindowFunctionStatement& wfStmt);
 
@@ -217,11 +217,11 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
     return {std::move(indexKeyBitset), std::move(keyFieldNames)};
 }
 
-inline bool pathIsPrefixOf(StringData lhs, StringData rhs) {
+inline bool pathIsPrefixOf(std::string_view lhs, std::string_view rhs) {
     return lhs.size() < rhs.size() ? rhs.starts_with(lhs) && rhs[lhs.size()] == '.' : lhs == rhs;
 }
 
-inline bool pathsAreConflicting(StringData lhs, StringData rhs) {
+inline bool pathsAreConflicting(std::string_view lhs, std::string_view rhs) {
     return lhs.size() < rhs.size() ? pathIsPrefixOf(lhs, rhs) : pathIsPrefixOf(rhs, lhs);
 }
 
@@ -266,7 +266,7 @@ struct PathTreeNode {
         return children.empty();
     }
 
-    PathTreeNode<T>* findChild(StringData fieldComponent) {
+    PathTreeNode<T>* findChild(std::string_view fieldComponent) {
         if (childrenMap) {
             auto it = childrenMap->find(fieldComponent);
             return it != childrenMap->end() ? it->second : nullptr;
@@ -340,7 +340,7 @@ SbExpr rehydrateIndexKey(StageBuilderState& state,
 
 template <typename T>
 inline const char* getRawStringData(const T& str) {
-    if constexpr (std::is_same_v<T, StringData>) {
+    if constexpr (std::is_same_v<T, std::string_view>) {
         return str.data();
     } else {
         return str.data();
@@ -368,7 +368,7 @@ inline std::unique_ptr<PathTreeNode<T>> buildPathTreeImpl(const std::vector<Stri
         size_t i = 0;
 
         auto* node = tree.get();
-        StringData part;
+        std::string_view part;
         for (; i < numParts; ++i) {
             part = path.getPart(i);
             auto child = node->findChild(part);
@@ -839,9 +839,9 @@ std::pair<SbStage, SbSlotVector> projectFieldsToSlots(SbStage stage,
                                                       const PlanStageSlots* slots = nullptr);
 
 template <typename T>
-inline StringData getTopLevelField(const T& path) {
+inline std::string_view getTopLevelField(const T& path) {
     auto idx = path.find('.');
-    return StringData(getRawStringData(path), idx != std::string::npos ? idx : path.size());
+    return std::string_view(getRawStringData(path), idx != std::string::npos ? idx : path.size());
 }
 
 inline std::vector<std::string> getTopLevelFields(const std::vector<std::string>& setOfPaths) {

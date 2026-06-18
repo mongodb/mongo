@@ -29,7 +29,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -58,6 +57,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -66,13 +66,14 @@
 namespace mongo::auth {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kX509Str = "x509"_sd;
-constexpr auto kX509Subject = "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=client"_sd;
+constexpr auto kX509Str = "x509"sv;
+constexpr auto kX509Subject = "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=client"sv;
 constexpr auto kX509UTF8String = 12;
 
-BSONObj generateX509UserDocument(const StringData username) {
-    const auto database = "$external"_sd;
+BSONObj generateX509UserDocument(const std::string_view username) {
+    const auto database = "$external"sv;
 
     return BSON("_id" << fmt::format("{}.{}", database, username)
                       << AuthorizationManager::USER_NAME_FIELD_NAME << username

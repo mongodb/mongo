@@ -29,7 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace otel {
@@ -41,7 +44,7 @@ namespace otel {
 class MONGO_MOD_PUBLIC TelemetryContext {
 public:
     virtual ~TelemetryContext() = default;
-    virtual StringData type() const {
+    virtual std::string_view type() const {
         return "TelemetryContext";
     };
     virtual std::shared_ptr<TelemetryContext> clone() const {

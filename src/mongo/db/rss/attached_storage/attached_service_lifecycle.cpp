@@ -42,6 +42,8 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 
+#include <string_view>
+
 namespace mongo::rss {
 namespace {
 // Checkpoint every 60 seconds by default.
@@ -122,7 +124,7 @@ bool AttachedServiceLifecycle::initializedUsingDefaultSyncDelay() const {
 void AttachedServiceLifecycle::initializeStateRequiredForOfflineValidation(OperationContext*) {}
 
 bool AttachedServiceLifecycle::shouldKeepThreadAliveUntilStorageEngineHasShutDown(
-    const StringData) const {
+    const std::string_view) const {
     return false;
 }
 

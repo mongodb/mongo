@@ -36,6 +36,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -125,7 +127,7 @@ public:
 
     std::vector<Document> getIndexStats(OperationContext* opCtx,
                                         const NamespaceString& ns,
-                                        StringData host,
+                                        std::string_view host,
                                         bool addShardName) override {
         MONGO_UNREACHABLE;
     }

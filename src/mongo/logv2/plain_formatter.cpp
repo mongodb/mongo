@@ -30,7 +30,6 @@
 #include "mongo/logv2/plain_formatter.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +47,7 @@
 #include <deque>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -62,6 +62,7 @@
 #include <fmt/format.h>
 
 namespace mongo::logv2 {
+using namespace std::literals::string_view_literals;
 namespace {
 
 struct TextValueExtractor {
@@ -124,7 +125,7 @@ private:
      * Workaround for `dynamic_format_arg_store`'s desire to copy string
      * values and user-defined values.
      */
-    static auto _wrapValue(StringData val) {
+    static auto _wrapValue(std::string_view val) {
         return val;
     }
 
@@ -142,7 +143,7 @@ private:
     }
 
     void _addString(const char* name, std::string&& val) {
-        _add(name, StringData{_store(std::move(val))});
+        _add(name, std::string_view{_store(std::move(val))});
     }
 
     template <typename T>
@@ -160,7 +161,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
                                 fmt::memory_buffer& buffer) const {
     using boost::log::extract;
 
-    StringData message = extract<StringData>(attributes::message(), rec).get();
+    std::string_view message = extract<std::string_view>(attributes::message(), rec).get();
     const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec);
 
     // Log messages logged via logd are already formatted and have the id == 0
@@ -185,7 +186,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     }
 
     buffer.resize(std::min(attributeMaxSize, buffer.size()));
-    if (StringData sd(buffer.data(), buffer.size()); sd.ends_with("\n"_sd))
+    if (std::string_view sd(buffer.data(), buffer.size()); sd.ends_with("\n"sv))
         buffer.resize(buffer.size() - 1);
 }
 

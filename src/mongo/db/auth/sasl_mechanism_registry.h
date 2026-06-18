@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authentication_metrics.h"
@@ -56,6 +55,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <typeinfo>
@@ -128,7 +128,7 @@ private:
 class SaslServerCommonBase {
 public:
     virtual ~SaslServerCommonBase() = default;
-    virtual StringData mechanismName() const = 0;
+    virtual std::string_view mechanismName() const = 0;
     virtual SecurityPropertySet properties() const = 0;
 
     /**
@@ -169,7 +169,7 @@ public:
      * This method is virtual so more complex implementations can obtain this value from a
      * non-member.
      */
-    virtual StringData getPrincipalName() const {
+    virtual std::string_view getPrincipalName() const {
         return _principalName;
     }
 
@@ -194,7 +194,8 @@ public:
      * The standard rule in MongoDB is simple.  The authenticated user name must be the same as the
      * requested user name.
      */
-    virtual bool isAuthorizedToActAs(StringData requestedUser, StringData authenticatedUser) {
+    virtual bool isAuthorizedToActAs(std::string_view requestedUser,
+                                     std::string_view authenticatedUser) {
         return requestedUser == authenticatedUser;
     }
 
@@ -212,7 +213,7 @@ public:
      * Performs a single step of a SASL exchange. Takes an input provided by a client,
      * and either returns an error, or a response to be sent back.
      */
-    StatusWith<std::string> step(OperationContext* opCtx, StringData input) {
+    StatusWith<std::string> step(OperationContext* opCtx, std::string_view input) {
 
         auto result = stepImpl(opCtx, input);
         if (result.isOK()) {
@@ -234,7 +235,7 @@ public:
     }
 
     /** Returns which database contains the user which authentication is being performed against. */
-    StringData getAuthenticationDatabase() const;
+    std::string_view getAuthenticationDatabase() const;
 
     /**
      * Flexible bag of options for a saslStart command.
@@ -272,7 +273,7 @@ protected:
      * containing the server's response to the client.
      */
     virtual StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                               StringData input) = 0;
+                                                               std::string_view input) = 0;
 
     bool _success = false;
     std::string _principalName;
@@ -313,7 +314,7 @@ public:
 
     using policy_type = Policy;
 
-    StringData mechanismName() const final {
+    std::string_view mechanismName() const final {
         return policy_type::getName();
     }
 
@@ -349,7 +350,7 @@ public:
         return new ServerMechanism(std::move(authenticationDatabase));
     }
 
-    StringData mechanismName() const final {
+    std::string_view mechanismName() const final {
         return policy_type::getName();
     }
 
@@ -403,7 +404,7 @@ public:
      * "authenticationDatabase".
      */
     StatusWith<std::unique_ptr<ServerMechanismBase>> getServerMechanism(
-        StringData mechanismName, std::string authenticationDatabase);
+        std::string_view mechanismName, std::string authenticationDatabase);
 
     /**
      * Registers a factory T to produce a type of SASL mechanism.
@@ -441,7 +442,7 @@ public:
 private:
     using MechList = std::vector<std::unique_ptr<ServerFactoryBase>>;
 
-    MechList& _getMapRef(StringData dbName) {
+    MechList& _getMapRef(std::string_view dbName) {
         return _getMapRef(dbName != DatabaseName::kExternal.db(omitTenant));
     }
 
@@ -452,7 +453,7 @@ private:
         return _externalMechs;
     }
 
-    bool _mechanismSupportedByConfig(StringData mechName) const;
+    bool _mechanismSupportedByConfig(std::string_view mechName) const;
 
     Service* _service = nullptr;
 

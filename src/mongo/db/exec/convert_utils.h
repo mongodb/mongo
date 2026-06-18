@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -45,7 +45,7 @@ namespace mongo::exec::expression::convert_utils {
  * object or a ConversionFailure. Used by $convert and the shorthand expressions $toArray and
  * $toObject.
  */
-Value parseJson(StringData data, boost::optional<BSONType> expectedType);
+Value parseJson(std::string_view data, boost::optional<BSONType> expectedType);
 
 /**
  * Data type for BinData vectors (per BinDataVector specification). See:

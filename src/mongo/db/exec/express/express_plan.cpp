@@ -41,6 +41,7 @@ MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInExpressWrite);
 MONGO_FAIL_POINT_DEFINE(throwTemporarilyUnavailableExceptionInExpressWrite);
 
 namespace express {
+using namespace std::literals::string_view_literals;
 
 void throwIfExpressWriteConflictFailpointEnabled() {
     if (MONGO_unlikely(throwWriteConflictExceptionInExpressWrite.shouldFail())) {
@@ -95,8 +96,8 @@ void logRecordNotFound(OperationContext* opCtx,
     }();
 
     BSONObjBuilder builder;
-    builder.append("key"_sd, redact(indexKey));
-    builder.append("pattern"_sd, keyPattern);
+    builder.append("key"sv, redact(indexKey));
+    builder.append("pattern"sv, keyPattern);
     const BSONObj indexKeyData = builder.obj();
     LOGV2_ERROR_OPTIONS(
         8944500,

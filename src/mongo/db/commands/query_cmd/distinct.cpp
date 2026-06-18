@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
@@ -111,6 +110,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -122,6 +122,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     OperationContext* opCtx,
@@ -728,7 +729,7 @@ public:
             if (!opCtx->inMultiDocumentTransaction() &&
                 repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
                 result.append(
-                    "atClusterTime"_sd,
+                    "atClusterTime"sv,
                     repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()->asTimestamp());
             }
 

@@ -29,7 +29,6 @@
 
 #include "mongo/util/strong_weak_finish_line.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>

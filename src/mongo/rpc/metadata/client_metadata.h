@@ -40,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -183,7 +184,9 @@ public:
      *     }
      * }
      */
-    static void serialize(StringData driverName, StringData driverVersion, BSONObjBuilder* builder);
+    static void serialize(std::string_view driverName,
+                          std::string_view driverVersion,
+                          BSONObjBuilder* builder);
 
     /**
      * Create a new client metadata document with os information from the ProcessInfo class.
@@ -213,9 +216,9 @@ public:
      *     }
      * }
      */
-    static Status serialize(StringData driverName,
-                            StringData driverVersion,
-                            StringData appName,
+    static Status serialize(std::string_view driverName,
+                            std::string_view driverVersion,
+                            std::string_view appName,
                             BSONObjBuilder* builder);
 
     /**
@@ -275,7 +278,9 @@ public:
      *     "version" : "string"
      * }
      */
-    void setMongoSMetadata(StringData hostAndPort, StringData mongosClient, StringData version);
+    void setMongoSMetadata(std::string_view hostAndPort,
+                           std::string_view mongosClient,
+                           std::string_view version);
 
     /**
      * Get the Application Name for the client metadata document.
@@ -283,14 +288,14 @@ public:
      * Used to log Application Name in slow operation reports, and into system.profile.
      * Return: May be empty.
      */
-    StringData getApplicationName() const;
+    std::string_view getApplicationName() const;
 
     /**
      * Get the Driver Name for the client metadata document.
      *
      * Return: May be empty.
      */
-    StringData getDriverName() const;
+    std::string_view getDriverName() const;
 
     /**
      * Get the BSON Document of the client metadata document. In the example above in the class
@@ -323,7 +328,7 @@ public:
     /**
      * Field name for requests that contains client metadata.
      */
-    static StringData fieldName();
+    static std::string_view fieldName();
 
 public:
     /**
@@ -341,13 +346,13 @@ public:
      *
      * Exposed for Unit Test purposes
      */
-    static Status serializePrivate(StringData driverName,
-                                   StringData driverVersion,
-                                   StringData osType,
-                                   StringData osName,
-                                   StringData osArchitecture,
-                                   StringData osVersion,
-                                   StringData appName,
+    static Status serializePrivate(std::string_view driverName,
+                                   std::string_view driverVersion,
+                                   std::string_view osType,
+                                   std::string_view osName,
+                                   std::string_view osArchitecture,
+                                   std::string_view osVersion,
+                                   std::string_view appName,
                                    BSONObjBuilder* builder);
 
 private:

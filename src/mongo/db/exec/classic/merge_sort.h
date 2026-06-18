@@ -43,6 +43,7 @@
 #include <list>
 #include <memory>
 #include <queue>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -87,7 +88,7 @@ public:
         return _memoryTracker;
     }
 
-    static constexpr StringData kStageType = "SORT_MERGE"_sd;
+    static constexpr std::string_view kStageType = "SORT_MERGE"_sd;
 
 private:
     struct StageWithValue {

@@ -37,6 +37,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class TxnWildcardMultikeyPathsTest : public ServiceContextTest {
 protected:
@@ -65,36 +66,36 @@ TEST_F(TxnWildcardMultikeyPathsTest, EmptyByDefault) {
 
 TEST_F(TxnWildcardMultikeyPathsTest, AppendAndReadBack) {
     auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
-    cache.append(testUuid, "wc_idx", {FieldRef("a.b"_sd), FieldRef("c"_sd)});
+    cache.append(testUuid, "wc_idx", {FieldRef("a.b"sv), FieldRef("c"sv)});
     ASSERT_FALSE(cache.empty());
 
     std::set<FieldRef> out;
     cache.appendMatchingPaths(testUuid, "wc_idx", &out);
     ASSERT_EQ(out.size(), 2u);
-    ASSERT_TRUE(out.contains(FieldRef("a.b"_sd)));
-    ASSERT_TRUE(out.contains(FieldRef("c"_sd)));
+    ASSERT_TRUE(out.contains(FieldRef("a.b"sv)));
+    ASSERT_TRUE(out.contains(FieldRef("c"sv)));
 }
 
 TEST_F(TxnWildcardMultikeyPathsTest, IndexSegregationByName) {
     auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
-    cache.append(testUuid, "idx1", {FieldRef("a"_sd)});
-    cache.append(testUuid, "idx2", {FieldRef("b"_sd)});
+    cache.append(testUuid, "idx1", {FieldRef("a"sv)});
+    cache.append(testUuid, "idx2", {FieldRef("b"sv)});
 
     std::set<FieldRef> out1;
     cache.appendMatchingPaths(testUuid, "idx1", &out1);
     ASSERT_EQ(out1.size(), 1u);
-    ASSERT_TRUE(out1.contains(FieldRef("a"_sd)));
+    ASSERT_TRUE(out1.contains(FieldRef("a"sv)));
 
     std::set<FieldRef> out2;
     cache.appendMatchingPaths(testUuid, "idx2", &out2);
     ASSERT_EQ(out2.size(), 1u);
-    ASSERT_TRUE(out2.contains(FieldRef("b"_sd)));
+    ASSERT_TRUE(out2.contains(FieldRef("b"sv)));
 }
 
 TEST_F(TxnWildcardMultikeyPathsTest, AppendIsAdditiveAndDeduplicates) {
     auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
-    cache.append(testUuid, "wc", {FieldRef("a"_sd)});
-    cache.append(testUuid, "wc", {FieldRef("a"_sd), FieldRef("b"_sd)});
+    cache.append(testUuid, "wc", {FieldRef("a"sv)});
+    cache.append(testUuid, "wc", {FieldRef("a"sv), FieldRef("b"sv)});
 
     std::set<FieldRef> out;
     cache.appendMatchingPaths(testUuid, "wc", &out);
@@ -110,7 +111,7 @@ TEST_F(TxnWildcardMultikeyPathsTest, AppendMatchingPathsOnEmptyIsNoOp) {
 
 TEST_F(TxnWildcardMultikeyPathsTest, AppendMatchingPathsForUnknownIndexIsNoOp) {
     auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
-    cache.append(testUuid, "exists", {FieldRef("a"_sd)});
+    cache.append(testUuid, "exists", {FieldRef("a"sv)});
 
     std::set<FieldRef> out;
     cache.appendMatchingPaths(testUuid, "absent", &out);
@@ -123,11 +124,11 @@ TEST_F(TxnWildcardMultikeyPathsTest, AppendMatchingPathsReturnsAllCachedForIndex
     auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
     cache.append(testUuid,
                  "wc",
-                 {FieldRef("a"_sd),
-                  FieldRef("a.b"_sd),
-                  FieldRef("a.b.x"_sd),
-                  FieldRef("a.c"_sd),
-                  FieldRef("unrelated"_sd)});
+                 {FieldRef("a"sv),
+                  FieldRef("a.b"sv),
+                  FieldRef("a.b.x"sv),
+                  FieldRef("a.c"sv),
+                  FieldRef("unrelated"sv)});
 
     std::set<FieldRef> out;
     cache.appendMatchingPaths(testUuid, "wc", &out);
@@ -137,49 +138,49 @@ TEST_F(TxnWildcardMultikeyPathsTest, AppendMatchingPathsReturnsAllCachedForIndex
 TEST_F(TxnWildcardMultikeyPathsTest, AppendMatchingPathsPreservesPriorOutEntries) {
     // appendMatchingPaths must merge into `out`, not clear/replace it.
     auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
-    cache.append(testUuid, "wc", {FieldRef("a"_sd)});
+    cache.append(testUuid, "wc", {FieldRef("a"sv)});
 
     std::set<FieldRef> out;
-    out.insert(FieldRef("preexisting.entry"_sd));
+    out.insert(FieldRef("preexisting.entry"sv));
     cache.appendMatchingPaths(testUuid, "wc", &out);
 
     ASSERT_EQ(out.size(), 2u);
-    ASSERT_TRUE(out.count(FieldRef("preexisting.entry"_sd)));
-    ASSERT_TRUE(out.count(FieldRef("a"_sd)));
+    ASSERT_TRUE(out.count(FieldRef("preexisting.entry"sv)));
+    ASSERT_TRUE(out.count(FieldRef("a"sv)));
 }
 
 TEST_F(TxnWildcardMultikeyPathsTest, DeepPathsRoundtripThroughCache) {
     // Deep FieldRefs should be stored and returned without loss.
     auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
-    cache.append(testUuid, "wc", {FieldRef("a"_sd), FieldRef("a.b.c.d.e.f.g"_sd)});
+    cache.append(testUuid, "wc", {FieldRef("a"sv), FieldRef("a.b.c.d.e.f.g"sv)});
 
     std::set<FieldRef> out;
     cache.appendMatchingPaths(testUuid, "wc", &out);
     ASSERT_EQ(out.size(), 2u);
-    ASSERT_TRUE(out.count(FieldRef("a.b.c.d.e.f.g"_sd)));
+    ASSERT_TRUE(out.count(FieldRef("a.b.c.d.e.f.g"sv)));
 }
 
 TEST_F(TxnWildcardMultikeyPathsTest, AppendAfterAppendMatchingPathsIsVisible) {
     // Cache stays mutable across lookups; subsequent appends show up immediately.
     auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
-    cache.append(testUuid, "wc", {FieldRef("a"_sd)});
+    cache.append(testUuid, "wc", {FieldRef("a"sv)});
 
     std::set<FieldRef> firstOut;
     cache.appendMatchingPaths(testUuid, "wc", &firstOut);
     ASSERT_EQ(firstOut.size(), 1u);
 
-    cache.append(testUuid, "wc", {FieldRef("a.late"_sd)});
+    cache.append(testUuid, "wc", {FieldRef("a.late"sv)});
 
     std::set<FieldRef> secondOut;
     cache.appendMatchingPaths(testUuid, "wc", &secondOut);
     ASSERT_EQ(secondOut.size(), 2u);
-    ASSERT_TRUE(secondOut.count(FieldRef("a.late"_sd)));
+    ASSERT_TRUE(secondOut.count(FieldRef("a.late"sv)));
 }
 
 TEST_F(TxnWildcardMultikeyPathsTest, DiesWithSnapshotOnAbandon) {
     {
         auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
-        cache.append(testUuid, "wc", {FieldRef("a"_sd)});
+        cache.append(testUuid, "wc", {FieldRef("a"sv)});
         ASSERT_FALSE(cache.empty());
     }
 
@@ -193,7 +194,7 @@ TEST_F(TxnWildcardMultikeyPathsTest, TryGetReturnsNullptrUntilGetIsCalled) {
     ASSERT_EQ(TxnWildcardMultikeyPaths::tryGet(opCtx()), nullptr);
 
     auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
-    cache.append(testUuid, "wc", {FieldRef("a"_sd)});
+    cache.append(testUuid, "wc", {FieldRef("a"sv)});
 
     const auto* tried = TxnWildcardMultikeyPaths::tryGet(opCtx());
     ASSERT_NE(tried, nullptr);
@@ -201,7 +202,7 @@ TEST_F(TxnWildcardMultikeyPathsTest, TryGetReturnsNullptrUntilGetIsCalled) {
 }
 
 TEST_F(TxnWildcardMultikeyPathsTest, TryGetIsNullptrAgainAfterAbandon) {
-    TxnWildcardMultikeyPaths::get(opCtx()).append(testUuid, "wc", {FieldRef("a"_sd)});
+    TxnWildcardMultikeyPaths::get(opCtx()).append(testUuid, "wc", {FieldRef("a"sv)});
     ASSERT_NE(TxnWildcardMultikeyPaths::tryGet(opCtx()), nullptr);
 
     shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();

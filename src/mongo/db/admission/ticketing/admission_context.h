@@ -28,13 +28,13 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -238,7 +238,7 @@ private:
     TickSource* _tickSource;
 };
 
-MONGO_MOD_PUBLIC StringData toString(AdmissionContext::Priority priority);
+MONGO_MOD_PUBLIC std::string_view toString(AdmissionContext::Priority priority);
 
 MONGO_MOD_PUBLIC inline int compare(AdmissionContext::Priority lhs,
                                     AdmissionContext::Priority rhs) {

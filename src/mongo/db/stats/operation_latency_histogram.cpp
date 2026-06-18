@@ -29,16 +29,17 @@
 
 #include "mongo/db/stats/operation_latency_histogram.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/bits.h"
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 constexpr std::array<uint64_t, operation_latency_histogram_details::kMaxBuckets> kLowerBounds = {
     0,             // 0x00000000000
     2,             // 0x00000000002
@@ -274,8 +275,9 @@ void appendHistograms(HistogramsType& histograms,
     static_assert(static_cast<int>(Command::ReadWriteType::kRead) == 1);
     static_assert(static_cast<int>(Command::ReadWriteType::kWrite) == 2);
     static_assert(static_cast<int>(Command::ReadWriteType::kTransaction) == 3);
-    static constexpr std::array<StringData, operation_latency_histogram_details::kHistogramsCount>
-        kNames = {"commands"_sd, "reads"_sd, "writes"_sd, "transactions"_sd};
+    static constexpr std::array<std::string_view,
+                                operation_latency_histogram_details::kHistogramsCount>
+        kNames = {"commands"sv, "reads"sv, "writes"sv, "transactions"sv};
 
     for (size_t i = 0; i < kNames.size(); ++i) {
         appendHistogram(histograms[i],

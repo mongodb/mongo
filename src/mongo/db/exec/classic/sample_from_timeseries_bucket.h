@@ -45,6 +45,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 
 #include <absl/hash/hash.h>
 #include <boost/optional/optional.hpp>
@@ -59,7 +60,7 @@ namespace mongo {
  */
 class SampleFromTimeseriesBucket final : public PlanStage {
 public:
-    static constexpr StringData kStageType = "SAMPLE_FROM_TIMESERIES_BUCKET"_sd;
+    static constexpr std::string_view kStageType = "SAMPLE_FROM_TIMESERIES_BUCKET"_sd;
 
     /**
      * Constructs a 'SampleFromTimeseriesBucket' stage which uses 'bucketUnpacker' to materialize

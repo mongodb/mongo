@@ -59,6 +59,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -73,23 +74,24 @@ namespace MONGO_MOD_PUB repl {
 /**
  * The first oplog entry is a no-op with this message in its "msg" field.
  */
-constexpr auto kInitiatingSetMsg = "initiating set"_sd;
+inline constexpr std::string_view kInitiatingSetMsg{"initiating set"};
 
 /**
  * Field name of the newPrimaryMsg within the 'o' field in the new term no-op oplog entry.
  */
-constexpr StringData kNewPrimaryMsgField = "msg"_sd;
+inline constexpr std::string_view kNewPrimaryMsgField{"msg"};
 
 /**
  * Message string passed in the new term no-op oplog entry after a primary has stepped up.
  */
-constexpr StringData kNewPrimaryMsg = "new primary"_sd;
+inline constexpr std::string_view kNewPrimaryMsg{"new primary"};
 
 /**
  * The field name for the commit timestamp for an oplog entry if the operation was executed in a
  * multi-document transaction that has been committed. This field is in-memory only.
  */
-constexpr StringData kExtractedCommitTransactionTimestampField = "commitTransactionTimestamp"_sd;
+inline constexpr std::string_view kExtractedCommitTransactionTimestampField{
+    "commitTransactionTimestamp"};
 
 /**
  * Variant type stored in the top-level `m` field of an oplog entry. Single operations (insert,
@@ -333,8 +335,8 @@ public:
      * Attaches local catalog identifiers into the 'o2' field of a 'create' OplogEntry.
      */
     static BSONObj makeCreateCollObject2(const RecordId& catalogId,
-                                         StringData ident,
-                                         const boost::optional<StringData>& idIndexIdents);
+                                         std::string_view ident,
+                                         const boost::optional<std::string_view>& idIndexIdents);
 
     static StatusWith<MutableOplogEntry> parse(const BSONObj& object);
 
@@ -495,7 +497,7 @@ struct DurableOplogEntryParams {
     OpTime opTime;
     OpTypeEnum opType;
     NamespaceString nss;
-    boost::optional<StringData> container;
+    boost::optional<std::string_view> container;
     boost::optional<UUID> uuid;
     boost::optional<bool> fromMigrate;
     boost::optional<bool> checkExistenceForDiffInsert;
@@ -890,7 +892,7 @@ public:
     const boost::optional<mongo::TenantId>& getTid() const;
     const mongo::NamespaceString& getNss() const;
     const boost::optional<mongo::UUID>& getUuid() const;
-    boost::optional<StringData> getContainer() const;
+    boost::optional<std::string_view> getContainer() const;
     const mongo::BSONObj& getObject() const;
     const boost::optional<mongo::BSONObj>& getObject2() const;
     boost::optional<bool> getIsTimeseries() const;

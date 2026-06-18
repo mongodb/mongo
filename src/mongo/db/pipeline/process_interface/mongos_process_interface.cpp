@@ -83,6 +83,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 /**
@@ -414,7 +415,7 @@ MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
     // version is stale.
     sharding::router::CollectionRouter router(expCtx->getOperationContext(), nss);
     return router.routeWithRoutingContext(
-        "MongosProcessInterface::fieldsHaveSupportingUniqueIndex"_sd,
+        "MongosProcessInterface::fieldsHaveSupportingUniqueIndex"sv,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             auto response =
                 loadIndexesFromAuthoritativeShard(expCtx->getOperationContext(), routingCtx, nss);

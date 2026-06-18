@@ -40,6 +40,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
@@ -146,13 +148,13 @@ protected:
         _cumulativeMetrics = initializeCumulativeMetrics();
     }
 
-    virtual StringData getRootSectionName() {
+    virtual std::string_view getRootSectionName() {
         return kTestMetricsName;
     }
 
     enum Section { kRoot, kActive, kLatencies, kCurrentInSteps };
 
-    StringData getSectionName(Section section) {
+    std::string_view getSectionName(Section section) {
         switch (section) {
             case kRoot:
                 return getRootSectionName();
@@ -195,7 +197,7 @@ protected:
     void assertAltersCumulativeMetricsField(ReshardingMetrics* metrics,
                                             const std::function<void(ReshardingMetrics*)>& mutateFn,
                                             Section section,
-                                            StringData fieldName,
+                                            std::string_view fieldName,
                                             const std::function<bool(int, int)>& verifyFn) {
         assertAltersCumulativeMetrics(metrics, mutateFn, [&](auto reportBefore, auto reportAfter) {
             auto before = getReportSection(reportBefore, section).getIntField(fieldName);
@@ -208,7 +210,7 @@ protected:
         ReshardingMetrics* metrics,
         const std::function<void(ReshardingMetrics*)>& mutateFn,
         Section section,
-        StringData fieldName) {
+        std::string_view fieldName) {
         assertAltersCumulativeMetricsField(
             metrics, mutateFn, section, fieldName, [](auto before, auto after) {
                 return after > before;
@@ -219,7 +221,7 @@ protected:
         ReshardingMetrics* metrics,
         const std::function<void(ReshardingMetrics*)>& mutateFn,
         Section section,
-        StringData fieldName) {
+        std::string_view fieldName) {
         assertAltersCumulativeMetricsField(
             metrics, mutateFn, section, fieldName, [](auto before, auto after) {
                 return after < before;

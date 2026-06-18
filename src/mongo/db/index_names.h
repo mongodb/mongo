@@ -33,6 +33,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -94,7 +95,7 @@ public:
     /**
      * Convert an index name to an IndexType.
      */
-    static IndexType nameToType(StringData accessMethod);
+    static IndexType nameToType(std::string_view accessMethod);
 
     /**
      * Index is not intended to be user facing.
@@ -106,10 +107,10 @@ public:
  * Contain utilities to work with wildcard fields used for Wildcard indexes.
  */
 struct MONGO_MOD_PUBLIC WildcardNames {
-    static constexpr StringData WILDCARD_FIELD_NAME = "$**"_sd;
-    static constexpr StringData WILDCARD_FIELD_NAME_SUFFIX = ".$**"_sd;
+    static constexpr std::string_view WILDCARD_FIELD_NAME = "$**"_sd;
+    static constexpr std::string_view WILDCARD_FIELD_NAME_SUFFIX = ".$**"_sd;
 
-    inline static bool isWildcardFieldName(StringData fieldName) {
+    inline static bool isWildcardFieldName(std::string_view fieldName) {
         return fieldName == WILDCARD_FIELD_NAME || fieldName.ends_with(WILDCARD_FIELD_NAME_SUFFIX);
     }
 };

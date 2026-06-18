@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
 
@@ -40,6 +39,7 @@
 #include <exception>
 #include <fstream>
 #include <ios>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -60,7 +60,7 @@ void handleErrors(Callable&& callable) {
     }
 }
 
-PerformanceReporter::PerformanceReporter(StringData uri,
+PerformanceReporter::PerformanceReporter(std::string_view uri,
                                          const std::string& perfFileName,
                                          size_t diskThreshold)
     : _packetsDumptoDiskThreshold(diskThreshold) {
@@ -74,7 +74,7 @@ PerformanceReporter::~PerformanceReporter() {
     close();
 }
 
-void PerformanceReporter::open(StringData uri, const std::string& filename) {
+void PerformanceReporter::open(std::string_view uri, const std::string& filename) {
     _outFile.open(filename, std::ios::binary | std::ios::out | std::ios_base::trunc);
     uassert(ErrorCodes::ReplayClientInternalError,
             "Impossible to create performance report file for MongoR. Be sure that "
@@ -201,7 +201,7 @@ uint64_t PerformanceReporter::extractNumberOfDocuments(const BSONObj& response) 
 }
 
 std::string PerformanceReporter::readURI(std::ifstream& inFile) {
-    StringData::size_type uriLen = 0;
+    std::string_view::size_type uriLen = 0;
     inFile.read((char*)(&uriLen), sizeof(uriLen));
     uassert(ErrorCodes::ReplayClientInternalError,
             "Reading perf file URI length header failed",
@@ -218,10 +218,10 @@ std::string PerformanceReporter::readURI(std::ifstream& inFile) {
     return buf;
 }
 
-void PerformanceReporter::writeURI(StringData uri) {
+void PerformanceReporter::writeURI(std::string_view uri) {
     DataBuilder db;
-    uassertStatusOK(db.writeAndAdvance<LittleEndian<StringData::size_type>>(uri.size()));
-    uassertStatusOK(db.writeAndAdvance<StringData>(uri));
+    uassertStatusOK(db.writeAndAdvance<LittleEndian<std::string_view::size_type>>(uri.size()));
+    uassertStatusOK(db.writeAndAdvance<std::string_view>(uri));
     _outFile.write(db.getCursor().data(), db.size());
 }
 

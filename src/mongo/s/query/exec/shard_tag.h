@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -52,7 +52,7 @@ struct ShardTag {
     auto operator<=>(const ShardTag& other) const = default;
 
     // Required to make 'ShardTag' attributes usable in our logging system.
-    StringData toString() const;
+    std::string_view toString() const;
 
     // The actual shard tag string. Can be any value, but different 'ShardTag' instances should use
     // different tag values.

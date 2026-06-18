@@ -41,6 +41,7 @@
 
 #include <memory>
 #include <queue>
+#include <string_view>
 #include <variant>
 
 namespace mongo {
@@ -51,7 +52,7 @@ namespace mongo {
  */
 class MockStage final : public PlanStage {
 public:
-    static constexpr StringData kStageType = "MOCK"_sd;
+    static constexpr std::string_view kStageType = "MOCK"_sd;
 
     MockStage(ExpressionContext* expCtx, WorkingSet* ws);
 

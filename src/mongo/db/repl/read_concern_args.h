@@ -45,6 +45,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -56,15 +57,16 @@ namespace repl {
 
 class MONGO_MOD_PUB ReadConcernArgs {
 public:
-    static constexpr StringData kReadConcernFieldName = "readConcern"_sd;
-    static constexpr StringData kAfterOpTimeFieldName = ReadConcernIdl::kAfterOpTimeFieldName;
-    static constexpr StringData kAfterClusterTimeFieldName =
+    static constexpr std::string_view kReadConcernFieldName = "readConcern"_sd;
+    static constexpr std::string_view kAfterOpTimeFieldName = ReadConcernIdl::kAfterOpTimeFieldName;
+    static constexpr std::string_view kAfterClusterTimeFieldName =
         ReadConcernIdl::kAfterClusterTimeFieldName;
-    static constexpr StringData kAtClusterTimeFieldName = ReadConcernIdl::kAtClusterTimeFieldName;
-    static constexpr StringData kLevelFieldName = ReadConcernIdl::kLevelFieldName;
-    static constexpr StringData kAllowTransactionTableSnapshot =
+    static constexpr std::string_view kAtClusterTimeFieldName =
+        ReadConcernIdl::kAtClusterTimeFieldName;
+    static constexpr std::string_view kLevelFieldName = ReadConcernIdl::kLevelFieldName;
+    static constexpr std::string_view kAllowTransactionTableSnapshot =
         ReadConcernIdl::kAllowTransactionTableSnapshotFieldName;
-    static constexpr StringData kWaitLastStableRecoveryTimestamp =
+    static constexpr std::string_view kWaitLastStableRecoveryTimestamp =
         ReadConcernIdl::kWaitLastStableRecoveryTimestampFieldName;
 
     static const ReadConcernArgs kImplicitDefault;

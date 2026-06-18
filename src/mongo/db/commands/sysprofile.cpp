@@ -33,6 +33,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include <fcntl.h>
 
@@ -96,7 +97,7 @@ void runProfiler(const std::string& profileName, PerfMode mode, const std::strin
     }
 }
 
-pid_t spawn(StringData filename, PerfMode mode) {
+pid_t spawn(std::string_view filename, PerfMode mode) {
     std::string pidString = std::to_string(getpid());
     std::string profileName =
         fmt::format("{}.{}", filename, mode == PerfMode::record ? "data" : "txt");
@@ -165,7 +166,7 @@ public:
                 // kill profiler
                 reply.setOk(stop(*pid));
             } else {
-                StringData filename = request().getFilename();
+                std::string_view filename = request().getFilename();
                 PerfMode mode = request().getMode() == ProfileModeEnum::record ? PerfMode::record
                                                                                : PerfMode::counters;
                 reply.setPid(spawn(filename, mode));

@@ -57,6 +57,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <map>
+#include <string_view>
 #include <tuple>
 
 #include <boost/none.hpp>
@@ -69,6 +70,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(merge,
                                      DocumentSourceMerge::LiteParsed::parse,
@@ -163,7 +165,7 @@ boost::optional<std::set<FieldPath>> convertToFieldPaths(
     return fieldPaths;
 }
 
-auto withErrorContext(const auto&& callback, StringData errorMessage) {
+auto withErrorContext(const auto&& callback, std::string_view errorMessage) {
     try {
         return callback();
     } catch (DBException& ex) {
@@ -325,10 +327,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
     if (whenMatched == WhenMatched::kPipeline) {
         // If unspecified, 'letVariables' defaults to {new: "$$ROOT"}.
         letVariables = letVariables.value_or(kDefaultPipelineLet);
-        auto newElt = letVariables->getField("new"_sd);
+        auto newElt = letVariables->getField("new"sv);
         uassert(51273,
                 "'let' may not define a value for the reserved 'new' variable other than '$$ROOT'",
-                !newElt || newElt.valueStringDataSafe() == "$$ROOT"_sd);
+                !newElt || newElt.valueStringDataSafe() == "$$ROOT"sv);
         // If the 'new' variable is missing and this is a {whenNotMatched: "insert"} merge, then the
         // new document *must* be serialized with the update request. Add it to the let variables.
         if (!newElt && whenNotMatched == WhenNotMatched::kInsert) {
@@ -456,7 +458,7 @@ Value DocumentSourceMerge::serialize(const query_shape::SerializationOptions& op
                                                           pipeline_factory::kOptionsMinimal)
                         ->serializeToBson(opts);
                 },
-                "Error parsing $merge.whenMatched pipeline"_sd);
+                "Error parsing $merge.whenMatched pipeline"sv);
         }()});
     spec.setWhenNotMatched(descriptor.mode.second);
     spec.setOn([&]() {

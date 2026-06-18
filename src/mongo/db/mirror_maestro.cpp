@@ -76,6 +76,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -90,28 +91,29 @@
 namespace mongo {
 
 namespace {
-constexpr auto kMirrorMaestroName = "MirrorMaestro"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kMirrorMaestroName = "MirrorMaestro"sv;
 constexpr auto kMirrorMaestroThreadPoolMaxThreads = 2ull;  // Just enough to allow concurrency
 constexpr auto kMirrorMaestroConnPoolMinSize = 1ull;       // Always be able to mirror eventually
 
-constexpr auto kMirroredReadsParamName = "mirrorReads"_sd;
+constexpr auto kMirroredReadsParamName = "mirrorReads"sv;
 
-constexpr auto kMirroredReadsSeenKey = "seen"_sd;
-constexpr auto kMirroredReadsSentKey = "sent"_sd;
-constexpr auto kMirroredReadsTargetedSentKey = "targetedSent"_sd;
-constexpr auto kMirroredReadsErroredDuringSendKey = "erroredDuringSend"_sd;
-constexpr auto kMirroredReadsTargetedErroredDuringSendKey = "targetedErroredDuringSend"_sd;
-constexpr auto kMirroredReadsProcessedAsSecondaryKey = "processedAsSecondary"_sd;
-constexpr auto kMirroredReadsResolvedKey = "resolved"_sd;
-constexpr auto kMirroredReadsTargetedResolvedKey = "targetedResolved"_sd;
-constexpr auto kMirroredReadsResolvedBreakdownKey = "resolvedBreakdown"_sd;
-constexpr auto kMirroredReadsTargetedResolvedBreakdownKey = "targetedResolvedBreakdown"_sd;
-constexpr auto kMirroredReadsSucceededKey = "succeeded"_sd;
-constexpr auto kMirroredReadsTargetedSucceededKey = "targetedSucceeded"_sd;
-constexpr auto kMirroredReadsPendingKey = "pending"_sd;
-constexpr auto kMirroredReadsTargetedPendingKey = "targetedPending"_sd;
-constexpr auto kMirroredReadsScheduledKey = "scheduled"_sd;
-constexpr auto kMirroredReadsTargetedScheduledKey = "targetedScheduled"_sd;
+constexpr auto kMirroredReadsSeenKey = "seen"sv;
+constexpr auto kMirroredReadsSentKey = "sent"sv;
+constexpr auto kMirroredReadsTargetedSentKey = "targetedSent"sv;
+constexpr auto kMirroredReadsErroredDuringSendKey = "erroredDuringSend"sv;
+constexpr auto kMirroredReadsTargetedErroredDuringSendKey = "targetedErroredDuringSend"sv;
+constexpr auto kMirroredReadsProcessedAsSecondaryKey = "processedAsSecondary"sv;
+constexpr auto kMirroredReadsResolvedKey = "resolved"sv;
+constexpr auto kMirroredReadsTargetedResolvedKey = "targetedResolved"sv;
+constexpr auto kMirroredReadsResolvedBreakdownKey = "resolvedBreakdown"sv;
+constexpr auto kMirroredReadsTargetedResolvedBreakdownKey = "targetedResolvedBreakdown"sv;
+constexpr auto kMirroredReadsSucceededKey = "succeeded"sv;
+constexpr auto kMirroredReadsTargetedSucceededKey = "targetedSucceeded"sv;
+constexpr auto kMirroredReadsPendingKey = "pending"sv;
+constexpr auto kMirroredReadsTargetedPendingKey = "targetedPending"sv;
+constexpr auto kMirroredReadsScheduledKey = "scheduled"sv;
+constexpr auto kMirroredReadsTargetedScheduledKey = "targetedScheduled"sv;
 
 MONGO_FAIL_POINT_DEFINE(mirrorMaestroExpectsResponse);
 MONGO_FAIL_POINT_DEFINE(mirrorMaestroTracksPending);
@@ -570,7 +572,7 @@ Status setMirrorReadsParameter(const BSONObj& param) try {
 
 void MirroredReadsServerParameter::append(OperationContext*,
                                           BSONObjBuilder* bob,
-                                          StringData name,
+                                          std::string_view name,
                                           const boost::optional<TenantId>&) {
     auto subBob = BSONObjBuilder(bob->subobjStart(name));
     _data->serialize(&subBob);
@@ -583,7 +585,7 @@ Status MirroredReadsServerParameter::set(const BSONElement& value,
     return e.toStatus();
 }
 
-Status MirroredReadsServerParameter::setFromString(StringData str,
+Status MirroredReadsServerParameter::setFromString(std::string_view str,
                                                    const boost::optional<TenantId>&) try {
     return setMirrorReadsParameter(fromjson(str));
 } catch (const AssertionException& e) {

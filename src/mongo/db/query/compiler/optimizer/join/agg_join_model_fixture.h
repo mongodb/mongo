@@ -36,6 +36,8 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
 class AggJoinModelFixture : public AggregationContextFixture {
 public:
@@ -48,13 +50,15 @@ public:
     }
 
     static std::string toString(const std::unique_ptr<Pipeline>& pipeline);
+    static std::vector<BSONObj> pipelineFromJsonArray(std::string_view jsonArray);
 
     std::unique_ptr<Pipeline> makePipeline(std::vector<BSONObj> bsonStages,
-                                           std::vector<StringData> collNames) {
+                                           std::vector<std::string_view> collNames) {
         return makePipelineForTest(bsonStages, collNames, getExpCtx());
     }
 
-    std::unique_ptr<Pipeline> makePipeline(StringData query, std::vector<StringData> collNames) {
+    std::unique_ptr<Pipeline> makePipeline(std::string_view query,
+                                           std::vector<std::string_view> collNames) {
         return makePipelineForTest(query, collNames, getExpCtx());
     }
 
@@ -67,8 +71,8 @@ public:
      */
     static void markFieldsAsScalar(
         Pipeline& pipeline,
-        const std::vector<StringData>& mainCollFields,
-        const StringMap<std::vector<StringData>>& secondaryCollFieldMap) {
+        const std::vector<std::string_view>& mainCollFields,
+        const StringMap<std::vector<std::string_view>>& secondaryCollFieldMap) {
         auto expCtx = pipeline.getContext();
 
         auto mainPathArrayness = std::make_shared<PathArrayness>();

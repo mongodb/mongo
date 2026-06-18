@@ -38,10 +38,12 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
-TimeseriesOptions makeTimeseriesOptions(StringData timeField) {
+TimeseriesOptions makeTimeseriesOptions(std::string_view timeField) {
     TimeseriesOptions opts;
     opts.setTimeField(timeField);
     return opts;

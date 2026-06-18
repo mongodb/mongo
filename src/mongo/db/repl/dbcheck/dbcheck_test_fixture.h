@@ -40,6 +40,8 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 
@@ -129,7 +131,7 @@ public:
      */
     SecondaryIndexCheckParameters createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum validateMode,
-        StringData secondaryIndex,
+        std::string_view secondaryIndex,
         bool skipLookupForExtraKeys = false,
         BSONValidateModeEnum bsonValidateMode = BSONValidateModeEnum::kDefault);
 

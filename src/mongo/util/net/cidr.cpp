@@ -33,6 +33,8 @@
 #include "mongo/util/ctype.h"
 
 #ifdef _WIN32
+#include <string_view>
+
 #include <Ws2tcpip.h>
 #else
 #include <arpa/inet.h>
@@ -95,7 +97,7 @@ StatusWith<CIDR> CIDR::parse(BSONElement from) {
     return parse(from.valueStringData());
 }
 
-StatusWith<CIDR> CIDR::parse(StringData s) {
+StatusWith<CIDR> CIDR::parse(std::string_view s) {
     CIDR value;
     auto slash = find(begin(s), end(s), '/');
     auto ip = (slash == end(s)) ? std::string{s} : std::string{s.substr(0, slash - begin(s))};
@@ -239,7 +241,7 @@ CIDR::ipv6WithZone_t CIDR::_splitIPv6String(const std::string& ipv6) {
     return result;
 }
 
-CIDR::CIDR(StringData s) {
+CIDR::CIDR(std::string_view s) {
     auto status = parse(s);
     uassertStatusOK(status);
     *this = status.getValue();

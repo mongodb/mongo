@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
@@ -40,6 +39,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 MONGO_MOD_PUBLIC;
@@ -109,14 +109,14 @@ void registerStorageEngine(ServiceContext* service,
 /**
  * Returns true if "name" refers to a registered storage engine.
  */
-bool isRegisteredStorageEngine(ServiceContext* service, StringData name);
+bool isRegisteredStorageEngine(ServiceContext* service, std::string_view name);
 
 /**
  * Returns an unowned pointer to the factory for the named storage engine, or nullptr.
  *
  * NOTE: Exposed only for use in legacy testing scenarios.
  */
-StorageEngine::Factory* getFactoryForStorageEngine(ServiceContext* context, StringData name);
+StorageEngine::Factory* getFactoryForStorageEngine(ServiceContext* context, std::string_view name);
 
 /*
  * Extracts the storageEngine bson from the CollectionOptions provided.  Loops through each
@@ -136,6 +136,6 @@ Status validateStorageOptions(
 /**
  * Returns the list of all storage engines.
  */
-std::vector<StringData> getStorageEngineNames(ServiceContext* svcCtx);
+std::vector<std::string_view> getStorageEngineNames(ServiceContext* svcCtx);
 
 }  // namespace mongo

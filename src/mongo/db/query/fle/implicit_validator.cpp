@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/fle/implicit_validator.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -49,6 +48,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -118,7 +118,7 @@ using AnnotationMode = ErrorAnnotation::Mode;
 std::unique_ptr<MatchExpression> createNotTypeExpression(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     MatcherTypeSet typeSet,
-    StringData path,
+    std::string_view path,
     bool ignoreError = true) {
     auto annotation = ignoreError
         ? doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore)
@@ -135,7 +135,7 @@ std::unique_ptr<MatchExpression> createNotTypeExpression(
 
 std::unique_ptr<MatchExpression> createObjectExpression(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    StringData path,
+    std::string_view path,
     std::unique_ptr<MatchExpression> subschema) {
     auto objectMatch = std::make_unique<InternalSchemaObjectMatchExpression>(
         path,
@@ -160,7 +160,7 @@ std::unique_ptr<MatchExpression> treeToMatchExpression(
             expCtx, "_property", BSON("propertyName" << node.name)));
 
         andExpr->add(std::make_unique<InternalSchemaBinDataFLE2EncryptedTypeExpression>(
-            StringData(node.name),
+            std::string_view(node.name),
             node.type.has_value() ? MatcherTypeSet(node.type.value()) : MatcherTypeSet(),
             doc_validation_error::createAnnotation(expCtx, "fle2Encrypt", BSONObj())));
 
@@ -178,7 +178,7 @@ std::unique_ptr<MatchExpression> treeToMatchExpression(
         doc_validation_error::createAnnotation(expCtx, "properties", BSONObj()));
     for (auto& subnode : node.subobjs) {
         auto existsExpr = std::make_unique<ExistsMatchExpression>(
-            StringData(subnode.name),
+            std::string_view(subnode.name),
             doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
         auto notExpr = std::make_unique<NotMatchExpression>(
             std::move(existsExpr),

@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/write_ops/query_stats_metrics_gen.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 /**
@@ -49,7 +50,7 @@ namespace mongo {
  *     ASSERT(...);
  * }
  */
-OpMsgRequest toOpMsg(StringData db, const BSONObj& cmd, bool useDocSequence);
+OpMsgRequest toOpMsg(std::string_view db, const BSONObj& cmd, bool useDocSequence);
 
 /**
  * Helper to create a QueryStatsMetrics object with all required fields populated.

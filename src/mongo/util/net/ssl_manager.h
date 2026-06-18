@@ -34,12 +34,12 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
 #ifdef MONGO_CONFIG_SSL
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -411,8 +411,8 @@ public:
      * implemented for the OpenSSL variant; other implementations return NotImplemented.
      * TODO SERVER-126149: Replace/remove this function.
      */
-    virtual StatusWith<std::string> decryptPEMKey(StringData pemContents,
-                                                  StringData password) const {
+    virtual StatusWith<std::string> decryptPEMKey(std::string_view pemContents,
+                                                  std::string_view password) const {
         return Status(ErrorCodes::NotImplemented,
                       "decryptPEMKey is not supported on this platform");
     }
@@ -491,7 +491,7 @@ std::string removeFQDNRoot(std::string name);
  *
  * See "2.4 Converting an AttributeValue from ASN.1 to a String" in RFC 2243
  */
-std::string escapeRfc2253(StringData str);
+std::string escapeRfc2253(std::string_view str);
 
 /**
  * Generates a new SSLX509Name containing only the attributes requested in filteredAttributes.
@@ -504,7 +504,7 @@ SSLX509Name filterClusterDN(const SSLX509Name& fullClusterDN,
 /**
  * Parse a DN from a string per RFC 4514
  */
-StatusWith<SSLX509Name> parseDN(StringData str);
+StatusWith<SSLX509Name> parseDN(std::string_view str);
 
 /**
  * These functions map short names for RDN components to numeric OID's and the other way around.
@@ -553,7 +553,7 @@ void logSSLInfo(const SSLInformationToLog& info,
  * Logs the certificate.
  * @param certType human-readable description of the certificate type.
  */
-void logCert(const CertInformationToLog& cert, StringData certType, int logNum);
+void logCert(const CertInformationToLog& cert, std::string_view certType, int logNum);
 void logCRL(const CRLInformationToLog& crl, int logNum);
 
 }  // namespace MONGO_MOD_PUBLIC mongo

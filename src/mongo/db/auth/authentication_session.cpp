@@ -46,6 +46,7 @@
 
 #include <algorithm>
 #include <ratio>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -235,7 +236,7 @@ AuthenticationSession* AuthenticationSession::get(Client* client) {
     return &(*maybeSession);
 }
 
-void AuthenticationSession::setMechanismName(StringData mechanismName) {
+void AuthenticationSession::setMechanismName(std::string_view mechanismName) {
     LOGV2_DEBUG(
         5286200, kDiagnosticLogLevel, "Setting mechanism name", "mechanism"_attr = mechanismName);
     tassert(5286201,

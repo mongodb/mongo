@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -92,6 +91,7 @@
 #include <ctime>
 #include <iterator>
 #include <map>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -621,7 +621,7 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
     }
 
     // Get index specs for each collection.
-    std::map<StringData, std::list<BSONObj>> collectionIndexSpecs;
+    std::map<std::string_view, std::list<BSONObj>> collectionIndexSpecs;
     for (auto&& params : createCollectionParams) {
         const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
         ListIndexes listIndexesCmd(nss);

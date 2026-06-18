@@ -35,6 +35,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPreImageToStageFn(
@@ -59,7 +61,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamAddPreImage,
                            documentSourceChangeStreamAddPreImageToStageFn)
 
 ChangeStreamAddPreImageStage::ChangeStreamAddPreImageStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const FullDocumentBeforeChangeModeEnum& fullDocumentBeforeChangeMode)
     : Stage(stageName, pExpCtx), _fullDocumentBeforeChangeMode(fullDocumentBeforeChangeMode) {}

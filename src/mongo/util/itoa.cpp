@@ -29,11 +29,10 @@
 
 #include "mongo/util/itoa.h"
 
-#include "mongo/base/string_data.h"
-
 #include <cstdint>
 #include <cstring>
 #include <iterator>
+#include <string_view>
 #include <type_traits>
 
 namespace mongo {
@@ -116,7 +115,7 @@ ItoA::ItoA(std::uint64_t val) {
     if (val < kTableSize) {
         const auto& e = gTable[val];
         std::size_t n = e.width;
-        _str = StringData(std::end(e.s) - n, n);
+        _str = std::string_view(std::end(e.s) - n, n);
         return;
     }
     char* p = std::end(_buf);
@@ -131,7 +130,7 @@ ItoA::ItoA(std::uint64_t val) {
     auto n = e.width;
     p -= n;
     memcpy(p, std::end(e.s) - n, n);
-    _str = StringData(p, std::end(_buf) - p);
+    _str = std::string_view(p, std::end(_buf) - p);
 }
 
 }  // namespace mongo

@@ -34,7 +34,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/repl/initial_sync/database_cloner.h"
@@ -54,12 +53,14 @@
 #include "mongo/util/uuid.h"
 
 #include <mutex>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 DatabaseCloner::DatabaseCloner(const DatabaseName& dbName,
                                InitialSyncSharedData* sharedData,
@@ -69,7 +70,7 @@ DatabaseCloner::DatabaseCloner(const DatabaseName& dbName,
                                ThreadPool* dbPool,
                                std::shared_ptr<InitialSyncSummaryStats> summaryStats)
     : InitialSyncBaseCloner(
-          "DatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+          "DatabaseCloner"sv, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
       _listCollectionsStage("listCollections", this, &DatabaseCloner::listCollectionsStage),
       _summaryStats(summaryStats) {
@@ -146,7 +147,7 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
 }
 
 bool DatabaseCloner::isMyFailPoint(const BSONObj& data) const {
-    const auto fpDbName = DatabaseNameUtil::parseFailPointData(data, "database"_sd);
+    const auto fpDbName = DatabaseNameUtil::parseFailPointData(data, "database"sv);
     return fpDbName == _dbName && BaseCloner::isMyFailPoint(data);
 }
 

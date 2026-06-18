@@ -34,7 +34,10 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::otel::metrics {
+using namespace std::literals::string_view_literals;
 
 namespace {
 class OtelMetricsCapturerTest : public testing::Test {
@@ -101,23 +104,23 @@ TEST_F(OtelMetricsCapturerTest, CounterWrongValueTypeThrowsException) {
 TEST_F(OtelMetricsCapturerTest, CounterReadWithWrongAttributeCountThrowsException) {
     OtelMetricsCapturer metricsCapturer(*metricsService);
 
-    Counter<int64_t, bool, StringData>& int64Counter =
-        metricsService->createInt64Counter<bool, StringData>(
+    Counter<int64_t, bool, std::string_view>& int64Counter =
+        metricsService->createInt64Counter<bool, std::string_view>(
             MetricNames::kTest1,
             "description",
             MetricUnit::kSeconds,
             AttributeDefinition<bool>{.name = "a", .values = {true, false}},
-            AttributeDefinition<StringData>{.name = "b", .values = {"x", "y"}});
-    int64Counter.add(1, {true, "x"_sd});
+            AttributeDefinition<std::string_view>{.name = "b", .values = {"x", "y"}});
+    int64Counter.add(1, {true, "x"sv});
 
-    Counter<double, bool, StringData>& doubleCounter =
-        metricsService->createDoubleCounter<bool, StringData>(
+    Counter<double, bool, std::string_view>& doubleCounter =
+        metricsService->createDoubleCounter<bool, std::string_view>(
             MetricNames::kTest2,
             "description",
             MetricUnit::kSeconds,
             AttributeDefinition<bool>{.name = "a", .values = {true, false}},
-            AttributeDefinition<StringData>{.name = "b", .values = {"x", "y"}});
-    doubleCounter.add(1.0, {true, "x"_sd});
+            AttributeDefinition<std::string_view>{.name = "b", .values = {"x", "y"}});
+    doubleCounter.add(1.0, {true, "x"sv});
 
     // Too few attributes (1 instead of 2).
     ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest1, std::tuple{true}),
@@ -129,13 +132,13 @@ TEST_F(OtelMetricsCapturerTest, CounterReadWithWrongAttributeCountThrowsExceptio
 
     // Too many attributes (3 instead of 2).
     ASSERT_THROWS_CODE(
-        metricsCapturer.readInt64Counter(MetricNames::kTest1, std::tuple{true, "x"_sd, "extra"_sd}),
+        metricsCapturer.readInt64Counter(MetricNames::kTest1, std::tuple{true, "x"sv, "extra"sv}),
         DBException,
         ErrorCodes::BadValue);
-    ASSERT_THROWS_CODE(metricsCapturer.readDoubleCounter(MetricNames::kTest2,
-                                                         std::tuple{true, "x"_sd, "extra"_sd}),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "x"sv, "extra"sv}),
+        DBException,
+        ErrorCodes::BadValue);
 }
 
 TEST_F(OtelMetricsCapturerTest, UpDownCounterWrongValueTypeThrowsException) {

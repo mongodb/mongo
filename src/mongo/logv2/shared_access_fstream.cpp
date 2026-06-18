@@ -34,6 +34,7 @@
 #include "mongo/util/text.h"  // IWYU pragma: keep
 
 #include <filesystem>
+#include <string_view>
 
 #include <fcntl.h>
 #include <io.h>
@@ -172,7 +173,7 @@ FILE* Win32SharedAccessFileDescriptor::_open(const wchar_t* filename,
     return _fdopen(fd, fdmode);
 }
 
-FILE* Win32SharedAccessFileDescriptor::_open(StringData filename,
+FILE* Win32SharedAccessFileDescriptor::_open(std::string_view filename,
                                              std::ios_base::openmode mode,
                                              bool sharedWriteAccess) {
     return _open(toWideStringFromStringData(filename).c_str(), mode, sharedWriteAccess);

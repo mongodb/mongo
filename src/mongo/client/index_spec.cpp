@@ -33,6 +33,8 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 const char IndexSpec::kIndexValText[] = "text";
@@ -58,7 +60,7 @@ const char kDuplicateOption[] = "duplicate option added to index descriptor";
 
 IndexSpec::IndexSpec() : _dynamicName(true) {}
 
-IndexSpec& IndexSpec::addKey(StringData field, IndexType type) {
+IndexSpec& IndexSpec::addKey(std::string_view field, IndexType type) {
     uassert(ErrorCodes::InvalidOptions, kDuplicateKey, !_keys.asTempObj().hasField(field));
     if (type <= kIndexTypeDescending)
         _keys.append(field, kIndexTypeNumbers[type]);
@@ -105,7 +107,7 @@ IndexSpec& IndexSpec::unique(bool value) {
     return *this;
 }
 
-IndexSpec& IndexSpec::name(StringData value) {
+IndexSpec& IndexSpec::name(std::string_view value) {
     _name = std::string{value};
     _dynamicName = false;
     return *this;
@@ -145,7 +147,7 @@ IndexSpec& IndexSpec::textWeights(const BSONObj& value) {
     return *this;
 }
 
-IndexSpec& IndexSpec::textDefaultLanguage(StringData value) {
+IndexSpec& IndexSpec::textDefaultLanguage(std::string_view value) {
     uassert(ErrorCodes::InvalidOptions,
             kDuplicateOption,
             !_options.asTempObj().hasField("default_language"));
@@ -153,7 +155,7 @@ IndexSpec& IndexSpec::textDefaultLanguage(StringData value) {
     return *this;
 }
 
-IndexSpec& IndexSpec::textLanguageOverride(StringData value) {
+IndexSpec& IndexSpec::textLanguageOverride(std::string_view value) {
     uassert(ErrorCodes::InvalidOptions,
             kDuplicateOption,
             !_options.asTempObj().hasField("language_override"));

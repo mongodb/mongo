@@ -47,6 +47,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -66,10 +67,11 @@ using ChangeStreamAddPreImageLiteParsed =
  */
 class DocumentSourceChangeStreamAddPreImage final : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamAddPreImage"_sd;
-    static constexpr StringData kFullDocumentBeforeChangeFieldName =
+    static constexpr std::string_view kStageName = "$_internalChangeStreamAddPreImage"_sd;
+    static constexpr std::string_view kFullDocumentBeforeChangeFieldName =
         DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
-    static constexpr StringData kPreImageIdFieldName = DocumentSourceChangeStream::kPreImageIdField;
+    static constexpr std::string_view kPreImageIdFieldName =
+        DocumentSourceChangeStream::kPreImageIdField;
 
     /**
      * Creates a DocumentSourceChangeStreamAddPreImage stage.
@@ -148,7 +150,7 @@ public:
     Value doSerialize(const query_shape::SerializationOptions& opts =
                           query_shape::SerializationOptions{}) const final;
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

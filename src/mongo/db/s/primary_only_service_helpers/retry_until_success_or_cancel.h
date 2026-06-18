@@ -34,6 +34,8 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace primary_only_service_helpers {
 
@@ -43,7 +45,7 @@ namespace primary_only_service_helpers {
  */
 class RetryUntilSuccessOrCancel {
 public:
-    RetryUntilSuccessOrCancel(StringData serviceName,
+    RetryUntilSuccessOrCancel(std::string_view serviceName,
                               std::shared_ptr<executor::ScopedTaskExecutor> taskExecutor,
                               std::shared_ptr<ThreadPool> markKilledExecutor,
                               CancellationToken token,
@@ -84,7 +86,7 @@ public:
     }
 
 private:
-    void logError(StringData errorKind,
+    void logError(std::string_view errorKind,
                   const std::string& operationName,
                   const Status& status) const;
 

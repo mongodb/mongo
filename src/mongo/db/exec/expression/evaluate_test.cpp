@@ -40,6 +40,7 @@
 
 namespace mongo {
 namespace expression_evaluation_test {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
@@ -68,18 +69,18 @@ TEST(ExpressionConstantTest, ConstantOfValueMissingRemovesField) {
     intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value());
     ASSERT_BSONOBJ_BINARY_EQ(
         BSONObj(),
-        toBson(expression->evaluate(Document{{"foo", Value("bar"_sd)}}, &expCtx.variables, {})));
+        toBson(expression->evaluate(Document{{"foo", Value("bar"sv)}}, &expCtx.variables, {})));
 }
 
 namespace BuiltinRemoveVariable {
 
 TEST(BuiltinRemoveVariableTest, TypeOfRemoveIsMissing) {
-    assertExpectedResults("$type", {{{Value("$$REMOVE"_sd)}, Value("missing"_sd)}});
+    assertExpectedResults("$type", {{{Value("$$REMOVE"sv)}, Value("missing"sv)}});
 }
 
 TEST(BuiltinRemoveVariableTest, LiteralEscapesRemoveVar) {
     assertExpectedResults(
-        "$literal", {{{Value("$$REMOVE"_sd)}, Value(std::vector<Value>{Value("$$REMOVE"_sd)})}});
+        "$literal", {{{Value("$$REMOVE"sv)}, Value(std::vector<Value>{Value("$$REMOVE"sv)})}});
 }
 
 }  // namespace BuiltinRemoveVariable

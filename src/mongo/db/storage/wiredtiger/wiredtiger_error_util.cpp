@@ -33,13 +33,16 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 static constexpr auto kTransactionTooLargeForCache =
-    "transaction is too large and will not fit in the storage engine cache"_sd;
+    "transaction is too large and will not fit in the storage engine cache"sv;
 /**
  * Configured WT cache is deemed insufficient for a transaction when its dirty bytes in cache
  * exceed a certain threshold on the proportion of total cache which is used by transaction.
@@ -68,7 +71,9 @@ bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold) {
         txnDirtyBytes.getValue(), cacheDirtyBytes.getValue(), threshold);
 }
 
-str::stream generateContextStrStream(StringData prefix, StringData reason, int retCode) {
+str::stream generateContextStrStream(std::string_view prefix,
+                                     std::string_view reason,
+                                     int retCode) {
     str::stream contextStrStream;
     if (!prefix.empty())
         contextStrStream << prefix << " ";
@@ -99,7 +104,7 @@ bool rollbackReasonWasCachePressure(int sub_level_err) {
 void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
                                               bool cacheIsInsufficientForTransaction,
                                               const char* reason,
-                                              StringData prefix,
+                                              std::string_view prefix,
                                               int retCode) {
     if (txnTooLargeEnabled && cacheIsInsufficientForTransaction) {
         throwTransactionTooLargeForCache(
@@ -112,7 +117,7 @@ void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
 void throwAppropriateException(bool txnTooLargeEnabled,
                                WT_SESSION* session,
                                double cacheThreshold,
-                               StringData prefix,
+                               std::string_view prefix,
                                int retCode) {
 
     // These values are initialized by WT_SESSION::get_last_error and should only be accessed if the
@@ -155,7 +160,7 @@ void dumpErrorLog(int retCode) {
     LOGV2_FATAL_CONTINUE(11131001, "WiredTiger dump error log failed", "ret"_attr = ret);
 }
 
-Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
+Status wtRCToStatus_slow(int retCode, WT_SESSION* session, std::string_view prefix) {
     if (retCode == 0)
         return Status::OK();
 
@@ -209,7 +214,7 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     return Status(ErrorCodes::UnknownError, s);
 }
 
-Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix) {
+Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, std::string_view prefix) {
     return session.with(
         [retCode, prefix](WT_SESSION* s) { return wtRCToStatus_slow(retCode, s, prefix); });
 }

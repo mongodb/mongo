@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
@@ -45,6 +44,7 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -74,9 +74,9 @@ public:
      *
      **/
     StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                       StringData inputData) override;
+                                                       std::string_view inputData) override;
 
-    StatusWith<std::string> saslPrep(StringData str) const {
+    StatusWith<std::string> saslPrep(std::string_view str) const {
         if (std::is_same<SHA1Block, HashBlock>::value) {
             return std::string{str};
         } else {
@@ -98,13 +98,14 @@ private:
     /**
      * Parse client-first-message and generate server-first-message
      **/
-    StatusWith<std::tuple<bool, std::string>> _firstStep(OperationContext* opCtx, StringData input);
+    StatusWith<std::tuple<bool, std::string>> _firstStep(OperationContext* opCtx,
+                                                         std::string_view input);
 
     /**
      * Parse client-final-message and generate server-final-message
      **/
     StatusWith<std::tuple<bool, std::string>> _secondStep(OperationContext* opCtx,
-                                                          StringData input);
+                                                          std::string_view input);
 
     std::uint32_t _totalSteps() const {
         return _skipEmptyExchange ? 2 : 3;

@@ -66,6 +66,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -762,23 +763,23 @@ boost::optional<UnfetchedIxscans> getUnfetchedIxscans(const QuerySolutionNode* r
     return {UnfetchedIxscans{std::move(ixscans), hasFetchesOrCollScans}};
 }
 
-bool isAccumulatorN(StringData name) {
+bool isAccumulatorN(std::string_view name) {
     return name == AccumulatorTop::getName() || name == AccumulatorBottom::getName() ||
         name == AccumulatorTopN::getName() || name == AccumulatorBottomN::getName() ||
         name == AccumulatorMinN::getName() || name == AccumulatorMaxN::getName() ||
         name == AccumulatorFirstN::getName() || name == AccumulatorLastN::getName();
 }
 
-bool isTopBottomN(StringData name) {
+bool isTopBottomN(std::string_view name) {
     return name == AccumulatorTop::getName() || name == AccumulatorBottom::getName() ||
         name == AccumulatorTopN::getName() || name == AccumulatorBottomN::getName();
 }
 
-StringData getAccumulationOpName(const AccumulationStatement& accStmt) {
+std::string_view getAccumulationOpName(const AccumulationStatement& accStmt) {
     return accStmt.expr.name;
 }
 
-StringData getWindowFunctionOpName(const WindowFunctionStatement& wfStmt) {
+std::string_view getWindowFunctionOpName(const WindowFunctionStatement& wfStmt) {
     return wfStmt.expr->getOpName();
 }
 
@@ -861,7 +862,7 @@ std::unique_ptr<sbe::SortSpec> makeSortSpecFromSortPattern(
  */
 std::unique_ptr<SlotTreeNode> buildKeyPatternTree(const BSONObj& keyPattern,
                                                   const SbSlotVector& slots) {
-    std::vector<StringData> paths;
+    std::vector<std::string_view> paths;
     for (auto&& elem : keyPattern) {
         paths.emplace_back(elem.fieldNameStringData());
     }
@@ -1014,7 +1015,7 @@ std::pair<SbStage, SbSlotVector> projectFieldsToSlots(SbStage stage,
         SbExprOptSlotVector projects;
 
         for (size_t i = 0; i < fields.size(); ++i) {
-            auto name = std::make_pair(PlanStageSlots::kField, StringData(fields[i]));
+            auto name = std::make_pair(PlanStageSlots::kField, std::string_view(fields[i]));
             auto fieldSlot = slots ? slots->getIfExists(name) : boost::none;
             if (fieldSlot) {
                 projects.emplace_back(*fieldSlot, boost::none);
@@ -1058,7 +1059,7 @@ std::pair<SbStage, SbSlotVector> projectFieldsToSlots(SbStage stage,
             return std::any_of(v.begin(), v.end(), [](auto&& c) { return !c->value.visited; });
         };
         auto preVisit = [&](Node* node, const std::string& path) {
-            auto name = std::make_pair(PlanStageSlots::kField, StringData(path));
+            auto name = std::make_pair(PlanStageSlots::kField, std::string_view(path));
             // Look for a kField slot that corresponds to node's path.
             if (auto slot = slots->getIfExists(name); slot) {
                 // We found a kField slot. Assign it to 'node->value.expr' and mark 'node'

@@ -37,6 +37,8 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo {
@@ -88,7 +90,7 @@ public:
  */
 class DocumentSourceWriter : public DocumentSource {
 public:
-    DocumentSourceWriter(StringData stageName,
+    DocumentSourceWriter(std::string_view stageName,
                          NamespaceString outputNs,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx), _outputNs(std::move(outputNs)) {}

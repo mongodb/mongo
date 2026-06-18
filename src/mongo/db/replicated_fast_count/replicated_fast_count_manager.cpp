@@ -50,6 +50,7 @@
 MONGO_FAIL_POINT_DEFINE(hangAfterReplicatedFastCountSnapshot);
 
 namespace mongo::replicated_fast_count {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -271,7 +272,7 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
 
         LOGV2(11648801,
               "ReplicatedFastCountManager persisted size/count information read complete",
-              "storeType"_attr = useContainers ? "container"_sd : "collection"_sd,
+              "storeType"_attr = useContainers ? "container"sv : "collection"sv,
               "numRecordsScanned"_attr = numRecordsScanned,
               "duration"_attr = Date_t::now() - startTime);
     }

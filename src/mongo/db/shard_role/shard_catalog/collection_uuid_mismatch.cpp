@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/util/assert_util.h"

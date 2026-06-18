@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -41,7 +42,6 @@
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -99,7 +99,7 @@ inline size_t estimate(S) {
     return 0;
 }
 
-inline size_t estimate(StringData str) {
+inline size_t estimate(std::string_view str) {
     return 0;
 }
 

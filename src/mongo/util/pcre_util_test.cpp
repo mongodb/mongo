@@ -29,7 +29,6 @@
 
 #include "mongo/util/pcre_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
@@ -37,16 +36,18 @@
 
 #include <climits>
 #include <cstdint>
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo::pcre_util {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Test compares `CompileOptions` as integers.
 TEST(PcreUtilTest, FlagsToOptions) {
     using namespace pcre::options;
-    auto parse = [](StringData flags) {
+    auto parse = [](std::string_view flags) {
         return static_cast<uint32_t>(flagsToOptions(flags));
     };
     auto expect = [](pcre::CompileOptions o) {
@@ -91,17 +92,17 @@ TEST(PcreUtilTest, OptionsToFlags) {
 
 TEST(PcreUtilTest, QuoteMeta) {
     ASSERT_EQ(quoteMeta(""), "");
-    ASSERT_EQ(quoteMeta("abc_def_123"_sd), "abc_def_123");
-    ASSERT_EQ(quoteMeta("🍌"_sd), "🍌");
-    ASSERT_EQ(quoteMeta("\0"_sd), "\\0") << "NUL";
-    ASSERT_EQ(quoteMeta("\n"_sd), "\\\n") << "one escape";
-    ASSERT_EQ(quoteMeta("a\n\nb"_sd), "a\\\n\\\nb") << "two adjacent escapes";
-    ASSERT_EQ(quoteMeta("a\nb\nc"_sd), "a\\\nb\\\nc") << "two nonadjacent escapes";
+    ASSERT_EQ(quoteMeta("abc_def_123"sv), "abc_def_123");
+    ASSERT_EQ(quoteMeta("🍌"sv), "🍌");
+    ASSERT_EQ(quoteMeta("\0"sv), "\\0") << "NUL";
+    ASSERT_EQ(quoteMeta("\n"sv), "\\\n") << "one escape";
+    ASSERT_EQ(quoteMeta("a\n\nb"sv), "a\\\n\\\nb") << "two adjacent escapes";
+    ASSERT_EQ(quoteMeta("a\nb\nc"sv), "a\\\nb\\\nc") << "two nonadjacent escapes";
 
     // All the single chars except '\0', which is already tested and behaves differently.
     for (int i = 1; i <= CHAR_MAX; ++i) {
         char c = i;
-        StringData in(&c, 1);
+        std::string_view in(&c, 1);
         std::string out = quoteMeta(in);
 
         // [a-zA-Z0-9_] and bit7 chars are not escaped. Everything else is.
@@ -115,11 +116,11 @@ TEST(PcreUtilTest, QuoteMeta) {
             return true;
         }();
 
-        auto hexdump = [](StringData in) {
+        auto hexdump = [](std::string_view in) {
             std::string r = "[";
-            StringData sep;
+            std::string_view sep;
             for (unsigned char c : in) {
-                static constexpr auto d = "0123456789abcdef"_sd;
+                static constexpr auto d = "0123456789abcdef"sv;
                 r += sep;
                 r += d[(c >> 4) & 0xf];
                 r += d[(c >> 0) & 0xf];

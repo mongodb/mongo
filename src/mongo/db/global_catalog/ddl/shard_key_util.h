@@ -45,6 +45,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -253,8 +254,8 @@ MONGO_MOD_NEEDS_REPLACEMENT void validateShardKeyIsNotEncrypted(
  * - If time field is present, it must be ranged and at the end of the key pattern.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void validateTimeseriesShardKey(
-    StringData timeFieldName,
-    boost::optional<StringData> metaFieldName,
+    std::string_view timeFieldName,
+    boost::optional<std::string_view> metaFieldName,
     const BSONObj& shardKeyPattern);
 
 /**

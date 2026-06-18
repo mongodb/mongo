@@ -46,6 +46,7 @@
 #include <limits>
 #include <ratio>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 #include <fmt/format.h>
@@ -147,7 +148,7 @@ inline long long durationCount(const std::chrono::duration<RepIn, PeriodIn>& d) 
 template <typename Period>
 class Duration {
 public:
-    static constexpr StringData unit_short() {
+    static constexpr std::string_view unit_short() {
         if constexpr (std::is_same_v<Duration, Nanoseconds>) {
             return "ns"_sd;
         } else if constexpr (std::is_same_v<Duration, Microseconds>) {
@@ -163,9 +164,9 @@ public:
         } else if constexpr (std::is_same_v<Duration, Days>) {
             return "d"_sd;
         }
-        return StringData{};
+        return std::string_view{};
     }
-    static constexpr StringData mongoUnitSuffix() {
+    static constexpr std::string_view mongoUnitSuffix() {
         if constexpr (std::is_same_v<Duration, Nanoseconds>) {
             return "Nanos"_sd;
         } else if constexpr (std::is_same_v<Duration, Microseconds>) {
@@ -181,7 +182,7 @@ public:
         } else if constexpr (std::is_same_v<Duration, Days>) {
             return "Days"_sd;
         }
-        return StringData{};
+        return std::string_view{};
     }
     MONGO_STATIC_ASSERT_MSG(Period::num > 0, "Duration::period's numerator must be positive");
     MONGO_STATIC_ASSERT_MSG(Period::den > 0, "Duration::period's denominator must be positive");

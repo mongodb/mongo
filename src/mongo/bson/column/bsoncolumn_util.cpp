@@ -31,6 +31,8 @@
 
 #include "mongo/bson/column/bsonobj_traversal.h"
 
+#include <string_view>
+
 namespace mongo::bsoncolumn {
 
 uint32_t numInterleavedStreams(const BSONObj& refObj, uint8_t control) {
@@ -47,7 +49,7 @@ uint32_t numInterleavedStreams(const BSONObj& refObj, uint8_t control) {
     BSONObjTraversal t(
         traverseIntoArrays,
         rootType,
-        [](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
+        [](std::string_view fieldName, const BSONObj& obj, BSONType type) { return true; },
         [&num](const BSONElement& elem) {
             ++num;
             return true;

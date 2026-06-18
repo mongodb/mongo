@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/pipeline/expression_find_internal.h"

@@ -45,6 +45,7 @@
 #include "mongo/util/processinfo.h"
 
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
@@ -518,7 +519,7 @@ void TicketingSystem::_appendOperationStats(BSONObjBuilder& b, OperationType opT
 }
 
 void TicketingSystem::_appendTicketHolderStats(BSONObjBuilder& b,
-                                               StringData fieldName,
+                                               std::string_view fieldName,
                                                bool prioritizationEnabled,
                                                const AdmissionContext::Priority& priority,
                                                const std::unique_ptr<TicketHolder>& holder,
@@ -808,7 +809,7 @@ void TicketingSystem::TicketingState::appendStats(BSONObjBuilder& b) const {
 
 void ExecutionControlDeprioritizationExemptions::append(OperationContext*,
                                                         BSONObjBuilder* bob,
-                                                        StringData name,
+                                                        std::string_view name,
                                                         const boost::optional<TenantId>&) {
     admission::appendAppNameExemptionList(
         executionControlDeprioritizationExemptions.makeSnapshot(), bob, name);
@@ -821,7 +822,7 @@ Status ExecutionControlDeprioritizationExemptions::set(const BSONElement& value,
     return Status::OK();
 }
 
-Status ExecutionControlDeprioritizationExemptions::setFromString(StringData str,
+Status ExecutionControlDeprioritizationExemptions::setFromString(std::string_view str,
                                                                  const boost::optional<TenantId>&) {
     executionControlDeprioritizationExemptions.update(
         admission::parseAppNameExemptionList(fromjson(str)));

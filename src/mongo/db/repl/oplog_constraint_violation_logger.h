@@ -37,6 +37,7 @@
 #include "mongo/util/time_support.h"
 
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -45,18 +46,19 @@
 namespace mongo {
 namespace repl {
 
-static constexpr StringData kInsertOnExistingDocMsg = "attempted to insert on existing doc"_sd;
-static constexpr StringData kUpdateOnMissingDocMsg =
-    "ran update as upsert and failed to match any documents"_sd;
-static constexpr StringData kDeleteWasEmptyMsg = "applied a delete that did not delete anything"_sd;
-static constexpr StringData kDeleteOnMissingNs = "applied a delete on missing namespace"_sd;
-static constexpr StringData kAcceptableErrorInCommand =
-    "received an acceptable error during oplog application"_sd;
-static constexpr StringData kRecordIdsReplicatedDocIdMismatch =
+inline constexpr std::string_view kInsertOnExistingDocMsg{"attempted to insert on existing doc"};
+inline constexpr std::string_view kUpdateOnMissingDocMsg{
+    "ran update as upsert and failed to match any documents"};
+inline constexpr std::string_view kDeleteWasEmptyMsg{
+    "applied a delete that did not delete anything"};
+inline constexpr std::string_view kDeleteOnMissingNs{"applied a delete on missing namespace"};
+inline constexpr std::string_view kAcceptableErrorInCommand{
+    "received an acceptable error during oplog application"};
+inline constexpr std::string_view kRecordIdsReplicatedDocIdMismatch{
     "the _id in the oplog entry for a replicated record id collection did not match the _id of the "
-    "document found at the rid";
-static constexpr StringData kReplicatedSizeDeltaMismatch =
-    "replicated size delta mismatch between primary and secondary";
+    "document found at the rid"};
+inline constexpr std::string_view kReplicatedSizeDeltaMismatch{
+    "replicated size delta mismatch between primary and secondary"};
 
 enum class OplogConstraintViolationEnum {
     kInsertOnExistingDoc = 0,
@@ -70,7 +72,7 @@ enum class OplogConstraintViolationEnum {
 };
 
 // Returns a string describing the constraint violation of the given type.
-StringData toString(OplogConstraintViolationEnum type);
+std::string_view toString(OplogConstraintViolationEnum type);
 
 /**
  * Logs oplog constraint violation occurrences.

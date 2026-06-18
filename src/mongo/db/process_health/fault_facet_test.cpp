@@ -29,7 +29,6 @@
 
 #include "mongo/db/process_health/fault_facet.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/process_health/fault_facet_impl.h"
 #include "mongo/db/process_health/fault_facet_mock.h"
 #include "mongo/db/service_context.h"
@@ -37,10 +36,13 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace process_health {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Using the Mock facet.
 class FaultFacetTestWithMock : public unittest::Test {
@@ -119,7 +121,7 @@ TEST_F(FaultFacetImplTest, Simple) {
     const auto status = getStatus();
     ASSERT_GT(status.getSeverity(), Severity::kOk);
     ASSERT_EQ(status.getType(), FaultFacetType::kMock1);
-    ASSERT_EQ(status.getShortDescription(), "test"_sd);
+    ASSERT_EQ(status.getShortDescription(), "test"sv);
 }
 
 TEST_F(FaultFacetImplTest, Update) {

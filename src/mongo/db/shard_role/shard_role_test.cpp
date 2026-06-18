@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/shard_role.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -86,6 +85,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -95,6 +95,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using unittest::assertGet;
 
@@ -2192,7 +2193,7 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionBecomesCreated) {
 TimeseriesOptions createTimeseriesOptions() {
     TimeseriesOptions tsOpts{};
     tsOpts.setTimeField("timeField");
-    tsOpts.setMetaField("metaField"_sd);
+    tsOpts.setMetaField("metaField"sv);
     return tsOpts;
 }
 

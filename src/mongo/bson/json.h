@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -40,6 +39,7 @@
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -64,7 +64,7 @@ namespace mongo {
  */
 
 
-MONGO_MOD_PUBLIC BSONObj fromjson(StringData str);
+MONGO_MOD_PUBLIC BSONObj fromjson(std::string_view str);
 
 /**
  * Convert a BSONArray to a JSON string.
@@ -100,7 +100,7 @@ class JParse {
 
 public:
     constexpr static int kMaxDepth = BSONDepth::kDefaultMaxAllowableDepth;
-    explicit JParse(StringData str) : _buf(str), _input(str) {}
+    explicit JParse(std::string_view str) : _buf(str), _input(str) {}
 
     /*
      * Notation: All-uppercase symbols denote non-terminals; all other
@@ -136,7 +136,7 @@ public:
      */
 
 private:
-    Status value(StringData fieldName, BSONObjBuilder&, int depth);
+    Status value(std::string_view fieldName, BSONObjBuilder&, int depth);
 
     /*
      * OBJECT :
@@ -166,7 +166,7 @@ private:
      *
      */
 public:
-    Status object(StringData fieldName, BSONObjBuilder&, bool subObj = true, int depth = 0);
+    Status object(std::string_view fieldName, BSONObjBuilder&, bool subObj = true, int depth = 0);
     Status parse(BSONObjBuilder& builder);
     bool isArray();
 
@@ -178,7 +178,7 @@ private:
      * OIDOBJECT :
      *     { FIELD("$oid") : <24 character hex std::string> }
      */
-    Status objectIdObject(StringData fieldName, BSONObjBuilder&);
+    Status objectIdObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * BINARYOBJECT :
@@ -186,19 +186,19 @@ private:
      *          FIELD("$type") : <hexadecimal representation of a single byte
      *              indicating the data type> }
      */
-    Status binaryObject(StringData fieldName, BSONObjBuilder&);
+    Status binaryObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * UUIDOBJECT :
      *     { FIELD("$uuid") : <string representation of UUID, in hexadecimal per RFC 4122> }
      */
-    Status uuidObject(StringData fieldName, BSONObjBuilder&);
+    Status uuidObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * DATEOBJECT :
      *     { FIELD("$date") : <64 bit signed integer for milliseconds since epoch> }
      */
-    Status dateObject(StringData fieldName, BSONObjBuilder&);
+    Status dateObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * TIMESTAMPOBJECT :
@@ -206,7 +206,7 @@ private:
      *         FIELD("t") : <32 bit unsigned integer for seconds since epoch>,
      *         FIELD("i") : <32 bit unsigned integer for the increment> } }
      */
-    Status timestampObject(StringData fieldName, BSONObjBuilder&);
+    Status timestampObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      *     NOTE: the rules for the body of the regex are different here,
@@ -216,7 +216,7 @@ private:
      *   | { FIELD("$regex") : <string representing body of regex>,
      *          FIELD("$options") : <string representing regex options> }
      */
-    Status regexObject(StringData fieldName, BSONObjBuilder&);
+    Status regexObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      *     NOTE: the rules for the body of the regex are different here,
@@ -226,7 +226,7 @@ private:
      *         FIELD("pattern") : <string representing body of regex>,
      *         FIELD("options") : <string representing regex options> } }
      */
-    Status regexObjectCanonical(StringData fieldName, BSONObjBuilder&);
+    Status regexObjectCanonical(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * REFOBJECT :
@@ -235,49 +235,49 @@ private:
      *   | { FIELD("$ref") : std::string , FIELD("$id") : OBJECTID }
      *   | { FIELD("$ref") : std::string , FIELD("$id") : OIDOBJECT }
      */
-    Status dbRefObject(StringData fieldName, BSONObjBuilder&, int depth);
+    Status dbRefObject(std::string_view fieldName, BSONObjBuilder&, int depth);
 
     /*
      * UNDEFINEDOBJECT :
      *     { FIELD("$undefined") : true }
      */
-    Status undefinedObject(StringData fieldName, BSONObjBuilder&);
+    Status undefinedObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * NUMBERINTOBJECT :
      *     { FIELD("$numberInt") : "<number>" }
      */
-    Status numberIntObject(StringData fieldName, BSONObjBuilder&);
+    Status numberIntObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * NUMBERLONGOBJECT :
      *     { FIELD("$numberLong") : "<number>" }
      */
-    Status numberLongObject(StringData fieldName, BSONObjBuilder&);
+    Status numberLongObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * NUMBERDOUBLEOBJECT :
      *     { FIELD("$numberDouble") : "<number>" }
      */
-    Status numberDoubleObject(StringData fieldName, BSONObjBuilder&);
+    Status numberDoubleObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * NUMBERDECIMALOBJECT :
      *     { FIELD("$numberDecimal") : "<number>" }
      */
-    Status numberDecimalObject(StringData fieldName, BSONObjBuilder&);
+    Status numberDecimalObject(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * MINKEYOBJECT :
      *     { FIELD("$minKey") : 1 }
      */
-    Status minKeyObject(StringData fieldName, BSONObjBuilder& builder);
+    Status minKeyObject(std::string_view fieldName, BSONObjBuilder& builder);
 
     /*
      * MAXKEYOBJECT :
      *     { FIELD("$maxKey") : 1 }
      */
-    Status maxKeyObject(StringData fieldName, BSONObjBuilder& builder);
+    Status maxKeyObject(std::string_view fieldName, BSONObjBuilder& builder);
 
     /*
      * ARRAY :
@@ -288,14 +288,14 @@ private:
      *     VALUE
      *   | VALUE , ELEMENTS
      */
-    Status array(StringData fieldName, BSONObjBuilder&, bool subObj, int depth);
+    Status array(std::string_view fieldName, BSONObjBuilder&, bool subObj, int depth);
 
     /*
      * NOTE: Currently only Date can be preceded by the "new" keyword
      * CONSTRUCTOR :
      *     DATE
      */
-    Status constructor(StringData fieldName, BSONObjBuilder&);
+    Status constructor(std::string_view fieldName, BSONObjBuilder&);
 
     /* The following functions only parse the body of the constructor
      * between the parentheses, not including the constructor name */
@@ -303,50 +303,50 @@ private:
      * DATE :
      *     Date( <64 bit signed integer for milliseconds since epoch> )
      */
-    Status date(StringData fieldName, BSONObjBuilder&);
+    Status date(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * TIMESTAMP :
      *     Timestamp( <32 bit unsigned integer for seconds since epoch>,
      *          <32 bit unsigned integer for the increment> )
      */
-    Status timestamp(StringData fieldName, BSONObjBuilder&);
+    Status timestamp(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * OBJECTID :
      *     ObjectId( <24 character hex std::string> )
      */
-    Status objectId(StringData fieldName, BSONObjBuilder&);
+    Status objectId(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * UUID :
      *     UUID( <36 character [<hex>, '-'] std::string> )
      */
-    Status uuid(StringData fieldName, BSONObjBuilder& builder);
+    Status uuid(std::string_view fieldName, BSONObjBuilder& builder);
 
     /*
      * NUMBERLONG :
      *     NumberLong( <number> )
      */
-    Status numberLong(StringData fieldName, BSONObjBuilder&);
+    Status numberLong(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * NUMBERDECIMAL :
      *     NumberDecimal( <number> )
      */
-    Status numberDecimal(StringData fieldName, BSONObjBuilder&);
+    Status numberDecimal(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * NUMBERINT :
      *     NumberInt( <number> )
      */
-    Status numberInt(StringData fieldName, BSONObjBuilder&);
+    Status numberInt(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * DBREF :
      *     Dbref( <namespace std::string> , <24 character hex std::string> )
      */
-    Status dbRef(StringData fieldName, BSONObjBuilder&, int depth);
+    Status dbRef(std::string_view fieldName, BSONObjBuilder&, int depth);
 
     /*
      * REGEX :
@@ -378,10 +378,10 @@ private:
      * REGEXOPTION :
      *     g | i | m | s
      */
-    Status regex(StringData fieldName, BSONObjBuilder&);
+    Status regex(std::string_view fieldName, BSONObjBuilder&);
     Status regexPat(std::string* result);
     Status regexOpt(std::string* result);
-    Status regexOptCheck(StringData opt);
+    Status regexOptCheck(std::string_view opt);
 
     /*
      * NUMBER :
@@ -394,7 +394,7 @@ private:
      * Timestamp - strtoul for both timestamp and increment and '-'
      * before a number explicity disallowed
      */
-    Status number(StringData fieldName, BSONObjBuilder&);
+    Status number(std::string_view fieldName, BSONObjBuilder&);
 
     /*
      * FIELD :
@@ -466,7 +466,7 @@ private:
      * we reach the end of our buffer.  Do not update the pointer to our
      * buffer (same as calling readTokenImpl with advance=false).
      */
-    inline bool peekToken(StringData token);
+    inline bool peekToken(std::string_view token);
 
     /**
      * @return true if the given token matches the next non whitespace
@@ -474,7 +474,7 @@ private:
      * we reach the end of our buffer.  Updates the pointer to our
      * buffer (same as calling readTokenImpl with advance=true).
      */
-    [[nodiscard]] inline bool readToken(StringData token);
+    [[nodiscard]] inline bool readToken(std::string_view token);
 
     /**
      * @return true if the given token matches the next non whitespace
@@ -482,13 +482,13 @@ private:
      * we reach the end of our buffer.  Do not update the pointer to our
      * buffer if advance is false.
      */
-    bool readTokenImpl(StringData token, bool advance = true);
+    bool readTokenImpl(std::string_view token, bool advance = true);
 
     /**
      * @return true if the next field in our stream matches field.
      * Handles single quoted, double quoted, and unquoted field names
      */
-    bool readField(StringData field);
+    bool readField(std::string_view field);
 
     /**
      * @return true if matchChar is in matchSet
@@ -499,13 +499,13 @@ private:
     /**
      * @return true if every character in the std::string is a hex digit
      */
-    bool isHexString(StringData) const;
+    bool isHexString(std::string_view) const;
 
     /**
      * @return true if every character in the std::string is a valid base64
      * character
      */
-    bool isBase64String(StringData) const;
+    bool isBase64String(std::string_view) const;
 
     /**
      * Assumes there is a parse error at the current offset, appends a snippet of text from around
@@ -525,7 +525,7 @@ private:
      * @return FailedToParse status with the given message and some
      * additional context information
      */
-    Status parseError(StringData msg);
+    Status parseError(std::string_view msg);
 
     /**
      * @returns a valid Date_t or FailedToParse status.
@@ -547,8 +547,8 @@ private:
      * _buf is the buffer containing the JSON string we are parsing.
      * _input is the not-yet-parsed part of the buffer
      */
-    StringData _buf;
-    StringData _input;
+    std::string_view _buf;
+    std::string_view _input;
 };
 
 }  // namespace mongo

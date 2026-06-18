@@ -34,6 +34,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -44,8 +46,8 @@ class MONGO_MOD_PUBLIC DirectShardClientTracker {
     DirectShardClientTracker& operator=(const DirectShardClientTracker&) = delete;
 
 public:
-    static constexpr StringData kCurrentFieldName = "current"_sd;
-    static constexpr StringData kCreatedFieldName = "totalCreated"_sd;
+    static constexpr std::string_view kCurrentFieldName = "current"_sd;
+    static constexpr std::string_view kCreatedFieldName = "totalCreated"_sd;
 
     DirectShardClientTracker() = default;
     ~DirectShardClientTracker() = default;

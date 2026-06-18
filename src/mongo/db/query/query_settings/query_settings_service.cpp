@@ -51,11 +51,14 @@
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/serialization_context.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::query_settings {
+using namespace std::literals::string_view_literals;
 MONGO_FAIL_POINT_DEFINE(throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter);
 
 using namespace query_shape;
@@ -69,24 +72,24 @@ const auto kSerializationContext =
                          SerializationContext::CallerType::Request,
                          SerializationContext::Prefix::ExcludePrefix};
 
-const stdx::unordered_set<StringData, StringMapHasher> rejectionIncompatibleStages = {
-    "$querySettings"_sd,
-    "$planCacheStats"_sd,
-    "$collStats"_sd,
-    "$indexStats"_sd,
-    "$listSessions"_sd,
-    "$listSampledQueries"_sd,
-    "$queryStats"_sd,
-    "$currentOp"_sd,
-    "$listCatalog"_sd,
-    "$listLocalSessions"_sd,
-    "$listSearchIndexes"_sd,
+const stdx::unordered_set<std::string_view, StringMapHasher> rejectionIncompatibleStages = {
+    "$querySettings"sv,
+    "$planCacheStats"sv,
+    "$collStats"sv,
+    "$indexStats"sv,
+    "$listSessions"sv,
+    "$listSampledQueries"sv,
+    "$queryStats"sv,
+    "$currentOp"sv,
+    "$listCatalog"sv,
+    "$listLocalSessions"sv,
+    "$listSearchIndexes"sv,
 };
 
 const auto getQuerySettingsService =
     ServiceContext::declareDecoration<std::unique_ptr<QuerySettingsService>>();
 
-static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
+static constexpr auto kQuerySettingsClusterParameterName = "querySettings"sv;
 
 MONGO_FAIL_POINT_DEFINE(allowAllSetQuerySettings);
 
@@ -670,7 +673,7 @@ public:
 
             int newQuerySettingsClusterParameterEstimatedBsonSize = [&]() {
                 BSONObjBuilder bob;
-                QuerySettingsClusterParameter p("querySettings"_sd,
+                QuerySettingsClusterParameter p("querySettings"sv,
                                                 ServerParameterType::kClusterWide);
                 p.append(opCtx, &bob, "", boost::none /* tenantId */);
                 return bob.obj().objsize();
@@ -818,7 +821,7 @@ bool QuerySettingsService::isEligbleForQuerySettings(
     return true;
 }
 
-const stdx::unordered_set<StringData, StringMapHasher>&
+const stdx::unordered_set<std::string_view, StringMapHasher>&
 QuerySettingsService::getRejectionIncompatibleStages() {
     return rejectionIncompatibleStages;
 };

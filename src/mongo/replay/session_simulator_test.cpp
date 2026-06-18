@@ -48,6 +48,7 @@
 
 #include <chrono>
 #include <memory>
+#include <string_view>
 
 #include <boost/filesystem/path.hpp>
 #include <gmock/gmock-more-matchers.h>
@@ -69,7 +70,7 @@ public:
 
     TestSessionSimulator(PacketSource source,
                          std::chrono::steady_clock::time_point startTime,
-                         StringData uri)
+                         std::string_view uri)
         : SessionSimulator(std::move(source),
                            0 /* sessionID */,
                            startTime,

@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <unicode/uchar.h>  // IWYU pragma: keep
@@ -48,6 +49,7 @@
 #include <unicode/utypes.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 /**
@@ -77,7 +79,7 @@ public:
         _str.resize(len);
     }
 
-    static UString fromUTF8(StringData str) {
+    static UString fromUTF8(std::string_view str) {
         if (str.empty()) {
             return UString(0);
         }
@@ -203,14 +205,14 @@ private:
 
 }  // namespace
 
-StatusWith<std::string> icuSaslPrep(StringData str, UStringPrepOptions options) try {
+StatusWith<std::string> icuSaslPrep(std::string_view str, UStringPrepOptions options) try {
     const auto opts = (options == kUStringPrepDefault) ? USPREP_DEFAULT : USPREP_ALLOW_UNASSIGNED;
     return USPrep(USPREP_RFC4013_SASLPREP).prepare(UString::fromUTF8(str), opts).toUTF8();
 } catch (const DBException& e) {
     return e.toStatus();
 }
 
-StatusWith<std::string> icuX509DNPrep(StringData str) try {
+StatusWith<std::string> icuX509DNPrep(std::string_view str) try {
     return USPrep(USPREP_RFC4518_LDAP).prepare(UString::fromUTF8(str), USPREP_DEFAULT).toUTF8();
 } catch (const DBException& e) {
     return e.toStatus();
@@ -222,11 +224,11 @@ StatusWith<std::string> icuX509DNPrep(StringData str) try {
  */
 MONGO_INITIALIZER_GENERAL(LoadIcuPrep, ("LoadICUData"), ("default"))(InitializerContext*) {
     // Force ICU to load its caches by calling each function.
-    invariant(icuSaslPrep("a"_sd).getStatus());
-    invariant(icuX509DNPrep("a"_sd).getStatus());
+    invariant(icuSaslPrep("a"sv).getStatus());
+    invariant(icuX509DNPrep("a"sv).getStatus());
 }
 
-std::string icuCaseFold(StringData str) {
+std::string icuCaseFold(std::string_view str) {
     return UString::fromUTF8(str).foldCase().toUTF8();
 }
 

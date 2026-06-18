@@ -33,6 +33,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/filesystem/directory.hpp>
@@ -43,7 +44,6 @@
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/constants.h"
@@ -140,7 +140,7 @@ std::vector<boost::filesystem::path> FTDCFileManager::scanDirectory() {
 }
 
 StatusWith<boost::filesystem::path> FTDCFileManager::generateArchiveFileName(
-    const boost::filesystem::path& path, StringData suffix) {
+    const boost::filesystem::path& path, std::string_view suffix) {
     auto fileName = path;
     fileName /= std::string(kFTDCArchiveFile);
     fileName += std::string(".");

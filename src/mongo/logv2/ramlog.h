@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
@@ -38,6 +37,7 @@
 #include <cstddef>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo::logv2 {
@@ -144,10 +144,10 @@ public:
     }
 
 private:
-    explicit RamLog(StringData name, size_t maxLines, size_t maxSizeBytes);
+    explicit RamLog(std::string_view name, size_t maxLines, size_t maxSizeBytes);
     ~RamLog();  // want this private as we want to leak so we can use them till the very end
 
-    StringData getLine(size_t lineNumber) const;
+    std::string_view getLine(size_t lineNumber) const;
 
     size_t getLineCount() const;
 
@@ -212,7 +212,7 @@ public:
     /**
      * Returns the next line and advances the iterator.
      */
-    StringData next() {
+    std::string_view next() {
         return _ramlog->getLine(_nextLineIndex++);  // Postfix increment.
     }
 

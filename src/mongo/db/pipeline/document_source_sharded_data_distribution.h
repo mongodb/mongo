@@ -45,6 +45,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -61,7 +62,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ShardedDataDistribution);
  */
 namespace DocumentSourceShardedDataDistribution {
 
-static constexpr StringData kStageName = "$shardedDataDistribution"_sd;
+static constexpr std::string_view kStageName = "$shardedDataDistribution"_sd;
 
 class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
 public:

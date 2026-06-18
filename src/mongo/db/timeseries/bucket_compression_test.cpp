@@ -34,7 +34,11 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
+
+using namespace std::literals::string_view_literals;
 
 namespace mongo {
 namespace {
@@ -125,7 +129,7 @@ void assertNoDuplicateIndexFieldNames(const BSONObj& column) {
 
 TEST(TimeseriesBucketCompression, BasicRoundtrip) {
     auto compressed = timeseries::compressBucket(
-        sampleBucket, "t"_sd, NamespaceString::createNamespaceString_forTest("test.foo"), false);
+        sampleBucket, "t"sv, NamespaceString::createNamespaceString_forTest("test.foo"), false);
     ASSERT_TRUE(compressed.compressedBucket.has_value());
     auto decompressed = timeseries::decompressBucket(compressed.compressedBucket.value());
     ASSERT_TRUE(decompressed.has_value());
@@ -136,7 +140,7 @@ TEST(TimeseriesBucketCompression, BasicRoundtrip) {
 }
 
 TEST(TimeseriesBucketCompression, RoundtripWithDuplicateIndexFieldNames) {
-    const StringData timeFieldName("t");
+    const std::string_view timeFieldName("t");
     auto compressed =
         timeseries::compressBucket(bucketWithDuplicateIndexFieldNames,
                                    timeFieldName,
@@ -172,11 +176,11 @@ TEST(TimeseriesBucketCompression, CompressAlreadyCompressedBucket) {
     // Compressing an already compressed bucket is a noop, should return the same compressed bucket
     // untouched.
     auto compressed = timeseries::compressBucket(
-        sampleBucket, "t"_sd, NamespaceString::createNamespaceString_forTest("test.foo"), false);
+        sampleBucket, "t"sv, NamespaceString::createNamespaceString_forTest("test.foo"), false);
     ASSERT_TRUE(compressed.compressedBucket.has_value());
     auto res =
         timeseries::compressBucket(*compressed.compressedBucket,
-                                   "t"_sd,
+                                   "t"sv,
                                    NamespaceString::createNamespaceString_forTest("test.foo"),
                                    false);
     ASSERT_TRUE(res.compressedBucket.has_value());

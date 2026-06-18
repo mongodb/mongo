@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -46,6 +45,7 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
@@ -117,7 +117,7 @@ public:
     /**
      * The name of the 'PrimaryOnlyService::Instance'.
      */
-    virtual StringData getInstanceName() = 0;
+    virtual std::string_view getInstanceName() = 0;
 
     /**
      * Interrupts the current running 'DefaultPrimaryOnlyServiceInstance' instance.

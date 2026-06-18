@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/decorable.h"
 
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -77,7 +77,7 @@ void ClusterNetworkRestrictionManager::set(
 
 void AllowListedClusterNetworkSetting::append(OperationContext*,
                                               BSONObjBuilder* b,
-                                              StringData name,
+                                              std::string_view name,
                                               const boost::optional<TenantId>&) {
     auto allowlistedClusterNetwork =
         std::atomic_load(&mongodGlobalParams.allowlistedClusterNetwork);  // NOLINT
@@ -121,7 +121,7 @@ Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e,
     return Status::OK();
 }
 
-Status AllowListedClusterNetworkSetting::setFromString(StringData s,
+Status AllowListedClusterNetworkSetting::setFromString(std::string_view s,
                                                        const boost::optional<TenantId>&) {
     return {ErrorCodes::InternalError, "Cannot invoke this method"};
 }

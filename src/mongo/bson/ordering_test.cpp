@@ -39,6 +39,7 @@
 #include <limits>
 #include <span>
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -191,7 +192,7 @@ TEST(IndexKeyOrderingTest, MakeFromSpanTooManyKeys) {
 TEST(IndexKeyOrderingTest, AllAscendingCompareResults) {
     Ordering o = Ordering::allAscending();
 
-    auto compare = [&o](StringData l, StringData r) -> int {
+    auto compare = [&o](std::string_view l, std::string_view r) -> int {
         return fromjson(l).woCompare(fromjson(r), o);
     };
 
@@ -216,7 +217,7 @@ TEST(IndexKeyOrderingTest, AllDescendingCompareResults) {
     auto o = Ordering::make(obj);
     ASSERT_EQ(o.getBits(), 0xffffffffU);
 
-    auto compare = [&o](StringData l, StringData r) -> int {
+    auto compare = [&o](std::string_view l, std::string_view r) -> int {
         return fromjson(l).woCompare(fromjson(r), o);
     };
 

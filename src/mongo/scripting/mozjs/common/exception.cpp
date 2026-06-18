@@ -38,6 +38,7 @@
 #include "mongo/scripting/mozjs/common/wraptype.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <js/ErrorReport.h>
@@ -82,7 +83,9 @@ std::string currentJSStackToString(JSContext* cx) {
     return ObjectWrapper(cx, error).getString("stack");
 }
 
-Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {
+Status currentJSExceptionToStatus(JSContext* cx,
+                                  ErrorCodes::Error altCode,
+                                  std::string_view altReason) {
     JS::RootedValue vp(cx);
     if (!JS_GetPendingException(cx, &vp))
         return Status(altCode, altReason);
@@ -93,7 +96,7 @@ Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, Stri
 Status JSErrorReportToStatus(JSContext* cx,
                              JSErrorReport* report,
                              ErrorCodes::Error altCode,
-                             StringData altReason) {
+                             std::string_view altReason) {
     JSStringWrapper jsstr(cx, mongoErrorReportToString(cx, report));
     if (!jsstr)
         return Status(altCode, altReason);
@@ -112,7 +115,7 @@ Status JSErrorReportToStatus(JSContext* cx,
     return Status(error, std::string{jsstr.toStringData()});
 }
 
-void throwCurrentJSException(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {
+void throwCurrentJSException(JSContext* cx, ErrorCodes::Error altCode, std::string_view altReason) {
     uassertStatusOK(currentJSExceptionToStatus(cx, altCode, altReason));
     MONGO_UNREACHABLE;
 }
@@ -130,7 +133,7 @@ void statusToJSException(JSContext* cx, Status status, JS::MutableHandleValue ou
 Status jsExceptionToStatus(JSContext* cx,
                            JS::HandleValue excn,
                            ErrorCodes::Error altCode,
-                           StringData altReason) {
+                           std::string_view altReason) {
     auto* runtime = getCommonRuntime(cx);
 
     // It's possible that we have an uncaught exception for OOM, which is reported on the

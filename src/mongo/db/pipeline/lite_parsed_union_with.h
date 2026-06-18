@@ -45,6 +45,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -103,7 +104,7 @@ private:
 class LiteParsedUnionWith final
     : public LiteParsedDocumentSourceNestedPipelines<LiteParsedUnionWith> {
 public:
-    static constexpr StringData kStageName = "$unionWith"_sd;
+    static constexpr std::string_view kStageName = "$unionWith"_sd;
 
     static std::unique_ptr<LiteParsedUnionWith> parse(const NamespaceString& nss,
                                                       const BSONElement& spec,

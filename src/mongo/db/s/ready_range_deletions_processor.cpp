@@ -41,12 +41,15 @@
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
-constexpr auto kRangeDeletionThreadName = "range-deleter"_sd;
+constexpr auto kRangeDeletionThreadName = "range-deleter"sv;
 const Seconds kCheckForEnabledServiceInterval(10);
 const Seconds kMissingIndexRetryInterval(10);
 
@@ -202,7 +205,7 @@ bool ReadyRangeDeletionsProcessor::_shouldDeferRangeDeletionForResharding(Namesp
 
 void ReadyRangeDeletionsProcessor::_rescheduleRangeDeletion(const RangeDeletionTask& task,
                                                             Seconds delay,
-                                                            StringData reason) {
+                                                            std::string_view reason) {
     _completedRangeDeletion();
 
     sleepFor(_executor, delay).getAsync([this, task, reason](Status status) {
@@ -295,7 +298,7 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                                    "task"_attr = task.toBSON());
 
                         _rescheduleRangeDeletion(
-                            task, kCheckForEnabledServiceInterval, "active resharding"_sd);
+                            task, kCheckForEnabledServiceInterval, "active resharding"sv);
                         break;
                     }
                 } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -416,7 +419,7 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                 // built on the shard key. This situation is expected for a hashed shard key and
                 // recoverable for a range shard key. This index may be rebuilt in the future, so
                 // reschedule the task at the end of the queue.
-                _rescheduleRangeDeletion(task, kMissingIndexRetryInterval, "missing index"_sd);
+                _rescheduleRangeDeletion(task, kMissingIndexRetryInterval, "missing index"sv);
                 break;
             } catch (const DBException&) {
                 // Release the thread only in case the operation context has been interrupted, as

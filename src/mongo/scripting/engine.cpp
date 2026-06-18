@@ -31,7 +31,6 @@
 #include "mongo/scripting/engine.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_cursor.h"
@@ -60,6 +59,7 @@
 #include <cstring>
 #include <deque>
 #include <mutex>
+#include <string_view>
 #include <thread>
 
 #include <boost/filesystem/directory.hpp>
@@ -266,7 +266,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
         offset = newline - data.get();
     }
 
-    StringData code(data.get() + offset, len - offset);
+    std::string_view code(data.get() + offset, len - offset);
     return exec(code, filename, printResult, reportError, false, timeoutMs);
 }
 
@@ -624,7 +624,7 @@ public:
     void setNumber(const char* field, double val) override {
         _real->setNumber(field, val);
     }
-    void setString(const char* field, StringData val) override {
+    void setString(const char* field, std::string_view val) override {
         _real->setString(field, val);
     }
     void setElement(const char* field, const BSONElement& val, const BSONObj& parent) override {
@@ -655,7 +655,7 @@ public:
                bool readOnlyRecv) override {
         return _real->invoke(func, args, recv, timeoutMs, ignoreReturn, readOnlyArgs, readOnlyRecv);
     }
-    bool exec(StringData code,
+    bool exec(std::string_view code,
               const string& name,
               bool printResult,
               bool reportError,
@@ -704,7 +704,7 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
     return p;
 }
 
-void (*ScriptEngine::_connectCallback)(DBClientBase&, StringData) = nullptr;
+void (*ScriptEngine::_connectCallback)(DBClientBase&, std::string_view) = nullptr;
 
 ScriptEngine* getGlobalScriptEngine() {
     std::lock_guard<std::mutex> lk(globalScriptEngineMutex);

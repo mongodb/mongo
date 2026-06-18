@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/planner_access.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"

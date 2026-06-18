@@ -30,7 +30,6 @@
 
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -38,8 +37,11 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(ChangeStreamDocumentDiffParserTest, DisambiguatesDottedFields) {
     BSONObj diff = fromjson(
@@ -173,8 +175,8 @@ TEST(ChangeStreamDocumentDiffParserTest, DisambiguatesRemovedFields) {
     auto parsedDiff = change_stream_document_diff_parser::parseDiff(diff);
 
     ASSERT(parsedDiff.removedFields.size() == 2);
-    ASSERT_VALUE_EQ(parsedDiff.removedFields[0], Value("a.b"_sd));
-    ASSERT_VALUE_EQ(parsedDiff.removedFields[1], Value("c.0"_sd));
+    ASSERT_VALUE_EQ(parsedDiff.removedFields[0], Value("a.b"sv));
+    ASSERT_VALUE_EQ(parsedDiff.removedFields[1], Value("c.0"sv));
 
     ASSERT_DOCUMENT_EQ(parsedDiff.disambiguatedPaths,
                        Document(fromjson("{'a.b': ['a.b'], 'c.0': ['c', '0']}")));

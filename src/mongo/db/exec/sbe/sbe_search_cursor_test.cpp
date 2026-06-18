@@ -31,7 +31,6 @@
  * This file contains tests for sbe::SearchCursorStage.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
@@ -49,12 +48,14 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 using SearchCursorStageTest = PlanStageTestFixture;
 
@@ -168,7 +169,7 @@ TEST_F(SearchCursorStageTest, SearchTestOutputs) {
     auto env = std::make_unique<RuntimeEnvironment>();
 
     // Register and fill input slots in the runtime environment.
-    auto limitSlot = env->registerSlot("limit"_sd,
+    auto limitSlot = env->registerSlot("limit"sv,
                                        sbe::value::TypeTags::NumberInt64,
                                        10 /* val */,
                                        true /* owned */,
@@ -224,7 +225,7 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
     auto env = std::make_unique<RuntimeEnvironment>();
 
     // Register and fill input slots in the runtime environment.
-    auto limitSlot = env->registerSlot("limit"_sd,
+    auto limitSlot = env->registerSlot("limit"sv,
                                        sbe::value::TypeTags::NumberInt64,
                                        1 /* val */,
                                        true /* owned */,
@@ -271,7 +272,7 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
     auto env = std::make_unique<RuntimeEnvironment>();
 
     // Register and fill input slots in the runtime environment.
-    auto limitSlot = env->registerSlot("limit"_sd,
+    auto limitSlot = env->registerSlot("limit"sv,
                                        sbe::value::TypeTags::NumberInt64,
                                        10 /* val */,
                                        true /* owned */,

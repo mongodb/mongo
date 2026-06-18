@@ -31,13 +31,13 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <mutex>
+#include <string_view>
 
 namespace mongo {
 
@@ -60,7 +60,7 @@ using HostSettingsMap = stdx::unordered_map<HostAndPort, HostSettings>;
 
 class BridgeCommand {
 public:
-    static StatusWith<BridgeCommand*> findCommand(StringData cmdName);
+    static StatusWith<BridgeCommand*> findCommand(std::string_view cmdName);
 
     virtual ~BridgeCommand() = 0;
 

@@ -41,11 +41,13 @@
 #include <algorithm>
 #include <iterator>
 #include <ostream>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 TEST(ReplSetWriteConcernModeDefinitions, Default) {
     auto definitions = ReplSetWriteConcernModeDefinitions();
     BSONObjBuilder bob;
@@ -74,7 +76,7 @@ TEST(ReplSetWriteConcernModeDefinitions, Empty) {
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, HasCustomModes) {
-    const StringData fieldName("modes"_sd);
+    const std::string_view fieldName("modes"sv);
     auto writeConcernModes = BSON(
         fieldName << BSON("wc1" << BSON("tag1" << 1 << "tag2" << 2) << "wc2" << BSON("tag3" << 3)));
     auto definitions =
@@ -118,7 +120,7 @@ TEST(ReplSetWriteConcernModeDefinitions, HasCustomModes) {
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, RoundTripBson) {
-    const StringData fieldName("modes"_sd);
+    const std::string_view fieldName("modes"sv);
     auto writeConcernModes = BSON(
         fieldName << BSON("wc2" << BSON("tag1" << 1 << "tag2" << 2) << "wc4" << BSON("tag3" << 3)
                                 << "wc3" << BSON("tag5" << 5 << "tag4" << 4) << "wc1"
@@ -144,7 +146,7 @@ TEST(ReplSetWriteConcernModeDefinitions, RoundTripBson) {
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, TagMissingFromTagConfig) {
-    const StringData fieldName("modes"_sd);
+    const std::string_view fieldName("modes"sv);
     auto writeConcernModes = BSON(
         fieldName << BSON("wc1" << BSON("tag1" << 1 << "tag2" << 2) << "wc2" << BSON("tag3" << 3)));
     auto definitions =
@@ -166,7 +168,7 @@ TEST(ReplSetWriteConcernModeDefinitions, TagMissingFromTagConfig) {
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, DuplicateModeNames) {
-    const StringData fieldName("modes"_sd);
+    const std::string_view fieldName("modes"sv);
     auto writeConcernModes = BSON(
         fieldName << BSON("wc1" << BSON("tag1" << 1 << "tag2" << 2) << "wc1" << BSON("tag3" << 3)));
     ASSERT_THROWS(
@@ -175,7 +177,7 @@ TEST(ReplSetWriteConcernModeDefinitions, DuplicateModeNames) {
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, ZeroConstraint) {
-    const StringData fieldName("modes"_sd);
+    const std::string_view fieldName("modes"sv);
     auto writeConcernModes = BSON(
         fieldName << BSON("wc1" << BSON("tag1" << 0 << "tag2" << 2) << "wc2" << BSON("tag3" << 3)));
     ASSERT_THROWS(
@@ -184,7 +186,7 @@ TEST(ReplSetWriteConcernModeDefinitions, ZeroConstraint) {
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, NegativeConstraint) {
-    const StringData fieldName("modes"_sd);
+    const std::string_view fieldName("modes"sv);
     auto writeConcernModes = BSON(fieldName << BSON("wc1" << BSON("tag1" << -1 << "tag2" << 2)
                                                           << "wc2" << BSON("tag3" << 3)));
     ASSERT_THROWS(

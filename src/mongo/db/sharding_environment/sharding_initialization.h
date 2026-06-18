@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/keys_collection_client.h"

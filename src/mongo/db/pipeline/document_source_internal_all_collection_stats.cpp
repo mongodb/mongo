@@ -39,6 +39,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -156,7 +158,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalAllCollectionStats::createFr
     return make_intrusive<DocumentSourceInternalAllCollectionStats>(pExpCtx, std::move(spec));
 }
 
-StringData DocumentSourceInternalAllCollectionStats::getSourceName() const {
+std::string_view DocumentSourceInternalAllCollectionStats::getSourceName() const {
     return kStageName;
 }
 

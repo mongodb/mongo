@@ -39,6 +39,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -46,7 +47,7 @@ namespace mongo {
 namespace {
 
 void assertOplogEntryIsUpdateOfExpectedType(const BSONObj& obj,
-                                            StringData fieldName,
+                                            std::string_view fieldName,
                                             BSONType expectedType = BSONType::date) {
     ASSERT_EQUALS(obj.nFields(), 2);
     ASSERT_EQUALS(obj["$v"].numberInt(), 2);

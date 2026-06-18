@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/document_path_support.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
@@ -44,12 +43,14 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
 namespace document_path_support {
 
 namespace {
+using namespace std::literals::string_view_literals;
 using std::vector;
 
 const ValueComparator kDefaultValueComparator{};
@@ -186,10 +187,10 @@ TEST(VisitAllValuesAtPathTest, TreatsNegativeIndexAsFieldName) {
     auto callback = [&values](const Value& val) {
         values.insert(val);
     };
-    Document doc{{"a", {0, 1, Document{{"-1", "target"_sd}}, Document{{"b", 3}}}}};
+    Document doc{{"a", {0, 1, Document{{"-1", "target"sv}}, Document{{"b", 3}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.-1"), callback);
     ASSERT_EQ(values.size(), 1UL);
-    ASSERT_EQ(values.count(Value("target"_sd)), 1UL);
+    ASSERT_EQ(values.count(Value("target"sv)), 1UL);
 }
 
 TEST(VisitAllValuesAtPathTest, ExtractsNoValuesFromOutOfBoundsIndex) {
@@ -266,7 +267,7 @@ TEST(VisitAllValuesAtPathTest, DoesExpandMultiplePositionalPathSpecifications) {
     Document doc(fromjson("{a: [[{b: '(0, 0)'}, {b: '(0, 1)'}], [{b: '(1, 0)'}, {b: '(1, 1)'}]]}"));
     visitAllValuesAtPath(doc, FieldPath("a.1.0.b"), callback);
     ASSERT_EQ(values.size(), 1UL);
-    ASSERT_EQ(values.count(Value("(1, 0)"_sd)), 1UL);
+    ASSERT_EQ(values.count(Value("(1, 0)"sv)), 1UL);
 }
 
 TEST(VisitAllValuesAtPathTest, DoesAcceptNumericInitialField) {
@@ -288,8 +289,8 @@ TEST(VisitAllValuesAtPathTest, DoesExpandArrayFoundAfterPositionalSpecification)
     Document doc(fromjson("{a: [[{b: '(0, 0)'}, {b: '(0, 1)'}], [{b: '(1, 0)'}, {b: '(1, 1)'}]]}"));
     visitAllValuesAtPath(doc, FieldPath("a.1.b"), callback);
     ASSERT_EQ(values.size(), 2UL);
-    ASSERT_EQ(values.count(Value("(1, 0)"_sd)), 1UL);
-    ASSERT_EQ(values.count(Value("(1, 1)"_sd)), 1UL);
+    ASSERT_EQ(values.count(Value("(1, 0)"sv)), 1UL);
+    ASSERT_EQ(values.count(Value("(1, 1)"sv)), 1UL);
 }
 
 TEST(VisitAllValuesAtPathTest, DoesNotAddMissingValueToResults) {

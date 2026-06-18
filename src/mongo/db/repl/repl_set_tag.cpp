@@ -30,7 +30,6 @@
 #include "mongo/db/repl/repl_set_tag.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
@@ -38,6 +37,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace repl {
@@ -97,7 +97,7 @@ bool ReplSetTagMatch::BoundTagValue::isSatisfied() const {
     return constraint.getMinCount() <= int32_t(boundValues.size());
 }
 
-ReplSetTag ReplSetTagConfig::makeTag(StringData key, StringData value) {
+ReplSetTag ReplSetTagConfig::makeTag(std::string_view key, std::string_view value) {
     int32_t keyIndex = _findKeyIndex(key);
     if (size_t(keyIndex) == _tagData.size()) {
         _tagData.push_back(make_pair(std::string{key}, ValueVector()));
@@ -112,7 +112,7 @@ ReplSetTag ReplSetTagConfig::makeTag(StringData key, StringData value) {
     return ReplSetTag(keyIndex, int32_t(values.size()) - 1);
 }
 
-ReplSetTag ReplSetTagConfig::findTag(StringData key, StringData value) const {
+ReplSetTag ReplSetTagConfig::findTag(std::string_view key, std::string_view value) const {
     int32_t keyIndex = _findKeyIndex(key);
     if (size_t(keyIndex) == _tagData.size())
         return ReplSetTag(-1, -1);
@@ -130,7 +130,7 @@ ReplSetTagPattern ReplSetTagConfig::makePattern() const {
 }
 
 Status ReplSetTagConfig::addTagCountConstraintToPattern(ReplSetTagPattern* pattern,
-                                                        StringData tagKey,
+                                                        std::string_view tagKey,
                                                         int32_t minCount) const {
     int32_t keyIndex = _findKeyIndex(tagKey);
     if (size_t(keyIndex) == _tagData.size()) {
@@ -141,7 +141,7 @@ Status ReplSetTagConfig::addTagCountConstraintToPattern(ReplSetTagPattern* patte
     return Status::OK();
 }
 
-int32_t ReplSetTagConfig::_findKeyIndex(StringData key) const {
+int32_t ReplSetTagConfig::_findKeyIndex(std::string_view key) const {
     size_t i;
     for (i = 0; i < _tagData.size(); ++i) {
         if (_tagData[i].first == key) {

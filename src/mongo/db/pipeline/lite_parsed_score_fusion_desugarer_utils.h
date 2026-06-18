@@ -38,21 +38,22 @@
 #include "mongo/util/string_map.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer::score_fusion_utils {
 
-inline constexpr StringData kInternalFieldsName =
+inline constexpr std::string_view kInternalFieldsName =
     ScoreFusionPipelineBuilder::kScoreFusionInternalFieldsName;
-inline constexpr StringData kDocsName = ScoreFusionPipelineBuilder::kScoreFusionDocsFieldName;
-inline constexpr StringData kScoreDetailsDescription =
+inline constexpr std::string_view kDocsName = ScoreFusionPipelineBuilder::kScoreFusionDocsFieldName;
+inline constexpr std::string_view kScoreDetailsDescription =
     ScoreFusionPipelineBuilder::kScoreFusionScoreDetailsDescription;
 
 // Per-pipeline scoreDetails scalar field suffix used in the desugared $group output (and the
 // matching $replaceRoot wrapper). For $scoreFusion the per-pipeline scalar is "<p>_rawScore".
-inline constexpr StringData kDetailsScalarSuffix = "_rawScore"_sd;
+inline constexpr std::string_view kDetailsScalarSuffix = "_rawScore"_sd;
 
 // Validation/translation of normalization + combination spec.
 class ScoreFusionScoringOptions {
@@ -63,13 +64,13 @@ public:
         return _normalizationMethod;
     }
 
-    StringData getNormalizationString() const;
+    std::string_view getNormalizationString() const;
 
     ScoreFusionCombinationMethodEnum getCombinationMethod() const {
         return _combinationMethod;
     }
 
-    StringData getCombinationMethodString() const;
+    std::string_view getCombinationMethodString() const;
 
     const boost::optional<IDLAnyType>& getCombinationExpression() const {
         return _combinationExpression;
@@ -85,25 +86,25 @@ private:
 // where <scoreOrNorm> is determined by the input.normalization:
 //   - none / minMaxScaler: {$meta: "score"}
 //   - sigmoid: {$sigmoid: {$meta: "score"}}
-BSONObj buildScoreAddFieldsBson(StringData inputPipelineName,
+BSONObj buildScoreAddFieldsBson(std::string_view inputPipelineName,
                                 ScoreFusionNormalizationEnum normalization,
                                 double weight);
 
 // {$addFields: {<INTERNAL_FIELDS>.<p>_rawScore: {$meta: "score"}}}
-BSONObj buildRawScoreAddFieldsBson(StringData inputPipelineName);
+BSONObj buildRawScoreAddFieldsBson(std::string_view inputPipelineName);
 
 // {$addFields: {<INTERNAL_FIELDS>.<p>_scoreDetails: ...}} -- two branches:
 //   - inputGeneratesScoreDetails: { details: {$meta: "scoreDetails"} }
 //   - else                       : { details: [] }
 // Mirrors `addInputPipelineScoreDetails` in score_fusion_pipeline_builder.cpp.
-BSONObj buildAddInputPipelineScoreDetailsBson(StringData inputPipelineName,
+BSONObj buildAddInputPipelineScoreDetailsBson(std::string_view inputPipelineName,
                                               bool inputGeneratesScoreDetails);
 
 // {$_internalSetWindowFields: {sortBy: {<INTERNAL_FIELDS>.<p>_score: -1},
 //                              output: {<INTERNAL_FIELDS>.<p>_score:
 //                                          {$minMaxScaler: {input:
 //                                          "$<INTERNAL_FIELDS>.<p>_score"}}}}}
-BSONObj buildMinMaxScalerSetWindowFieldsBson(StringData inputPipelineName);
+BSONObj buildMinMaxScalerSetWindowFieldsBson(std::string_view inputPipelineName);
 
 // {$setMetadata: {score: {$avg: ["$<INTERNAL_FIELDS>.<p>_score", ...]}}} (avg branch)
 // or

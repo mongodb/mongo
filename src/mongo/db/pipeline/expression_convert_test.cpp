@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -53,10 +52,13 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+using namespace std::literals::string_view_literals;
 
 namespace mongo {
 
@@ -320,7 +322,7 @@ TEST_F(ExpressionConvertTest, ConvertWithOnErrorOptimizesToExpressionConstant) {
 
     auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
     ASSERT(constResult);
-    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), "X"_sd, BSONType::string);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), "X"sv, BSONType::string);
 }
 
 TEST_F(ExpressionConvertTest, ConvertWithBaseOptimizesToExpressionConstant) {
@@ -332,7 +334,7 @@ TEST_F(ExpressionConvertTest, ConvertWithBaseOptimizesToExpressionConstant) {
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     convertExp = convertExp->optimize();
 
-    Value result{"A0"_sd};
+    Value result{"A0"sv};
 
     auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
     ASSERT(constResult);

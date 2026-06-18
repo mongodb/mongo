@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -48,7 +49,7 @@ namespace mongo::otel::metrics {
  * Invalid: "", ".", "network..open_connections", "network.OpenConnections",
  *   "network.Open_connections", "network.2connections"
  */
-Status validateOtelMetricName(StringData name);
+Status validateOtelMetricName(std::string_view name);
 
 inline constexpr size_t kMaxOtelMetricNameLength = 255;
 

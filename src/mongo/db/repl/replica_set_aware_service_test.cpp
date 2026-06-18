@@ -29,7 +29,6 @@
 
 #include "mongo/db/repl/replica_set_aware_service.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"

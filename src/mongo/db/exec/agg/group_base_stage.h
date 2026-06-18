@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/group_processor.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 
 class GroupBaseStage : public Stage {
@@ -52,7 +54,7 @@ public:
                                   query_shape::SerializationOptions{}) const final;
 
 protected:
-    GroupBaseStage(StringData stageName,
+    GroupBaseStage(std::string_view stageName,
                    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                    const std::shared_ptr<GroupProcessor>& groupProcessor)
         : exec::agg::Stage(stageName, pExpCtx), _groupProcessor(groupProcessor) {};

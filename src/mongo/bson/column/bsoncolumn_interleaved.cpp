@@ -29,6 +29,8 @@
 
 #include "mongo/bson/column/bsoncolumn_interleaved.h"
 
+#include <string_view>
+
 namespace mongo::bsoncolumn::internal {
 
 BlockBasedInterleavedDecompressor::BlockBasedInterleavedDecompressor(BSONElementStorage& allocator,
@@ -50,7 +52,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder64::writeToElement
     BSONType type,
     int64_t value,
     BSONElement lastLiteral,
-    StringData fieldName) const {
+    std::string_view fieldName) const {
     switch (type) {
         case BSONType::numberInt: {
             BSONElementStorage::Element esElem = allocator.allocate(type, fieldName, 4);
@@ -88,7 +90,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::writeToElemen
     BSONType type,
     int128_t value,
     BSONElement lastLiteral,
-    StringData fieldName) const {
+    std::string_view fieldName) const {
     switch (type) {
         case BSONType::string:
         case BSONType::code: {
@@ -138,7 +140,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::writeToElemen
  * a BSONElement with the appropriate field name.
  */
 void BlockBasedInterleavedDecompressor::writeToElementStorage(BSONElement bsonElem,
-                                                              StringData fieldName) {
+                                                              std::string_view fieldName) {
     if (!bsonElem.eoo()) {
         BSONElementStorage::Element esElem =
             _allocator.allocate(bsonElem.type(), fieldName, bsonElem.valuesize());

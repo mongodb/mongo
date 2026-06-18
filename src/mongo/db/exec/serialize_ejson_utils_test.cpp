@@ -38,6 +38,7 @@
 
 namespace mongo::exec::expression::serialize_ejson_utils {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /// Specify if the input contains any BSON-only types or values.
 enum class JsonCompatible { no, yes };
@@ -76,7 +77,7 @@ const TestCase testCases[]{
      BSON("$numberDouble" << "NaN"),
      JsonCompatible::no},
     // string
-    {"string"_sd, "string"_sd, "string"_sd, JsonCompatible::yes},
+    {"string"sv, "string"sv, "string"sv, JsonCompatible::yes},
     // object
     {BSON("foo" << 1),
      BSON("foo" << BSON("$numberInt" << "1")),
@@ -200,12 +201,12 @@ const Value invalidExtendedJsonTestCases[]{
     Value(BSON("extra" << "field" << "$minKey" << 1)),
     // numberDouble
     Value(BSON("$numberDouble" << 0)),
-    Value(BSON("$numberDouble" << "inf"_sd)),
-    Value(BSON("$numberDouble" << "infinity"_sd)),
-    Value(BSON("$numberDouble" << "-inf"_sd)),
-    Value(BSON("$numberDouble" << "-infinity"_sd)),
-    Value(BSON("$numberDouble" << "nan"_sd)),
-    Value(BSON("$numberDouble" << "bad"_sd)),
+    Value(BSON("$numberDouble" << "inf"sv)),
+    Value(BSON("$numberDouble" << "infinity"sv)),
+    Value(BSON("$numberDouble" << "-inf"sv)),
+    Value(BSON("$numberDouble" << "-infinity"sv)),
+    Value(BSON("$numberDouble" << "nan"sv)),
+    Value(BSON("$numberDouble" << "bad"sv)),
     Value(BSON("extra" << "field" << "$numberDouble" << "0")),
     // binData
     Value(BSON("$binary" << 0)),

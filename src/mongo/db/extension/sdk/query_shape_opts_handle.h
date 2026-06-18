@@ -67,7 +67,7 @@ public:
     std::string serializeFieldPath(const std::string& fieldPath) const;
 
     void appendLiteral(BSONObjBuilder& builder,
-                       StringData fieldName,
+                       std::string_view fieldName,
                        const BSONElement& bsonElement) const;
 
     static void assertVTableConstraints(const VTable_t& vtable) {

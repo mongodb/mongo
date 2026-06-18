@@ -134,6 +134,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -145,6 +146,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 MONGO_FAIL_POINT_DEFINE(hangAfterFirstListCatalogRead);
 namespace {
 
@@ -164,10 +166,10 @@ void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionC
  * Create a BSONObjBuilder with all fields common to collections, views and timeseries.
  */
 BSONObjBuilder createCommonNsFields(const VersionContext& vCtx,
-                                    StringData shardName,
+                                    std::string_view shardName,
                                     const NamespaceString& ns,
                                     const BSONObj& extraElements,
-                                    StringData type) {
+                                    std::string_view type) {
     BSONObjBuilder builder;
     builder.append("db",
                    DatabaseNameUtil::serialize(ns.dbName(), SerializationContext::stateDefault()));
@@ -185,7 +187,7 @@ BSONObjBuilder createCommonNsFields(const VersionContext& vCtx,
 }
 
 BSONObj createListCatalogEntryForCollection(const VersionContext& vCtx,
-                                            StringData shardName,
+                                            std::string_view shardName,
                                             const NamespaceString& ns,
                                             const BSONObj& catalogEntry) {
     auto type = [&]() {
@@ -194,10 +196,10 @@ BSONObj createListCatalogEntryForCollection(const VersionContext& vCtx,
         // thus we can always return "timeseries" if the collection has timeseries options
         if (catalogEntry["md"]["options"]["timeseries"].ok() &&
             !ns.isTimeseriesBucketsCollection()) {
-            return "timeseries"_sd;
+            return "timeseries"sv;
         }
 
-        return "collection"_sd;
+        return "collection"sv;
     }();
 
     return createCommonNsFields(vCtx, shardName, ns, catalogEntry, type).obj();
@@ -208,7 +210,7 @@ BSONObj createListCatalogEntryForCollection(const VersionContext& vCtx,
  * <db>.system.views namespaces found.
  */
 void listDurableCatalog(OperationContext* opCtx,
-                        StringData shardName,
+                        std::string_view shardName,
                         std::deque<BSONObj>* docs,
                         std::vector<NamespaceStringOrUUID>* systemViewsNamespaces) {
     auto cursor = MDBCatalog::get(opCtx)->getCursor(opCtx);
@@ -459,7 +461,7 @@ CommonMongodProcessInterface::createTransactionHistoryIterator(repl::OpTime time
 
 std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationContext* opCtx,
                                                                   const NamespaceString& ns,
-                                                                  StringData host,
+                                                                  std::string_view host,
                                                                   bool addShardName) {
     // Using kPretendUnsharded as
     // 1. the function is called in a stage where the shard version has already been checked.
@@ -1020,7 +1022,7 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
         BSONObjBuilder out;
         Explain::planCacheEntryToBSON(entry, &out);
         if (auto querySettings = key.querySettings().toBSON(); !querySettings.isEmpty()) {
-            out.append("querySettings"_sd, querySettings);
+            out.append("querySettings"sv, querySettings);
         }
         return out.obj();
     };

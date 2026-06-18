@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/decimal128.h"
@@ -37,6 +36,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include <jsapi.h>
 
@@ -62,7 +62,7 @@ public:
     void fromBSONArray(const BSONObj& obj, const BSONObj* parent, bool readOnly);
     void fromDouble(double d);
     void fromInt64(int64_t i);
-    void fromStringData(StringData sd);
+    void fromStringData(std::string_view sd);
     void fromDecimal128(Decimal128 decimal);
 
 private:

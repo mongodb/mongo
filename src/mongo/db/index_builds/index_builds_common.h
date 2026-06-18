@@ -34,6 +34,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -52,7 +53,7 @@ struct IndexBuildInfo {
      * Creates an IndexBuildInfo with the given index spec and index ident, and generates the
      * internal idents.
      */
-    IndexBuildInfo(BSONObj specObj, StringData idxIdent, StorageEngine& storageEngine);
+    IndexBuildInfo(BSONObj specObj, std::string_view idxIdent, StorageEngine& storageEngine);
 
     /**
      * Creates an IndexBuildInfo with the index spec and generates both the index ident and the
@@ -63,7 +64,7 @@ struct IndexBuildInfo {
     /**
      * Extracts index name from the spec and returns it.
      */
-    StringData getIndexName() const;
+    std::string_view getIndexName() const;
 
     /**
      * Generates new idents and initializes all member fields tracking idents of internal tables.

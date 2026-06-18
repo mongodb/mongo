@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -49,6 +48,7 @@
 #include "mongo/util/time_support.h"
 
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -103,7 +103,7 @@ public:
     void _sleepInLock(mongo::OperationContext* opCtx,
                       long long millis,
                       LockMode mode,
-                      StringData ns) {
+                      std::string_view ns) {
         if (ns.empty()) {
             Lock::GlobalLock lk(opCtx, mode, Date_t::max(), Lock::InterruptBehavior::kThrow);
             LOGV2(6001601,
@@ -197,7 +197,7 @@ public:
 
             ON_BLOCK_EXIT([&now, opCtx] { now = opCtx->fastClockSource().now(); });
 
-            StringData lockTarget;
+            std::string_view lockTarget;
             if (cmdObj["lockTarget"]) {
                 lockTarget = cmdObj["lockTarget"].checkAndGetStringData();
             }

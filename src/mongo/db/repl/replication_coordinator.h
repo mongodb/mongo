@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -74,6 +73,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -1056,7 +1056,7 @@ public:
      * Appends diagnostics about the replication subsystem.
      * Places it under a subobject called `leafName`.
      */
-    virtual void appendDiagnosticBSON(BSONObjBuilder* bob, StringData leafName) = 0;
+    virtual void appendDiagnosticBSON(BSONObjBuilder* bob, std::string_view leafName) = 0;
 
     /**
      * Appends connection information to the provided BSONObjBuilder.

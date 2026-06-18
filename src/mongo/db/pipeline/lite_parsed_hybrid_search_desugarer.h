@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -38,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer {
 
@@ -54,7 +54,7 @@ namespace mongo::lite_parsed_hybrid_search_desugarer {
  */
 StageSpecs desugarRankFusion(const LiteParsedRankFusion& stage,
                              const NamespaceString& nss,
-                             StringData userCollName);
+                             std::string_view userCollName);
 
 /**
  * StageExpander implementation as required by LiteParsedDesugarer::StageExpander. Downcasts
@@ -79,7 +79,7 @@ size_t rankFusionStageExpander(LiteParsedPipeline* pipeline,
  */
 StageSpecs desugarScoreFusion(const LiteParsedScoreFusion& stage,
                               const NamespaceString& nss,
-                              StringData userCollName);
+                              std::string_view userCollName);
 
 /**
  * StageExpander implementation as required by LiteParsedDesugarer::StageExpander. Downcasts

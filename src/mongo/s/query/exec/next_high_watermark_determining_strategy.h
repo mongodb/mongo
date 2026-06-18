@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -58,7 +58,7 @@ public:
     /**
      * Return the name of the strategy.
      */
-    virtual StringData getName() const = 0;
+    virtual std::string_view getName() const = 0;
 };
 
 using NextHighWaterMarkDeterminingStrategyPtr =

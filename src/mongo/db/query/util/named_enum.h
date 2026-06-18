@@ -33,6 +33,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 /**
  * Defines an `enum class ENUM_` populated by `LIST_`.
@@ -54,17 +55,17 @@
  *   Its elements are MyColors::red, MyColors::green, and MyColors::blue. We
  *   also define an associated toStringData(MyColors) function which returns
  *   the unqualified value names "red", "green", "blue" as constexpr
- *   StringData. The array of unqualified StringData names is accessible via
+ *   std::string_view. The array of unqualified std::string_view names is accessible via
  *   the arr_ field; in the example above, this would be MyColors_EnumString::arr_.
  */
 
-#define QUERY_UTIL_NAMED_ENUM_DEFINE(ENUM_, LIST_)                                   \
-    namespace ENUM_##EnumString {                                                    \
-        constexpr StringData arr_[] = {LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_)}; \
-    }                                                                                \
-    enum class ENUM_ { LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_) };                   \
-    constexpr StringData toStringData(ENUM_ v_) {                                    \
-        return ENUM_##EnumString::arr_[static_cast<size_t>(v_)];                     \
+#define QUERY_UTIL_NAMED_ENUM_DEFINE(ENUM_, LIST_)                                         \
+    namespace ENUM_##EnumString {                                                          \
+        constexpr std::string_view arr_[] = {LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_)}; \
+    }                                                                                      \
+    enum class ENUM_ { LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_) };                         \
+    constexpr std::string_view toStringData(ENUM_ v_) {                                    \
+        return ENUM_##EnumString::arr_[static_cast<size_t>(v_)];                           \
     }
 #define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_(x) x,
 #define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_(x) #x ""_sd,

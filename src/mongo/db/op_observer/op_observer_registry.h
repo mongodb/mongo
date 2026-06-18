@@ -57,6 +57,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -299,7 +300,7 @@ public:
     }
 
     void onContainerInsert(OperationContext* opCtx,
-                           StringData ident,
+                           std::string_view ident,
                            int64_t key,
                            std::span<const char> value) override {
         ReservedTimes times{opCtx};
@@ -309,7 +310,7 @@ public:
     }
 
     void onContainerInsert(OperationContext* opCtx,
-                           StringData ident,
+                           std::string_view ident,
                            std::span<const char> key,
                            std::span<const char> value) override {
         ReservedTimes times{opCtx};
@@ -319,7 +320,7 @@ public:
     }
 
     void onContainerUpdate(OperationContext* opCtx,
-                           StringData ident,
+                           std::string_view ident,
                            int64_t key,
                            std::span<const char> value) override {
         ReservedTimes times{opCtx};
@@ -329,7 +330,7 @@ public:
     }
 
     void onContainerUpdate(OperationContext* opCtx,
-                           StringData ident,
+                           std::string_view ident,
                            std::span<const char> key,
                            std::span<const char> value) override {
         ReservedTimes times{opCtx};
@@ -338,7 +339,7 @@ public:
         }
     }
 
-    void onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) override {
+    void onContainerDelete(OperationContext* opCtx, std::string_view ident, int64_t key) override {
         ReservedTimes times{opCtx};
         for (auto&& observer : _observers) {
             observer->onContainerDelete(opCtx, ident, key);
@@ -346,7 +347,7 @@ public:
     }
 
     void onContainerDelete(OperationContext* opCtx,
-                           StringData ident,
+                           std::string_view ident,
                            std::span<const char> key) override {
         ReservedTimes times{opCtx};
         for (auto&& observer : _observers) {

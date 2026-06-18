@@ -30,6 +30,8 @@
 #define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
 
+#include <string_view>
+
 #include <wiredtiger.h>
 
 #include <boost/cstdint.hpp>
@@ -217,7 +219,7 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
 }
 
 std::string WiredTigerRecordStore::generateCreateString(
-    StringData tableName,
+    std::string_view tableName,
     const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
     bool isOplog) {
 
@@ -1180,7 +1182,7 @@ void WiredTigerRecordStore::appendAllCustomStats(RecoveryUnit& ru,
     std::string type, sourceURI;
     WiredTigerUtil::fetchTypeAndSourceURI(*session, std::string{getURI()}, &type, &sourceURI);
     StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadataCreate(*session, sourceURI);
-    StringData creationStringName("creationString");
+    std::string_view creationStringName("creationString");
     if (!metadataResult.isOK()) {
         BSONObjBuilder creationString(bob.subobjStart(creationStringName));
         creationString.append("error", "unable to retrieve creation config");

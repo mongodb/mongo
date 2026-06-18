@@ -42,6 +42,7 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 
 boost::optional<Date_t> ReplicationCoordinatorImpl::getCatchupTakeover_forTest() const {
@@ -357,8 +358,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     if (newState.arbiter()) {
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
         serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
-            "arbiter"_sd);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext("arbiter"sv);
     }
 
     _memberState = newState;

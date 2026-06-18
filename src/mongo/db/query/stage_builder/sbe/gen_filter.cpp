@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
@@ -88,6 +87,7 @@
 #include <functional>
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -97,6 +97,7 @@
 
 namespace mongo::stage_builder {
 namespace {
+using namespace std::literals::string_view_literals;
 /**
  * A function of type 'MakePredicateFn' can be called to generate an SbExpr which applies
  * a predicate to the value found in 'inputExpr'.
@@ -275,7 +276,7 @@ SbExpr generateTraverseF(SbExpr inputExpr,
         auto expr =
             b.makeIf(b.makeFunction(sbe::EFn::kIsArray, getFieldValue),
                      getFieldValue,
-                     b.makeFunction(sbe::EFn::kGetField, getFieldValue, b.makeStrConstant(""_sd)));
+                     b.makeFunction(sbe::EFn::kGetField, getFieldValue, b.makeStrConstant(""sv)));
 
         fieldExpr = b.makeLet(frameId, SbExpr::makeSeq(std::move(fieldExpr)), std::move(expr));
     }

@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
 #include <map>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -53,17 +53,18 @@ namespace mongo {
  * configuration string; e.g. setting flag "abc" to true sets it in the BSON object like:
  * {storageEngine: {wiredTiger: {configString: 'app_metadata=(abc=true)'}}}
  */
-std::map<StringData, boost::optional<bool>> getFlagsFromWiredTigerStorageOptions(
-    const BSONObj& storageEngineOptions, const std::vector<StringData>& flagNames);
+std::map<std::string_view, boost::optional<bool>> getFlagsFromWiredTigerStorageOptions(
+    const BSONObj& storageEngineOptions, const std::vector<std::string_view>& flagNames);
 
 boost::optional<bool> getFlagFromWiredTigerStorageOptions(const BSONObj& storageEngineOptions,
-                                                          StringData flagName);
+                                                          std::string_view flagName);
 
 BSONObj setFlagsToWiredTigerStorageOptions(
-    const BSONObj& storageEngineOptions, const std::map<StringData, boost::optional<bool>>& flags);
+    const BSONObj& storageEngineOptions,
+    const std::map<std::string_view, boost::optional<bool>>& flags);
 
 BSONObj setFlagToWiredTigerStorageOptions(const BSONObj& storageEngineOptions,
-                                          StringData flagName,
+                                          std::string_view flagName,
                                           boost::optional<bool> flagValue);
 
 }  // namespace mongo

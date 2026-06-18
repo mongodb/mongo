@@ -34,6 +34,8 @@
 #include "mongo/db/extension/sdk/log_util.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
 #include "mongo/db/extension/shared/get_next_result.h"
+
+#include <string_view>
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 

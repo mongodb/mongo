@@ -39,7 +39,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -74,6 +73,7 @@
 
 #include <algorithm>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -425,7 +425,7 @@ bool explodeNode(const QuerySolutionNode* node,
     return isn->shouldDedup;
 }
 
-void geoSkipValidationOn(const std::set<StringData>& twoDSphereFields,
+void geoSkipValidationOn(const std::set<std::string_view>& twoDSphereFields,
                          QuerySolutionNode* solnRoot) {
     // If there is a GeoMatchExpression in the tree on a field with a 2dsphere index,
     // we can skip validation since it was validated on insertion. This only applies to
@@ -435,7 +435,7 @@ void geoSkipValidationOn(const std::set<StringData>& twoDSphereFields,
     // only that there exists a 2dsphere index on this field.
     MatchExpression* expr = solnRoot->filter.get();
     if (expr) {
-        StringData nodeField = expr->path();
+        std::string_view nodeField = expr->path();
         if (expr->matchType() == MatchExpression::GEO &&
             twoDSphereFields.find(nodeField) != twoDSphereFields.end()) {
             GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(expr);
@@ -1057,7 +1057,7 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
 void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
                                       QuerySolutionNode* solnRoot) {
     // Get field names of all 2dsphere indexes with version >= 3.
-    std::set<StringData> twoDSphereFields;
+    std::set<std::string_view> twoDSphereFields;
     for (const IndexEntry& indexEntry : params.mainCollectionInfo.indexes) {
         if (indexEntry.type != IndexType::INDEX_2DSPHERE) {
             continue;

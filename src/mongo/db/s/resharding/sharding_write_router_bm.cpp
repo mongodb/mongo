@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/resharding/sharding_write_router.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"

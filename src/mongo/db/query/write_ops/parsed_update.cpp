@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -53,6 +52,7 @@
 
 #include <map>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -83,6 +83,7 @@ const UpdateDriver* ParsedUpdate::getDriver() const {
 
 namespace parsed_update_command {
 namespace {
+using namespace std::literals::string_view_literals;
 
 Status parseQueryToParsedFindCommand(boost::intrusive_ptr<ExpressionContext> expCtx,
                                      ParsedUpdate& parsedUpdate) {
@@ -169,7 +170,7 @@ Status parseRequest(boost::intrusive_ptr<ExpressionContext> expCtx, ParsedUpdate
                 str::stream() << "the parameter '"
                               << write_ops::UpdateOpEntry::kUpsertSuppliedFieldName
                               << "' is set to 'true', but no document was supplied",
-                constants && (*constants)["new"_sd].type() == BSONType::object);
+                constants && (*constants)["new"sv].type() == BSONType::object);
     }
 
     // It is invalid to request that a ProjectionStage be applied to the UpdateStage if the
@@ -187,7 +188,7 @@ Status parseRequest(boost::intrusive_ptr<ExpressionContext> expCtx, ParsedUpdate
         return statusWithArrayFilters.getStatus();
     }
     parsedUpdate.arrayFilters =
-        std::make_unique<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>(
+        std::make_unique<std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>>(
             std::move(statusWithArrayFilters.getValue()));
 
     expCtx->startExpressionCounters();

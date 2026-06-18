@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/operation_context.h"
@@ -40,6 +39,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -79,7 +79,9 @@ public:
      * Record paths from a side-committed wildcard multikey write so subsequent reads on the
      * parent transaction can see them (RYOW).
      */
-    void append(const UUID& collectionUuid, StringData indexName, const std::set<FieldRef>& paths);
+    void append(const UUID& collectionUuid,
+                std::string_view indexName,
+                const std::set<FieldRef>& paths);
 
     /**
      * Append every cached multikey path for `(collectionUuid, indexName)` into `out`.
@@ -87,7 +89,7 @@ public:
      * Safe to call when the cache is empty (no-op).
      */
     void appendMatchingPaths(const UUID& collectionUuid,
-                             StringData indexName,
+                             std::string_view indexName,
                              std::set<FieldRef>* out) const;
 
     /**

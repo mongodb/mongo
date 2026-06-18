@@ -30,7 +30,6 @@
 
 #include "mongo/platform/random.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/debug_util.h"

@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
@@ -49,7 +51,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceRedactToStageFn(
 
 REGISTER_AGG_STAGE_MAPPING(redact, DocumentSourceRedact::id, documentSourceRedactToStageFn);
 
-RedactStage::RedactStage(StringData stageName,
+RedactStage::RedactStage(std::string_view stageName,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const std::shared_ptr<RedactProcessor>& redactProcessor)
     : Stage(stageName, expCtx), _redactProcessor{redactProcessor} {}

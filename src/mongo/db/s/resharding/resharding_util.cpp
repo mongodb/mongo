@@ -80,6 +80,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -93,6 +94,7 @@
 
 namespace mongo {
 namespace resharding {
+using namespace std::literals::string_view_literals;
 
 namespace {
 /**
@@ -130,7 +132,7 @@ BSONObj serializeAndTruncateReshardingErrorIfNeeded(Status originalError) {
 
     auto originalErrorStr = originalError.toString();
     auto truncatedErrorStr =
-        str::UTF8SafeTruncation(StringData(originalErrorStr), kReshardErrorMaxBytes);
+        str::UTF8SafeTruncation(std::string_view(originalErrorStr), kReshardErrorMaxBytes);
     Status truncatedError{ErrorCodes::ReshardCollectionTruncatedError, truncatedErrorStr};
     BSONObjBuilder truncatedBob;
     truncatedError.serializeErrorToBSON(&truncatedBob);
@@ -217,7 +219,7 @@ Timestamp getHighestMinFetchTimestamp(const std::vector<DonorShardEntry>& donorS
         auto donorFetchTimestamp = donor.getMutableState().getMinFetchTimestamp();
         uassert(4957300,
                 fmt::format("All donors must have a minFetchTimestamp, but donor {} does not.",
-                            StringData{donor.getId()}),
+                            std::string_view{donor.getId()}),
                 donorFetchTimestamp.has_value());
         if (maxMinFetchTimestamp < donorFetchTimestamp.value()) {
             maxMinFetchTimestamp = donorFetchTimestamp.value();
@@ -278,18 +280,18 @@ std::unique_ptr<Pipeline> createOplogFetchingPipelineForResharding(
     stages.emplace_back(DocumentSourceMatch::create(
         Doc{{"$or",
              // Only capture CRUD operations relevant for the `destinedRecipient`.
-             Arr{V{Doc{{"op", Doc{{"$in", Arr{V{"i"_sd}, V{"u"_sd}, V{"d"_sd}, V{"n"_sd}}}}},
+             Arr{V{Doc{{"op", Doc{{"$in", Arr{V{"i"sv}, V{"u"sv}, V{"d"sv}, V{"n"sv}}}}},
                        {"ui", collUUID},
                        {"destinedRecipient", recipientShard.toString()}}},
                  // Capture all commands. One cannot determine if a command is relevant to the
                  // `destinedRecipient` until after oplog chaining via `prevOpTime` is resolved.
-                 V{Doc{{"op", "c"_sd},
+                 V{Doc{{"op", "c"sv},
                        {"o.applyOps", EXISTS},
                        {"o.partialTxn", DNE},
                        {"o.prepare", DNE}}},
-                 V{Doc{{"op", "c"_sd}, {"o.commitTransaction", EXISTS}}},
-                 V{Doc{{"op", "c"_sd}, {"o.abortTransaction", EXISTS}}},
-                 V{Doc{{"op", "c"_sd}, {"ui", collUUID}}}}}}
+                 V{Doc{{"op", "c"sv}, {"o.commitTransaction", EXISTS}}},
+                 V{Doc{{"op", "c"sv}, {"o.abortTransaction", EXISTS}}},
+                 V{Doc{{"op", "c"sv}, {"ui", collUUID}}}}}}
             .toBson(),
         expCtx));
 
@@ -308,9 +310,9 @@ std::unique_ptr<Pipeline> createOplogFetchingPipelineForResharding(
     // Filter out applyOps entries which do not contain any relevant operations.
     stages.emplace_back(DocumentSourceMatch::create(
         Doc{{"$or",
-             Arr{V{Doc{{"op", Doc{{"$ne", "c"_sd}}}}},
-                 V{Doc{{"op", "c"_sd}, {"o.applyOps", DNE}}},
-                 V{Doc{{"op", "c"_sd},
+             Arr{V{Doc{{"op", Doc{{"$ne", "c"sv}}}}},
+                 V{Doc{{"op", "c"sv}, {"o.applyOps", DNE}}},
+                 V{Doc{{"op", "c"sv},
                        {"o.applyOps",
                         Doc{{"$elemMatch",
                              Doc{{"destinedRecipient", recipientShard.toString()},
@@ -398,7 +400,7 @@ NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorS
                                                                 donorShardId.toString());
 }
 
-void doNoopWrite(OperationContext* opCtx, StringData opStr, const NamespaceString& nss) {
+void doNoopWrite(OperationContext* opCtx, std::string_view opStr, const NamespaceString& nss) {
     writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace, [&] {
         AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
 

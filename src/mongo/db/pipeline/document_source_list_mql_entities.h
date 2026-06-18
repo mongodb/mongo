@@ -48,6 +48,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -100,8 +101,8 @@ public:
         }
     };
 
-    static constexpr StringData kStageName = "$listMqlEntities"_sd;
-    static constexpr StringData kEntityTypeFieldName = "entityType"_sd;
+    static constexpr std::string_view kStageName = "$listMqlEntities"_sd;
+    static constexpr std::string_view kEntityTypeFieldName = "entityType"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -110,7 +111,7 @@ public:
                                   MqlEntityTypeEnum type);
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

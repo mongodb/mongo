@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -69,6 +68,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -314,7 +314,7 @@ private:
     // Take action on error for the given host.
     void _doErrorActions(
         const HostAndPort& host,
-        StringData reason,
+        std::string_view reason,
         const StreamableReplicaSetMonitorErrorHandler::ErrorActions& errorActions) const;
 
     void _failedHost(const HostAndPort& host,

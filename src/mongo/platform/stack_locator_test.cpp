@@ -36,7 +36,6 @@
 #include <pthread.h>
 #endif
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/stack_locator.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"

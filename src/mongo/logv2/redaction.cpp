@@ -38,13 +38,16 @@
 #include "mongo/logv2/log_util.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kRedactionDefaultMask = "###"_sd;
+constexpr auto kRedactionDefaultMask = "###"sv;
 
 }  // namespace
 
@@ -59,7 +62,7 @@ BSONObj redact(const BSONObj& objectToRedact, bool forceRedaction) {
     return objectToRedact.redact(BSONObj::RedactLevel::all);
 }
 
-StringData redact(StringData stringToRedact, bool forceRedaction) {
+std::string_view redact(std::string_view stringToRedact, bool forceRedaction) {
     if (!logv2::shouldRedactLogs() && !forceRedaction) {
         return stringToRedact;
     }

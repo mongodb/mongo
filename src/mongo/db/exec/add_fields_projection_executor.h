@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
@@ -51,6 +50,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -177,7 +177,9 @@ public:
     }
 
     std::pair<BSONObj, bool> extractComputedProjections(
-        StringData oldName, StringData newName, const std::set<StringData>& reservedNames) final {
+        std::string_view oldName,
+        std::string_view newName,
+        const std::set<std::string_view>& reservedNames) final {
         return _root->extractComputedProjectionsInAddFields(oldName, newName, reservedNames);
     }
 

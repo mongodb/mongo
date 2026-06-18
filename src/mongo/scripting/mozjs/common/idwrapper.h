@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/scripting/mozjs/common/jsstringwrapper.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include <jsapi.h>
 
@@ -59,7 +59,7 @@ public:
      * Converts to a string.  This coerces for integers
      */
     std::string toString() const;
-    StringData toStringData(JSStringWrapper* jsstr) const;
+    std::string_view toStringData(JSStringWrapper* jsstr) const;
 
     /**
      * Converts to an int.  This throws if the id is not an integer
@@ -71,8 +71,8 @@ public:
     bool isString() const;
     bool isInt() const;
 
-    bool equals(StringData sd) const;
-    bool equalsAscii(StringData sd) const;
+    bool equals(std::string_view sd) const;
+    bool equalsAscii(std::string_view sd) const;
 
 private:
     JSContext* _context;

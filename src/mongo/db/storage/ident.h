@@ -35,6 +35,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
 
@@ -46,7 +47,7 @@ namespace MONGO_MOD_PUBLIC mongo {
  */
 class Ident {
 public:
-    explicit Ident(StringData ident) : _ident(std::string{ident}) {}
+    explicit Ident(std::string_view ident) : _ident(std::string{ident}) {}
 
     const std::string& getIdent() const {
         return _ident;
@@ -62,13 +63,13 @@ namespace ident {
 
 // The size storer and catalog have hardcoded idents as we need to be able to open them before we
 // can look up idents in the catalog.
-constexpr inline StringData kSizeStorer = "sizeStorer"_sd;
-constexpr inline StringData kMdbCatalog = "_mdb_catalog"_sd;
+constexpr inline std::string_view kSizeStorer = "sizeStorer"_sd;
+constexpr inline std::string_view kMdbCatalog = "_mdb_catalog"_sd;
 
 // Replicated fast count use hardcoded idents to avoid consulting the catalog when checking for
 // existence on stepup.
-constexpr inline StringData kFastCountMetadataStore = "internal-fastCountMetadataStore"_sd;
-constexpr inline StringData kFastCountMetadataStoreTimestamps =
+constexpr inline std::string_view kFastCountMetadataStore = "internal-fastCountMetadataStore"_sd;
+constexpr inline std::string_view kFastCountMetadataStoreTimestamps =
     "internal-fastCountMetadataStoreTimestamps"_sd;
 
 /**
@@ -91,13 +92,13 @@ std::string generateNewCollectionIdent(
     const DatabaseName& dbName,
     bool directoryPerDB,
     bool directoryForIndexes,
-    const boost::optional<StringData>& optIdentUniqueTag = boost::none);
+    const boost::optional<std::string_view>& optIdentUniqueTag = boost::none);
 
 std::string generateNewIndexIdent(
     const DatabaseName& dbName,
     bool directoryPerDB,
     bool directoryForIndexes,
-    const boost::optional<StringData>& optIdentUniqueTag = boost::none);
+    const boost::optional<std::string_view>& optIdentUniqueTag = boost::none);
 
 /**
  * Marking an ident as internal implies the underlying data is subject to different handling by the
@@ -106,13 +107,14 @@ std::string generateNewIndexIdent(
  * Generates a unique ident tagged with an 'internal-' prefix. Returns an ident in the form of
  * 'internal-<identStem><unique identifier>'.
  */
-std::string generateNewInternalIdent(StringData identStem = ""_sd);
+std::string generateNewInternalIdent(std::string_view identStem = ""_sd);
 
 /**
  * Returns an ident in the form of 'internal-<identStem>-<indexUniqueTag>' or
  * '<db>/internal-<identStem>-<indexUniqueTag>' when 'indexIdent' contains a db component.
  */
-std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData indexIdent);
+std::string generateNewInternalIndexBuildIdent(std::string_view identStem,
+                                               std::string_view indexIdent);
 
 /**
  * Returns the ident for the tracking table of a resumable primary-driven index build.
@@ -124,42 +126,42 @@ std::string generateNewIndexBuildIdent(const UUID& buildUUID);
  * Assumes 'ident' is a well-formed ident for a collection, returns the unique identifier component
  * of the ident.
  */
-StringData getCollectionIdentUniqueTag(StringData ident,
-                                       const DatabaseName& dbName,
-                                       bool directoryPerDB,
-                                       bool directoryForIndexes);
+std::string_view getCollectionIdentUniqueTag(std::string_view ident,
+                                             const DatabaseName& dbName,
+                                             bool directoryPerDB,
+                                             bool directoryForIndexes);
 
 /**
  * Assumes 'ident' is a well-formed ident for an index, returns the unique identifier component
  * of the ident.
  */
-StringData getIndexIdentUniqueTag(StringData ident,
-                                  const DatabaseName& dbName,
-                                  bool directoryPerDB,
-                                  bool directoryForIndexes);
+std::string_view getIndexIdentUniqueTag(std::string_view ident,
+                                        const DatabaseName& dbName,
+                                        bool directoryPerDB,
+                                        bool directoryForIndexes);
 
 /**
  * Returns true if the ident specifies a basic "collection" or "index" table type.
  */
-bool isCollectionOrIndexIdent(StringData ident);
+bool isCollectionOrIndexIdent(std::string_view ident);
 
 /**
  * True if the ident contains the 'internal-<identStem>' prefix.
  */
-bool isInternalIdent(StringData ident, StringData identStem = ""_sd);
+bool isInternalIdent(std::string_view ident, std::string_view identStem = ""_sd);
 
 /**
  * Returns true if the ident is for one of the replicated fastcount containers.
  */
-bool isReplicatedFastCountIdent(StringData ident);
+bool isReplicatedFastCountIdent(std::string_view ident);
 
-bool isCollectionIdent(StringData ident);
+bool isCollectionIdent(std::string_view ident);
 
 /**
  * Validates that the tag does not contain any characters which would be special when interpreted as
  * a path.
  */
-bool validateTag(StringData uniqueTag);
+bool validateTag(std::string_view uniqueTag);
 
 /**
  * Returns false if the string is definitely not a well-formed ident or would be unsafe to interpret
@@ -167,14 +169,14 @@ bool validateTag(StringData uniqueTag);
  * Creating an ident which this returns true for may still fail due to the filesystem imposing
  * additional restrictions (e.g. on Windows) or the maximum path length being exceeded.
  */
-bool isValidIdent(StringData ident);
+bool isValidIdent(std::string_view ident);
 
 /**
  * Returns the directory component of the ident, which is the prefix before the last '/'.
  * Returns an empty string when the ident has no directory component.
  * Supplying an ill-formed ident will trigger a uassert.
  */
-StringData getDirectory(StringData ident);
+std::string_view getDirectory(std::string_view ident);
 
 /**
  * When idents are generated with 'directoryPerDB', the name of the database is encoded within the

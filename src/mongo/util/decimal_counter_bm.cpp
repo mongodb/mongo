@@ -29,12 +29,12 @@
 
 #include "mongo/util/decimal_counter.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/itoa.h"
 
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <string_view>
 
 #include <benchmark/benchmark.h>
 
@@ -49,7 +49,7 @@ void BM_decimalCounterPreInc(benchmark::State& state) {
         DecimalCounter<uint32_t> count(state.range(1));
         for (int i = state.range(0); i--;) {
             benchmark::ClobberMemory();
-            benchmark::DoNotOptimize(StringData(++count));
+            benchmark::DoNotOptimize(std::string_view(++count));
         }
         items += state.range(0);
     }
@@ -62,7 +62,7 @@ void BM_ItoACounter(benchmark::State& state) {
         uint32_t count = state.range(1);
         for (int i = state.range(0); i--;) {
             benchmark::ClobberMemory();
-            benchmark::DoNotOptimize(StringData(ItoA(++count)));
+            benchmark::DoNotOptimize(std::string_view(ItoA(++count)));
         }
         items += state.range(0);
     }

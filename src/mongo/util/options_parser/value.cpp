@@ -30,13 +30,14 @@
 #include "mongo/util/options_parser/value.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 
+#include <string_view>
 #include <utility>
 
 namespace mongo {
 namespace optionenvironment {
+using namespace std::literals::string_view_literals;
 
 // Value implementation
 
@@ -198,17 +199,17 @@ std::string Value::toString() const {
     StringBuilder sb;
     switch (_type) {
         case StringVector: {
-            StringData sep;
+            std::string_view sep;
             for (const auto& elem : _stringVectorVal) {
                 sb << sep << elem;
-                sep = ","_sd;
+                sep = ","sv;
             }
         } break;
         case StringMap: {
-            StringData sep;
+            std::string_view sep;
             for (const auto& elem : _stringMapVal) {
                 sb << sep << elem.first << ":" << elem.second;
-                sep = ","_sd;
+                sep = ","sv;
             }
         } break;
         case Bool:

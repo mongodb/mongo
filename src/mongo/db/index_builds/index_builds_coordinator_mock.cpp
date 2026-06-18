@@ -32,6 +32,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 
+#include <string_view>
+
 namespace mongo {
 
 void IndexBuildsCoordinatorMock::shutdown(OperationContext* opCtx) {}
@@ -61,7 +63,7 @@ IndexBuildsCoordinatorMock::resumeIndexBuild(OperationContext* opCtx,
 Status IndexBuildsCoordinatorMock::voteAbortIndexBuild(OperationContext* opCtx,
                                                        const UUID& buildUUID,
                                                        const HostAndPort& hostAndPort,
-                                                       StringData reason) {
+                                                       std::string_view reason) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -73,7 +75,7 @@ Status IndexBuildsCoordinatorMock::voteCommitIndexBuild(OperationContext* opCtx,
 
 Status IndexBuildsCoordinatorMock::setCommitQuorum(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   const std::vector<StringData>& indexNames,
+                                                   const std::vector<std::string_view>& indexNames,
                                                    const CommitQuorumOptions& newCommitQuorum) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }

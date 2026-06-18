@@ -49,6 +49,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -151,7 +152,7 @@ void MockRemoteDBServer::remove(const NamespaceString& nss, const BSONObj&) {
     _dataMgr.erase(ns);
 }
 
-void MockRemoteDBServer::assignCollectionUuid(StringData ns, const mongo::UUID& uuid) {
+void MockRemoteDBServer::assignCollectionUuid(std::string_view ns, const mongo::UUID& uuid) {
     scoped_spinlock sLock(_lock);
     _uuidToNs[uuid] = std::string{ns};
 }

@@ -45,6 +45,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -55,6 +56,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -63,31 +65,31 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 // Mocks
 class MockParameterService : public ServerParameterService {
 public:
-    MockParameterService(std::function<ServerParameter*(StringData)> get) : _getMock(get) {};
+    MockParameterService(std::function<ServerParameter*(std::string_view)> get) : _getMock(get) {};
 
-    ServerParameter* get(StringData parameterName) override {
+    ServerParameter* get(std::string_view parameterName) override {
         return _getMock(parameterName);
     }
 
 private:
-    std::function<ServerParameter*(StringData)> _getMock;
+    std::function<ServerParameter*(std::string_view)> _getMock;
 };
 
 class MockServerParameter : public ServerParameter {
 public:
-    MockServerParameter(StringData name,
+    MockServerParameter(std::string_view name,
                         std::function<Status(const BSONElement& newValueElement)> validateImpl)
         : ServerParameter(name, ServerParameterType::kRuntimeOnly) {
         this->validateImpl = validateImpl;
     }
     void append(OperationContext* opCtx,
                 BSONObjBuilder* b,
-                StringData name,
+                std::string_view name,
                 const boost::optional<TenantId>&) override {}
 
     void appendSupportingRoundtrip(OperationContext* opCtx,
                                    BSONObjBuilder* b,
-                                   StringData name,
+                                   std::string_view name,
                                    const boost::optional<TenantId>&) override {}
 
     Status set(const BSONElement& newValueElement,
@@ -95,7 +97,7 @@ public:
         return Status(ErrorCodes::BadValue, "Should not call set() in this test");
     }
 
-    Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) override {
+    Status setFromString(std::string_view str, const boost::optional<TenantId>& tenantId) override {
         return Status(ErrorCodes::BadValue, "Should not call setFromString() in this test");
     }
 
@@ -135,14 +137,14 @@ private:
         updateParameterOnDiskMockImpl;
 };
 
-MockServerParameter alwaysValidatingServerParameter(StringData name) {
+MockServerParameter alwaysValidatingServerParameter(std::string_view name) {
 
     MockServerParameter sp(name, [&](const BSONElement& newValueElement) { return Status::OK(); });
 
     return sp;
 }
 
-MockServerParameter alwaysInvalidatingServerParameter(StringData name) {
+MockServerParameter alwaysInvalidatingServerParameter(std::string_view name) {
 
     MockServerParameter sp(name, [&](const BSONElement& newValueElement) {
         return Status(ErrorCodes::BadValue, "Parameter Validation Failed");
@@ -186,20 +188,20 @@ DBClientMock alwaysFailingDbClient() {
 // Tests
 TEST(SetClusterParameterCommand, SucceedsWithObjectParameter) {
 
-    MockServerParameter sp = alwaysValidatingServerParameter("Succeeds"_sd);
+    MockServerParameter sp = alwaysValidatingServerParameter("Succeeds"sv);
     DBClientMock dbServiceMock = alwaysSucceedingDbClient();
 
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->getService()->makeClient("SomeTest");
 
-    auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
+    auto mpsPtr = std::make_unique<MockParameterService>([&](std::string_view s) { return &sp; });
 
     Client* clientPtr = client.get();
 
     BSONObjBuilder testCmdBson;
 
     BSONObj subObj = BSON("ok" << "hello_there");
-    testCmdBson.append("testCmd"_sd, subObj);
+    testCmdBson.append("testCmd"sv, subObj);
 
     BSONObj obj = testCmdBson.obj();
 
@@ -214,13 +216,13 @@ TEST(SetClusterParameterCommand, SucceedsWithObjectParameter) {
 
 TEST(SetClusterParameterCommand, ThrowsWithNonObjectParameter) {
 
-    MockServerParameter sp = alwaysValidatingServerParameter("Succeeds"_sd);
+    MockServerParameter sp = alwaysValidatingServerParameter("Succeeds"sv);
     DBClientMock dbServiceMock = alwaysSucceedingDbClient();
 
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->getService()->makeClient("SomeTest");
 
-    auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
+    auto mpsPtr = std::make_unique<MockParameterService>([&](std::string_view s) { return &sp; });
 
     Client* clientPtr = client.get();
 
@@ -243,13 +245,13 @@ TEST(SetClusterParameterCommand, ThrowsWithNonObjectParameter) {
 TEST(SetClusterParameterCommand, ThrowsWhenServerParameterValidationFails) {
 
     MockServerParameter sp =
-        alwaysInvalidatingServerParameter("CommandFailsWhenServerParameterValidationFails"_sd);
+        alwaysInvalidatingServerParameter("CommandFailsWhenServerParameterValidationFails"sv);
     DBClientMock dbServiceMock = alwaysSucceedingDbClient();
 
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->getService()->makeClient("SomeTest");
 
-    auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
+    auto mpsPtr = std::make_unique<MockParameterService>([&](std::string_view s) { return &sp; });
 
     Client* clientPtr = client.get();
 
@@ -267,18 +269,18 @@ TEST(SetClusterParameterCommand, ThrowsWhenServerParameterValidationFails) {
         fixture.invoke(&spyCtx, testCmd, boost::none, boost::none, kMajorityWriteConcern),
         DBException,
         ErrorCodes::BadValue,
-        "Parameter Validation Failed"_sd);
+        "Parameter Validation Failed"sv);
 }
 
 TEST(SetClusterParameterCommand, ThrowsWhenDBUpdateFails) {
 
-    MockServerParameter sp = alwaysValidatingServerParameter("CommandFailsWhenDBUpdateFails"_sd);
+    MockServerParameter sp = alwaysValidatingServerParameter("CommandFailsWhenDBUpdateFails"sv);
     DBClientMock dbServiceMock = alwaysFailingDbClient();
 
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->getService()->makeClient("SomeTest");
 
-    auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
+    auto mpsPtr = std::make_unique<MockParameterService>([&](std::string_view s) { return &sp; });
 
     Client* clientPtr = client.get();
 
@@ -296,7 +298,7 @@ TEST(SetClusterParameterCommand, ThrowsWhenDBUpdateFails) {
     ASSERT_THROWS_WHAT(
         fixture.invoke(&spyCtx, testCmd, boost::none, boost::none, kMajorityWriteConcern),
         DBException,
-        "DB Client Update Failed"_sd);
+        "DB Client Update Failed"sv);
 }
 
 TEST(SetClusterParameterCommand, ThrowsWhenParameterNotPresent) {
@@ -306,8 +308,8 @@ TEST(SetClusterParameterCommand, ThrowsWhenParameterNotPresent) {
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->getService()->makeClient("SomeTest");
 
-    auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) {
-        return ServerParameterSet::getClusterParameterSet()->get("doesNotExistParam"_sd);
+    auto mpsPtr = std::make_unique<MockParameterService>([&](std::string_view s) {
+        return ServerParameterSet::getClusterParameterSet()->get("doesNotExistParam"sv);
     });
 
     Client* clientPtr = client.get();
@@ -332,12 +334,12 @@ TEST(SetClusterParameterCommand, ThrowsWhenParameterNotPresent) {
 TEST(SetClusterParameterCommand, TenantIdPassesThrough) {
 
     DBClientMock dbServiceMock = tenantIdReportingDbClient();
-    MockServerParameter sp = alwaysValidatingServerParameter("TenantIdPassesThroughParameter"_sd);
+    MockServerParameter sp = alwaysValidatingServerParameter("TenantIdPassesThroughParameter"sv);
 
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->getService()->makeClient("SomeTest");
 
-    auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
+    auto mpsPtr = std::make_unique<MockParameterService>([&](std::string_view s) { return &sp; });
 
     Client* clientPtr = client.get();
 

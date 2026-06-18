@@ -92,6 +92,7 @@
 #include "mongo/util/timer.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -105,6 +106,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible);
@@ -278,7 +280,7 @@ void FilteringMetadataCache::init(ServiceContext* serviceCtx,
     if (feature_flags::gDualCatalogCache.isEnabled() ||
         feature_flags::gDatabaseDualCatalogCache.isEnabled()) {
         decoration->_cache =
-            std::make_unique<CatalogCache>(serviceCtx, loader, "FilteringMetadata"_sd);
+            std::make_unique<CatalogCache>(serviceCtx, loader, "FilteringMetadata"sv);
     }
 }
 
@@ -293,7 +295,7 @@ void FilteringMetadataCache::initForTesting(ServiceContext* serviceCtx,
     if (feature_flags::gDualCatalogCache.isEnabled() ||
         feature_flags::gDatabaseDualCatalogCache.isEnabled()) {
         decoration->_cache =
-            std::make_unique<CatalogCache>(serviceCtx, loader, "FilteringMetadata"_sd);
+            std::make_unique<CatalogCache>(serviceCtx, loader, "FilteringMetadata"sv);
     }
 }
 
@@ -1102,14 +1104,14 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
     bool needsDbPrimaryShardCheck = false;
     const int maxNoProgressAttempts = maxShardMetadataDiskRecoveryAttempts.loadRelaxed();
     int noProgressAttempts = 0;
-    StringData lastRetryReason;
+    std::string_view lastRetryReason;
 
-    auto resetConsecutiveNoProgressAttempts = [&](StringData retryReason) {
+    auto resetConsecutiveNoProgressAttempts = [&](std::string_view retryReason) {
         lastRetryReason = retryReason;
         noProgressAttempts = 0;
     };
 
-    auto incrementConsecutiveNoProgressAttempts = [&](StringData retryReason) {
+    auto incrementConsecutiveNoProgressAttempts = [&](std::string_view retryReason) {
         lastRetryReason = retryReason;
         ++noProgressAttempts;
         tassert(StaleConfigInfo(nss,
@@ -1145,7 +1147,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
 
             if (joinPlacementVersionOperations(opCtx, &scopedCsr)) {
                 resetConsecutiveNoProgressAttempts(
-                    "ongoing collection critical section or concurrent refresh"_sd);
+                    "ongoing collection critical section or concurrent refresh"sv);
                 continue;
             }
 
@@ -1154,7 +1156,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                     boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
 
                 if (waitForCriticalSectionIfNeeded(opCtx, &scopedDsr, &scopedCsr)) {
-                    resetConsecutiveNoProgressAttempts("ongoing database critical section"_sd);
+                    resetConsecutiveNoProgressAttempts("ongoing database critical section"sv);
                     continue;
                 }
 
@@ -1213,7 +1215,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                         "error"_attr = status);
 
             if (status == ErrorCodes::AtomicityFailure) {
-                incrementConsecutiveNoProgressAttempts("disk recoverer initial pass failed"_sd);
+                incrementConsecutiveNoProgressAttempts("disk recoverer initial pass failed"sv);
                 continue;
             }
             uassertStatusOK(status);
@@ -1234,7 +1236,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                     logAttrs(nss));
 
                 incrementConsecutiveNoProgressAttempts(
-                    "interrupted by an invalidate oplog entry"_sd);
+                    "interrupted by an invalidate oplog entry"sv);
                 continue;
             }
 
@@ -1247,7 +1249,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                     logAttrs(nss));
 
                 incrementConsecutiveNoProgressAttempts(
-                    "collection critical section entered after drain"_sd);
+                    "collection critical section entered after drain"sv);
                 continue;
             }
 
@@ -1257,7 +1259,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
             if (!needsDbPrimaryShardCheck && !metadata->hasRoutingTable()) {
                 needsDbPrimaryShardCheck = true;
                 incrementConsecutiveNoProgressAttempts(
-                    "no collection metadata found, switching to DB primary check mode"_sd);
+                    "no collection metadata found, switching to DB primary check mode"sv);
                 continue;
             }
 
@@ -1271,7 +1273,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                 if ((*scopedDsr)
                         ->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)) {
                     incrementConsecutiveNoProgressAttempts(
-                        "database critical section entered after drain"_sd);
+                        "database critical section entered after drain"sv);
                     continue;
                 }
 
@@ -1287,7 +1289,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                                 "snapshottedMutations"_attr = dbMetadataMutationsSnapshot,
                                 "currentMutations"_attr = (*scopedDsr)->getNumMetadataMutations());
                     incrementConsecutiveNoProgressAttempts(
-                        "DB primary shard changed during drain"_sd);
+                        "DB primary shard changed during drain"sv);
                     continue;
                 }
             }

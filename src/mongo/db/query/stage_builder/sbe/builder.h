@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_period_utils.h"
@@ -55,6 +54,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -139,7 +139,7 @@ public:
     };
 
     // Slot "names" in this file are really type-and-name pairs.
-    using UnownedSlotName = std::pair<SlotType, StringData>;
+    using UnownedSlotName = std::pair<SlotType, std::string_view>;
     using OwnedSlotName = std::pair<SlotType, std::string>;
 
     using MakeMergeStageFn = std::function<std::pair<SbStage, SbSlotVector>(
@@ -166,23 +166,21 @@ public:
     static constexpr SlotType kPathExpr = SlotType::kPathExpr;
     static constexpr SlotType kFilterCellField = SlotType::kFilterCellField;
 
-    static constexpr UnownedSlotName kResult = {kMeta, "result"_sd};
-    static constexpr UnownedSlotName kRecordId = {kMeta, "recordId"_sd};
-    static constexpr UnownedSlotName kReturnKey = {kMeta, "returnKey"_sd};
-    static constexpr UnownedSlotName kSnapshotId = {kMeta, "snapshotId"_sd};
-    static constexpr UnownedSlotName kIndexIdent = {kMeta, "indexIdent"_sd};
-    static constexpr UnownedSlotName kIndexKey = {kMeta, "indexKey"_sd};
-    static constexpr UnownedSlotName kIndexKeyPattern = {kMeta, "indexKeyPattern"_sd};
-    static constexpr UnownedSlotName kPrefetchedResult = {kMeta, "prefetchedResult"_sd};
-    static constexpr UnownedSlotName kMetadataSearchScore = {kMeta, "metadataSearchScore"_sd};
-    static constexpr UnownedSlotName kMetadataSearchHighlights = {kMeta,
-                                                                  "metadataSearchHighlights"_sd};
-    static constexpr UnownedSlotName kMetadataSearchDetails = {kMeta, "metadataSearchDetails"_sd};
-    static constexpr UnownedSlotName kMetadataSearchSortValues = {kMeta,
-                                                                  "metadataSearchSortValues"_sd};
-    static constexpr UnownedSlotName kMetadataSearchSequenceToken = {
-        kMeta, "metadataSearchSequenceToken"_sd};
-    static constexpr UnownedSlotName kBlockSelectivityBitmap = {kMeta, "bitmap"_sd};
+    static constexpr UnownedSlotName kResult{kMeta, "result"};
+    static constexpr UnownedSlotName kRecordId{kMeta, "recordId"};
+    static constexpr UnownedSlotName kReturnKey{kMeta, "returnKey"};
+    static constexpr UnownedSlotName kSnapshotId{kMeta, "snapshotId"};
+    static constexpr UnownedSlotName kIndexIdent{kMeta, "indexIdent"};
+    static constexpr UnownedSlotName kIndexKey{kMeta, "indexKey"};
+    static constexpr UnownedSlotName kIndexKeyPattern{kMeta, "indexKeyPattern"};
+    static constexpr UnownedSlotName kPrefetchedResult{kMeta, "prefetchedResult"};
+    static constexpr UnownedSlotName kMetadataSearchScore{kMeta, "metadataSearchScore"};
+    static constexpr UnownedSlotName kMetadataSearchHighlights{kMeta, "metadataSearchHighlights"};
+    static constexpr UnownedSlotName kMetadataSearchDetails{kMeta, "metadataSearchDetails"};
+    static constexpr UnownedSlotName kMetadataSearchSortValues{kMeta, "metadataSearchSortValues"};
+    static constexpr UnownedSlotName kMetadataSearchSequenceToken{kMeta,
+                                                                  "metadataSearchSequenceToken"};
+    static constexpr UnownedSlotName kBlockSelectivityBitmap{kMeta, "bitmap"};
 
     struct Data {
         // Slot type-and-name to SlotId map for the output slots produced by this plan stage.
@@ -282,7 +280,7 @@ public:
     }
 
     // Equivalent to 'clear({kField, fieldName})'.
-    void clearField(StringData fieldName) {
+    void clearField(std::string_view fieldName) {
         clear(UnownedSlotName(kField, fieldName));
     }
 
@@ -296,7 +294,7 @@ public:
 
     // This method will clear all fields whose names conflict with 'path' (i.e. either the name
     // equals 'path', or the name is a prefix of 'path', or 'path' is a prefix of the name).
-    void clearAffectedFields(StringData path) {
+    void clearAffectedFields(std::string_view path) {
         absl::erase_if(_data->slotNameToIdMap, [path](auto& elem) {
             const auto& name = elem.first;
             return name.first == kField && pathsAreConflicting(name.second, path);
@@ -679,7 +677,7 @@ public:
     FieldSet getNeededFieldSet() const;
 
     // Equivalent to 'clear({kField, fieldName})'.
-    void clearField(StringData fieldName) {
+    void clearField(std::string_view fieldName) {
         clear(UnownedSlotName(kField, fieldName));
     }
 
@@ -700,7 +698,7 @@ public:
 
     // This method will clear all field reqs whose names are conflict with 'path' (i.e. either the
     // name equals 'path', or the name is a prefix of 'path', or 'path' is a prefix of the name).
-    PlanStageReqs& clearAffectedFields(StringData path) {
+    PlanStageReqs& clearAffectedFields(std::string_view path) {
         absl::erase_if(_data->slotNameSet, [path](auto& name) {
             return name.first == kField && pathsAreConflicting(name.second, path);
         });

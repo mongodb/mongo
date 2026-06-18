@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"
@@ -58,6 +57,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -149,7 +149,7 @@ private:
      * is connected with is no longer the primary if a "not primary" error message or error code was
      * returned.
      */
-    void handleNotPrimaryResponse(const BSONObj& replyBody, StringData errorMsgFieldName);
+    void handleNotPrimaryResponse(const BSONObj& replyBody, std::string_view errorMsgFieldName);
 
     // Contains the string for the replica set name of the host this is connected to.
     // Should be empty if this connection is not pointing to a replica set member.

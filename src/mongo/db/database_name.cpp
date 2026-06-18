@@ -30,6 +30,8 @@
 
 #include "mongo/db/database_name.h"
 
+#include <string_view>
+
 #include <boost/container_hash/hash.hpp>
 
 namespace mongo {

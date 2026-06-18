@@ -32,11 +32,13 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 
 class InternalSplitPipelineStage final : public Stage {
 public:
-    InternalSplitPipelineStage(StringData stageName,
+    InternalSplitPipelineStage(std::string_view stageName,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:

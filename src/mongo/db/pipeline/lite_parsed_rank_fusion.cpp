@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/lite_parsed_rank_fusion.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/extension/host/extension_search_server_status.h"
@@ -44,6 +43,8 @@
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/util/rank_fusion_util.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -91,7 +92,7 @@ void LiteParsedRankFusion::validate() const {
         "$vectorSearch, $geoNear, or have a $sort in the pipeline.";
 
     // Validate pipeline names are unique. Uses the parsed spec which owns the data,
-    // so StringData from fieldNameStringData() is safe (no use-after-free).
+    // so std::string_view from fieldNameStringData() is safe (no use-after-free).
     StringDataSet seenNames;
     for (const auto& elem : _parsedSpec.getInput().getPipelines()) {
         auto pipelineName = elem.fieldNameStringData();

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
@@ -46,6 +45,7 @@
 #include <algorithm>
 #include <ctime>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -272,7 +272,7 @@ struct MONGO_MOD_PUB ServerGlobalParams {
          * context: the context in which this function was called, to differentiate logs (e.g.
          * startup, log rotation).
          */
-        void logFCVWithContext(StringData context) const;
+        void logFCVWithContext(std::string_view context) const;
 
     private:
         const FCV _version;

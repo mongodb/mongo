@@ -35,6 +35,8 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -48,12 +50,14 @@ class EncryptedFieldHelper {
 public:
     EncryptedFieldHelper(EncryptedField fieldSchema);
 
-    static EncryptedFieldHelper makeUnindexed(StringData path, BSONType type, UUID indexKeyId);
-    static EncryptedFieldHelper makeEquality(StringData path,
+    static EncryptedFieldHelper makeUnindexed(std::string_view path,
+                                              BSONType type,
+                                              UUID indexKeyId);
+    static EncryptedFieldHelper makeEquality(std::string_view path,
                                              BSONType type,
                                              UUID indexKeyId,
                                              boost::optional<int64_t> contention = boost::none);
-    static EncryptedFieldHelper makeRange(StringData path,
+    static EncryptedFieldHelper makeRange(std::string_view path,
                                           BSONType type,
                                           UUID indexKeyId,
                                           boost::optional<Value> min = boost::none,
@@ -62,7 +66,7 @@ public:
                                           boost::optional<int32_t> trimFactor = boost::none,
                                           boost::optional<int32_t> precision = boost::none,
                                           boost::optional<int64_t> contention = boost::none);
-    static EncryptedFieldHelper makeSuffix(StringData path,
+    static EncryptedFieldHelper makeSuffix(std::string_view path,
                                            BSONType type,
                                            UUID indexKeyId,
                                            int lb,
@@ -70,7 +74,7 @@ public:
                                            bool caseSensitive = false,
                                            bool diacriticSensitive = false,
                                            boost::optional<int64_t> contention = boost::none);
-    static EncryptedFieldHelper makePrefix(StringData path,
+    static EncryptedFieldHelper makePrefix(std::string_view path,
                                            BSONType type,
                                            UUID indexKeyId,
                                            int lb,
@@ -78,7 +82,7 @@ public:
                                            bool caseSensitive = false,
                                            bool diacriticSensitive = false,
                                            boost::optional<int64_t> contention = boost::none);
-    static EncryptedFieldHelper makeSubstring(StringData path,
+    static EncryptedFieldHelper makeSubstring(std::string_view path,
                                               BSONType type,
                                               UUID indexKeyId,
                                               int lb,
@@ -87,7 +91,7 @@ public:
                                               bool caseSensitive = false,
                                               bool diacriticSensitive = false,
                                               boost::optional<int64_t> contention = boost::none);
-    static EncryptedFieldHelper makePrefixSuffix(StringData path,
+    static EncryptedFieldHelper makePrefixSuffix(std::string_view path,
                                                  BSONType type,
                                                  UUID indexKeyId,
                                                  int lb,
@@ -105,7 +109,7 @@ public:
     }
 
 private:
-    EncryptedFieldHelper(Fle2AlgorithmInt alg, StringData path, UUID keyId, BSONType type);
+    EncryptedFieldHelper(Fle2AlgorithmInt alg, std::string_view path, UUID keyId, BSONType type);
 
     Fle2AlgorithmInt _algorithm;
     EncryptedField _ef;

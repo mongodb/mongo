@@ -37,6 +37,7 @@
 
 namespace mongo {
 namespace coordinate_multi_update_util {
+using namespace std::literals::string_view_literals;
 
 namespace {
 auto getCommandNameForOp(const BatchItemRef& op) {
@@ -166,7 +167,7 @@ BSONObj executeCoordinateMultiUpdate(OperationContext* opCtx,
 
     sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
     return router.route(
-        "multi update"_sd, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+        "multi update"sv, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
             auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                 opCtx,
                 DatabaseName::kAdmin,

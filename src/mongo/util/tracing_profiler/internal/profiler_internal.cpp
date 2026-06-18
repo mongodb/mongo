@@ -34,6 +34,7 @@
 #include "mongo/logv2/log.h"
 
 #include <algorithm>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -49,7 +50,7 @@ ProfilerTags* ProfilerTags::get() {
 #endif
 }
 
-ProfilerTag ProfilerTags::getOrInsertTag(StringData name) {
+ProfilerTag ProfilerTags::getOrInsertTag(std::string_view name) {
     auto it = _tagIdByName.find(name);
     if (it != _tagIdByName.end()) {
         return _tags[it->second];

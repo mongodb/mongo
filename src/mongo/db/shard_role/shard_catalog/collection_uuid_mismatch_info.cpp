@@ -31,11 +31,12 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name_util.h"
 #include "mongo/db/tenant_id.h"
+
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -44,12 +45,13 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(CollectionUUIDMismatchInfo);
 
-constexpr StringData kDbFieldName = "db"_sd;
-constexpr StringData kCollectionUUIDFieldName = "collectionUUID"_sd;
-constexpr StringData kExpectedCollectionFieldName = "expectedCollection"_sd;
-constexpr StringData kActualCollectionFieldName = "actualCollection"_sd;
+constexpr std::string_view kDbFieldName = "db"sv;
+constexpr std::string_view kCollectionUUIDFieldName = "collectionUUID"sv;
+constexpr std::string_view kExpectedCollectionFieldName = "expectedCollection"sv;
+constexpr std::string_view kActualCollectionFieldName = "actualCollection"sv;
 }  // namespace
 
 std::shared_ptr<const ErrorExtraInfo> CollectionUUIDMismatchInfo::parse(const BSONObj& obj) {

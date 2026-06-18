@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -46,6 +45,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -64,7 +64,7 @@ class GroupFromFirstDocumentTransformation final : public TransformerInterface {
 public:
     GroupFromFirstDocumentTransformation(
         const std::string& groupId,
-        StringData originalStageName,
+        std::string_view originalStageName,
         std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs,
         AccumulatorDocumentsNeeded docsNeeded = AccumulatorDocumentsNeeded::kFirstInputDocument)
         : _accumulatorExprs(std::move(accumulatorExprs)),
@@ -84,7 +84,7 @@ public:
         return _groupId;
     }
 
-    StringData originalStageName() const {
+    std::string_view originalStageName() const {
         return _originalStageName;
     }
 
@@ -114,14 +114,14 @@ public:
     static std::unique_ptr<GroupFromFirstDocumentTransformation> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const std::string& groupId,
-        StringData originalStageName,
+        std::string_view originalStageName,
         std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs,
         AccumulatorDocumentsNeeded docsNeeded);
 
 private:
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> _accumulatorExprs;
     std::string _groupId;
-    StringData _originalStageName;
+    std::string_view _originalStageName;
     AccumulatorDocumentsNeeded _docsNeeded;
 };
 

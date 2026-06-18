@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -109,7 +110,7 @@ public:
     /**
      * The name of this MatchExpression.
      */
-    virtual StringData name() const = 0;
+    virtual std::string_view name() const = 0;
 
     /**
      * Serializes each subexpression sequentially in a BSONArray.

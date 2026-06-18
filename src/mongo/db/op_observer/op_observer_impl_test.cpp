@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -123,6 +122,7 @@
 #include <functional>
 #include <limits>
 #include <ostream>
+#include <string_view>
 #include <utility>
 
 #include <boost/cstdint.hpp>
@@ -133,6 +133,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using repl::OplogEntry;
 using unittest::assertGet;
@@ -2039,8 +2040,8 @@ protected:
         ASSERT_EQ(*opCtx()->getTxnNumber(), oplogEntry.getField("txnNumber").safeNumberLong());
     }
     void checkCommonFields(const BSONObj& oplogEntry) {
-        ASSERT_EQ("c"_sd, oplogEntry.getStringField("op"));
-        ASSERT_EQ("admin.$cmd"_sd, oplogEntry.getStringField("ns"));
+        ASSERT_EQ("c"sv, oplogEntry.getStringField("op"));
+        ASSERT_EQ("admin.$cmd"sv, oplogEntry.getStringField("ns"));
         checkSessionAndTransactionFields(oplogEntry);
     }
 
@@ -2995,7 +2996,7 @@ protected:
         ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPostImageOpTimeFieldName));
         ASSERT_TRUE(oplogEntry.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName));
         ASSERT_EQUALS(oplogEntry.getStringField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
-                      "postImage"_sd);
+                      "postImage"sv);
 
         finish();
     }
@@ -3026,7 +3027,7 @@ protected:
         ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPostImageOpTimeFieldName));
         ASSERT_TRUE(oplogEntry.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName));
         ASSERT_EQUALS(oplogEntry.getStringField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
-                      "preImage"_sd);
+                      "preImage"sv);
 
         finish();
     }
@@ -3050,7 +3051,7 @@ protected:
         ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPostImageOpTimeFieldName));
         ASSERT_TRUE(oplogEntry.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName));
         ASSERT_EQUALS(oplogEntry.getStringField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
-                      "preImage"_sd);
+                      "preImage"sv);
 
         finish();
     }
@@ -7049,8 +7050,8 @@ TEST_F(OpObserverTest, OnContainerInsert) {
 
     ASSERT_EQ(entry1.getOpType(), repl::OpTypeEnum::kContainerInsert);
     ASSERT_EQ(entry2.getOpType(), repl::OpTypeEnum::kContainerInsert);
-    ASSERT_EQ(entry1.getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(entry2.getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(entry1.getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(entry2.getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = entry1.getObject();
     ASSERT_EQ(entry1Object.nFields(), 2);
@@ -7097,8 +7098,8 @@ TEST_F(OpObserverTest, OnContainerDelete) {
 
     ASSERT_EQ(entry1.getOpType(), repl::OpTypeEnum::kContainerDelete);
     ASSERT_EQ(entry2.getOpType(), repl::OpTypeEnum::kContainerDelete);
-    ASSERT_EQ(entry1.getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(entry2.getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(entry1.getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(entry2.getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = entry1.getObject();
     ASSERT_EQ(entry1Object.nFields(), 1);
@@ -7135,8 +7136,8 @@ TEST_F(OpObserverTest, OnContainerUpdate) {
 
     ASSERT_EQ(entry1.getOpType(), repl::OpTypeEnum::kContainerUpdate);
     ASSERT_EQ(entry2.getOpType(), repl::OpTypeEnum::kContainerUpdate);
-    ASSERT_EQ(entry1.getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(entry2.getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(entry1.getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(entry2.getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = entry1.getObject();
     ASSERT_EQ(entry1Object.nFields(), 3);
@@ -7221,8 +7222,8 @@ TEST_F(BatchedWriteOutputsTest, OnContainerInsertBatched) {
 
     ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerInsert);
     ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerInsert);
-    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = innerEntries[0].getObject();
     ASSERT_EQ(entry1Object.nFields(), 2);
@@ -7275,8 +7276,8 @@ TEST_F(BatchedWriteOutputsTest, OnContainerDeleteBatched) {
 
     ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerDelete);
     ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerDelete);
-    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = innerEntries[0].getObject();
     ASSERT_EQ(entry1Object.nFields(), 1);
@@ -7321,8 +7322,8 @@ TEST_F(BatchedWriteOutputsTest, OnContainerUpdateBatched) {
 
     ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerUpdate);
     ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerUpdate);
-    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = innerEntries[0].getObject();
     ASSERT_EQ(entry1Object.nFields(), 3);
@@ -7411,8 +7412,8 @@ TEST_F(BatchedWriteOutputsTest, OnContainerInsertDeleteBatchedWithInsertDeleteUp
 
     ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerInsert);
     ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerDelete);
-    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = innerEntries[0].getObject();
     ASSERT_EQ(entry1Object.nFields(), 2);
@@ -7469,8 +7470,8 @@ TEST_F(OpObserverTransactionTest, OnContainerInsert) {
 
     ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerInsert);
     ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerInsert);
-    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = innerEntries[0].getObject();
     ASSERT_EQ(entry1Object.nFields(), 2);
@@ -7524,8 +7525,8 @@ TEST_F(OpObserverTransactionTest, OnContainerDelete) {
 
     ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerDelete);
     ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerDelete);
-    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = innerEntries[0].getObject();
     ASSERT_EQ(entry1Object.nFields(), 1);
@@ -7569,8 +7570,8 @@ TEST_F(OpObserverTransactionTest, OnContainerUpdate) {
 
     ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerUpdate);
     ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerUpdate);
-    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = innerEntries[0].getObject();
     ASSERT_EQ(entry1Object.nFields(), 3);
@@ -7656,8 +7657,8 @@ TEST_F(OpObserverTransactionTest, OnContainerInsertDeleteWithInsertDeleteUpdate)
 
     ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerInsert);
     ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerDelete);
-    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
-    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), std::string_view{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), std::string_view{ident});
 
     auto entry1Object = innerEntries[0].getObject();
     ASSERT_EQ(entry1Object.nFields(), 2);

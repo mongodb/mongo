@@ -43,6 +43,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -60,7 +61,7 @@ public:
     /**
      * The name of this MatchExpression.
      */
-    virtual StringData name() const = 0;
+    virtual std::string_view name() const = 0;
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
         _debugAddSpace(debug, indentationLevel);
@@ -102,12 +103,12 @@ public:
 class MONGO_MOD_NEEDS_REPLACEMENT AlwaysFalseMatchExpression final
     : public AlwaysBooleanMatchExpression {
 public:
-    static constexpr StringData kName = "$alwaysFalse"_sd;
+    static constexpr std::string_view kName = "$alwaysFalse"_sd;
 
     AlwaysFalseMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : AlwaysBooleanMatchExpression(MatchType::ALWAYS_FALSE, std::move(annotation)) {}
 
-    StringData name() const final {
+    std::string_view name() const final {
         return kName;
     }
 
@@ -135,12 +136,12 @@ public:
 class MONGO_MOD_NEEDS_REPLACEMENT AlwaysTrueMatchExpression final
     : public AlwaysBooleanMatchExpression {
 public:
-    static constexpr StringData kName = "$alwaysTrue"_sd;
+    static constexpr std::string_view kName = "$alwaysTrue"_sd;
 
     AlwaysTrueMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : AlwaysBooleanMatchExpression(MatchType::ALWAYS_TRUE, std::move(annotation)) {}
 
-    StringData name() const final {
+    std::string_view name() const final {
         return kName;
     }
 

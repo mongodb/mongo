@@ -37,6 +37,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -63,7 +65,7 @@ REGISTER_AGG_STAGE_MAPPING(internalSearchIdLookupStage,
                            documentSourceInternalSearchIdLookupToStageFn);
 
 InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
-    StringData stageName,
+    std::string_view stageName,
     DocumentSourceIdLookupSpec spec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&

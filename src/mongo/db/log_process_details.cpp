@@ -30,7 +30,6 @@
 
 #include "mongo/db/log_process_details.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
@@ -47,6 +46,7 @@
 
 #include <ostream>
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -54,6 +54,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -118,7 +119,7 @@ void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
     }
 
     serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
-        "log rotation"_sd);
+        "log rotation"sv);
     logProcessDetails(nullptr);
 }
 

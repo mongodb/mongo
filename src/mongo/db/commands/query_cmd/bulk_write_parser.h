@@ -38,6 +38,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>

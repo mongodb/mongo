@@ -39,6 +39,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using std::string;
 
@@ -206,7 +207,7 @@ WorkingSetMember roundtripWsmThroughSerialization(WorkingSetMember wsm) {
 }  // namespace
 
 TEST_F(WorkingSetFixture, RecordIdLongAndObjStateCanRoundtripThroughSerialization) {
-    Document doc{{"foo", Value{"bar"_sd}}};
+    Document doc{{"foo", Value{"bar"sv}}};
     member->doc.setValue(doc);
     member->doc.setSnapshotId(SnapshotId{42u});
     member->recordId = RecordId{43};
@@ -220,7 +221,7 @@ TEST_F(WorkingSetFixture, RecordIdLongAndObjStateCanRoundtripThroughSerializatio
 }
 
 TEST_F(WorkingSetFixture, RecordIdStrAndObjStateCanRoundtripThroughSerialization) {
-    Document doc{{"foo", Value{"bar"_sd}}};
+    Document doc{{"foo", Value{"bar"sv}}};
     member->doc.setValue(doc);
     member->doc.setSnapshotId(SnapshotId{42u});
     const OID oid = OID::gen();
@@ -236,7 +237,7 @@ TEST_F(WorkingSetFixture, RecordIdStrAndObjStateCanRoundtripThroughSerialization
 }
 
 TEST_F(WorkingSetFixture, OwnedObjStateCanRoundtripThroughSerialization) {
-    Document doc{{"foo", Value{"bar"_sd}}};
+    Document doc{{"foo", Value{"bar"sv}}};
     member->doc.setValue(doc);
     member->doc.setSnapshotId(SnapshotId{42u});
     ws->transitionToOwnedObj(id);
@@ -274,7 +275,7 @@ TEST_F(WorkingSetFixture, RecordIdAndIdxStateCanRoundtripThroughSerialization) {
 }
 
 TEST_F(WorkingSetFixture, WsmWithMetadataCanRoundtripThroughSerialization) {
-    Document doc{{"foo", Value{"bar"_sd}}};
+    Document doc{{"foo", Value{"bar"sv}}};
     member->doc.setValue(doc);
     member->metadata().setTextScore(42.0);
     member->metadata().setSearchScore(43.0);
@@ -297,7 +298,7 @@ TEST_F(WorkingSetFixture, WsmWithMetadataCanRoundtripThroughSerialization) {
 }
 
 TEST_F(WorkingSetFixture, WsmCanBeExtractedAndReinserted) {
-    Document doc{{"foo", Value{"bar"_sd}}};
+    Document doc{{"foo", Value{"bar"sv}}};
     member->doc.setValue(doc);
     member->doc.setSnapshotId(SnapshotId{42u});
     member->recordId = RecordId{43};

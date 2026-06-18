@@ -45,6 +45,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -79,7 +80,7 @@ void SASLServerMechanismRegistry::setEnabledMechanisms(std::vector<std::string> 
 }
 
 StatusWith<std::unique_ptr<ServerMechanismBase>> SASLServerMechanismRegistry::getServerMechanism(
-    StringData mechanismName, std::string authenticationDatabase) {
+    std::string_view mechanismName, std::string authenticationDatabase) {
     auto& mechList = _getMapRef(authenticationDatabase);
 
     auto it = std::find_if(mechList.begin(), mechList.end(), [&](const auto& mech) {
@@ -163,7 +164,7 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
     builder->appendArray("saslSupportedMechs", mechanismsBuilder.arr());
 }
 
-bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechName) const {
+bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(std::string_view mechName) const {
     const auto& v = _enabledMechanisms;
     return std::find(v.begin(), v.end(), mechName) != v.end();
 }
@@ -188,7 +189,7 @@ std::vector<std::string> SASLServerMechanismRegistry::getMechanismNames() const 
     return names;
 }
 
-StringData ServerMechanismBase::getAuthenticationDatabase() const {
+std::string_view ServerMechanismBase::getAuthenticationDatabase() const {
     auto systemUser = internalSecurity.getUser();
     if (getTestCommandsEnabled() && _authenticationDatabase == "admin" &&
         getPrincipalName() == (*systemUser)->getName().getUser()) {

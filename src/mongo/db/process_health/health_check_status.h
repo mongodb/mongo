@@ -35,12 +35,13 @@
 
 #include <memory>
 #include <ostream>
+#include <string_view>
 
 namespace mongo {
 namespace process_health {
 
 enum class MONGO_MOD_PUBLIC Severity { kOk, kFailure };
-static const StringData SeverityStrings[] = {"kOk", "kFailure"};
+static const std::string_view SeverityStrings[] = {"kOk", "kFailure"};
 
 inline StringBuilder& operator<<(StringBuilder& s, const Severity& sev) {
     return s << SeverityStrings[static_cast<int>(sev)];
@@ -54,7 +55,7 @@ inline std::ostream& operator<<(std::ostream& s, const Severity& sev) {
  */
 class MONGO_MOD_PUBLIC HealthCheckStatus {
 public:
-    HealthCheckStatus(FaultFacetType type, Severity severity, StringData description)
+    HealthCheckStatus(FaultFacetType type, Severity severity, std::string_view description)
         : _type(type), _severity(severity), _description(description) {}
 
     // Constructs a resolved status (no fault detected).
@@ -85,7 +86,7 @@ public:
         return _severity;
     }
 
-    StringData getShortDescription() const {
+    std::string_view getShortDescription() const {
         return _description;
     }
 

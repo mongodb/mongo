@@ -37,17 +37,18 @@
 
 #include <exception>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::label;
-constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::field;
+constexpr std::string_view mongo::address_restriction_detail::ClientSource::label;
+constexpr std::string_view mongo::address_restriction_detail::ClientSource::field;
 
-constexpr mongo::StringData mongo::address_restriction_detail::ServerAddress::label;
-constexpr mongo::StringData mongo::address_restriction_detail::ServerAddress::field;
+constexpr std::string_view mongo::address_restriction_detail::ServerAddress::label;
+constexpr std::string_view mongo::address_restriction_detail::ServerAddress::field;
 
 mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
     const BSONObj& obj) try {
@@ -55,12 +56,12 @@ mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
     const auto ar = Address_restriction::parse(obj, ctx);
     std::vector<std::unique_ptr<NamedRestriction>> vec;
 
-    const boost::optional<std::vector<StringData>>& client = ar.getClientSource();
+    const boost::optional<std::vector<std::string_view>>& client = ar.getClientSource();
     if (client) {
         vec.push_back(std::make_unique<ClientSourceRestriction>(client.value()));
     }
 
-    const boost::optional<std::vector<StringData>>& server = ar.getServerAddress();
+    const boost::optional<std::vector<std::string_view>>& server = ar.getServerAddress();
     if (server) {
         vec.push_back(std::make_unique<ServerAddressRestriction>(server.value()));
     }

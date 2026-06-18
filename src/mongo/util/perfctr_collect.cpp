@@ -37,6 +37,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 
@@ -94,7 +96,7 @@ std::string errnoWithPdhDescription(PDH_STATUS status) {
 /**
  * Format an error message for a PDH function call failure.
  */
-std::string formatFunctionCallError(StringData functionName, PDH_STATUS status) {
+std::string formatFunctionCallError(std::string_view functionName, PDH_STATUS status) {
     return str::stream() << functionName << " failed with '" << errnoWithPdhDescription(status)
                          << "'";
 }
@@ -102,7 +104,7 @@ std::string formatFunctionCallError(StringData functionName, PDH_STATUS status) 
 /**
  * Transform a vector of string data into a vector of strings.
  */
-void transformStringDataVector(const std::vector<StringData>& input,
+void transformStringDataVector(const std::vector<std::string_view>& input,
                                std::vector<std::string>* output) {
     output->reserve(input.size());
     for (const auto& str : input) {
@@ -123,7 +125,7 @@ bool counterHasTickBasedTimeBase(uint32_t type) {
 }  // namespace
 
 StatusWith<std::vector<std::string>> PerfCounterCollection::checkCounters(
-    StringData name, const std::vector<StringData>& paths) {
+    std::string_view name, const std::vector<std::string_view>& paths) {
 
     if (_counters.find(std::string{name}) != _counters.end() ||
         _nestedCounters.find(std::string{name}) != _nestedCounters.end()) {
@@ -144,8 +146,8 @@ StatusWith<std::vector<std::string>> PerfCounterCollection::checkCounters(
     return {stringPaths};
 }
 
-Status PerfCounterCollection::addCountersGroup(StringData name,
-                                               const std::vector<StringData>& paths) {
+Status PerfCounterCollection::addCountersGroup(std::string_view name,
+                                               const std::vector<std::string_view>& paths) {
 
     auto swCounters = checkCounters(name, paths);
     if (!swCounters.getStatus().isOK()) {
@@ -158,7 +160,7 @@ Status PerfCounterCollection::addCountersGroup(StringData name,
 }
 
 Status PerfCounterCollection::addCountersGroupedByInstanceName(
-    StringData name, const std::vector<StringData>& paths) {
+    std::string_view name, const std::vector<std::string_view>& paths) {
 
     auto swCounters = checkCounters(name, paths);
     if (!swCounters.getStatus().isOK()) {
@@ -223,7 +225,7 @@ Status PerfCounterCollector::open() {
 }
 
 StatusWith<std::tuple<PDH_HCOUNTER, std::unique_ptr<PDH_COUNTER_INFO>>>
-PerfCounterCollector::addAndGetCounter(StringData path) {
+PerfCounterCollector::addAndGetCounter(std::string_view path) {
     PDH_HCOUNTER counter{0};
 
     PDH_STATUS status = PdhAddEnglishCounterW(
@@ -254,7 +256,8 @@ PerfCounterCollector::addAndGetCounter(StringData path) {
                                                                        std::move(counterInfo)};
 }
 
-StatusWith<PerfCounterCollector::CounterInfo> PerfCounterCollector::addCounter(StringData path) {
+StatusWith<PerfCounterCollector::CounterInfo> PerfCounterCollector::addCounter(
+    std::string_view path) {
     auto swCounterInfo = addAndGetCounter(path);
     if (!swCounterInfo.isOK()) {
         return swCounterInfo.getStatus();
@@ -297,7 +300,7 @@ StatusWith<PerfCounterCollector::CounterInfo> PerfCounterCollector::addCounter(S
 }
 
 StatusWith<std::vector<PerfCounterCollector::CounterInfo>> PerfCounterCollector::addCounters(
-    StringData path) {
+    std::string_view path) {
 
     auto swCounterInfo = addAndGetCounter(path);
     if (!swCounterInfo.isOK()) {
@@ -361,7 +364,7 @@ StatusWith<std::vector<PerfCounterCollector::CounterInfo>> PerfCounterCollector:
     return {std::move(counters)};
 }
 
-Status PerfCounterCollector::addCountersGroup(StringData groupName,
+Status PerfCounterCollector::addCountersGroup(std::string_view groupName,
                                               const std::vector<std::string>& paths) {
     CounterGroup group;
     group.name = std::string{groupName};
@@ -383,7 +386,7 @@ Status PerfCounterCollector::addCountersGroup(StringData groupName,
 }
 
 Status PerfCounterCollector::addCountersGroupedByInstanceName(
-    StringData groupName, const std::vector<std::string>& paths) {
+    std::string_view groupName, const std::vector<std::string>& paths) {
     NestedCounterGroup group;
     group.name = std::string{groupName};
 

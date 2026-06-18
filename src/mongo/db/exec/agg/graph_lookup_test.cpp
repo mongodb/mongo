@@ -49,6 +49,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 using namespace test;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
@@ -104,7 +105,7 @@ TEST_F(GraphLookUpTest, ShouldErrorWhenExploringGraphIfDocumentInFromCollectionI
     auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{
-        Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"to", 1}}};
+        Document{{"_id", "a"sv}, {"to", 0}, {"from", 1}}, Document{{"to", 1}}};
 
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
@@ -172,10 +173,10 @@ TEST_F(GraphLookUpTest, ShouldTraverseSubgraphIfIdOfDocumentsInFromCollectionAre
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
-    Document to0from1{{"_id", "a"_sd}, {"to", 0}, {"from", 1}};
-    Document to0from2{{"_id", "a"_sd}, {"to", 0}, {"from", 2}};
-    Document to1{{"_id", "b"_sd}, {"to", 1}};
-    Document to2{{"_id", "c"_sd}, {"to", 2}};
+    Document to0from1{{"_id", "a"sv}, {"to", 0}, {"from", 1}};
+    Document to0from2{{"_id", "a"sv}, {"to", 0}, {"from", 2}};
+    Document to1{{"_id", "b"sv}, {"to", 1}};
+    Document to2{{"_id", "c"sv}, {"to", 2}};
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document(to1), Document(to2), Document(to0from1), Document(to0from2)};
 
@@ -241,7 +242,7 @@ TEST_F(GraphLookUpTest, ShouldPropagatePauses) {
                                             expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{
-        Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"_sd}, {"to", 1}}};
+        Document{{"_id", "a"sv}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"sv}, {"to", 1}}};
 
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
@@ -274,9 +275,9 @@ TEST_F(GraphLookUpTest, ShouldPropagatePauses) {
     ASSERT_EQ(result["results"].getArray().size(), 2UL);
     ASSERT_TRUE(arrayContains(expCtx,
                               result["results"].getArray(),
-                              Value(Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}})));
+                              Value(Document{{"_id", "a"sv}, {"to", 0}, {"from", 1}})));
     ASSERT_TRUE(arrayContains(
-        expCtx, result["results"].getArray(), Value(Document{{"_id", "b"_sd}, {"to", 1}})));
+        expCtx, result["results"].getArray(), Value(Document{{"_id", "b"sv}, {"to", 1}})));
 
     ASSERT_TRUE(graphLookupStage->getNext().isPaused());
 
@@ -288,9 +289,9 @@ TEST_F(GraphLookUpTest, ShouldPropagatePauses) {
     ASSERT_EQ(result["results"].getArray().size(), 2UL);
     ASSERT_TRUE(arrayContains(expCtx,
                               result["results"].getArray(),
-                              Value(Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}})));
+                              Value(Document{{"_id", "a"sv}, {"to", 0}, {"from", 1}})));
     ASSERT_TRUE(arrayContains(
-        expCtx, result["results"].getArray(), Value(Document{{"_id", "b"_sd}, {"to", 1}})));
+        expCtx, result["results"].getArray(), Value(Document{{"_id", "b"sv}, {"to", 1}})));
 
     ASSERT_TRUE(graphLookupStage->getNext().isPaused());
 
@@ -309,7 +310,7 @@ TEST_F(GraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
                                             expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{
-        Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"_sd}, {"to", 1}}};
+        Document{{"_id", "a"sv}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"sv}, {"to", 1}}};
 
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
@@ -340,8 +341,8 @@ TEST_F(GraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     // Assert it has the expected results. Note the results can be in either order.
     auto expectedA =
-        Document{{"startPoint", 0}, {"results", Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}}};
-    auto expectedB = Document{{"startPoint", 0}, {"results", Document{{"_id", "b"_sd}, {"to", 1}}}};
+        Document{{"startPoint", 0}, {"results", Document{{"_id", "a"sv}, {"to", 0}, {"from", 1}}}};
+    auto expectedB = Document{{"startPoint", 0}, {"results", Document{{"_id", "b"sv}, {"to", 1}}}};
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     if (expCtx->getDocumentComparator().evaluate(next.getDocument() == expectedA)) {

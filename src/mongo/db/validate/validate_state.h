@@ -56,6 +56,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -82,7 +83,7 @@ enum struct FastCountType {
     neither,
 };
 
-StringData toString(FastCountType unit);
+std::string_view toString(FastCountType unit);
 
 /**
  * Contains information about the collection being validated and the user provided validation

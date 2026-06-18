@@ -40,6 +40,7 @@
 #include <ostream>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -76,7 +77,9 @@ template <typename T>
 std::ostream& stream(std::ostream& os, const T& v);
 
 template <typename Seq>
-std::ostream& streamSequence(std::ostream& os, std::array<StringData, 2> braces, const Seq& seq) {
+std::ostream& streamSequence(std::ostream& os,
+                             std::array<std::string_view, 2> braces,
+                             const Seq& seq) {
     bool sep = false;
     os << braces[0];
     for (const auto& item : seq) {

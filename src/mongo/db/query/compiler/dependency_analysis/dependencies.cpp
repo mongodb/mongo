@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -39,6 +38,7 @@
 #include <algorithm>
 #include <bitset>
 #include <compare>
+#include <string_view>
 
 namespace mongo {
 
@@ -184,12 +184,13 @@ void DepsTracker::clearMetadataAvailable() {
 }
 
 // Returns true if the lhs value should sort before the rhs, false otherwise.
-bool PathComparator::operator()(StringData lhs, StringData rhs) const {
+bool PathComparator::operator()(std::string_view lhs, std::string_view rhs) const {
     // Use the three-way (<=>) comparator to avoid code duplication.
     return std::is_lt(ThreeWayPathComparator{}(lhs, rhs));
 }
 
-std::strong_ordering ThreeWayPathComparator::operator()(StringData lhs, StringData rhs) const {
+std::strong_ordering ThreeWayPathComparator::operator()(std::string_view lhs,
+                                                        std::string_view rhs) const {
     constexpr char dot = '.';
 
     for (size_t pos = 0, len = std::min(lhs.size(), rhs.size()); pos < len; ++pos) {

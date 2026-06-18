@@ -36,6 +36,7 @@
 
 #include <bit>
 #include <cstring>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -316,8 +317,8 @@ struct Arguments {
 };
 
 void uassertIfNotIntegralAndNonNegative(Value val,
-                                        StringData expressionName,
-                                        StringData argumentName) {
+                                        std::string_view expressionName,
+                                        std::string_view argumentName) {
     uassert(9711600,
             str::stream() << expressionName << "requires an integral " << argumentName
                           << ", found a value of type: " << typeName(val.getType())
@@ -818,7 +819,9 @@ namespace {
  * For arrays, borrows directly from the Value (zero-copy). For binData vectors,
  * converts into 'buf' and returns a reference to it.
  */
-const std::vector<Value>& toArray(const Value& val, std::vector<Value>& buf, StringData opName) {
+const std::vector<Value>& toArray(const Value& val,
+                                  std::vector<Value>& buf,
+                                  std::string_view opName) {
     if (val.isArray()) {
         return val.getArray();
     }
@@ -1076,7 +1079,7 @@ auto dispatchDtype(dType d, F&& f) {
 template <SimilarityAlgorithm Algo>
 boost::optional<double> tryBinDataSimilarity(const Value& val1,
                                              const Value& val2,
-                                             StringData opName) {
+                                             std::string_view opName) {
     if (val1.getType() != BSONType::binData || val2.getType() != BSONType::binData) {
         return boost::none;
     }
@@ -1133,7 +1136,7 @@ boost::optional<double> tryBinDataSimilarity(const Value& val1,
  */
 void validate(const std::vector<Value>& array1,
               const std::vector<Value>& array2,
-              StringData opName) {
+              std::string_view opName) {
     uassert(10413202,
             str::stream() << "Arguments to " << opName
                           << " must be the same size, but the first is of size "

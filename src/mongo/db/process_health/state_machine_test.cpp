@@ -29,7 +29,6 @@
 
 #include "mongo/db/process_health/state_machine.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 

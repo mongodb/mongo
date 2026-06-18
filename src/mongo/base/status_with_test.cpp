@@ -31,12 +31,12 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/stringify.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -44,6 +44,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(StatusWith, MakeCtad) {
     auto validate = [](auto&& arg) {
@@ -63,16 +64,16 @@ TEST(StatusWith, MakeCtad) {
 
 /** Check uassertStatusOK with various reference types */
 TEST(StatusWith, UassertStatusOKReferenceTypes) {
-    auto sd = "barbaz"_sd;
+    auto sd = "barbaz"sv;
     auto sw = StatusWith(sd);
 
-    const StatusWith<StringData>& cref = sw;
+    const StatusWith<std::string_view>& cref = sw;
     ASSERT_EQUALS(uassertStatusOK(cref), sd);
 
-    StatusWith<StringData>& ncref = sw;
+    StatusWith<std::string_view>& ncref = sw;
     ASSERT_EQUALS(uassertStatusOK(ncref), sd);
 
-    StatusWith<StringData>&& rref = std::move(sw);
+    StatusWith<std::string_view>&& rref = std::move(sw);
     ASSERT_EQUALS(uassertStatusOK(std::move(rref)), sd);
 }
 
@@ -102,9 +103,9 @@ TEST(StatusWith, ignoreTest) {
 
 TEST(StatusWith, AssertionFormat) {
     Status failed(ErrorCodes::CallbackCanceled, "foo");
-    ASSERT_EQ(unittest::stringify::invoke(StatusWith<StringData>(failed)),
+    ASSERT_EQ(unittest::stringify::invoke(StatusWith<std::string_view>(failed)),
               unittest::stringify::invoke(failed));
-    ASSERT_EQ(unittest::stringify::invoke(StatusWith<StringData>("foo")), "foo");
+    ASSERT_EQ(unittest::stringify::invoke(StatusWith<std::string_view>("foo")), "foo");
 }
 
 }  // namespace

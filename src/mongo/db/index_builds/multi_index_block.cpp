@@ -102,6 +102,7 @@
 #include <exception>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
@@ -1828,7 +1829,7 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
 
 Status MultiIndexBlock::_failPointHangDuringBuild(OperationContext* opCtx,
                                                   FailPoint* fp,
-                                                  StringData where,
+                                                  std::string_view where,
                                                   const BSONObj& doc,
                                                   unsigned long long iteration) const {
     try {

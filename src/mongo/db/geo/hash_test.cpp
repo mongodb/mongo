@@ -33,7 +33,6 @@
 
 #include "mongo/db/geo/hash.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/type_traits.h"

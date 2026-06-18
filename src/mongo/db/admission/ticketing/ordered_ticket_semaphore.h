@@ -38,6 +38,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <set>
 
 namespace mongo {
 

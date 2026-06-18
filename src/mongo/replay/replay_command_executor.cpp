@@ -28,7 +28,6 @@
  */
 #include "mongo/replay/replay_command_executor.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
@@ -40,11 +39,12 @@
 
 #include <chrono>
 #include <string>
+#include <string_view>
 #include <thread>
 
 namespace mongo {
 
-void ReplayCommandExecutor::connect(StringData uri) {
+void ReplayCommandExecutor::connect(std::string_view uri) {
     // Connect to mongo d/s instance and keep instance of the connection alive as long as this
     // object is alive.
     auto mongoURI = uassertStatusOK(MongoURI::parse(uri));

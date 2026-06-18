@@ -35,6 +35,7 @@
 #include "mongo/util/str.h"
 
 #include <iostream>
+#include <string_view>
 
 namespace MONGO_MOD_PUB mongo {
 namespace repl {
@@ -64,7 +65,7 @@ public:
         return MemberId(element.numberInt());
     }
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
         builder->appendNumber(fieldName, _id);
     }
 

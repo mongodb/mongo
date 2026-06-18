@@ -31,6 +31,7 @@
 
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -49,6 +50,7 @@
 
 namespace mongo::transport {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace unittest::match;
 
@@ -56,10 +58,10 @@ MATCHER_P2(ProxiedEndpointsAre, src, dst, "") {
     return ExplainMatchResult(FieldsAre(src, dst), arg, result_listener);
 }
 
-ParserResults parseAllPrefixes(StringData s) {
+ParserResults parseAllPrefixes(std::string_view s) {
     boost::optional<ParserResults> results;
     for (size_t len = 0; len <= s.size(); ++len) {
-        StringData sub = s.substr(0, len);
+        std::string_view sub = s.substr(0, len);
         results = parseProxyProtocolHeader(sub, false);
         if (len < s.size()) {
             ASSERT_FALSE(results) << fmt::format("size={}, sub={}", len, sub);
@@ -69,7 +71,7 @@ ParserResults parseAllPrefixes(StringData s) {
     return *results;
 }
 
-void parseStringExpectFailure(StringData s, std::string regex) {
+void parseStringExpectFailure(std::string_view s, std::string regex) {
     try {
         parseAllPrefixes(s);
         FAIL("Expected to throw");
@@ -78,7 +80,7 @@ void parseStringExpectFailure(StringData s, std::string regex) {
     }
 }
 
-boost::optional<ProxiedEndpoints> parseStringExpectSuccess(StringData s) {
+boost::optional<ProxiedEndpoints> parseStringExpectSuccess(std::string_view s) {
     const ParserResults results = parseAllPrefixes(s);
     ASSERT_THAT(results.bytesParsed, Eq(s.size()));
 
@@ -100,23 +102,23 @@ boost::optional<ProxiedEndpoints> parseStringExpectSuccess(StringData s) {
 }
 
 TEST(ProxyProtocolHeaderParser, MalformedIpv4Addresses) {
-    StringData testCases[] = {"1",
-                              "1.1",
-                              "1.1.1",
-                              "1.1.1.1.1",
-                              "1.1.1.1.",
-                              ".1.1.1.1",
-                              "1234.1.1.1",
-                              "1.1234.1.1",
-                              "1.1.1234.1",
-                              "1.1.1.1234",
-                              "1.1.1.a",
-                              "1.1.1.256",
-                              "256.1.1.1",
-                              "1.1..1.1",
-                              "-0.1.1.1",
-                              "-1.1.1.1",
-                              ""};
+    std::string_view testCases[] = {"1",
+                                    "1.1",
+                                    "1.1.1",
+                                    "1.1.1.1.1",
+                                    "1.1.1.1.",
+                                    ".1.1.1.1",
+                                    "1234.1.1.1",
+                                    "1.1234.1.1",
+                                    "1.1.1234.1",
+                                    "1.1.1.1234",
+                                    "1.1.1.a",
+                                    "1.1.1.256",
+                                    "256.1.1.1",
+                                    "1.1..1.1",
+                                    "-0.1.1.1",
+                                    "-1.1.1.1",
+                                    ""};
 
     for (const auto& testCase : testCases) {
         try {
@@ -130,7 +132,7 @@ TEST(ProxyProtocolHeaderParser, MalformedIpv4Addresses) {
 }
 
 TEST(ProxyProtocolHeaderParser, WellFormedIpv4Addresses) {
-    StringData testCases[] = {
+    std::string_view testCases[] = {
         "1.1.1.1", "0.0.0.0", "255.255.255.255", "0.255.0.255", "127.0.1.1", "1.12.123.0"};
 
     for (const auto& testCase : testCases) {
@@ -139,33 +141,33 @@ TEST(ProxyProtocolHeaderParser, WellFormedIpv4Addresses) {
 }
 
 TEST(ProxyProtocolHeaderParser, MalformedIpv6Addresses) {
-    StringData testCases[] = {"0000",
-                              "0000:0000",
-                              "0000:0000:0000",
-                              "0000:0000:0000:0000:0000",
-                              "0000:0000:0000:0000:0000:0000",
-                              "0000:0000:0000:0000:0000:0000:0000",
-                              "0000:0000:0000:0000:0000:0000:0000:0000:0000",
-                              "0000:0000:0000:0000:0000:0000:0000:",
-                              ":0000:0000:0000:0000:0000:0000:0000",
-                              "00000:0000:0000:0000:0000:0000:0000:0000",
-                              "0000:0000:0000:0000:0000:0000:0000:00000",
-                              "0000:-0000:0000:0000:0000:0000:0000:0000",
-                              "0000:-000:0000:0000:0000:0000:0000:0000",
-                              "000g:0000:0000:0000:0000:0000:0000:0000",
-                              "0000:0000:0000:0000:0000:0000:0000:000g",
-                              "0000::0000:0000:0000:0000:0000:0000:0000",
-                              "0000:0000:0000:0000:0000:0000:0000::0000",
-                              "0000:0000:0000:0000:0000:0000:0000:0000::",
-                              "::0000:0000:0000:0000:0000:0000:0000:0000",
-                              "::0000::",
-                              "0000::0000::0000:0000:0000:0000:0000",
-                              "0000::0000::0000:0000:0000:0000:0000:0000",
-                              "::0000:",
-                              "::-100",
-                              ":0000::",
-                              ":::",
-                              ""};
+    std::string_view testCases[] = {"0000",
+                                    "0000:0000",
+                                    "0000:0000:0000",
+                                    "0000:0000:0000:0000:0000",
+                                    "0000:0000:0000:0000:0000:0000",
+                                    "0000:0000:0000:0000:0000:0000:0000",
+                                    "0000:0000:0000:0000:0000:0000:0000:0000:0000",
+                                    "0000:0000:0000:0000:0000:0000:0000:",
+                                    ":0000:0000:0000:0000:0000:0000:0000",
+                                    "00000:0000:0000:0000:0000:0000:0000:0000",
+                                    "0000:0000:0000:0000:0000:0000:0000:00000",
+                                    "0000:-0000:0000:0000:0000:0000:0000:0000",
+                                    "0000:-000:0000:0000:0000:0000:0000:0000",
+                                    "000g:0000:0000:0000:0000:0000:0000:0000",
+                                    "0000:0000:0000:0000:0000:0000:0000:000g",
+                                    "0000::0000:0000:0000:0000:0000:0000:0000",
+                                    "0000:0000:0000:0000:0000:0000:0000::0000",
+                                    "0000:0000:0000:0000:0000:0000:0000:0000::",
+                                    "::0000:0000:0000:0000:0000:0000:0000:0000",
+                                    "::0000::",
+                                    "0000::0000::0000:0000:0000:0000:0000",
+                                    "0000::0000::0000:0000:0000:0000:0000:0000",
+                                    "::0000:",
+                                    "::-100",
+                                    ":0000::",
+                                    ":::",
+                                    ""};
 
     for (const auto& testCase : testCases) {
         try {
@@ -179,35 +181,35 @@ TEST(ProxyProtocolHeaderParser, MalformedIpv6Addresses) {
 }
 
 TEST(ProxyProtocolHeaderParser, WellFormedIpv6Addresses) {
-    StringData testCases[] = {"::",
-                              "::0000",
-                              "::0000:0000",
-                              "::0000:0000:0000",
-                              "::0000:0000:0000:0000",
-                              "::0000:0000:0000:0000:0000",
-                              "::0000:0000:0000:0000:0000:0000",
-                              "::0000:0000:0000:0000:0000:0000:0000",
-                              "0000:0000:0000:0000:0000:0000:0000::",
-                              "0000:0000:0000:0000:0000:0000::",
-                              "0000:0000:0000:0000:0000::",
-                              "0000:0000:0000:0000::",
-                              "0000:0000:0000::",
-                              "0000:0000::",
-                              "0000::",
-                              "0000::0000",
-                              "0000::0000:0000",
-                              "0000::0000:0000:0000",
-                              "0000::0000:0000:0000:0000",
-                              "0000::0000:0000:0000:0000:0000",
-                              "0000::0000:0000:0000:0000:0000:0000",
-                              "0000:0000:0000::0000:0000:0000",
-                              "0000:0000:0000::0000:0000",
-                              "0000:0000:0000:0000:0000:0000:0000:0000",
-                              "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-                              "ffff::",
-                              "0123:4567:89ab:cdef::",
-                              "::0123:4567:89ab:cdef",
-                              "0123:4567::89ab:cdef"};
+    std::string_view testCases[] = {"::",
+                                    "::0000",
+                                    "::0000:0000",
+                                    "::0000:0000:0000",
+                                    "::0000:0000:0000:0000",
+                                    "::0000:0000:0000:0000:0000",
+                                    "::0000:0000:0000:0000:0000:0000",
+                                    "::0000:0000:0000:0000:0000:0000:0000",
+                                    "0000:0000:0000:0000:0000:0000:0000::",
+                                    "0000:0000:0000:0000:0000:0000::",
+                                    "0000:0000:0000:0000:0000::",
+                                    "0000:0000:0000:0000::",
+                                    "0000:0000:0000::",
+                                    "0000:0000::",
+                                    "0000::",
+                                    "0000::0000",
+                                    "0000::0000:0000",
+                                    "0000::0000:0000:0000",
+                                    "0000::0000:0000:0000:0000",
+                                    "0000::0000:0000:0000:0000:0000",
+                                    "0000::0000:0000:0000:0000:0000:0000",
+                                    "0000:0000:0000::0000:0000:0000",
+                                    "0000:0000:0000::0000:0000",
+                                    "0000:0000:0000:0000:0000:0000:0000:0000",
+                                    "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+                                    "ffff::",
+                                    "0123:4567:89ab:cdef::",
+                                    "::0123:4567:89ab:cdef",
+                                    "0123:4567::89ab:cdef"};
 
     for (const auto& testCase : testCases) {
         proxy_protocol_details::validateIpv6Address(testCase);
@@ -265,7 +267,7 @@ TEST(ProxyProtocolHeaderParser, WellFormedV1Headers) {
                 ProxiedEndpointsAre(Eq(SockAddr::create("0.0.0.128", 1000, AF_INET)),
                                     Eq(SockAddr::create("0.0.1.44", 3000, AF_INET))));
 
-    static constexpr StringData allFs = "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"_sd;
+    static constexpr std::string_view allFs = "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"sv;
     ASSERT_THAT(
         *parseStringExpectSuccess(fmt::format("PROXY TCP6 {} {} 10000 30000\r\n", allFs, allFs)),
         ProxiedEndpointsAre(Eq(SockAddr::create(allFs, 10000, AF_INET6)),
@@ -324,7 +326,7 @@ enum class AddressFamily {
     UNIX,
 };
 
-std::string createTestUnixPathString(StringData path) {
+std::string createTestUnixPathString(std::string_view path) {
     std::string out{path};
     out.resize(proxy_protocol_details::kMaxUnixPathLength);
     return out;
@@ -352,7 +354,7 @@ std::string encodeU16BigEndian(size_t value) {
         .replace(1, 1, 1, static_cast<char>(v & 0xFF));
 }
 
-TestV2Header buildValidPP2Header(AddressFamily type, StringData tlv = "") {
+TestV2Header buildValidPP2Header(AddressFamily type, std::string_view tlv = "") {
     using namespace std::string_literals;
 
     TestV2Header header;

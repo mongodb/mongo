@@ -47,6 +47,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -113,7 +114,7 @@ public:
                                       bool differentCAServerCertSucceeds,
                                       bool bothSucceeds) {
         struct CertificateValidationTestCase {
-            StringData description;
+            std::string_view description;
             Server::Options serverOptions;
             bool shouldSucceed;
         };

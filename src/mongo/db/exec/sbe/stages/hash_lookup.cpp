@@ -41,6 +41,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 HashLookupStage::HashLookupStage(std::unique_ptr<PlanStage> outer,
                                  std::unique_ptr<PlanStage> inner,
@@ -52,7 +53,7 @@ HashLookupStage::HashLookupStage(std::unique_ptr<PlanStage> outer,
                                  PlanNodeId planNodeId,
                                  bool participateInTrialRunTracking)
     : PlanStage(
-          "hash_lookup"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+          "hash_lookup"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _outerKeySlot(outerKeySlot),
       _innerKeySlot(innerKeySlot),
       _innerProjectSlot(innerProjectSlot),

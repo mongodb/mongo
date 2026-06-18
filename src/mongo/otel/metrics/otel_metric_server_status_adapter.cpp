@@ -33,6 +33,8 @@
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::otel::metrics {
@@ -41,7 +43,7 @@ OtelMetricServerStatusAdapter::OtelMetricServerStatusAdapter(Metric* metric) : _
     invariant(_metric);
 }
 
-void OtelMetricServerStatusAdapter::appendTo(BSONObjBuilder& b, StringData leafName) const {
+void OtelMetricServerStatusAdapter::appendTo(BSONObjBuilder& b, std::string_view leafName) const {
     if (!isEnabled()) {
         return;
     }

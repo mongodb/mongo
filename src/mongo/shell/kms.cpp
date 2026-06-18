@@ -35,14 +35,16 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
 
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-BSONObj KMSService::encryptDataKeyByString(ConstDataRange cdr, StringData keyId) {
+BSONObj KMSService::encryptDataKeyByString(ConstDataRange cdr, std::string_view keyId) {
     uasserted(5380101,
               str::stream() << "Customer Master Keys for " << name()
                             << " must be BSON object, not a string.");
@@ -63,7 +65,7 @@ void KMSServiceController::registerFactory(KMSProviderEnum provider,
     invariant(ret.second);
 }
 
-std::unique_ptr<KMSService> KMSServiceController::createFromClient(StringData kmsProvider,
+std::unique_ptr<KMSService> KMSServiceController::createFromClient(std::string_view kmsProvider,
                                                                    const BSONObj& config) {
     KMSProviderEnum provider =
         idl::deserialize<KMSProviderEnum>(kmsProvider, IDLParserContext("client fle options"));
@@ -75,7 +77,7 @@ std::unique_ptr<KMSService> KMSServiceController::createFromClient(StringData km
 
 std::unique_ptr<KMSService> KMSServiceController::createFromDisk(const BSONObj& config,
                                                                  const BSONObj& masterKey) {
-    auto providerObj = masterKey.getStringField("provider"_sd);
+    auto providerObj = masterKey.getStringField("provider"sv);
     auto provider = idl::deserialize<KMSProviderEnum>(providerObj, IDLParserContext("root"));
     auto service = _factories.at(provider)->create(config);
     uassert(51193, str::stream() << "Cannot find disk kms provider " << providerObj, service);

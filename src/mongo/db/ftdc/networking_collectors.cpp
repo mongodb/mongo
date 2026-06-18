@@ -38,13 +38,16 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 void appendDiagnosticInfo(BSONObjBuilder& builder,
-                          StringData subsectionName,
+                          std::string_view subsectionName,
                           const std::shared_ptr<executor::TaskExecutor>& taskExecutor) {
 
     BSONObjBuilder subSectionBuilder = builder.subobjStart(subsectionName);
@@ -88,13 +91,13 @@ public:
         // Add Search diagnostics.
         if (auto swExec = executor::getMongotTaskExecutor(opCtx->getServiceContext());
             swExec.isOK()) {
-            appendDiagnosticInfo(builder, "mongot"_sd, swExec.getValue());
+            appendDiagnosticInfo(builder, "mongot"sv, swExec.getValue());
         }
 
         if (auto swExec =
                 executor::getSearchIndexManagementTaskExecutor(opCtx->getServiceContext());
             swExec.isOK()) {
-            appendDiagnosticInfo(builder, "searchIndex"_sd, swExec.getValue());
+            appendDiagnosticInfo(builder, "searchIndex"sv, swExec.getValue());
         }
     }
 

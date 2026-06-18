@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -43,6 +42,7 @@
 #include <mutex>
 #include <random>
 #include <string>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/none.hpp>
@@ -62,7 +62,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT DDLLockManager {
         ScopedBaseDDLLock(OperationContext* opCtx,
                           Locker* locker,
                           const NamespaceString& nss,
-                          StringData reason,
+                          std::string_view reason,
                           LockMode mode,
                           bool waitForRecovery,
                           boost::optional<Milliseconds> timeout = boost::none);
@@ -70,7 +70,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT DDLLockManager {
         ScopedBaseDDLLock(OperationContext* opCtx,
                           Locker* locker,
                           const DatabaseName& db,
-                          StringData reason,
+                          std::string_view reason,
                           LockMode mode,
                           bool waitForRecovery,
                           boost::optional<Milliseconds> timeout = boost::none);
@@ -79,10 +79,10 @@ class MONGO_MOD_NEEDS_REPLACEMENT DDLLockManager {
 
         ScopedBaseDDLLock(ScopedBaseDDLLock&& other);
 
-        StringData getResourceName() const {
+        std::string_view getResourceName() const {
             return _resourceName;
         }
-        StringData getReason() const {
+        std::string_view getReason() const {
             return _reason;
         }
 
@@ -92,9 +92,9 @@ class MONGO_MOD_NEEDS_REPLACEMENT DDLLockManager {
 
         ScopedBaseDDLLock(OperationContext* opCtx,
                           Locker* locker,
-                          StringData resName,
+                          std::string_view resName,
                           const ResourceId& resId,
-                          StringData reason,
+                          std::string_view reason,
                           LockMode mode,
                           bool waitForRecovery,
                           Milliseconds timeout);
@@ -243,20 +243,20 @@ public:
          */
         ScopedDatabaseDDLLock(OperationContext* opCtx,
                               const DatabaseName& db,
-                              StringData reason,
+                              std::string_view reason,
                               LockMode mode,
                               boost::optional<BackoffStrategy&> backoffStrategy = boost::none);
 
     private:
         bool _tryLock(OperationContext* opCtx,
                       const DatabaseName& db,
-                      StringData reason,
+                      std::string_view reason,
                       LockMode mode,
                       BackoffStrategy& backoffStrategy);
 
         void _lock(OperationContext* opCtx,
                    const DatabaseName& db,
-                   StringData reason,
+                   std::string_view reason,
                    LockMode mode,
                    boost::optional<Milliseconds> timeout);
 
@@ -286,20 +286,20 @@ public:
          */
         ScopedCollectionDDLLock(OperationContext* opCtx,
                                 const NamespaceString& ns,
-                                StringData reason,
+                                std::string_view reason,
                                 LockMode mode,
                                 boost::optional<BackoffStrategy&> backoffStrategy = boost::none);
 
     private:
         bool _tryLock(OperationContext* opCtx,
                       const NamespaceString& ns,
-                      StringData reason,
+                      std::string_view reason,
                       LockMode mode,
                       BackoffStrategy& backoffStrategy);
 
         void _lock(OperationContext* opCtx,
                    const NamespaceString& ns,
-                   StringData reason,
+                   std::string_view reason,
                    LockMode mode,
                    boost::optional<Milliseconds> timeout);
 
@@ -330,15 +330,18 @@ protected:
 
     void _lock(OperationContext* opCtx,
                Locker* locker,
-               StringData ns,
+               std::string_view ns,
                const ResourceId& resId,
-               StringData reason,
+               std::string_view reason,
                LockMode mode,
                Date_t deadline,
                bool waitForRecovery);
 
-    void _unlock(
-        Locker* locker, StringData ns, const ResourceId& resId, StringData reason, LockMode mode);
+    void _unlock(Locker* locker,
+                 std::string_view ns,
+                 const ResourceId& resId,
+                 std::string_view reason,
+                 LockMode mode);
 
     // Stores how many holders either are trying to acquire or are holding a specific resource at
     // that moment.
@@ -347,8 +350,8 @@ protected:
     /**
      * Register/Unregister a resourceName into the ResourceCatalog for debuggability purposes.
      */
-    void _registerResourceName(ResourceId resId, StringData resName);
-    void _unregisterResourceNameIfNoLongerNeeded(ResourceId resId, StringData resName);
+    void _registerResourceName(ResourceId resId, std::string_view resName);
+    void _unregisterResourceNameIfNoLongerNeeded(ResourceId resId, std::string_view resName);
 
 
     // TODO(SERVER-121488): Encapsulate ScopedBaseDDLLock and remove those friend declarations.

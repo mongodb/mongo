@@ -37,12 +37,12 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -65,7 +65,7 @@ inline auto makeBoolConstant(bool boolVal) {
     return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, val);
 }
 
-inline auto makeStringConstant(StringData value) {
+inline auto makeStringConstant(std::string_view value) {
     auto [tag, val] = value::makeNewString(value);
     return sbe::makeE<sbe::EConstant>(tag, val);
 }

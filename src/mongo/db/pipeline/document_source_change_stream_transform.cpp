@@ -42,6 +42,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 // The following fields will be removed for query shape serialization.
@@ -136,7 +137,7 @@ Value DocumentSourceChangeStreamTransform::serialize(
     if (opts.isSerializingForExplain()) {
         return Value(Document{
             {DocumentSourceChangeStream::kStageName,
-             Document{{"stage"_sd, "internalTransform"_sd}, {"options"_sd, serializedOptions}}}});
+             Document{{"stage"sv, "internalTransform"sv}, {"options"sv, serializedOptions}}}});
     }
 
     // Internal change stream stages are not serialized for query stats. Query stats uses this stage

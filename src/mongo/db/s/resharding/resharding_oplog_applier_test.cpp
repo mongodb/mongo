@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -101,6 +100,7 @@
 #include <iterator>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -114,6 +114,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class OplogIteratorMock : public ReshardingDonorOplogIteratorInterface {
 public:
@@ -426,7 +427,7 @@ public:
 
     long long metricsAppliedCount() const {
         auto fullCurOp = _metrics->reportForCurrentOp();
-        return fullCurOp["oplogEntriesApplied"_sd].Long();
+        return fullCurOp["oplogEntriesApplied"sv].Long();
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> getExecutor() {

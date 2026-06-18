@@ -42,19 +42,20 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 DEATH_TEST_REGEX(InternalSchemaMinItemsMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400215") {
-    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);
+    InternalSchemaMinItemsMatchExpression minItems("a"sv, 2);
 
     ASSERT_EQ(minItems.numChildren(), 0);
     ASSERT_THROWS_CODE(minItems.getChild(0), AssertionException, 6400215);
 }
 
 TEST(InternalSchemaMinItemsMatchExpression, EquivalentTest) {
-    InternalSchemaMinItemsMatchExpression minItems1("a"_sd, 2);
-    InternalSchemaMinItemsMatchExpression minItems2("a"_sd, 5);
+    InternalSchemaMinItemsMatchExpression minItems1("a"sv, 2);
+    InternalSchemaMinItemsMatchExpression minItems2("a"sv, 5);
 
     auto clone = minItems1.clone();
     ASSERT_TRUE(minItems1.equivalent(clone.get()));

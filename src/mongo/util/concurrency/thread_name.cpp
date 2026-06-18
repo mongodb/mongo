@@ -51,6 +51,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <system_error>
 
 #include <boost/move/utility_core.hpp>
@@ -132,7 +133,7 @@ void setOSThreadName(const std::string& threadName) {
     boost::optional<std::string> shortNameBuf;
     const char* truncName = threadName.c_str();
     if (threadName.size() > kMaxThreadNameLength) {
-        StringData sd = threadName;
+        std::string_view sd = threadName;
         shortNameBuf = fmt::format("{}.{}", sd.substr(0, 7), sd.substr(sd.size() - 7));
         truncName = shortNameBuf->c_str();
     }

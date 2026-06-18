@@ -91,6 +91,7 @@
 #include <iterator>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -100,6 +101,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 using namespace change_stream_test_helper;
 
 using boost::intrusive_ptr;
@@ -352,7 +354,7 @@ TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
 TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
     auto expCtx = getExpCtx();
 
-    auto nss = NamespaceString::createNamespaceString_forTest("unittest"_sd, "someCollection"_sd);
+    auto nss = NamespaceString::createNamespaceString_forTest("unittest"sv, "someCollection"sv);
     expCtx->setNamespaceString(nss);
 
     ASSERT_EQ("^unittest\\.someCollection$",
@@ -374,7 +376,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
     auto expCtx = getExpCtx();
 
     auto nss = NamespaceString::makeCollectionlessAggregateNSS(
-        NamespaceString::createNamespaceString_forTest("unittest"_sd).dbName());
+        NamespaceString::createNamespaceString_forTest("unittest"sv).dbName());
     expCtx->setNamespaceString(nss);
 
     ASSERT_EQ(fmt::format("^unittest\\.{}", DocumentSourceChangeStream::kRegexAllCollections),
@@ -404,7 +406,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
 TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesWholeCluster) {
     auto expCtx = getExpCtx();
 
-    auto nss = NamespaceString::createNamespaceString_forTest("admin"_sd);
+    auto nss = NamespaceString::createNamespaceString_forTest("admin"sv);
     expCtx->setNamespaceString(nss);
 
     ASSERT_EQ(fmt::format("{}\\.{}",
@@ -452,7 +454,7 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(AllocationToShardsStatus::kOk);
 
     // Versions "v1", "v2" are supported.
-    std::array<boost::optional<StringData>, 3> versions = {boost::none, "v1"_sd, "v2"_sd};
+    std::array<boost::optional<std::string_view>, 3> versions = {boost::none, "v1"sv, "v2"sv};
 
     for (auto version : versions) {
         BSONObj spec;
@@ -481,7 +483,7 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
                                   .getDocument()
                                   .getField(DocumentSourceChangeStreamTransform::kStageName)
                                   .getDocument()
-                                  .getField("version"_sd)
+                                  .getField("version"sv)
                                   .getStringData());
                     ASSERT_EQ(idl::deserialize<ChangeStreamReaderVersionEnum>(*version),
                               getExpCtx()->getChangeStreamSpec()->getVersion());
@@ -493,7 +495,7 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
                                   .getDocument()
                                   .getField(DocumentSourceChangeStreamTransform::kStageName)
                                   .getDocument()
-                                  .getField("version"_sd)
+                                  .getField("version"sv)
                                   .getStringData());
                     ASSERT_EQ(ChangeStreamReaderVersionEnum::kV2,
                               getExpCtx()->getChangeStreamSpec()->getVersion());
@@ -655,7 +657,7 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
     const ChangeStreamEventTransformation::SupportedEvents expectedEvents = {
-        "moveChunk"_sd, "namespacePlacementChanged"_sd, "movePrimary"_sd};
+        "moveChunk"sv, "namespacePlacementChanged"sv, "movePrimary"sv};
 
     ScopedChangeStreamReaderBuilderMock readerBuilder(
         std::make_unique<ChangeStreamReaderBuilderMock>(
@@ -702,7 +704,7 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterFor
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
     const ChangeStreamEventTransformation::SupportedEvents expectedEvents = {
-        "moveChunk"_sd, "namespacePlacementChanged"_sd, "movePrimary"_sd};
+        "moveChunk"sv, "namespacePlacementChanged"sv, "movePrimary"sv};
 
     // Build oplog match expression for supported events.
     BSONObj filter = [&]() {
@@ -1199,14 +1201,14 @@ TEST_F(ChangeStreamStageTest, SetIgnoreRemovedShards) {
                                   .getDocument()
                                   .getField(DocumentSourceChangeStreamTransform::kStageName)
                                   .getDocument()
-                                  .getField("ignoreRemovedShards"_sd)
+                                  .getField("ignoreRemovedShards"sv)
                                   .getBool());
                 } else {
                     ASSERT_TRUE(serialization[0]
                                     .getDocument()
                                     .getField(DocumentSourceChangeStreamTransform::kStageName)
                                     .getDocument()
-                                    .getField("ignoreRemovedShards"_sd)
+                                    .getField("ignoreRemovedShards"sv)
                                     .missing());
                 }
                 found = true;
@@ -1412,7 +1414,7 @@ TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogUpdatedFields) {
                                         << "updated"));
 
     runUpdateV2OplogTest(diff,
-                         D{{"updatedFields", D{{"a", 1}, {"b", "updated"_sd}}},
+                         D{{"updatedFields", D{{"a", 1}, {"b", "updated"sv}}},
                            {"removedFields", std::vector<V>{}},
                            {"truncatedArrays", std::vector<V>{}}});
 }
@@ -1422,7 +1424,7 @@ TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogInsertFields) {
                                         << "updated"));
 
     runUpdateV2OplogTest(diff,
-                         D{{"updatedFields", D{{"a", 1}, {"b", "updated"_sd}}},
+                         D{{"updatedFields", D{{"a", 1}, {"b", "updated"sv}}},
                            {"removedFields", std::vector<V>{}},
                            {"truncatedArrays", std::vector<V>{}}});
 }
@@ -1432,7 +1434,7 @@ TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogRemovedFields) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{}},
-                           {"removedFields", std::vector<V>{V("a"_sd), V("b"_sd)}},
+                           {"removedFields", std::vector<V>{V("a"sv), V("b"sv)}},
                            {"truncatedArrays", std::vector<V>{}}});
 }
 
@@ -1445,8 +1447,8 @@ TEST_F(ChangeStreamStageTest, TransformComplexDeltaOplog) {
         "}");
 
     runUpdateV2OplogTest(diff,
-                         D{{"updatedFields", D{{"c", 1}, {"d", "updated"_sd}, {"e", 2}, {"f", 3}}},
-                           {"removedFields", std::vector<V>{V("a"_sd), V("b"_sd)}},
+                         D{{"updatedFields", D{{"c", 1}, {"d", "updated"sv}, {"e", 2}, {"f", 3}}},
+                           {"removedFields", std::vector<V>{V("a"sv), V("b"sv)}},
                            {"truncatedArrays", std::vector<V>{}}});
 }
 
@@ -1463,8 +1465,8 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubObjectDiff) {
     runUpdateV2OplogTest(
         diff,
         D{{"updatedFields",
-           D{{"c", 1}, {"d", "updated"_sd}, {"subObj.c", 1}, {"subObj.d", "updated"_sd}}},
-          {"removedFields", std::vector<V>{V("subObj.a"_sd), V("subObj.b"_sd)}},
+           D{{"c", 1}, {"d", "updated"sv}, {"subObj.c", 1}, {"subObj.d", "updated"sv}}},
+          {"removedFields", std::vector<V>{V("subObj.a"sv), V("subObj.b"sv)}},
           {"truncatedArrays", std::vector<V>{}}});
 }
 
@@ -1481,8 +1483,8 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiff) {
                          D{{"updatedFields", D{{"arrField.0", 1}, {"arrField.1", D{{"a", 1}}}}},
                            {"removedFields", std::vector<V>{}},
                            {"truncatedArrays",
-                            std::vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}},
-                                           V{D{{"field", "arrField2"_sd}, {"newSize", 20}}}}}});
+                            std::vector<V>{V{D{{"field", "arrField"sv}, {"newSize", 10}}},
+                                           V{D{{"field", "arrField2"sv}, {"newSize", 20}}}}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiffWithEmptyStringField) {
@@ -1497,7 +1499,7 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiffWithEmptyStringFiel
         diff,
         D{{"updatedFields", D{{".0", 1}, {".1", D{{"a", 1}}}}},
           {"removedFields", std::vector<V>{}},
-          {"truncatedArrays", std::vector<V>{V{D{{"field", ""_sd}, {"newSize", 10}}}}}});
+          {"truncatedArrays", std::vector<V>{V{D{{"field", ""sv}, {"newSize", 10}}}}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeltaOplogNestedComplexSubDiffs) {
@@ -1528,8 +1530,8 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogNestedComplexSubDiffs) {
                {"arrField.6", 2},
                {"subObj.a", 1},
            }},
-          {"removedFields", std::vector<V>{V("subObj.b"_sd)}},
-          {"truncatedArrays", std::vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}}}}});
+          {"removedFields", std::vector<V>{V("subObj.b"sv)}},
+          {"truncatedArrays", std::vector<V>{V{D{{"field", "arrField"sv}, {"newSize", 10}}}}}});
 }
 
 // Legacy documents might not have an _id field; then the document key is the full (post-update)
@@ -1571,7 +1573,7 @@ TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
                                 nss,
                                 o2,
                                 D{{"updatedFields", D{}},
-                                  {"removedFields", {"y"_sd}},
+                                  {"removedFields", {"y"sv}},
                                   {"truncatedArrays", std::vector<V>()}});
     checkTransformation(removeField, expectedUpdateField);
 }  // namespace
@@ -1826,7 +1828,7 @@ TEST_F(ChangeStreamStageTest, TransformCreate) {
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kOperationDescriptionField, Value(expectedOpDescription)},
-        {DSChangeStream::kNsTypeField, "collection"_sd}};
+        {DSChangeStream::kNsTypeField, "collection"sv}};
 
     checkTransformation(create, expectedCreate, kShowExpandedEventsSpec);
 }
@@ -1987,12 +1989,12 @@ TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
 
         Value opDesc = V{D{}};
         if (hasReshardingUuid) {
-            opDesc = V{D{{DSChangeStream::kReshardingUuidField, D{{"uuid"_sd, uuid}}}}};
+            opDesc = V{D{{DSChangeStream::kReshardingUuidField, D{{"uuid"sv, uuid}}}}};
         }
 
         Document expectedDoc{
             {DSChangeStream::kReshardingUuidField,
-             hasReshardingUuid ? V{D{{"uuid"_sd, uuid}}} : V{}},
+             hasReshardingUuid ? V{D{{"uuid"sv, uuid}}} : V{}},
             {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, uuid, opDesc, eventType)},
             {DSChangeStream::kOperationTypeField, eventType},
             {DSChangeStream::kClusterTimeField, kDefaultTs},
@@ -2204,10 +2206,10 @@ DEATH_TEST_F(ChangeStreamStageTestDeathTest, ShouldCrashWithNoopInsideApplyOps, 
     Document applyOpsDoc =
         Document{{"applyOps",
                   Value{std::vector<Document>{
-                      Document{{"op", "n"_sd},
+                      Document{{"op", "n"sv},
                                {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
-                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
     getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
 }
@@ -2220,7 +2222,7 @@ DEATH_TEST_F(ChangeStreamStageTestDeathTest,
                   Value{std::vector<Document>{
                       Document{{"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
-                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
     getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
 }
@@ -2234,7 +2236,7 @@ DEATH_TEST_F(ChangeStreamStageTestDeathTest,
                       Document{{"op", 2},
                                {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
-                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
     getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
 }
@@ -2243,10 +2245,10 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberApplyOps) {
     Document applyOpsDoc =
         Document{{"applyOps",
                   Value{std::vector<Document>{
-                      Document{{"op", "i"_sd},
+                      Document{{"op", "i"sv},
                                {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
-                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}}}}}};
 
     LogicalSessionFromClient lsid = testLsid();
     std::vector<Document> results =
@@ -2268,15 +2270,15 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberBatchedDeleteApplyOps) {
     Document applyOpsDoc{
         {"applyOps",
          Value{std::vector<Document>{
-             Document{{"op", "d"_sd},
+             Document{{"op", "d"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 10}}}}},
-             Document{{"op", "d"_sd},
+             Document{{"op", "d"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 11}}}}},
-             Document{{"op", "d"_sd},
+             Document{{"op", "d"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 12}}}}},
@@ -2307,11 +2309,11 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyOmitsSessionInfo
     Document applyOpsDoc{
         {"applyOps",
          Value{std::vector<Document>{
-             Document{{"op", "i"_sd},
+             Document{{"op", "i"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 1}}}}},
-             Document{{"op", "i"_sd},
+             Document{{"op", "i"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 2}}}}},
@@ -2348,11 +2350,11 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyDoesNotEmitEndOf
     Document applyOpsDoc{
         {"applyOps",
          Value{std::vector<Document>{
-             Document{{"op", "i"_sd},
+             Document{{"op", "i"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 1}}}}},
-             Document{{"op", "i"_sd},
+             Document{{"op", "i"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 2}}}}},
@@ -2382,14 +2384,14 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
     Document applyOpsDoc{
         {"applyOps",
          Value{std::vector<Document>{
-             Document{{"op", "i"_sd},
-                      {"ns", "someotherdb.collname"_sd},
+             Document{{"op", "i"sv},
+                      {"ns", "someotherdb.collname"sv},
                       {"ui", otherUUID},
-                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}},
-             Document{{"op", "u"_sd},
-                      {"ns", "someotherdb.collname"_sd},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+             Document{{"op", "u"sv},
+                      {"ns", "someotherdb.collname"sv},
                       {"ui", otherUUID},
-                      {"o", Value{Document{{"$set", Value{Document{{"x", "hallo 2"_sd}}}}}}},
+                      {"o", Value{Document{{"$set", Value{Document{{"x", "hallo 2"sv}}}}}}},
                       {"o2", Value{Document{{"_id", 123}}}}},
          }}},
     };
@@ -2401,14 +2403,13 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
 }
 
 TEST_F(ChangeStreamStageTest, PreparedTransactionApplyOpsEntriesAreIgnored) {
-    Document applyOpsDoc =
-        Document{{"applyOps",
-                  Value{std::vector<Document>{
-                      Document{{"op", "i"_sd},
-                               {"ns", nss.ns_forTest()},
-                               {"ui", testUuid()},
-                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}},
-                 {"prepare", true}};
+    Document applyOpsDoc = Document{{"applyOps",
+                                     Value{std::vector<Document>{Document{
+                                         {"op", "i"sv},
+                                         {"ns", nss.ns_forTest()},
+                                         {"ui", testUuid()},
+                                         {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}}}}},
+                                    {"prepare", true}};
     LogicalSessionFromClient lsid = testLsid();
     std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
@@ -2422,7 +2423,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
     Document preparedApplyOps{
         {"applyOps",
          Value{std::vector<Document>{
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 123}}}},
@@ -2524,12 +2525,12 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     Document applyOps1{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{Document{{"_id", 123}}}},
                {"o2", V{Document{{"_id", 123}}}}},
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{Document{{"_id", 456}}}},
@@ -2552,7 +2553,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     Document applyOps2{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 789}}}},
@@ -2678,7 +2679,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     Document applyOps2{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{Document{{"_id", 123}}}},
@@ -2716,7 +2717,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     repl::OpTime applyOpsOpTime4(Timestamp(100, 4), 1);
     Document applyOps4{
         {"applyOps",
-         V{std::vector<Document>{D{{"op", "i"_sd},
+         V{std::vector<Document>{D{{"op", "i"sv},
                                    {"ns", nss.ns_forTest()},
                                    {"ui", testUuid()},
                                    {"o", V{Document{{"_id", 456}}}},
@@ -2870,12 +2871,12 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     Document applyOps1{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 123}}}},
                {"o2", V{D{{"_id", 123}}}}},
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 456}}}},
@@ -2898,7 +2899,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     Document applyOps2{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 789}}}},
@@ -3023,12 +3024,12 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     Document applyOps1{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 123}}}},
                {"o2", V{D{{"_id", 123}}}}},
-             D{{"op", "i"_sd},
+             D{{"op", "i"sv},
                {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
                {"o", V{D{{"_id", 456}}}},
@@ -3149,23 +3150,23 @@ TEST_F(ChangeStreamStageTest, TransformApplyOps) {
     Document applyOpsDoc{
         {"applyOps",
          Value{std::vector<Document>{
-             Document{{"op", "i"_sd},
+             Document{{"op", "i"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
-                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}},
-             Document{{"op", "u"_sd},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+             Document{{"op", "u"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o",
                        Value{Document{
-                           {"diff", Value{Document{{"u", Value{Document{{"x", "hallo 2"_sd}}}}}}},
+                           {"diff", Value{Document{{"u", Value{Document{{"x", "hallo 2"sv}}}}}}},
                            {"$v", 2}}}},
                       {"o2", Value{Document{{"_id", 123}}}}},
              // Operation on another namespace which should be skipped.
-             Document{{"op", "i"_sd},
-                      {"ns", "someotherdb.collname"_sd},
+             Document{{"op", "i"sv},
+                      {"ns", "someotherdb.collname"sv},
                       {"ui", UUID::gen()},
-                      {"o", Value{Document{{"_id", 0}, {"x", "Should not read this!"_sd}}}}},
+                      {"o", Value{Document{{"_id", 0}, {"x", "Should not read this!"sv}}}}},
          }}},
     };
     LogicalSessionFromClient lsid = testLsid();
@@ -3205,21 +3206,21 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     Document applyOpsDoc{
         {"applyOps",
          Value{std::vector<Document>{
-             Document{{"op", "c"_sd},
+             Document{{"op", "c"sv},
                       {"ns", std::string(nss.db_forTest()) + ".$cmd"},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"create", nss.coll()}, {"idIndex", idIndexDef}}}},
                       {"ts", Timestamp(0, 1)}},
-             Document{{"op", "i"_sd},
+             Document{{"op", "i"sv},
                       {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
-                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
              Document{
-                 {"op", "c"_sd},
+                 {"op", "c"sv},
                  {"ns", std::string(nss.db_forTest()) + ".$cmd"},
                  {"ui", UUID::gen()},
                  // Operation on another collection which should be skipped.
-                 {"o", Value{Document{{"create", "otherCollection"_sd}, {"idIndex", idIndexDef}}}}},
+                 {"o", Value{Document{{"create", "otherCollection"sv}, {"idIndex", idIndexDef}}}}},
          }}},
     };
     LogicalSessionFromClient lsid = testLsid();
@@ -3238,7 +3239,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     ASSERT_VALUE_EQ(nextDoc[DSChangeStream::kOperationDescriptionField],
                     Value(Document{{"idIndex", idIndexDef}}));
     ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
-    ASSERT_EQ(nextDoc[DSChangeStream::kNsTypeField].getString(), "collection"_sd);
+    ASSERT_EQ(nextDoc[DSChangeStream::kNsTypeField].getString(), "collection"sv);
     ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 0);
 
     // Check the second document.
@@ -3330,7 +3331,7 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
 
 TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollectionWhenShowExpandedEventsOff) {
     auto collSpec =
-        D{{"create", "foo"_sd},
+        D{{"create", "foo"sv},
           {"idIndex", D{{"v", 2}, {"key", D{{"_id", 1}}}, {"name", IndexConstants::kIdIndexName}}}};
     OplogEntry createColl = createCommand(collSpec.toBson(), testUuid());
     checkTransformation(createColl, boost::none);
@@ -3348,7 +3349,7 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
 // `ci` ops should always be filtered out by the change stream.
 TEST_F(ChangeStreamStageTest, MatchFiltersContainerInsert) {
     auto ci = repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), 1 /* term */),
-                                                  "containerIdent"_sd,
+                                                  "containerIdent"sv,
                                                   1LL,
                                                   BSONBinData("V", 1, BinDataGeneral));
 
@@ -3359,7 +3360,7 @@ TEST_F(ChangeStreamStageTest, MatchFiltersContainerInsert) {
 // `cd` ops should always be filtered out by the change stream.
 TEST_F(ChangeStreamStageTest, MatchFiltersContainerDelete) {
     auto cd = repl::makeContainerDeleteOplogEntry(
-        repl::OpTime(Timestamp(10, 10), 1 /* term */), "containerIdent"_sd, 1LL);
+        repl::OpTime(Timestamp(10, 10), 1 /* term */), "containerIdent"sv, 1LL);
 
     checkTransformation(cd, boost::none);
 }
@@ -3410,7 +3411,7 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSuppo
                                          .getDocument()
                                          .getField(DocumentSourceChangeStreamTransform::kStageName)
                                          .getDocument()
-                                         .getField("supportedEvents"_sd);
+                                         .getField("supportedEvents"sv);
         ASSERT_TRUE(actualSupportedEvents.isArray());
         ASSERT_VALUE_EQ(Value(expected), Value(actualSupportedEvents.getArray()));
     }
@@ -3464,7 +3465,7 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingle
 
     BSONObj spec =
         BSON(DocumentSourceChangeStreamTransform::kStageName
-             << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+             << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"sv)
                                    << "supportedEvents" << BSON_ARRAY("eventType1")));
 
     BSONObj operationDescription = BSON("foo" << "bar"
@@ -3482,8 +3483,8 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingle
 
     Document expectedDoc{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), operationDescription, "eventType1"_sd)},
-        {DSChangeStream::kOperationTypeField, "eventType1"_sd},
+         makeResumeToken(kDefaultTs, testUuid(), operationDescription, "eventType1"sv)},
+        {DSChangeStream::kOperationTypeField, "eventType1"sv},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
@@ -3508,7 +3509,7 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
 
     BSONObj spec = BSON(DocumentSourceChangeStreamTransform::kStageName
                         << BSON("resumeAfter"
-                                << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+                                << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"sv)
                                 << "supportedEvents" << BSON_ARRAY("eventType1" << "eventType2")));
 
     BSONObj operationDescriptionEvent1 =
@@ -3541,8 +3542,8 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
 
     Document expectedDoc1{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent1, "eventType1"_sd)},
-        {DSChangeStream::kOperationTypeField, "eventType1"_sd},
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent1, "eventType1"sv)},
+        {DSChangeStream::kOperationTypeField, "eventType1"sv},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
@@ -3550,8 +3551,8 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
 
     Document expectedDoc2{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent2, "eventType2"_sd)},
-        {DSChangeStream::kOperationTypeField, "eventType2"_sd},
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent2, "eventType2"sv)},
+        {DSChangeStream::kOperationTypeField, "eventType2"sv},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
@@ -3588,7 +3589,7 @@ TEST_F(ChangeStreamStageTest,
 
     BSONObj spec =
         BSON(DocumentSourceChangeStreamTransform::kStageName
-             << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+             << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"sv)
                                    << "showExpandedEvents" << true << "supportedEvents"
                                    << BSON_ARRAY("eventType1" << "eventType2")));
 
@@ -3622,8 +3623,8 @@ TEST_F(ChangeStreamStageTest,
 
     Document expectedDoc1{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent1, "eventType1"_sd)},
-        {DSChangeStream::kOperationTypeField, "eventType1"_sd},
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent1, "eventType1"sv)},
+        {DSChangeStream::kOperationTypeField, "eventType1"sv},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
@@ -3632,8 +3633,8 @@ TEST_F(ChangeStreamStageTest,
 
     Document expectedDoc2{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent2, "eventType2"_sd)},
-        {DSChangeStream::kOperationTypeField, "eventType2"_sd},
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent2, "eventType2"sv)},
+        {DSChangeStream::kOperationTypeField, "eventType2"sv},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
@@ -3672,7 +3673,7 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
 
     BSONObj spec = BSON(DocumentSourceChangeStreamTransform::kStageName
                         << BSON("resumeAfter"
-                                << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+                                << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"sv)
                                 << "supportedEvents" << BSON_ARRAY("eventType1" << "eventType2")));
 
     auto entry = makeOplogEntry(OpTypeEnum::kNoop,
@@ -3896,7 +3897,7 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
 
     // Test invalid actions values.
     {
-        for (StringData value : {"", " ", "foo", "dum dee dum", "INJECTCONTROLEVENT"}) {
+        for (std::string_view value : {"", " ", "foo", "dum dee dum", "INJECTCONTROLEVENT"}) {
             auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(BSON("event" << value));
             ASSERT_THROWS_CODE(validateDocumentSourceStageSerialization<
                                    DocumentSourceChangeStreamInjectControlEvents>(
@@ -4108,7 +4109,7 @@ TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByProjectStageUnmodified) 
         auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
 
         auto project =
-            DocumentSourceProject::create(BSON("foo" << projectType), expCtx, "$project"_sd);
+            DocumentSourceProject::create(BSON("foo" << projectType), expCtx, "$project"sv);
         auto projectStage = exec::agg::buildStageAndStitch(project, stage);
 
         auto result = projectStage->getNext();
@@ -4757,7 +4758,7 @@ TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
                                 nss,
                                 o2,
                                 D{{"updatedFields", D{}},
-                                  {"removedFields", {"y"_sd}},
+                                  {"removedFields", {"y"sv}},
                                   {"truncatedArrays", std::vector<V>()}});
     checkTransformation(removeField, expectedRemoveField);
 }
@@ -6276,7 +6277,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2Token) {
 
     // Create a resume token matching the 'oplogResumeTime' above.
     ResumeTokenData resumeToken{
-        resumeTs, 2 /* version */, 0, uuid, "update"_sd, Value(midDocumentKey), Value()};
+        resumeTs, 2 /* version */, 0, uuid, "update"sv, Value(midDocumentKey), Value()};
 
     // Create a change stream spec that resumes after 'resumeToken'.
     const auto spec =
@@ -6302,7 +6303,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2Token) {
     ASSERT_EQ(sameTsResumeToken.version, 2);
     ASSERT_VALUE_EQ(
         sameTsResumeToken.eventIdentifier,
-        Value(Document{{"operationType", "update"_sd}, {"documentKey", higherDocumentKey}}));
+        Value(Document{{"operationType", "update"sv}, {"documentKey", higherDocumentKey}}));
 
     // The next event has a clusterTime later than the resume point, and should therefore start
     // using the default token version, which is 2.
@@ -6314,7 +6315,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2Token) {
     ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
     ASSERT_VALUE_EQ(
         afterResumeTsResumeToken.eventIdentifier,
-        Value(Document{{"operationType", "update"_sd}, {"documentKey", midDocumentKey}}));
+        Value(Document{{"operationType", "update"sv}, {"documentKey", midDocumentKey}}));
 
     // Verify that no other events are returned.
     next = lastStage->getNext();
@@ -6339,7 +6340,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1Token) {
 
     // Create a resume token matching the 'oplogResumeTime' above.
     ResumeTokenData resumeToken{
-        resumeTs, 1 /* version */, 0, uuid, "update"_sd, Value(midDocumentKey), Value()};
+        resumeTs, 1 /* version */, 0, uuid, "update"sv, Value(midDocumentKey), Value()};
 
     // Create a change stream spec that resumes after 'resumeToken'.
     const auto spec =
@@ -6375,7 +6376,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1Token) {
     ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
     ASSERT_VALUE_EQ(
         afterResumeTsResumeToken.eventIdentifier,
-        Value(Document{{"operationType", "update"_sd}, {"documentKey", midDocumentKey}}));
+        Value(Document{{"operationType", "update"sv}, {"documentKey", midDocumentKey}}));
 
     // Verify that no other events are returned.
     next = lastStage->getNext();
@@ -6425,7 +6426,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1HighWaterMark) {
     ASSERT_EQ(sameTsResumeToken1.clusterTime, resumeTs);
     ASSERT_EQ(sameTsResumeToken1.version, 2);
     ASSERT_VALUE_EQ(sameTsResumeToken1.eventIdentifier,
-                    Value(Document{{"operationType", "update"_sd}, {"documentKey", documentKey}}));
+                    Value(Document{{"operationType", "update"sv}, {"documentKey", documentKey}}));
 
     next = lastStage->getNext();
     ASSERT(next.isAdvanced());
@@ -6435,7 +6436,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1HighWaterMark) {
     ASSERT_EQ(sameTsResumeToken2.version, 2);
     ASSERT_VALUE_EQ(
         sameTsResumeToken2.eventIdentifier,
-        Value(Document{{"operationType", "update"_sd}, {"documentKey", higherDocumentKey}}));
+        Value(Document{{"operationType", "update"sv}, {"documentKey", higherDocumentKey}}));
 
     // The resumeToken after the current clusterTime should start using the default version, and
     // corresponding 'eventIdentifier' format.
@@ -6446,7 +6447,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1HighWaterMark) {
     ASSERT_EQ(afterResumeTsResumeToken.clusterTime, afterResumeTs);
     ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
     ASSERT_VALUE_EQ(afterResumeTsResumeToken.eventIdentifier,
-                    Value(Document{{"operationType", "update"_sd}, {"documentKey", documentKey}}));
+                    Value(Document{{"operationType", "update"sv}, {"documentKey", documentKey}}));
 
     // Verify that no other events are returned.
     next = lastStage->getNext();

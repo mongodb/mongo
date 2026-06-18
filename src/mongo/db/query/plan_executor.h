@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -54,6 +53,7 @@
 
 #include <exception>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -475,7 +475,7 @@ public:
     /**
      * For queries that have multiple executors, this can be used to differentiate between them.
      */
-    virtual boost::optional<StringData> getExecutorType() const {
+    virtual boost::optional<std::string_view> getExecutorType() const {
         return boost::none;
     }
 

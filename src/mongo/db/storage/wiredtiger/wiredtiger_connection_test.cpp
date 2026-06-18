@@ -29,7 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
@@ -43,6 +42,7 @@
 
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -53,7 +53,8 @@ using std::stringstream;
 
 class WiredTigerConnectionTest {
 public:
-    WiredTigerConnectionTest(StringData dbpath, StringData extraStrings) : _conn(nullptr) {
+    WiredTigerConnectionTest(std::string_view dbpath, std::string_view extraStrings)
+        : _conn(nullptr) {
         std::stringstream ss;
         ss << "create,";
         ss << extraStrings;
@@ -80,14 +81,14 @@ private:
 
 class WiredTigerConnectionHarnessHelper {
 public:
-    WiredTigerConnectionHarnessHelper(StringData extraStrings)
+    WiredTigerConnectionHarnessHelper(std::string_view extraStrings)
         : _dbpath("wt_test"),
           _connectionTest(_dbpath.path(), extraStrings),
           _connection(_connectionTest.getConnection(),
                       _connectionTest.getClockSource(),
                       /*sessionCacheMax=*/33000) {}
 
-    WiredTigerConnectionHarnessHelper(StringData extraStrings, unsigned long sessionCacheMax)
+    WiredTigerConnectionHarnessHelper(std::string_view extraStrings, unsigned long sessionCacheMax)
         : _dbpath("wt_test"),
           _connectionTest(_dbpath.path(), extraStrings),
           _connection(

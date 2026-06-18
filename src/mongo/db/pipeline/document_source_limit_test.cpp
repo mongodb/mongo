@@ -56,6 +56,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceLimitTest = AggregationContextFixture;
@@ -113,7 +114,7 @@ TEST_F(DocumentSourceLimitTest, DoesNotPushProjectBeforeSelf) {
     DocumentSourceContainer container;
     auto limit = DocumentSourceLimit::create(getExpCtx(), 10);
     auto project =
-        DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);
+        DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"sv);
 
     container.push_back(limit);
     container.push_back(project);

@@ -29,7 +29,6 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
@@ -48,6 +47,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
+
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -767,13 +768,13 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.collectionUUID);
     TrackingContexts trackingContexts;
-    auto batch =
-        std::make_shared<WriteBatch>(trackingContexts,
-                                     bucketId,
-                                     info1.key,
-                                     0,
-                                     stats,
-                                     StringData{bucket.timeField.data(), bucket.timeField.size()});
+    auto batch = std::make_shared<WriteBatch>(
+        trackingContexts,
+        bucketId,
+        info1.key,
+        0,
+        stats,
+        std::string_view{bucket.timeField.data(), bucket.timeField.size()});
 
     internal::abort(
         *this, *stripes[info1.stripeNumber], WithLock::withoutLock(), batch, Status::OK());

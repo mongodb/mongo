@@ -32,6 +32,8 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -625,7 +627,7 @@ void CodeFragment::appendGetField(Instruction::Parameter lhs, Instruction::Param
     appendSimpleInstruction(Instruction::getField, lhs, rhs);
 }
 
-void CodeFragment::appendGetField(Instruction::Parameter input, StringData fieldName) {
+void CodeFragment::appendGetField(Instruction::Parameter input, std::string_view fieldName) {
     auto size = fieldName.size();
     tassert(11086817, "Field name is too long", size < Instruction::kMaxInlineStringSize);
 

@@ -37,6 +37,7 @@
 #include "mongo/db/stats/counters.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(overrideMemoryLimitForSpillForSBEWindowStage);
 
@@ -49,7 +50,7 @@ WindowStage::WindowStage(std::unique_ptr<PlanStage> input,
                          bool allowDiskUse,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
-    : PlanStage("window"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("window"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _currSlots(std::move(currSlots)),
       _boundTestingSlots(std::move(boundTestingSlots)),
       _partitionSlotCount(partitionSlotCount),

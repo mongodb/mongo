@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -41,6 +40,7 @@
 
 #include <map>
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -95,7 +95,8 @@ struct MONGO_MOD_PUBLIC ParsedUpdate {
     const UpdateRequest* request;
 
     // The array filters for the parsed update. Owned here.
-    std::unique_ptr<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>> arrayFilters;
+    std::unique_ptr<std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>>
+        arrayFilters;
 
     // Driver for processing updates on matched documents.
     std::unique_ptr<UpdateDriver> driver;

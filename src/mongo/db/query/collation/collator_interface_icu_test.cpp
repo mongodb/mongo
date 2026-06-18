@@ -34,6 +34,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <unicode/coll.h>
@@ -41,6 +42,7 @@
 #include <unicode/utypes.h>
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace mongo;
 
@@ -66,7 +68,9 @@ bool isExpectedComparison(int cmp, ExpectedComparison expectedCmp) {
     MONGO_UNREACHABLE;
 }
 
-void assertEnUSComparison(StringData left, StringData right, ExpectedComparison expectedCmp) {
+void assertEnUSComparison(std::string_view left,
+                          std::string_view right,
+                          ExpectedComparison expectedCmp) {
     Collation collationSpec;
     collationSpec.setLocale("en_US");
     UErrorCode status = U_ZERO_ERROR;
@@ -84,21 +88,21 @@ void assertEnUSComparison(StringData left, StringData right, ExpectedComparison 
 
 // Returns true if an ICU collator compares 'lessThan' as smaller than 'greaterThan'. Verifies that
 // the comparison is correct using the compare() function directly and using comparison keys.
-void assertLessThanEnUS(StringData lessThan, StringData greaterThan) {
+void assertLessThanEnUS(std::string_view lessThan, std::string_view greaterThan) {
     assertEnUSComparison(lessThan, greaterThan, ExpectedComparison::LESS_THAN);
     assertEnUSComparison(greaterThan, lessThan, ExpectedComparison::GREATER_THAN);
 }
 
 // Returns true if an ICU collator compares 'left' and 'right' as equal. Verifies that
 // the comparison is correct using the compare() function directly and using comparison keys.
-void assertEqualEnUS(StringData left, StringData right) {
+void assertEqualEnUS(std::string_view left, std::string_view right) {
     assertEnUSComparison(left, right, ExpectedComparison::EQUAL);
     assertEnUSComparison(right, left, ExpectedComparison::EQUAL);
 }
 
 // Returns true if an ICU collator compares 'left' and 'right' as non-equal. Verifies that
 // the comparison is correct using the compare() function directly and using comparison keys.
-void assertNotEqualEnUS(StringData left, StringData right) {
+void assertNotEqualEnUS(std::string_view left, std::string_view right) {
     assertEnUSComparison(left, right, ExpectedComparison::NOT_EQUAL);
     assertEnUSComparison(right, left, ExpectedComparison::NOT_EQUAL);
 }
@@ -188,9 +192,9 @@ TEST(CollatorInterfaceICUTest, ZeroLengthStringsCompareCorrectly) {
     ASSERT(U_SUCCESS(status));
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
-    ASSERT_EQ(icuCollator.compare(StringData(), StringData()), 0);
-    ASSERT_LT(icuCollator.compare(StringData(), "abc"), 0);
-    ASSERT_GT(icuCollator.compare("abc", StringData()), 0);
+    ASSERT_EQ(icuCollator.compare(std::string_view(), std::string_view()), 0);
+    ASSERT_LT(icuCollator.compare(std::string_view(), "abc"), 0);
+    ASSERT_GT(icuCollator.compare("abc", std::string_view()), 0);
 }
 
 TEST(CollatorInterfaceICUTest, ZeroLengthStringsCompareCorrectlyUsingComparisonKeys) {
@@ -203,7 +207,7 @@ TEST(CollatorInterfaceICUTest, ZeroLengthStringsCompareCorrectlyUsingComparisonK
     ASSERT(U_SUCCESS(status));
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
-    auto emptyKey = icuCollator.getComparisonKey(StringData());
+    auto emptyKey = icuCollator.getComparisonKey(std::string_view());
     auto comparisonKeyABC = icuCollator.getComparisonKey("abc");
     ASSERT_EQ(emptyKey.getKeyData().compare(emptyKey.getKeyData()), 0);
     ASSERT_LT(emptyKey.getKeyData().compare(comparisonKeyABC.getKeyData()), 0);
@@ -219,7 +223,7 @@ TEST(CollatorInterfaceICUTest, EmptyNullTerminatedStringComparesCorrectly) {
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    StringData emptyString("");
+    std::string_view emptyString("");
     ASSERT(emptyString.data());
     ASSERT_EQ(emptyString.size(), 0u);
 
@@ -238,7 +242,7 @@ TEST(CollatorInterfaceICUTest, EmptyNullTerminatedStringComparesCorrectlyUsingCo
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    StringData emptyString("");
+    std::string_view emptyString("");
     ASSERT(emptyString.data());
     ASSERT_EQ(emptyString.size(), 0u);
 
@@ -259,7 +263,7 @@ TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectly) {
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    const auto nullByte = "\0"_sd;
+    const auto nullByte = "\0"sv;
     ASSERT_EQ(nullByte.data()[0], '\0');
     ASSERT_EQ(nullByte.size(), 1u);
 
@@ -278,7 +282,7 @@ TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectlyUsing
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    const auto nullByte = "\0"_sd;
+    const auto nullByte = "\0"sv;
     ASSERT_EQ(nullByte.data()[0], '\0');
     ASSERT_EQ(nullByte.size(), 1u);
 
@@ -299,9 +303,9 @@ TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectly) {
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    const auto string1 = "a\0b"_sd;
+    const auto string1 = "a\0b"sv;
     ASSERT_EQ(string1.size(), 3u);
-    const auto string2 = "a\0c"_sd;
+    const auto string2 = "a\0c"sv;
     ASSERT_EQ(string2.size(), 3u);
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
@@ -319,9 +323,9 @@ TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectlyUsingC
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    const auto string1 = "a\0b"_sd;
+    const auto string1 = "a\0b"sv;
     ASSERT_EQ(string1.size(), 3u);
-    const auto string2 = "a\0c"_sd;
+    const auto string2 = "a\0c"sv;
     ASSERT_EQ(string2.size(), 3u);
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
@@ -383,9 +387,9 @@ TEST(CollatorInterfaceICUTest, FrenchCanadianCollatorComparesCorrectly) {
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
 
-    StringData circumflex(u8"p\u00EAche"_as_char_ptr);
-    StringData graveAndAcute(u8"p\u00E8ch\u00E9"_as_char_ptr);
-    StringData circumflexAndAcute(u8"p\u00EAch\u00E9"_as_char_ptr);
+    std::string_view circumflex(u8"p\u00EAche"_as_char_ptr);
+    std::string_view graveAndAcute(u8"p\u00E8ch\u00E9"_as_char_ptr);
+    std::string_view circumflexAndAcute(u8"p\u00EAch\u00E9"_as_char_ptr);
 
     ASSERT_LT(icuCollator.compare(circumflex, graveAndAcute), 0);
     ASSERT_LT(icuCollator.compare(graveAndAcute, circumflexAndAcute), 0);
@@ -466,11 +470,11 @@ TEST(CollatorInterfaceICUTest, IllegalCodePositionsCompareEqualToReplacementChar
 
 TEST(CollatorInterfaceICUTest, UnexpectedTrailingContinuationByteComparesAsReplacementCharacter) {
     // U+0123 ("latin small letter g with cedilla").
-    StringData gWithCedilla("\xC4\xA3");
+    std::string_view gWithCedilla("\xC4\xA3");
     // U+0123 ("latin small letter g with cedilla") with an unexpected continuation byte.
-    StringData unexpectedContinuation("\xC4\xA3\x80");
+    std::string_view unexpectedContinuation("\xC4\xA3\x80");
     // U+0123 ("latin small letter g with cedilla") followed by the replacement character, U+FFFD.
-    StringData gWithCedillaPlusReplacement("\xC4\xA3\xEF\xBF\xBD");
+    std::string_view gWithCedillaPlusReplacement("\xC4\xA3\xEF\xBF\xBD");
 
     assertLessThanEnUS(gWithCedilla, unexpectedContinuation);
     assertLessThanEnUS(gWithCedilla, gWithCedillaPlusReplacement);
@@ -488,11 +492,11 @@ TEST(CollatorInterfaceICUTest, FourImpossibleBytesCompareEqualToFourReplacementC
 
 TEST(CollatorInterfaceICUTest, TwoUnexpectedContinuationsCompareAsTwoReplacementCharacters) {
     // U+0123 ("latin small letter g with cedilla").
-    StringData gWithCedilla("\xC4\xA3");
+    std::string_view gWithCedilla("\xC4\xA3");
     // U+0123 ("latin small letter g with cedilla") with two unexpected continuation bytes.
-    StringData unexpectedContinuations("\xC4\xA3\x80\x80");
+    std::string_view unexpectedContinuations("\xC4\xA3\x80\x80");
     // U+0123 ("latin small letter g with cedilla") followed by two replacement characters.
-    StringData gWithCedillaPlusReplacements(u8"\u0123\uFFFD\uFFFD"_as_char_ptr);
+    std::string_view gWithCedillaPlusReplacements(u8"\u0123\uFFFD\uFFFD"_as_char_ptr);
 
     assertLessThanEnUS(gWithCedilla, unexpectedContinuations);
     assertLessThanEnUS(gWithCedilla, gWithCedillaPlusReplacements);
@@ -530,13 +534,13 @@ TEST(CollatorInterfaceICUTest, CodePointBeyondLargestValidComparesEqualToReplace
 TEST(CollatorInterfaceICUTest, StringsWithDifferentEmbeddedInvalidSequencesCompareEqual) {
     // U+0123 ("latin small letter g with cedilla"), follwed by invalid byte \xEF, followed by
     // U+0145 ("latin capital letter n with cedilla").
-    StringData invalid1("\xC4\xA3\xEF\xC5\x85");
+    std::string_view invalid1("\xC4\xA3\xEF\xC5\x85");
     // U+0123 ("latin small letter g with cedilla"), follwed by unexpected continuation byte \x80,
     // followed by U+0145 ("latin capital letter n with cedilla").
-    StringData invalid2("\xC4\xA3\x80\xC5\x85");
+    std::string_view invalid2("\xC4\xA3\x80\xC5\x85");
     // U+0123 ("latin small letter g with cedilla"), followed by the replacement character, followed
     // by U+0145 ("latin capital letter n with cedilla").
-    StringData withReplacementChar(u8"\u0123\uFFFD\u0145"_as_char_ptr);
+    std::string_view withReplacementChar(u8"\u0123\uFFFD\u0145"_as_char_ptr);
 
     assertEqualEnUS(invalid1, invalid2);
     assertEqualEnUS(invalid1, withReplacementChar);
@@ -546,17 +550,17 @@ TEST(CollatorInterfaceICUTest, StringsWithDifferentEmbeddedInvalidSequencesCompa
 TEST(CollatorInterfaceICUTest, DifferentEmbeddedInvalidSequencesAndDifferentFinalCodePoints) {
     // U+0123 ("latin small letter g with cedilla"), followed by U+0146 ("latin small letter n
     // with cedilla").
-    StringData valid1("\xC4\xA3\xC5\x86");
+    std::string_view valid1("\xC4\xA3\xC5\x86");
     // U+0123 ("latin small letter g with cedilla"), followed by U+0145 ("latin capital letter n
     // with cedilla").
-    StringData valid2("\xC4\xA3\xC5\x85");
+    std::string_view valid2("\xC4\xA3\xC5\x85");
 
     // U+0123 ("latin small letter g with cedilla"), follwed by unexpected continuation byte \x80,
     // followed by U+0146 ("latin small letter n with cedilla").
-    StringData invalid1("\xC4\xA3\x80\xC5\x86");
+    std::string_view invalid1("\xC4\xA3\x80\xC5\x86");
     // U+0123 ("latin small letter g with cedilla"), follwed by invalid byte \xEF, followed by
     // U+0145 ("latin capital letter n with cedilla").
-    StringData invalid2("\xC4\xA3\xEF\xC5\x85");
+    std::string_view invalid2("\xC4\xA3\xEF\xC5\x85");
 
     assertLessThanEnUS(valid1, valid2);
     assertLessThanEnUS(invalid1, invalid2);

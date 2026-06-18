@@ -30,7 +30,6 @@
 #include "mongo/db/ftdc/ftdc_mongod.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -56,6 +55,7 @@
 #include "mongo/util/synchronized_value.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/optional/optional.hpp>
@@ -83,27 +83,27 @@ Status validateCollectionStatsNamespaces(const std::vector<std::string> value,
 }
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 struct CollectionStatsSpec {
-    StringData statsName;
-    StringData collName;
+    std::string_view statsName;
+    std::string_view collName;
     const DatabaseName& dbName;
 };
 
 std::vector<CollectionStatsSpec> getCollectionSpecs(ServiceContext* serviceContext) {
     std::vector<CollectionStatsSpec> specs{
-        {"local.oplog.rs.stats"_sd, "oplog.rs"_sd, DatabaseName::kLocal},
+        {"local.oplog.rs.stats"sv, "oplog.rs"sv, DatabaseName::kLocal},
     };
 
     auto& rss = rss::ReplicatedStorageService::get(serviceContext);
     if (!rss.getPersistenceProvider().shouldUseReplicatedFastCount()) {
-        specs.emplace_back(
-            "config.transactions.stats"_sd, "transactions"_sd, DatabaseName::kConfig);
+        specs.emplace_back("config.transactions.stats"sv, "transactions"sv, DatabaseName::kConfig);
     }
 
     if (rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
         specs.emplace_back(
-            "config.image_collection.stats"_sd, "image_collection"_sd, DatabaseName::kConfig);
+            "config.image_collection.stats"sv, "image_collection"sv, DatabaseName::kConfig);
     }
 
     return specs;

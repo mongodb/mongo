@@ -40,6 +40,7 @@
 
 #include <exception>
 #include <ostream>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
@@ -49,7 +50,7 @@
 
 namespace mongo {
 
-Status& Status::addContext(StringData reasonPrefix) {
+Status& Status::addContext(std::string_view reasonPrefix) {
     if (!isOK()) {
         boost::intrusive_ptr oldInfo = std::move(_error);
         const Status::ErrorInfo& e = *oldInfo;

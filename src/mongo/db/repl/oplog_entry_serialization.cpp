@@ -30,11 +30,12 @@
 #include "mongo/db/repl/oplog_entry_serialization.h"
 
 #include <charconv>
+#include <string_view>
 
 namespace mongo {
 namespace repl {
 void zeroOneManyStmtIdAppend(const std::vector<StmtId>& stmtIds,
-                             StringData fieldName,
+                             std::string_view fieldName,
                              BSONObjBuilder* bob) {
     if (stmtIds.size() == 1) {
         bob->append(fieldName, stmtIds.front());

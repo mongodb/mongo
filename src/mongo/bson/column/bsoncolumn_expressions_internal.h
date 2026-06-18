@@ -33,6 +33,8 @@
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 
 namespace mongo::bsoncolumn::internal {
 
@@ -119,18 +121,18 @@ public:
         }
     }
 
-    void append(StringData val) {
+    void append(std::string_view val) {
         const size_t idx = _counter++;
         if (_comparator) {
-            if (Compare{}(
-                    _comparator->compare(val, CMaterializer::template get<StringData>(_working)),
-                    0)) {
+            if (Compare{}(_comparator->compare(
+                              val, CMaterializer::template get<std::string_view>(_working)),
+                          0)) {
                 _setCandidate(val, idx);
             }
         } else {
             // TODO SERVER-90961: Do not use 3way compare
             if (Compare{}(_compareElementStringValues(
-                              val, CMaterializer::template get<StringData>(_working)),
+                              val, CMaterializer::template get<std::string_view>(_working)),
                           0)) {
                 _setCandidate(val, idx);
             }
@@ -189,7 +191,7 @@ public:
                 append(BSONElementValue(val.value()).Double());
                 return;
             }
-        } else if constexpr (std::is_same_v<T, StringData>) {
+        } else if constexpr (std::is_same_v<T, std::string_view>) {
             if (_type == BSONType::string) {
                 append(BSONElementValue(val.value()).String());
                 return;
@@ -342,7 +344,7 @@ private:
         }
     }
 
-    int _compareElementStringValues(StringData lhs, StringData rhs) {
+    int _compareElementStringValues(std::string_view lhs, std::string_view rhs) {
         // we use memcmp as we allow zeros in UTF8 strings
         int common = std::min(lhs.size(), rhs.size());
         int res = memcmp(lhs.data(), rhs.data(), common);
@@ -471,28 +473,32 @@ public:
         }
     }
 
-    void append(StringData val) {
+    void append(std::string_view val) {
         if (_comparator) {
             if (MinCompare<int>{}(
-                    _comparator->compare(val, CMaterializer::template get<StringData>(_minForType)),
+                    _comparator->compare(
+                        val, CMaterializer::template get<std::string_view>(_minForType)),
                     0)) {
                 _minForType = CMaterializer::materialize(*_allocator, val);
             }
             if (MaxCompare<int>{}(
-                    _comparator->compare(val, CMaterializer::template get<StringData>(_maxForType)),
+                    _comparator->compare(
+                        val, CMaterializer::template get<std::string_view>(_maxForType)),
                     0)) {
                 _maxForType = CMaterializer::materialize(*_allocator, val);
             }
         } else {
             // TODO SERVER-90961: Do not use 3way compare
-            if (MinCompare<int>{}(_compareElementStringValues(
-                                      val, CMaterializer::template get<StringData>(_minForType)),
-                                  0)) {
+            if (MinCompare<int>{}(
+                    _compareElementStringValues(
+                        val, CMaterializer::template get<std::string_view>(_minForType)),
+                    0)) {
                 _minForType = CMaterializer::materialize(*_allocator, val);
             }
-            if (MaxCompare<int>{}(_compareElementStringValues(
-                                      val, CMaterializer::template get<StringData>(_maxForType)),
-                                  0)) {
+            if (MaxCompare<int>{}(
+                    _compareElementStringValues(
+                        val, CMaterializer::template get<std::string_view>(_maxForType)),
+                    0)) {
                 _maxForType = CMaterializer::materialize(*_allocator, val);
             }
         }
@@ -585,7 +591,7 @@ public:
                 append(BSONElementValue(val.value()).Double());
                 return;
             }
-        } else if constexpr (std::is_same_v<T, StringData>) {
+        } else if constexpr (std::is_same_v<T, std::string_view>) {
             if (_type == BSONType::string) {
                 append(BSONElementValue(val.value()).String());
                 return;
@@ -748,7 +754,7 @@ public:
     }
 
 private:
-    int _compareElementStringValues(StringData lhs, StringData rhs) {
+    int _compareElementStringValues(std::string_view lhs, std::string_view rhs) {
         // we use memcmp as we allow zeros in UTF8 strings
         int common = std::min(lhs.size(), rhs.size());
         int res = memcmp(lhs.data(), rhs.data(), common);
@@ -939,7 +945,7 @@ typename CMaterializer::Element last(const char* buffer,
                             auto string = Simple8bTypeUtil::decodeString(last);
                             return CMaterializer{}.materialize(
                                 *allocator,
-                                StringData((const char*)string.str.data(), string.size));
+                                std::string_view((const char*)string.str.data(), string.size));
                         }
                     }
                 } break;
@@ -988,7 +994,8 @@ typename CMaterializer::Element last(const char* buffer,
                             auto string = Simple8bTypeUtil::decodeString(last);
                             return CMaterializer{}.materialize(
                                 *allocator,
-                                BSONCode(StringData((const char*)string.str.data(), string.size)));
+                                BSONCode(
+                                    std::string_view((const char*)string.str.data(), string.size)));
                         }
                     }
                 } break;

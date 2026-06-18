@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <span>
+#include <string_view>
 
 namespace mongo {
 
@@ -98,11 +99,11 @@ private:
     WiredTigerUtil();
 
 public:
-    static constexpr StringData kConfigStringField = "configString"_sd;
-    static constexpr StringData kTableUriPrefix = "table:"_sd;
+    static constexpr std::string_view kConfigStringField = "configString"_sd;
+    static constexpr std::string_view kTableUriPrefix = "table:"_sd;
     static constexpr double memoryThresholdPercentage = 0.8;
 
-    static std::string buildTableUri(StringData ident);
+    static std::string buildTableUri(std::string_view ident);
 
     /**
      * Fetch the type and source fields out of the colgroup metadata.  'tableUri' must be a
@@ -163,7 +164,7 @@ public:
      *
      * Returns the FailedToParse status if the storage engine metadata object is malformed.
      */
-    static StatusWith<std::string> generateImportString(StringData ident,
+    static StatusWith<std::string> generateImportString(std::string_view ident,
                                                         const BSONObj& storageMetadata,
                                                         bool panicOnCorruptWtMetadata,
                                                         bool repair);
@@ -203,7 +204,8 @@ public:
      * This merges together the config strings for the table, colgroup, and file, which is a very
      * slow process.
      */
-    static StatusWith<std::string> getMetadataCreate(WiredTigerSession& session, StringData uri);
+    static StatusWith<std::string> getMetadataCreate(WiredTigerSession& session,
+                                                     std::string_view uri);
 
     /**
      * Gets the entire metadata string for collection or index at URI.
@@ -211,7 +213,7 @@ public:
      * This returns only the table config string, and for fields stored there is the fastest way to
      * obtain that information.
      */
-    static StatusWith<std::string> getMetadata(WiredTigerSession& session, StringData uri);
+    static StatusWith<std::string> getMetadata(WiredTigerSession& session, std::string_view uri);
 
     /**
      * Gets the source metadata string for collection or index at URI.
@@ -219,16 +221,18 @@ public:
      * This is the WiredTiger config string for a specific file. If given a table: URI, it will
      * return the config for the file of the table's only colgroup.
      */
-    static StatusWith<std::string> getSourceMetadata(WiredTigerSession& session, StringData uri);
+    static StatusWith<std::string> getSourceMetadata(WiredTigerSession& session,
+                                                     std::string_view uri);
 
     /**
      * Reads app_metadata for collection/index at URI as a BSON document.
      */
     static Status getApplicationMetadata(WiredTigerSession& session,
-                                         StringData uri,
+                                         std::string_view uri,
                                          BSONObjBuilder* bob);
 
-    static StatusWith<BSONObj> getApplicationMetadata(WiredTigerSession& session, StringData uri);
+    static StatusWith<BSONObj> getApplicationMetadata(WiredTigerSession& session,
+                                                      std::string_view uri);
 
     /**
      * Validates formatVersion in application metadata for 'uri'.
@@ -236,7 +240,7 @@ public:
      * URI is used in error messages only. Returns actual version.
      */
     static StatusWith<int64_t> checkApplicationMetadataFormatVersion(WiredTigerSession& session,
-                                                                     StringData uri,
+                                                                     std::string_view uri,
                                                                      int64_t minimumVersion,
                                                                      int64_t maximumVersion);
 
@@ -325,9 +329,9 @@ public:
      * 'isLogged'. Populates 'valid', 'errors', and 'warnings' accordingly.
      */
     static void validateTableLogging(WiredTigerSession& session,
-                                     StringData uri,
+                                     std::string_view uri,
                                      bool isLogged,
-                                     boost::optional<StringData> indexName,
+                                     boost::optional<std::string_view> indexName,
                                      ValidateResultsIf& validationResult);
 
     static bool useTableLogging(const rss::PersistenceProvider& provider,
@@ -388,7 +392,7 @@ public:
     /**
      * Truncates the table identified by uri, removing all entries from it.
      */
-    static void truncate(WiredTigerRecoveryUnit& ru, StringData uri);
+    static void truncate(WiredTigerRecoveryUnit& ru, std::string_view uri);
 
     static uint64_t genTableId();
 
@@ -425,7 +429,7 @@ public:
     /**
      * Dumps the complete contents of the WiredTiger metadata table to the log output.
      */
-    static void logMetadata(WiredTigerSession& session, StringData uri);
+    static void logMetadata(WiredTigerSession& session, std::string_view uri);
 
     /**
      * Creates a new WiredTiger table with the given uri and config.
@@ -448,7 +452,7 @@ class WiredTigerConfigParser {
     WiredTigerConfigParser& operator=(const WiredTigerConfigParser&) = delete;
 
 public:
-    WiredTigerConfigParser(StringData config) {
+    WiredTigerConfigParser(std::string_view config) {
         invariantWTOK(
             wiredtiger_config_parser_open(nullptr, config.data(), config.size(), &_parser),
             nullptr);

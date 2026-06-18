@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/cursor_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <memory.h>
 
@@ -45,7 +46,7 @@ namespace agg {
 
 class GeoNearCursorStage final : public CursorStage {
 public:
-    GeoNearCursorStage(StringData sourceName,
+    GeoNearCursorStage(std::string_view sourceName,
                        const boost::intrusive_ptr<CatalogResourceHandle>&,
                        const boost::intrusive_ptr<ExpressionContext>&,
                        CursorType,

@@ -52,6 +52,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
@@ -672,7 +674,7 @@ void persistPrimaryDrivenResumeState(OperationContext* opCtx,
 // step-up, and asserts the build resumed.
 void runResumePrimaryDrivenOnStepUpTest(OperationContext* opCtx,
                                         repl::StorageInterface* storageInterface,
-                                        StringData testName,
+                                        std::string_view testName,
                                         std::tuple<IndexBuildPhaseEnum, bool> param) {
     auto [phase, hasPersistedResumeState] = param;
     // TODO (SERVER-116165): Remove.

@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -52,6 +51,8 @@
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
@@ -316,7 +317,9 @@ boost::optional<bool> parseExplainModeFromBSON(const BSONElement& explainElem) {
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void serializeExplainToBSON(const bool& explain, StringData fieldName, BSONObjBuilder* builder) {
+void serializeExplainToBSON(const bool& explain,
+                            std::string_view fieldName,
+                            BSONObjBuilder* builder) {
     // Note that we do not serialize 'explain' field to the command object. This serializer only
     // serializes an empty cursor object for field 'cursor' when it is an explain command.
     builder->append(AggregateCommandRequest::kCursorFieldName, BSONObj());
@@ -352,7 +355,7 @@ mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& curso
  * break because of it.
  */
 void serializeAggregateCursorToBSON(const mongo::SimpleCursorOptions& cursor,
-                                    StringData fieldName,
+                                    std::string_view fieldName,
                                     BSONObjBuilder* builder) {
     if (!builder->hasField(fieldName)) {
         builder->append(

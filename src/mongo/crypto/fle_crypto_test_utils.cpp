@@ -33,6 +33,8 @@
 #include "mongo/crypto/encryption_fields_validation.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 
+#include <string_view>
+
 namespace mongo {
 
 EncryptedFieldHelper::EncryptedFieldHelper(EncryptedField fieldSchema) {
@@ -70,7 +72,7 @@ EncryptedFieldHelper::EncryptedFieldHelper(EncryptedField fieldSchema) {
 }
 
 EncryptedFieldHelper::EncryptedFieldHelper(Fle2AlgorithmInt alg,
-                                           StringData path,
+                                           std::string_view path,
                                            UUID keyId,
                                            BSONType type)
     : _algorithm(alg), _ef(keyId, std::string(path)) {
@@ -163,13 +165,13 @@ std::vector<char> EncryptedFieldHelper::generatePlaceholder(BSONElement value,
 }
 
 
-EncryptedFieldHelper EncryptedFieldHelper::makeUnindexed(StringData path,
+EncryptedFieldHelper EncryptedFieldHelper::makeUnindexed(std::string_view path,
                                                          BSONType type,
                                                          UUID indexKeyId) {
     return EncryptedFieldHelper(Fle2AlgorithmInt::kUnindexed, path, indexKeyId, type);
 }
 
-EncryptedFieldHelper EncryptedFieldHelper::makeEquality(StringData path,
+EncryptedFieldHelper EncryptedFieldHelper::makeEquality(std::string_view path,
                                                         BSONType type,
                                                         UUID indexKeyId,
                                                         boost::optional<int64_t> contention) {
@@ -183,7 +185,7 @@ EncryptedFieldHelper EncryptedFieldHelper::makeEquality(StringData path,
     return res;
 }
 
-EncryptedFieldHelper EncryptedFieldHelper::makeRange(StringData path,
+EncryptedFieldHelper EncryptedFieldHelper::makeRange(std::string_view path,
                                                      BSONType type,
                                                      UUID indexKeyId,
                                                      boost::optional<Value> min,
@@ -210,7 +212,7 @@ EncryptedFieldHelper EncryptedFieldHelper::makeRange(StringData path,
     return res;
 }
 
-EncryptedFieldHelper EncryptedFieldHelper::makeSuffix(StringData path,
+EncryptedFieldHelper EncryptedFieldHelper::makeSuffix(std::string_view path,
                                                       BSONType type,
                                                       UUID indexKeyId,
                                                       int lb,
@@ -232,7 +234,7 @@ EncryptedFieldHelper EncryptedFieldHelper::makeSuffix(StringData path,
     return res;
 }
 
-EncryptedFieldHelper EncryptedFieldHelper::makePrefix(StringData path,
+EncryptedFieldHelper EncryptedFieldHelper::makePrefix(std::string_view path,
                                                       BSONType type,
                                                       UUID indexKeyId,
                                                       int lb,
@@ -247,7 +249,7 @@ EncryptedFieldHelper EncryptedFieldHelper::makePrefix(StringData path,
     return res;
 }
 
-EncryptedFieldHelper EncryptedFieldHelper::makeSubstring(StringData path,
+EncryptedFieldHelper EncryptedFieldHelper::makeSubstring(std::string_view path,
                                                          BSONType type,
                                                          UUID indexKeyId,
                                                          int lb,
@@ -264,7 +266,7 @@ EncryptedFieldHelper EncryptedFieldHelper::makeSubstring(StringData path,
     return res;
 }
 
-EncryptedFieldHelper EncryptedFieldHelper::makePrefixSuffix(StringData path,
+EncryptedFieldHelper EncryptedFieldHelper::makePrefixSuffix(std::string_view path,
                                                             BSONType type,
                                                             UUID indexKeyId,
                                                             int lb,

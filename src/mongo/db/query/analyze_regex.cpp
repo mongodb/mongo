@@ -29,11 +29,11 @@
 
 #include "mongo/db/query/analyze_regex.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/str.h"
 
 #include <cstring>
+#include <string_view>
 
 namespace mongo::analyze_regex {
 
@@ -44,7 +44,7 @@ namespace {
  * character inside of a character class or the \Q...\E escape sequence has no special meaning but
  * may still be reported by this function as being non-escaped.
  */
-bool stringMayHaveUnescapedPipe(StringData str) {
+bool stringMayHaveUnescapedPipe(std::string_view str) {
     if (str.size() > 0 && str[0] == '|') {
         return true;
     }
@@ -80,7 +80,7 @@ std::pair<std::string, bool> getRegexPrefixMatch(const char* regex, const char* 
     }
 
     // A regex with an unescaped pipe character is not considered a simple regex.
-    if (stringMayHaveUnescapedPipe(StringData(regex))) {
+    if (stringMayHaveUnescapedPipe(std::string_view(regex))) {
         return {"", false};
     }
 

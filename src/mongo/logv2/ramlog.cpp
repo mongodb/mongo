@@ -36,6 +36,7 @@
 #include "mongo/util/observable_mutex_registry.h"
 
 #include <map>
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
@@ -54,7 +55,7 @@ Atomic<size_t> _globalMaxSizeBytes = 1024 * 1024;
 
 }  // namespace
 
-RamLog::RamLog(StringData name, size_t maxLines, size_t maxSizeBytes)
+RamLog::RamLog(std::string_view name, size_t maxLines, size_t maxSizeBytes)
     : _maxLines(maxLines), _maxSizeBytes(maxSizeBytes), _name(name) {
     ObservableMutexRegistry::get().add(fmt::format("logv2::RamLog({})::_mutex", name), _mutex);
     _lines.resize(_maxLines);
@@ -131,7 +132,7 @@ void RamLog::clear() {
     }
 }
 
-StringData RamLog::getLine(size_t lineNumber) const {
+std::string_view RamLog::getLine(size_t lineNumber) const {
     if (lineNumber >= getLineCount()) {
         return "";
     }

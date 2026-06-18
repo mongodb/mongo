@@ -71,6 +71,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_set.h>
@@ -84,9 +85,10 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kDBFieldName = "db"_sd;
-constexpr auto kSASLPayloadUsernameField = "username"_sd;
+constexpr auto kDBFieldName = "db"sv;
+constexpr auto kSASLPayloadUsernameField = "username"sv;
 
 class CmdLogout : public TypedCommand<CmdLogout> {
 public:
@@ -191,7 +193,7 @@ std::unique_ptr<UserRequest> getX509UserRequest(OperationContext* opCtx, const U
         username, roles, sslPeerInfo, true, insertAuthenticatedMechanism));
 }
 
-constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;
+constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."sv;
 
 // TODO SERVER-78809: remove
 /**
@@ -300,7 +302,9 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 #endif  // MONGO_CONFIG_SSL
 
 // TODO SERVER-78809: remove
-void _authenticate(OperationContext* opCtx, AuthenticationSession* session, StringData mechanism) {
+void _authenticate(OperationContext* opCtx,
+                   AuthenticationSession* session,
+                   std::string_view mechanism) {
 #ifdef MONGO_CONFIG_SSL
     if (mechanism == auth::kMechanismMongoX509) {
         return _authenticateX509(opCtx, session);
@@ -309,7 +313,7 @@ void _authenticate(OperationContext* opCtx, AuthenticationSession* session, Stri
     uasserted(ErrorCodes::BadValue, "Unsupported mechanism: " + std::string{mechanism});
 }
 
-auth::SaslPayload generateSaslPayload(const boost::optional<StringData>& user,
+auth::SaslPayload generateSaslPayload(const boost::optional<std::string_view>& user,
                                       const DatabaseName& dbname) {
     auth::X509MechanismClientStep1 step;
     step.setPrincipalName(user);

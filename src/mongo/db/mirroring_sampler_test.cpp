@@ -29,7 +29,6 @@
 
 #include "mongo/db/mirroring_sampler.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -39,6 +38,7 @@
 #include <cmath>
 #include <numeric>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>

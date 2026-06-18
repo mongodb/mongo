@@ -54,6 +54,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
+#include <string_view>
 
 #include <boost/container/vector.hpp>
 #include <boost/cstdint.hpp>
@@ -82,7 +83,7 @@ void QueryPlannerTest::clearState() {
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern,
-                                StringData indexName,
+                                std::string_view indexName,
                                 bool multikey,
                                 bool sparse,
                                 bool unique,
@@ -177,7 +178,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const CollatorInterface* col
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern,
                                 const CollatorInterface* collator,
-                                StringData indexName) {
+                                std::string_view indexName) {
     addIndex(keyPattern, indexName, false, false, false, BSONObj(), nullptr, collator);
 }
 

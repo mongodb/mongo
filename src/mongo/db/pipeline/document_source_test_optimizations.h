@@ -32,6 +32,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 /**
  * A dummy class for other tests to inherit from to customize the behavior of any of the virtual
@@ -39,11 +41,11 @@ namespace mongo {
  */
 class DocumentSourceTestOptimizations : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalTestOptimizations"_sd;
+    static constexpr std::string_view kStageName = "$_internalTestOptimizations"_sd;
     DocumentSourceTestOptimizations(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx) {}
     ~DocumentSourceTestOptimizations() override = default;
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return DocumentSourceTestOptimizations::kStageName;
     }
 

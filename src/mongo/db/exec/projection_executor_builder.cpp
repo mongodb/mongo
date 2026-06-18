@@ -30,7 +30,6 @@
 #include "mongo/db/exec/projection_executor_builder.h"
 
 #include "mongo/base/exact_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/expression.h"

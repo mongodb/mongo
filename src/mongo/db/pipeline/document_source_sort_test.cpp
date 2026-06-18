@@ -73,6 +73,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 using std::deque;
@@ -255,7 +256,7 @@ TEST_F(DocumentSourceSortTest, DoesNotPushProjectBeforeSelf) {
     DocumentSourceContainer container;
     createSort(BSON("_id" << 1));
     auto project =
-        DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);
+        DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"sv);
 
     container.push_back(sort());
     container.push_back(project);
@@ -438,7 +439,7 @@ TEST_F(DocumentSourceSortExecutionTest, CompoundSortSpecAlternateOrderSecondFiel
 /** Sorting different types is not supported. */
 TEST_F(DocumentSourceSortExecutionTest, InconsistentTypeSort) {
     createSort(BSON("a" << 1));
-    checkResults({Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}, {"a", "foo"_sd}}},
+    checkResults({Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}, {"a", "foo"sv}}},
                  sort(),
                  "[{_id:0,a:1},{_id:1,a:\"foo\"}]");
 }

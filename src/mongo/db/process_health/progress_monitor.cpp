@@ -30,7 +30,6 @@
 
 #include "mongo/db/process_health/progress_monitor.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/process_health/fault_manager_config.h"
@@ -45,6 +44,7 @@
 #include <algorithm>
 #include <mutex>
 #include <ratio>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
@@ -52,6 +52,7 @@
 
 namespace mongo {
 namespace process_health {
+using namespace std::literals::string_view_literals;
 
 ProgressMonitor::ProgressMonitor(FaultManager* faultManager,
                                  ServiceContext* svcCtx,
@@ -151,7 +152,7 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
 
 void ProgressMonitor::_progressMonitorLoop() {
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-    Client::initThread("FaultManagerProgressMonitor"_sd,
+    Client::initThread("FaultManagerProgressMonitor"sv,
                        _svcCtx->getService(),
                        Client::noSession(),
                        ClientOperationKillableByStepdown{false});

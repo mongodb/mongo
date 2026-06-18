@@ -67,6 +67,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -146,7 +147,7 @@ namespace mongo::window_function {
  */
 class Expression : public RefCountable {
 public:
-    static constexpr StringData kWindowArg = "window"_sd;
+    static constexpr std::string_view kWindowArg = "window"_sd;
     /**
      * Parses a single window-function expression. One of the BSONObj's keys is the function
      * name, and the other (optional) key is 'window': for example, the whole BSONObj might be
@@ -184,7 +185,7 @@ public:
     /**
      * Is this a function that the parser knows about?
      */
-    inline static bool isFunction(mongo::StringData name) {
+    inline static bool isFunction(std::string_view name) {
         return parserMap.find(name) != parserMap.end();
     }
 
@@ -206,7 +207,7 @@ public:
           _input(std::move(input)),
           _bounds(std::move(bounds)) {}
 
-    StringData getOpName() const {
+    std::string_view getOpName() const {
         return _accumulatorName;
     }
 
@@ -268,7 +269,7 @@ public:
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx) {
         // 'obj' is something like '{$func: <args>, window: {...}}'
-        boost::optional<StringData> accumulatorName;
+        boost::optional<std::string_view> accumulatorName;
         WindowBounds bounds = WindowBounds::defaultBounds();
         boost::intrusive_ptr<::mongo::Expression> input;
         for (const auto& arg : obj) {
@@ -328,7 +329,7 @@ public:
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx) {
         // 'obj' is something like '{$func: <expressionArg>}'
-        boost::optional<StringData> accumulatorName;
+        boost::optional<std::string_view> accumulatorName;
         // These expressions have variable lower bounds, but the functions themselves will handle
         // the specifics of what documents to count. All documents preceding current must be
         // seen by the function.
@@ -387,7 +388,7 @@ public:
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx) {
         // 'obj' is something like '{$func: <args>, window: {...}}'
-        boost::optional<StringData> accumulatorName;
+        boost::optional<std::string_view> accumulatorName;
         WindowBounds bounds = WindowBounds::defaultBounds();
         boost::intrusive_ptr<::mongo::Expression> input;
         for (const auto& arg : obj) {
@@ -433,7 +434,7 @@ template <typename RankType>
 class ExpressionFromRankAccumulator : public Expression {
 public:
     static auto createLegacyRankWF(ExpressionContext* expCtx,
-                                   StringData accumulatorName,
+                                   std::string_view accumulatorName,
                                    const SortPattern& sortBy,
                                    WindowBounds bounds) {
         auto sortPatternPart = sortBy[0];
@@ -461,7 +462,7 @@ public:
                                                   ExpressionContext* expCtx) {
         // 'obj' is something like '{$func: <args>}'
         uassert(5371601, "Rank style window functions take no other arguments", obj.nFields() == 1);
-        boost::optional<StringData> accumulatorName;
+        boost::optional<std::string_view> accumulatorName;
         // Rank based accumulators are always unbounded to current.
         WindowBounds bounds = WindowBounds{
             WindowBounds::DocumentBased{WindowBounds::Unbounded{}, WindowBounds::Current{}}};
@@ -549,10 +550,10 @@ private:
 
 class ExpressionExpMovingAvg : public Expression {
 public:
-    static constexpr StringData kAccName = "$expMovingAvg"_sd;
-    static constexpr StringData kInputArg = "input"_sd;
-    static constexpr StringData kNArg = "N"_sd;
-    static constexpr StringData kAlphaArg = "alpha"_sd;
+    static constexpr std::string_view kAccName = "$expMovingAvg"_sd;
+    static constexpr std::string_view kInputArg = "input"_sd;
+    static constexpr std::string_view kNArg = "N"_sd;
+    static constexpr std::string_view kAlphaArg = "alpha"_sd;
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx);
@@ -620,8 +621,8 @@ protected:
 
 class ExpressionWithUnit : public Expression {
 public:
-    static constexpr StringData kArgInput = "input"_sd;
-    static constexpr StringData kArgUnit = "unit"_sd;
+    static constexpr std::string_view kArgInput = "input"_sd;
+    static constexpr std::string_view kArgUnit = "unit"_sd;
 
     ExpressionWithUnit(ExpressionContext* expCtx,
                        std::string accumulatorName,
@@ -705,7 +706,7 @@ protected:
 
 class ExpressionDerivative : public ExpressionWithUnit {
 public:
-    static constexpr StringData kName = "$derivative"_sd;
+    static constexpr std::string_view kName = "$derivative"_sd;
     ExpressionDerivative(ExpressionContext* expCtx,
                          boost::intrusive_ptr<::mongo::Expression> input,
                          WindowBounds bounds,
@@ -856,7 +857,7 @@ public:
 
 class ExpressionLinearFill : public Expression {
 public:
-    static constexpr StringData kName = "$linearFill"_sd;
+    static constexpr std::string_view kName = "$linearFill"_sd;
     ExpressionLinearFill(ExpressionContext* expCtx,
                          std::string accumulatorName,
                          boost::intrusive_ptr<::mongo::Expression> input,
@@ -865,7 +866,7 @@ public:
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx) {
-        boost::optional<StringData> accumulatorName;
+        boost::optional<std::string_view> accumulatorName;
         WindowBounds bounds = WindowBounds::defaultBounds();
         boost::intrusive_ptr<::mongo::Expression> input;
 
@@ -985,10 +986,10 @@ public:
 
 class ExpressionMinMaxScaler : public Expression {
 public:
-    static constexpr StringData kWindowFnName = "$minMaxScaler"_sd;
-    static constexpr StringData kInputArg = "input"_sd;
-    static constexpr StringData kMinArg = "min"_sd;
-    static constexpr StringData kMaxArg = "max"_sd;
+    static constexpr std::string_view kWindowFnName = "$minMaxScaler"_sd;
+    static constexpr std::string_view kInputArg = "input"_sd;
+    static constexpr std::string_view kMinArg = "min"_sd;
+    static constexpr std::string_view kMaxArg = "max"_sd;
 
     ExpressionMinMaxScaler(ExpressionContext* expCtx,
                            boost::intrusive_ptr<::mongo::Expression> input,

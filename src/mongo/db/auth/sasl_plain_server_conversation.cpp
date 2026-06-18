@@ -33,7 +33,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
@@ -51,6 +50,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -60,7 +60,7 @@
 namespace mongo {
 namespace {
 template <typename HashBlock>
-StatusWith<bool> trySCRAM(const User::CredentialData& credentials, StringData pwd) {
+StatusWith<bool> trySCRAM(const User::CredentialData& credentials, std::string_view pwd) {
     const auto scram = credentials.scram<HashBlock>();
     if (!scram.isValid()) {
         // No stored credentials available.
@@ -75,8 +75,8 @@ StatusWith<bool> trySCRAM(const User::CredentialData& credentials, StringData pw
                                       decodedSalt.size()),
         scram.iterationCount));
     if (scram.storedKey !=
-        base64::encode(StringData(reinterpret_cast<const char*>(secrets.storedKey().data()),
-                                  secrets.storedKey().size()))) {
+        base64::encode(std::string_view(reinterpret_cast<const char*>(secrets.storedKey().data()),
+                                        secrets.storedKey().size()))) {
         return Status(ErrorCodes::AuthenticationFailed,
                       str::stream() << "Incorrect user name or password");
     }
@@ -86,7 +86,7 @@ StatusWith<bool> trySCRAM(const User::CredentialData& credentials, StringData pw
 }  // namespace
 
 StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
-    OperationContext* opCtx, StringData inputData) {
+    OperationContext* opCtx, std::string_view inputData) {
     if (_authenticationDatabase == "$external") {
         return Status(ErrorCodes::AuthenticationFailed,
                       "PLAIN mechanism must be used with internal users");

@@ -53,6 +53,7 @@
 #include <cstdint>
 #include <iterator>
 #include <map>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -89,7 +90,7 @@ namespace {
 
 const std::string kStepDownCheckWriteConcernModeName = "$stepDownCheck";
 
-bool isValidCIDRRange(StringData host) {
+bool isValidCIDRRange(std::string_view host) {
     return CIDR::parse(host).isOK();
 }
 
@@ -595,11 +596,12 @@ bool ReplSetConfig::isLocalHostAllowed() const {
     return getMembers().begin()->getHostAndPort().isLocalHost();
 }
 
-ReplSetTag ReplSetConfig::findTag(StringData key, StringData value) const {
+ReplSetTag ReplSetConfig::findTag(std::string_view key, std::string_view value) const {
     return _tagConfig.findTag(key, value);
 }
 
-StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patternName) const {
+StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(
+    std::string_view patternName) const {
     // The string "majority" corresponds to the internal "$majority" custom write mode
     if (patternName == WriteConcernOptions::kMajority) {
         patternName = kMajorityWriteConcernModeName;

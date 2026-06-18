@@ -31,6 +31,8 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
@@ -56,7 +58,7 @@ public:
         return BSONObj();
     }
 
-    bool dependsOn(StringData topLevelField) const final {
+    bool dependsOn(std::string_view topLevelField) const final {
         return true;
     };
 

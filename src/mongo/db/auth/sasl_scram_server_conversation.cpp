@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -60,6 +59,7 @@
 #include <deque>
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <absl/strings/str_split.h>
 #include <boost/algorithm/string/replace.hpp>
@@ -74,7 +74,7 @@ namespace mongo {
 
 template <typename Policy>
 StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::stepImpl(
-    OperationContext* opCtx, StringData inputData) {
+    OperationContext* opCtx, std::string_view inputData) {
     _step++;
 
     const unsigned int numSteps = _totalSteps();
@@ -114,7 +114,7 @@ static void decodeSCRAMUsername(std::string& user) {
  */
 template <typename Policy>
 StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_firstStep(
-    OperationContext* opCtx, StringData inputData) {
+    OperationContext* opCtx, std::string_view inputData) {
     const auto badCount = [](int got) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
@@ -291,7 +291,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     SecureRandom().fill(binaryNonce, sizeof(binaryNonce));
 
     _nonce = clientNonce +
-        base64::encode(StringData(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce)));
+        base64::encode(std::string_view(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce)));
     StringBuilder sb;
     sb << "r=" << _nonce << ",s=" << scramCredentials.salt
        << ",i=" << scramCredentials.iterationCount;
@@ -317,7 +317,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
  **/
 template <typename Policy>
 StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_secondStep(
-    OperationContext* opCtx, StringData inputData) {
+    OperationContext* opCtx, std::string_view inputData) {
     const auto badCount = [](int got) {
         return Status(ErrorCodes::BadValue,
                       str::stream()

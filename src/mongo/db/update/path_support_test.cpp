@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonobj.h"
@@ -51,6 +50,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -81,7 +81,7 @@ public:
         return _field;
     }
 
-    void setField(StringData str) {
+    void setField(std::string_view str) {
         _field.parse(str);
     }
 
@@ -154,7 +154,7 @@ public:
     FieldRef& field() {
         return _field;
     }
-    void setField(StringData str) {
+    void setField(std::string_view str) {
         _field.parse(str);
     }
 
@@ -269,7 +269,7 @@ public:
     FieldRef& field() {
         return _field;
     }
-    void setField(StringData str) {
+    void setField(std::string_view str) {
         _field.parse(str);
     }
 
@@ -395,7 +395,7 @@ public:
         return _field;
     }
 
-    void setField(StringData str) {
+    void setField(std::string_view str) {
         _field.parse(str);
     }
 
@@ -633,7 +633,7 @@ static MatchExpression* makeExpr(const BSONObj& exprBSON) {
 
 static void assertContains(const EqualityMatches& equalities, const BSONObj& wrapped) {
     BSONElement value = wrapped.firstElement();
-    StringData path = value.fieldNameStringData();
+    std::string_view path = value.fieldNameStringData();
 
     EqualityMatches::const_iterator it = equalities.find(path);
     if (it == equalities.end()) {
@@ -648,7 +648,7 @@ static void assertContains(const EqualityMatches& equalities, const BSONObj& wra
     }
 }
 
-static void assertContains(const EqualityMatches& equalities, StringData path, int value) {
+static void assertContains(const EqualityMatches& equalities, std::string_view path, int value) {
     assertContains(equalities, BSON(path << value));
 }
 
@@ -918,11 +918,11 @@ TEST(ExtractEqualities, EmptyConflict) {
 //
 
 static void assertParent(const EqualityMatches& equalities,
-                         StringData pathStr,
+                         std::string_view pathStr,
                          const BSONObj& wrapped) {
     FieldRef path(pathStr);
     BSONElement value = wrapped.firstElement();
-    StringData parentPath = value.fieldNameStringData();
+    std::string_view parentPath = value.fieldNameStringData();
 
     int parentPathPart;
     BSONElement parentEl = findParentEqualityElement(equalities, path, &parentPathPart);
@@ -932,7 +932,7 @@ static void assertParent(const EqualityMatches& equalities,
                                   << "\""));
     }
 
-    StringData foundParentPath = path.dottedSubstring(0, parentPathPart);
+    std::string_view foundParentPath = path.dottedSubstring(0, parentPathPart);
     if (foundParentPath != parentPath) {
         FAIL(std::string(stream() << "Equality match parent at path \"" << foundParentPath
                                   << "\" does not match \"" << parentPath << "\""));
@@ -948,20 +948,20 @@ static void assertParent(const EqualityMatches& equalities,
 }
 
 static void assertParent(const EqualityMatches& equalities,
-                         StringData path,
-                         StringData parentPath,
+                         std::string_view path,
+                         std::string_view parentPath,
                          int value) {
     assertParent(equalities, path, BSON(parentPath << value));
 }
 
-static void assertNoParent(const EqualityMatches& equalities, StringData pathStr) {
+static void assertNoParent(const EqualityMatches& equalities, std::string_view pathStr) {
     FieldRef path(pathStr);
 
     int parentPathPart;
     BSONElement parentEl = findParentEqualityElement(equalities, path, &parentPathPart);
 
     if (!parentEl.eoo()) {
-        StringData foundParentPath = path.dottedSubstring(0, parentPathPart);
+        std::string_view foundParentPath = path.dottedSubstring(0, parentPathPart);
         FAIL(std::string(stream() << "Equality matches contained parent for \"" << pathStr
                                   << "\" at \"" << foundParentPath << "\""));
     }

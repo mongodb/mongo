@@ -37,11 +37,14 @@
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace timeseries {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Determine whether the catalog data indicates that the collection is a viewless timeseries
@@ -80,11 +83,11 @@ void performCustomTranslation(const boost::intrusive_ptr<ExpressionContext>& exp
 
     BSONObjBuilder bob;
     {
-        BSONObjBuilder tsOptsBob(bob.subobjStart(""_sd));
+        BSONObjBuilder tsOptsBob(bob.subobjStart(""sv));
 
         tsOptsBob.append(timeseries::kTimeFieldName, params.tsOptions.getTimeField());
 
-        const boost::optional<StringData>& maybeMetaField = params.tsOptions.getMetaField();
+        const boost::optional<std::string_view>& maybeMetaField = params.tsOptions.getMetaField();
         if (maybeMetaField) {
             tsOptsBob.append(timeseries::kMetaFieldName, *maybeMetaField);
         }
@@ -101,11 +104,11 @@ void prependUnpackStageToPipeline(const boost::intrusive_ptr<ExpressionContext>&
                                   const TimeseriesTranslationParams& params) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder tsOptsBob(bob.subobjStart(""_sd));
+        BSONObjBuilder tsOptsBob(bob.subobjStart(""sv));
 
         tsOptsBob.append(timeseries::kTimeFieldName, params.tsOptions.getTimeField());
 
-        const boost::optional<StringData>& maybeMetaField = params.tsOptions.getMetaField();
+        const boost::optional<std::string_view>& maybeMetaField = params.tsOptions.getMetaField();
         if (maybeMetaField) {
             tsOptsBob.append(timeseries::kMetaFieldName, *maybeMetaField);
         }

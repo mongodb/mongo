@@ -47,6 +47,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(InternalSchemaEqMatchExpression, EquivalentReturnsCorrectResults) {
     auto query = fromjson(R"(
@@ -83,7 +84,7 @@ DEATH_TEST_REGEX(InternalSchemaEqMatchExpressionDeathTest,
                  GetChildFailsLargerThanZero,
                  "Tripwire assertion.*6400213") {
     BSONObj operand = BSON("a" << 5);
-    InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
+    InternalSchemaEqMatchExpression eq("a"sv, operand["a"]);
 
     ASSERT_EQ(eq.numChildren(), 0);
     ASSERT_THROWS_CODE(eq.getChild(0), AssertionException, 6400213);

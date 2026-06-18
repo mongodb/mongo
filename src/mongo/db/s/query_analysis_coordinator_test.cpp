@@ -48,6 +48,7 @@
 #include "mongo/util/version.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -151,7 +152,7 @@ protected:
     }
 
     void assertContainsSampler(const StringMap<QueryAnalysisCoordinator::Sampler>& samplers,
-                               StringData name,
+                               std::string_view name,
                                Date_t pingTime,
                                boost::optional<double> numQueriesPerSecond) {
         auto it = samplers.find(name);

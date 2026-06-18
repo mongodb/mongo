@@ -34,7 +34,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
@@ -58,6 +57,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -88,7 +88,7 @@ public:
      * connections. */
     DBClientReplicaSet(const std::string& name,
                        const std::vector<HostAndPort>& servers,
-                       StringData applicationName,
+                       std::string_view applicationName,
                        double so_timeout = 0,
                        MongoURI uri = {},
                        const ClientAPIVersionParameters* apiParameters = nullptr);

@@ -29,41 +29,47 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/static_immortal.h"
 
+#include <array>
+#include <string_view>
 #include <vector>
 
 namespace mongo::str_trim_utils {
 
-const size_t kMaximumAllowedTrimStringBytes = 4096;
+constexpr inline size_t kMaximumAllowedTrimStringBytes = 4096;
 
-const std::vector<StringData> kDefaultTrimWhitespaceChars = {
-    "\0"_sd,      // Null character. Avoid using "\u0000" syntax to work around a gcc bug:
-                  // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53690.
-    "\u0020"_sd,  // Space
-    "\u0009"_sd,  // Horizontal tab
-    "\u000A"_sd,  // Line feed/new line
-    "\u000B"_sd,  // Vertical tab
-    "\u000C"_sd,  // Form feed
-    "\u000D"_sd,  // Horizontal tab
-    "\u00A0"_sd,  // Non-breaking space
-    "\u1680"_sd,  // Ogham space mark
-    "\u2000"_sd,  // En quad
-    "\u2001"_sd,  // Em quad
-    "\u2002"_sd,  // En space
-    "\u2003"_sd,  // Em space
-    "\u2004"_sd,  // Three-per-em space
-    "\u2005"_sd,  // Four-per-em space
-    "\u2006"_sd,  // Six-per-em space
-    "\u2007"_sd,  // Figure space
-    "\u2008"_sd,  // Punctuation space
-    "\u2009"_sd,  // Thin space
-    "\u200A"_sd   // Hair space
-};
+inline const std::vector<std::string_view>& defaultTrimWhitespaceChars() {
+    using namespace std::literals::string_view_literals;
+    static StaticImmortal vec = std::vector<std::string_view>{
+        "\0"sv,      // Null character. Avoid using "\u0000" syntax to work around a gcc
+                     // bug: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53690.
+        "\u0020"sv,  // Space
+        "\u0009"sv,  // Horizontal tab
+        "\u000A"sv,  // Line feed/new line
+        "\u000B"sv,  // Vertical tab
+        "\u000C"sv,  // Form feed
+        "\u000D"sv,  // Horizontal tab
+        "\u00A0"sv,  // Non-breaking space
+        "\u1680"sv,  // Ogham space mark
+        "\u2000"sv,  // En quad
+        "\u2001"sv,  // Em quad
+        "\u2002"sv,  // En space
+        "\u2003"sv,  // Em space
+        "\u2004"sv,  // Three-per-em space
+        "\u2005"sv,  // Four-per-em space
+        "\u2006"sv,  // Six-per-em space
+        "\u2007"sv,  // Figure space
+        "\u2008"sv,  // Punctuation space
+        "\u2009"sv,  // Thin space
+        "\u200A"sv,  // Hair space
+    };
+    return *vec;
+}
 
 /**
  * Assuming 'charByte' is the beginning of a UTF-8 code point, returns the number of bytes that
@@ -76,17 +82,20 @@ size_t numberOfBytesForCodePoint(char charByte);
  * Returns a vector with one entry per code point to trim, or throws an exception if 'utf8String'
  * contains invalid UTF-8.
  */
-std::vector<StringData> extractCodePointsFromChars(StringData utf8String);
+std::vector<std::string_view> extractCodePointsFromChars(std::string_view utf8String);
 
-bool codePointMatchesAtIndex(StringData input, std::size_t indexOfInput, StringData testCP);
+bool codePointMatchesAtIndex(std::string_view input,
+                             std::size_t indexOfInput,
+                             std::string_view testCP);
 
-StringData trimFromLeft(StringData input, const std::vector<StringData>& trimCPs);
+std::string_view trimFromLeft(std::string_view input, const std::vector<std::string_view>& trimCPs);
 
-StringData trimFromRight(StringData input, const std::vector<StringData>& trimCPs);
+std::string_view trimFromRight(std::string_view input,
+                               const std::vector<std::string_view>& trimCPs);
 
-StringData doTrim(StringData input,
-                  const std::vector<StringData>& trimCPs,
-                  bool trimLeft,
-                  bool trimRight);
+std::string_view doTrim(std::string_view input,
+                        const std::vector<std::string_view>& trimCPs,
+                        bool trimLeft,
+                        bool trimRight);
 
 }  // namespace mongo::str_trim_utils

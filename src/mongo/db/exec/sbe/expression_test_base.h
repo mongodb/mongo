@@ -42,6 +42,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::sbe {
 
 /**
@@ -99,7 +101,7 @@ protected:
         return _slotIdGenerator;
     }
 
-    sbe::value::SlotId registerSlot(StringData name,
+    sbe::value::SlotId registerSlot(std::string_view name,
                                     value::TypeTags tag,
                                     value::Value val,
                                     bool owned) {

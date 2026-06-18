@@ -40,6 +40,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 using IndexIterator = IndexCatalog::IndexIterator;
 
 bool IndexIterator::more() {
@@ -119,7 +120,7 @@ BSONObj IndexCatalog::normalizeIndexSpecFromListIndexes(const BSONObj& indexSpec
     BSONObjBuilder bob;
 
     // Remove simple collation under 'spec' field
-    constexpr auto kSpecFieldName = "spec"_sd;
+    constexpr auto kSpecFieldName = "spec"sv;
     if (indexSpec.hasField(kSpecFieldName)) {
         bob.append(kSpecFieldName,
                    removeSimpleCollationFromBsonObj(indexSpec[kSpecFieldName].Obj()));

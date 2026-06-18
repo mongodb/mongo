@@ -52,6 +52,7 @@
 #include <list>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -234,12 +235,12 @@ private:
 };
 class RangeStatement {
 public:
-    static constexpr StringData kArgUnit = "unit"_sd;
-    static constexpr StringData kArgBounds = "bounds"_sd;
-    static constexpr StringData kArgStep = "step"_sd;
+    static constexpr std::string_view kArgUnit = "unit"_sd;
+    static constexpr std::string_view kArgBounds = "bounds"_sd;
+    static constexpr std::string_view kArgStep = "step"_sd;
 
-    static constexpr StringData kValFull = "full"_sd;
-    static constexpr StringData kValPartition = "partition"_sd;
+    static constexpr std::string_view kValFull = "full"_sd;
+    static constexpr std::string_view kValPartition = "partition"_sd;
 
     struct Full {};
     struct Partition {};
@@ -287,7 +288,7 @@ private:
 };
 
 namespace document_source_densify {
-constexpr StringData kStageName = "$densify"_sd;
+constexpr std::string_view kStageName = "$densify"_sd;
 
 /**
  * The 'internal' parameter specifies whether or not we create a sort stage that is required for
@@ -296,7 +297,7 @@ constexpr StringData kStageName = "$densify"_sd;
 std::list<boost::intrusive_ptr<DocumentSource>> createFromBsonInternal(
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-    StringData stageName,
+    std::string_view stageName,
     bool isInternal);
 std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -315,10 +316,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> create(
 
 class DocumentSourceInternalDensify final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalDensify"_sd;
-    static constexpr StringData kPartitionByFieldsFieldName = "partitionByFields"_sd;
-    static constexpr StringData kFieldFieldName = "field"_sd;
-    static constexpr StringData kRangeFieldName = "range"_sd;
+    static constexpr std::string_view kStageName = "$_internalDensify"_sd;
+    static constexpr std::string_view kPartitionByFieldsFieldName = "partitionByFields"_sd;
+    static constexpr std::string_view kFieldFieldName = "field"_sd;
+    static constexpr std::string_view kRangeFieldName = "range"_sd;
 
     DocumentSourceInternalDensify(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                   FieldPath field,
@@ -352,7 +353,7 @@ public:
                 UnionRequirement::kAllowed};
     }
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

@@ -29,19 +29,20 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::find_command_idl_utils {
 
 /** Should not be modified, as API version I/O guarantees could break. */
-void noOpSerializer(bool, StringData fieldName, BSONObjBuilder* bob);
+void noOpSerializer(bool, std::string_view fieldName, BSONObjBuilder* bob);
 
 /** Should not be modified, as API version I/O guarantees could break. */
-void serializeBSONWhenNotEmpty(BSONObj obj, StringData fieldName, BSONObjBuilder* bob);
+void serializeBSONWhenNotEmpty(BSONObj obj, std::string_view fieldName, BSONObjBuilder* bob);
 
 /** Should not be modified, as API version I/O guarantees could break. */
 BSONObj parseOwnedBSON(BSONElement element);

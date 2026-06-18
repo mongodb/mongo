@@ -52,6 +52,7 @@
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 
 
 /**
@@ -183,7 +184,7 @@ std::vector<DebugPrinter::Block> EVariable::debugPrint() const {
     std::vector<DebugPrinter::Block> ret;
 
     if (_moveFrom) {
-        ret.emplace_back("move(`"_sd);
+        ret.emplace_back("move(`"sv);
     }
     if (_frameId) {
         DebugPrinter::addIdentifier(ret, *_frameId, _var);
@@ -191,7 +192,7 @@ std::vector<DebugPrinter::Block> EVariable::debugPrint() const {
         DebugPrinter::addIdentifier(ret, _var);
     }
     if (_moveFrom) {
-        ret.emplace_back("`)"_sd);
+        ret.emplace_back("`)"sv);
     }
 
     return ret;

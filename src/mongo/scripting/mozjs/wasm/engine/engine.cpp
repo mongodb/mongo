@@ -60,6 +60,7 @@
 #include <ctime>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include "error.h"
 #include "jsapi.h"
@@ -308,7 +309,7 @@ err_code_t MozJSScriptEngine::interrupt(wasm_mozjs_error_t* err) {
     return SM_OK;
 }
 
-bool MozJSScriptEngine::_parseFunctionSource(StringData raw,
+bool MozJSScriptEngine::_parseFunctionSource(std::string_view raw,
                                              std::string* out,
                                              wasm_mozjs_error_t* err) {
     ExecutionCheck chk(_cx, err);
@@ -395,7 +396,8 @@ err_code_t MozJSScriptEngine::createFunction(const uint8_t* src,
     }
 
     std::string parsed;
-    if (!_parseFunctionSource(StringData(reinterpret_cast<const char*>(src), len), &parsed, err))
+    if (!_parseFunctionSource(
+            std::string_view(reinterpret_cast<const char*>(src), len), &parsed, err))
         return err ? err->code : SM_E_COMPILE;
 
     std::string code_str;
@@ -1016,9 +1018,11 @@ bool MozJSScriptEngine::requiresOwnedObjects() const {
     return false;
 }
 
-void MozJSScriptEngine::newFunction(StringData raw, JS::MutableHandleValue out) {
+void MozJSScriptEngine::newFunction(std::string_view raw, JS::MutableHandleValue out) {
     // Use the cached helper (not the free parseJSFunctionOrExpression) because
     // __parseJSFunctionOrExpression is removed from the global during init.
+    JS::RootedObject global(_cx, JS::CurrentGlobalOrNull(_cx));
+
     std::string parsed;
     if (!_parseFunctionSource(raw, &parsed, nullptr))
         return;  // JS exception is pending

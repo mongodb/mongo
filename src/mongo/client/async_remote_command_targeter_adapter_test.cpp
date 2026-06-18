@@ -30,7 +30,6 @@
 #include "mongo/client/async_remote_command_targeter_adapter.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"

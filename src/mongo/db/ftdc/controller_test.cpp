@@ -30,7 +30,6 @@
 #include <boost/filesystem/path.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
@@ -53,6 +52,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -247,7 +247,8 @@ public:
     }
 };
 
-std::vector<BSONObj> insertNewSchemaDocuments(const std::vector<BSONObj>& docs, StringData role) {
+std::vector<BSONObj> insertNewSchemaDocuments(const std::vector<BSONObj>& docs,
+                                              std::string_view role) {
     std::vector<BSONObj> newDocs;
     for (const auto& doc : docs) {
         constexpr static auto dummyTs = Date_t::fromMillisSinceEpoch(1);

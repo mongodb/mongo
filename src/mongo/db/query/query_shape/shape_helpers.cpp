@@ -34,7 +34,10 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/query_shape_gen.h"
 
+#include <string_view>
+
 namespace mongo::shape_helpers {
+using namespace std::literals::string_view_literals;
 
 namespace {
 // SerializationContext used when computing QueryShapeHash.
@@ -44,7 +47,7 @@ const auto kSerializationContext =
                          SerializationContext::Prefix::ExcludePrefix};
 }  // namespace
 
-static constexpr StringData hintSpecialField = "$hint"_sd;
+static constexpr std::string_view hintSpecialField = "$hint"sv;
 // A "Flat" object is one with only top-level fields. We won't descend recursively to shapify any
 // sub-objects.
 BSONObj shapifyFlatObj(const BSONObj& obj,

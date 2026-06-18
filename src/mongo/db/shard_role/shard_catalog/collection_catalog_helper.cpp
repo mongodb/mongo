@@ -54,6 +54,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
@@ -67,6 +68,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangBeforeGettingNextCollection);
 
 namespace catalog {
+using namespace std::literals::string_view_literals;
 
 Status checkIfNamespaceExists(OperationContext* opCtx, const NamespaceString& nss) {
     auto catalog = CollectionCatalog::get(opCtx);
@@ -235,17 +237,17 @@ void modifyAllCollectionsMatching(OperationContext* opCtx,
 
 boost::optional<bool> getConfigDebugDump(const VersionContext& vCtx, const NamespaceString& nss) {
     static const std::array kConfigDumpCollections = {
-        "chunks"_sd,
-        "collections"_sd,
-        "databases"_sd,
-        "settings"_sd,
-        "shards"_sd,
-        "tags"_sd,
-        "version"_sd,
+        "chunks"sv,
+        "collections"sv,
+        "databases"sv,
+        "settings"sv,
+        "shards"sv,
+        "tags"sv,
+        "version"sv,
         // Authoritative shard-local catalog collections (config.shard.catalog.*).
-        "shard.catalog.databases"_sd,
-        "shard.catalog.collections"_sd,
-        "shard.catalog.chunks"_sd,
+        "shard.catalog.databases"sv,
+        "shard.catalog.collections"sv,
+        "shard.catalog.chunks"sv,
     };
 
     if (!nss.isConfigDB()) {
@@ -301,7 +303,7 @@ Status dropCollections(OperationContext* opCtx,
 }  // namespace
 
 void removeIndex(OperationContext* opCtx,
-                 StringData indexName,
+                 std::string_view indexName,
                  Collection* collection,
                  std::shared_ptr<IndexCatalogEntry> entry,
                  DataRemoval dataRemoval) {

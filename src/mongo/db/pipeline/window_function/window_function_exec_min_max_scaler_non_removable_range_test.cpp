@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/window_function/window_function_exec_min_max_scaler_non_removable_range.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -45,6 +44,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -53,6 +53,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 class WindowFunctionExecMinMaxScalerNonRemovableRangeTest : public AggregationContextFixture {
 public:
     WindowFunctionExecMinMaxScalerNonRemovableRange createForFieldPath(
@@ -192,7 +193,7 @@ DEATH_TEST_F(WindowFunctionExecMinMaxScalerNonRemovableRangeTestDeathTest,
              GetWindowValueThrowsWithNonNumericInput,
              "10487006") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
-        Document{{"a", Value("invalid_string"_sd)}, {"y", 1}, {"key", 1}},
+        Document{{"a", Value("invalid_string"sv)}, {"y", 1}, {"key", 1}},
         Document{{"a", 4}, {"y", 5}, {"key", 1}}};
     auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
@@ -216,13 +217,13 @@ DEATH_TEST_F(WindowFunctionExecMinMaxScalerNonRemovableRangeTestDeathTest,
         createRangeBounds(WindowBounds::Unbounded{}, Value(2)),
         &_tracker["output"],
         {Value(0), Value(1)});
-    mgr.getWindowValue(Document{{"a", Value("invalid_string"_sd)}, {"y", 1}, {"key", 1}});
+    mgr.getWindowValue(Document{{"a", Value("invalid_string"sv)}, {"y", 1}, {"key", 1}});
 }
 
 TEST_F(WindowFunctionExecMinMaxScalerNonRemovableRangeTest,
        UpdateWindowValueThrowsWithNonNumericInput) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
-        Document{{"a", Value("invalid_string"_sd)}, {"y", 1}, {"key", 1}},
+        Document{{"a", Value("invalid_string"sv)}, {"y", 1}, {"key", 1}},
         Document{{"a", 4}, {"y", 5}, {"key", 1}}};
     auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
@@ -247,7 +248,7 @@ TEST_F(WindowFunctionExecMinMaxScalerNonRemovableRangeTest,
         &_tracker["output"],
         {Value(0), Value(1)});
     ASSERT_THROWS_CODE(
-        mgr.getNext(Document{{"a", Value("invalid_string"_sd)}, {"y", 1}, {"key", 1}}),
+        mgr.getNext(Document{{"a", Value("invalid_string"sv)}, {"y", 1}, {"key", 1}}),
         AssertionException,
         10487004);
 }

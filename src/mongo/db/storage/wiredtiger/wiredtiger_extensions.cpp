@@ -29,11 +29,12 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/decorable.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -65,7 +66,7 @@ std::string WiredTigerExtensions::getOpenExtensionsConfig() const {
     return extensions.str();
 }
 
-void WiredTigerExtensions::addExtension(StringData extensionConfigStr) {
+void WiredTigerExtensions::addExtension(std::string_view extensionConfigStr) {
     _wtExtensions.emplace_back(std::string{extensionConfigStr});
 }
 
@@ -84,7 +85,7 @@ std::string SpillWiredTigerExtensions::getOpenExtensionsConfig() const {
     return extensions.str();
 }
 
-void SpillWiredTigerExtensions::addExtension(StringData extensionConfigStr) {
+void SpillWiredTigerExtensions::addExtension(std::string_view extensionConfigStr) {
     _wtExtensions.emplace_back(std::string{extensionConfigStr});
 }
 

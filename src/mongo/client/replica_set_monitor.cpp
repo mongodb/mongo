@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -98,7 +99,7 @@ void ReplicaSetMonitor::cleanup() {
     ReplicaSetMonitorManager::get()->removeAllMonitors();
 }
 
-std::function<void()> ReplicaSetMonitor::_getCleanupCallback(StringData name) {
+std::function<void()> ReplicaSetMonitor::_getCleanupCallback(std::string_view name) {
     return [n = std::string{name}] {
         LOGV2(5046701, "ReplicaSetMonitor cleanup callback invoked", "name"_attr = n);
         // This callback should never invoke ReplicaSetMonitorManager::removeMonitor() because it's

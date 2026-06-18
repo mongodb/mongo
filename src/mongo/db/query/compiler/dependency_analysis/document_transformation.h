@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/util/modules.h"
 
 #include <concepts>
+#include <string_view>
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/noncopyable.hpp>
@@ -88,15 +88,15 @@ private:
  */
 class PreservePath final : public DocumentOperation {
 public:
-    explicit PreservePath(StringData path) : _path(path) {}
+    explicit PreservePath(std::string_view path) : _path(path) {}
 
     /// The path being preserved.
-    StringData getPath() const {
+    std::string_view getPath() const {
         return _path;
     }
 
 private:
-    const StringData _path;
+    const std::string_view _path;
 };
 
 /**
@@ -137,10 +137,11 @@ enum class ModifiedPrefixPolicy {
  */
 class ModifyPath : public DocumentOperation {
 public:
-    ModifyPath(StringData path, ModifiedPrefixPolicy policy) : _path(path), _prefixPolicy(policy) {}
+    ModifyPath(std::string_view path, ModifiedPrefixPolicy policy)
+        : _path(path), _prefixPolicy(policy) {}
 
     /// The path being modified.
-    StringData getPath() const {
+    std::string_view getPath() const {
         return _path;
     }
 
@@ -169,7 +170,7 @@ public:
     }
 
 private:
-    const StringData _path;
+    const std::string_view _path;
     const ModifiedPrefixPolicy _prefixPolicy;
 };
 
@@ -182,15 +183,16 @@ private:
  */
 class RenamePath : public DocumentOperation {
 public:
-    RenamePath(StringData newPath, StringData oldPath) : _newPath(newPath), _oldPath(oldPath) {}
+    RenamePath(std::string_view newPath, std::string_view oldPath)
+        : _newPath(newPath), _oldPath(oldPath) {}
 
     /// The new name.
-    StringData getNewPath() const {
+    std::string_view getNewPath() const {
         return _newPath;
     }
 
     /// The old name.
-    StringData getOldPath() const {
+    std::string_view getOldPath() const {
         return _oldPath;
     }
 
@@ -207,8 +209,8 @@ public:
     virtual BSONDepthIndex getOldPathMaxArrayTraversals() const;
 
 private:
-    const StringData _newPath;
-    const StringData _oldPath;
+    const std::string_view _newPath;
+    const std::string_view _oldPath;
 };
 
 /**

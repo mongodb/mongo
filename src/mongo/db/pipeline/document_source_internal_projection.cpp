@@ -31,6 +31,8 @@
 
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 
+#include <string_view>
+
 namespace mongo {
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalProjection, DocumentSourceInternalProjection::id)
@@ -58,7 +60,7 @@ DocumentSourceInternalProjection::DocumentSourceInternalProjection(
       _projection(projection_ast::parseAndAnalyze(
           pExpCtx, _stageSpec.getSpec(), lookUpPolicies(_stageSpec.getPolicies()))) {}
 
-StringData DocumentSourceInternalProjection::getSourceName() const {
+std::string_view DocumentSourceInternalProjection::getSourceName() const {
     return kStageNameInternal;
 }
 

@@ -36,6 +36,8 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::extension {
 
 using DistributedPlanLogicHandle = OwnedHandle<::MongoExtensionDistributedPlanLogic>;
@@ -57,7 +59,7 @@ public:
     LogicalAggStageAPI(::MongoExtensionLogicalAggStage* ptr)
         : VTableAPI<::MongoExtensionLogicalAggStage>(ptr) {}
 
-    StringData getName() const;
+    std::string_view getName() const;
 
     BSONObj serialize() const;
 
@@ -94,14 +96,15 @@ public:
      * Evaluates the precondition of the rule identified by name. Return the precondition value.
      */
     bool evaluatePipelineRewriteRulePrecondition(
-        StringData ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext) const;
+        std::string_view ruleName,
+        MongoExtensionPipelineRewriteContext* pipelineRewriteContext) const;
 
     /**
      * Applies the transform of the rule identified by name. Returns true if pipeline was modified
      * and rule should be requeued in RBR engine.
      */
     bool evaluatePipelineRewriteRuleTransform(
-        StringData ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext);
+        std::string_view ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext);
 
     /**
      * Returns the filter predicate applied by this stage for shard targeting. Returns an empty

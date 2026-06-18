@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/init.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_change_notifier.h"
 #include "mongo/db/server_parameter.h"
@@ -42,6 +41,7 @@
 #include <functional>
 #include <memory>
 #include <span>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -59,12 +59,12 @@ public:
     struct Entry {
         using ReadGlobalFn = std::function<QueryKnobValue()>;
         using FromBSONFn = QueryKnobValue (*)(const BSONElement&);
-        using ToBSONFn = void (*)(BSONObjBuilder&, StringData, const QueryKnobValue&);
+        using ToBSONFn = void (*)(BSONObjBuilder&, std::string_view, const QueryKnobValue&);
         using AttachOnUpdateFn = std::function<void(const QueryKnobChangeNotifier*)>;
 
         template <auto& global, typename T>
         requires AtomicLoadable<decltype(global)>
-        static Entry create(QueryKnob<T> knob, StringData name) {
+        static Entry create(QueryKnob<T> knob, std::string_view name) {
             using SPT = IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime,
                                                       std::remove_cvref_t<decltype(global)>>;
             return create<SPT>(knob, name);
@@ -72,7 +72,7 @@ public:
 
         template <typename SPT, typename T>
         requires std::derived_from<SPT, ServerParameter>
-        static Entry create(QueryKnob<T> knob, StringData name) {
+        static Entry create(QueryKnob<T> knob, std::string_view name) {
             auto* param =
                 dynamic_cast<SPT*>(ServerParameterSet::getNodeParameterSet()->getIfExists(name));
             FromBSONFn fromBSON = detail::ConverterTraits<T>::fromBSON;
@@ -111,7 +111,7 @@ public:
         AttachOnUpdateFn attachOnUpdate = nullptr;
 
         // Non-owning, points into `param`'s annotation BSON (static lifetime).
-        StringData wireName;
+        std::string_view wireName;
         bool pqsSettable;
         // Present for PQS knobs only.
         boost::optional<multiversion::FeatureCompatibilityVersion> minFcv;
@@ -129,7 +129,7 @@ public:
     /**
      * PQS-settable knobs only; boost::none for non-PQS or unknown name.
      */
-    boost::optional<QueryKnobId> getKnobIdForName(StringData wireName) const;
+    boost::optional<QueryKnobId> getKnobIdForName(std::string_view wireName) const;
 
     const Entry& entry(QueryKnobId id) const;
     std::span<const Entry> entries() const;

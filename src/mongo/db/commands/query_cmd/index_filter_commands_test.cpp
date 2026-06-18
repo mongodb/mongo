@@ -34,7 +34,6 @@
 #include "mongo/db/commands/query_cmd/index_filter_commands.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
@@ -64,6 +63,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -482,7 +482,7 @@ TEST_F(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("query"), fromjson("{a: 1, b: 1}"));
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("sort"), fromjson("{a: -1}"));
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("projection"), fromjson("{_id: 0, a: 1}"));
-    ASSERT_EQUALS(StringData(filters[0].getObjectField("collation").getStringField("locale")),
+    ASSERT_EQUALS(std::string_view(filters[0].getObjectField("collation").getStringField("locale")),
                   "mock_reverse_string");
 
     // Replacing the index filter for the same query shape ({a: 1, b: 1} and {b: 2, a: 3} share same
@@ -554,7 +554,7 @@ TEST_F(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("query"), fromjson("{a: 'foo'}"));
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("sort"), fromjson("{}"));
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("projection"), fromjson("{}"));
-    ASSERT_EQUALS(StringData(filters[0].getObjectField("collation").getStringField("locale")),
+    ASSERT_EQUALS(std::string_view(filters[0].getObjectField("collation").getStringField("locale")),
                   "mock_reverse_string");
 
     // Setting a filter will remove the cache entry associated with the query so now the plan cache

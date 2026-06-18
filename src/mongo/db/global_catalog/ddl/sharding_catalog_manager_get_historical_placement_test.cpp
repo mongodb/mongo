@@ -46,6 +46,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -54,6 +55,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const Timestamp kDawnOfTime(0, 1);
 
@@ -286,7 +288,8 @@ public:
      * Retrieves the historical placement for the specified namespace and timestamp in
      * 'ignoreRemovedShards' mode.
      */
-    HistoricalPlacement getHistoricalPlacementIgnoreRemovedShards(StringData nss, Timestamp ts) {
+    HistoricalPlacement getHistoricalPlacementIgnoreRemovedShards(std::string_view nss,
+                                                                  Timestamp ts) {
         return shardingCatalogManager().getHistoricalPlacement(
             operationContext(),
             nss.empty() ? boost::optional<NamespaceString>()
@@ -851,7 +854,7 @@ TEST_F(GetHistoricalPlacementTestFixture,
     // Execute the specified callback function while capturing logs, and validate all query-related
     // log messages for the expected output.
     auto runWithLogCaptureAndValidateLogMessages = [&](const std::function<void()>& callback,
-                                                       StringData expectedNss,
+                                                       std::string_view expectedNss,
                                                        const BSONObj& expectedNssMatch) {
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kSharding,
                                                                   logv2::LogSeverity::Debug(3)};
@@ -875,7 +878,7 @@ TEST_F(GetHistoricalPlacementTestFixture,
         {
             const auto& logLine = logLines[0];
             const auto& pipeline = logLine["pipeline"].Array();
-            ASSERT_EQUALS("$facet"_sd, pipeline[0].Obj().firstElementFieldNameStringData());
+            ASSERT_EQUALS("$facet"sv, pipeline[0].Obj().firstElementFieldNameStringData());
         }
 
         // The query issued in ignoreRemovedShards mode by
@@ -930,7 +933,7 @@ TEST_F(GetHistoricalPlacementTestFixture,
                                       .value,
                                   historicalPlacement);
         },
-        "db.collection1"_sd,
+        "db.collection1"sv,
         BSON("$regex" << "^db(\\.collection1)?$"));
 
 
@@ -947,7 +950,7 @@ TEST_F(GetHistoricalPlacementTestFixture,
                                       .value,
                                   historicalPlacement);
         },
-        "db"_sd,
+        "db"sv,
         BSON("$regex" << "^db(\\..*)?$"));
 
     // Run placementHistory query for an all-databases placement.

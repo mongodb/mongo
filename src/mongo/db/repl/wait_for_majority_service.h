@@ -46,6 +46,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -127,7 +128,7 @@ private:
 
     virtual Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) = 0;
 
-    virtual StringData _getReadOrWrite() const = 0;
+    virtual std::string_view _getReadOrWrite() const = 0;
 
     // The pool of threads available to wait on opTimes and cancel existing requests.
     std::shared_ptr<ThreadPool> _pool;
@@ -160,7 +161,7 @@ private:
 class WaitForMajorityServiceForReadImpl : public WaitForMajorityServiceImplBase {
 private:
     Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) final;
-    StringData _getReadOrWrite() const final {
+    std::string_view _getReadOrWrite() const final {
         return "Read"_sd;
     }
 };
@@ -168,7 +169,7 @@ private:
 class WaitForMajorityServiceForWriteImpl : public WaitForMajorityServiceImplBase {
 private:
     Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) final;
-    StringData _getReadOrWrite() const final {
+    std::string_view _getReadOrWrite() const final {
         return "Write"_sd;
     }
 };

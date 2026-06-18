@@ -43,9 +43,10 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 TEST(InternalSchemaUniqueItemsMatchExpression, EquivalentFunctionTest) {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems1("foo"_sd);
-    InternalSchemaUniqueItemsMatchExpression uniqueItems2("bar"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems1("foo"sv);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems2("bar"sv);
 
     auto uniqueItems3 = uniqueItems1.clone();
     ASSERT_TRUE(uniqueItems1.equivalent(uniqueItems3.get()));
@@ -55,7 +56,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, EquivalentFunctionTest) {
 DEATH_TEST_REGEX(InternalSchemaUniqueItemsMatchExpressionDeathTest,
                  GetChildFailsIndexLargerThanZero,
                  "Tripwire assertion.*6400219") {
-    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"sv);
 
     ASSERT_EQ(uniqueItems.numChildren(), 0);
     ASSERT_THROWS_CODE(uniqueItems.getChild(0), AssertionException, 6400219);

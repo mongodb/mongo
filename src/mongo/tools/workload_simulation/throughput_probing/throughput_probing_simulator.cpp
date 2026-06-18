@@ -34,11 +34,13 @@
 #include "mongo/db/admission/execution_control/throughput_probing_gen.h"
 #include "mongo/db/admission/ticketing/ticketholder.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::workload_simulation {
 
-ThroughputProbing::ThroughputProbing(StringData workloadName)
+ThroughputProbing::ThroughputProbing(std::string_view workloadName)
     : Simulation("ThroughputProbing", workloadName) {}
 
 void ThroughputProbing::setup() {

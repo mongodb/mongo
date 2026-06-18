@@ -39,6 +39,8 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -54,7 +56,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalInhibitOptimization,
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalInhibitOptimization,
                             DocumentSourceInternalInhibitOptimization::id);
 
-constexpr StringData DocumentSourceInternalInhibitOptimization::kStageName;
+constexpr std::string_view DocumentSourceInternalInhibitOptimization::kStageName;
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalInhibitOptimization::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

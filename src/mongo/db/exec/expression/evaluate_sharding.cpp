@@ -58,6 +58,7 @@
 namespace mongo {
 
 namespace exec::expression {
+using namespace std::literals::string_view_literals;
 
 Value evaluate(const ExpressionInternalOwningShard& expr,
                const Document& root,
@@ -80,9 +81,9 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
             input.getType() == BSONType::object);
 
     // Retrieve the values from the incoming document.
-    Value nsUnchecked = input["ns"_sd];
-    Value shardVersionUnchecked = input["shardVersion"_sd];
-    Value shardKeyValUnchecked = input["shardKeyVal"_sd];
+    Value nsUnchecked = input["ns"sv];
+    Value shardVersionUnchecked = input["shardVersion"sv];
+    Value shardKeyValUnchecked = input["shardKeyVal"sv];
 
     uassert(9567001,
             str::stream() << opName << " requires 'ns' argument to be an string",

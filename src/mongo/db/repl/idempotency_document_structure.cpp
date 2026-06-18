@@ -32,15 +32,17 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
 
+#include <string_view>
 #include <utility>
 
 namespace mongo {
 
-DocumentStructureEnumeratorConfig::DocumentStructureEnumeratorConfig(std::set<StringData> fields_,
-                                                                     std::size_t depth_,
-                                                                     std::size_t length_,
-                                                                     bool skipSubDocs_,
-                                                                     bool skipSubArrs_)
+DocumentStructureEnumeratorConfig::DocumentStructureEnumeratorConfig(
+    std::set<std::string_view> fields_,
+    std::size_t depth_,
+    std::size_t length_,
+    bool skipSubDocs_,
+    bool skipSubArrs_)
     : fields(std::move(fields_)),
       depth(depth_),
       length(length_),
@@ -130,9 +132,9 @@ void DocumentStructureEnumerator::_enumerateDocs(const DocumentStructureEnumerat
     }
 
     // Create a copy of the fields we have.
-    std::set<StringData> remainingFields(config.fields);
+    std::set<std::string_view> remainingFields(config.fields);
     // Pop the first field arbitrarily.
-    StringData field = *remainingFields.begin();
+    std::string_view field = *remainingFields.begin();
     remainingFields.erase(remainingFields.begin());
 
     DocumentStructureEnumeratorConfig nextFieldConfig(config);

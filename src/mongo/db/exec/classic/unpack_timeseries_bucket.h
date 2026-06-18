@@ -39,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 /**
@@ -48,7 +49,7 @@ namespace mongo {
  */
 class UnpackTimeseriesBucket final : public PlanStage {
 public:
-    static constexpr StringData kStageType = "UNPACK_BUCKET"_sd;
+    static constexpr std::string_view kStageType = "UNPACK_BUCKET"_sd;
 
     UnpackTimeseriesBucket(ExpressionContext* expCtx,
                            WorkingSet* ws,

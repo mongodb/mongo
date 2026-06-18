@@ -31,7 +31,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -41,10 +40,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 BranchStage::BranchStage(std::unique_ptr<PlanStage> inputThen,
                          std::unique_ptr<PlanStage> inputElse,
                          std::unique_ptr<EExpression> filter,
@@ -53,7 +54,7 @@ BranchStage::BranchStage(std::unique_ptr<PlanStage> inputThen,
                          value::SlotVector outputVals,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
-    : PlanStage("branch"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("branch"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _filter(std::move(filter)),
       _inputThenVals(std::move(inputThenVals)),
       _inputElseVals(std::move(inputElseVals)),

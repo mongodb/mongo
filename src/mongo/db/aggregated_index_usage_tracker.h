@@ -33,6 +33,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
+#include <array>
 #include <functional>
 #include <string>
 

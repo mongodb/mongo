@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -54,22 +54,22 @@ enum UStringPrepOptions {
  * Attempt to apply RFC4013 saslPrep to the target string.
  * Normalizes unicode sequences for SCRAM authentication.
  */
-StatusWith<std::string> icuSaslPrep(StringData str, UStringPrepOptions = kUStringPrepDefault);
+StatusWith<std::string> icuSaslPrep(std::string_view str, UStringPrepOptions = kUStringPrepDefault);
 
 /**
  * Attempt to apply RFC4518 string prep to the target string, this normalizes an X509 DN
  * so it can be compared against other X509 DNs
  */
-StatusWith<std::string> icuX509DNPrep(StringData str);
+StatusWith<std::string> icuX509DNPrep(std::string_view str);
 
 // Similar to mk_wcswidth, but use the larger unicode database for character lookup.
-int icuGetStringWidth(StringData str, bool ambiguousAsFullWidth, bool expandEmojiSequence);
+int icuGetStringWidth(std::string_view str, bool ambiguousAsFullWidth, bool expandEmojiSequence);
 
 /**
  * Returns a Unicode case-folded copy of `str`.
  * Case folding maps characters to a canonical lowercase form suitable for case-insensitive
  * comparison.
  */
-std::string icuCaseFold(StringData str);
+std::string icuCaseFold(std::string_view str);
 
 }  // namespace mongo

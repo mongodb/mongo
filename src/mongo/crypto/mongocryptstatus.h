@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/mongocrypt_definitions.h"
 #include "mongo/util/modules.h"
 

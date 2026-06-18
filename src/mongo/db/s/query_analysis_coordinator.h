@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/global_catalog/type_mongos.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -46,6 +45,7 @@
 
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -132,7 +132,7 @@ public:
      * configurations for the sampler.
      */
     std::vector<CollectionQueryAnalyzerConfiguration> getNewConfigurationsForSampler(
-        OperationContext* opCtx, StringData samplerName, double numQueriesExecutedPerSecond);
+        OperationContext* opCtx, std::string_view samplerName, double numQueriesExecutedPerSecond);
 
 
     CollectionQueryAnalyzerConfigurationMap getConfigurationsForTest() const {

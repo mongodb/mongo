@@ -33,6 +33,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -44,7 +46,7 @@ namespace {
 StringMap<Rounder> rounderMap;
 }  // namespace
 
-void GranularityRounder::registerGranularityRounder(StringData name, Rounder rounder) {
+void GranularityRounder::registerGranularityRounder(std::string_view name, Rounder rounder) {
     auto it = rounderMap.find(name);
     massert(40256,
             str::stream() << "Duplicate granularity rounder (" << name << ") registered.",
@@ -53,7 +55,7 @@ void GranularityRounder::registerGranularityRounder(StringData name, Rounder rou
 }
 
 boost::intrusive_ptr<GranularityRounder> GranularityRounder::getGranularityRounder(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData granularity) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, std::string_view granularity) {
     auto it = rounderMap.find(granularity);
     uassert(40257,
             str::stream() << "Unknown rounding granularity '" << granularity << "'",

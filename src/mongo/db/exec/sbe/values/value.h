@@ -39,7 +39,6 @@
 // IWYU pragma: no_include "emmintrin.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -76,6 +75,7 @@
 #include <ostream>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -447,7 +447,7 @@ std::string printTagAndVal(const std::pair<TypeTags, Value>& value);  // debuggi
  * guarantees that the result will be exactlty -1, 0, or 1, which is important, because not all
  * comparison functions make that guarantee.
  *
- * The StringData::compare(basic_string_view s) function, for example, only promises that it
+ * The std::string_view::compare(basic_string_view s) function, for example, only promises that it
  * will return a value less than 0 in the case that 'this' is less than 's,' whereas we want to
  * return exactly -1.
  */
@@ -1361,7 +1361,7 @@ public:
         }
     }
 
-    void push_back_raw(StringData name, TypeTags tag, Value val) {
+    void push_back_raw(std::string_view name, TypeTags tag, Value val) {
         if (tag != TypeTags::Nothing) {
             ValueGuard guard{tag, val};
             // Reserve space in all vectors, they are the same size. We arbitrarily picked _typeTags
@@ -1382,7 +1382,7 @@ public:
         }
     }
 
-    TagValueView getField(StringData field) {
+    TagValueView getField(std::string_view field) {
         for (size_t idx = 0; idx < _typeTags.size(); ++idx) {
             if (_names[idx] == field) {
                 return {_typeTags[idx], _values[idx]};
@@ -1391,7 +1391,7 @@ public:
         return {TypeTags::Nothing, 0};
     }
 
-    bool contains(StringData field) const {
+    bool contains(std::string_view field) const {
         return std::find(_names.begin(), _names.end(), field) != _names.end();
     }
 
@@ -1945,12 +1945,12 @@ struct TinyStrHelpers {
 /**
  * getStringView() should be preferred over getRawStringView() where possible.
  */
-MONGO_MOD_NEEDS_REPLACEMENT inline StringData getStringView(TypeTags tag,
-                                                            const Value& val) noexcept {
+MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view getStringView(TypeTags tag,
+                                                                  const Value& val) noexcept {
     return {getRawStringView(tag, val), getStringLength(tag, val)};
 }
 
-inline StringData getStringOrSymbolView(TypeTags tag, const Value& val) noexcept {
+inline std::string_view getStringOrSymbolView(TypeTags tag, const Value& val) noexcept {
     tag = (tag == TypeTags::bsonSymbol) ? TypeTags::StringBig : tag;
     return {getRawStringView(tag, val), getStringLength(tag, val)};
 }
@@ -2030,7 +2030,7 @@ inline CellBlock* getCellBlock(Value v) {
     return reinterpret_cast<CellBlock*>(v);
 }
 
-inline bool canUseSmallString(StringData input) {
+inline bool canUseSmallString(std::string_view input) {
     auto length = input.size();
     auto ptr = input.data();
     auto end = ptr + length;
@@ -2041,7 +2041,7 @@ inline bool canUseSmallString(StringData input) {
  * Callers must check that canUseSmallString() returns true before calling this function.
  * makeNewString() should be preferred over makeSmallString() where possible.
  */
-inline std::pair<TypeTags, Value> makeSmallString(StringData input) {
+inline std::pair<TypeTags, Value> makeSmallString(std::string_view input) {
     dassert(canUseSmallString(input));
 
     Value smallString{0};
@@ -2051,7 +2051,7 @@ inline std::pair<TypeTags, Value> makeSmallString(StringData input) {
     return {TypeTags::StringSmall, smallString};
 }
 
-inline std::pair<TypeTags, Value> makeBigString(StringData input) {
+inline std::pair<TypeTags, Value> makeBigString(std::string_view input) {
     auto len = input.size();
     auto ptr = input.data();
 
@@ -2065,7 +2065,7 @@ inline std::pair<TypeTags, Value> makeBigString(StringData input) {
     return {TypeTags::StringBig, reinterpret_cast<Value>(buf)};
 }
 
-inline std::pair<TypeTags, Value> makeNewString(StringData input) {
+inline std::pair<TypeTags, Value> makeNewString(std::string_view input) {
     if (canUseSmallString(input)) {
         return makeSmallString(input);
     } else {
@@ -2073,7 +2073,7 @@ inline std::pair<TypeTags, Value> makeNewString(StringData input) {
     }
 }
 
-inline std::pair<TypeTags, Value> makeNewBsonSymbol(StringData input) {
+inline std::pair<TypeTags, Value> makeNewBsonSymbol(std::string_view input) {
     auto [_, strVal] = makeBigString(input);
     return {TypeTags::bsonSymbol, strVal};
 }
@@ -2265,25 +2265,25 @@ struct MONGO_MOD_NEEDS_REPLACEMENT BsonRegex {
         return pattern.size() + sizeof(char) + flags.size() + sizeof(char);
     }
 
-    StringData pattern;
-    StringData flags;
+    std::string_view pattern;
+    std::string_view flags;
 };
 
 inline BsonRegex getBsonRegexView(Value val) noexcept {
     return BsonRegex(getRawPointerView(val));
 }
 
-std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags);
+std::pair<TypeTags, Value> makeNewBsonRegex(std::string_view pattern, std::string_view flags);
 
 inline std::pair<TypeTags, Value> makeCopyBsonRegex(const BsonRegex& regex) {
     return makeNewBsonRegex(regex.pattern, regex.flags);
 }
 
-MONGO_MOD_NEEDS_REPLACEMENT inline StringData getBsonJavascriptView(Value val) noexcept {
+MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view getBsonJavascriptView(Value val) noexcept {
     return getStringView(TypeTags::StringBig, val);
 }
 
-std::pair<TypeTags, Value> makeCopyBsonJavascript(StringData code);
+std::pair<TypeTags, Value> makeCopyBsonJavascript(std::string_view code);
 
 /**
  * The BsonDBPointer class is used to represent the DBRef BSON type. DBRefs consist of a namespace
@@ -2305,7 +2305,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT BsonDBPointer {
         return sizeof(uint32_t) + ns.size() + sizeof(char) + sizeof(value::ObjectIdType);
     }
 
-    StringData ns;
+    std::string_view ns;
     const uint8_t* id{nullptr};
 };
 
@@ -2313,7 +2313,7 @@ inline BsonDBPointer getBsonDBPointerView(Value val) noexcept {
     return BsonDBPointer(getRawPointerView(val));
 }
 
-std::pair<TypeTags, Value> makeNewBsonDBPointer(StringData ns, const uint8_t* id);
+std::pair<TypeTags, Value> makeNewBsonDBPointer(std::string_view ns, const uint8_t* id);
 
 inline std::pair<TypeTags, Value> makeCopyBsonDBPointer(const BsonDBPointer& dbptr) {
     return makeNewBsonDBPointer(dbptr.ns, dbptr.id);
@@ -2342,7 +2342,7 @@ struct BsonCodeWScope {
     }
 
     uint32_t numBytes{0};
-    StringData code;
+    std::string_view code;
     const char* scope{nullptr};
 };
 
@@ -2350,7 +2350,7 @@ inline BsonCodeWScope getBsonCodeWScopeView(Value val) noexcept {
     return BsonCodeWScope(getRawPointerView(val));
 }
 
-std::pair<TypeTags, Value> makeNewBsonCodeWScope(StringData code, const char* scope);
+std::pair<TypeTags, Value> makeNewBsonCodeWScope(std::string_view code, const char* scope);
 
 inline std::pair<TypeTags, Value> makeCopyBsonCodeWScope(const BsonCodeWScope& cws) {
     return makeNewBsonCodeWScope(cws.code, cws.scope);
@@ -2647,7 +2647,7 @@ public:
         }
     }
     TagValueView getViewOfValue() const;
-    StringData getFieldName() const;
+    std::string_view getFieldName() const;
 
     bool atEnd() const {
         if (_object) {

@@ -31,7 +31,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,6 +55,7 @@
 #include <queue>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -548,7 +548,7 @@ private:
             void* addr = stack.frames[j];
             const auto& meta = metaGen.load(addr);
             if (meta.symbol()) {
-                if (StringData name = meta.symbol().name(); !name.empty()) {
+                if (std::string_view name = meta.symbol().name(); !name.empty()) {
                     // Upgrade frameString to symbol name.
                     frameString.assign(name.begin(), name.end());
                     if (char* dm = demangler(frameString.c_str())) {

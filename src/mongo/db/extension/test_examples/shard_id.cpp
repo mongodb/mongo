@@ -36,6 +36,10 @@
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 
+#include <string_view>
+
+using namespace std::literals::string_view_literals;
+
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
@@ -49,7 +53,7 @@ using namespace mongo;
  *   {$testShardId: {runOnRouter: true}}     - runs on mongos via DistributedPlanLogic
  */
 
-static constexpr auto kRunOnRouterField = "runOnRouter"_sd;
+static constexpr auto kRunOnRouterField = "runOnRouter"sv;
 
 class ShardIdExecStage : public sdk::ExecAggStageTransform {
 public:

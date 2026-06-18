@@ -29,17 +29,19 @@
 
 #include "mongo/db/exec/sbe/stages/agg_project.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 AggProjectStage::AggProjectStage(std::unique_ptr<PlanStage> input,
                                  AggExprVector aggExprPairs,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
-    : PlanStage("agg_project"_sd, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
+    : PlanStage("agg_project"sv, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
       _projects(std::move(aggExprPairs)) {
     _children.emplace_back(std::move(input));
 }

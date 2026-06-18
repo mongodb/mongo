@@ -33,11 +33,13 @@
 #include "mongo/util/str.h"
 
 #include <limits>
+#include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 TEST(Builder, String1) {
     const char* big = "eliot was here";
-    StringData small(big, 5);
+    std::string_view small(big, 5);
     ASSERT_EQUALS(small, "eliot");
 
     BufBuilder bb;
@@ -51,7 +53,7 @@ TEST(Builder, String1) {
 }
 
 TEST(Builder, StringNulByteHandling) {
-    auto hasNulByte = "hello\0world"_sd;
+    auto hasNulByte = "hello\0world"sv;
 
     {
         // appendCStr() throws without changing bb;
@@ -64,7 +66,7 @@ TEST(Builder, StringNulByteHandling) {
         // appendStrBytes appends embedded NUL without terminator.
         BufBuilder bb;
         bb.appendStrBytes(hasNulByte);
-        ASSERT_EQ(StringData(bb.buf(), bb.len()), hasNulByte);
+        ASSERT_EQ(std::string_view(bb.buf(), bb.len()), hasNulByte);
     }
 
     {
@@ -73,8 +75,8 @@ TEST(Builder, StringNulByteHandling) {
         bb.appendStrBytesAndNul(hasNulByte);
         // Since hasNulByte points to a string literal, we know that
         // *(hasNulByte.data() + hasNulByte.size()) is valid and == '\0'
-        ASSERT_EQ(StringData(bb.buf(), bb.len()),
-                  StringData(hasNulByte.data(), hasNulByte.size() + 1));
+        ASSERT_EQ(std::string_view(bb.buf(), bb.len()),
+                  std::string_view(hasNulByte.data(), hasNulByte.size() + 1));
     }
 }
 

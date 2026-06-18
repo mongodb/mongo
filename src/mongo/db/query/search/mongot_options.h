@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -45,7 +46,7 @@ namespace mongo {
  */
 struct MONGO_MOD_PUB MongotParams {
     static Status onSetHost(const std::string&);
-    static Status onValidateHost(StringData str, const boost::optional<TenantId>&);
+    static Status onValidateHost(std::string_view str, const boost::optional<TenantId>&);
 
     MongotParams();
 

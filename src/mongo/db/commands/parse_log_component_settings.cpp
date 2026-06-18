@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -40,13 +39,14 @@
 #include "mongo/util/str.h"
 
 #include <deque>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
-StatusWith<int> tryCoerceVerbosity(BSONElement elem, StringData parentComponentDottedName) {
+StatusWith<int> tryCoerceVerbosity(BSONElement elem, std::string_view parentComponentDottedName) {
     int newVerbosityLevel;
     Status coercionStatus = elem.tryCoerce(&newVerbosityLevel);
     if (!coercionStatus.isOK()) {
@@ -72,7 +72,7 @@ StatusWith<int> tryCoerceVerbosity(BSONElement elem, StringData parentComponentD
  * Looks up a component by its short name, or returns kNumLogComponents
  * if the shortName is invalid
  */
-logv2::LogComponent _getComponentForShortName(StringData shortName) {
+logv2::LogComponent _getComponentForShortName(std::string_view shortName) {
     for (int i = 0; i < int(logv2::LogComponent::kNumLogComponents); ++i) {
         logv2::LogComponent component = static_cast<logv2::LogComponent::Value>(i);
         if (component.getShortName() == shortName)
@@ -110,7 +110,7 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
             levelsToSet.push_back((LogComponentSetting(parentComponent, swVerbosity.getValue())));
             continue;
         }
-        const StringData shortName = elem.fieldNameStringData();
+        const std::string_view shortName = elem.fieldNameStringData();
         const logv2::LogComponent curr = _getComponentForShortName(shortName);
 
         if (curr == logv2::LogComponent::kNumLogComponents || curr.parent() != parentComponent) {

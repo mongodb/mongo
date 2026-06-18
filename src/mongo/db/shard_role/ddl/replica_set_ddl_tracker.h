@@ -37,13 +37,14 @@
 #include "mongo/util/string_map.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
 class MONGO_MOD_PRIVATE ReplicaSetDDLHook {
 public:
     virtual ~ReplicaSetDDLHook() = default;
-    virtual StringData getName() const = 0;
+    virtual std::string_view getName() const = 0;
     virtual void onBeginDDL(OperationContext* opCtx, const std::vector<NamespaceString>& nss) = 0;
     virtual void onEndDDL(OperationContext* opCtx, const std::vector<NamespaceString>& nss) = 0;
 };
@@ -72,7 +73,7 @@ public:
      * at startup. Since all services live for the lifetime of the mongod process (unlike their
      * Instance objects), there's no concern about the returned pointer becoming invalid.
      */
-    ReplicaSetDDLHook* lookupHookByName(StringData hookName) const;
+    ReplicaSetDDLHook* lookupHookByName(std::string_view hookName) const;
 
     /**
      * Scoped object which calls onBeginDDL for all hooks in the constructor and onEndDDL for
@@ -82,12 +83,12 @@ public:
     public:
         ScopedReplicaSetDDL(OperationContext* opCtx,
                             const std::vector<NamespaceString>& namespaces,
-                            StringData ddlName = "",
+                            std::string_view ddlName = "",
                             const ReplicaSetDDLOptions& options = {});
         ~ScopedReplicaSetDDL();
 
     private:
-        void acquireDDLLocks(OperationContext* opCtx, StringData reason);
+        void acquireDDLLocks(OperationContext* opCtx, std::string_view reason);
 
         const ReplicaSetDDLTracker* const _ddlTracker;
         OperationContext* const _opCtx;

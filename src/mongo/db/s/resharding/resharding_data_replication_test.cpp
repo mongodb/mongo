@@ -30,7 +30,6 @@
 #include "mongo/db/s/resharding/resharding_data_replication.h"
 
 #include "mongo/base/counter.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/basic_types_gen.h"
@@ -71,6 +70,7 @@
 
 #include <ostream>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -254,8 +254,8 @@ private:
             ComparableChunkVersion::makeComparableChunkVersion(version));
     }
 
-    const StringData _currentShardKey = "currentShardKey";
-    const StringData _newShardKey = "newShardKey";
+    const std::string_view _currentShardKey = "currentShardKey";
+    const std::string_view _newShardKey = "newShardKey";
 
     const NamespaceString _sourceNss =
         NamespaceString::createNamespaceString_forTest("testDb", "testColl");

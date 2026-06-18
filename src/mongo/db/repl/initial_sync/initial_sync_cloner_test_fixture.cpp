@@ -30,7 +30,6 @@
 #include "mongo/db/repl/initial_sync/initial_sync_cloner_test_fixture.h"
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/initial_sync/repl_sync_shared_data.h"

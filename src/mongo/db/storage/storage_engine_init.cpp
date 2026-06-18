@@ -57,6 +57,7 @@
 #include <exception>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/filesystem/path.hpp>
@@ -260,11 +261,11 @@ void registerStorageEngine(ServiceContext* service,
     storageFactories(service).emplace(name, std::move(factory));
 }
 
-bool isRegisteredStorageEngine(ServiceContext* service, StringData name) {
+bool isRegisteredStorageEngine(ServiceContext* service, std::string_view name) {
     return getFactoryForStorageEngine(service, name);
 }
 
-StorageEngine::Factory* getFactoryForStorageEngine(ServiceContext* service, StringData name) {
+StorageEngine::Factory* getFactoryForStorageEngine(ServiceContext* service, std::string_view name) {
     const auto result = storageFactories(service).find(std::string{name});
     if (result == storageFactories(service).end()) {
         return nullptr;
@@ -280,7 +281,7 @@ Status validateStorageOptions(
     BSONObjIterator storageIt(storageEngineOptions);
     while (storageIt.more()) {
         BSONElement storageElement = storageIt.next();
-        StringData storageEngineName = storageElement.fieldNameStringData();
+        std::string_view storageEngineName = storageElement.fieldNameStringData();
         if (storageElement.type() != BSONType::object) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "'storageEngine." << storageElement.fieldNameStringData()
@@ -301,11 +302,11 @@ Status validateStorageOptions(
     return Status::OK();
 }
 
-std::vector<StringData> getStorageEngineNames(ServiceContext* svcCtx) {
+std::vector<std::string_view> getStorageEngineNames(ServiceContext* svcCtx) {
     const auto& factories = storageFactories(svcCtx);
-    std::vector<StringData> ret;
+    std::vector<std::string_view> ret;
     std::transform(factories.begin(), factories.end(), std::back_inserter(ret), [](auto& it) {
-        return StringData(it.first);
+        return std::string_view(it.first);
     });
     return ret;
 }

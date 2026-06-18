@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/unittest/death_test.h"
@@ -38,8 +37,12 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
+using namespace std::literals::string_view_literals;
+
+using namespace std::literals::string_view_literals;
 namespace mongo {
 
 TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
@@ -50,7 +53,7 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
     metadata.setGeoNearDistance(3.2);
     metadata.setGeoNearPoint(Value{BSON_ARRAY(1 << 2)});
     metadata.setSearchScore(5.4);
-    metadata.setSearchHighlights(Value{"foo"_sd});
+    metadata.setSearchHighlights(Value{"foo"sv});
     metadata.setIndexKey(BSON("b" << 1));
     metadata.setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
@@ -76,7 +79,7 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
     ASSERT_EQ(deserialized.getGeoNearDistance(), 3.2);
     ASSERT_VALUE_EQ(deserialized.getGeoNearPoint(), Value{BSON_ARRAY(1 << 2)});
     ASSERT_EQ(deserialized.getSearchScore(), 5.4);
-    ASSERT_VALUE_EQ(deserialized.getSearchHighlights(), Value{"foo"_sd});
+    ASSERT_VALUE_EQ(deserialized.getSearchHighlights(), Value{"foo"sv});
     ASSERT_BSONOBJ_EQ(deserialized.getIndexKey(), BSON("b" << 1));
     ASSERT_BSONOBJ_EQ(deserialized.getSearchScoreDetails(), BSON("scoreDetails" << "foo"));
     ASSERT_BSONOBJ_EQ(deserialized.getSearchSortValues(), BSON("a" << 1));
@@ -147,7 +150,7 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
     ASSERT_TRUE(metadata.hasSearchScore());
 
     ASSERT_FALSE(metadata.hasSearchHighlights());
-    metadata.setSearchHighlights(Value{"foo"_sd});
+    metadata.setSearchHighlights(Value{"foo"sv});
     ASSERT_TRUE(metadata.hasSearchHighlights());
 
     ASSERT_FALSE(metadata.hasIndexKey());
@@ -184,7 +187,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     metadata.setGeoNearDistance(3.2);
     metadata.setGeoNearPoint(Value{BSON_ARRAY(1 << 2)});
     metadata.setSearchScore(5.4);
-    metadata.setSearchHighlights(Value{"foo"_sd});
+    metadata.setSearchHighlights(Value{"foo"sv});
     metadata.setIndexKey(BSON("b" << 1));
     metadata.setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
@@ -204,7 +207,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     ASSERT_EQ(moveConstructed.getGeoNearDistance(), 3.2);
     ASSERT_VALUE_EQ(moveConstructed.getGeoNearPoint(), Value{BSON_ARRAY(1 << 2)});
     ASSERT_EQ(moveConstructed.getSearchScore(), 5.4);
-    ASSERT_VALUE_EQ(moveConstructed.getSearchHighlights(), Value{"foo"_sd});
+    ASSERT_VALUE_EQ(moveConstructed.getSearchHighlights(), Value{"foo"sv});
     ASSERT_BSONOBJ_EQ(moveConstructed.getIndexKey(), BSON("b" << 1));
     ASSERT_BSONOBJ_EQ(moveConstructed.getSearchScoreDetails(), BSON("scoreDetails" << "foo"));
     ASSERT_BSONOBJ_EQ(moveConstructed.getSearchSortValues(), BSON("a" << 1));
@@ -225,7 +228,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     metadata.setGeoNearDistance(3.2);
     metadata.setGeoNearPoint(Value{BSON_ARRAY(1 << 2)});
     metadata.setSearchScore(5.4);
-    metadata.setSearchHighlights(Value{"foo"_sd});
+    metadata.setSearchHighlights(Value{"foo"sv});
     metadata.setIndexKey(BSON("b" << 1));
     metadata.setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
@@ -248,7 +251,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     ASSERT_EQ(moveAssigned.getGeoNearDistance(), 3.2);
     ASSERT_VALUE_EQ(moveAssigned.getGeoNearPoint(), Value{BSON_ARRAY(1 << 2)});
     ASSERT_EQ(moveAssigned.getSearchScore(), 5.4);
-    ASSERT_VALUE_EQ(moveAssigned.getSearchHighlights(), Value{"foo"_sd});
+    ASSERT_VALUE_EQ(moveAssigned.getSearchHighlights(), Value{"foo"sv});
     ASSERT_BSONOBJ_EQ(moveAssigned.getIndexKey(), BSON("b" << 1));
     ASSERT_BSONOBJ_EQ(moveAssigned.getSearchScoreDetails(), BSON("scoreDetails" << "foo"));
     ASSERT_BSONOBJ_EQ(moveAssigned.getSearchSortValues(), BSON("a" << 1));
@@ -358,7 +361,7 @@ TEST(DocumentMetadataFieldsTest, MetadataIsMarkedModifiedOnSetMetadataField) {
     testFieldSetter(
         [](DocumentMetadataFields& md) { md.setGeoNearPoint(Value{BSON_ARRAY(1 << 2)}); });
     testFieldSetter([](DocumentMetadataFields& md) { md.setSearchScore(50.0); });
-    testFieldSetter([](DocumentMetadataFields& md) { md.setSearchHighlights(Value{"foo"_sd}); });
+    testFieldSetter([](DocumentMetadataFields& md) { md.setSearchHighlights(Value{"foo"sv}); });
     testFieldSetter([](DocumentMetadataFields& md) { md.setIndexKey(BSON("b" << 1)); });
     testFieldSetter([](DocumentMetadataFields& md) { md.setRecordId(RecordId{6}); });
     testFieldSetter([](DocumentMetadataFields& md) {
@@ -775,7 +778,7 @@ TEST(DocumentMetadataFieldsTest, EqualityOperatorWithAllFields) {
         meta.setGeoNearPoint(
             Value(BSON("type" << "Point" << "coordinates" << BSON_ARRAY(1.0 << 2.0))));
         meta.setSearchScore(3.5);
-        meta.setSearchHighlights(Value{"foo"_sd});
+        meta.setSearchHighlights(Value{"foo"sv});
         meta.setIndexKey(BSON("b" << 1));
         meta.setRecordId(RecordId{6});
         meta.setSearchScoreDetails(BSON("scoreDetails" << "foo"));
@@ -785,11 +788,11 @@ TEST(DocumentMetadataFieldsTest, EqualityOperatorWithAllFields) {
         meta.setTimeseriesBucketMaxTime(time);
         meta.setSearchSortValues(BSON("a" << 1));
         meta.setVectorSearchScore(7.6);
-        meta.setSearchSequenceToken(Value("token1"_sd));
+        meta.setSearchSequenceToken(Value("token1"sv));
         meta.setScore(2.5);
         meta.setScoreDetails(Value(BSON("value" << 3 << "otherDetails"
                                                 << "foo")));
-        meta.setStream(Value("topic-stream"_sd));
+        meta.setStream(Value("topic-stream"sv));
         return meta;
     };
     DocumentMetadataFields meta1 = generateMeta();
@@ -802,7 +805,7 @@ TEST(DocumentMetadataFieldsTest, IsScoreProducingMetaTypeReturnsTrueForScoreMeta
     const std::vector<std::string> scoreMetadataFields = {
         "score", "searchScore", "vectorSearchScore", "textScore"};
     for (const auto& field : scoreMetadataFields) {
-        ASSERT_TRUE(DocumentMetadataFields::isScoreProducingMetaType(StringData{field}))
+        ASSERT_TRUE(DocumentMetadataFields::isScoreProducingMetaType(std::string_view{field}))
             << "Expected isScoreProducingMetaType to return true for: " << field;
     }
 }
@@ -822,13 +825,13 @@ TEST(DocumentMetadataFieldsTest, IsScoreProducingMetaTypeReturnsFalseForNonScore
                                                              "stream",
                                                              "changeStreamControlEvent"};
     for (const auto& field : nonScoreMetadataFields) {
-        ASSERT_FALSE(DocumentMetadataFields::isScoreProducingMetaType(StringData{field}))
+        ASSERT_FALSE(DocumentMetadataFields::isScoreProducingMetaType(std::string_view{field}))
             << "Expected isScoreProducingMetaType to return false for: " << field;
     }
 }
 
 TEST(DocumentMetadataFieldsTest, IsScoreProducingMetaTypeThrowsForUnsupportedMetaField) {
-    ASSERT_THROWS_CODE(DocumentMetadataFields::isScoreProducingMetaType("unsupportedField"_sd),
+    ASSERT_THROWS_CODE(DocumentMetadataFields::isScoreProducingMetaType("unsupportedField"sv),
                        AssertionException,
                        17308);
 }

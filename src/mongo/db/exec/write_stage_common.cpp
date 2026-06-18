@@ -50,6 +50,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 
@@ -116,7 +118,7 @@ void PreWriteFilter::restoreState() {
 }
 
 void PreWriteFilter::logSkippingDocument(const Document& doc,
-                                         StringData opKind,
+                                         std::string_view opKind,
                                          const NamespaceString& collNs) {
     LOGV2_DEBUG(5983201,
                 3,
@@ -128,7 +130,7 @@ void PreWriteFilter::logSkippingDocument(const Document& doc,
 }
 
 void PreWriteFilter::logFromMigrate(const Document& doc,
-                                    StringData opKind,
+                                    std::string_view opKind,
                                     const NamespaceString& collNs) {
     LOGV2_DEBUG(6184700,
                 3,

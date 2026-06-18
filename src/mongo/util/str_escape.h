@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -78,10 +78,10 @@ namespace mongo::str {
  * if there was no length limit.
  */
 void escapeForText(fmt::memory_buffer& buffer,
-                   StringData str,
+                   std::string_view str,
                    size_t maxLength = std::string::npos,
                    size_t* wouldWrite = nullptr);
-std::string escapeForText(StringData str,
+std::string escapeForText(std::string_view str,
                           size_t maxLength = std::string::npos,
                           size_t* wouldWrite = nullptr);
 
@@ -105,17 +105,17 @@ std::string escapeForText(StringData str,
  * Invalid bytes found are replaced with the sequence: "\ufffd".
  */
 void escapeForJSON(fmt::memory_buffer& buffer,
-                   StringData str,
+                   std::string_view str,
                    size_t maxLength = std::string::npos,
                    size_t* wouldWrite = nullptr);
-std::string escapeForJSON(StringData str,
+std::string escapeForJSON(std::string_view str,
                           size_t maxLength = std::string::npos,
                           size_t* wouldWrite = nullptr);
 
 /**
  * Returns whether a string consists with valid UTF-8 encoded characters.
  */
-bool validUTF8(StringData str);
+bool validUTF8(std::string_view str);
 
 /**
  * Scrubs invalid UTF-8 characters from the input str.
@@ -124,5 +124,5 @@ bool validUTF8(StringData str);
  * UTF-8 encoding of the replacement character U+FFFD.
  * https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
  */
-std::string scrubInvalidUTF8(StringData str);
+std::string scrubInvalidUTF8(std::string_view str);
 }  // namespace mongo::str

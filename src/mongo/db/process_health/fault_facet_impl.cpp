@@ -29,7 +29,6 @@
 
 #include "mongo/db/process_health/fault_facet_impl.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 
 #include <algorithm>

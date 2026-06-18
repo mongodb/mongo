@@ -41,6 +41,7 @@
 #include <cstddef>
 #include <memory>
 #include <queue>
+#include <string_view>
 
 namespace mongo {
 
@@ -67,7 +68,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "AND_SORTED"_sd;
+    static constexpr std::string_view kStageType = "AND_SORTED"_sd;
 
 private:
     // Find a node to AND against.

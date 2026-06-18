@@ -31,7 +31,6 @@
 #include "mongo/db/topology/user_write_block/set_user_write_block_mode_coordinator.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -47,6 +46,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -56,6 +56,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class CommandMirroringTest : public unittest::Test {
 public:
@@ -63,7 +64,7 @@ public:
 
     void setUp() override {
         setGlobalServiceContext(ServiceContext::make());
-        Client::initThread("CommandMirroringTest"_sd, getGlobalServiceContext()->getService());
+        Client::initThread("CommandMirroringTest"sv, getGlobalServiceContext()->getService());
     }
 
     void tearDown() override {
@@ -99,7 +100,7 @@ public:
         return (a == b).type == BSONObj::DeferredComparison::Type::kEQ;
     }
 
-    static constexpr auto kDB = "testDB"_sd;
+    static constexpr auto kDB = "testDB"sv;
     const ShardVersionBase kShardVersion = []() {
         ShardVersionBase sv;
         sv.setEpoch(OID());

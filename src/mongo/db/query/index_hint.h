@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,6 +37,7 @@
 
 #include <compare>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <variant>
 
@@ -100,7 +100,7 @@ public:
     explicit IndexHint(NaturalOrderHint hint) : _hint(hint) {}
 
     static IndexHint parse(const BSONElement& element);
-    static void append(const IndexHint& hint, StringData fieldName, BSONObjBuilder* builder);
+    static void append(const IndexHint& hint, std::string_view fieldName, BSONObjBuilder* builder);
 
     void append(BSONArrayBuilder* builder) const;
 

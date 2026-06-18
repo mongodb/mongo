@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/idl/idl_parser.h"
@@ -43,6 +42,7 @@
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -69,7 +69,7 @@ enum class TopologyType {
 };
 std::vector<TopologyType> allTopologyTypes();
 std::string toString(TopologyType topologyType);
-StatusWith<TopologyType> parseTopologyType(StringData strTopologyType);
+StatusWith<TopologyType> parseTopologyType(std::string_view strTopologyType);
 std::ostream& operator<<(std::ostream& os, TopologyType topologyType);
 
 enum class ServerType {
@@ -84,7 +84,7 @@ enum class ServerType {
 };
 std::vector<ServerType> allServerTypes();
 std::string toString(ServerType serverType);
-StatusWith<ServerType> parseServerType(StringData strServerType);
+StatusWith<ServerType> parseServerType(std::string_view strServerType);
 std::ostream& operator<<(std::ostream& os, ServerType serverType);
 
 using HelloRTT = Microseconds;

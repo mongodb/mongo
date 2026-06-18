@@ -30,7 +30,6 @@
 #include "mongo/db/profile_collection.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
@@ -71,6 +70,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -82,6 +82,7 @@
 namespace mongo::profile_collection {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(forceLockTimeoutForProfiler);
 
@@ -186,7 +187,7 @@ BSONObj encodeProfileSettings(const ProfileSettings& dbProfileSettings) {
     if (dbProfileSettings.filter) {
         settingsBuilder.append("filter", dbProfileSettings.filter->serialize());
     } else {
-        settingsBuilder.append("filter", "unset"_sd);
+        settingsBuilder.append("filter", "unset"sv);
     }
 
     return settingsBuilder.obj();

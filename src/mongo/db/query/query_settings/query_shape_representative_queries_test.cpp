@@ -42,6 +42,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 static auto const kNss = NamespaceString::createNamespaceString_forTest("foo", "exampleColl");
 static auto const kSerializationContext =
@@ -67,9 +68,9 @@ public:
         auto findCmd = query_request_helper::makeFromFindCommandForTests(
             [&] {
                 BSONObjBuilder bb;
-                bb.append("find"_sd, kNss.coll());
-                bb.append("filter"_sd, filter);
-                bb.append("$db"_sd, kNss.db(omitTenant));
+                bb.append("find"sv, kNss.coll());
+                bb.append("filter"sv, filter);
+                bb.append("$db"sv, kNss.db(omitTenant));
                 return bb.obj();
             }(),
             kNss);
@@ -94,7 +95,7 @@ public:
         return [expectedHashes = std::move(expectedHashes)](
                    const async_rpc::AsyncMockAsyncRPCRunner::Request& req) {
             // Check if this is an insert command.
-            const bool isInsert = req.cmdBSON.firstElementFieldNameStringData() == "insert"_sd;
+            const bool isInsert = req.cmdBSON.firstElementFieldNameStringData() == "insert"sv;
             if (!isInsert) {
                 return false;
             }
@@ -111,7 +112,7 @@ public:
             // Ensure that the insert contains all the hashes.
             auto&& documents = insertOp.getDocuments();
             for (auto&& doc : documents) {
-                std::string insertedHash{doc.getStringField("_id"_sd)};
+                std::string insertedHash{doc.getStringField("_id"sv)};
                 if (!expectedHashes.count(insertedHash)) {
                     return false;
                 }

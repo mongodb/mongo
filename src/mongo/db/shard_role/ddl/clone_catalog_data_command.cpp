@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
@@ -62,6 +61,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -71,7 +71,7 @@ namespace {
 
 void cloneDatabase(OperationContext* opCtx,
                    const DatabaseName& dbName,
-                   StringData from,
+                   std::string_view from,
                    BSONObjBuilder& result) {
     std::vector<NamespaceString> trackedColls;
     auto const catalogClient = Grid::get(opCtx)->catalogClient();

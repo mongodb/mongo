@@ -30,11 +30,12 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -51,7 +52,7 @@ namespace mongo {
  * The database must be locked in MODE_IX when calling this function.
  */
 MONGO_MOD_PRIVATE StatusWith<NamespaceString> makeUniqueCollectionName(
-    OperationContext* opCtx, const DatabaseName& dbName, StringData collectionNameModel);
+    OperationContext* opCtx, const DatabaseName& dbName, std::string_view collectionNameModel);
 
 /**
  * Generates a random collection name suitable for creating a temporary collection. Does not check
@@ -63,6 +64,6 @@ MONGO_MOD_PRIVATE StatusWith<NamespaceString> makeUniqueCollectionName(
  * Throws FailedToParse if 'collectionNameModel' does not contain any percent signs.
  */
 MONGO_MOD_NEEDS_REPLACEMENT StatusWith<NamespaceString> generateRandomCollectionName(
-    OperationContext* opCtx, const DatabaseName& dbName, StringData collectionNameModel);
+    OperationContext* opCtx, const DatabaseName& dbName, std::string_view collectionNameModel);
 
 }  // namespace mongo

@@ -30,6 +30,7 @@
 #include "mongo/platform/visibility_test_libcommon.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace visibility_test_libcommon {

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/util/assert_util.h"
@@ -37,6 +36,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -46,14 +46,14 @@ namespace mongo {
  */
 class MONGO_MOD_PUB TransactionParticipantResourceYielder : public ResourceYielder {
 public:
-    TransactionParticipantResourceYielder(StringData cmdName) : _cmdName(cmdName) {
+    TransactionParticipantResourceYielder(std::string_view cmdName) : _cmdName(cmdName) {
         invariant(!cmdName.empty());
     }
 
     /**
      * Returns a newly allocated yielder.
      */
-    static std::unique_ptr<TransactionParticipantResourceYielder> make(StringData cmdName);
+    static std::unique_ptr<TransactionParticipantResourceYielder> make(std::string_view cmdName);
 
     /**
      * If the opCtx has a checked out Session, yields it and stashed its TransactionParticipant

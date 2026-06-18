@@ -28,10 +28,11 @@
  */
 
 #pragma once
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 // TODO SERVER-78399 Remove BSONKey class once featureFlagSecondaryIndexChecksInDbCheck is removed.
 namespace mongo {
@@ -65,7 +66,7 @@ public:
     /**
      * Serialize this class as a field in a document.
      */
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const;
 
     const BSONObj& obj() const;
     BSONElement elem() const;

@@ -30,7 +30,6 @@
 #include "mongo/util/stacktrace_somap.h"
 
 #include "mongo/base/initializer.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 
 #include <cstdint>
@@ -38,6 +37,7 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
@@ -122,7 +122,7 @@ void processNoteSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
         if (noteHeader.n_type != NT_GNU_BUILD_ID)
             continue;
         const char* const noteNameBegin = notesCurr + sizeof(noteHeader);
-        if (StringData(noteNameBegin, noteHeader.n_namesz - 1) != ELF_NOTE_GNU) {
+        if (std::string_view(noteNameBegin, noteHeader.n_namesz - 1) != ELF_NOTE_GNU) {
             continue;
         }
         const char* const noteDescBegin =
@@ -294,7 +294,7 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
         return reinterpret_cast<const load_command*>(lcCurr)->cmd;
     };
     auto maybeAppendLoadAddr = [](BSONObjBuilder* soInfo, const auto* segmentCommand) -> bool {
-        if (StringData(SEG_TEXT) != segmentCommand->segname) {
+        if (std::string_view(SEG_TEXT) != segmentCommand->segname) {
             return false;
         }
         *soInfo << "vmaddr" << unsignedHex(segmentCommand->vmaddr);

@@ -41,6 +41,8 @@
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -547,7 +549,7 @@ private:
      */
     void _abandonCacheIfSentToShards() {
         for (auto&& stage : _splitPipeline.shardsPipeline->getSources()) {
-            if (StringData(stage->getSourceName()) ==
+            if (std::string_view(stage->getSourceName()) ==
                 DocumentSourceSequentialDocumentCache::kStageName) {
                 static_cast<DocumentSourceSequentialDocumentCache*>(stage.get())->abandonCache();
             }

@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/basic_types_gen.h"
@@ -43,6 +42,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <unicode/coll.h>
@@ -56,8 +56,9 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kFallbackLocaleName = "root"_sd;
+constexpr std::string_view kFallbackLocaleName = "root"sv;
 
 // Helper methods for converting between ICU attributes and types used by Collation.
 
@@ -423,7 +424,7 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
     }
 
     if (!collation->getVersion()) {
-        collation->setVersion(StringData(U_ICU_VERSION));
+        collation->setVersion(std::string_view(U_ICU_VERSION));
     } else {
         if (U_ICU_VERSION != *collation->getVersion()) {
             return {ErrorCodes::IncompatibleCollationVersion,
@@ -437,7 +438,9 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
 }
 
 // Returns a non-OK status if any part of the locale ID is invalid or not recognized by ICU.
-Status validateLocaleID(const BSONObj& spec, StringData originalID, const icu::Collator& collator) {
+Status validateLocaleID(const BSONObj& spec,
+                        std::string_view originalID,
+                        const icu::Collator& collator) {
     UErrorCode status = U_ZERO_ERROR;
     icu::Locale collatorLocale = collator.getLocale(ULOC_VALID_LOCALE, status);
     if (U_FAILURE(status)) {
@@ -460,7 +463,7 @@ Status validateLocaleID(const BSONObj& spec, StringData originalID, const icu::C
     // resulting icu::Locale name will not match the requested locale. In this case we return an
     // error to the user. In the error message to the user, we report the locale that ICU *would
     // have* used, which the application can supply as an alternative.
-    auto collatorLocaleName = StringData(collatorLocale.getName());
+    auto collatorLocaleName = std::string_view(collatorLocale.getName());
     if (originalID != collatorLocaleName) {
         str::stream ss;
         ss << "Field '" << Collation::kLocaleFieldName << "' is invalid in: " << spec;

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/int128.h"
@@ -38,6 +37,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 #include <absl/base/config.h>
 #include <absl/numeric/int128.h>
@@ -126,7 +126,7 @@ public:
         std::array<char, 16> str;
         uint8_t size;
     };
-    static boost::optional<int128_t> encodeString(StringData str);
+    static boost::optional<int128_t> encodeString(std::string_view str);
     static SmallString decodeString(int128_t val);
 
     // Array is a double as it will always be multiplied by a double and we don't want to do an

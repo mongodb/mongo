@@ -36,6 +36,7 @@
 
 #include <mutex>
 #include <new>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_set.h>
@@ -64,7 +65,7 @@ void ResourceCatalog::add(ResourceId id, const DatabaseName& dbName) {
 
 void ResourceCatalog::add(ResourceId id, DDLResourceName resourceName) {
     invariant(id.getType() == RESOURCE_DDL_DATABASE || id.getType() == RESOURCE_DDL_COLLECTION);
-    _add(id, std::string{StringData(resourceName)});
+    _add(id, std::string{std::string_view(resourceName)});
 }
 
 void ResourceCatalog::_add(ResourceId id, std::string name) {
@@ -84,7 +85,7 @@ void ResourceCatalog::remove(ResourceId id, const DatabaseName& dbName) {
 
 void ResourceCatalog::remove(ResourceId id, DDLResourceName resourceName) {
     invariant(id.getType() == RESOURCE_DDL_DATABASE || id.getType() == RESOURCE_DDL_COLLECTION);
-    _remove(id, std::string{StringData(resourceName)});
+    _remove(id, std::string{std::string_view(resourceName)});
 }
 
 ResourceId ResourceCatalog::newResourceIdForMutex(std::string resourceLabel) {

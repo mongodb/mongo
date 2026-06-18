@@ -84,6 +84,7 @@
 #include <algorithm>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
@@ -94,6 +95,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(failIndexBuildWithErrorInSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterRegisteringIndexBuild);
@@ -104,7 +106,8 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeRunningIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeSignalingPrimaryForAbort);
 MONGO_FAIL_POINT_DEFINE(hangBeforeVoteCommitIndexBuild);
 
-const StringData kMaxNumActiveUserIndexBuildsServerParameterName = "maxNumActiveUserIndexBuilds"_sd;
+const std::string_view kMaxNumActiveUserIndexBuildsServerParameterName =
+    "maxNumActiveUserIndexBuilds"sv;
 
 /**
  * Constructs the options for the loader thread pool.
@@ -598,7 +601,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 Status IndexBuildsCoordinatorMongod::voteAbortIndexBuild(OperationContext* opCtx,
                                                          const UUID& buildUUID,
                                                          const HostAndPort& votingNode,
-                                                         StringData reason) {
+                                                         std::string_view reason) {
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto memberConfig = replCoord->findConfigMemberByHostAndPort_deprecated(votingNode);
@@ -1035,10 +1038,11 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
     }
 }
 
-Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     const std::vector<StringData>& indexNames,
-                                                     const CommitQuorumOptions& newCommitQuorum) {
+Status IndexBuildsCoordinatorMongod::setCommitQuorum(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<std::string_view>& indexNames,
+    const CommitQuorumOptions& newCommitQuorum) {
     if (indexNames.empty()) {
         return Status(ErrorCodes::IndexNotFound,
                       str::stream()

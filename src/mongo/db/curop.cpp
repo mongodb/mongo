@@ -75,6 +75,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
+#include <string_view>
 #include <tuple>
 
 #include <absl/container/flat_hash_set.h>
@@ -88,6 +89,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 auto& oplogGetMoreStats = *MetricBuilder<TimerStats>("repl.network.oplogGetMoresProcessed");
 
@@ -350,7 +352,7 @@ void CurOp::reportCurrentOpForClient(WithLock,
     }
 
     if (transport::ServiceExecutorContext::get(client)) {
-        infoBuilder->append("threaded"_sd, true);
+        infoBuilder->append("threaded"sv, true);
     }
 
     if (clientOpCtx) {
@@ -599,7 +601,7 @@ void CurOp::setEndOfOpMetricsForBatchWrites() {
     }
 }
 
-void CurOp::setMessage(WithLock, StringData message) {
+void CurOp::setMessage(WithLock, std::string_view message) {
     if (_progressMeter && _progressMeter->isActive()) {
         LOGV2_ERROR(
             20527, "Updating message", "old"_attr = redact(_message), "new"_attr = redact(message));
@@ -609,7 +611,7 @@ void CurOp::setMessage(WithLock, StringData message) {
 }
 
 ProgressMeter& CurOp::setProgress(WithLock lk,
-                                  StringData message,
+                                  std::string_view message,
                                   unsigned long long progressMeterTotal,
                                   int secondsBetween) {
     setMessage(lk, message);
@@ -966,11 +968,11 @@ std::string CurOp::getNS() const {
 }
 
 // Failpoints after commands are logged.
-constexpr auto kPrepareTransactionCmdName = "prepareTransaction"_sd;
+constexpr auto kPrepareTransactionCmdName = "prepareTransaction"sv;
 MONGO_FAIL_POINT_DEFINE(waitForPrepareTransactionCommandLogged);
-constexpr auto kHelloCmdName = "hello"_sd;
+constexpr auto kHelloCmdName = "hello"sv;
 MONGO_FAIL_POINT_DEFINE(waitForHelloCommandLogged);
-constexpr auto kIsMasterCmdName = "isMaster"_sd;
+constexpr auto kIsMasterCmdName = "isMaster"sv;
 MONGO_FAIL_POINT_DEFINE(waitForIsMasterCommandLogged);
 
 void CurOp::_checkForFailpointsAfterCommandLogged() {
@@ -1121,7 +1123,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
             redactedCommandBuilder.append(commentElement);
         }
 
-        if (obj.firstElementFieldNameStringData() == "getMore"_sd) {
+        if (obj.firstElementFieldNameStringData() == "getMore"sv) {
             redactedCommandBuilder.append(obj["collection"]);
         }
 

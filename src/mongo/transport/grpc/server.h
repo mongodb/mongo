@@ -33,6 +33,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string_view>
 
 #include <grpc/grpc_security.h>
 #include <grpcpp/security/server_credentials.h>
@@ -47,8 +48,8 @@ public:
          */
         std::vector<HostAndPort> addresses;
         size_t maxThreads;
-        StringData tlsCertificateKeyFile;
-        boost::optional<StringData> tlsCAFile;
+        std::string_view tlsCertificateKeyFile;
+        boost::optional<std::string_view> tlsCAFile;
         bool tlsAllowConnectionsWithoutCertificates;
         bool tlsAllowInvalidCertificates;
     };

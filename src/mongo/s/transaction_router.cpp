@@ -75,6 +75,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -1178,7 +1179,7 @@ void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCt
     }
 }
 
-bool TransactionRouter::Router::canContinueOnStaleShardOrDbError(StringData cmdName,
+bool TransactionRouter::Router::canContinueOnStaleShardOrDbError(std::string_view cmdName,
                                                                  const Status& status) const {
     if (MONGO_unlikely(enableStaleVersionAndSnapshotRetriesWithinTransactions.shouldFail())) {
         // We can always retry on the first overall statement because all targeted participants must
@@ -1205,7 +1206,7 @@ bool TransactionRouter::Router::canContinueOnStaleShardOrDbError(StringData cmdN
 }
 
 void TransactionRouter::Router::onStaleShardOrDbError(OperationContext* opCtx,
-                                                      StringData cmdName,
+                                                      std::string_view cmdName,
                                                       const Status& status) {
     invariant(canContinueOnStaleShardOrDbError(cmdName, status));
 
@@ -2424,7 +2425,7 @@ void TransactionRouter::MetricsTracker::endTransaction(
     TickSource::Tick curTicks,
     TransactionRouter::TerminationCause terminationCause,
     TransactionRouter::CommitType commitType,
-    StringData abortCause) {
+    std::string_view abortCause) {
     dassert(isActive());
 
     timingStats.timeActiveMicros +=

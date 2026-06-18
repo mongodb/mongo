@@ -31,13 +31,16 @@
 
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
-StringData toString(OperationSource source) {
-    static constexpr StringData kStandardString = "standard"_sd;
-    static constexpr StringData kFromMigrateString = "from migrate"_sd;
-    static constexpr StringData kTimeseriesInsertString = "time-series insert"_sd;
-    static constexpr StringData kTimeseriesUpdateString = "time-series update"_sd;
-    static constexpr StringData kTimeseriesDeleteString = "time-series delete"_sd;
+using namespace std::literals::string_view_literals;
+std::string_view toString(OperationSource source) {
+    static constexpr std::string_view kStandardString = "standard"sv;
+    static constexpr std::string_view kFromMigrateString = "from migrate"sv;
+    static constexpr std::string_view kTimeseriesInsertString = "time-series insert"sv;
+    static constexpr std::string_view kTimeseriesUpdateString = "time-series update"sv;
+    static constexpr std::string_view kTimeseriesDeleteString = "time-series delete"sv;
 
     switch (source) {
         case OperationSource::kStandard:

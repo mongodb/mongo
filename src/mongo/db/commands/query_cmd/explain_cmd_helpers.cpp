@@ -35,6 +35,7 @@
 
 namespace mongo {
 namespace explain_cmd_helpers {
+using namespace std::literals::string_view_literals;
 
 ExplainedCommand makeExplainedCommand(OperationContext* opCtx,
                                       const OpMsgRequest& opMsgRequest,
@@ -94,7 +95,7 @@ BSONObj makeExplainedObjForMongos(const BSONObj& outerObj, const BSONObj& innerO
         const auto name = outerElem.fieldNameStringData();
         // Don't copy $db from the outer explain into the inner command. This is handled later when
         // we make the request for the inner command.
-        if (name == "$db"_sd) {
+        if (name == "$db"sv) {
             continue;
         }
         if (isGenericArgument(name) && !innerObj.hasField(name)) {

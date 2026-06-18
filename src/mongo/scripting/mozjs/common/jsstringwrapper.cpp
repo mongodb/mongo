@@ -34,6 +34,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <cstring>
+#include <string_view>
 
 #include <fmt/format.h>
 #include <js/CharacterEncoding.h>
@@ -77,9 +78,9 @@ JSStringWrapper::JSStringWrapper(JSContext* cx, JSString* str) : _isSet(true) {
     out[_length] = '\0';
 }
 
-StringData JSStringWrapper::toStringData() const {
+std::string_view JSStringWrapper::toStringData() const {
     invariant(_isSet);
-    return StringData(_str ? _str.get() : _buf, _length);
+    return std::string_view(_str ? _str.get() : _buf, _length);
 }
 
 std::string JSStringWrapper::toString() const {

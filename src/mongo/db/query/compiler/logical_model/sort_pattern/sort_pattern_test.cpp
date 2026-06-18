@@ -28,7 +28,6 @@
  */
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"

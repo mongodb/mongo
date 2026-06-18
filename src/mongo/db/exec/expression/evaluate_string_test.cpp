@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -41,6 +43,7 @@
 
 namespace mongo {
 namespace expression_evaluation_test {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 using std::string;
@@ -103,19 +106,19 @@ TEST(ExpressionStrcaseCmpTest, NullMiddleGt) {
 namespace str_len_bytes {
 
 TEST(ExpressionStrLenBytes, ComputesLengthOfString) {
-    assertExpectedResults("$strLenBytes", {{{Value("abc"_sd)}, Value(3)}});
+    assertExpectedResults("$strLenBytes", {{{Value("abc"sv)}, Value(3)}});
 }
 
 TEST(ExpressionStrLenBytes, ComputesLengthOfEmptyString) {
-    assertExpectedResults("$strLenBytes", {{{Value(StringData())}, Value(0)}});
+    assertExpectedResults("$strLenBytes", {{{Value(std::string_view())}, Value(0)}});
 }
 
 TEST(ExpressionStrLenBytes, ComputesLengthOfStringWithNull) {
-    assertExpectedResults("$strLenBytes", {{{Value("ab\0c"_sd)}, Value(4)}});
+    assertExpectedResults("$strLenBytes", {{{Value("ab\0c"sv)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
-    assertExpectedResults("$strLenBytes", {{{Value("abc\0"_sd)}, Value(4)}});
+    assertExpectedResults("$strLenBytes", {{{Value("abc\0"sv)}, Value(4)}});
 }
 
 }  // namespace str_len_bytes
@@ -123,27 +126,27 @@ TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
 namespace str_len_cp {
 
 TEST(ExpressionStrLenCP, ComputesLengthOfASCIIString) {
-    assertExpectedResults("$strLenCP", {{{Value("abc"_sd)}, Value(3)}});
+    assertExpectedResults("$strLenCP", {{{Value("abc"sv)}, Value(3)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfEmptyString) {
-    assertExpectedResults("$strLenCP", {{{Value(StringData())}, Value(0)}});
+    assertExpectedResults("$strLenCP", {{{Value(std::string_view())}, Value(0)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNull) {
-    assertExpectedResults("$strLenCP", {{{Value("ab\0c"_sd)}, Value(4)}});
+    assertExpectedResults("$strLenCP", {{{Value("ab\0c"sv)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
-    assertExpectedResults("$strLenCP", {{{Value("abc\0"_sd)}, Value(4)}});
+    assertExpectedResults("$strLenCP", {{{Value("abc\0"sv)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithAccent) {
-    assertExpectedResults("$strLenCP", {{{Value("a\0bâ"_sd)}, Value(4)}});
+    assertExpectedResults("$strLenCP", {{{Value("a\0bâ"sv)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithSpecialCharacters) {
-    assertExpectedResults("$strLenCP", {{{Value("ºabøåß"_sd)}, Value(6)}});
+    assertExpectedResults("$strLenCP", {{{Value("ºabøåß"sv)}, Value(6)}});
 }
 
 }  // namespace str_len_cp
@@ -193,7 +196,7 @@ TEST(ExpressionSubstrTest, ThrowsWithNegativeStart) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
-    const auto str = "abcdef"_sd;
+    const auto str = "abcdef"sv;
     const auto expr =
         Expression::parseExpression(&expCtx, BSON("$substrCP" << BSON_ARRAY(str << -5 << 1)), vps);
     ASSERT_THROWS(
@@ -211,7 +214,7 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithBadContinuationByte) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
-    const auto continuationByte = "\x80\x00"_sd;
+    const auto continuationByte = "\x80\x00"sv;
     const auto expr = Expression::parseExpression(
         &expCtx, BSON("$substrCP" << BSON_ARRAY(continuationByte << 0 << 1)), vps);
     ASSERT_THROWS(
@@ -225,7 +228,7 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
-    const auto leadingByte = "\xFF\x00"_sd;
+    const auto leadingByte = "\xFF\x00"sv;
     const auto expr = Expression::parseExpression(
         &expCtx, BSON("$substrCP" << BSON_ARRAY(leadingByte << 0 << 1)), vps);
     ASSERT_THROWS(
@@ -236,49 +239,46 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
 }
 
 TEST(ExpressionSubstrCPTest, WithStandardValue) {
-    assertExpectedResults("$substrCP", {{{Value("abc"_sd), Value(0), Value(2)}, Value("ab"_sd)}});
+    assertExpectedResults("$substrCP", {{{Value("abc"sv), Value(0), Value(2)}, Value("ab"sv)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithNullCharacter) {
     assertExpectedResults("$substrCP",
-                          {{{Value("abc\0d"_sd), Value(2), Value(3)}, Value("c\0d"_sd)}});
+                          {{{Value("abc\0d"sv), Value(2), Value(3)}, Value("c\0d"sv)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithNullCharacterAtEnd) {
-    assertExpectedResults("$substrCP",
-                          {{{Value("abc\0"_sd), Value(2), Value(2)}, Value("c\0"_sd)}});
+    assertExpectedResults("$substrCP", {{{Value("abc\0"sv), Value(2), Value(2)}, Value("c\0"sv)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithOutOfRangeString) {
     assertExpectedResults("$substrCP",
-                          {{{Value("abc"_sd), Value(3), Value(2)}, Value(StringData())}});
+                          {{{Value("abc"sv), Value(3), Value(2)}, Value(std::string_view())}});
 }
 
 TEST(ExpressionSubstrCPTest, WithPartiallyOutOfRangeString) {
-    assertExpectedResults("$substrCP", {{{Value("abc"_sd), Value(1), Value(4)}, Value("bc"_sd)}});
+    assertExpectedResults("$substrCP", {{{Value("abc"sv), Value(1), Value(4)}, Value("bc"sv)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithUnicodeValue) {
-    assertExpectedResults("$substrCP",
-                          {{{Value("øø∫å"_sd), Value(0), Value(4)}, Value("øø∫å"_sd)}});
-    assertExpectedResults("$substrBytes",
-                          {{{Value("øø∫å"_sd), Value(0), Value(4)}, Value("øø"_sd)}});
+    assertExpectedResults("$substrCP", {{{Value("øø∫å"sv), Value(0), Value(4)}, Value("øø∫å"sv)}});
+    assertExpectedResults("$substrBytes", {{{Value("øø∫å"sv), Value(0), Value(4)}, Value("øø"sv)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithMixedUnicodeAndASCIIValue) {
     assertExpectedResults("$substrCP",
-                          {{{Value("a∫bøßabc"_sd), Value(1), Value(4)}, Value("∫bøß"_sd)}});
+                          {{{Value("a∫bøßabc"sv), Value(1), Value(4)}, Value("∫bøß"sv)}});
     assertExpectedResults("$substrBytes",
-                          {{{Value("a∫bøßabc"_sd), Value(1), Value(4)}, Value("∫b"_sd)}});
+                          {{{Value("a∫bøßabc"sv), Value(1), Value(4)}, Value("∫b"sv)}});
 }
 
 TEST(ExpressionSubstrCPTest, ShouldCoerceDateToString) {
     assertExpectedResults("$substrCP",
                           {{{Value(Date_t::fromMillisSinceEpoch(0)), Value(0), Value(1000)},
-                            Value("1970-01-01T00:00:00.000Z"_sd)}});
+                            Value("1970-01-01T00:00:00.000Z"sv)}});
     assertExpectedResults("$substrBytes",
                           {{{Value(Date_t::fromMillisSinceEpoch(0)), Value(0), Value(1000)},
-                            Value("1970-01-01T00:00:00.000Z"_sd)}});
+                            Value("1970-01-01T00:00:00.000Z"sv)}});
 }
 
 }  // namespace substr_cp
@@ -351,322 +351,319 @@ TEST(ExpressionTrimTest, ThrowsIfInputIsNotString) {
 }
 
 TEST(ExpressionTrimTest, ThrowsIfCharsIsNotAString) {
-    ASSERT_THROWS(evaluateNamedArgExpression("$trim", Document{{"input", " x "_sd}, {"chars", 1}}),
+    ASSERT_THROWS(evaluateNamedArgExpression("$trim", Document{{"input", " x "sv}, {"chars", 1}}),
                   AssertionException);
     ASSERT_THROWS(evaluateNamedArgExpression(
-                      "$trim", Document{{"input", " x "_sd}, {"chars", BSON_ARRAY(1 << 2)}}),
+                      "$trim", Document{{"input", " x "sv}, {"chars", BSON_ARRAY(1 << 2)}}),
                   AssertionException);
-    ASSERT_THROWS(evaluateNamedArgExpression("$ltrim", Document{{"input", " x "_sd}, {"chars", 3}}),
+    ASSERT_THROWS(evaluateNamedArgExpression("$ltrim", Document{{"input", " x "sv}, {"chars", 3}}),
                   AssertionException);
     ASSERT_THROWS(evaluateNamedArgExpression(
-                      "$rtrim", Document{{"input", " x "_sd}, {"chars", Document{{"x", 1}}}}),
+                      "$rtrim", Document{{"input", " x "sv}, {"chars", Document{{"x", 1}}}}),
                   AssertionException);
 }
 
 TEST(ExpressionTrimTest, DoesTrimAsciiWhitespace) {
     // Trim from both sides.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "  abc  "_sd}}),
-                    Value{"abc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "\n  abc \r\n "_sd}}),
-                    Value{"abc"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "  abc  "sv}}),
+                    Value{"abc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "\n  abc \r\n "sv}}),
+                    Value{"abc"sv});
 
     // Trim just from the right.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc  "_sd}}),
-                    Value{"abc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc \r\n "_sd}}),
-                    Value{"abc"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc  "sv}}),
+                    Value{"abc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc \r\n "sv}}),
+                    Value{"abc"sv});
 
     // Trim just from the left.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "  abc"_sd}}),
-                    Value{"abc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\n  abc"_sd}}),
-                    Value{"abc"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "  abc"sv}}),
+                    Value{"abc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\n  abc"sv}}),
+                    Value{"abc"sv});
 
     // Make sure we don't trim from the opposite side when doing $ltrim or $rtrim.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "  abc"_sd}}),
-                    Value{"  abc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "\t \nabc \r\n "_sd}}),
-                    Value{"\t \nabc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "  abc  "_sd}}),
-                    Value{"abc  "_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\n  abc \t\n  "_sd}}),
-                    Value{"abc \t\n  "_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "abc  "_sd}}),
-                    Value{"abc  "_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "  abc"sv}}),
+                    Value{"  abc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "\t \nabc \r\n "sv}}),
+                    Value{"\t \nabc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "  abc  "sv}}),
+                    Value{"abc  "sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\n  abc \t\n  "sv}}),
+                    Value{"abc \t\n  "sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "abc  "sv}}),
+                    Value{"abc  "sv});
 }
 
 TEST(ExpressionTrimTest, DoesTrimNullCharacters) {
     // Trim from both sides.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "\0\0abc\0"_sd}}),
-                    Value{"abc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "\0 \0 abc \0  "_sd}}),
-                    Value{"abc"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "\0\0abc\0"sv}}),
+                    Value{"abc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "\0 \0 abc \0  "sv}}),
+                    Value{"abc"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "\n \0  abc \r\0\n "_sd}}),
-        Value{"abc"_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "\n \0  abc \r\0\n "sv}}),
+        Value{"abc"sv});
 
     // Trim just from the right.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc\0\0"_sd}}),
-                    Value{"abc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc \r\0\n\0 "_sd}}),
-                    Value{"abc"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc\0\0"sv}}),
+                    Value{"abc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc \r\0\n\0 "sv}}),
+                    Value{"abc"sv});
 
     // Trim just from the left.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\0\0abc"_sd}}),
-                    Value{"abc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\n \0\0 abc"_sd}}),
-                    Value{"abc"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\0\0abc"sv}}),
+                    Value{"abc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\n \0\0 abc"sv}}),
+                    Value{"abc"sv});
 
     // Make sure we don't trim from the opposite side when doing $ltrim or $rtrim.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "\0\0abc"_sd}}),
-                    Value{"\0\0abc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", " \0 abc"_sd}}),
-                    Value{" \0 abc"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "\0\0abc"sv}}),
+                    Value{"\0\0abc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", " \0 abc"sv}}),
+                    Value{" \0 abc"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "\t\0\0 \nabc \r\n "_sd}}),
-        Value{"\t\0\0 \nabc"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "  abc\0\0"_sd}}),
-                    Value{"abc\0\0"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "\t\0\0 \nabc \r\n "sv}}),
+        Value{"\t\0\0 \nabc"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "  abc\0\0"sv}}),
+                    Value{"abc\0\0"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$ltrim", Document{{"input", "\n  abc \t\0\n \0\0 "_sd}}),
-        Value{"abc \t\0\n \0\0 "_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "abc\0\0"_sd}}),
-                    Value{"abc\0\0"_sd});
+        evaluateNamedArgExpression("$ltrim", Document{{"input", "\n  abc \t\0\n \0\0 "sv}}),
+        Value{"abc \t\0\n \0\0 "sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "abc\0\0"sv}}),
+                    Value{"abc\0\0"sv});
 }
 
 TEST(ExpressionTrimTest, DoesTrimUnicodeWhitespace) {
     // Trim from both sides.
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "\u2001abc\u2004\u200A"_sd}}),
-        Value{"abc"_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "\u2001abc\u2004\u200A"sv}}),
+        Value{"abc"sv});
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
-            "$trim", Document{{"input", "\n\u0020 \0\u2007  abc \r\0\n\u0009\u200A "_sd}}),
-        Value{"abc"_sd});
+            "$trim", Document{{"input", "\n\u0020 \0\u2007  abc \r\0\n\u0009\u200A "sv}}),
+        Value{"abc"sv});
 
     // Trim just from the right.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc\u2007\u2006"_sd}}),
-                    Value{"abc"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "abc\u2007\u2006"sv}}),
+                    Value{"abc"sv});
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$rtrim", Document{{"input", "abc \r\u2009\u0009\u200A\n\0 "_sd}}),
-                    Value{"abc"_sd});
+                        "$rtrim", Document{{"input", "abc \r\u2009\u0009\u200A\n\0 "sv}}),
+                    Value{"abc"sv});
 
     // Trim just from the left.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\u2009\u2004abc"_sd}}),
-                    Value{"abc"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "\u2009\u2004abc"sv}}),
+                    Value{"abc"sv});
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$ltrim", Document{{"input", "\n \u2000 \0\u2008\0 \u200Aabc"_sd}}),
-                    Value{"abc"_sd});
+                        "$ltrim", Document{{"input", "\n \u2000 \0\u2008\0 \u200Aabc"sv}}),
+                    Value{"abc"sv});
 }
 
 TEST(ExpressionTrimTest, DoesTrimCustomAsciiCharacters) {
     // Trim from both sides.
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "xxXXxx"_sd}, {"chars", "x"_sd}}),
-        Value{"XX"_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "xxXXxx"sv}, {"chars", "x"sv}}),
+        Value{"XX"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "00123"_sd}, {"chars", "0"_sd}}),
-        Value{"123"_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "00123"sv}, {"chars", "0"sv}}),
+        Value{"123"sv});
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression("$trim",
-                                   Document{{"input", "30:00:12 I don't care about the time"_sd},
-                                            {"chars", "0123456789: "_sd}}),
-        Value{"I don't care about the time"_sd});
+                                   Document{{"input", "30:00:12 I don't care about the time"sv},
+                                            {"chars", "0123456789: "sv}}),
+        Value{"I don't care about the time"sv});
 
     // Trim just from the right.
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "xxXXxx"_sd}, {"chars", "x"_sd}}),
-        Value{"xxXX"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "xxXXxx"sv}, {"chars", "x"sv}}),
+        Value{"xxXX"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "00123"_sd}, {"chars", "0"_sd}}),
-        Value{"00123"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "00123"sv}, {"chars", "0"sv}}),
+        Value{"00123"sv});
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression("$rtrim",
-                                   Document{{"input", "30:00:12 I don't care about the time"_sd},
-                                            {"chars", "0123456789: "_sd}}),
-        Value{"30:00:12 I don't care about the time"_sd});
+                                   Document{{"input", "30:00:12 I don't care about the time"sv},
+                                            {"chars", "0123456789: "sv}}),
+        Value{"30:00:12 I don't care about the time"sv});
 
     // Trim just from the left.
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "xxXXxx"_sd}, {"chars", "x"_sd}}),
-        Value{"xxXX"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "xxXXxx"sv}, {"chars", "x"sv}}),
+        Value{"xxXX"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "00123"_sd}, {"chars", "0"_sd}}),
-        Value{"00123"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "00123"sv}, {"chars", "0"sv}}),
+        Value{"00123"sv});
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression("$rtrim",
-                                   Document{{"input", "30:00:12 I don't care about the time"_sd},
-                                            {"chars", "0123456789: "_sd}}),
-        Value{"30:00:12 I don't care about the time"_sd});
+                                   Document{{"input", "30:00:12 I don't care about the time"sv},
+                                            {"chars", "0123456789: "sv}}),
+        Value{"30:00:12 I don't care about the time"sv});
 }
 
 TEST(ExpressionTrimTest, DoesTrimCustomUnicodeCharacters) {
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$ltrim", Document{{"input", "∃x.x ≥ y"_sd}, {"chars", "∃"_sd}}),
-        Value{"x.x ≥ y"_sd});
+        evaluateNamedArgExpression("$ltrim", Document{{"input", "∃x.x ≥ y"sv}, {"chars", "∃"sv}}),
+        Value{"x.x ≥ y"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "∃x.x ≥ y"_sd}, {"chars", "∃"_sd}}),
-        Value{"∃x.x ≥ y"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "∃x.x ≥ y"sv}, {"chars", "∃"sv}}),
+        Value{"∃x.x ≥ y"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "∃x.x ≥ y"_sd}, {"chars", "∃"_sd}}),
-        Value{"x.x ≥ y"_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "∃x.x ≥ y"sv}, {"chars", "∃"sv}}),
+        Value{"x.x ≥ y"sv});
 
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$ltrim", Document{{"input", "⌊x⌋"_sd}, {"chars", "⌊⌋"_sd}}),
-        Value{"x⌋"_sd});
+        evaluateNamedArgExpression("$ltrim", Document{{"input", "⌊x⌋"sv}, {"chars", "⌊⌋"sv}}),
+        Value{"x⌋"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "⌊x⌋"_sd}, {"chars", "⌊⌋"_sd}}),
-        Value{"⌊x"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "⌊x⌋"sv}, {"chars", "⌊⌋"sv}}),
+        Value{"⌊x"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "⌊x⌋"_sd}, {"chars", "⌊⌋"_sd}}),
-        Value{"x"_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "⌊x⌋"sv}, {"chars", "⌊⌋"sv}}),
+        Value{"x"sv});
 }
 
 TEST(ExpressionTrimTest, DoesTrimCustomMixOfUnicodeAndAsciiCharacters) {
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$ltrim", Document{{"input", "∃x.x ≥ y"_sd}, {"chars", "∃y"_sd}}),
-                    Value{"x.x ≥ y"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$rtrim", Document{{"input", "∃x.x ≥ y"_sd}, {"chars", "∃y"_sd}}),
-                    Value{"∃x.x ≥ "_sd});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "∃x.x ≥ y"_sd}, {"chars", "∃y"_sd}}),
-        Value{"x.x ≥ "_sd});
+        evaluateNamedArgExpression("$ltrim", Document{{"input", "∃x.x ≥ y"sv}, {"chars", "∃y"sv}}),
+        Value{"x.x ≥ y"sv});
+    ASSERT_VALUE_EQ(
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "∃x.x ≥ y"sv}, {"chars", "∃y"sv}}),
+        Value{"∃x.x ≥ "sv});
+    ASSERT_VALUE_EQ(
+        evaluateNamedArgExpression("$trim", Document{{"input", "∃x.x ≥ y"sv}, {"chars", "∃y"sv}}),
+        Value{"x.x ≥ "sv});
 
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$ltrim", Document{{"input", "⌊x⌋"_sd}, {"chars", "⌊x⌋"_sd}}),
-        Value{""_sd});
+        evaluateNamedArgExpression("$ltrim", Document{{"input", "⌊x⌋"sv}, {"chars", "⌊x⌋"sv}}),
+        Value{""sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "⌊x⌋"_sd}, {"chars", "⌊x⌋"_sd}}),
-        Value{""_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "⌊x⌋"sv}, {"chars", "⌊x⌋"sv}}),
+        Value{""sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "⌊x⌋"_sd}, {"chars", "⌊x⌋"_sd}}),
-        Value{""_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "⌊x⌋"sv}, {"chars", "⌊x⌋"sv}}),
+        Value{""sv});
 
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
-            "$ltrim", Document{{"input", "▹▱◯□ I ▙◉VE Shapes □◯▱◃"_sd}, {"chars", "□◯▱◃▹ "_sd}}),
-        Value{"I ▙◉VE Shapes □◯▱◃"_sd});
+            "$ltrim", Document{{"input", "▹▱◯□ I ▙◉VE Shapes □◯▱◃"sv}, {"chars", "□◯▱◃▹ "sv}}),
+        Value{"I ▙◉VE Shapes □◯▱◃"sv});
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
-            "$rtrim", Document{{"input", "▹▱◯□ I ▙◉VE Shapes □◯▱◃"_sd}, {"chars", "□◯▱◃▹ "_sd}}),
-        Value{"▹▱◯□ I ▙◉VE Shapes"_sd});
+            "$rtrim", Document{{"input", "▹▱◯□ I ▙◉VE Shapes □◯▱◃"sv}, {"chars", "□◯▱◃▹ "sv}}),
+        Value{"▹▱◯□ I ▙◉VE Shapes"sv});
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
-            "$trim", Document{{"input", "▹▱◯□ I ▙◉VE Shapes □◯▱◃"_sd}, {"chars", "□◯▱◃▹ "_sd}}),
-        Value{"I ▙◉VE Shapes"_sd});
+            "$trim", Document{{"input", "▹▱◯□ I ▙◉VE Shapes □◯▱◃"sv}, {"chars", "□◯▱◃▹ "sv}}),
+        Value{"I ▙◉VE Shapes"sv});
 }
 
 TEST(ExpressionTrimTest, DoesNotTrimFromMiddle) {
     // Using ascii whitespace.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "  a\tb c  "_sd}}),
-                    Value{"a\tb c"_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "  a\tb c  "sv}}),
+                    Value{"a\tb c"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "\n  a\nb  c \r\n "sv}}),
+                    Value{"a\nb  c"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "  a\tb c  "sv}}),
+                    Value{"  a\tb c"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "\n  a\nb  c \r\n "_sd}}),
-        Value{"a\nb  c"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "  a\tb c  "_sd}}),
-                    Value{"  a\tb c"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "\n  a\nb  c \r\n "sv}}),
+        Value{"\n  a\nb  c"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "  a\tb c  "sv}}),
+                    Value{"a\tb c  "sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "\n  a\nb  c \r\n "_sd}}),
-        Value{"\n  a\nb  c"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "  a\tb c  "_sd}}),
-                    Value{"a\tb c  "_sd});
-    ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$ltrim", Document{{"input", "\n  a\nb  c \r\n "_sd}}),
-        Value{"a\nb  c \r\n "_sd});
+        evaluateNamedArgExpression("$ltrim", Document{{"input", "\n  a\nb  c \r\n "sv}}),
+        Value{"a\nb  c \r\n "sv});
 
     // Using unicode whitespace.
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$trim", Document{{"input", "\u2001a\u2001\u000Ab\u2009c\u2004\u200A"_sd}}),
-                    Value{"a\u2001\u000Ab\u2009c"_sd});
-    ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression(
-            "$ltrim", Document{{"input", "\u2001a\u2001\u000Ab\u2009c\u2004\u200A"_sd}}),
-        Value{"a\u2001\u000Ab\u2009c\u2004\u200A"_sd});
-    ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression(
-            "$rtrim", Document{{"input", "\u2001a\u2001\u000Ab\u2009c\u2004\u200A"_sd}}),
-        Value{"\u2001a\u2001\u000Ab\u2009c"_sd});
+                        "$trim", Document{{"input", "\u2001a\u2001\u000Ab\u2009c\u2004\u200A"sv}}),
+                    Value{"a\u2001\u000Ab\u2009c"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
+                        "$ltrim", Document{{"input", "\u2001a\u2001\u000Ab\u2009c\u2004\u200A"sv}}),
+                    Value{"a\u2001\u000Ab\u2009c\u2004\u200A"sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
+                        "$rtrim", Document{{"input", "\u2001a\u2001\u000Ab\u2009c\u2004\u200A"sv}}),
+                    Value{"\u2001a\u2001\u000Ab\u2009c"sv});
 
     // With custom ascii characters.
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "xxXxXxx"_sd}, {"chars", "x"_sd}}),
-        Value{"XxX"_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "xxXxXxx"sv}, {"chars", "x"sv}}),
+        Value{"XxX"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "xxXxXxx"_sd}, {"chars", "x"_sd}}),
-        Value{"xxXxX"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "xxXxXxx"sv}, {"chars", "x"sv}}),
+        Value{"xxXxX"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$ltrim", Document{{"input", "xxXxXxx"_sd}, {"chars", "x"_sd}}),
-        Value{"XxXxx"_sd});
+        evaluateNamedArgExpression("$ltrim", Document{{"input", "xxXxXxx"sv}, {"chars", "x"sv}}),
+        Value{"XxXxx"sv});
 
     // With custom unicode characters.
+    ASSERT_VALUE_EQ(
+        evaluateNamedArgExpression("$trim", Document{{"input", "⌊y + 2⌋⌊x⌋"sv}, {"chars", "⌊⌋"sv}}),
+        Value{"y + 2⌋⌊x"sv});
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$trim", Document{{"input", "⌊y + 2⌋⌊x⌋"_sd}, {"chars", "⌊⌋"_sd}}),
-                    Value{"y + 2⌋⌊x"_sd});
+                        "$ltrim", Document{{"input", "⌊y + 2⌋⌊x⌋"sv}, {"chars", "⌊⌋"sv}}),
+                    Value{"y + 2⌋⌊x⌋"sv});
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$ltrim", Document{{"input", "⌊y + 2⌋⌊x⌋"_sd}, {"chars", "⌊⌋"_sd}}),
-                    Value{"y + 2⌋⌊x⌋"_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$rtrim", Document{{"input", "⌊y + 2⌋⌊x⌋"_sd}, {"chars", "⌊⌋"_sd}}),
-                    Value{"⌊y + 2⌋⌊x"_sd});
+                        "$rtrim", Document{{"input", "⌊y + 2⌋⌊x⌋"sv}, {"chars", "⌊⌋"sv}}),
+                    Value{"⌊y + 2⌋⌊x"sv});
 }
 
 TEST(ExpressionTrimTest, DoesTrimEntireString) {
     // Using ascii whitespace.
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "  \t \n  "_sd}}),
-                    Value{""_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "   \t  \n\0  "_sd}}),
-                    Value{""_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "  \t   "_sd}}),
-                    Value{""_sd});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "  \t \n  "sv}}),
+                    Value{""sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", "   \t  \n\0  "sv}}),
+                    Value{""sv});
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$rtrim", Document{{"input", "  \t   "sv}}),
+                    Value{""sv});
 
     // Using unicode whitespace.
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
-            "$trim", Document{{"input", "\u2001 \u2001\t\u000A  \u2009\u2004\u200A"_sd}}),
-        Value{""_sd});
+            "$trim", Document{{"input", "\u2001 \u2001\t\u000A  \u2009\u2004\u200A"sv}}),
+        Value{""sv});
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
-            "$ltrim", Document{{"input", "\u2001 \u2001\t\u000A  \u2009\u2004\u200A"_sd}}),
-        Value{""_sd});
+            "$ltrim", Document{{"input", "\u2001 \u2001\t\u000A  \u2009\u2004\u200A"sv}}),
+        Value{""sv});
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
-            "$rtrim", Document{{"input", "\u2001 \u2001\t\u000A  \u2009\u2004\u200A"_sd}}),
-        Value{""_sd});
+            "$rtrim", Document{{"input", "\u2001 \u2001\t\u000A  \u2009\u2004\u200A"sv}}),
+        Value{""sv});
 
     // With custom characters.
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "xxXxXxx"_sd}, {"chars", "x"_sd}}),
-        Value{"XxX"_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "xxXxXxx"sv}, {"chars", "x"sv}}),
+        Value{"XxX"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$rtrim", Document{{"input", "xxXxXxx"_sd}, {"chars", "x"_sd}}),
-        Value{"xxXxX"_sd});
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "xxXxXxx"sv}, {"chars", "x"sv}}),
+        Value{"xxXxX"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$ltrim", Document{{"input", "xxXxXxx"_sd}, {"chars", "x"_sd}}),
-        Value{"XxXxx"_sd});
+        evaluateNamedArgExpression("$ltrim", Document{{"input", "xxXxXxx"sv}, {"chars", "x"sv}}),
+        Value{"XxXxx"sv});
 
     // With custom unicode characters.
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "⌊y⌋⌊x⌋"_sd}, {"chars", "⌊xy⌋"_sd}}),
-        Value{""_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$ltrim", Document{{"input", "⌊y⌋⌊x⌋"_sd}, {"chars", "⌊xy⌋"_sd}}),
-                    Value{""_sd});
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$rtrim", Document{{"input", "⌊y⌋⌊x⌋"_sd}, {"chars", "⌊xy⌋"_sd}}),
-                    Value{""_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "⌊y⌋⌊x⌋"sv}, {"chars", "⌊xy⌋"sv}}),
+        Value{""sv});
+    ASSERT_VALUE_EQ(
+        evaluateNamedArgExpression("$ltrim", Document{{"input", "⌊y⌋⌊x⌋"sv}, {"chars", "⌊xy⌋"sv}}),
+        Value{""sv});
+    ASSERT_VALUE_EQ(
+        evaluateNamedArgExpression("$rtrim", Document{{"input", "⌊y⌋⌊x⌋"sv}, {"chars", "⌊xy⌋"sv}}),
+        Value{""sv});
 }
 
 TEST(ExpressionTrimTest, DoesNotTrimAnyThingWithEmptyChars) {
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "abcde"_sd}, {"chars", ""_sd}}),
-        Value{"abcde"_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "abcde"sv}, {"chars", ""sv}}),
+        Value{"abcde"sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", "  "_sd}, {"chars", ""_sd}}),
-        Value{"  "_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", "  "sv}, {"chars", ""sv}}),
+        Value{"  "sv});
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", " ⌊y⌋⌊x⌋ "_sd}, {"chars", ""_sd}}),
-        Value{" ⌊y⌋⌊x⌋ "_sd});
+        evaluateNamedArgExpression("$trim", Document{{"input", " ⌊y⌋⌊x⌋ "sv}, {"chars", ""sv}}),
+        Value{" ⌊y⌋⌊x⌋ "sv});
 }
 
 TEST(ExpressionTrimTest, TrimComparisonsShouldNotRespectCollation) {
@@ -681,18 +678,18 @@ TEST(ExpressionTrimTest, TrimComparisonsShouldNotRespectCollation) {
                                                                          << "x")),
                                             expCtx.variablesParseState);
 
-    ASSERT_VALUE_EQ(trim->evaluate({}, &expCtx.variables), Value("XX"_sd));
+    ASSERT_VALUE_EQ(trim->evaluate({}, &expCtx.variables), Value("XX"sv));
 }
 
 TEST(ExpressionTrimTest, ShouldRejectInvalidUTFInCharsArgument) {
-    const auto twoThirdsOfExistsSymbol = "\xE2\x88"_sd;  // Full ∃ symbol would be "\xE2\x88\x83".
+    const auto twoThirdsOfExistsSymbol = "\xE2\x88"sv;  // Full ∃ symbol would be "\xE2\x88\x83".
     ASSERT_THROWS(evaluateNamedArgExpression(
-                      "$trim", Document{{"input", "abcde"_sd}, {"chars", twoThirdsOfExistsSymbol}}),
+                      "$trim", Document{{"input", "abcde"sv}, {"chars", twoThirdsOfExistsSymbol}}),
                   AssertionException);
-    const auto stringWithExtraContinuationByte = "\xE2\x88\x83\x83"_sd;
+    const auto stringWithExtraContinuationByte = "\xE2\x88\x83\x83"sv;
     ASSERT_THROWS(
         evaluateNamedArgExpression(
-            "$trim", Document{{"input", "ab∃"_sd}, {"chars", stringWithExtraContinuationByte}}),
+            "$trim", Document{{"input", "ab∃"sv}, {"chars", stringWithExtraContinuationByte}}),
         AssertionException);
     ASSERT_THROWS(evaluateNamedArgExpression(
                       "$ltrim",
@@ -702,95 +699,95 @@ TEST(ExpressionTrimTest, ShouldRejectInvalidUTFInCharsArgument) {
 }
 
 TEST(ExpressionTrimTest, ShouldIgnoreUTF8InputWithTruncatedCodePoint) {
-    const auto twoThirdsOfExistsSymbol = "\xE2\x88"_sd;  // Full ∃ symbol would be "\xE2\x88\x83".
+    const auto twoThirdsOfExistsSymbol = "\xE2\x88"sv;  // Full ∃ symbol would be "\xE2\x88\x83".
 
     // We are OK producing invalid UTF-8 if the input string was invalid UTF-8, so if the truncated
     // code point is in the middle and we never examine it, it should work fine.
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
                         "$rtrim",
                         Document{{"input", "abc" + std::string(twoThirdsOfExistsSymbol) + "edf∃"},
-                                 {"chars", "∃"_sd}}),
+                                 {"chars", "∃"sv}}),
                     Value("abc" + std::string(twoThirdsOfExistsSymbol) + "edf"));
 
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$trim", Document{{"input", twoThirdsOfExistsSymbol}, {"chars", "∃"_sd}}),
+                        "$trim", Document{{"input", twoThirdsOfExistsSymbol}, {"chars", "∃"sv}}),
                     Value(twoThirdsOfExistsSymbol));
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
             "$rtrim",
-            Document{{"input", "abc" + std::string(twoThirdsOfExistsSymbol)}, {"chars", "∃"_sd}}),
+            Document{{"input", "abc" + std::string(twoThirdsOfExistsSymbol)}, {"chars", "∃"sv}}),
         Value("abc" + std::string(twoThirdsOfExistsSymbol)));
 }
 
 TEST(ExpressionTrimTest, ShouldNotTrimUTF8InputWithTrailingExtraContinuationBytes) {
-    const auto stringWithExtraContinuationByte = "\xE2\x88\x83\x83"_sd;
+    const auto stringWithExtraContinuationByte = "\xE2\x88\x83\x83"sv;
 
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
                         "$trim",
                         Document{{"input", std::string(stringWithExtraContinuationByte) + "edf∃"},
-                                 {"chars", "∃"_sd}}),
-                    Value("\x83" + std::string("edf"_sd)));
+                                 {"chars", "∃"sv}}),
+                    Value("\x83" + std::string("edf"sv)));
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
             "$trim",
             Document{{"input", "abc" + std::string(stringWithExtraContinuationByte) + "edf∃"},
-                     {"chars", "∃"_sd}}),
-        Value("abc" + std::string(stringWithExtraContinuationByte) + std::string("edf"_sd)));
+                     {"chars", "∃"sv}}),
+        Value("abc" + std::string(stringWithExtraContinuationByte) + std::string("edf"sv)));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
                         "$trim",
                         Document{{"input", "Abc" + std::string(stringWithExtraContinuationByte)},
-                                 {"chars", "∃"_sd}}),
+                                 {"chars", "∃"sv}}),
                     Value("Abc" + std::string(stringWithExtraContinuationByte)));
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
-            "$rtrim", Document{{"input", stringWithExtraContinuationByte}, {"chars", "∃"_sd}}),
+            "$rtrim", Document{{"input", stringWithExtraContinuationByte}, {"chars", "∃"sv}}),
         Value(stringWithExtraContinuationByte));
 }
 
 TEST(ExpressionTrimTest, ShouldRetunNullIfInputIsNullish) {
     ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", BSONNULL}}),
                     Value(BSONNULL));
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "$missingField"_sd}}),
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", "$missingField"sv}}),
                     Value(BSONNULL));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression("$trim", Document{{"input", BSONUndefined}}),
                     Value(BSONNULL));
 
     // Test with a chars argument provided.
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", BSONNULL}, {"chars", "∃"_sd}}),
+        evaluateNamedArgExpression("$trim", Document{{"input", BSONNULL}, {"chars", "∃"sv}}),
         Value(BSONNULL));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$trim", Document{{"input", "$missingField"_sd}, {"chars", "∃"_sd}}),
+                        "$trim", Document{{"input", "$missingField"sv}, {"chars", "∃"sv}}),
                     Value(BSONNULL));
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", BSONUndefined}, {"chars", "∃"_sd}}),
+        evaluateNamedArgExpression("$trim", Document{{"input", BSONUndefined}, {"chars", "∃"sv}}),
         Value(BSONNULL));
 
     // Test other variants of trim.
     ASSERT_VALUE_EQ(evaluateNamedArgExpression("$ltrim", Document{{"input", BSONNULL}}),
                     Value(BSONNULL));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$rtrim", Document{{"input", "$missingField"_sd}, {"chars", "∃"_sd}}),
+                        "$rtrim", Document{{"input", "$missingField"sv}, {"chars", "∃"sv}}),
                     Value(BSONNULL));
 }
 
 TEST(ExpressionTrimTest, ShouldRetunNullIfCharsIsNullish) {
     ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression("$trim", Document{{"input", " x "_sd}, {"chars", BSONNULL}}),
+        evaluateNamedArgExpression("$trim", Document{{"input", " x "sv}, {"chars", BSONNULL}}),
         Value(BSONNULL));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$trim", Document{{"input", " x "_sd}, {"chars", "$missingField"_sd}}),
+                        "$trim", Document{{"input", " x "sv}, {"chars", "$missingField"sv}}),
                     Value(BSONNULL));
-    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$trim", Document{{"input", " x "_sd}, {"chars", BSONUndefined}}),
-                    Value(BSONNULL));
+    ASSERT_VALUE_EQ(
+        evaluateNamedArgExpression("$trim", Document{{"input", " x "sv}, {"chars", BSONUndefined}}),
+        Value(BSONNULL));
 
     // Test other variants of trim.
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$ltrim", Document{{"input", " x "_sd}, {"chars", "$missingField"_sd}}),
+                        "$ltrim", Document{{"input", " x "sv}, {"chars", "$missingField"sv}}),
                     Value(BSONNULL));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$rtrim", Document{{"input", " x "_sd}, {"chars", BSONUndefined}}),
+                        "$rtrim", Document{{"input", " x "sv}, {"chars", BSONUndefined}}),
                     Value(BSONNULL));
 }
 
@@ -799,18 +796,18 @@ TEST(ExpressionTrimTest, ShouldReturnNullIfBothCharsAndCharsAreNullish) {
         evaluateNamedArgExpression("$trim", Document{{"input", BSONNULL}, {"chars", BSONNULL}}),
         Value(BSONNULL));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$trim", Document{{"input", BSONUndefined}, {"chars", "$missingField"_sd}}),
+                        "$trim", Document{{"input", BSONUndefined}, {"chars", "$missingField"sv}}),
                     Value(BSONNULL));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$trim", Document{{"input", "$missingField"_sd}, {"chars", BSONUndefined}}),
+                        "$trim", Document{{"input", "$missingField"sv}, {"chars", BSONUndefined}}),
                     Value(BSONNULL));
 
     // Test other variants of trim.
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$rtrim", Document{{"input", BSONNULL}, {"chars", "$missingField"_sd}}),
+                        "$rtrim", Document{{"input", BSONNULL}, {"chars", "$missingField"sv}}),
                     Value(BSONNULL));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
-                        "$ltrim", Document{{"input", "$missingField"_sd}, {"chars", BSONNULL}}),
+                        "$ltrim", Document{{"input", "$missingField"sv}, {"chars", BSONNULL}}),
                     Value(BSONNULL));
 }
 

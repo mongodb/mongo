@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/index_path_projection.h"
@@ -43,6 +42,8 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
+
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -62,7 +63,7 @@ namespace mongo {
  */
 class WildcardKeyGenerator {
 public:
-    static constexpr StringData kSubtreeSuffix = WildcardNames::WILDCARD_FIELD_NAME_SUFFIX;
+    static constexpr std::string_view kSubtreeSuffix = WildcardNames::WILDCARD_FIELD_NAME_SUFFIX;
 
     /**
      * Returns an owned ProjectionExecutor identical to the one that WildcardKeyGenerator will use
@@ -104,7 +105,7 @@ public:
      * document-driven key generation on the primary and when regenerating keys from a
      * `setMultikeyMetadata` oplog entry on the secondary.
      */
-    static key_string::Value makeMultikeyMetadataKey(StringData fieldPath,
+    static key_string::Value makeMultikeyMetadataKey(std::string_view fieldPath,
                                                      size_t prefixFieldCount,
                                                      size_t suffixFieldCount,
                                                      key_string::Version version,

@@ -61,6 +61,7 @@
 #include <memory>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <variant>
@@ -137,6 +138,7 @@ static_assert(kDebugBuild == 1, "Only use in debug builds");
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -280,21 +282,21 @@ ConstDataRange binDataToCDR(const Value& value) {
 }
 
 template <typename T>
-void toBinData(StringData field, T t, BSONObjBuilder* builder) {
+void toBinData(std::string_view field, T t, BSONObjBuilder* builder) {
     BSONObj obj = t.toBSON();
 
     builder->appendBinData(field, obj.objsize(), BinDataType::BinDataGeneral, obj.objdata());
 }
 
-void toBinData(StringData field, PrfBlock block, BSONObjBuilder* builder) {
+void toBinData(std::string_view field, PrfBlock block, BSONObjBuilder* builder) {
     builder->appendBinData(field, block.size(), BinDataType::BinDataGeneral, block.data());
 }
 
-void toBinData(StringData field, ConstDataRange block, BSONObjBuilder* builder) {
+void toBinData(std::string_view field, ConstDataRange block, BSONObjBuilder* builder) {
     builder->appendBinData(field, block.length(), BinDataType::BinDataGeneral, block.data());
 }
 
-void toBinData(StringData field, std::vector<uint8_t>& block, BSONObjBuilder* builder) {
+void toBinData(std::string_view field, std::vector<uint8_t>& block, BSONObjBuilder* builder) {
     builder->appendBinData(field, block.size(), BinDataType::BinDataGeneral, block.data());
 }
 
@@ -315,13 +317,16 @@ std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, T t) {
 }
 
 template <typename T>
-void toEncryptedBinData(StringData field, EncryptedBinDataType dt, T t, BSONObjBuilder* builder) {
+void toEncryptedBinData(std::string_view field,
+                        EncryptedBinDataType dt,
+                        T t,
+                        BSONObjBuilder* builder) {
     auto buf = toEncryptedVector(dt, t);
 
     builder->appendBinData(field, buf.size(), BinDataType::Encrypt, buf.data());
 }
 
-void toEncryptedBinData(StringData field,
+void toEncryptedBinData(std::string_view field,
                         EncryptedBinDataType dt,
                         ConstDataRange cdr,
                         BSONObjBuilder* builder) {
@@ -333,7 +338,7 @@ void toEncryptedBinData(StringData field,
     builder->appendBinData(field, buf.size(), BinDataType::Encrypt, buf.data());
 }
 
-void toEncryptedBinDataPretyped(StringData field,
+void toEncryptedBinDataPretyped(std::string_view field,
                                 EncryptedBinDataType dt,
                                 ConstDataRange cdr,
                                 BSONObjBuilder* builder) {
@@ -808,15 +813,15 @@ class SinglyLinkedFieldPath {
 public:
     SinglyLinkedFieldPath() : _predecessor(nullptr) {}
 
-    SinglyLinkedFieldPath(StringData fieldName, const SinglyLinkedFieldPath* predecessor)
+    SinglyLinkedFieldPath(std::string_view fieldName, const SinglyLinkedFieldPath* predecessor)
         : _currentField(fieldName), _predecessor(predecessor) {}
 
 
-    std::string getFieldPath(StringData fieldName) const;
+    std::string getFieldPath(std::string_view fieldName) const;
 
 private:
     // Name of the current field that is being parsed.
-    const StringData _currentField;
+    const std::string_view _currentField;
 
     // Pointer to a parent parser context.
     // This provides a singly linked list of parent pointers, and use to produce a full path to a
@@ -825,7 +830,7 @@ private:
 };
 
 
-std::string SinglyLinkedFieldPath::getFieldPath(StringData fieldName) const {
+std::string SinglyLinkedFieldPath::getFieldPath(std::string_view fieldName) const {
     dassert(!fieldName.empty());
     if (_predecessor == nullptr) {
         str::stream builder;
@@ -838,7 +843,7 @@ std::string SinglyLinkedFieldPath::getFieldPath(StringData fieldName) const {
 
         return builder;
     } else {
-        std::stack<StringData> pieces;
+        std::stack<std::string_view> pieces;
 
         pieces.push(fieldName);
 
@@ -879,7 +884,7 @@ std::string SinglyLinkedFieldPath::getFieldPath(StringData fieldName) const {
  */
 BSONObj transformBSON(
     const BSONObj& object,
-    const std::function<void(ConstDataRange, BSONObjBuilder*, StringData)>& doTransform) {
+    const std::function<void(ConstDataRange, BSONObjBuilder*, std::string_view)>& doTransform) {
     struct IteratorState {
         BSONObjIterator iter;
         BSONObjBuilder builder;
@@ -973,7 +978,7 @@ void visitEncryptedBSON(const BSONObj& object,
 }
 
 void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pFields,
-                                       StringData fieldPath,
+                                       std::string_view fieldPath,
                                        EncryptedBinDataType type,
                                        ConstDataRange subCdr) {
     EDCServerPayloadInfo payloadInfo;
@@ -1027,7 +1032,7 @@ void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pField
 
 void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
                           ConstDataRange cdr,
-                          StringData fieldPath) {
+                          std::string_view fieldPath) {
 
     // TODO: SERVER-127454 - validate field is actually indexed in the schema
 
@@ -1075,7 +1080,7 @@ void convertServerPayload(ConstDataRange cdr,
                           std::vector<TagInfo>* pTags,
                           ConstVectorIteratorPair<EDCServerPayloadInfo>& it,
                           BSONObjBuilder* builder,
-                          StringData fieldPath) {
+                          std::string_view fieldPath) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     if (encryptedTypeBinding == EncryptedBinDataType::kFLE2FindEqualityPayloadV2 ||
         encryptedTypeBinding == EncryptedBinDataType::kFLE2FindRangePayloadV2) {
@@ -1141,7 +1146,7 @@ void convertServerPayload(ConstDataRange cdr,
 
 void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
                           ConstDataRange cdr,
-                          StringData fieldPath) {
+                          std::string_view fieldPath) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
 
     if (encryptedTypeBinding == EncryptedBinDataType::kFLE2EqualityIndexedValueV2 ||
@@ -1153,7 +1158,7 @@ void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
 
 void collectFieldValidationInfo(stdx::unordered_map<std::string, ConstDataRange>* pFields,
                                 ConstDataRange cdr,
-                                StringData fieldPath) {
+                                std::string_view fieldPath) {
     pFields->insert({std::string{fieldPath}, cdr});
 }
 
@@ -1294,24 +1299,24 @@ UniqueMongoCrypt createMongoCrypt() {
 BSONObj runStateMachineForEncryption(mongocrypt_ctx_t* ctx,
                                      FLEKeyVault* keyVault,
                                      const BSONObj& cryptdResult,
-                                     StringData dbName) {
+                                     std::string_view dbName) {
     bool done = false;
     BSONObj result;
-    StringData errorContext = "encryptionStateMachine"_sd;
+    std::string_view errorContext = "encryptionStateMachine"sv;
 
     while (!done) {
         switch (mongocrypt_ctx_state(ctx)) {
             case MONGOCRYPT_CTX_NEED_MONGO_MARKINGS: {
                 MongoCryptBinary opbin = MongoCryptBinary::create();
                 if (!mongocrypt_ctx_mongo_op(ctx, opbin)) {
-                    errorContext = "mongocrypt_ctx_mongo_op failed"_sd;
+                    errorContext = "mongocrypt_ctx_mongo_op failed"sv;
                     break;
                 }
 
                 BSONObj opobj = opbin.toBSON();
 
                 bool feedOk = false;
-                StringData opCmdName(opobj.firstElementFieldName());
+                std::string_view opCmdName(opobj.firstElementFieldName());
                 uassert(7132300,
                         "Invalid command obtained from mongocrypt_ctx_mongo_op",
                         !opCmdName.empty());
@@ -1330,9 +1335,9 @@ BSONObj runStateMachineForEncryption(mongocrypt_ctx_t* ctx,
                 }
 
                 if (!feedOk) {
-                    errorContext = "mongocrypt_ctx_mongo_feed failed"_sd;
+                    errorContext = "mongocrypt_ctx_mongo_feed failed"sv;
                 } else if (!mongocrypt_ctx_mongo_done(ctx)) {
-                    errorContext = "mongocrypt_ctx_mongo_done failed"_sd;
+                    errorContext = "mongocrypt_ctx_mongo_done failed"sv;
                 }
                 break;
             }
@@ -1343,7 +1348,7 @@ BSONObj runStateMachineForEncryption(mongocrypt_ctx_t* ctx,
             case MONGOCRYPT_CTX_READY: {
                 MongoCryptBinary output = MongoCryptBinary::create();
                 if (!mongocrypt_ctx_finalize(ctx, output)) {
-                    errorContext = "mongocrypt_ctx_finalize failed"_sd;
+                    errorContext = "mongocrypt_ctx_finalize failed"sv;
                     break;
                 }
                 result = output.toBSON().getOwned();
@@ -1374,7 +1379,7 @@ BSONObj runStateMachineForEncryption(mongocrypt_ctx_t* ctx,
                 // mongocrypt_setopt_encrypted_field_config_map().
                 MongoCryptBinary opbin = MongoCryptBinary::create();
                 if (!mongocrypt_ctx_mongo_op(ctx, opbin)) {
-                    errorContext = "mongocrypt_ctx_mongo_op failed"_sd;
+                    errorContext = "mongocrypt_ctx_mongo_op failed"sv;
                     break;
                 }
 
@@ -1391,9 +1396,9 @@ BSONObj runStateMachineForEncryption(mongocrypt_ctx_t* ctx,
                 auto feed = MongoCryptBinary::createFromBSONObj(listCollectionReply.done());
                 auto feedOk = mongocrypt_ctx_mongo_feed(ctx, feed);
                 if (!feedOk) {
-                    errorContext = "mongocrypt_ctx_mongo_feed failed"_sd;
+                    errorContext = "mongocrypt_ctx_mongo_feed failed"sv;
                 } else if (!mongocrypt_ctx_mongo_done(ctx)) {
-                    errorContext = "mongocrypt_ctx_mongo_done failed"_sd;
+                    errorContext = "mongocrypt_ctx_mongo_done failed"sv;
                 }
                 break;
             }
@@ -1835,7 +1840,7 @@ StateCollectionTokensV2::Encrypted StateCollectionTokensV2::encrypt(const ECOCTo
     MONGO_UNREACHABLE;
 }
 
-BSONObj StateCollectionTokensV2::Encrypted::generateDocument(StringData fieldName) const {
+BSONObj StateCollectionTokensV2::Encrypted::generateDocument(std::string_view fieldName) const {
     assertLength(_encryptedTokens.size());
     BSONObjBuilder builder;
     builder.append(kId, OID::gen());
@@ -1852,7 +1857,7 @@ BSONObj FLEClientCrypto::transformPlaceholders(const BSONObj& originalCmd,
                                                const BSONObj& cryptdResult,
                                                const BSONObj& encryptedFieldConfigMap,
                                                FLEKeyVault* keyVault,
-                                               StringData dbName) {
+                                               std::string_view dbName) {
     auto crypt = createMongoCrypt();
     LOGV2_DEBUG(7132304,
                 1,
@@ -1860,13 +1865,14 @@ BSONObj FLEClientCrypto::transformPlaceholders(const BSONObj& originalCmd,
                 "originalCmd"_attr = originalCmd,
                 "cryptdResult"_attr = cryptdResult);
 
-    auto uassertMongoCryptStatusOK = [](mongocrypt_t* crypt, bool result, StringData context) {
-        if (!result) {
-            MongoCryptStatus status;
-            mongocrypt_status(crypt, status);
-            uassertStatusOK(status.toStatus().withContext(context));
-        }
-    };
+    auto uassertMongoCryptStatusOK =
+        [](mongocrypt_t* crypt, bool result, std::string_view context) {
+            if (!result) {
+                MongoCryptStatus status;
+                mongocrypt_status(crypt, status);
+                uassertStatusOK(status.toStatus().withContext(context));
+            }
+        };
 
     {
         SymmetricKey& key = keyVault->getKMSLocalKey();
@@ -3192,7 +3198,7 @@ void EDCServerCollection::validateEncryptedFieldInfo(BSONObj& obj,
         }
     }
 
-    visitEncryptedBSON(obj, [&indexedFields](ConstDataRange cdr, StringData fieldPath) {
+    visitEncryptedBSON(obj, [&indexedFields](ConstDataRange cdr, std::string_view fieldPath) {
         auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
 
         if (encryptedTypeBinding == EncryptedBinDataType::kFLE2InsertUpdatePayloadV2) {
@@ -3210,7 +3216,7 @@ void EDCServerCollection::validateEncryptedFieldInfo(BSONObj& obj,
 }
 
 void EDCServerCollection::validateModifiedDocumentCompatibility(BSONObj& obj) {
-    visitEncryptedBSON(obj, [](ConstDataRange cdr, StringData fieldPath) {
+    visitEncryptedBSON(obj, [](ConstDataRange cdr, std::string_view fieldPath) {
         auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
         switch (encryptedTypeBinding) {
             case EncryptedBinDataType::kFLE2EqualityIndexedValue:
@@ -3229,7 +3235,7 @@ void EDCServerCollection::validateModifiedDocumentCompatibility(BSONObj& obj) {
 
 std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSONObj& obj) {
     std::vector<EDCServerPayloadInfo> fields;
-    visitEncryptedBSON(obj, [&fields](ConstDataRange cdr, StringData fieldPath) {
+    visitEncryptedBSON(obj, [&fields](ConstDataRange cdr, std::string_view fieldPath) {
         collectEDCServerInfo(&fields, cdr, fieldPath);
     });
 
@@ -3357,7 +3363,7 @@ BSONObj EDCServerCollection::finalizeForInsert(
 
     // First: transform all the markings
     auto obj = transformBSON(
-        doc, [&tags, &it](ConstDataRange cdr, BSONObjBuilder* builder, StringData fieldPath) {
+        doc, [&tags, &it](ConstDataRange cdr, BSONObjBuilder* builder, std::string_view fieldPath) {
             convertServerPayload(cdr, &tags, it, builder, fieldPath);
         });
 
@@ -3409,7 +3415,7 @@ BSONObj EDCServerCollection::finalizeForUpdate(
 
     // First: transform all the markings
     auto obj = transformBSON(
-        doc, [&tags, &it](ConstDataRange cdr, BSONObjBuilder* builder, StringData fieldPath) {
+        doc, [&tags, &it](ConstDataRange cdr, BSONObjBuilder* builder, std::string_view fieldPath) {
             convertServerPayload(cdr, &tags, it, builder, fieldPath);
         });
 
@@ -3547,7 +3553,7 @@ std::vector<PrfBlock> EDCServerCollection::getRemovedTags(
 std::vector<EDCIndexedFields> EDCServerCollection::getEncryptedIndexedFields(BSONObj& obj) {
     std::vector<EDCIndexedFields> fields;
 
-    visitEncryptedBSON(obj, [&fields](ConstDataRange cdr, StringData fieldPath) {
+    visitEncryptedBSON(obj, [&fields](ConstDataRange cdr, std::string_view fieldPath) {
         collectIndexedFields(&fields, cdr, fieldPath);
     });
 
@@ -3616,8 +3622,8 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
 void EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
     const EncryptedFieldConfig& ef) {
 
-    auto calculateMaxTags = [](const boost::optional<StringData>& type,
-                               StringData path,
+    auto calculateMaxTags = [](const boost::optional<std::string_view>& type,
+                               std::string_view path,
                                const QueryTypeConfig& qtc) -> uint64_t {
         auto qtype = qtc.getQueryType();
         if (qtype == QueryTypeEnum::Equality) {
@@ -3695,7 +3701,7 @@ void EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceed
     static_assert(kSubstringPreviewLowerBoundMin <= kSubstringPreviewUpperBoundMax);
     static_assert(kSubstringPreviewUpperBoundMax <= kSubstringPreviewMaxLengthMax);
 
-    static constexpr StringData bypassMsg =
+    static constexpr std::string_view bypassMsg =
         "Consider setting the fleDisableSubstringPreviewParameterLimits cluster parameter to true "
         "to bypass this limit.";
     if (ServerParameterSet::getClusterParameterSet()
@@ -3935,13 +3941,13 @@ std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj co
 
 void CompactionHelpers::validateCompactionOrCleanupTokens(const EncryptedFieldConfig& efc,
                                                           BSONObj compactionTokens,
-                                                          StringData tokenType) {
+                                                          std::string_view tokenType) {
     _validateTokens(efc, compactionTokens, tokenType);
 }
 
 void CompactionHelpers::_validateTokens(const EncryptedFieldConfig& efc,
                                         BSONObj tokens,
-                                        StringData cmd) {
+                                        std::string_view cmd) {
     for (const auto& field : efc.getFields()) {
         const auto& tokenElement = tokens.getField(field.getPath());
         uassert(7294900,
@@ -4070,10 +4076,10 @@ Edges::Edges(std::string leaf, int sparsity, const boost::optional<int>& optTrim
             _trimFactor >= 0 && (_trimFactor == 0 || (size_t)_trimFactor < _leaf.length()));
 }
 
-std::vector<StringData> Edges::get() {
-    static const StringData kRoot = "root"_sd;
-    StringData leaf = _leaf;
-    std::vector<StringData> result;
+std::vector<std::string_view> Edges::get() {
+    static const std::string_view kRoot = "root"sv;
+    std::string_view leaf = _leaf;
+    std::vector<std::string_view> result;
     if (_trimFactor == 0) {
         result.push_back(kRoot);
     }
@@ -4161,7 +4167,9 @@ std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
     return getEdgesT(aost.value, aost.min, aost.max, sparsity, trimFactor);
 }
 
-std::uint64_t getEdgesLength(BSONType fieldType, StringData fieldPath, QueryTypeConfig config) {
+std::uint64_t getEdgesLength(BSONType fieldType,
+                             std::string_view fieldPath,
+                             QueryTypeConfig config) {
     // validates fieldType & config and sets defaults
     setRangeDefaults(fieldType, fieldPath, &config);
 

@@ -29,7 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+
+#include <cstdint>
+#include <string_view>
 
 /**
  * Enum and string constants for all function names that can appear in ABT FunctionCall nodes.
@@ -40,7 +42,7 @@
  *    is lowered to EVariable, and kBlockTraverseFPlaceholder, which is resolved by the vectorizer)
  *
  * EFn is an enum class whose integer values index into a parallel array of string names in
- * sbe_fn_names.cpp. Use toString(EFn) to get the string and fromString(StringData) to reverse
+ * sbe_fn_names.cpp. Use toString(EFn) to get the string and fromString(std::string_view) to reverse
  * the mapping.
  *
  * The authoritative source for VM dispatch is the kBuiltinFunctions and kInstrFunctions maps in
@@ -55,7 +57,7 @@
  *    Increment kNumFunctions by adjusting the sentinel; it is the last enumerator and its
  *    value is computed automatically.
  *
- * 2. sbe_fn_names.cpp — add a {StringData, EFn} entry to kEFnByName[] in the same
+ * 2. sbe_fn_names.cpp — add a {std::string_view, EFn} entry to kEFnByName[] in the same
  *    alphabetical position as step 1. This array must remain sorted by string value
  *    and its enum values must stay in sequential order (both are compile-time checked).
  *    If the function is only reachable from the ABT/optimizer layer under a different
@@ -429,7 +431,7 @@ enum class EFn : uint16_t {
  * Convert an EFn value to its canonical string representation.
  * Calling with an out-of-range value is a programming error (invariant).
  */
-StringData toString(EFn fn);
+std::string_view toString(EFn fn);
 
 /**
  * Reverse mapping: look up an EFn by its string name (or a recognised alias
@@ -438,7 +440,7 @@ StringData toString(EFn fn);
  * invalid function name, which is a programmer error, not a recoverable
  * condition.
  */
-EFn fromString(StringData name);
+EFn fromString(std::string_view name);
 
 // clang-format on
 

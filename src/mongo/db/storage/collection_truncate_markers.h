@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -46,6 +45,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -163,7 +163,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    static StringData toString(MarkersCreationMethod creationMethod);
+    static std::string_view toString(MarkersCreationMethod creationMethod);
 
     // The initial set of markers to use when constructing the CollectionMarkers object.
     struct InitialSetOfMarkers {

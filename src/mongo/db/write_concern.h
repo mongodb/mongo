@@ -43,6 +43,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace MONGO_MOD_PUB mongo {
@@ -73,7 +74,7 @@ extern std::function<void(WriteConcernOptions&)> remapWriteConcernHook;
  */
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                                                     const GenericArguments& invocation,
-                                                    StringData commandName,
+                                                    std::string_view commandName,
                                                     bool isInternalClient);
 
 /**

@@ -42,6 +42,8 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::rule_based_rewrites::pipeline {
@@ -109,7 +111,7 @@ bool groupMatchSwapVerified(const DocumentSourceMatch& nextMatch,
  * Returns 'true' if the given stage is an internal change stream stage that can appear in a router
  * (mongoS) pipeline, or 'false' otherwise.
  */
-bool isChangeStreamRouterPipelineStage(StringData stageName) {
+bool isChangeStreamRouterPipelineStage(std::string_view stageName) {
     return change_stream_constants::kChangeStreamRouterPipelineStages.contains(stageName);
 }
 
@@ -186,7 +188,7 @@ DocumentSource::GetModPathsReturn buildModPaths(PipelineRewriteContext& ctx, Doc
         return toGetModPathsReturn(prev);
     }
 
-    auto canPathBeArray = [&](StringData path) {
+    auto canPathBeArray = [&](std::string_view path) {
         return ctx.getDependencyGraph().canPathBeArray(&prev, path);
     };
 
@@ -251,7 +253,7 @@ bool matchContainsTestingField(PipelineRewriteContext& ctx) {
     auto& match = checked_cast<DocumentSourceMatch&>(ctx.current());
     auto me = match.getMatchExpression();
 
-    if (me->path().find("test") == StringData::npos) {
+    if (me->path().find("test") == std::string_view::npos) {
         return false;
     }
 
@@ -287,7 +289,7 @@ bool introduceArrayTypeFilteringToMatch(PipelineRewriteContext& ctx) {
         auto query = match.getQuery();
         for (const auto& elem : query) {
             auto typeExpr = std::make_unique<TypeMatchExpression>(
-                StringData(elem.fieldNameStringData()), MatcherTypeSet(BSONType::array));
+                std::string_view(elem.fieldNameStringData()), MatcherTypeSet(BSONType::array));
             if (ctx.getExpCtx().canPathBeArrayForNss(FieldPath(elem.fieldNameStringData()),
                                                      ctx.getExpCtx().getNamespaceString())) {
                 additionalFilter->add(std::move(typeExpr));

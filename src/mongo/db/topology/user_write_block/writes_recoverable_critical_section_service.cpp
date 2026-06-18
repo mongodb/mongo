@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -64,6 +63,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -72,6 +72,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(skipRecoverUserWriteCriticalSections);
@@ -79,11 +80,11 @@ MONGO_FAIL_POINT_DEFINE(skipRecoverUserWriteCriticalSections);
 const auto serviceDecorator =
     ServiceContext::declareDecoration<UserWritesRecoverableCriticalSectionService>();
 
-inline StringData reasonText(const boost::optional<UserWritesBlockReasonEnum>& reason) {
+inline std::string_view reasonText(const boost::optional<UserWritesBlockReasonEnum>& reason) {
     return idl::serialize(reason.value_or(UserWritesBlockReasonEnum::kUnspecified));
 }
 
-inline StringData reasonText(const ReplicaSetWritesBlockReasonEnum& reason) {
+inline std::string_view reasonText(const ReplicaSetWritesBlockReasonEnum& reason) {
     return idl::serialize(reason);
 }
 
@@ -118,7 +119,7 @@ void acquireCriticalSection(OperationContext* opCtx,
                             const NamespaceString& collectionNss,
                             const NamespaceString& nss,
                             LockMode lockMode,
-                            StringData logContext,
+                            std::string_view logContext,
                             CheckExistingFn&& checkExistingDoc,
                             BuildNewDocFn&& buildNewDoc) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
@@ -145,7 +146,7 @@ template <typename DocType, typename CheckExistingFn>
 void releaseCriticalSection(OperationContext* opCtx,
                             const NamespaceString& collectionNss,
                             const NamespaceString& nss,
-                            StringData logContext,
+                            std::string_view logContext,
                             CheckExistingFn&& checkExistingDoc) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
@@ -234,7 +235,7 @@ void UserWritesRecoverableCriticalSectionService::
         NamespaceString::kUserWritesCriticalSectionsNamespace,
         nss,
         MODE_X,
-        "AcquireUserWritesCS"_sd,
+        "AcquireUserWritesCS"sv,
         [&](const UserWriteBlockingCriticalSectionDocument& collCSDoc) {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "Cannot acquire user writes critical section with different "
@@ -298,7 +299,7 @@ void UserWritesRecoverableCriticalSectionService::
         NamespaceString::kUserWritesCriticalSectionsNamespace,
         nss,
         MODE_IX,
-        "AcquireUserWritesCS"_sd,
+        "AcquireUserWritesCS"sv,
         [&](const UserWriteBlockingCriticalSectionDocument& collCSDoc) {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "Cannot acquire user writes critical section with different "
@@ -474,7 +475,7 @@ void UserWritesRecoverableCriticalSectionService::
         opCtx,
         NamespaceString::kUserWritesCriticalSectionsNamespace,
         nss,
-        "ReleaseUserWritesCS"_sd,
+        "ReleaseUserWritesCS"sv,
         [&](const UserWriteBlockingCriticalSectionDocument& collCSDoc) {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "Cannot release user writes critical section with different "
@@ -561,7 +562,7 @@ void UserWritesRecoverableCriticalSectionService::
         NamespaceString::kReplicaSetWritesCriticalSectionsNamespace,
         nss,
         MODE_X,
-        "AcquireReplicaSetWritesCS"_sd,
+        "AcquireReplicaSetWritesCS"sv,
         [&](const ReplicaSetWriteBlockingCriticalSectionDocument& collCSDoc) {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream()
@@ -617,7 +618,7 @@ void UserWritesRecoverableCriticalSectionService::
         opCtx,
         NamespaceString::kReplicaSetWritesCriticalSectionsNamespace,
         nss,
-        "ReleaseReplicaSetWritesCS"_sd,
+        "ReleaseReplicaSetWritesCS"sv,
         [&](const ReplicaSetWriteBlockingCriticalSectionDocument& doc) {
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot release with different reason",

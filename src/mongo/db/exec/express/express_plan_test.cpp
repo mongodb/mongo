@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/express/express_plan.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/curop.h"
@@ -54,11 +53,13 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 #include <variant>
 
 namespace mongo::express {
 namespace {
+using namespace std::literals::string_view_literals;
 class ExpressPlanTest : public CatalogTestFixture {
 public:
     CollectionAcquisition createAndPopulateTestCollectionWithOptions(
@@ -106,13 +107,13 @@ public:
 
     // std::convertible_to is not yet universally supported.
     CollectionAcquisition createAndPopulateTestCollection(
-        /* std::convertible_to<StringData> */ auto... documents) {
+        /* std::convertible_to<std::string_view> */ auto... documents) {
         return createAndPopulateTestCollectionWithOptions(
             CollectionOptions(), {}, {fromjson(documents)...});
     }
 
     CollectionAcquisition createAndPopulateTestClusteredCollection(
-        /* std::convertible_to<StringData> */ auto... documents) {
+        /* std::convertible_to<std::string_view> */ auto... documents) {
         bool unique = true;
         bool legacyFormat = false;
         return createAndPopulateTestCollectionWithOptions(
@@ -123,7 +124,7 @@ public:
     }
 
     CollectionAcquisition createAndPopulateTestCollectionWithIndex(
-        BSONObj indexSpec, /* std::convertible_to<StringData> */ auto... documents) {
+        BSONObj indexSpec, /* std::convertible_to<std::string_view> */ auto... documents) {
         return createAndPopulateTestCollectionWithOptions(
             CollectionOptions(), {std::move(indexSpec)}, {fromjson(documents)...});
     }
@@ -158,8 +159,8 @@ static PlanProgress iterateButExpectNoDocument(OperationContext* opCtx, auto& it
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
-    auto collection = createAndPopulateTestCollection(
-        "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
+    auto collection =
+        createAndPopulateTestCollection("{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 2}"));
@@ -192,8 +193,8 @@ TEST_F(ExpressPlanTest,
         rss::ReplicatedStorageService::get(operationContext()).getPersistenceProvider();
     ASSERT(provider.supportsCursorReuseForExpressPathQueries());
 
-    auto collection = createAndPopulateTestCollection(
-        "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
+    auto collection =
+        createAndPopulateTestCollection("{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 2}"));
@@ -221,8 +222,8 @@ TEST_F(ExpressPlanTest,
 TEST_F(ExpressPlanTest, TestIdLookupViaIndexBsonRemainsValidAndOwnableAfterConsumeOneReturns) {
     // The executor reads (and may 'makeOwned') the BSONObj produced by the iterator after
     // 'consumeOne' returns.
-    auto collection = createAndPopulateTestCollection(
-        "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
+    auto collection =
+        createAndPopulateTestCollection("{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 2}"));
@@ -251,8 +252,8 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexBsonRemainsValidAndOwnableAfterConsu
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
-    auto collection = createAndPopulateTestCollection(
-        "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
+    auto collection =
+        createAndPopulateTestCollection("{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 4}"));
@@ -274,7 +275,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
 
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
     auto collection = createAndPopulateTestClusteredCollection(
-        "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
+        "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
 
     IteratorStats iteratorStats;
     IdLookupOnClusteredCollection iterator(fromjson("{_id: 2}"));
@@ -299,7 +300,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
 
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
     auto collection = createAndPopulateTestClusteredCollection(
-        "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
+        "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
 
     IteratorStats iteratorStats;
     IdLookupOnClusteredCollection iterator(fromjson("{_id: 4}"));
@@ -320,10 +321,10 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
-    StringData indexName = "a_1"_sd;
+    std::string_view indexName = "a_1"sv;
     auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
     auto collection = createAndPopulateTestCollectionWithIndex(
-        indexSpec, "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
     const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
     auto indexEntry =
@@ -354,13 +355,13 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
-    StringData indexName = "a_1"_sd;
+    std::string_view indexName = "a_1"sv;
     auto collationSpec = BSON("locale" << "en_US"
                                        << "strength" << 2);
     auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1) << "collation"
                               << collationSpec);
     auto collection = createAndPopulateTestCollectionWithIndex(
-        indexSpec, "{_id: 0, a: 'II'}"_sd, "{_id: 1, a: 'III'}"_sd, "{_id: 2, a: 'V'}"_sd);
+        indexSpec, "{_id: 0, a: 'II'}"sv, "{_id: 1, a: 'III'}"sv, "{_id: 2, a: 'V'}"sv);
     const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
     auto indexEntry =
@@ -391,10 +392,10 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
-    StringData indexName = "a_1"_sd;
+    std::string_view indexName = "a_1"sv;
     auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
     auto collection = createAndPopulateTestCollectionWithIndex(
-        indexSpec, "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
     const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
     auto indexEntry =
@@ -428,13 +429,13 @@ projection_ast::Projection parseProjection(OperationContext* opCtx, BSONObj proj
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
-    StringData indexName = "a_1_b_1_c_1"_sd;
+    std::string_view indexName = "a_1_b_1_c_1"sv;
     auto indexSpec =
         BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1 << "b" << 1 << "c" << 1));
     auto collection = createAndPopulateTestCollectionWithIndex(indexSpec,
-                                                               "{_id: 0, a: 2, b: 3, c: 4}"_sd,
-                                                               "{_id: 1, a: 5, b: 6, c: 7}"_sd,
-                                                               "{_id: 2, a: 8, b: 9, c: 10}"_sd);
+                                                               "{_id: 0, a: 2, b: 3, c: 4}"sv,
+                                                               "{_id: 1, a: 5, b: 6, c: 7}"sv,
+                                                               "{_id: 2, a: 8, b: 9, c: 10}"sv);
     const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
     auto indexEntry =

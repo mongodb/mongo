@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -41,6 +40,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -60,7 +60,7 @@ public:
 
     static ABT createFromCopy(sbe::value::TypeTags tag, sbe::value::Value val);
 
-    static ABT str(StringData str);
+    static ABT str(std::string_view str);
 
     static ABT int32(int32_t valueInt32);
     static ABT int64(int64_t valueInt64);
@@ -104,7 +104,7 @@ public:
     }
 
     bool isString() const;
-    StringData getString() const;
+    std::string_view getString() const;
 
     bool isValueInt64() const;
     int64_t getValueInt64() const;
@@ -551,7 +551,7 @@ public:
     }
 
     // Accepts a string name for backward compatibility; resolves via fromString() at construction.
-    FunctionCall(StringData inName, ABTVector inArgs)
+    FunctionCall(std::string_view inName, ABTVector inArgs)
         : FunctionCall(sbe::fromString(inName), std::move(inArgs)) {}
 
     bool operator==(const FunctionCall& other) const {
@@ -559,7 +559,7 @@ public:
     }
 
     // Returns the canonical string name for this function. O(1) array lookup, no allocation.
-    StringData name() const {
+    std::string_view name() const {
         return sbe::toString(_fn);
     }
 

@@ -59,6 +59,8 @@
 #include <iosfwd>
 
 #if !defined(MONGO_MOZJS_WASI_BUILD)
+#include <string_view>
+
 #include <jscustomallocator.h>
 #endif
 
@@ -112,7 +114,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
                     LOGV2_WARNING(23826, "CodeWScope doesn't transfer to db.eval");
 #endif
                 runtime->newFunction(
-                    StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1), _value);
+                    std::string_view(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1), _value);
             }
             return;
         case BSONType::symbol:
@@ -167,7 +169,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             int len;
             const char* data = elem.binData(len);
             std::stringstream ss;
-            base64::encode(ss, StringData(data, len));
+            base64::encode(ss, std::string_view(data, len));
 
             JS::RootedValueArray<2> args(_context);
 
@@ -287,7 +289,7 @@ void ValueReader::fromBSONArray(const BSONObj& obj, const BSONObj* parent, bool 
  * Basically, we have to use their routines to convert to utf16, then assign
  * those bytes with JS_NewUCStringCopyN
  */
-void ValueReader::fromStringData(StringData sd) {
+void ValueReader::fromStringData(std::string_view sd) {
     size_t utf16Len;
 
     // TODO SERVER-122825: we have tests that involve dropping garbage in. Do we want to throw, or

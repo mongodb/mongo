@@ -40,6 +40,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 HashLookupUnwindStage::HashLookupUnwindStage(std::unique_ptr<PlanStage> outer,
                                              std::unique_ptr<PlanStage> inner,
@@ -52,7 +53,7 @@ HashLookupUnwindStage::HashLookupUnwindStage(std::unique_ptr<PlanStage> outer,
                                              boost::optional<value::SlotId> indexSlot,
                                              PlanNodeId planNodeId,
                                              bool participateInTrialRunTracking)
-    : PlanStage("hash_lookup_unwind"_sd,
+    : PlanStage("hash_lookup_unwind"sv,
                 nullptr /* yieldPolicy */,
                 planNodeId,
                 participateInTrialRunTracking),

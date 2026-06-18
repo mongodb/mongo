@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace sharding {
@@ -77,7 +77,7 @@ public:
     DBPrimaryRouter(OperationContext* opCtx, const DatabaseName& db);
 
     template <typename F>
-    auto route(StringData comment, F&& callbackFn) {
+    auto route(std::string_view comment, F&& callbackFn) {
         RoutingRetryInfo retryInfo{std::string{comment}};
         _initTxnRouterIfNeeded();
 
@@ -156,7 +156,7 @@ public:
     CollectionRouter(OperationContext* opCtx, CatalogCache* catalogCache, NamespaceString nss);
 
     template <typename F>
-    auto route(StringData comment, F&& callbackFn) {
+    auto route(std::string_view comment, F&& callbackFn) {
         return _routeImpl(comment, [&] {
             auto cri = _createDbIfRequestedAndGetRoutingInfo();
             return callbackFn(_opCtx, cri);
@@ -164,7 +164,7 @@ public:
     }
 
     template <typename F>
-    auto routeWithRoutingContext(StringData comment, F&& callbackFn) {
+    auto routeWithRoutingContext(std::string_view comment, F&& callbackFn) {
         return _routeImpl(comment, [&] {
             RoutingContext routingCtx = _createDbIfRequestedAndGetRoutingContext();
             return routing_context_utils::runAndValidate(
@@ -187,7 +187,7 @@ public:
 
 private:
     template <typename F>
-    auto _routeImpl(StringData comment, F&& work) {
+    auto _routeImpl(std::string_view comment, F&& work) {
         RoutingRetryInfo retryInfo{std::string{comment}};
         _initTxnRouterIfNeeded();
 
@@ -223,7 +223,7 @@ public:
 
 
     template <typename F>
-    auto route(StringData comment, F&& callbackFn) {
+    auto route(std::string_view comment, F&& callbackFn) {
         RoutingRetryInfo retryInfo{std::string{comment}};
         _initTxnRouterIfNeeded();
 

@@ -35,6 +35,8 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry_mock.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -92,7 +94,7 @@ public:
     // Note that the inclusion policy is currently ignored for this mock implementation (all added
     // indexes are considered).
     const IndexCatalogEntry* findIndexByName(OperationContext*,
-                                             StringData name,
+                                             std::string_view name,
                                              InclusionPolicy) const override {
         for (const auto& entry : _indexEntries) {
             if (entry->descriptor()->indexName() == name) {
@@ -124,7 +126,7 @@ public:
     }
 
     const IndexCatalogEntry* findIndexByIdent(OperationContext*,
-                                              StringData ident,
+                                              std::string_view ident,
                                               InclusionPolicy) const override {
         for (const auto& entry : _indexEntries) {
             if (entry->getIdent() == ident) {
@@ -142,7 +144,7 @@ public:
     }
 
     IndexCatalogEntry* getWritableEntryByName(OperationContext*,
-                                              StringData,
+                                              std::string_view,
                                               InclusionPolicy) override {
         MONGO_UNREACHABLE;
     }

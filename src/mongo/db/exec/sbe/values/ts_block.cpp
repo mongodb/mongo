@@ -45,6 +45,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -211,7 +212,7 @@ boost::optional<bsoncolumn::SBEPath> canUsePathBasedDecompression(const PathRequ
 }  // namespace
 
 TsBucketPathExtractor::TsBucketPathExtractor(std::vector<PathRequest> pathReqs,
-                                             StringData timeField)
+                                             std::string_view timeField)
     : _pathReqs(std::move(pathReqs)), _timeField(timeField) {
 
     size_t idx = 0;
@@ -219,7 +220,7 @@ TsBucketPathExtractor::TsBucketPathExtractor(std::vector<PathRequest> pathReqs,
         tassert(
             7796405, "Path must start with a Get operation", holds_alternative<Get>(req.path[0]));
 
-        StringData field = get<Get>(req.path[0]).field;
+        std::string_view field = get<Get>(req.path[0]).field;
         _topLevelFieldToIdxes[field].push_back(idx);
 
         if (req.path.size() > 2) {
@@ -245,8 +246,8 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
                     count >= 0);
             return static_cast<size_t>(count);
         }
-        const int count =
-            timeseries::BucketUnpacker::computeMeasurementCount(bucketObj, StringData(_timeField));
+        const int count = timeseries::BucketUnpacker::computeMeasurementCount(
+            bucketObj, std::string_view(_timeField));
         tassert(
             12193301, "Measurement count in time-series bucket must be non-negative", count >= 0);
         return static_cast<size_t>(count);

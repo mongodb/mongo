@@ -35,6 +35,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -42,7 +44,7 @@ namespace mongo {
  */
 class SpillWiredTigerServerStatusSection : public ServerStatusSection {
 public:
-    static constexpr StringData kServerStatusSectionName = "spillWiredTiger"_sd;
+    static constexpr std::string_view kServerStatusSectionName = "spillWiredTiger"_sd;
 
     using ServerStatusSection::ServerStatusSection;
     bool includeByDefault() const override;

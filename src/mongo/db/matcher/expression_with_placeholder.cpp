@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/static_immortal.h"
@@ -39,6 +38,7 @@
 
 #include <cstddef>
 #include <new>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -49,7 +49,7 @@ namespace mongo {
 
 namespace {
 
-bool matchesPlaceholderPattern(StringData placeholder) {
+bool matchesPlaceholderPattern(std::string_view placeholder) {
     // The placeholder must begin with a lowercase letter and contain no special characters.
     static StaticImmortal<pcre::Regex> kRe("^[[:lower:]][[:alnum:]]*$");
     return !!kRe->matchView(placeholder);
@@ -59,7 +59,7 @@ bool matchesPlaceholderPattern(StringData placeholder) {
  * Finds the top-level field that 'expr' is over. Returns boost::none if the expression does not
  * have a top-level field name, or a non-OK status if there are multiple top-level field names.
  */
-StatusWith<boost::optional<StringData>> parseTopLevelFieldName(MatchExpression* expr) {
+StatusWith<boost::optional<std::string_view>> parseTopLevelFieldName(MatchExpression* expr) {
     if (auto pathExpr = dynamic_cast<PathMatchExpression*>(expr)) {
         auto firstDotPos = pathExpr->path().find('.');
         if (firstDotPos == std::string::npos) {
@@ -67,7 +67,7 @@ StatusWith<boost::optional<StringData>> parseTopLevelFieldName(MatchExpression* 
         }
         return {pathExpr->path().substr(0, firstDotPos)};
     } else if (expr->getCategory() == MatchExpression::MatchCategory::kLogical) {
-        boost::optional<StringData> placeholder;
+        boost::optional<std::string_view> placeholder;
         for (size_t i = 0; i < expr->numChildren(); ++i) {
             auto statusWithId = parseTopLevelFieldName(expr->getChild(i));
             if (!statusWithId.isOK()) {

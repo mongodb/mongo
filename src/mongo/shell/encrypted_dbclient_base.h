@@ -84,6 +84,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -106,22 +107,22 @@ constexpr uint8_t kRandomEncryptionBit = 0x02;
 
 static constexpr auto kExplain = "explain"_sd;
 
-constexpr std::array<StringData, 16> kEncryptedCommands = {"aggregate"_sd,
-                                                           "count"_sd,
-                                                           "delete"_sd,
-                                                           "distinct"_sd,
-                                                           kExplain,
-                                                           "find"_sd,
-                                                           "findandmodify"_sd,
-                                                           "findAndModify"_sd,
-                                                           "getMore"_sd,
-                                                           "insert"_sd,
-                                                           "update"_sd,
-                                                           "create"_sd,
-                                                           "createIndexes"_sd,
-                                                           "collMod"_sd,
-                                                           "bulkWrite"_sd,
-                                                           "_getCompactionTokens"_sd};
+constexpr std::array<std::string_view, 16> kEncryptedCommands = {"aggregate"_sd,
+                                                                 "count"_sd,
+                                                                 "delete"_sd,
+                                                                 "distinct"_sd,
+                                                                 kExplain,
+                                                                 "find"_sd,
+                                                                 "findandmodify"_sd,
+                                                                 "findAndModify"_sd,
+                                                                 "getMore"_sd,
+                                                                 "insert"_sd,
+                                                                 "update"_sd,
+                                                                 "create"_sd,
+                                                                 "createIndexes"_sd,
+                                                                 "collMod"_sd,
+                                                                 "bulkWrite"_sd,
+                                                                 "_getCompactionTokens"_sd};
 
 class EncryptedDBClientBase : public DBClientBase,
                               public mozjs::EncryptionCallbacks,
@@ -213,7 +214,7 @@ public:
     SymmetricKey& getKMSLocalKey() final;
 
 protected:
-    BSONObj _decryptResponsePayload(BSONObj& reply, StringData databaseName, bool isFLE2);
+    BSONObj _decryptResponsePayload(BSONObj& reply, std::string_view databaseName, bool isFLE2);
 
     enum class RunCommandConnectionType { rawPtr, sharedPtr };
 
@@ -285,9 +286,11 @@ protected:
 private:
     Message _call(Message& toSend, std::string* actualServer) final;
 
-    virtual void encryptMarking(const BSONObj& elem, BSONObjBuilder* builder, StringData elemName);
+    virtual void encryptMarking(const BSONObj& elem,
+                                BSONObjBuilder* builder,
+                                std::string_view elemName);
 
-    void decryptPayload(ConstDataRange data, BSONObjBuilder* builder, StringData elemName);
+    void decryptPayload(ConstDataRange data, BSONObjBuilder* builder, std::string_view elemName);
 
     std::vector<uint8_t> getBinDataArg(mozjs::MozJSImplScope* scope,
                                        JSContext* cx,

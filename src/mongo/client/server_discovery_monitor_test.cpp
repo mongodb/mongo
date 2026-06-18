@@ -31,7 +31,6 @@
 #include "mongo/client/server_discovery_monitor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"

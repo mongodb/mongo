@@ -33,6 +33,7 @@
 #include <exception>
 #include <fstream>  // IWYU pragma: keep
 #include <iostream>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -137,7 +138,7 @@ void FileRotateSink::removeFile(const std::string& filename) {
 }
 
 Status FileRotateSink::rotate(bool rename,
-                              StringData renameSuffix,
+                              std::string_view renameSuffix,
                               std::function<void(Status)> onMinorError) {
     for (auto& file : _impl->files) {
         const std::string& filename = file.first;
@@ -244,7 +245,7 @@ void FileRotateSink::consume(const boost::log::record_view& rec,
                         LogTruncation::Disabled);
             // Commented out log line below to get validation of the log id with the errorcodes
             // linter LOGV2(4522200, "Writing to log file failed, aborting application");
-            std::cerr << StringData(buffer.data(), buffer.size()) << std::endl;
+            std::cerr << std::string_view(buffer.data(), buffer.size()) << std::endl;
         } catch (const std::exception& ex) {
             std::cerr << "Caught std::exception of type " << demangleName(typeid(ex)) << ": "
                       << ex.what() << std::endl;

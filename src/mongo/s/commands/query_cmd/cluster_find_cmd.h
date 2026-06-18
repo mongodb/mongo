@@ -66,6 +66,8 @@
 #include "mongo/s/query/shard_targeting_helpers.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional.hpp>
 
 namespace mongo {
@@ -79,7 +81,7 @@ public:
     using TC = TypedCommand<ClusterFindCmdBase<Impl>>;
     using Request = typename Impl::Request;
 
-    static constexpr StringData kTermField = "term"_sd;
+    static constexpr std::string_view kTermField = "term"_sd;
 
     ClusterFindCmdBase() : TC(Impl::kCommandName) {}
 

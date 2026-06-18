@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_internal_shred_documents.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> internalShredDocumentsStageToStageFn(
@@ -49,7 +51,7 @@ REGISTER_AGG_STAGE_MAPPING(internalShredDocumentsStage,
                            internalShredDocumentsStageToStageFn);
 
 InternalShredDocumentsStage::InternalShredDocumentsStage(
-    StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
+    std::string_view stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
     : Stage(stageName, pExpCtx) {}
 
 GetNextResult InternalShredDocumentsStage::doGetNext() {

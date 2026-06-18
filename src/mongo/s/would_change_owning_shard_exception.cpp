@@ -30,21 +30,23 @@
 #include "mongo/s/would_change_owning_shard_exception.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(WouldChangeOwningShardInfo);
 
-constexpr StringData kPreImage = "preImage"_sd;
-constexpr StringData kPostImage = "postImage"_sd;
-constexpr StringData kShouldUpsert = "shouldUpsert"_sd;
-constexpr StringData kUserPostImage = "userPostImage"_sd;
+constexpr std::string_view kPreImage = "preImage"sv;
+constexpr std::string_view kPostImage = "postImage"sv;
+constexpr std::string_view kShouldUpsert = "shouldUpsert"sv;
+constexpr std::string_view kUserPostImage = "userPostImage"sv;
 
 }  // namespace
 

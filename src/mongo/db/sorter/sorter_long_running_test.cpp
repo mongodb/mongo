@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/sorter/file.h"
@@ -49,6 +48,7 @@
 #include <numeric>
 #include <queue>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -143,7 +143,7 @@ std::string makeSpillDirName() {
     return name;
 }
 
-uint64_t generateShuffleSeed(StringData context = {}) {
+uint64_t generateShuffleSeed(std::string_view context = {}) {
     const auto seed = SecureRandom{}.nextUInt64();
     LOGV2(11974200,
           "Sorter long-running test shuffle seed",
@@ -154,7 +154,7 @@ uint64_t generateShuffleSeed(StringData context = {}) {
 
 std::vector<int> makeInputData(std::size_t length,
                                ShuffleMode shuffleMode = ShuffleMode::kShuffle,
-                               StringData context = {}) {
+                               std::string_view context = {}) {
     std::vector<int> keys(length);
     std::iota(keys.begin(), keys.end(), 0);
     if (shuffleMode == ShuffleMode::kShuffle) {

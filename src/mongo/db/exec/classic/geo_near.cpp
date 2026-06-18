@@ -36,6 +36,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -43,7 +44,6 @@
 
 
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/classic/fetch.h"
@@ -613,7 +613,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DStage::nextInterval(Operati
     // FLAT searches need to add an additional annulus $within matcher, see above
     // TODO: Find out if this matcher is actually needed
     if (FLAT == queryCRS) {
-        docMatcher = new TwoDPtInAnnulusExpression(_fullBounds, StringData(twoDFieldName));
+        docMatcher = new TwoDPtInAnnulusExpression(_fullBounds, std::string_view(twoDFieldName));
     }
 
     // FetchStage owns index scan

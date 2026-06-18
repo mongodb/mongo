@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
@@ -41,6 +40,8 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -51,10 +52,10 @@ namespace mongo {
 class DocumentSourceChangeStreamEnsureResumeTokenPresent final
     : public DocumentSourceChangeStreamCheckResumability {
 public:
-    static constexpr StringData kStageName =
+    static constexpr std::string_view kStageName =
         change_stream_constants::stage_names::kEnsureResumeTokenPresent;
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     StageConstraints constraints(PipelineSplitState) const final;
 

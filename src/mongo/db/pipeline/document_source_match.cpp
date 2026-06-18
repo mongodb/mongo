@@ -55,12 +55,14 @@
 #include <iterator>
 #include <list>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 using std::pair;
@@ -116,7 +118,7 @@ void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpres
         std::move(expr), std::move(dependencies), std::move(predicate));
 }
 
-StringData DocumentSourceMatch::getSourceName() const {
+std::string_view DocumentSourceMatch::getSourceName() const {
     return kStageName;
 }
 
@@ -177,7 +179,7 @@ namespace {
 // the Match expression has been successfully parsed so they can assume that
 // input is well formed.
 
-bool isFieldnameRedactSafe(StringData fieldName) {
+bool isFieldnameRedactSafe(std::string_view fieldName) {
     // Can't have numeric elements in the dotted path since redacting elements from an array
     // would change the indexes.
 
@@ -185,8 +187,8 @@ bool isFieldnameRedactSafe(StringData fieldName) {
     if (dotPos == string::npos)
         return fieldName.empty() || !str::isAllDigits(fieldName);
 
-    const StringData part = fieldName.substr(0, dotPos);
-    const StringData rest = fieldName.substr(dotPos + 1);
+    const std::string_view part = fieldName.substr(0, dotPos);
+    const std::string_view rest = fieldName.substr(dotPos + 1);
     return (part.empty() || !str::isAllDigits(part)) && isFieldnameRedactSafe(rest);
 }
 
@@ -327,7 +329,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
 Document redactSafePortionTopLevel(BSONObj query) {
     MutableDocument output;
     for (BSONElement field : query) {
-        StringData fieldName = field.fieldNameStringData();
+        std::string_view fieldName = field.fieldNameStringData();
         if (fieldName.starts_with("$")) {
             if (fieldName == "$or") {
                 // $or must be all-or-nothing (line $in). Can't include subset of elements.
@@ -401,8 +403,8 @@ std::unique_ptr<MatchLiteParsed> MatchLiteParsed::parse(const NamespaceString& n
 
 bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
     for (auto&& e : query) {
-        const StringData fieldName = e.fieldNameStringData();
-        if (fieldName == "$text"_sd)
+        const std::string_view fieldName = e.fieldNameStringData();
+        if (fieldName == "$text"sv)
             return true;
 
         if (e.isABSONObj() && isTextQuery(e.Obj()))

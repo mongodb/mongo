@@ -37,20 +37,21 @@
 #include "mongo/util/string_map.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer::rank_fusion_utils {
 
 inline constexpr int kRankConstant = RankFusionPipelineBuilder::kRankConstant;
-inline constexpr StringData kInternalFieldsName =
+inline constexpr std::string_view kInternalFieldsName =
     RankFusionPipelineBuilder::kRankFusionInternalFieldsName;
-inline constexpr StringData kDocsName = RankFusionPipelineBuilder::kRankFusionDocsFieldName;
-inline constexpr StringData kScoreDetailsDescription =
+inline constexpr std::string_view kDocsName = RankFusionPipelineBuilder::kRankFusionDocsFieldName;
+inline constexpr std::string_view kScoreDetailsDescription =
     RankFusionPipelineBuilder::kRankFusionScoreDetailsDescription;
 
 // Per-pipeline scoreDetails scalar field suffix used in the desugared $group output (and the
 // matching $replaceRoot wrapper). For $rankFusion the per-pipeline scalar is "<p>_rank".
-inline constexpr StringData kDetailsScalarSuffix = "_rank"_sd;
+inline constexpr std::string_view kDetailsScalarSuffix = "_rank"_sd;
 
 // {$_internalSetWindowFields: {sortBy: {order: 1},
 //                              output: {<INTERNAL_FIELDS>.<p>_rank: {$rank: {}}}}}
@@ -58,10 +59,12 @@ BSONObj buildSetWindowFieldsBson(const std::string& rankFieldName);
 
 // {$addFields: {<INTERNAL_FIELDS>.<p>_score: {$multiply: [{$divide: [1, {$add: [<rank>, K]}]},
 //                                                          <weight>]}}}
-BSONObj buildScoreAddFieldsBson(StringData inputPipelineName, int rankConstant, double weight);
+BSONObj buildScoreAddFieldsBson(std::string_view inputPipelineName,
+                                int rankConstant,
+                                double weight);
 
 // {$addFields: {<INTERNAL_FIELDS>.<p>_scoreDetails: <three branches>}}
-BSONObj buildAddInputPipelineScoreDetailsBson(StringData inputPipelineName,
+BSONObj buildAddInputPipelineScoreDetailsBson(std::string_view inputPipelineName,
                                               bool inputGeneratesScore,
                                               bool inputGeneratesScoreDetails);
 

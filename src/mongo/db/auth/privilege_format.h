@@ -34,6 +34,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -53,7 +55,7 @@ namespace auth {
  */
 class ParsedPrivilegeFormat {
 public:
-    static constexpr StringData kAsUserFragment = "asUserFragment"_sd;
+    static constexpr std::string_view kAsUserFragment = "asUserFragment"_sd;
 
     static PrivilegeFormat fromBool(bool fmt) {
         return fmt ? PrivilegeFormat::kShowSeparate : PrivilegeFormat::kOmit;
@@ -95,7 +97,7 @@ public:
         }
     }
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const {
         if (_format == PrivilegeFormat::kShowAsUserFragment) {
             bob->append(fieldName, kAsUserFragment);
         } else {

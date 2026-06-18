@@ -60,6 +60,7 @@
 
 #include <deque>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -197,7 +198,7 @@ public:
     /**
      * For queries that have multiple executors, this can be used to differentiate between them.
      */
-    boost::optional<StringData> getExecutorType() const final {
+    boost::optional<std::string_view> getExecutorType() const final {
         return idl::serialize(_cursorType);
     }
 
@@ -210,7 +211,7 @@ private:
 
     enum class State { kClosed, kOpened };
 
-    static StringData serializeState(State state);
+    static std::string_view serializeState(State state);
 
     State _state{State::kClosed};
 

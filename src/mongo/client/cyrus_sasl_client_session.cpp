@@ -40,6 +40,7 @@
 #include "mongo/util/str.h"
 
 #include <mutex>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -207,7 +208,7 @@ int saslClientGetSimple(void* context, int id, const char** result, unsigned* re
 
         if (!session->hasParameter(requiredParameterId))
             return SASL_FAIL;
-        StringData value = session->getParameter(requiredParameterId);
+        std::string_view value = session->getParameter(requiredParameterId);
         *result = value.data();
         if (resultLen)
             *resultLen = static_cast<unsigned>(value.size());
@@ -258,7 +259,7 @@ CyrusSaslClientSession::~CyrusSaslClientSession() {
     sasl_dispose(&_saslConnection);
 }
 
-void CyrusSaslClientSession::setParameter(Parameter id, StringData value) {
+void CyrusSaslClientSession::setParameter(Parameter id, std::string_view value) {
     fassert(18665, id >= 0 && id < numParameters);
     if (id == parameterPassword) {
         // The parameterPassword is stored as a sasl_secret_t,  while other
@@ -298,7 +299,7 @@ Status CyrusSaslClientSession::initialize() {
     return Status::OK();
 }
 
-Status CyrusSaslClientSession::step(StringData inputData, std::string* outputData) {
+Status CyrusSaslClientSession::step(std::string_view inputData, std::string* outputData) {
     const char* output = nullptr;
     unsigned outputSize = 0xFFFFFFFF;
 

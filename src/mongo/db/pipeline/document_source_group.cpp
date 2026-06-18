@@ -44,6 +44,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -55,7 +56,7 @@
 
 namespace mongo {
 
-constexpr StringData DocumentSourceGroup::kStageName;
+constexpr std::string_view DocumentSourceGroup::kStageName;
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(group, GroupLiteParsed::parse, AllowedWithApiStrict::kAlways);
 
@@ -63,7 +64,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(group, DocumentSourceGroup, G
 
 ALLOCATE_DOCUMENT_SOURCE_ID(group, DocumentSourceGroup::id)
 
-StringData DocumentSourceGroup::getSourceName() const {
+std::string_view DocumentSourceGroup::getSourceName() const {
     return kStageName;
 }
 
@@ -177,7 +178,7 @@ namespace {
 template <TopBottomSense sense, bool single = true>
 AccumulationStatement makeAccStmtForTopBottom(boost::intrusive_ptr<ExpressionContext> pExpCtx,
                                               const SortPattern& sortPattern,
-                                              StringData fieldName,
+                                              std::string_view fieldName,
                                               boost::intrusive_ptr<Expression> origExpr) {
     static_assert(
         single,
@@ -273,6 +274,7 @@ bool DocumentSourceGroup::tryToAbsorbTopKSort(DocumentSourceSort* prospectiveSor
 }
 
 namespace {
+using namespace std::literals::string_view_literals;
 // The key to group $top(N)/$bottom(N) with the same sort pattern and the same N into a hash table.
 struct TopBottomAccKey {
     SortPattern sortPattern;
@@ -334,15 +336,15 @@ TopBottomAccKey getTopBottomAccKey(AccumulatorN* accN) {
 }
 
 template <TopBottomSense sense, bool single>
-constexpr StringData getMergeFieldNameForAcc() {
+constexpr std::string_view getMergeFieldNameForAcc() {
     if constexpr (sense == TopBottomSense::kTop && single) {
-        return "ts"_sd;
+        return "ts"sv;
     } else if constexpr (sense == TopBottomSense::kTop && !single) {
-        return "tns"_sd;
+        return "tns"sv;
     } else if constexpr (sense == TopBottomSense::kBottom && single) {
-        return "bs"_sd;
+        return "bs"sv;
     } else if constexpr (sense == TopBottomSense::kBottom && !single) {
-        return "bns"_sd;
+        return "bns"sv;
     }
 };
 
@@ -405,7 +407,7 @@ AccumulationStatement mergeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pE
                         {
                             // Composes {$ifNull: ["outputExpression", null]}.
                             BSONArrayBuilder ifNullArrayBuilder(
-                                ifNullOutputBuilder.subarrayStart("$ifNull"_sd));
+                                ifNullOutputBuilder.subarrayStart("$ifNull"sv));
                             getOutputArgExpr(accStmts[accIdx].expr.argument)
                                 ->serialize()
                                 .addToBsonArray(&ifNullArrayBuilder);
@@ -433,7 +435,7 @@ AccumulationStatement mergeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pE
 
 AccumulationStatement makeAccStmtForFirstLast(boost::intrusive_ptr<ExpressionContext> pExpCtx,
                                               AccumulatorFirstLastN::Sense sense,
-                                              StringData fieldName,
+                                              std::string_view fieldName,
                                               boost::intrusive_ptr<Expression> origExpr) {
     const auto accName =
         sense == AccumulatorFirstLastN::kFirst ? AccumulatorFirst::kName : AccumulatorLast::kName;
@@ -465,7 +467,7 @@ struct AccumulatorInfo {
 // Contains info about all allowed accumulators for the tryToOptimizeAccN() optimization. The info
 // is useful to determine whether accumulators can be converted (i.e. are `multi`), and to compare
 // senses of different accumulators.
-const std::map<StringData, AccumulatorInfo> kAccNameToInfoMap{
+const std::map<std::string_view, AccumulatorInfo> kAccNameToInfoMap{
     {AccumulatorFirst::kName, {false, AccumulatorFirstLastN::kFirst}},
     {AccumulatorLast::kName, {false, AccumulatorFirstLastN::kLast}},
     {AccumulatorFirstN::kName, {true, AccumulatorFirstLastN::kFirst}},

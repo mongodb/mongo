@@ -69,6 +69,7 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -79,14 +80,15 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 
 using service_context_test::RoleOverride;
 using service_context_test::ServerRoleIndex;
 
 TEST(Commands, CommandNameAtom) {
-    CommandNameAtom foo("foo"_sd), bar("bar"_sd), baz("baz"_sd), foo2("foo"_sd), baz2("baz"_sd),
-        bar2("bar"_sd);
+    CommandNameAtom foo("foo"sv), bar("bar"sv), baz("baz"sv), foo2("foo"sv), baz2("baz"sv),
+        bar2("bar"sv);
 
     ASSERT_EQ(foo, foo2);
     ASSERT_EQ(bar, bar2);
@@ -278,22 +280,22 @@ public:
                                << scram::Secrets<SHA256Block>::generateCredentials(
                                       "a", saslGlobalParams.scramSHA256IterationCount.load()));
 
-        BSONObj userDoc = BSON("_id"_sd << "test.varun"_sd
-                                        << "user"_sd
-                                        << "varun"
-                                        << "db"_sd
-                                        << "test"
-                                        << "credentials"_sd << credentials << "roles"_sd
-                                        << BSON_ARRAY(BSON("role"_sd << "readWrite"_sd
-                                                                     << "db"_sd
-                                                                     << "test"_sd)));
+        BSONObj userDoc = BSON("_id"sv << "test.varun"sv
+                                       << "user"sv
+                                       << "varun"
+                                       << "db"sv
+                                       << "test"
+                                       << "credentials"sv << credentials << "roles"sv
+                                       << BSON_ARRAY(BSON("role"sv << "readWrite"sv
+                                                                   << "db"sv
+                                                                   << "test"sv)));
 
         auto opCtx = _client->makeOperationContext();
         ASSERT_OK(_mockBackend->insertUserDocument(opCtx.get(), userDoc, {}));
     }
 
     template <typename ConcreteCommand>
-    auto& fetchCommandAs(StringData name) {
+    auto& fetchCommandAs(std::string_view name) {
         return *dynamic_cast<ConcreteCommand*>(_registry->findCommand(name));
     }
 

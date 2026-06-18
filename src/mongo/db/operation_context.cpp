@@ -31,7 +31,6 @@
 #include "mongo/db/operation_context.h"
 
 #include "mongo/base/error_extra_info.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/operation_key_manager.h"

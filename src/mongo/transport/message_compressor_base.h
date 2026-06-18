@@ -31,10 +31,10 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <type_traits>
 
 #include <boost/optional/optional.hpp>
@@ -48,7 +48,7 @@ enum class MessageCompressor : uint8_t {
     kExtended = 255,
 };
 
-StringData getMessageCompressorName(MessageCompressor id);
+std::string_view getMessageCompressorName(MessageCompressor id);
 using MessageCompressorId = std::underlying_type<MessageCompressor>::type;
 
 class MessageCompressorBase {

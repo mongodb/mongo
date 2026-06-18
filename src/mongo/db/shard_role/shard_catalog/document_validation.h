@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
@@ -38,13 +37,14 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-MONGO_MOD_NEEDS_REPLACEMENT inline StringData bypassDocumentValidationCommandOption() {
+MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view bypassDocumentValidationCommandOption() {
     return "bypassDocumentValidation";
 }
 

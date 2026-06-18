@@ -40,6 +40,7 @@
 #include <functional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 #include <boost/exception/exception.hpp>
 #include <boost/optional/optional.hpp>
@@ -86,7 +87,7 @@ TEST(Status, ReasonStrings) {
     checkReason(kReasonString);
     checkReason(std::string_view{kReason});  // NOLINT
     checkReason(std::string{kReason});
-    checkReason(StringData{kReason});
+    checkReason(std::string_view{kReason});
     checkReason(str::stream{} << kReason);
     checkReason(CanStringRef{});
 
@@ -94,10 +95,10 @@ TEST(Status, ReasonStrings) {
     ASSERT((usableStatusArgs<ErrorCodes::Error, std::string&>));
     ASSERT((usableStatusArgs<ErrorCodes::Error, const std::string&>));
     ASSERT((usableStatusArgs<ErrorCodes::Error, std::string&&>));
-    ASSERT((usableStatusArgs<ErrorCodes::Error, StringData>));
-    ASSERT((usableStatusArgs<ErrorCodes::Error, StringData&>));
-    ASSERT((usableStatusArgs<ErrorCodes::Error, const StringData&>));
-    ASSERT((usableStatusArgs<ErrorCodes::Error, StringData&&>));
+    ASSERT((usableStatusArgs<ErrorCodes::Error, std::string_view>));
+    ASSERT((usableStatusArgs<ErrorCodes::Error, std::string_view&>));
+    ASSERT((usableStatusArgs<ErrorCodes::Error, const std::string_view&>));
+    ASSERT((usableStatusArgs<ErrorCodes::Error, std::string_view&&>));
     ASSERT((!usableStatusArgs<ErrorCodes::Error, boost::optional<std::string>>));
     ASSERT((usableStatusArgs<ErrorCodes::Error, CanString>));
     ASSERT((usableStatusArgs<ErrorCodes::Error, CanStringExplicit>));
@@ -348,10 +349,10 @@ TEST(ErrorExtraInfo, StatusCtorExtraAndReason) {
     ASSERT((usableStatusArgs<Extra, std::string&>));
     ASSERT((usableStatusArgs<Extra, const std::string&>));
     ASSERT((usableStatusArgs<Extra, std::string&&>));
-    ASSERT((usableStatusArgs<Extra, StringData>));
-    ASSERT((usableStatusArgs<Extra, StringData&>));
-    ASSERT((usableStatusArgs<Extra, const StringData&>));
-    ASSERT((usableStatusArgs<Extra, StringData&&>));
+    ASSERT((usableStatusArgs<Extra, std::string_view>));
+    ASSERT((usableStatusArgs<Extra, std::string_view&>));
+    ASSERT((usableStatusArgs<Extra, const std::string_view&>));
+    ASSERT((usableStatusArgs<Extra, std::string_view&&>));
     ASSERT((!usableStatusArgs<Extra, boost::optional<std::string>>));
     ASSERT((usableStatusArgs<Extra, CanString>));
     ASSERT((usableStatusArgs<Extra, CanStringExplicit>));

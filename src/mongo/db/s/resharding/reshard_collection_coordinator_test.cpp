@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <gtest/gtest.h>
@@ -53,8 +53,8 @@ namespace {
 const ShardKeyPattern kSourceShardKey(BSON("a" << 1));
 const BSONObj kUserShardKey = BSON("b" << 1);
 
-TypeCollectionTimeseriesFields makeTimeseriesFields(StringData timeField,
-                                                    boost::optional<StringData> metaField) {
+TypeCollectionTimeseriesFields makeTimeseriesFields(std::string_view timeField,
+                                                    boost::optional<std::string_view> metaField) {
     TimeseriesOptions options{std::string{timeField}};
     if (metaField) {
         options.setMetaField(*metaField);
@@ -114,7 +114,7 @@ TEST_P(ReshardingProvenanceTest, ComputeShardKeyTimeseries) {
     const ShardKeyPattern tsSourceKey(BSON("meta.x" << 1));
     const BSONObj tsUserKey = BSON("metadata.x" << 1);
 
-    auto tsFields = makeTimeseriesFields("time", StringData("metadata"));
+    auto tsFields = makeTimeseriesFields("time", std::string_view("metadata"));
     auto result = computeReshardingShardKey(GetParam(), tsSourceKey, tsFields, tsUserKey);
 
     if (isRewriteCollection(GetParam()) || isOrdinaryReshardCollection(GetParam()))

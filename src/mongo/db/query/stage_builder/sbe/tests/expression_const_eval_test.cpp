@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -42,9 +41,11 @@
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace mongo::stage_builder {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace abt;
 using namespace abt_lower::unit_test_abt_literals;
@@ -943,7 +944,7 @@ TEST(Optimizer, ConstFoldSwitchAnd) {
 TEST(Optimizer, ConstFoldMultiLet) {
     {
         ExpressionConstEval evaluator{nullptr};
-        auto tree = _multiLet("x"_sd, "A"_cstr, "y"_sd, "B"_cstr, "z"_var)._n;
+        auto tree = _multiLet("x"sv, "A"_cstr, "y"sv, "B"_cstr, "z"_var)._n;
         evaluator.optimize(tree);
 
 
@@ -953,8 +954,7 @@ TEST(Optimizer, ConstFoldMultiLet) {
     }
     {
         ExpressionConstEval evaluator{nullptr};
-        auto tree =
-            _multiLet("x"_sd, "A"_cstr, "y"_sd, "B"_cstr, _binary("Eq", "x"_var, "y"_var))._n;
+        auto tree = _multiLet("x"sv, "A"_cstr, "y"sv, "B"_cstr, _binary("Eq", "x"_var, "y"_var))._n;
         evaluator.optimize(tree);
 
         ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
@@ -964,9 +964,9 @@ TEST(Optimizer, ConstFoldMultiLet) {
     {
         // inline variables with single references
         ExpressionConstEval evaluator{nullptr};
-        auto tree = _multiLet("x"_sd,
+        auto tree = _multiLet("x"sv,
                               _fn("floor", "v1"_var),
-                              "y"_sd,
+                              "y"sv,
                               _fn("floor", "v2"_var),
                               _binary("Mult", "x"_var, "y"_var))
                         ._n;
@@ -982,11 +982,11 @@ TEST(Optimizer, ConstFoldMultiLet) {
     }
     {
         ExpressionConstEval evaluator{nullptr};
-        auto tree = _multiLet("x"_sd,
+        auto tree = _multiLet("x"sv,
                               _fn("floor", "v1"_var),
-                              "y"_sd,
+                              "y"sv,
                               _fn("floor", "v2"_var),
-                              "z"_sd,
+                              "z"sv,
                               _fn("floor", "v3"_var),
                               _binary("Mult", "z"_var, "5"_cint32))
                         ._n;
@@ -1001,11 +1001,11 @@ TEST(Optimizer, ConstFoldMultiLet) {
     }
     {
         ExpressionConstEval evaluator{nullptr};
-        auto tree = _multiLet("x"_sd,
+        auto tree = _multiLet("x"sv,
                               _fn("floor", "v1"_var),
-                              "y"_sd,
+                              "y"sv,
                               _fn("floor", "v2"_var),
-                              "z"_sd,
+                              "z"sv,
                               _fn("floor", "v3"_var),
                               _binary("Mult", "z"_var, "z"_var))
                         ._n;
@@ -1022,11 +1022,11 @@ TEST(Optimizer, ConstFoldMultiLet) {
     }
     {
         ExpressionConstEval evaluator{nullptr};
-        auto tree = _multiLet("x"_sd,
+        auto tree = _multiLet("x"sv,
                               _fn("floor", "v1"_var),
-                              "y"_sd,
+                              "y"sv,
                               _fn("floor", "v2"_var),
-                              "z"_sd,
+                              "z"sv,
                               _fn("floor", "v3"_var),
                               _binary("Add",
                                       _binary("Mult", "x"_var, "x"_var),
@@ -1053,9 +1053,9 @@ TEST(Optimizer, ConstFoldMultiLet) {
         ExpressionConstEval evaluator{nullptr};
         auto tree =
             _multiLet(
-                "x"_sd,
+                "x"sv,
                 _fn("floor", "v1"_var),
-                _multiLet("y"_sd, _fn("floor", "v2"_var), _binary("Mult", "1"_cint64, "y"_var)))
+                _multiLet("y"sv, _fn("floor", "v2"_var), _binary("Mult", "1"_cint64, "y"_var)))
                 ._n;
 
         evaluator.optimize(tree);
@@ -1080,7 +1080,7 @@ TEST_F(AbtToSbeExpression, NonNullableLhsOrTrueConstFold) {
     auto treeConstFold = constFold(tree);
 
     auto var =
-        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+        std::make_pair(ProjectionName{"x"sv}, sbe::value::makeValue(mongo::Value((int32_t)1)));
 
     auto res = evalExpr(tree, var);
     auto resConstFold = evalExpr(treeConstFold, var);
@@ -1095,7 +1095,7 @@ TEST_F(AbtToSbeExpression, NonNullableLhsOrFalseConstFold) {
     auto treeConstFold = constFold(tree);
 
     auto var =
-        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+        std::make_pair(ProjectionName{"x"sv}, sbe::value::makeValue(mongo::Value((int32_t)1)));
 
     auto res = evalExpr(tree, var);
     auto resConstFold = evalExpr(treeConstFold, var);
@@ -1136,7 +1136,7 @@ TEST_F(AbtToSbeExpression, NonNullableLhsAndFalseConstFold) {
     auto treeConstFold = constFold(tree);
 
     auto var =
-        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+        std::make_pair(ProjectionName{"x"sv}, sbe::value::makeValue(mongo::Value((int32_t)1)));
     auto res = evalExpr(tree, var);
     auto resConstFold = evalExpr(treeConstFold, var);
 
@@ -1150,7 +1150,7 @@ TEST_F(AbtToSbeExpression, NonNullableLhsAndTrueConstFold) {
     auto treeConstFold = constFold(tree);
 
     auto var =
-        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+        std::make_pair(ProjectionName{"x"sv}, sbe::value::makeValue(mongo::Value((int32_t)1)));
     auto res = evalExpr(tree, var);
     auto resConstFold = evalExpr(treeConstFold, var);
 

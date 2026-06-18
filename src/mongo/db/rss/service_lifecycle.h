@@ -36,6 +36,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -103,7 +104,7 @@ public:
      * If true, the named thread must be kept alive until the storage engine has shut down.
      */
     virtual bool shouldKeepThreadAliveUntilStorageEngineHasShutDown(
-        StringData threadName) const = 0;
+        std::string_view threadName) const = 0;
 };
 
 }  // namespace rss

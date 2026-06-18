@@ -47,6 +47,7 @@
 #include <iterator>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <s2cellid.h>
@@ -198,7 +199,7 @@ void BucketUnpackerV1::extractSingleMeasurement(
     bool includeTimeField,
     bool includeMetaField) {
     auto rowKey = std::to_string(j);
-    auto targetIdx = StringData{rowKey};
+    auto targetIdx = std::string_view{rowKey};
     auto&& dataRegion = bucket.getField(kBucketDataFieldName).Obj();
 
     if (includeMetaField && !metaValue.missing()) {
@@ -398,7 +399,8 @@ BucketUnpacker::BucketUnpacker(BucketSpec spec) {
     setBucketSpec(std::move(spec));
 }
 
-void BucketUnpacker::addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames) {
+void BucketUnpacker::addComputedMetaProjFields(
+    const std::vector<std::string_view>& computedFieldNames) {
     for (auto&& field : computedFieldNames) {
         _spec.addComputedMetaProjFields(field);
 
@@ -710,7 +712,7 @@ const std::set<std::string>& BucketUnpacker::fieldsToIncludeExcludeDuringUnpack(
     return *_unpackFieldsToIncludeExclude;
 }
 
-const std::set<StringData> BucketUnpacker::reservedBucketFieldNames = {
+const std::set<std::string_view> BucketUnpacker::reservedBucketFieldNames = {
     kBucketIdFieldName, kBucketDataFieldName, kBucketMetaFieldName, kBucketControlFieldName};
 
 }  // namespace mongo::timeseries

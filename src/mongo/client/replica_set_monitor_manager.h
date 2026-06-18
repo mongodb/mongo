@@ -32,7 +32,6 @@
 #include "mongo/base/counter.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -60,6 +59,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -130,7 +130,7 @@ public:
      * nullptr if there is no monitor registered for the particular replica set.
      * @param cleanupCallback will be executed when the instance of ReplicaSetMonitor is deleted.
      */
-    std::shared_ptr<ReplicaSetMonitor> getMonitor(StringData setName);
+    std::shared_ptr<ReplicaSetMonitor> getMonitor(std::string_view setName);
     std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const ConnectionString& connStr,
                                                           std::function<void()> cleanupCallback);
     std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const MongoURI& uri,
@@ -152,13 +152,13 @@ public:
      * does nothing. Once all shared_ptr references to that monitor are released, the monitor
      * will be destroyed and will no longer be tracked.
      */
-    void removeMonitor(StringData setName);
+    void removeMonitor(std::string_view setName);
 
     /**
      * Adds the 'setName' to the garbage collect queue for later cleanup.
      * The 2-step GC is implemented to avoid deadlocks.
      */
-    void registerForGarbageCollection(StringData setName);
+    void registerForGarbageCollection(std::string_view setName);
 
     std::shared_ptr<ReplicaSetMonitor> getMonitorForHost(const HostAndPort& host);
 

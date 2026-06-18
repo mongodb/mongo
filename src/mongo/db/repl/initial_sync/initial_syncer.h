@@ -74,6 +74,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -168,7 +169,7 @@ public:
         kComplete,
     };
 
-    static StringData phaseToString(Phase phase);
+    static std::string_view phaseToString(Phase phase);
 
     struct InitialSyncAttemptInfo {
         int durationMillis;

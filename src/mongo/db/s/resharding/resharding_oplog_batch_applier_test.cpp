@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -122,6 +121,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -532,7 +532,7 @@ private:
             ComparableChunkVersion::makeComparableChunkVersion(version));
     }
 
-    const StringData _currentShardKey = "sk";
+    const std::string_view _currentShardKey = "sk";
 
     const NamespaceString _sourceNss =
         NamespaceString::createNamespaceString_forTest("test_crud", "collection_being_resharded");

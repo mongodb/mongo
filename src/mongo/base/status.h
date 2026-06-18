@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
@@ -44,6 +43,7 @@
 #include <memory>
 #include <new>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -75,7 +75,7 @@ public:
      *
      * In all Status constructors, the `reason` is natively a `std::string`, but
      * as a convenience it can be given as any type explicitly convertible to
-     * `std::string`, such as `const char*`, `StringData`, or `str::stream`, or
+     * `std::string`, such as `const char*`, or `str::stream`, or
      * `std::string_view`.
      *
      * If code is ErrorCodes::OK, the remaining arguments are ignored. Prefer
@@ -151,7 +151,7 @@ public:
     }
 
     /** In-place version of `withContext`. Returns *this for chaining. */
-    Status& addContext(StringData reasonPrefix);
+    Status& addContext(std::string_view reasonPrefix);
 
     /**
      * Returns a new Status with the same data as this, but with the reason string prefixed with
@@ -160,7 +160,7 @@ public:
      *
      * No-op when called on an OK status.
      */
-    Status withContext(StringData reasonPrefix) const {
+    Status withContext(std::string_view reasonPrefix) const {
         return Status(*this).addContext(reasonPrefix);
     }
 

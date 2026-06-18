@@ -42,12 +42,14 @@
 #include <fstream>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace executor {
 namespace {
+using namespace std::literals::string_view_literals;
 
 std::string loadFile(const std::string& name) {
     std::ifstream input(name);
@@ -63,7 +65,7 @@ public:
 
         // Setup an internal user so that we can use it for external auth
         std::unique_ptr<UserRequest> systemLocal =
-            std::make_unique<UserRequestGeneral>(UserName("__system"_sd, "local"_sd), boost::none);
+            std::make_unique<UserRequestGeneral>(UserName("__system"sv, "local"sv), boost::none);
         auto user = std::make_shared<UserHandle>(User(std::move(systemLocal)));
 
         internalSecurity.setUser(user);
@@ -76,7 +78,7 @@ public:
 
         // Set the internal user auth parameters so we auth with X.509 externally
         auth::setInternalUserAuthParams(
-            auth::createInternalX509AuthCredential(boost::optional<StringData>("Ignored")));
+            auth::createInternalX509AuthCredential(boost::optional<std::string_view>("Ignored")));
 
         createNet();
         net().startup();

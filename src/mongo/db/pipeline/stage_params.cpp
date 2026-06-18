@@ -31,9 +31,11 @@
 
 #include "mongo/base/init.h"
 
+#include <string_view>
+
 namespace mongo {
 
-StageParams::Id StageParams::allocateId(StringData name) {
+StageParams::Id StageParams::allocateId(std::string_view name) {
     static AtomicWord<Id> next{kUnallocatedId + 1};
     auto id = next.fetchAndAdd(1);
     return id;

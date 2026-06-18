@@ -28,7 +28,6 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/connpool.h"
 #include "mongo/stdx/condition_variable.h"

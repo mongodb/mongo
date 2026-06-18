@@ -32,6 +32,8 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/unordered_fields_bsonelement_comparator.h"
 
+#include <string_view>
+
 #include <boost/container/small_vector.hpp>
 
 namespace mongo::timeseries::metadata {
@@ -75,7 +77,7 @@ void normalizeObject(const BSONObj& obj, allocator_aware::BSONObjBuilder<Allocat
         bool operator<(const Field& rhs) const {
             return fieldName < rhs.fieldName;
         }
-        StringData fieldName;
+        std::string_view fieldName;
     };
 
     // Put all elements in a buffer, sort it and then continue normalize in sorted order
@@ -185,7 +187,7 @@ bool areBSONObjectsEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
 template <class Allocator>
 void normalize(const BSONElement& elem,
                allocator_aware::BSONObjBuilder<Allocator>& builder,
-               boost::optional<StringData> as) {
+               boost::optional<std::string_view> as) {
     if (elem.type() == BSONType::array) {
         allocator_aware::BSONArrayBuilder<Allocator> subArray(
             builder.subarrayStart(as.has_value() ? as.value() : elem.fieldNameStringData()));
@@ -205,10 +207,10 @@ void normalize(const BSONElement& elem,
 
 template void normalize(const BSONElement& elem,
                         allocator_aware::BSONObjBuilder<std::allocator<void>>& builder,
-                        boost::optional<StringData> as);
+                        boost::optional<std::string_view> as);
 template void normalize(const BSONElement& elem,
                         allocator_aware::BSONObjBuilder<tracking::Allocator<void>>& builder,
-                        boost::optional<StringData> as);
+                        boost::optional<std::string_view> as);
 
 bool areMetadataEqual(const BSONElement& elem1, const BSONElement& elem2) {
     if (elem1.type() != elem2.type()) {

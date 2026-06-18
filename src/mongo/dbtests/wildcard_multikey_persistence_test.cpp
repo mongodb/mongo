@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -72,6 +71,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -289,12 +289,12 @@ protected:
     }
 
     const IndexCatalogEntry* getIndexCatalogEntry(const CollectionPtr& collection,
-                                                  const StringData indexName) {
+                                                  const std::string_view indexName) {
         return collection->getIndexCatalog()->findIndexByName(opCtx(), indexName);
     }
 
     std::unique_ptr<SortedDataInterface::Cursor> getIndexCursor(const CollectionPtr& collection,
-                                                                const StringData indexName) {
+                                                                const std::string_view indexName) {
         return getIndexCatalogEntry(collection, indexName)
             ->accessMethod()
             ->asSortedData()

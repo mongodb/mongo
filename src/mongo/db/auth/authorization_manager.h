@@ -56,6 +56,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -116,14 +117,14 @@ public:
 
     virtual ~AuthorizationManager() = default;
 
-    static constexpr StringData USERID_FIELD_NAME = "userId"_sd;
-    static constexpr StringData USER_NAME_FIELD_NAME = "user"_sd;
-    static constexpr StringData USER_DB_FIELD_NAME = "db"_sd;
-    static constexpr StringData ROLE_NAME_FIELD_NAME = "role"_sd;
-    static constexpr StringData ROLE_DB_FIELD_NAME = "db"_sd;
-    static constexpr StringData PASSWORD_FIELD_NAME = "pwd"_sd;
-    static constexpr StringData V1_USER_NAME_FIELD_NAME = "user"_sd;
-    static constexpr StringData V1_USER_SOURCE_FIELD_NAME = "userSource"_sd;
+    static constexpr std::string_view USERID_FIELD_NAME = "userId"_sd;
+    static constexpr std::string_view USER_NAME_FIELD_NAME = "user"_sd;
+    static constexpr std::string_view USER_DB_FIELD_NAME = "db"_sd;
+    static constexpr std::string_view ROLE_NAME_FIELD_NAME = "role"_sd;
+    static constexpr std::string_view ROLE_DB_FIELD_NAME = "db"_sd;
+    static constexpr std::string_view PASSWORD_FIELD_NAME = "pwd"_sd;
+    static constexpr std::string_view V1_USER_NAME_FIELD_NAME = "user"_sd;
+    static constexpr std::string_view V1_USER_SOURCE_FIELD_NAME = "userSource"_sd;
 
     /**
      * Status to be returned when authentication fails. Being consistent about our returned Status
@@ -140,7 +141,7 @@ public:
     /**
      * Name of the field in the auth schema version document containing the current schema version.
      */
-    static constexpr StringData schemaVersionFieldName = "currentVersion"_sd;
+    static constexpr std::string_view schemaVersionFieldName = "currentVersion"_sd;
 
     /**
      * Auth schema version for MongoDB 3.0 SCRAM only mode.
@@ -203,7 +204,7 @@ public:
      * Doing so will result in a no-op.
      */
     virtual void notifyDDLOperation(OperationContext* opCtx,
-                                    StringData op,
+                                    std::string_view op,
                                     const NamespaceString& nss,
                                     const BSONObj& o,
                                     const BSONObj* o2) = 0;

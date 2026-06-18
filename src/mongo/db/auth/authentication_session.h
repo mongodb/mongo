@@ -46,6 +46,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -128,21 +129,21 @@ public:
     /**
      * This returns the mechanism name for this session.
      */
-    StringData getMechanismName() const {
+    std::string_view getMechanismName() const {
         return _mechName;
     }
 
     /**
-     * This returns the user portion of the UserName which may be an empty StringData.
+     * This returns the user portion of the UserName which may be an empty std::string_view.
      */
-    StringData getUserName() const {
+    std::string_view getUserName() const {
         return _userName.getUser();
     }
 
     /**
-     * This returns the database portion of the UserName which may be an empty StringData.
+     * This returns the database portion of the UserName which may be an empty std::string_view.
      */
-    StringData getDatabase() const {
+    std::string_view getDatabase() const {
         return _userName.getDB();
     }
 
@@ -158,14 +159,14 @@ public:
      *
      * If the mechanism name is not recognized, this will throw.
      */
-    void setMechanismName(StringData mechanismName);
+    void setMechanismName(std::string_view mechanismName);
 
     /**
      * Update the database for this session.
      *
      * The database will be validated against the current database for this session.
      */
-    void updateDatabase(StringData database, bool isMechX509) {
+    void updateDatabase(std::string_view database, bool isMechX509) {
         updateUserName(UserName("", std::string{database}), isMechX509);
     }
 
@@ -248,7 +249,7 @@ public:
     /**
      * Convert a StepType to a constant string.
      */
-    friend constexpr StringData toString(StepType step) {
+    friend constexpr std::string_view toString(StepType step) {
         switch (step) {
             case StepType::kSaslSupportedMechanisms:
                 return "SaslSupportedMechanisms"_sd;

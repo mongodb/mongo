@@ -32,11 +32,13 @@
 #include "mongo/util/ctype.h"
 #include "mongo/util/pcre.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::pcre_util {
 
-pcre::CompileOptions flagsToOptions(StringData optionFlags, StringData opName) {
+pcre::CompileOptions flagsToOptions(std::string_view optionFlags, std::string_view opName) {
     pcre::CompileOptions opt = pcre::UTF;
     for (char flag : optionFlags) {
         switch (flag) {
@@ -74,7 +76,7 @@ std::string optionsToFlags(pcre::CompileOptions opt) {
     return optionFlags;
 }
 
-std::string quoteMeta(StringData str) {
+std::string quoteMeta(std::string_view str) {
     std::string result;
     for (char c : str) {
         if (c == '\0') {

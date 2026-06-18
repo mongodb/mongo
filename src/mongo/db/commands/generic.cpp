@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -57,6 +56,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -68,6 +68,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class PingCommand : public PingCmdVersion1Gen<PingCommand> {
 public:
@@ -116,7 +117,7 @@ class EchoCommand final : public TypedCommand<EchoCommand> {
 public:
     class Request : public BasicTypedRequest {
     public:
-        static constexpr auto kCommandName = "echo"_sd;
+        static constexpr auto kCommandName = "echo"sv;
         static Request parse(const OpMsgRequest& opMsgRequest,
                              const IDLParserContext&,
                              DeserializationContext*) {
@@ -185,7 +186,7 @@ public:
 
     class Request : public BasicTypedRequest {
     public:
-        static constexpr StringData kCommandName = "listCommands";
+        static constexpr std::string_view kCommandName = "listCommands";
         static Request parse(const OpMsgRequest& opMsgRequest,
                              const IDLParserContext&,
                              DeserializationContext*) {

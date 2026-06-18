@@ -33,6 +33,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -183,7 +185,7 @@ void logReplSetReconfig(Client* client, const BSONObj* oldConfig, const BSONObj*
         ->logReplSetReconfig(client, oldConfig, newConfig);
 }
 
-void logApplicationMessage(Client* client, StringData msg) {
+void logApplicationMessage(Client* client, std::string_view msg) {
     AuditInterface::get(client->getServiceContext())->logApplicationMessage(client, msg);
 }
 
@@ -196,7 +198,7 @@ void logShutdown(Client* client) {
 }
 
 void logLogout(Client* client,
-               StringData reason,
+               std::string_view reason,
                const BSONArray& initialUsers,
                const BSONArray& updatedUsers,
                const boost::optional<Date_t>& loginTime) {
@@ -206,9 +208,9 @@ void logLogout(Client* client,
 
 void logCreateIndex(Client* client,
                     const BSONObj* indexSpec,
-                    StringData indexname,
+                    std::string_view indexname,
                     const NamespaceString& nsname,
-                    StringData indexBuildState,
+                    std::string_view indexBuildState,
                     ErrorCodes::Error result) {
     AuditInterface::get(client->getServiceContext())
         ->logCreateIndex(client, indexSpec, indexname, nsname, indexBuildState, result);
@@ -236,7 +238,7 @@ void logCreateDatabase(Client* client, const DatabaseName& dbname) {
 }
 
 
-void logDropIndex(Client* client, StringData indexname, const NamespaceString& nsname) {
+void logDropIndex(Client* client, std::string_view indexname, const NamespaceString& nsname) {
     AuditInterface::get(client->getServiceContext())->logDropIndex(client, indexname, nsname);
 }
 
@@ -263,15 +265,15 @@ void logRenameCollection(Client* client,
     AuditInterface::get(client->getServiceContext())->logRenameCollection(client, source, target);
 }
 
-void logEnableSharding(Client* client, StringData dbname) {
+void logEnableSharding(Client* client, std::string_view dbname) {
     AuditInterface::get(client->getServiceContext())->logEnableSharding(client, dbname);
 }
 
-void logAddShard(Client* client, StringData name, const std::string& servers) {
+void logAddShard(Client* client, std::string_view name, const std::string& servers) {
     AuditInterface::get(client->getServiceContext())->logAddShard(client, name, servers);
 }
 
-void logRemoveShard(Client* client, StringData shardname) {
+void logRemoveShard(Client* client, std::string_view shardname) {
     AuditInterface::get(client->getServiceContext())->logRemoveShard(client, shardname);
 }
 

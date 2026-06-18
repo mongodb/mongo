@@ -29,7 +29,6 @@
 
 #include "mongo/dbtests/mock/mock_replica_set.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"

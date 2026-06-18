@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -66,7 +66,7 @@ public:
     }
 
     static SaslPayload parseFromBSON(const BSONElement& elem);
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
     void serializeToBSON(BSONArrayBuilder* bob) const;
 
 private:

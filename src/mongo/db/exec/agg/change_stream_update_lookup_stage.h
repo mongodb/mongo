@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
@@ -38,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -52,7 +52,7 @@ namespace mongo::exec::agg {
  */
 class ChangeStreamUpdateLookupStage final : public Stage {
 public:
-    ChangeStreamUpdateLookupStage(StringData stageName,
+    ChangeStreamUpdateLookupStage(std::string_view stageName,
                                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                   std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor);
 

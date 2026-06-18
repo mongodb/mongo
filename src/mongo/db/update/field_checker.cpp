@@ -33,6 +33,8 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
 
@@ -46,7 +48,7 @@ Status isUpdatable(const FieldRef& field) {
     }
 
     for (size_t i = 0; i != numParts; ++i) {
-        const StringData part = field.getPart(i);
+        const std::string_view part = field.getPart(i);
 
         if (part.empty()) {
             return Status(ErrorCodes::EmptyFieldName,
@@ -58,7 +60,7 @@ Status isUpdatable(const FieldRef& field) {
     return Status::OK();
 }
 
-bool isPositionalElement(StringData field) {
+bool isPositionalElement(std::string_view field) {
     return field.size() == 1 && field[0] == '$';
 }
 
@@ -72,7 +74,7 @@ bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {
     *count = 0;
     size_t size = fieldRef.numParts();
     for (size_t i = 0; i < size; i++) {
-        StringData fieldPart = fieldRef.getPart(i);
+        std::string_view fieldPart = fieldRef.getPart(i);
         if (isPositionalElement(fieldPart)) {
             if (*count == 0)
                 *pos = i;
@@ -82,7 +84,7 @@ bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {
     return *count > 0;
 }
 
-bool isArrayFilterIdentifier(StringData field) {
+bool isArrayFilterIdentifier(std::string_view field) {
     return field.size() >= 3 && field[0] == '$' && field[1] == '[' &&
         field[field.size() - 1] == ']';
 }

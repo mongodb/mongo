@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/operation_context.h"
@@ -49,6 +48,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -246,7 +246,7 @@ public:
     /**
      * Returns a string representation of the state name.
      */
-    static StringData stateToString(State state);
+    static std::string_view stateToString(State state);
 
     /**
      * Returns the predecessor stage in the pipeline, which is always a 'MergeCursorsStage'.
@@ -352,12 +352,12 @@ private:
      */
     void _assertState(State expectedState,
                       boost::optional<ChangeStreamReadMode> expectedMode,
-                      StringData context) const;
+                      std::string_view context) const;
 
     /**
      * Asserts that the change stream was opened in strict mode.
      */
-    void _assertStrictMode(StringData context) const;
+    void _assertStrictMode(std::string_view context) const;
 
     /**
      * Ensures that the '_shardTargeter' instance variable is populated with a valid shard targeter
@@ -370,11 +370,12 @@ private:
      * There are 3 variants of this function supporting slightly different additional parameters to
      * be logged.
      */
-    void _logShardTargeterDecision(StringData context, ShardTargeterDecision targeterResult) const;
-    void _logShardTargeterDecision(StringData context,
+    void _logShardTargeterDecision(std::string_view context,
+                                   ShardTargeterDecision targeterResult) const;
+    void _logShardTargeterDecision(std::string_view context,
                                    ShardTargeterDecision targeterResult,
                                    const Document& event) const;
-    void _logShardTargeterDecision(StringData context,
+    void _logShardTargeterDecision(std::string_view context,
                                    ShardTargeterDecision targeterResult,
                                    Timestamp segmentBegin,
                                    Timestamp segmentEnd) const;

@@ -48,6 +48,7 @@
 
 namespace mongo::transport::grpc {
 namespace {
+using namespace std::literals::string_view_literals;
 const Seconds kSessionManagerShutdownTimeout{10};
 
 class GRPCSection : public ServerStatusSection {
@@ -72,7 +73,7 @@ public:
         }
 
         if (tl->isIngress()) {
-            BSONObjBuilder ingressSection(section.subobjStart("ingress"_sd));
+            BSONObjBuilder ingressSection(section.subobjStart("ingress"sv));
             if (auto sm = dynamic_cast<GRPCSessionManager*>(tl->getSessionManager())) {
                 sm->appendStats(&ingressSection);
             };

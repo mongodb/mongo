@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,6 +51,7 @@ struct JSRegEx;
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include <jsapi.h>
 
@@ -118,7 +118,7 @@ public:
         void define(JSContext* cx, JS::HandleObject o, JS::HandleValue value, unsigned attrs);
         void del(JSContext* cx, JS::HandleObject o);
         std::string toString(JSContext* cx);
-        StringData toStringData(JSContext* cx, JSStringWrapper* jsstr);
+        std::string_view toStringData(JSContext* cx, JSStringWrapper* jsstr);
 
         union {
             const char* _field;
@@ -147,7 +147,7 @@ public:
     JSRegEx getRegEx(Key key);
 
     void setNumber(Key key, double val);
-    void setString(Key key, StringData val);
+    void setString(Key key, std::string_view val);
     void setBoolean(Key key, bool val);
     void setBSONElement(Key key, const BSONElement& elem, const BSONObj& obj, bool readOnly);
     void setBSON(Key key, const BSONObj& obj, bool readOnly);
@@ -236,7 +236,7 @@ public:
         WriteFieldRecursionFrame(JSContext* cx,
                                  JSObject* obj,
                                  BSONObjBuilder* parent,
-                                 StringData sd);
+                                 std::string_view sd);
 
         BSONObjBuilder* subbob_or(BSONObjBuilder* option) {
             return subbob ? &subbob.get() : option;

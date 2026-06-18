@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -65,6 +64,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -74,10 +74,13 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/matcher"};
 
-void verifyDebugString(unittest::GoldenTestContext& gctx, MatchExpression* match, StringData name) {
+void verifyDebugString(unittest::GoldenTestContext& gctx,
+                       MatchExpression* match,
+                       std::string_view name) {
     // Verify the untagged case.
     gctx.outStream() << "==== VARIATION: matchExpression=" << name << std::endl;
     StringBuilder debug;
@@ -109,19 +112,19 @@ TEST(DebugStringTest, ArrayMatchExpressions) {
 
     // ElemMatchObjectExpression.
     auto baseOperandObj = BSON("1" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("1"_sd, baseOperandObj["1"]);
-    auto elemMatchObjExpr = std::make_unique<ElemMatchObjectMatchExpression>("a"_sd, std::move(eq));
+    auto eq = std::make_unique<EqualityMatchExpression>("1"sv, baseOperandObj["1"]);
+    auto elemMatchObjExpr = std::make_unique<ElemMatchObjectMatchExpression>("a"sv, std::move(eq));
     verifyDebugString(gctx, elemMatchObjExpr.get(), "ElemMatchObjectExpression");
 
     // ElemMatchValueExpression.
     auto baseOperandVal = BSON("$gt" << 5);
-    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperandVal["$gt"]);
-    auto elemMatchValExpr = std::make_unique<ElemMatchValueMatchExpression>("a"_sd);
+    auto gt = std::make_unique<GTMatchExpression>(""sv, baseOperandVal["$gt"]);
+    auto elemMatchValExpr = std::make_unique<ElemMatchValueMatchExpression>("a"sv);
     elemMatchValExpr->add(std::move(gt));
     verifyDebugString(gctx, elemMatchValExpr.get(), "ElemMatchValueExpression");
 
     // SizeMatchExpression.
-    auto sizeExpr = std::make_unique<SizeMatchExpression>("a"_sd, 5);
+    auto sizeExpr = std::make_unique<SizeMatchExpression>("a"sv, 5);
     verifyDebugString(gctx, sizeExpr.get(), "SizeMatchExpression");
 }
 
@@ -141,7 +144,7 @@ TEST(DebugStringTest, ExpressionGeo) {
     std::unique_ptr<GeoExpression> gq(new GeoExpression);
     ASSERT_OK(parsers::matcher::parseGeoExpressionFromBSON(query["loc"].Obj(), *gq));
 
-    GeoMatchExpression ge("a"_sd, gq.release(), query);
+    GeoMatchExpression ge("a"sv, gq.release(), query);
     verifyDebugString(gctx, &ge, "GeoMatchExpression");
 
     // GeoNearMatchExpression.
@@ -152,7 +155,7 @@ TEST(DebugStringTest, ExpressionGeo) {
     std::unique_ptr<GeoNearExpression> nq(new GeoNearExpression);
     ASSERT_OK(parsers::matcher::parseGeoNearExpressionFromBSON(query["loc"].Obj(), *nq));
 
-    GeoNearMatchExpression gne("a"_sd, nq.release(), query);
+    GeoNearMatchExpression gne("a"sv, nq.release(), query);
     verifyDebugString(gctx, &gne, "GeoNearMatchExpression");
 }
 
@@ -179,45 +182,45 @@ TEST(DebugStringTest, ExpressionLeaf) {
 
     // ComparisonMatchExpression (EQ, GT, GTE, LT, LTE).
     auto baseOperandEq = BSON("1" << 5);
-    auto eq = std::make_unique<EqualityMatchExpression>("1"_sd, baseOperandEq["1"]);
+    auto eq = std::make_unique<EqualityMatchExpression>("1"sv, baseOperandEq["1"]);
     verifyDebugString(gctx, eq.get(), "ComparisonMatchExpressionEq");
 
     auto baseOperandGt = BSON("$gt" << 5);
-    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperandGt["$gt"]);
+    auto gt = std::make_unique<GTMatchExpression>(""sv, baseOperandGt["$gt"]);
     verifyDebugString(gctx, gt.get(), "ComparisonMatchExpressionGt");
 
     auto baseOperandGte = BSON("$gte" << 5);
-    auto gte = std::make_unique<GTEMatchExpression>(""_sd, baseOperandGte["$gte"]);
+    auto gte = std::make_unique<GTEMatchExpression>(""sv, baseOperandGte["$gte"]);
     verifyDebugString(gctx, gte.get(), "ComparisonMatchExpressionGte");
 
     auto baseOperandLt = BSON("$lt" << 5);
-    auto lt = std::make_unique<LTMatchExpression>(""_sd, baseOperandLt["$lt"]);
+    auto lt = std::make_unique<LTMatchExpression>(""sv, baseOperandLt["$lt"]);
     verifyDebugString(gctx, lt.get(), "ComparisonMatchExpressionLt");
 
     auto baseOperandLte = BSON("$lte" << 5);
-    auto lte = std::make_unique<LTEMatchExpression>(""_sd, baseOperandLte["$lte"]);
+    auto lte = std::make_unique<LTEMatchExpression>(""sv, baseOperandLte["$lte"]);
     verifyDebugString(gctx, lte.get(), "ComparisonMatchExpressionLte");
 
     // RegexMatchExpression.
-    RegexMatchExpression regex(""_sd, "^ab", "");
+    RegexMatchExpression regex(""sv, "^ab", "");
     // Additional space before regex since path is not defined.
     verifyDebugString(gctx, &regex, "RegexMatchExpression");
 
     // ModMatchExpression.
-    ModMatchExpression mod(""_sd, 3, 1);
+    ModMatchExpression mod(""sv, 3, 1);
     verifyDebugString(gctx, &mod, "ModMatchExpression");
 
     // ExistsMatchExpression.
-    ExistsMatchExpression exists("a"_sd);
+    ExistsMatchExpression exists("a"sv);
     verifyDebugString(gctx, &exists, "ExistsMatchExpression");
 
     // InMatchExpression.
-    InMatchExpression in("a"_sd);
+    InMatchExpression in("a"sv);
     verifyDebugString(gctx, &in, "InMatchExpression");
 
     // BitTestMatchExpression.
     std::vector<uint32_t> bitPositions;
-    BitsAllSetMatchExpression balls("a"_sd, bitPositions);
+    BitsAllSetMatchExpression balls("a"sv, bitPositions);
     verifyDebugString(gctx, &balls, "BitsAllSetMatchExpression");
 }
 
@@ -236,9 +239,9 @@ TEST(DebugStringTest, ExpressionTree) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
     auto baseOperand1 = BSON("$lt" << "z1");
     auto baseOperand2 = BSON("$gt" << "a1");
-    auto sub1 = std::make_unique<LTMatchExpression>("a"_sd, baseOperand1["$lt"]);
-    auto sub2 = std::make_unique<GTMatchExpression>("a"_sd, baseOperand2["$gt"]);
-    auto sub3 = std::make_unique<RegexMatchExpression>("a"_sd, "1", "");
+    auto sub1 = std::make_unique<LTMatchExpression>("a"sv, baseOperand1["$lt"]);
+    auto sub2 = std::make_unique<GTMatchExpression>("a"sv, baseOperand2["$gt"]);
+    auto sub3 = std::make_unique<RegexMatchExpression>("a"sv, "1", "");
 
     // AndMatchExpression.
     auto andOp = AndMatchExpression{};
@@ -271,13 +274,13 @@ TEST(DebugStringTest, ExpressionType) {
     MatcherTypeSet typeSet;
     typeSet.allNumbers = true;
 
-    TypeMatchExpression typeExpr("a"_sd, typeSet);
+    TypeMatchExpression typeExpr("a"sv, typeSet);
     verifyDebugString(gctx, &typeExpr, "TypeMatchExpression");
 
-    InternalSchemaTypeExpression schemaType("a"_sd, typeSet);
+    InternalSchemaTypeExpression schemaType("a"sv, typeSet);
     verifyDebugString(gctx, &schemaType, "InternalSchemaTypeExpression");
 
-    InternalSchemaBinDataSubTypeExpression binType(""_sd, BinDataType::BinDataGeneral);
+    InternalSchemaBinDataSubTypeExpression binType(""sv, BinDataType::BinDataGeneral);
     verifyDebugString(gctx, &binType, "InternalSchemaBinDataSubTypeExpression");
 }
 
@@ -313,7 +316,7 @@ TEST(DebugStringTest, ExpressionInternalSchemaAllElemMatchFromIndex) {
 TEST(DebugStringTest, ExpressionInternalSchemaEqMatchExpression) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
     BSONObj numberOperand = BSON("a" << 5);
-    InternalSchemaEqMatchExpression eqNumberOperand("a"_sd, numberOperand["a"]);
+    InternalSchemaEqMatchExpression eqNumberOperand("a"sv, numberOperand["a"]);
     verifyDebugString(gctx, &eqNumberOperand, "InternalSchemaEqMatchExpression");
 }
 
@@ -338,7 +341,7 @@ TEST(DebugStringTest, ExpressionInternalSchemaMatchArrayIndex) {
 
 TEST(DebugStringTest, ExpressionInternalSchemaNumArrayItems) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
-    InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 2);
+    InternalSchemaMaxItemsMatchExpression maxItems("a"sv, 2);
     verifyDebugString(gctx, &maxItems, "InternalSchemaMaxItemsMatchExpression");
 }
 
@@ -367,13 +370,13 @@ TEST(DebugStringTest, ExpressionInternalSchemaRootDocEq) {
 
 TEST(DebugStringTest, ExpressionInternalSchemaStrLength) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
-    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 1);
+    InternalSchemaMaxLengthMatchExpression maxLength("a"sv, 1);
     verifyDebugString(gctx, &maxLength, "InternalSchemaMaxLengthMatchExpression");
 }
 
 TEST(DebugStringTest, ExpressionInternalSchemaUniqueItems) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
-    InternalSchemaUniqueItemsMatchExpression expr("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression expr("foo"sv);
     verifyDebugString(gctx, &expr, "InternalSchemaUniqueItemsMatchExpression");
 }
 

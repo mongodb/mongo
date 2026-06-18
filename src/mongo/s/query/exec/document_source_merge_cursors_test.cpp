@@ -31,7 +31,6 @@
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -79,6 +78,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -88,6 +88,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 
@@ -99,7 +100,7 @@ const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 
                                                   HostAndPort("FakeShard3Host", 12345)};
 
 const std::string kMergeCursorNsStr{"test.mergeCursors"};
-const HostAndPort kTestHost = HostAndPort("localhost:27017"_sd);
+const HostAndPort kTestHost = HostAndPort("localhost:27017"sv);
 
 const CursorId kExhaustedCursorID = 0;
 

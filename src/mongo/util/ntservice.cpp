@@ -46,6 +46,7 @@
 
 #include <chrono>
 #include <future>
+#include <string_view>
 
 #include <boost/range/size.hpp>
 
@@ -264,8 +265,8 @@ std::vector<std::string> constructServiceArgv(const std::vector<std::string>& in
             continue;
         }
 
-        StringData name;
-        StringData value;
+        std::string_view name;
+        std::string_view value;
         bool foundEqualSign = str::splitOn(*iter, '=', name, value);
         if (!foundEqualSign)
             name = *iter;

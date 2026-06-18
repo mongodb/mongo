@@ -31,13 +31,13 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <pdh.h>
@@ -85,7 +85,7 @@ public:
      *   }
      * }
      */
-    Status addCountersGroup(StringData groupName, const std::vector<StringData>& paths);
+    Status addCountersGroup(std::string_view groupName, const std::vector<std::string_view>& paths);
 
     /**
      * Add vector of counters grouped under 'name', and grouped by instance name.
@@ -114,15 +114,15 @@ public:
      *   }
      * }
      */
-    Status addCountersGroupedByInstanceName(StringData groupName,
-                                            const std::vector<StringData>& paths);
+    Status addCountersGroupedByInstanceName(std::string_view groupName,
+                                            const std::vector<std::string_view>& paths);
 
 private:
     /**
      * Check for duplicate group and counters.
      */
-    StatusWith<std::vector<std::string>> checkCounters(StringData groupName,
-                                                       const std::vector<StringData>& paths);
+    StatusWith<std::vector<std::string>> checkCounters(std::string_view groupName,
+                                                       const std::vector<std::string_view>& paths);
 
 private:
     // Vector of counters which are not sub-grouped by instance name.
@@ -244,23 +244,23 @@ private:
     /**
      * Add the specified counter group to the PDH Query.
      */
-    Status addCountersGroup(StringData groupName, const std::vector<std::string>& paths);
+    Status addCountersGroup(std::string_view groupName, const std::vector<std::string>& paths);
 
     /**
      * Add the specified counter group to the PDH Query grouped by instance name.
      */
-    Status addCountersGroupedByInstanceName(StringData groupName,
+    Status addCountersGroupedByInstanceName(std::string_view groupName,
                                             const std::vector<std::string>& paths);
 
     /**
      * Add a counter to the PDH query and get a description of it.
      */
-    StatusWith<CounterInfo> addCounter(StringData path);
+    StatusWith<CounterInfo> addCounter(std::string_view path);
 
     /**
      * Add a set of counters to the PDH query, and get descriptions of them.
      */
-    StatusWith<std::vector<CounterInfo>> addCounters(StringData path);
+    StatusWith<std::vector<CounterInfo>> addCounters(std::string_view path);
 
     /**
      * Collect a vector of counters and output them to builder.
@@ -276,7 +276,7 @@ private:
      * Add and get a counter by an English name in a language independent way.
      */
     StatusWith<std::tuple<PDH_HCOUNTER, std::unique_ptr<PDH_COUNTER_INFO>>> addAndGetCounter(
-        StringData path);
+        std::string_view path);
 
 private:
     // PDH Query

@@ -60,6 +60,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -83,12 +84,12 @@ struct GraphLookUpParams {
 
 class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$graphLookup"_sd;
+    static constexpr std::string_view kStageName = "$graphLookup"_sd;
 
     DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp&,
                               const boost::intrusive_ptr<ExpressionContext>&);
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

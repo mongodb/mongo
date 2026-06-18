@@ -33,6 +33,8 @@
 #include "mongo/scripting/config_engine_gen.h"
 
 #include <algorithm>
+#include <cstring>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

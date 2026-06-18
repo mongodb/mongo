@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/serialization_context.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -61,8 +61,8 @@ public:
      * on.
      */
     static NamespaceString deserialize(const boost::optional<TenantId>& tenantId,
-                                       StringData db,
-                                       StringData coll);
+                                       std::string_view db,
+                                       std::string_view coll);
 };
 
 class NamespaceStringUtil {
@@ -105,7 +105,7 @@ public:
     static std::string serializeForCatalog(const NamespaceString& ns);
 
     /**
-     * Deserializes StringData ns to a NamespaceString object.
+     * Deserializes std::string_view ns to a NamespaceString object.
      *
      * If multitenancySupport is enabled and featureFlagRequireTenantID is enabled, then a
      * NamespaceString object is constructed using the tenantId passed in to the constructor. The
@@ -129,18 +129,18 @@ public:
      * eg. deserialize(boost::none, "foo.bar") -> NamespaceString(boost::none, "foo.bar")
      */
     static NamespaceString deserialize(boost::optional<TenantId> tenantId,
-                                       StringData ns,
+                                       std::string_view ns,
                                        const SerializationContext& context);
 
-    static NamespaceString deserialize(const DatabaseName& dbName, StringData coll);
+    static NamespaceString deserialize(const DatabaseName& dbName, std::string_view coll);
 
     static NamespaceString deserialize(const boost::optional<TenantId>& tenantId,
-                                       StringData db,
-                                       StringData coll,
+                                       std::string_view db,
+                                       std::string_view coll,
                                        const SerializationContext& context);
 
     /**
-     * Deserializes StringData ns to a NamespaceString object for catalog code.
+     * Deserializes std::string_view ns to a NamespaceString object for catalog code.
      *
      * Always includes the tenantId prefix for the catalog deserialization.
      * eg. deserializeForCatalog(tenantID, "foo.bar") -> "tenantID_foo.bar"
@@ -148,13 +148,13 @@ public:
      * MUST only be used for deserializing a NamespaceString object for catalog.
      */
     static NamespaceString deserializeForCatalog(const boost::optional<TenantId>& tenantId,
-                                                 StringData ns);
+                                                 std::string_view ns);
 
     /**
      * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
      * namespace from disk. 'ns' is expected to contain a tenantId when running in Serverless mode.
      */
-    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
+    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(std::string_view ns);
 
     /**
      * To be used within a Failpoint. When used in the `executeIf` we parse a BSONObj which should
@@ -162,14 +162,14 @@ public:
      */
     static NamespaceString parseFailPointData(
         const BSONObj& data,
-        StringData nsFieldName,
+        std::string_view nsFieldName,
         const boost::optional<TenantId>& tenantId = boost::none);
 
     /**
      * To be used only for deserializing a NamespaceString object from a ns string in error
      * messages.
      */
-    static NamespaceString deserializeForErrorMsg(StringData nsInErrMsg);
+    static NamespaceString deserializeForErrorMsg(std::string_view nsInErrMsg);
 
 private:
     static std::string serializeForStorage(const NamespaceString& ns,
@@ -179,16 +179,16 @@ private:
                                             const SerializationContext& context);
 
     static NamespaceString deserializeForStorage(boost::optional<TenantId> tenantId,
-                                                 StringData db,
-                                                 StringData coll);
+                                                 std::string_view db,
+                                                 std::string_view coll);
 
     static NamespaceString deserializeForCommands(boost::optional<TenantId> tenantId,
-                                                  StringData db,
-                                                  StringData coll,
+                                                  std::string_view db,
+                                                  std::string_view coll,
                                                   const SerializationContext& context);
 
-    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData db,
-                                                                           StringData coll);
+    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(std::string_view db,
+                                                                           std::string_view coll);
 };
 
 }  // namespace mongo

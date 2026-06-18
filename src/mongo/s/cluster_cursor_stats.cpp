@@ -34,13 +34,14 @@
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
 
 /** ServerStatus metric cursor counts. */
 struct CursorStatsMetricPolicy {
-    void appendTo(BSONObjBuilder& b, StringData leafName) const {
+    void appendTo(BSONObjBuilder& b, std::string_view leafName) const {
         auto ll = [](auto v) {
             return static_cast<long long>(v);
         };

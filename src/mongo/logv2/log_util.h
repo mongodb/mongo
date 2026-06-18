@@ -35,6 +35,7 @@
 #include "mongo/util/str.h"
 
 #include <functional>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -49,14 +50,15 @@ constexpr auto kAuditLogTag = "audit"_sd;
 constexpr auto kWindowsNUL = "nul"_sd;
 #endif
 
-using LogRotateCallback = std::function<Status(bool, StringData, std::function<void(Status)>)>;
+using LogRotateCallback =
+    std::function<Status(bool, std::string_view, std::function<void(Status)>)>;
 using ShouldEmitLogServiceFn = std::function<bool()>;
 
 /**
  * logType param needs to have static lifetime. If a new logType needs to be defined, add it above
  * with the other constexpr logTags.
  */
-void addLogRotator(StringData logType, LogRotateCallback cb);
+void addLogRotator(std::string_view logType, LogRotateCallback cb);
 
 /**
  * Class that combines error Status objects into a single Status object.
@@ -88,7 +90,7 @@ private:
  * we do should result in a file create.
  */
 Status rotateLogs(bool renameFiles,
-                  boost::optional<StringData> logType,
+                  boost::optional<std::string_view> logType,
                   std::function<void(Status)> onMinorError);
 
 /**

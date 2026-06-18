@@ -33,6 +33,9 @@
 #include "mongo/logv2/log_truncation.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
+#include <string_view>
+
 namespace mongo::logv2::constants {
 
 // Used in data structures to indicate number of attributes to store without having to allocate
@@ -40,22 +43,22 @@ namespace mongo::logv2::constants {
 constexpr size_t kNumStaticAttrs = 16;
 
 // Field names used in the JSON and BSON formatter
-constexpr StringData kTimestampFieldName = "t"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kSeverityFieldName = "s"_sd;
-constexpr StringData kComponentFieldName = "c"_sd;
-constexpr StringData kServiceFieldName = "svc"_sd;
-constexpr StringData kContextFieldName = "ctx"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kIdFieldName = "id"_sd;
-constexpr StringData kMessageFieldName = "msg"_sd;
-constexpr StringData kAttributesFieldName = "attr"_sd;
-constexpr StringData kTruncatedFieldName = "truncated"_sd;
-constexpr StringData kOmittedFieldName = "omitted"_sd;
-constexpr StringData kTruncatedSizeFieldName = "size"_sd;
-constexpr StringData kTagsFieldName = "tags"_sd;
-constexpr StringData kTenantFieldName = "tenant"_sd;
+constexpr std::string_view kTimestampFieldName = "t"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kSeverityFieldName = "s"_sd;
+constexpr std::string_view kComponentFieldName = "c"_sd;
+constexpr std::string_view kServiceFieldName = "svc"_sd;
+constexpr std::string_view kContextFieldName = "ctx"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kIdFieldName = "id"_sd;
+constexpr std::string_view kMessageFieldName = "msg"_sd;
+constexpr std::string_view kAttributesFieldName = "attr"_sd;
+constexpr std::string_view kTruncatedFieldName = "truncated"_sd;
+constexpr std::string_view kOmittedFieldName = "omitted"_sd;
+constexpr std::string_view kTruncatedSizeFieldName = "size"_sd;
+constexpr std::string_view kTagsFieldName = "tags"_sd;
+constexpr std::string_view kTenantFieldName = "tenant"_sd;
 
 // String to be used when logging empty boost::optional with the text formatter
-constexpr StringData kNullOptionalString = "(nothing)"_sd;
+constexpr std::string_view kNullOptionalString = "(nothing)"_sd;
 
 constexpr LogTruncation kDefaultTruncation = LogTruncation::Enabled;
 MONGO_MOD_NEEDS_REPLACEMENT constexpr int32_t kDefaultMaxAttributeOutputSizeKB = 10;

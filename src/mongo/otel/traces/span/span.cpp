@@ -40,6 +40,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 
 #include <opentelemetry/trace/provider.h>
 #include <opentelemetry/trace/span.h>
@@ -72,11 +73,11 @@ public:
         _span->End();
     }
 
-    void setAttribute(StringData key, int value) {
+    void setAttribute(std::string_view key, int value) {
         _span->SetAttribute(std::string{key}, value);
     }
 
-    void setAttribute(StringData key, StringData value) {
+    void setAttribute(std::string_view key, std::string_view value) {
         _span->SetAttribute(std::string{key}, std::string{value});
     }
 
@@ -103,13 +104,13 @@ Span& Span::operator=(Span&&) noexcept = default;
 
 Span::Span(Span&&) noexcept = default;
 
-void Span::setAttribute(StringData key, int value) {
+void Span::setAttribute(std::string_view key, int value) {
     if (_impl) {
         _impl->setAttribute(key, value);
     }
 }
 
-void Span::setAttribute(StringData key, StringData value) {
+void Span::setAttribute(std::string_view key, std::string_view value) {
     if (_impl) {
         _impl->setAttribute(key, value);
     }
@@ -121,7 +122,7 @@ void Span::setStatus(const Status& status) {
     }
 }
 
-Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, StringData name) {
+Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, std::string_view name) {
     ServiceContext* serviceContext = getGlobalServiceContext();
     if (!serviceContext) {
         return Span{};
@@ -178,7 +179,7 @@ Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name)
     return startImpl(telemetryCtx, name.getName());
 }
 
-Span Span::startImpl(OperationContext* opCtx, StringData name, bool createIfMissing) {
+Span Span::startImpl(OperationContext* opCtx, std::string_view name, bool createIfMissing) {
     if (opCtx == nullptr) {
         return Span{};
     }

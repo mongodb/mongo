@@ -44,11 +44,14 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
+
 #include <absl/container/flat_hash_set.h>
 #include <boost/move/utility_core.hpp>
 
 namespace mongo::async_rpc {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * This test fixture is used to test the functionality of the mocks, rather than test any facilities
@@ -129,7 +132,7 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, RemoteSuccess) {
 }
 
 TEST_F(SyncMockAsyncRPCRunnerTestFixture, RemoteError) {
-    StringData exampleErrMsg{"example error message"};
+    std::string_view exampleErrMsg{"example error message"};
     auto exampleErrCode = ErrorCodes::ShutdownInProgress;
     ErrorReply errorReply;
     errorReply.setOk(0);
@@ -287,7 +290,7 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, Expectation) {
     // We expect that some code will use the runner to send a hello
     // to localhost on "testdb".
     auto matcher = [](const AsyncMockAsyncRPCRunner::Request& req) {
-        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
+        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"sv;
         bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
         return isHello && isRightTarget;
     };
@@ -313,7 +316,7 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectLocalError) {
     // We expect that some code will use the runner to send a hello
     // to localhost on "testdb".
     auto matcher = [](const AsyncMockAsyncRPCRunner::Request& req) {
-        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
+        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"sv;
         bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
         return isHello && isRightTarget;
     };
@@ -339,7 +342,7 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectLocalError) {
 }
 
 TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectRemoteError) {
-    StringData exampleErrMsg{"example error message"};
+    std::string_view exampleErrMsg{"example error message"};
     auto exampleErrCode = ErrorCodes::ShutdownInProgress;
     ErrorReply errorReply;
     errorReply.setOk(0);
@@ -349,7 +352,7 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectRemoteError) {
     // We expect that some code will use the runner to send a hello
     // to localhost on "testdb".
     auto matcher = [](const AsyncMockAsyncRPCRunner::Request& req) {
-        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
+        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"sv;
         bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
         return isHello && isRightTarget;
     };
@@ -379,7 +382,7 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, AsyncMockAsyncRPCRunnerWithRetryStrat
     // We expect that some code will use the runner to send a hello
     // to localhost on "testdb".
     auto matcher = [](const AsyncMockAsyncRPCRunner::Request& req) {
-        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
+        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"sv;
         bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
         return isHello && isRightTarget;
     };
@@ -436,13 +439,13 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, SeveralExpectations) {
     HostAndPort targetThree("FakeHost3", 12345);
 
     auto matcherOne = [&](const AsyncMockAsyncRPCRunner::Request& req) {
-        return (req.cmdBSON.firstElementFieldName() == "hello"_sd) && (req.target == targetOne);
+        return (req.cmdBSON.firstElementFieldName() == "hello"sv) && (req.target == targetOne);
     };
     auto matcherTwo = [&](const AsyncMockAsyncRPCRunner::Request& req) {
-        return (req.cmdBSON.firstElementFieldName() == "hello"_sd) && (req.target == targetTwo);
+        return (req.cmdBSON.firstElementFieldName() == "hello"sv) && (req.target == targetTwo);
     };
     auto matcherThree = [&](const AsyncMockAsyncRPCRunner::Request& req) {
-        return (req.cmdBSON.firstElementFieldName() == "hello"_sd) && (req.target == targetThree);
+        return (req.cmdBSON.firstElementFieldName() == "hello"sv) && (req.target == targetThree);
     };
 
     // Create three expectations
@@ -490,7 +493,7 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, UnexpectedRequests) {
     initializeCommand(hello);
     hello.setClientOperationKey(getOpKeyFromCommand(unexpectedRequests[0].cmdBSON));
     ASSERT_BSONOBJ_EQ(unexpectedRequests[0].cmdBSON, hello.toBSON());
-    ASSERT_EQ(unexpectedRequests[0].dbName, "testdb"_sd);
+    ASSERT_EQ(unexpectedRequests[0].dbName, "testdb"sv);
     HostAndPort localhost = HostAndPort("localhost", serverGlobalParams.port);
     ASSERT_EQ(unexpectedRequests[0].target, localhost);
     // Note that unexpected requests are BSON-convertable and can be printed as extended JSON.
@@ -504,7 +507,7 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, UnexpectedRequests) {
 TEST_F(AsyncMockAsyncRPCRunnerTestFixture, UnmetExpectations) {
     HostAndPort theTarget("FakeHost1", 12345);
     auto matcher = [&](const AsyncMockAsyncRPCRunner::Request& req) {
-        return (req.cmdBSON.firstElementFieldName() == "hello"_sd) && (req.target == theTarget);
+        return (req.cmdBSON.firstElementFieldName() == "hello"sv) && (req.target == theTarget);
     };
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
     BSONObjBuilder result(helloReply.toBSON());

@@ -35,7 +35,6 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/smart_ptr.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -64,6 +63,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -124,7 +124,9 @@ public:
      * and cannot be deleted.
      */
     std::pair<BSONObj, bool> extractComputedProjectionsInProject(
-        StringData oldName, StringData newName, const std::set<StringData>& reservedNames);
+        std::string_view oldName,
+        std::string_view newName,
+        const std::set<std::string_view>& reservedNames);
 
     /**
      * Returns a pair of <BSONObj, bool>. The BSONObj contains extracted computed projections that
@@ -137,7 +139,9 @@ public:
      * extraction and can be deleted by the caller.
      */
     std::pair<BSONObj, bool> extractComputedProjectionsInAddFields(
-        StringData oldName, StringData newName, const std::set<StringData>& reservedNames);
+        std::string_view oldName,
+        std::string_view newName,
+        const std::set<std::string_view>& reservedNames);
 
 protected:
     Type getType() const override {
@@ -146,7 +150,9 @@ protected:
 
     // For inclusions, we can apply an optimization here by simply appending to the output document
     // via MutableDocument::addField, rather than always checking for existing fields via setField.
-    void outputProjectedField(StringData field, Value val, MutableDocument* outputDoc) const final {
+    void outputProjectedField(std::string_view field,
+                              Value val,
+                              MutableDocument* outputDoc) const final {
         outputDoc->addField(field, val);
     }
     std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const override {
@@ -261,7 +267,7 @@ public:
         // ambiguity in the expected behavior of the serialized projection.
         _root->serialize(&output, options);
         auto idFieldName = options.serializeFieldPath("_id");
-        if (output.peek()[StringData{idFieldName}].missing()) {
+        if (output.peek()[std::string_view{idFieldName}].missing()) {
             output.addField(idFieldName, Value{false});
         }
 
@@ -344,7 +350,9 @@ public:
     }
 
     std::pair<BSONObj, bool> extractComputedProjections(
-        StringData oldName, StringData newName, const std::set<StringData>& reservedNames) final {
+        std::string_view oldName,
+        std::string_view newName,
+        const std::set<std::string_view>& reservedNames) final {
         return _root->extractComputedProjectionsInProject(oldName, newName, reservedNames);
     }
 

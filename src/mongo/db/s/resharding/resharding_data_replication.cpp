@@ -31,7 +31,6 @@
 #include "mongo/db/s/resharding/resharding_data_replication.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types_gen.h"
@@ -64,6 +63,7 @@
 
 #include <initializer_list>
 #include <string>
+#include <string_view>
 #include <tuple>
 
 #include <boost/move/utility_core.hpp>
@@ -75,6 +75,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 /**
@@ -184,7 +185,7 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
 
 std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeOplogFetcherExecutor(
     size_t numDonors) {
-    static constexpr auto prefix = "ReshardingOplogFetcher"_sd;
+    static constexpr std::string_view prefix = "ReshardingOplogFetcher";
     auto executor = executor::ThreadPoolTaskExecutor::create(
         ThreadPool::make({
             .poolName = fmt::format("{}ThreadPool", prefix),
@@ -199,7 +200,7 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeOplogFet
 
 std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeCollectionClonerExecutor(
     size_t numDonors) {
-    auto prefix = "ReshardingCollectionCloner"_sd;
+    static constexpr std::string_view prefix = "ReshardingCollectionCloner";
     auto executor = executor::ThreadPoolTaskExecutor::create(
         ThreadPool::make({
             .poolName = fmt::format("{}ThreadPool", prefix),

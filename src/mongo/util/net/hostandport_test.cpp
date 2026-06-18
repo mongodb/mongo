@@ -38,6 +38,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(HostAndPort, BasicLessThanComparison) {
     // Not less than self.
@@ -131,13 +132,13 @@ TEST(HostAndPort, CanIdentifyDefaultRoutes) {
 
 TEST(HostAndPort, PortRemovedFromUds) {
     // If a UDS is created with a port, that port should not be printed via toString().
-    const auto uds = "/dev/mongod.sock"_sd;
-    const auto uds_port = "/dev/mongod.sock:1234"_sd;
+    const auto uds = "/dev/mongod.sock"sv;
+    const auto uds_port = "/dev/mongod.sock:1234"sv;
     ASSERT_EQUALS(HostAndPort(uds).toString(), uds);
     ASSERT_EQUALS(HostAndPort(uds).toString(), HostAndPort(uds_port).toString());
 
-    const auto anon_uds = "anonymous unix socket"_sd;
-    const auto anon_uds_port = "anonymous unix socket:1234"_sd;
+    const auto anon_uds = "anonymous unix socket"sv;
+    const auto anon_uds_port = "anonymous unix socket:1234"sv;
     ASSERT_EQUALS(HostAndPort(anon_uds).toString(), anon_uds);
     ASSERT_EQUALS(HostAndPort(anon_uds).toString(), HostAndPort(anon_uds_port).toString());
 }

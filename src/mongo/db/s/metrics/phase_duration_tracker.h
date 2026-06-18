@@ -33,12 +33,14 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 template <typename PhaseEnum, size_t Size>
 class PhaseDurationTracker {
 public:
-    using TimedPhaseNameMap = stdx::unordered_map<PhaseEnum, StringData>;
+    using TimedPhaseNameMap = stdx::unordered_map<PhaseEnum, std::string_view>;
 
     boost::optional<ReshardingMetricsTimeInterval> getIntervalFor(PhaseEnum phase) const {
         auto start = getStartFor(phase);
@@ -117,7 +119,8 @@ private:
         return index;
     }
 
-    static boost::optional<StringData> getNameFor(PhaseEnum phase, const TimedPhaseNameMap& names) {
+    static boost::optional<std::string_view> getNameFor(PhaseEnum phase,
+                                                        const TimedPhaseNameMap& names) {
         auto it = names.find(phase);
         if (it == names.end()) {
             return boost::none;

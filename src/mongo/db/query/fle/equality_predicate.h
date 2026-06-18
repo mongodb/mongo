@@ -39,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -54,7 +55,7 @@ public:
     EqualityPredicate(const QueryRewriterInterface* rewriter) : EncryptedPredicate(rewriter) {}
 
 protected:
-    std::vector<PrfBlock> generateTags(BSONValue payload, StringData path) const override;
+    std::vector<PrfBlock> generateTags(BSONValue payload, std::string_view path) const override;
 
     std::unique_ptr<MatchExpression> rewriteToTagDisjunction(MatchExpression* expr) const override;
     std::unique_ptr<Expression> rewriteToTagDisjunction(Expression* expr) const override;

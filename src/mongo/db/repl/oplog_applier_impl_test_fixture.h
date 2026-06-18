@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
@@ -71,6 +70,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -421,7 +421,7 @@ void createCollectionWithPreImages(OperationContext* opCtx, const NamespaceStrin
 /**
  * Create test database.
  */
-void createDatabase(OperationContext* opCtx, StringData dbName);
+void createDatabase(OperationContext* opCtx, std::string_view dbName);
 
 /**
  * Returns true if collection exists.

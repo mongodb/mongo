@@ -161,8 +161,9 @@ private:
 };
 
 namespace {
-constexpr auto kShutdownInProgressMsg = "NetworkInterface shutdown in progress"_sd;
-constexpr auto kNotYetStartedUpMsg = "NetworkInterface has not started yet"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kShutdownInProgressMsg = "NetworkInterface shutdown in progress"sv;
+constexpr auto kNotYetStartedUpMsg = "NetworkInterface has not started yet"sv;
 }  // namespace
 
 NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,

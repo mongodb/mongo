@@ -33,6 +33,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
+#include <string_view>
+
 #include <io.h>
 
 #include <boost/filesystem.hpp>
@@ -80,7 +82,7 @@ public:
     HANDLE _handle;
 };
 
-StorageEngineLockFile::StorageEngineLockFile(StringData dbpath, StringData fileName)
+StorageEngineLockFile::StorageEngineLockFile(std::string_view dbpath, std::string_view fileName)
     : _dbpath(dbpath),
       _filespec(lockFilePath(_dbpath, fileName)),
       _uncleanShutdown(boost::filesystem::exists(_filespec) &&
@@ -144,7 +146,7 @@ void StorageEngineLockFile::close() {
     _lockFileHandle->clear();
 }
 
-Status StorageEngineLockFile::writeString(StringData str) {
+Status StorageEngineLockFile::writeString(std::string_view str) {
     if (!_lockFileHandle->isValid()) {
         return Status(ErrorCodes::FileNotOpen,
                       str::stream() << "Unable to write string to " << _filespec

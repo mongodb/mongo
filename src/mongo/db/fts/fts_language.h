@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_basic_phrase_matcher.h"
 #include "mongo/db/fts/fts_phrase_matcher.h"
 #include "mongo/db/fts/fts_unicode_phrase_matcher.h"
@@ -39,6 +38,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -108,7 +108,7 @@ public:
      * documents needs to be processed with the English stemmer and the empty stopword list
      * (since "en" is recognized by Snowball but not the stopword processing logic).
      */
-    static const FTSLanguage& make(StringData langName, TextIndexVersion textIndexVersion);
+    static const FTSLanguage& make(std::string_view langName, TextIndexVersion textIndexVersion);
 
 private:
     std::string _canonicalName;

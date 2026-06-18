@@ -32,6 +32,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 extern const char kFTDCInterimFile[];
@@ -49,6 +51,6 @@ extern const char kFTDCDocsField[];
 extern const char kFTDCCollectStartField[];
 extern const char kFTDCCollectEndField[];
 
-constexpr StringData kFTDCDefaultDirectory = "diagnostic.data"_sd;
+constexpr std::string_view kFTDCDefaultDirectory = "diagnostic.data"_sd;
 
 }  // namespace mongo

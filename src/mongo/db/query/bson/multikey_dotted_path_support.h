@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
@@ -37,6 +36,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 namespace mongo {
 namespace multikey_dotted_path_support {
@@ -62,13 +62,13 @@ namespace multikey_dotted_path_support {
  *   std::set<size_t>{0U} if 'expandArrayOnTrailingField' is false.
  */
 void extractAllElementsAlongPath(const BSONObj& obj,
-                                 StringData path,
+                                 std::string_view path,
                                  BSONElementSet& elements,
                                  bool expandArrayOnTrailingField = true,
                                  MultikeyComponents* arrayComponents = nullptr);
 
 void extractAllElementsAlongPath(const BSONObj& obj,
-                                 StringData path,
+                                 std::string_view path,
                                  BSONElementMultiSet& elements,
                                  bool expandArrayOnTrailingField = true,
                                  MultikeyComponents* arrayComponents = nullptr);
@@ -88,7 +88,7 @@ void extractAllElementsAlongPath(const BSONObj& obj,
  */
 void extractAllElementsAlongPathLegacy_forValidationOnly(
     const BSONObj& obj,
-    StringData path,
+    std::string_view path,
     BSONElementSet& elements,
     bool expandArrayOnTrailingField = true,
     MultikeyComponents* arrayComponents = nullptr);

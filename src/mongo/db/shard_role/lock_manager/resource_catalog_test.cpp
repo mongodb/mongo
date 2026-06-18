@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/lock_manager/resource_catalog.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

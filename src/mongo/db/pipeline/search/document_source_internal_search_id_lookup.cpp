@@ -38,9 +38,12 @@
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
@@ -102,7 +105,7 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(
         // _id value is unknown as it is only returned by mongot during execution.
         // TODO SERVER-93637 add comment explaining why subPipeline is only needed for explain.
         std::vector<BSONObj> pipeline = {
-            BSON("$match" << Document({{"_id", Value("_id placeholder"_sd)}}))};
+            BSON("$match" << Document({{"_id", Value("_id placeholder"sv)}}))};
 
         if (_spec.getViewPipeline()) {
             // Append the view pipeline so explain shows the post-lookup transforms. For a
@@ -130,7 +133,7 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(
     return Value(DOC(getSourceName() << outputSpec.freezeToValue()));
 }
 
-StringData DocumentSourceInternalSearchIdLookUp::getSourceName() const {
+std::string_view DocumentSourceInternalSearchIdLookUp::getSourceName() const {
     return kStageName;
 }
 

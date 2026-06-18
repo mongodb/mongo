@@ -57,12 +57,14 @@
 
 #include <fstream>  // IWYU pragma: keep
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -86,12 +88,15 @@ synchronized_value<boost::filesystem::path> ftdcDirectoryPathParameter;
 FTDCStartupParams ftdcStartupParams;
 
 void DiagnosticDataCollectionDirectoryPathServerParameter::append(
-    OperationContext* opCtx, BSONObjBuilder* b, StringData name, const boost::optional<TenantId>&) {
+    OperationContext* opCtx,
+    BSONObjBuilder* b,
+    std::string_view name,
+    const boost::optional<TenantId>&) {
     b->append(name, ftdcDirectoryPathParameter->generic_string());
 }
 
 Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(
-    StringData str, const boost::optional<TenantId>&) {
+    std::string_view str, const boost::optional<TenantId>&) {
     if (!hasGlobalServiceContext()) {
         ftdcDirectoryPathParameter = std::string{str};
         return Status::OK();
@@ -239,8 +244,8 @@ Status validateSampleTimeoutMillis(std::int32_t potentialNewValue,
     return Status::OK();
 }
 
-FTDCSimpleInternalCommandCollector::FTDCSimpleInternalCommandCollector(StringData command,
-                                                                       StringData name,
+FTDCSimpleInternalCommandCollector::FTDCSimpleInternalCommandCollector(std::string_view command,
+                                                                       std::string_view name,
                                                                        const DatabaseName& db,
                                                                        BSONObj cmdObj)
     : _name(std::string{name}),
@@ -268,8 +273,8 @@ std::string FTDCSimpleInternalCommandCollector::name() const {
  */
 class FTDCServerStatusCommandCollector : public FTDCCollectorInterface {
 private:
-    constexpr static StringData kName = "serverStatus"_sd;
-    constexpr static StringData kCommand = "serverStatus"_sd;
+    constexpr static std::string_view kName = "serverStatus"sv;
+    constexpr static std::string_view kCommand = "serverStatus"sv;
 
 public:
     FTDCServerStatusCommandCollector() : _serverShuttingDown(false) {}

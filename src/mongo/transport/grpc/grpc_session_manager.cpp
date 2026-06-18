@@ -36,11 +36,14 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/transport_layer_manager.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport::grpc {
+using namespace std::literals::string_view_literals;
 namespace {
-void appendI64(BSONObjBuilder* b, StringData n, auto v) {
+void appendI64(BSONObjBuilder* b, std::string_view n, auto v) {
     b->append(n, static_cast<std::int64_t>(v));
 }
 
@@ -76,14 +79,14 @@ void GRPCSessionManager::configureServiceExecutorContext(mongo::Client* client,
 
 void GRPCSessionManager::appendStats(BSONObjBuilder* bob) const {
     {
-        BSONObjBuilder streams(bob->subobjStart("streams"_sd));
+        BSONObjBuilder streams(bob->subobjStart("streams"sv));
 
         const auto current = numOpenSessions();
-        appendI64(&streams, "current"_sd, current);
-        appendI64(&streams, "available"_sd, maxOpenSessions() - current);
-        appendI64(&streams, "rejected"_sd, numRejectedSessions());
-        appendI64(&streams, "total"_sd, numCreatedSessions());
-        appendI64(&streams, "successful"_sd, _successfulSessions.load());
+        appendI64(&streams, "current"sv, current);
+        appendI64(&streams, "available"sv, maxOpenSessions() - current);
+        appendI64(&streams, "rejected"sv, numRejectedSessions());
+        appendI64(&streams, "total"sv, numCreatedSessions());
+        appendI64(&streams, "successful"sv, _successfulSessions.load());
 
         helloMetrics.serialize(&streams);
 
@@ -93,13 +96,13 @@ void GRPCSessionManager::appendStats(BSONObjBuilder* bob) const {
     {
         const auto totalOps = getTotalOperations();
         const auto completedOps = getCompletedOperations();
-        BSONObjBuilder ops(bob->subobjStart("operations"_sd));
-        appendI64(&ops, "active"_sd, totalOps - completedOps);
-        appendI64(&ops, "total"_sd, totalOps);
+        BSONObjBuilder ops(bob->subobjStart("operations"sv));
+        appendI64(&ops, "active"sv, totalOps - completedOps);
+        appendI64(&ops, "total"sv, totalOps);
         ops.doneFast();
     }
 
-    appendI64(bob, "uniqueClientsSeen"_sd, _clientCache->getUniqueClientsSeen());
+    appendI64(bob, "uniqueClientsSeen"sv, _clientCache->getUniqueClientsSeen());
 }
 
 void GRPCSessionManager::endSessionByClient(mongo::Client* client) {

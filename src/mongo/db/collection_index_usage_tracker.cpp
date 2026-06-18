@@ -33,6 +33,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -51,7 +52,7 @@ CollectionIndexUsageTracker::CollectionIndexUsageTracker(
     invariant(_clockSource);
 }
 
-void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) const {
+void CollectionIndexUsageTracker::recordIndexAccess(std::string_view indexName) const {
     tassert(11122205,
             "CollectionIndexUsageTracker::recordIndexAccess invoked with an empty indexname",
             !indexName.empty());
@@ -86,7 +87,7 @@ void CollectionIndexUsageTracker::recordCollectionScansNonTailable(
     }
 }
 
-void CollectionIndexUsageTracker::registerIndex(StringData indexName,
+void CollectionIndexUsageTracker::registerIndex(std::string_view indexName,
                                                 const BSONObj& indexKey,
                                                 const IndexFeatures& features) {
     tassert(11122207,
@@ -105,7 +106,7 @@ void CollectionIndexUsageTracker::registerIndex(StringData indexName,
     _aggregatedIndexUsageTracker->onRegister(inserted.first->second->features);
 }
 
-void CollectionIndexUsageTracker::unregisterIndex(StringData indexName) {
+void CollectionIndexUsageTracker::unregisterIndex(std::string_view indexName) {
     tassert(11122209,
             "CollectionIndexUsageTracker::unregisterIndex invoked with an empty indexname",
             !indexName.empty());

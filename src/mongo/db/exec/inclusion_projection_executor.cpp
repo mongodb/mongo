@@ -34,6 +34,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -114,7 +115,9 @@ bool computedExprDependsOnField(const std::vector<OrderedPathSet>& topLevelDeps,
 }  // namespace
 
 std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
-    StringData oldName, StringData newName, const std::set<StringData>& reservedNames) {
+    std::string_view oldName,
+    std::string_view newName,
+    const std::set<std::string_view>& reservedNames) {
     if (_policies.computedFieldsPolicy != ComputedFieldsPolicy::kAllowComputedFields) {
         return {BSONObj{}, false};
     }
@@ -131,7 +134,7 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
     // Auxiliary vector with extracted computed projections: <name, expression, replacement
     // strategy>. If the replacement strategy flag is true, the expression is replaced with a
     // projected field. If it is false - the expression is replaced with an identity projection.
-    std::vector<std::tuple<StringData, boost::intrusive_ptr<Expression>, bool>>
+    std::vector<std::tuple<std::string_view, boost::intrusive_ptr<Expression>, bool>>
         addFieldsExpressions;
     bool replaceWithProjField = true;
     for (size_t i = 0; i < _orderToProcessAdditionsAndChildren.size(); i++) {
@@ -189,7 +192,7 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
             if (std::get<2>(expressionSpec)) {
                 // Replace the expression with an inclusion projected field.
                 auto it = _projectedFields.insert(_projectedFields.end(), fieldName);
-                _projectedFieldsSet.insert(StringData(*it));
+                _projectedFieldsSet.insert(std::string_view(*it));
                 _expressions.erase(fieldName);
                 // Only computed projections at the beginning of the list were marked to become
                 // projected fields. The new projected field is at the beginning of the
@@ -211,7 +214,9 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
 }
 
 std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
-    StringData oldName, StringData newName, const std::set<StringData>& reservedNames) {
+    std::string_view oldName,
+    std::string_view newName,
+    const std::set<std::string_view>& reservedNames) {
     if (_policies.computedFieldsPolicy != ComputedFieldsPolicy::kAllowComputedFields) {
         return {BSONObj{}, false};
     }
@@ -228,7 +233,7 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
     // Auxiliary vector with extracted computed projections: <name, expression>.
     // To preserve the original fields order, only projections at the beginning of the
     // _orderToProcessAdditionsAndChildren list can be extracted for pushdown.
-    std::vector<std::pair<StringData, boost::intrusive_ptr<Expression>>> addFieldsExpressions;
+    std::vector<std::pair<std::string_view, boost::intrusive_ptr<Expression>>> addFieldsExpressions;
     for (size_t i = 0; i < _orderToProcessAdditionsAndChildren.size(); i++) {
         auto&& field = _orderToProcessAdditionsAndChildren[i];
         // Do not extract for pushdown computed projection with reserved name.

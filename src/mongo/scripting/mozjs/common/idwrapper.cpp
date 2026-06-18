@@ -34,6 +34,8 @@
 #include "mongo/scripting/mozjs/common/jsstringwrapper.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <js/Id.h>
 #include <js/RootingAPI.h>
 #include <js/String.h>
@@ -49,7 +51,7 @@ std::string IdWrapper::toString() const {
     return std::string{toStringData(&jsstr)};
 }
 
-StringData IdWrapper::toStringData(JSStringWrapper* jsstr) const {
+std::string_view IdWrapper::toStringData(JSStringWrapper* jsstr) const {
     if (_value.isString()) {
         *jsstr = JSStringWrapper(_context, _value.toString());
     } else if (_value.isInt()) {
@@ -84,11 +86,11 @@ void IdWrapper::toValue(JS::MutableHandleValue value) const {
     uasserted(ErrorCodes::BadValue, "Failed to toValue() non-string and non-integer jsid");
 }
 
-bool IdWrapper::equals(StringData sd) const {
+bool IdWrapper::equals(std::string_view sd) const {
     return sd.compare(toString()) == 0;
 }
 
-bool IdWrapper::equalsAscii(StringData sd) const {
+bool IdWrapper::equalsAscii(std::string_view sd) const {
     if (isString()) {
         auto str = _value.toString();
 

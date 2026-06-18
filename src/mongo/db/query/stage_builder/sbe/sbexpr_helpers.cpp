@@ -60,6 +60,7 @@
 #include "mongo/util/overloaded_visitor.h"
 
 #include <memory>
+#include <string_view>
 #include <variant>
 
 namespace mongo::stage_builder {
@@ -228,7 +229,7 @@ SbExpr SbExprBuilder::makeDecimalConstant(const Decimal128& num) {
     return abt::Constant::fromDecimal(num);
 }
 
-SbExpr SbExprBuilder::makeStrConstant(StringData str) {
+SbExpr SbExprBuilder::makeStrConstant(std::string_view str) {
     return abt::Constant::str(str);
 }
 
@@ -281,7 +282,7 @@ SbExpr SbExprBuilder::makeNumericConvert(SbExpr expr, sbe::value::TypeTags tag) 
         sbe::EFn::kConvert, std::move(expr), makeInt32Constant(static_cast<int32_t>(tag)));
 }
 
-SbExpr SbExprBuilder::makeFail(ErrorCodes::Error error, StringData errorMessage) {
+SbExpr SbExprBuilder::makeFail(ErrorCodes::Error error, std::string_view errorMessage) {
     return makeFunction(sbe::EFn::kFail, makeInt32Constant(error), makeStrConstant(errorMessage));
 }
 
@@ -523,7 +524,7 @@ std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeSimpl
     const VariableTypes& varTypes,
     UUID collectionUuid,
     DatabaseName dbName,
-    StringData indexName,
+    std::string_view indexName,
     const BSONObj& keyPattern,
     bool forward,
     SbExpr lowKeyExpr,
@@ -563,7 +564,7 @@ std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeGener
     const VariableTypes& varTypes,
     UUID collectionUuid,
     DatabaseName dbName,
-    StringData indexName,
+    std::string_view indexName,
     const BSONObj& keyPattern,
     bool forward,
     SbExpr boundsExpr,

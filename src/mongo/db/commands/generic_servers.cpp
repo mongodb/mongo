@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -65,6 +64,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -79,6 +79,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 struct AdminOnlyNoTenant {
     static constexpr bool kAdminOnly = true;
@@ -264,7 +265,7 @@ void LogRotateCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) con
 template <>
 OkReply LogRotateCmd::Invocation::typedRun(OperationContext* opCtx) {
     auto arg = request().getCommandParameter();
-    boost::optional<StringData> logType = boost::none;
+    boost::optional<std::string_view> logType = boost::none;
     if (holds_alternative<std::string>(arg)) {
         logType = std::get<std::string>(arg);
     }
@@ -276,7 +277,7 @@ OkReply LogRotateCmd::Invocation::typedRun(OperationContext* opCtx) {
 
     // Mask the detailed error message so file paths & host info are not
     // revealed to the client, but keep the real status code as a hint.
-    constexpr auto rotateErrmsg = "Log rotation failed due to one or more errors"_sd;
+    constexpr auto rotateErrmsg = "Log rotation failed due to one or more errors"sv;
     uassert(status.code(), rotateErrmsg, status.isOK());
 
     logProcessDetailsForLogRotate(opCtx->getServiceContext());
@@ -345,7 +346,7 @@ public:
             std::vector<std::string> names;
             logv2::RamLog::getNames(names);
 
-            BSONArrayBuilder arr(result.subarrayStart("names"_sd));
+            BSONArrayBuilder arr(result.subarrayStart("names"sv));
             for (const auto& name : names) {
                 arr.append(name);
             }

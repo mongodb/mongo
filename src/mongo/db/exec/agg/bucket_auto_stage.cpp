@@ -41,6 +41,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -66,7 +68,7 @@ REGISTER_AGG_STAGE_MAPPING(bucketAuto,
 namespace exec::agg {
 
 BucketAutoStage::BucketAutoStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::shared_ptr<std::vector<AccumulationStatement>> accumulatedFields,
     std::shared_ptr<bool> populated,

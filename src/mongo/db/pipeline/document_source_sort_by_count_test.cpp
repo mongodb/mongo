@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_sort_by_count.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -45,12 +44,14 @@
 #include "mongo/util/intrusive_counter.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 using boost::intrusive_ptr;
 using std::list;
 using std::vector;
@@ -93,7 +94,7 @@ public:
 TEST_F(SortByCountReturnsGroupAndSort, ExpressionFieldPathSpec) {
     BSONObj spec = BSON("$sortByCount" << "$x");
     Value expectedGroupExplain =
-        Value{Document{{"_id", "$x"_sd},
+        Value{Document{{"_id", "$x"sv},
                        {"count", Document{{"$sum", Document{{"$const", 1}}}}},
                        {"$willBeMerged", false}}};
     testCreateFromBsonResult(spec, expectedGroupExplain);

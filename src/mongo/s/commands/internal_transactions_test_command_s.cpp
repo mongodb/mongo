@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/resource_yielder.h"
@@ -40,6 +39,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -54,7 +54,7 @@ public:
     static txn_api::SyncTransactionWithRetries getTxn(
         OperationContext* opCtx,
         std::shared_ptr<executor::TaskExecutor> executor,
-        StringData commandName,
+        std::string_view commandName,
         bool useClusterClient) {
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
 

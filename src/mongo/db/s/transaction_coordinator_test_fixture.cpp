@@ -55,6 +55,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -125,7 +127,7 @@ TransactionCoordinatorTestFixture::makeShardingCatalogClient() {
 }
 
 void TransactionCoordinatorTestFixture::assertCommandSentAndRespondWith(
-    StringData commandName,
+    std::string_view commandName,
     const StatusWith<BSONObj>& response,
     boost::optional<WriteConcernOptions> expectedWriteConcern) {
     onCommand([&](const executor::RemoteCommandRequest& request) {

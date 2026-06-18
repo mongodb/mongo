@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -79,6 +78,7 @@
 #include <deque>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -90,6 +90,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using Doc = Document;
 using Arr = std::vector<Value>;
@@ -156,7 +157,7 @@ protected:
         const std::deque<DocumentSource::GetNextResult>& configCacheChunksData,
         const TestOptions& testOptions) {
         _sourceNss = NamespaceString::createNamespaceString_forTest(
-            std::string("testDb"_sd) + std::to_string(_sourceDbNum++), "testColl"_sd);
+            std::string("testDb"sv) + std::to_string(_sourceDbNum++), "testColl"sv);
         _sourceUUID = UUID::gen();
         _tempNss = resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
         _reshardingUUID = UUID::gen();
@@ -502,13 +503,13 @@ TEST_F(ReshardingCollectionClonerTest, HashedShardKey) {
         std::deque<DocumentSource::GetNextResult> configData{
             Doc{{"_id", Doc{{"x", V(MINKEY)}}},
                 {"max", Doc{{"x", getHashedElementValue(0)}}},
-                {"shard", "shard1"_sd}},
+                {"shard", "shard1"sv}},
             Doc{{"_id", Doc{{"x", getHashedElementValue(0)}}},
                 {"max", Doc{{"x", getHashedElementValue(0) + 1}}},
-                {"shard", "shard2"_sd}},
+                {"shard", "shard2"sv}},
             Doc{{"_id", Doc{{"x", getHashedElementValue(0) + 1}}},
                 {"max", Doc{{"x", V(MAXKEY)}}},
-                {"shard", "shard3"_sd}}};
+                {"shard", "shard3"sv}}};
         constexpr auto kExpectedCopiedCount = 4;
         const auto verify = [](auto cursor) {
             auto next = cursor->next();
@@ -559,13 +560,13 @@ TEST_F(ReshardingCollectionClonerTest, CompoundHashedShardKey) {
         std::deque<DocumentSource::GetNextResult> configData{
             Doc{{"_id", Doc{{"x", V(MINKEY)}, {"y", V(MINKEY)}}},
                 {"max", Doc{{"x", getHashedElementValue(0)}, {"y", 0}}},
-                {"shard", "shard1"_sd}},
+                {"shard", "shard1"sv}},
             Doc{{"_id", Doc{{"x", getHashedElementValue(0)}, {"y", 0}}},
                 {"max", Doc{{"x", getHashedElementValue(0)}, {"y", 1}}},
-                {"shard", "shard2"_sd}},
+                {"shard", "shard2"sv}},
             Doc{{"_id", Doc{{"x", getHashedElementValue(0)}, {"y", 1}}},
                 {"max", Doc{{"x", V(MAXKEY)}, {"y", V(MAXKEY)}}},
-                {"shard", "shard3"_sd}}};
+                {"shard", "shard3"sv}}};
         constexpr auto kExpectedCopiedCount = 1;
         const auto verify = [](auto cursor) {
             auto next = cursor->next();

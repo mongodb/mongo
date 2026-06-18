@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -61,6 +60,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -69,6 +69,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class AuthorizationSessionImplTestHelper {
 public:
@@ -76,13 +77,13 @@ public:
      * Synthesize a user with the useTenant privilege and add them to the authorization session.
      */
     static void grantUseTenant(Client& client) {
-        User user(std::make_unique<UserRequestGeneral>(UserName("useTenant"_sd, "admin"_sd),
-                                                       boost::none));
+        User user(
+            std::make_unique<UserRequestGeneral>(UserName("useTenant"sv, "admin"sv), boost::none));
         user.setPrivileges(
             {Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useTenant)});
         auto* as = dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(client));
         if (as->_authenticatedUser != boost::none) {
-            as->logoutAllDatabases("AuthorizationSessionImplTestHelper"_sd);
+            as->logoutAllDatabases("AuthorizationSessionImplTestHelper"sv);
         }
         as->_authenticatedUser = std::move(user);
         as->_authenticationMode = AuthorizationSession::AuthenticationMode::kConnection;
@@ -121,7 +122,7 @@ protected:
                                       ValidatedTenancyScope::TenantProtocol::kDefault) {
         return std::string{auth::ValidatedTenancyScopeFactory::create(
                                userName,
-                               "secret"_sd,
+                               "secret"sv,
                                protocol,
                                auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
                                .getOriginalToken()};

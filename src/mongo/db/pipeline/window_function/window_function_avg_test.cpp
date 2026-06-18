@@ -29,14 +29,15 @@
 
 #include "mongo/db/pipeline/window_function/window_function_avg.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WindowFunctionAvgTest : public unittest::Test {
 public:
@@ -55,7 +56,7 @@ TEST_F(WindowFunctionAvgTest, SingletonWindow) {
 }
 
 TEST_F(WindowFunctionAvgTest, IgnoresNonnumeric) {
-    avg.add(Value{"not a number"_sd});
+    avg.add(Value{"not a number"sv});
     avg.add(Value{1});
     ASSERT_VALUE_EQ(avg.getValue(), Value{1});
 }

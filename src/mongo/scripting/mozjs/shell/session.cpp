@@ -31,7 +31,6 @@
 #include "mongo/scripting/mozjs/shell/session.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
@@ -46,6 +45,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <js/CallArgs.h>
@@ -89,30 +89,31 @@ struct SessionHolder {
 };
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-StringData transactionStateName(SessionHolder::TransactionState state) {
+std::string_view transactionStateName(SessionHolder::TransactionState state) {
     switch (state) {
         case SessionHolder::TransactionState::kActive:
-            return "active"_sd;
+            return "active"sv;
         case SessionHolder::TransactionState::kInactive:
-            return "inactive"_sd;
+            return "inactive"sv;
         case SessionHolder::TransactionState::kCommitted:
-            return "committed"_sd;
+            return "committed"sv;
         case SessionHolder::TransactionState::kAborted:
-            return "aborted"_sd;
+            return "aborted"sv;
     }
 
     MONGO_UNREACHABLE;
 }
 
-SessionHolder::TransactionState transactionStateEnum(StringData name) {
-    if (name == "active"_sd) {
+SessionHolder::TransactionState transactionStateEnum(std::string_view name) {
+    if (name == "active"sv) {
         return SessionHolder::TransactionState::kActive;
-    } else if (name == "inactive"_sd) {
+    } else if (name == "inactive"sv) {
         return SessionHolder::TransactionState::kInactive;
-    } else if (name == "committed"_sd) {
+    } else if (name == "committed"sv) {
         return SessionHolder::TransactionState::kCommitted;
-    } else if (name == "aborted"_sd) {
+    } else if (name == "aborted"sv) {
         return SessionHolder::TransactionState::kAborted;
     } else {
         uasserted(ErrorCodes::BadValue, str::stream() << "Invalid TransactionState name: " << name);

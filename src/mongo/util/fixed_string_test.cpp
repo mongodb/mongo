@@ -29,28 +29,29 @@
 
 #include "mongo/util/fixed_string.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(FixedString, ConversionToStringData) {
     static constexpr FixedString hi{"hi"};
     static_assert(std::is_same_v<decltype(hi), const FixedString<2>>);
-    ASSERT_EQ(StringData{hi}, "hi");
+    ASSERT_EQ(std::string_view{hi}, "hi");
 }
 
 TEST(FixedString, CharListCtor) {
     static constexpr FixedString hi{'h', 'i'};
     static_assert(std::is_same_v<decltype(hi), const FixedString<2>>);
-    ASSERT_EQ(StringData{hi}, "hi");
+    ASSERT_EQ(std::string_view{hi}, "hi");
 }
 
 template <FixedString fs>
@@ -75,8 +76,8 @@ TEST(FixedString, Plus) {
 }
 
 TEST(FixedString, EmbeddedNul) {
-    ASSERT_EQ(FixedString{"abc\0d"}, "abc\0d"_sd);
-    ASSERT_EQ((FixedString{'a', 'b', 'c', '\0', 'd'}), "abc\0d"_sd);
+    ASSERT_EQ(FixedString{"abc\0d"}, "abc\0d"sv);
+    ASSERT_EQ((FixedString{'a', 'b', 'c', '\0', 'd'}), "abc\0d"sv);
 }
 
 /**
@@ -102,7 +103,7 @@ constexpr auto tupleCartesianProduct(auto aTup, auto bTup) {
 TEST(FixedString, Comparison) {
     // Test every element of `strs` with every other element of `strs`.
     // Each such test performs all 6 comparisons, and we make sure that we get
-    // the same answer as their StringData representation would.
+    // the same answer as their std::string_view representation would.
     // This has to be tuple-based because the FixedStrings are all
     // different types.
     static constexpr std::tuple strs{
@@ -117,8 +118,8 @@ TEST(FixedString, Comparison) {
         [&](auto... pairs) {
             (std::apply(
                  [](auto&& a, auto&& b) {
-                     StringData sa{a};
-                     StringData sb{b};
+                     std::string_view sa{a};
+                     std::string_view sb{b};
                      SCOPED_TRACE(fmt::format("{}={:?}", "a", sa));
                      SCOPED_TRACE(fmt::format("{}={:?}", "b", sb));
                      EXPECT_EQ(a == b, sa == sb);
@@ -141,7 +142,7 @@ struct UnitQuantity {
     }
 
     std::string toString() const {
-        return fmt::format("{} {}", value, StringData{unitName()});
+        return fmt::format("{} {}", value, std::string_view{unitName()});
     }
 
     Rep value;

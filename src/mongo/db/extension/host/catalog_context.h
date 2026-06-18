@@ -39,6 +39,7 @@
 #include "mongo/util/uuid.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo::extension::host {
 /**
@@ -62,12 +63,12 @@ public:
               return shardingState && shardingState->enabled() ? shardingState->shardId().toString()
                                                                : std::string{};
           }()),
-          _api(::MongoExtensionNamespaceString(stringDataAsByteView(StringData(_dbName)),
-                                               stringDataAsByteView(StringData(_collName))),
-               stringDataAsByteView(StringData(_uuid)),
+          _api(::MongoExtensionNamespaceString(stringDataAsByteView(std::string_view(_dbName)),
+                                               stringDataAsByteView(std::string_view(_collName))),
+               stringDataAsByteView(std::string_view(_uuid)),
                _inRouter,
                convertHostVerbosityToExtVerbosity(_verbosity),
-               stringDataAsByteView(StringData(_shardId))) {}
+               stringDataAsByteView(std::string_view(_shardId))) {}
 
     ~CatalogContext() = default;
 

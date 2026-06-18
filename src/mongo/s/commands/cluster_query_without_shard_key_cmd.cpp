@@ -28,7 +28,6 @@
  */
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -100,6 +99,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -111,9 +111,10 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeMetadataRefreshClusterQuery);
-constexpr auto kIdFieldName = "_id"_sd;
+constexpr auto kIdFieldName = "_id"sv;
 
 struct ParsedCommandInfo {
     NamespaceString nss;
@@ -549,7 +550,7 @@ public:
                     if (auto nextResponse = uassertStatusOK(root->next()); !nextResponse.isEOF()) {
                         res.setTargetDoc(nextResponse.getResult());
                         res.setShardId(
-                            boost::optional<mongo::StringData>(nextResponse.getShardId()));
+                            boost::optional<std::string_view>(nextResponse.getShardId()));
                     }
 
                     // If there are no targetable documents and {upsert: true}, create the document
@@ -601,7 +602,7 @@ public:
             const auto& nss = parsedInfoFromRequest.nss;
             sharding::router::CollectionRouter router(opCtx, nss);
             return router.routeWithRoutingContext(
-                "explain queryWithoutShardKey"_sd,
+                "explain queryWithoutShardKey"sv,
                 [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 

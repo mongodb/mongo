@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_crypto.h"
@@ -63,6 +62,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -74,6 +74,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(preImagesEnabledOnAllCollectionsByDefault);
 
@@ -95,7 +96,7 @@ constexpr auto kCreateCommandHelp =
     "  collation: <document: default collation for the collection or view>,\n"
     "  changeStreamPreAndPostImages: <document: pre- and post-images options for change streams>,\n"
     "  writeConcern: <document: write concern expression for the operation>]\n"
-    "}"_sd;
+    "}"sv;
 
 class CmdCreate final : public CreateCmdVersion1Gen<CmdCreate> {
 public:
@@ -296,10 +297,10 @@ public:
                                 isGenericArgument(fieldName));
                 }
 
-                auto hasDot = [](StringData field) -> bool {
+                auto hasDot = [](std::string_view field) -> bool {
                     return field.find('.') != std::string::npos;
                 };
-                auto mustBeTopLevel = [&cmd](StringData field) -> std::string {
+                auto mustBeTopLevel = [&cmd](std::string_view field) -> std::string {
                     return str::stream() << cmd.getNamespace().toStringForErrorMsg() << ": '"
                                          << field << "' must be a top-level field "
                                          << "and not contain a '.'";

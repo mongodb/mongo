@@ -30,7 +30,6 @@
 #include "mongo/db/global_catalog/type_shard_identity.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/server_feature_flags_gen.h"

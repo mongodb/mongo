@@ -33,6 +33,8 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
+#include <string_view>
+
 namespace sdk = mongo::extension::sdk;
 
 using BarExecStage = sdk::shared_test_stages::TransformExecAggStage;

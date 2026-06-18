@@ -40,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -48,9 +49,9 @@ namespace mongo::exec::agg {
 
 class VectorSearchStage final : public Stage {
 public:
-    static constexpr StringData kNumCandidatesFieldName = "numCandidates"_sd;
+    static constexpr std::string_view kNumCandidatesFieldName = "numCandidates"_sd;
 
-    VectorSearchStage(StringData stageName,
+    VectorSearchStage(std::string_view stageName,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       const std::shared_ptr<executor::TaskExecutor>& taskExecutor,
                       BSONObj originalSpec,

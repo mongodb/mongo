@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
@@ -52,6 +51,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -94,7 +94,7 @@ public:
     static StatusWith<std::string> generateCreateString(const std::string& engineName,
                                                         const std::string& sysIndexConfig,
                                                         const std::string& collIndexConfig,
-                                                        StringData tableName,
+                                                        std::string_view tableName,
                                                         const IndexConfig& config,
                                                         bool isLogged);
 
@@ -118,7 +118,7 @@ public:
                     RecoveryUnit& ru,
                     const std::string& uri,
                     const UUID& collectionUUID,
-                    StringData ident,
+                    std::string_view ident,
                     KeyFormat rsKeyFormat,
                     const IndexConfig& config,
                     bool isLogged);
@@ -274,7 +274,7 @@ protected:
     int _handleVersionInfo(OperationContext* ctx,
                            RecoveryUnit& ru,
                            const std::string& uri,
-                           StringData ident,
+                           std::string_view ident,
                            const IndexConfig& config,
                            bool isLogged);
 
@@ -285,7 +285,7 @@ protected:
     int _repairDataFormatVersion(OperationContext* opCtx,
                                  RecoveryUnit& ru,
                                  const std::string& uri,
-                                 StringData ident,
+                                 std::string_view ident,
                                  const IndexConfig& config,
                                  int dataFormatVersion);
 
@@ -302,7 +302,7 @@ public:
                           RecoveryUnit& ru,
                           const std::string& uri,
                           const UUID& collectionUUID,
-                          StringData ident,
+                          std::string_view ident,
                           KeyFormat rsKeyFormat,
                           const IndexConfig& config,
                           bool isLogged);
@@ -362,7 +362,7 @@ public:
                       RecoveryUnit& ru,
                       const std::string& uri,
                       const UUID& collectionUUID,
-                      StringData ident,
+                      std::string_view ident,
                       const IndexConfig& config,
                       bool isLogged);
 
@@ -431,7 +431,7 @@ public:
                             RecoveryUnit& ru,
                             const std::string& uri,
                             const UUID& collectionUUID,
-                            StringData ident,
+                            std::string_view ident,
                             KeyFormat rsKeyFormat,
                             const IndexConfig& config,
                             bool isLogged);

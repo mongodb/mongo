@@ -34,6 +34,8 @@
 #include "mongo/tools/workload_simulation/simulator_options.h"
 #include "mongo/util/pcre.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::workload_simulation {
@@ -69,7 +71,7 @@ bool shouldRun(const Simulation& simulation) {
 
 }  // namespace
 
-Simulation::Simulation(StringData suiteName, StringData workloadName)
+Simulation::Simulation(std::string_view suiteName, std::string_view workloadName)
     : _suiteName(std::string{suiteName}), _workloadName(std::string{workloadName}) {}
 
 Simulation::~Simulation() {}

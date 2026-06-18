@@ -51,6 +51,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>

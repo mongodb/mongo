@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -105,6 +104,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -116,6 +116,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class ReshardingOplogCrudApplicationTest : public ServiceContextMongoDTest {
 public:
@@ -198,7 +199,7 @@ public:
         return _applier.get();
     }
 
-    StringData sk() {
+    std::string_view sk() {
         return _currentShardKey;
     }
 
@@ -331,7 +332,7 @@ public:
 
                           for (const auto& innerOp : applyOpsInfo.getOperations()) {
                               operations.emplace_back(repl::DurableReplOperation::parse(
-                                  innerOp, IDLParserContext{"findOpsNewerThan"_sd}));
+                                  innerOp, IDLParserContext{"findOpsNewerThan"sv}));
                           }
 
                           result.emplace_back(
@@ -408,8 +409,8 @@ private:
             ComparableChunkVersion::makeComparableChunkVersion(version));
     }
 
-    const StringData _currentShardKey = "sk";
-    const StringData _newShardKey = "new_sk";
+    const std::string_view _currentShardKey = "sk";
+    const std::string_view _newShardKey = "new_sk";
 
     const NamespaceString _sourceNss =
         NamespaceString::createNamespaceString_forTest("test_crud", "collection_being_resharded");

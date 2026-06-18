@@ -31,11 +31,13 @@
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo {
-Counter64* getSingletonMetricPtrWithinCmd(StringData commandName,
-                                          StringData statPath,
+Counter64* getSingletonMetricPtrWithinCmd(std::string_view commandName,
+                                          std::string_view statPath,
                                           boost::optional<ClusterRole> role) {
     return &*MetricBuilder<Counter64>{fmt::format("commands.{}.{}", commandName, statPath)}.setRole(
         role.value_or(ClusterRole::None));

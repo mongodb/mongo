@@ -34,7 +34,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_connection.h"
@@ -80,6 +79,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -91,6 +91,7 @@ namespace mongo {
 using std::string;
 
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 namespace {
 const int kSleepToAllowBatchingMillis = 2;
@@ -749,7 +750,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             connection = std::make_unique<DBClientConnection>();
             connection->setSoTimeout(durationCount<Milliseconds>(kRollbackOplogSocketTimeout) /
                                      1000.0);
-            connection->connect(source, "Rollback"_sd, boost::none);
+            connection->connect(source, "Rollback"sv, boost::none);
             if (auth::isInternalAuthSet()) {
                 connection->authenticateInternalUser();
             }

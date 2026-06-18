@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamCheckTopologyChangeToStageFn(
@@ -55,7 +57,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamCheckTopologyChange,
                            documentSourceChangeStreamCheckTopologyChangeToStageFn)
 
 ChangeStreamCheckTopologyChangeStage::ChangeStreamCheckTopologyChangeStage(
-    StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
+    std::string_view stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
     : Stage(stageName, pExpCtx) {}
 
 GetNextResult ChangeStreamCheckTopologyChangeStage::doGetNext() {

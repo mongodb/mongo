@@ -33,6 +33,7 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -77,7 +78,7 @@ struct FLE2PayloadParams {
 
 // Check that the payload's params agree with the QueryTypeConfig(s) at `params.expectedTypes` on
 // `field`. Throws if `field` is not configured for every expected type.
-void validatePayloadAgainstQueryTypeConfig(StringData fieldPath,
+void validatePayloadAgainstQueryTypeConfig(std::string_view fieldPath,
                                            const EncryptedField& field,
                                            const FLE2PayloadParams& params);
 

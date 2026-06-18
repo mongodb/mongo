@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/matcher/expression.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/string_map.h"
 
 #include <functional>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 
@@ -56,7 +56,7 @@ public:
         return _matcher.getMatchExpression()->serialize();
     }
 
-    MONGO_MOD_PRIVATE bool dependsOn(StringData topLevelField) const override {
+    MONGO_MOD_PRIVATE bool dependsOn(std::string_view topLevelField) const override {
         return _needWholeDocument || _dependencies.count(topLevelField) > 0;
     }
 

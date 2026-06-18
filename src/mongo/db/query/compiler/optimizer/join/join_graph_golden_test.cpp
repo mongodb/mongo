@@ -34,6 +34,8 @@
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
 class JoinGraphGoldenTest : public unittest::Test {
 public:
@@ -41,7 +43,7 @@ public:
         _opCtx = _serviceContext.makeOperationContext();
     }
 
-    void runVariation(MutableJoinGraph mgraph, StringData variationName) {
+    void runVariation(MutableJoinGraph mgraph, std::string_view variationName) {
         JoinGraph graph(std::move(mgraph));
         unittest::GoldenTestContext ctx(&_cfg);
         ctx.outStream() << "VARIATION " << variationName << std::endl;

@@ -38,6 +38,8 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUBLIC mongo {
 
 enum class OCSPPurpose { kClientVerify, kStaple };
@@ -54,7 +56,7 @@ public:
     static OCSPManager* get(ServiceContext* service);
 
     Future<std::vector<uint8_t>> requestStatus(std::vector<uint8_t> data,
-                                               StringData responderURI,
+                                               std::string_view responderURI,
                                                OCSPPurpose direction);
 
 private:

@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -53,7 +53,7 @@ MONGO_MOD_FILE_PRIVATE [[noreturn]] void throwExceptionFor(std::string reason) {
  * other. For example if two operations get the same version of a document, and then both try to
  * modify that document, this exception will get thrown by one of them.
  */
-[[noreturn]] inline void throwWriteConflictException(StringData context) {
+[[noreturn]] inline void throwWriteConflictException(std::string_view context) {
     throwExceptionFor<ErrorCodes::WriteConflict>(fmt::format(
         "Caused by :: {} :: Please retry your operation or multi-document transaction.", context));
 }

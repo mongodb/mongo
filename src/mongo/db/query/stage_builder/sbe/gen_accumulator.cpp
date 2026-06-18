@@ -293,6 +293,7 @@ struct AccumOpInfo {
 };
 
 namespace {
+using namespace std::literals::string_view_literals;
 /**
  * Wraps an SbExpr in a let-if that resolves null, missing, and undefined values all to a
  * TypeTags::Nothing constant, else retains the original value.
@@ -760,7 +761,7 @@ SbExpr::Vector buildAccumAggsConcatArraysHelper(SbExpr arg,
     auto expr = b.makeIf(b.makeFunction(sbe::EFn::kIsArray, argValue),
                          argValue,
                          b.makeFail(ErrorCodes::TypeMismatch,
-                                    "Expected new value for $concatArrays to be an array"_sd));
+                                    "Expected new value for $concatArrays to be an array"sv));
 
     auto argWithTypeCheck = b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(expr));
 
@@ -799,7 +800,7 @@ SbExpr::Vector buildAccumAggsSetUnionHelper(SbExpr arg,
     auto expr = b.makeIf(
         b.makeFunction(sbe::EFn::kIsArray, argValue),
         argValue,
-        b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"_sd));
+        b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"sv));
 
     auto argWithTypeCheck = b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(expr));
 
@@ -968,11 +969,11 @@ SbExpr buildFinalizePartialStdDevHelper(SbSlot stdDevSlot, StageBuilderState& st
                        b.makeInt32Constant(static_cast<int>(sbe::vm::AggStdDevValueElems::kCount)));
 
     return b.makeFunction(sbe::EFn::kNewObj,
-                          b.makeStrConstant("m2"_sd),
+                          b.makeStrConstant("m2"sv),
                           std::move(m2Field),
-                          b.makeStrConstant("mean"_sd),
+                          b.makeStrConstant("mean"sv),
                           std::move(meanField),
-                          b.makeStrConstant("count"_sd),
+                          b.makeStrConstant("count"sv),
                           std::move(countField));
 }
 

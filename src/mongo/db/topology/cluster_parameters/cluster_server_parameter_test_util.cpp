@@ -49,6 +49,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -56,9 +57,10 @@
 
 namespace mongo {
 namespace cluster_server_parameter_test_util {
+using namespace std::literals::string_view_literals;
 
 const TenantId ClusterServerParameterTestBase::kTenantId =
-    TenantId(OID("123456789012345678901234"_sd));
+    TenantId(OID("123456789012345678901234"sv));
 
 void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId) {
     const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w" << "majority"));
@@ -133,8 +135,8 @@ void remove(const boost::optional<TenantId>& tenantId) {
 
 BSONObj makeClusterParametersDoc(const LogicalTime& cpTime,
                                  int intValue,
-                                 StringData strValue,
-                                 StringData parameterName) {
+                                 std::string_view strValue,
+                                 std::string_view parameterName) {
     ClusterServerParameter csp;
     csp.set_id(parameterName);
     csp.setClusterParameterTime(cpTime);

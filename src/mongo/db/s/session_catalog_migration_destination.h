@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/namespace_string.h"
@@ -50,6 +49,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -118,7 +118,7 @@ public:
     /**
      * Forces this into an error state which will also stop session transfer thread.
      */
-    void forceFail(StringData errMsg);
+    void forceFail(std::string_view errMsg);
 
     /**
      * Returns the session id for the migration.
@@ -148,7 +148,7 @@ private:
                                             ServiceContext* serviceContext,
                                             CancellationToken cancellationToken);
 
-    void _errorOccurred(StringData errMsg);
+    void _errorOccurred(std::string_view errMsg);
 
     const NamespaceString _nss;
     const ShardId _fromShard;

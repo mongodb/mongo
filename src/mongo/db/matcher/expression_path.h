@@ -33,6 +33,8 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -45,7 +47,7 @@ namespace mongo {
 class PathMatchExpression : public MatchExpression {
 public:
     PathMatchExpression(MatchType matchType,
-                        boost::optional<StringData> path,
+                        boost::optional<std::string_view> path,
                         ElementPath::LeafArrayBehavior leafArrBehavior,
                         ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr)
@@ -59,7 +61,7 @@ public:
      * empty path as well as no path cases. optPath() should be preferred in order to
      * distinguish between the two.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT StringData path() const final {
+    MONGO_MOD_NEEDS_REPLACEMENT std::string_view path() const final {
         return _elementPath ? _elementPath->fieldRef().dottedField() : "";
     }
 
@@ -75,15 +77,15 @@ public:
      * Gets the path that the expression applies to. If the expression does not apply to a specific
      * path, returns boost::none.
      */
-    boost::optional<StringData> optPath() const {
-        return _elementPath ? boost::optional<StringData>(path()) : boost::none;
+    boost::optional<std::string_view> optPath() const {
+        return _elementPath ? boost::optional<std::string_view>(path()) : boost::none;
     }
 
     /**
      * Resets the path for this expression. Note that this method will make a copy of 'path' such
      * that there's no lifetime requirements for the string which 'path' points into.
      */
-    void setPath(StringData path) {
+    void setPath(std::string_view path) {
         invariant(_elementPath);
         _elementPath->reset(path);
     }
@@ -115,7 +117,7 @@ public:
     }
 
     /**
-     * Returns a pair of bool and boost::optional<StringData>.
+     * Returns a pair of bool and boost::optional<std::string_view>.
      *
      * - The bool indicates whether renames will always succeed if any rename is applicable. No
      *   applicable renames is considered as a successful rename and returns true with the second
@@ -129,7 +131,8 @@ public:
      *   Another similar example is expr = {x: {$elemMatch: {$eq: {y: 3}}}} and renames = {{"x.y",
      *   "a.b"}}.
 
-     * - The boost::optional<StringData> is the rewritten path iff one rename is applicable. The
+     * - The boost::optional<std::string_view> is the rewritten path iff one rename is applicable.
+     The
      *   rewritten path is the path after applying the only applicable rename in 'renameList'. If no
      *   rename is applicable, the rewritten path is boost::none.
      *

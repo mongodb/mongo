@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -55,6 +54,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -111,8 +111,8 @@ public:
     RoleNameIterator getAuthenticatedRoleNames() override;
 
     void logoutSecurityTokenUser() override;
-    void logoutAllDatabases(StringData reason) override;
-    void logoutDatabase(const DatabaseName& dbname, StringData reason) override;
+    void logoutAllDatabases(std::string_view reason) override;
+    void logoutDatabase(const DatabaseName& dbname, std::string_view reason) override;
 
     AuthenticationMode getAuthenticationMode() const override {
         return _authenticationMode;

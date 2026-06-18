@@ -36,6 +36,8 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace auth {
 
@@ -65,7 +67,7 @@ SaslPayload SaslPayload::parseFromBSON(const BSONElement& elem) {
     }
 }
 
-void SaslPayload::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+void SaslPayload::serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const {
     if (_serializeAsBase64) {
         bob->append(fieldName, base64::encode(_payload));
     } else {

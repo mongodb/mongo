@@ -30,7 +30,6 @@
 
 #include "mongo/util/signal_handlers_synchronous.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/type_traits.h"
@@ -45,6 +44,7 @@
 #include <csignal>
 #include <exception>
 #include <string>
+#include <string_view>
 #include <thread>
 
 #include <fmt/format.h>
@@ -185,7 +185,7 @@ public:
         }
     }
 
-    static void write(StringData s) {
+    static void write(std::string_view s) {
         logv2::signalSafeWriteToStderr(s);
     }
 
@@ -207,7 +207,7 @@ public:
     template <FixedString message, auto nextAction>
     static void handler(int signo) {
         {
-            write(StringData{message});
+            write(std::string_view{message});
             auto guard = makeGuard(signo);
             nextAction();
         }

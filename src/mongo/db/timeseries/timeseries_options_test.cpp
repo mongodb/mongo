@@ -29,7 +29,6 @@
 
 #include "mongo/db/timeseries/timeseries_options.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"

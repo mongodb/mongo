@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -51,7 +51,7 @@ namespace mongo::exec::agg {
  */
 class ReshardingOwnershipMatchStage final : public Stage {
 public:
-    ReshardingOwnershipMatchStage(StringData stageName,
+    ReshardingOwnershipMatchStage(std::string_view stageName,
                                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                   ShardId recipientShardId,
                                   const std::shared_ptr<ShardKeyPattern>& reshardingKey,

@@ -31,9 +31,11 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
 namespace {
-StringData toStringData(JoinPredicate::Operator op) {
+std::string_view toStringData(JoinPredicate::Operator op) {
     switch (op) {
         case JoinPredicate::Operator::Eq:
             return "eq";

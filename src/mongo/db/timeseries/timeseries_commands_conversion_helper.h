@@ -36,6 +36,8 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 MONGO_MOD_PUBLIC;
@@ -43,7 +45,7 @@ MONGO_MOD_PUBLIC;
 namespace mongo::timeseries {
 
 // TODO SERVER-101896 remove this constant once 9.0 becomes last LTS and all timeseries are viewless
-inline constexpr StringData kIsTimeseriesNamespaceFieldName = "isTimeseriesNamespace"_sd;
+inline constexpr std::string_view kIsTimeseriesNamespaceFieldName = "isTimeseriesNamespace"_sd;
 
 /**
  * Returns a command object with time-series view namespace translated to bucket namespace.
@@ -52,8 +54,8 @@ inline constexpr StringData kIsTimeseriesNamespaceFieldName = "isTimeseriesNames
  */
 BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
                               const NamespaceString& ns,
-                              StringData nsFieldName,
-                              boost::optional<StringData> appendTimeSeriesFlag);
+                              std::string_view nsFieldName,
+                              boost::optional<std::string_view> appendTimeSeriesFlag);
 
 mongo::BSONObj translateIndexSpecFromLogicalToBuckets(OperationContext* opCtx,
                                                       const NamespaceString& origNs,

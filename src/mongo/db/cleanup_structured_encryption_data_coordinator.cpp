@@ -66,6 +66,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -78,6 +79,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(fleCleanupHangBeforeECOCCreate);
 MONGO_FAIL_POINT_DEFINE(fleCleanupHangBeforeCleanupESCNonAnchors);
@@ -209,7 +211,7 @@ void checkRequiredOperation(const CleanupStructuredEncryptionDataState& state,
 void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
                                                const NamespaceString& escNss,
                                                FLECleanupESCDeleteQueue& pq,
-                                               StringData description,
+                                               std::string_view description,
                                                ECStats* escStats) {
     auto tagsPerDelete =
         ServerParameterSet::getClusterParameterSet()
@@ -363,7 +365,7 @@ void doAnchorRemovalOperation(OperationContext* opCtx,
         opCtx,
         escNss,
         pq,
-        "anchor deletes phase of queryable encryption cleanup coordinator"_sd,
+        "anchor deletes phase of queryable encryption cleanup coordinator"sv,
         escStats);
 
     if (MONGO_unlikely(fleCleanupHangAfterCleanupESCAnchors.shouldFail())) {

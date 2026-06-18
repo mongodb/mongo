@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -50,8 +51,9 @@ namespace mongo {
 class MONGO_MOD_PUB TransactionParticipantFailedUnyieldInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TransactionParticipantFailedUnyield;
-    static constexpr StringData kOriginalErrorFieldName = "originalError"_sd;
-    static constexpr StringData kOriginalResponseStatusFieldName = "originalResponseStatus"_sd;
+
+    static constexpr std::string_view kOriginalErrorFieldName{"originalError"};
+    static constexpr std::string_view kOriginalResponseStatusFieldName{"originalResponseStatus"};
 
     TransactionParticipantFailedUnyieldInfo(
         const Status& originalError, boost::optional<Status> originalResponseStatus = boost::none)

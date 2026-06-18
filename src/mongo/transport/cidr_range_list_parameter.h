@@ -28,7 +28,6 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/modules.h"
@@ -36,6 +35,7 @@
 #include "mongo/util/versioned_value.h"
 
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -48,7 +48,7 @@ namespace MONGO_MOD_PUBLIC transport {
  */
 void appendCIDRRangeListParameter(VersionedValue<CIDRList>& value,
                                   BSONObjBuilder* bob,
-                                  StringData name);
+                                  std::string_view name);
 
 /**
  * Parses the 'obj' bson object and sets 'value' if parsing the CIDR range was sucessful. If parsing

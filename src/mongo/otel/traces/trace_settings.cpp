@@ -37,6 +37,7 @@
 #include "mongo/otel/traces/trace_settings_gen.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo::otel::traces {
@@ -74,7 +75,7 @@ Status OpenTelemetryTracingHttpExportHeaders::set(const BSONElement& newValueEle
 }
 
 Status OpenTelemetryTracingHttpExportHeaders::setFromString(
-    StringData s, const boost::optional<TenantId>& tenant) {
+    std::string_view s, const boost::optional<TenantId>& tenant) {
     try {
         auto b = BSON("v" << fromjson(s));
         return set(b.firstElement(), tenant);
@@ -86,7 +87,7 @@ Status OpenTelemetryTracingHttpExportHeaders::setFromString(
 
 void OpenTelemetryTracingResourceAttributes::append(OperationContext*,
                                                     BSONObjBuilder* bob,
-                                                    StringData name,
+                                                    std::string_view name,
                                                     const boost::optional<TenantId>&) {
     BSONObjBuilder sub(bob->subobjStart(name));
     for (auto& [k, v] : attributeMap()) {
@@ -119,7 +120,7 @@ Status OpenTelemetryTracingResourceAttributes::set(const BSONElement& newValueEl
     return Status::OK();
 }
 
-Status OpenTelemetryTracingResourceAttributes::setFromString(StringData,
+Status OpenTelemetryTracingResourceAttributes::setFromString(std::string_view,
                                                              const boost::optional<TenantId>&) {
     return Status(ErrorCodes::BadValue,
                   "openTelemetryTracingResourceAttributes cannot be set via string; "

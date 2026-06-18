@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"

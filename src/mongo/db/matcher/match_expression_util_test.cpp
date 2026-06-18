@@ -29,7 +29,6 @@
 
 #include "mongo/db/matcher/match_expression_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"

@@ -29,7 +29,6 @@
 
 #include "mongo/db/client_strand.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/stdx/thread.h"

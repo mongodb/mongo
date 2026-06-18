@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -41,6 +40,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 MONGO_MOD_PUBLIC;
@@ -52,8 +52,8 @@ namespace mongo {
  * Returns Status::OK() and sets "*outElement" to the found element on success.  Returns
  * ErrorCodes::NoSuchKey if there are no matches.
  */
-Status bsonExtractField(const BSONObj& object, StringData fieldName, BSONElement* outElement);
-StatusWith<BSONElement> bsonExtractField(const BSONObj& object, StringData fieldName);
+Status bsonExtractField(const BSONObj& object, std::string_view fieldName, BSONElement* outElement);
+StatusWith<BSONElement> bsonExtractField(const BSONObj& object, std::string_view fieldName);
 
 /**
  * Finds an element named "fieldName" in "object".
@@ -64,11 +64,11 @@ StatusWith<BSONElement> bsonExtractField(const BSONObj& object, StringData field
  * Status::OK(), the resulting value of "*outElement" is undefined.
  */
 Status bsonExtractTypedField(const BSONObj& object,
-                             StringData fieldName,
+                             std::string_view fieldName,
                              BSONType type,
                              BSONElement* outElement);
 StatusWith<BSONElement> bsonExtractTypedField(const BSONObj& object,
-                                              StringData fieldName,
+                                              std::string_view fieldName,
                                               BSONType type);
 
 /**
@@ -79,8 +79,8 @@ StatusWith<BSONElement> bsonExtractTypedField(const BSONObj& object,
  * if the type of the matching element is not Bool or a number type.  For return values other
  * than Status::OK(), the resulting value of "*out" is undefined.
  */
-Status bsonExtractBooleanField(const BSONObj& object, StringData fieldName, bool* out);
-StatusWith<bool> bsonExtractBooleanField(const BSONObj& object, StringData fieldName);
+Status bsonExtractBooleanField(const BSONObj& object, std::string_view fieldName, bool* out);
+StatusWith<bool> bsonExtractBooleanField(const BSONObj& object, std::string_view fieldName);
 
 /**
  * If a field named "fieldName" is present, and is either a number or boolean type, stores the
@@ -91,11 +91,11 @@ StatusWith<bool> bsonExtractBooleanField(const BSONObj& object, StringData field
  * boolean or number, returns ErrorCodes::TypeMismatch.
  */
 Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
-                                          StringData fieldName,
+                                          std::string_view fieldName,
                                           bool defaultValue,
                                           bool* out);
 StatusWith<bool> bsonExtractBooleanFieldWithDefault(const BSONObj& object,
-                                                    StringData fieldName,
+                                                    std::string_view fieldName,
                                                     bool defaultValue);
 
 /**
@@ -108,8 +108,8 @@ StatusWith<bool> bsonExtractBooleanFieldWithDefault(const BSONObj& object,
  * representation.  For return values other than Status::OK(), the resulting value of "*out" is
  * undefined.
  */
-Status bsonExtractIntegerField(const BSONObj& object, StringData fieldName, long long* out);
-StatusWith<long long> bsonExtractIntegerField(const BSONObj& object, StringData fieldName);
+Status bsonExtractIntegerField(const BSONObj& object, std::string_view fieldName, long long* out);
+StatusWith<long long> bsonExtractIntegerField(const BSONObj& object, std::string_view fieldName);
 
 /**
  * If a field named "fieldName" is present and is a value of numeric type with an exact 64-bit
@@ -120,11 +120,11 @@ StatusWith<long long> bsonExtractIntegerField(const BSONObj& object, StringData 
  * ErrorCodes::BadValue.
  */
 Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
-                                          StringData fieldName,
+                                          std::string_view fieldName,
                                           long long defaultValue,
                                           long long* out);
 StatusWith<long long> bsonExtractIntegerFieldWithDefault(const BSONObj& object,
-                                                         StringData fieldName,
+                                                         std::string_view fieldName,
                                                          long long defaultValue);
 
 /**
@@ -137,8 +137,8 @@ StatusWith<long long> bsonExtractIntegerFieldWithDefault(const BSONObj& object,
  * ErrorCodes::BadValue if the value does not have an exact floating point number representation.
  * For return values other than Status::OK(), the resulting value of "*out" is undefined.
  */
-Status bsonExtractDoubleField(const BSONObj& object, StringData fieldName, double* out);
-StatusWith<double> bsonExtractDoubleField(const BSONObj& object, StringData fieldName);
+Status bsonExtractDoubleField(const BSONObj& object, std::string_view fieldName, double* out);
+StatusWith<double> bsonExtractDoubleField(const BSONObj& object, std::string_view fieldName);
 
 /**
  * Finds a string-typed element named "fieldName" in "object" and stores its value in "out".
@@ -148,8 +148,8 @@ StatusWith<double> bsonExtractDoubleField(const BSONObj& object, StringData fiel
  * if the type of the matching element is not String.  For return values other than
  * Status::OK(), the resulting value of "*out" is undefined.
  */
-Status bsonExtractStringField(const BSONObj& object, StringData fieldName, std::string* out);
-StatusWith<std::string> bsonExtractStringField(const BSONObj& object, StringData fieldName);
+Status bsonExtractStringField(const BSONObj& object, std::string_view fieldName, std::string* out);
+StatusWith<std::string> bsonExtractStringField(const BSONObj& object, std::string_view fieldName);
 
 /**
  * If a field named "fieldName" is present, and is a string, stores the value of the field into
@@ -160,12 +160,12 @@ StatusWith<std::string> bsonExtractStringField(const BSONObj& object, StringData
  * string, returns ErrorCodes::TypeMismatch.
  */
 Status bsonExtractStringFieldWithDefault(const BSONObj& object,
-                                         StringData fieldName,
-                                         StringData defaultValue,
+                                         std::string_view fieldName,
+                                         std::string_view defaultValue,
                                          std::string* out);
 StatusWith<std::string> bsonExtractStringFieldWithDefault(const BSONObj& object,
-                                                          StringData fieldName,
-                                                          StringData defaultValue);
+                                                          std::string_view fieldName,
+                                                          std::string_view defaultValue);
 
 /**
  * Finds an Timestamp-typed element named "fieldName" in "object" and stores its value in "out".
@@ -175,8 +175,8 @@ StatusWith<std::string> bsonExtractStringFieldWithDefault(const BSONObj& object,
  * if the type of the matching element is not Timestamp.  For return values other than
  * Status::OK(), the resulting value of "*out" is undefined.
  */
-Status bsonExtractTimestampField(const BSONObj& object, StringData fieldName, Timestamp* out);
-StatusWith<Timestamp> bsonExtractTimestampField(const BSONObj& object, StringData fieldName);
+Status bsonExtractTimestampField(const BSONObj& object, std::string_view fieldName, Timestamp* out);
+StatusWith<Timestamp> bsonExtractTimestampField(const BSONObj& object, std::string_view fieldName);
 
 /**
  * Finds an OID-typed element named "fieldName" in "object" and stores its value in "out".
@@ -186,6 +186,6 @@ StatusWith<Timestamp> bsonExtractTimestampField(const BSONObj& object, StringDat
  * if the type of the matching element is not OID.  For return values other than Status::OK(),
  * the resulting value of "*out" is undefined.
  */
-Status bsonExtractOIDField(const BSONObj& object, StringData fieldName, OID* out);
-StatusWith<OID> bsonExtractOIDField(const BSONObj& object, StringData fieldName);
+Status bsonExtractOIDField(const BSONObj& object, std::string_view fieldName, OID* out);
+StatusWith<OID> bsonExtractOIDField(const BSONObj& object, std::string_view fieldName);
 }  // namespace mongo

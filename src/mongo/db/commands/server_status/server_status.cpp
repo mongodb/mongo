@@ -28,8 +28,9 @@
  */
 #include "mongo/db/commands/server_status/server_status.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
+
+#include <string_view>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -37,7 +38,8 @@
 namespace mongo {
 
 namespace {
-constexpr auto kTimingSection = "timing"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kTimingSection = "timing"sv;
 }  // namespace
 
 ServerStatusSectionRegistry* ServerStatusSectionRegistry::instance() {

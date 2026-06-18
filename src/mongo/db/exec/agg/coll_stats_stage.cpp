@@ -42,6 +42,8 @@
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceCollStatsToStageFn(
@@ -59,7 +61,7 @@ namespace exec::agg {
 
 REGISTER_AGG_STAGE_MAPPING(collStats, DocumentSourceCollStats::id, documentSourceCollStatsToStageFn)
 
-CollStatsStage::CollStatsStage(StringData stageName,
+CollStatsStage::CollStatsStage(std::string_view stageName,
                                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                DocumentSourceCollStatsSpec collStatsSpec)
     : Stage(stageName, pExpCtx), _collStatsSpec(std::move(collStatsSpec)) {}

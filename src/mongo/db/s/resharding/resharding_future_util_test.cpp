@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/resharding/resharding_future_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

@@ -40,6 +40,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string_view>
 
 namespace mongo::replicated_fast_count {
 
@@ -98,7 +99,7 @@ private:
      */
     void _runFlushThread(ServiceContext* service);
 
-    void _handleWorkerFailure(Status status, StringData message);
+    void _handleWorkerFailure(Status status, std::string_view message);
 
     std::unique_ptr<SizeCountCheckpointOplogTailer> _oplogTailer;
     std::unique_ptr<SizeCountCheckpointFlusher> _flusher;

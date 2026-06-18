@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 
 #include <string>
+#include <string_view>
 
 #include <js/TypeDecls.h>
 
@@ -57,7 +57,7 @@ bool installParseJSFunctionHelper(JSContext* cx, JS::HandleObject global);
  */
 bool parseJSFunctionOrExpression(JSContext* cx,
                                  JS::HandleObject global,
-                                 StringData input,
+                                 std::string_view input,
                                  std::string* out);
 
 }  // namespace mozjs

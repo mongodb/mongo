@@ -43,6 +43,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using QueueStageTest = AggregationContextFixture;
 
@@ -52,7 +53,7 @@ TEST_F(QueueStageTest, QueueStageDeserialization) {
     auto queueStage = DocumentSourceQueue::createFromBson(queueDoc.firstElement(), getExpCtx());
     ASSERT_TRUE(queueStage);
 
-    auto expectedResult = Document{{"a"_sd, 1}};
+    auto expectedResult = Document{{"a"sv, 1}};
     auto queueDoc1 = BSON("$queue" << BSON_ARRAY(BSON("a" << 1)));
     auto queueSource1 = DocumentSourceQueue::createFromBson(queueDoc1.firstElement(), getExpCtx());
     auto queueStage1 = exec::agg::buildStage(queueSource1);

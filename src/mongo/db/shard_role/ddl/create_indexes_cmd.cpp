@@ -31,13 +31,13 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -110,6 +110,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // This failpoint simulates a WriteConflictException during createIndexes where the collection is
 // implicitly created.
@@ -127,18 +128,18 @@ MONGO_FAIL_POINT_DEFINE(hangCreateIndexesBeforeStartingIndexBuild);
 
 MONGO_FAIL_POINT_DEFINE(skipTTLIndexValidationOnCreateIndex);
 
-constexpr auto kCommandName = "createIndexes"_sd;
-constexpr auto kAllIndexesAlreadyExist = "all indexes already exist"_sd;
-constexpr auto kIndexAlreadyExists = "index already exists"_sd;
+constexpr auto kCommandName = "createIndexes"sv;
+constexpr auto kAllIndexesAlreadyExist = "all indexes already exist"sv;
+constexpr auto kIndexAlreadyExists = "index already exists"sv;
 
 /**
  * Appends 'message' to the 'note' component of the response.
  */
-void appendMessageToNoteField(CreateIndexesReply* reply, StringData message) {
+void appendMessageToNoteField(CreateIndexesReply* reply, std::string_view message) {
     std::string noteCopy = reply->getNote() ? (std::string{*reply->getNote()} + "\n\n") : "";
     noteCopy += message;
     // setNote() will internally make its own copy.
-    reply->setNote(StringData(noteCopy));
+    reply->setNote(std::string_view(noteCopy));
 }
 
 /**
@@ -437,8 +438,8 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
 
         if (createStatus == ErrorCodes::NamespaceExists) {
             throwWriteConflictException(
-                str::stream() << "Failed to create indexes on new collection: namespace "_sd
-                              << ns.toStringForErrorMsg() << " exists. Status: "_sd
+                str::stream() << "Failed to create indexes on new collection: namespace "sv
+                              << ns.toStringForErrorMsg() << " exists. Status: "sv
                               << createStatus.toString());
         }
 

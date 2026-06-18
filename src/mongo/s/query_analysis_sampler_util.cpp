@@ -36,6 +36,7 @@
 
 #include <iterator>
 #include <new>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -46,8 +47,9 @@ namespace mongo {
 namespace analyze_shard_key {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kSampleIdFieldName = "sampleId"_sd;
+constexpr auto kSampleIdFieldName = "sampleId"sv;
 
 template <typename C>
 auto sampleIter(C&& c) {
@@ -56,9 +58,9 @@ auto sampleIter(C&& c) {
     return std::next(c.begin(), (*random)->nextInt64(c.size()));
 }
 
-StringData adjustCmdNameCase(StringData cmdName) {
+std::string_view adjustCmdNameCase(std::string_view cmdName) {
     if (cmdName == "findandmodify") {
-        return StringData("findAndModify");
+        return std::string_view("findAndModify");
     } else {
         return cmdName;
     }
@@ -76,7 +78,7 @@ boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
 
 boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          StringData cmdName) {
+                                          std::string_view cmdName) {
     return tryGenerateSampleId(
         opCtx,
         nss,
@@ -96,7 +98,7 @@ boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* 
 
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
                                                               const NamespaceString& nss,
-                                                              StringData cmdName,
+                                                              std::string_view cmdName,
                                                               const std::set<ShardId>& shardIds) {
     return tryGenerateTargetedSampleId(
         opCtx,

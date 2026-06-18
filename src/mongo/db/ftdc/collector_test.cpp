@@ -44,11 +44,14 @@
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kFieldName = "Field"_sd;
-constexpr auto kAnotherFieldName = "AnotherField"_sd;
+constexpr auto kFieldName = "Field"sv;
+constexpr auto kAnotherFieldName = "AnotherField"sv;
 constexpr auto kCollectorName = "Collector1";
 constexpr auto kAnotherCollectorName = "Collector2";
 constexpr auto kSampleData = 1;
@@ -195,7 +198,7 @@ TEST_F(SampleCollectorCacheTestFixture, TimeoutDuringCollectionShouldFinishInThe
 TEST_F(SampleCollectorCacheTestFixture, TimeoutShouldNotAffectOtherSamples) {
     // Tracks the order of collections by recording the name of collectors in the order they are
     // invoked by `collector`.
-    synchronized_value<std::vector<StringData>> collections;
+    synchronized_value<std::vector<std::string_view>> collections;
 
     auto collector = makeSampleCollectorCache();
 
@@ -222,7 +225,8 @@ TEST_F(SampleCollectorCacheTestFixture, TimeoutShouldNotAffectOtherSamples) {
     ASSERT_TRUE(sample1.hasField(kAnotherCollectorName));
 
     using unittest::match::Eq;
-    ASSERT_THAT(**collections, Eq(std::vector<StringData>{kCollectorName, kAnotherCollectorName}));
+    ASSERT_THAT(**collections,
+                Eq(std::vector<std::string_view>{kCollectorName, kAnotherCollectorName}));
 
     auto sample2 = collect(collector);
     ASSERT_TRUE(sample2.hasField(kCollectorName));

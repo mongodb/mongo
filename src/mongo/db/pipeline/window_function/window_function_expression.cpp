@@ -40,6 +40,7 @@
 #include "mongo/db/stats/counters.h"
 
 #include <cmath>
+#include <string_view>
 #include <tuple>
 
 #include <boost/none.hpp>
@@ -50,6 +51,7 @@ using boost::intrusive_ptr;
 using boost::optional;
 
 namespace mongo::window_function {
+using namespace std::literals::string_view_literals;
 using namespace std::string_literals;
 using namespace window_function_n_traits;
 REGISTER_STABLE_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
@@ -94,7 +96,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
         // Check if window function is $-prefixed.
         auto fieldName = field.fieldNameStringData();
 
-        if (fieldName.starts_with("$"_sd)) {
+        if (fieldName.starts_with("$"sv)) {
             auto exprName = field.fieldNameStringData();
             if (auto parserFCV = parserMap.find(exprName); parserFCV != parserMap.end()) {
                 // Found one valid window function. If there are multiple window functions they will
@@ -166,7 +168,7 @@ void Expression::registerParser(std::string functionName,
 boost::intrusive_ptr<Expression> ExpressionExpMovingAvg::parse(
     BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
     // 'obj' is something like '{$expMovingAvg: {input: <arg>, <N/alpha>: <int/float>}}'
-    boost::optional<StringData> accumulatorName;
+    boost::optional<std::string_view> accumulatorName;
     boost::intrusive_ptr<::mongo::Expression> input;
     uassert(ErrorCodes::FailedToParse,
             "$expMovingAvg must have exactly one argument that is an object",
@@ -243,7 +245,7 @@ boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
                                   << "' expression",
                     bounds == boost::none);
             bounds = WindowBounds::parse(arg, sortBy, expCtx);
-        } else if (argName == StringData(accumulatorName)) {
+        } else if (argName == std::string_view(accumulatorName)) {
             input = ::mongo::Expression::parseOperand(expCtx, arg, expCtx->variablesParseState);
 
         } else {
@@ -378,7 +380,7 @@ MinMaxScalerArguments getMinMaxScalerArgumentsFromSpec(const MinMaxScalerSpec& s
         expCtx, minMaxScaler.getInput().getElement(), expCtx->variablesParseState);
 
     // This helper function takes in a constant numerical expression and evaluates it into a Value.
-    auto parseNumericalValueConstant = [&expCtx](StringData argName,
+    auto parseNumericalValueConstant = [&expCtx](std::string_view argName,
                                                  BSONElement expressionElem) -> Value {
         auto expr =
             ::mongo::Expression::parseOperand(expCtx, expressionElem, expCtx->variablesParseState)

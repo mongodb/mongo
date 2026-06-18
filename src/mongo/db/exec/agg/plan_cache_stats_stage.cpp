@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/agg/plan_cache_stats_stage.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -38,6 +37,8 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -59,7 +60,7 @@ REGISTER_AGG_STAGE_MAPPING(planCacheStats,
 namespace exec::agg {
 
 PlanCacheStatsStage::PlanCacheStatsStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::intrusive_ptr<DocumentSourceMatch>& absorbedMatch)
     : Stage(stageName, expCtx), _absorbedMatch(absorbedMatch) {}

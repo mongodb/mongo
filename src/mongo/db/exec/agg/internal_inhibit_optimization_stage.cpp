@@ -32,6 +32,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalInhibitOptimizationToStageFn(
@@ -53,7 +55,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalInhibitOptimization,
                            documentSourceInternalInhibitOptimizationToStageFn);
 
 InternalInhibitOptimizationStage::InternalInhibitOptimizationStage(
-    StringData stageName, const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    std::string_view stageName, const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : Stage(stageName, expCtx) {}
 
 GetNextResult InternalInhibitOptimizationStage::doGetNext() {

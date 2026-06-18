@@ -43,6 +43,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -137,7 +138,7 @@ private:
 
 class MONGO_MOD_NEEDS_REPLACEMENT AndMatchExpression : public ListOfMatchExpression {
 public:
-    static constexpr StringData kName = "$and"_sd;
+    static constexpr std::string_view kName = "$and"_sd;
 
     AndMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(AND, std::move(annotation), {}) {}
@@ -180,7 +181,7 @@ public:
 
 class OrMatchExpression : public ListOfMatchExpression {
 public:
-    static constexpr StringData kName = "$or"_sd;
+    static constexpr std::string_view kName = "$or"_sd;
 
     OrMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(OR, std::move(annotation), {}) {}
@@ -223,7 +224,7 @@ public:
 
 class NorMatchExpression : public ListOfMatchExpression {
 public:
-    static constexpr StringData kName = "$nor"_sd;
+    static constexpr std::string_view kName = "$nor"_sd;
 
     NorMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(NOR, std::move(annotation), {}) {}

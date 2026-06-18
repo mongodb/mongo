@@ -57,6 +57,7 @@
 namespace mongo {
 namespace repl {
 namespace {
+using namespace std::literals::string_view_literals;
 
 constexpr std::size_t kTestOplogBufferSize = 64 * 1024 * 1024;
 constexpr std::size_t kTestOplogBufferCount = std::numeric_limits<std::size_t>::max();
@@ -123,7 +124,7 @@ void OplogApplierTest::tearDown() {
     _buffer = {};
 }
 
-const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
+const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test"sv);
 
 TEST_F(OplogApplierTest, GetNextApplierBatchReturnsBadValueIfAnyOplogEntryHasWrongVersion) {
     unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",

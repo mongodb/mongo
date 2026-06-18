@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -47,6 +46,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -58,13 +58,14 @@ namespace mongo {
 namespace rpc {
 namespace test {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kPingFieldName = "ping"_sd;
+constexpr auto kPingFieldName = "ping"sv;
 
 std::string makeSecurityToken(const UserName& userName) {
     return std::string{auth::ValidatedTenancyScopeFactory::create(
                            userName,
-                           "secret"_sd,
+                           "secret"sv,
                            auth::ValidatedTenancyScope::TenantProtocol::kDefault,
                            auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
                            .getOriginalToken()};

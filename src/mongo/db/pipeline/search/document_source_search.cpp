@@ -47,6 +47,8 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/compiler.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -58,7 +60,7 @@ using std::list;
 
 namespace {
 /** Helper written in a particular redundant way to work around a GCC false-positive warning. */
-StringData removePrefixWorkaround(StringData key, StringData pre) {
+std::string_view removePrefixWorkaround(std::string_view key, std::string_view pre) {
     MONGO_COMPILER_DIAGNOSTIC_PUSH
     MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Warray-bounds")
     if (!key.starts_with(pre))
@@ -110,7 +112,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(search, DocumentSourceSearch,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(search, DocumentSourceSearch::id);
 
-StringData DocumentSourceSearch::getSourceName() const {
+std::string_view DocumentSourceSearch::getSourceName() const {
     return kStageName;
 }
 

@@ -29,6 +29,8 @@
 
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 
+#include <string_view>
+
 namespace mongo::mozjs::wasm::wasm_helpers {
 
 std::vector<uint8_t> readWasmFile(const std::string& path) {

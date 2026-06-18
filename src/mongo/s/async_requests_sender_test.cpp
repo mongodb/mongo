@@ -57,6 +57,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
@@ -324,7 +325,7 @@ TEST_P(AsyncRequestsSenderTest, DesignatedHostChosen) {
 
     auto shard1Secondary = kTestShardHosts[1][1];
     _targeters[1]->setConnectionStringReturnValue(
-        ConnectionString::forReplicaSet("shard1_rs"_sd, kTestShardHosts[1]));
+        ConnectionString::forReplicaSet("shard1_rs"sv, kTestShardHosts[1]));
     designatedHosts[shardRef(1)] = shard1Secondary;
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),

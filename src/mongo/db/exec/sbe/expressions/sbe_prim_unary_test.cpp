@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -40,10 +39,12 @@
 
 #include <iosfwd>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 class SBEPrimUnaryTest : public GoldenEExpressionTestFixture {
 public:
@@ -87,7 +88,7 @@ protected:
                          makeBool(true),
                          makeInt32(12),
                          value::makeCopyDecimal(Decimal128(223.5)),
-                         value::makeNewString("abc"_sd),
+                         value::makeNewString("abc"sv),
                          makeTimestamp(Timestamp(1668792433))});
 };
 

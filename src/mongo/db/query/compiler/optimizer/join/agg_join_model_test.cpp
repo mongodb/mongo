@@ -35,8 +35,13 @@
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
 namespace {
+
+using namespace std::literals::string_view_literals;
+
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/join/agg_join_model"};
 
 using mongo::ParsedMatchExpressionForTest;
@@ -76,7 +81,7 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnSameField) {
     ])";
 
     auto pipeline = makePipeline(query, {"B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"B", {"a"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"a"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
@@ -112,7 +117,7 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnDiffField) {
     ])";
 
     auto pipeline = makePipeline(query, {"B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"b"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
@@ -180,7 +185,7 @@ TEST_F(PipelineAnalyzerTest, PropagateSomeButNotAllSTPs) {
         { $unwind: "$joined" }
     ])";
     auto pipeline = makePipeline(query, {"B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"b"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
@@ -236,7 +241,7 @@ TEST_F(PipelineAnalyzerTest, PropagateSTPsThruJoinChain) {
     ])";
 
     auto pipeline = makePipeline(query, {"B", "C"});
-    markFieldsAsScalar(*pipeline, {"a"_sd, "b"_sd}, {{"B", {"a"_sd, "b"_sd}}, {"C", {"a"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv, "b"sv}, {{"B", {"a"sv, "b"sv}}, {"C", {"a"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
@@ -346,11 +351,10 @@ TEST_F(PipelineAnalyzerTest, JoinChainWithPartialSTPPropagation) {
     ])";
 
     auto pipeline = makePipeline(query, {"B", "C", "D"});
-    markFieldsAsScalar(*pipeline,
-                       {"a"_sd, "x"_sd},
-                       {{"B", {"b"_sd, "x"_sd, "m"_sd}},
-                        {"C", {"c"_sd, "x"_sd, "n"_sd}},
-                        {"D", {"d"_sd, "o"_sd}}});
+    markFieldsAsScalar(
+        *pipeline,
+        {"a"sv, "x"sv},
+        {{"B", {"b"sv, "x"sv, "m"sv}}, {"C", {"c"sv, "x"sv, "n"sv}}, {"D", {"d"sv, "o"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
@@ -454,8 +458,8 @@ TEST_F(PipelineAnalyzerTest, DoNotPropagateOrNorNinSingleTablePredicates) {
     auto pipeline = makePipeline(query, {"B", "C"});
 
     markFieldsAsScalar(*pipeline,
-                       {"joinKey1"_sd, "joinKey2"_sd},
-                       {{"B", {"joinKey1"_sd, "joinKey2"_sd}}, {"C", {"joinKey2"_sd}}});
+                       {"joinKey1"sv, "joinKey2"sv},
+                       {{"B", {"joinKey1"sv, "joinKey2"sv}}, {"C", {"joinKey2"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
@@ -516,7 +520,7 @@ TEST_F(PipelineAnalyzerTest, PropagateInSingleTablePredicate) {
     { $unwind: "$joinedB" }
     ])";
     auto pipeline = makePipeline(query, {"B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd, "c"_sd}, {{"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv, "c"sv}, {{"B", {"b"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
@@ -574,7 +578,7 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemantics) {
     { $unwind: "$Cdocs" }
     ])";
     auto pipeline = makePipeline(query, {"B", "C"});
-    markFieldsAsScalar(*pipeline, {"a"_sd, "c"_sd}, {{"B", {"b"_sd}}, {"C", {"c"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv, "c"sv}, {{"B", {"b"sv}}, {"C", {"c"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
@@ -654,11 +658,10 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemanticsInAJoinCycle) {
         { $unwind: "$dDocs" }
         ])";
     auto pipeline = makePipeline(query, {"B", "C", "D"});
-    markFieldsAsScalar(*pipeline,
-                       {"x"_sd, "z"_sd},
-                       {{"B", {"x"_sd, "y"_sd}},
-                        {"C", {"y"_sd, "z"_sd, "x"_sd, "w"_sd}},
-                        {"D", {"w"_sd, "p"_sd}}});
+    markFieldsAsScalar(
+        *pipeline,
+        {"x"sv, "z"sv},
+        {{"B", {"x"sv, "y"sv}}, {"C", {"y"sv, "z"sv, "x"sv, "w"sv}}, {"D", {"w"sv, "p"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
@@ -722,7 +725,7 @@ TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForei
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     // This pipeline's prefix is eligible for reordering.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
@@ -740,7 +743,7 @@ TEST_F(PipelineAnalyzerTest, PipelineEligibleForJoinReorderingSingleLookupUnwind
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
     // This pipeline is eligible for reordering.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -765,7 +768,7 @@ TEST_F(PipelineAnalyzerTest, LetLocalFieldPrefixedByAsField) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"X.y"_sd}, {{"A", {"z"_sd}}});
+    markFieldsAsScalar(*pipeline, {"X.y"sv}, {{"A", {"z"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -828,7 +831,7 @@ TEST_F(PipelineAnalyzerTest, TwoLookupUnwinds) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -848,7 +851,7 @@ TEST_F(PipelineAnalyzerTest, MatchOnMainCollection) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -870,7 +873,7 @@ TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -894,7 +897,7 @@ TEST_F(PipelineAnalyzerTest, AbsorbedFilterNonPipelineLookup) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -922,7 +925,7 @@ TEST_F(PipelineAnalyzerTest, AbsorbedFilterEmptyPipeline) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -949,7 +952,7 @@ TEST_F(PipelineAnalyzerTest, EmptyPipelineNoFilterEligible) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
@@ -984,7 +987,7 @@ TEST_F(PipelineAnalyzerTest, NumericLocalFieldIneligibleJoinPredicate) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a.0"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a.0"sv}, {{"A", {"b"sv}}});
     // Structurally eligible ($lookup + $unwind pair exists) ...
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     // ... but the numeric path component in localField makes the join predicate ineligible.
@@ -999,7 +1002,7 @@ TEST_F(PipelineAnalyzerTest, NumericForeignFieldIneligibleJoinPredicate) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b.0"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b.0"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
@@ -1012,7 +1015,7 @@ TEST_F(PipelineAnalyzerTest, NumericMidPathComponentIneligibleJoinPredicate) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a.0.b"_sd}, {{"A", {"c"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a.0.b"sv}, {{"A", {"c"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
@@ -1030,7 +1033,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilter) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1060,7 +1063,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMultiPredicateMatchOrderingNoAbsorbedFil
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1094,7 +1097,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilterPreservesPipeline
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1131,7 +1134,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineCorrelatedMatchPlusAbsorbedFilter) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1162,7 +1165,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilterMixedBaseAndAsFie
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1194,7 +1197,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMixedCorrelatedAndUncorrelatedPlusAbsorb
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1223,7 +1226,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineMultiPredicateMatchPlusAbsorbedFilter) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1256,7 +1259,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineNonEqStpPlusNonEqAbsorbedFilter) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1290,7 +1293,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineNestedOrPlusAbsorbedFilter) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1321,7 +1324,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineNonCorrelatedExprStpPlusAbsorbedFilter) 
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1353,7 +1356,7 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesBothOnAsFieldPipelineForm) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1386,7 +1389,7 @@ TEST_F(PipelineAnalyzerTest, SubPipelineNonEquijoinExprPlusAbsorbedFilter) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1404,7 +1407,7 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesBothOnAsField) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1428,7 +1431,7 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesFirstOnAsFieldSecondOnBaseField) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1453,7 +1456,7 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesFirstOnBaseFieldSecondOnAsField) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1478,7 +1481,7 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesSameFieldBothOnAsField) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1504,7 +1507,7 @@ TEST_F(PipelineAnalyzerTest, TwoMatchesEachOnDifferentCollection) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"c"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"c"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1533,7 +1536,7 @@ TEST_F(PipelineAnalyzerTest, MatchBetweenTwoLookupUnwinds) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"c"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"c"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1558,7 +1561,7 @@ TEST_F(PipelineAnalyzerTest, SingleMatchOnBothBaseAndAsField) {
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1584,7 +1587,7 @@ TEST_F(PipelineAnalyzerTest, SingleMatchOnTwoDifferentAsFields) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"c"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"c"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1613,7 +1616,7 @@ TEST_F(PipelineAnalyzerTest, AbsorbedFilterOnChainedLookup) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd, "c"_sd}}, {"B", {"d"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv, "c"sv}}, {"B", {"d"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1642,7 +1645,7 @@ TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
     // We don't detect ineligibility here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
@@ -1663,7 +1666,7 @@ TEST_F(PipelineAnalyzerTest, ConflictingLocalFields) {
     ])";
 
     auto pipeline = makePipeline(query, {"B", "C"});
-    markFieldsAsScalar(*pipeline, {"x"_sd, "a"_sd}, {{"B", {"y"_sd}}, {"C", {"z"_sd}}});
+    markFieldsAsScalar(*pipeline, {"x"sv, "a"sv}, {{"B", {"y"sv}}, {"C", {"z"sv}}});
     // We don't detect ineligibility of local path fields here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
@@ -1699,7 +1702,7 @@ TEST_F(PipelineAnalyzerTest, ConflictingLocalFieldExprSyntax) {
 
     auto pipeline = makePipeline(query, {"B", "A"});
     markFieldsAsScalar(
-        *pipeline, {"x"_sd, "foo"_sd, "bar"_sd}, {{"B", {"y"_sd}}, {"A", {"foo"_sd, "bar"_sd}}});
+        *pipeline, {"x"sv, "foo"sv, "bar"sv}, {{"B", {"y"sv}}, {"A", {"foo"sv, "bar"sv}}});
     // We don't detect ineligibility of local path fields here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
@@ -1715,7 +1718,7 @@ TEST_F(PipelineAnalyzerTest, CompatibleAsFields) {
             {$unwind: "$x.z"}
         ])";
     auto pipeline = makePipeline(query, {"B", "C"});
-    markFieldsAsScalar(*pipeline, {"x.c"_sd}, {{"B", {"c"_sd, "d"_sd}}, {"C", {"d"_sd}}});
+    markFieldsAsScalar(*pipeline, {"x.c"sv}, {{"B", {"c"sv, "d"sv}}, {"C", {"d"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
@@ -1733,7 +1736,7 @@ TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
 
     // We don't detect ineligibility here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
@@ -1756,7 +1759,7 @@ TEST_F(PipelineAnalyzerTest, GroupInSubPipeline) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1830,7 +1833,7 @@ TEST_F(PipelineAnalyzerTest, IneligibleSubPipelineStage) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1903,7 +1906,7 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1925,7 +1928,7 @@ TEST_F(PipelineAnalyzerTest, PipelineInEligibleForSortStage) {
         ])";
 
     auto pipeline = makePipeline(sortPrefixQuery, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
     // This is not where we examine the pipeline for a $sort stage.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto status = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams).getStatus();
@@ -1958,7 +1961,7 @@ TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd, "b"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv, "b"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -1971,7 +1974,7 @@ TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
 TEST_F(PipelineAnalyzerTest, tooManyNodes) {
     static constexpr size_t numJoins = 5;
     auto pipeline = makePipelineOfSize(numJoins);
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
     // Configure the buildParams that one $lookup/$unwind pair is forced to the suffix because the
     // maximum number of nodes is hit.
     AggModelBuildParams buildParams{
@@ -1987,7 +1990,7 @@ TEST_F(PipelineAnalyzerTest, tooManyNodes) {
 TEST_F(PipelineAnalyzerTest, tooManyEdges) {
     static constexpr size_t numJoins = 5;
     auto pipeline = makePipelineOfSize(numJoins);
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
     // Configure the buildParams that one $lookup/$unwind pair is forced to the suffix because the
     // maximum number of edges is hit.
     AggModelBuildParams buildParams{
@@ -2026,7 +2029,7 @@ TEST_F(PipelineAnalyzerTest, SingleJoinCompoundPredicate) {
     ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"foo"_sd, "bar"_sd}, {{"A", {"foo"_sd, "bar"_sd}}});
+    markFieldsAsScalar(*pipeline, {"foo"sv, "bar"sv}, {{"A", {"foo"sv, "bar"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -2087,9 +2090,8 @@ TEST_F(PipelineAnalyzerTest, CompoundJoinKeyWithLocalForeignSyntax) {
     ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline,
-                       {"foo"_sd, "bar"_sd},
-                       {{"A", {"foo"_sd, "bar"_sd}}, {"B", {"foo"_sd, "bar"_sd}}});
+    markFieldsAsScalar(
+        *pipeline, {"foo"sv, "bar"sv}, {{"A", {"foo"sv, "bar"sv}}, {"B", {"foo"sv, "bar"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -2150,7 +2152,7 @@ TEST_F(PipelineAnalyzerTest, DuplicateExprEqAndEqEdges) {
 
     auto pipeline = makePipeline(query, {"A", "B", "C"});
     markFieldsAsScalar(
-        *pipeline, {"bar"_sd}, {{"A", {"bar"_sd}}, {"B", {"bar"_sd}}, {"C", {"bar"_sd}}});
+        *pipeline, {"bar"sv}, {{"A", {"bar"sv}}, {"B", {"bar"sv}}, {"C", {"bar"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -2196,7 +2198,7 @@ TEST_F(PipelineAnalyzerTest, ExprOnlyImplicitEdges) {
     ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"bar"_sd}, {{"A", {"bar"_sd}}, {"B", {"bar"_sd}}});
+    markFieldsAsScalar(*pipeline, {"bar"sv}, {{"A", {"bar"sv}}, {"B", {"bar"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -2228,7 +2230,7 @@ TEST_F(PipelineAnalyzerTest, PipelineIneligibleWithCorrelatedNonJoinPredicate) {
     ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"foo"_sd}, {{"A", {"foo"_sd}}});
+    markFieldsAsScalar(*pipeline, {"foo"sv}, {{"A", {"foo"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -2258,7 +2260,7 @@ TEST_F(PipelineAnalyzerTest, PipelineIneligibleWithNonFieldPathVariable) {
     ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"foo"_sd}, {{"A", {"foo"_sd}}});
+    markFieldsAsScalar(*pipeline, {"foo"sv}, {{"A", {"foo"sv}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -2281,7 +2283,7 @@ TEST_F(PipelineAnalyzerTest, NumericLocalFieldExprIneligibleJoinPredicate) {
     ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a.0"_sd}, {{"A", {"b"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a.0"sv}, {{"A", {"b"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
@@ -2302,7 +2304,7 @@ TEST_F(PipelineAnalyzerTest, NumericForeignFieldExprIneligibleJoinPredicate) {
     ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b.0"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b.0"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
@@ -2323,7 +2325,7 @@ TEST_F(PipelineAnalyzerTest, NumericMidPathExprIneligibleJoinPredicate) {
     ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a.0.b"_sd}, {{"A", {"c"_sd}}});
+    markFieldsAsScalar(*pipeline, {"a.0.b"sv}, {{"A", {"c"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
@@ -2349,7 +2351,7 @@ TEST_F(PipelineAnalyzerTest, ImplicitEdgeInferenceSelfEdgeSkipped) {
     ])";
 
     auto pipeline = makePipeline(query, {"base_other"});
-    markFieldsAsScalar(*pipeline, {"key"_sd, "cor.key.foo"_sd}, {{"base_other", {"key"_sd}}});
+    markFieldsAsScalar(*pipeline, {"key"sv, "cor.key.foo"sv}, {{"base_other", {"key"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
@@ -2380,7 +2382,7 @@ TEST_F(PipelineAnalyzerTest, LeadingMatchAfterLimitPushdownBailsOut) {
     ])";
 
     auto pipeline = makePipeline(query, {"B"});
-    markFieldsAsScalar(*pipeline, {"x"_sd}, {{"B", {"y"_sd}}});
+    markFieldsAsScalar(*pipeline, {"x"sv}, {{"B", {"y"sv}}});
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
 }

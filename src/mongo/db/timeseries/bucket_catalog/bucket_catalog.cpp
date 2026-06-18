@@ -52,6 +52,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::timeseries::bucket_catalog {
+using namespace std::literals::string_view_literals;
 namespace {
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationAfterStart);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
@@ -192,7 +193,7 @@ void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builde
 #ifndef MONGO_CONFIG_DEBUG_BUILD
     return;
 #else
-    BSONObjBuilder subBuilder(builder.subobjStart("memoryUsageDetails"_sd));
+    BSONObjBuilder subBuilder(builder.subobjStart("memoryUsageDetails"sv));
 
     subBuilder.appendNumber(
         "archivedBuckets",

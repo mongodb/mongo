@@ -29,7 +29,6 @@
 
 #include "mongo/db/stats/top.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string_util.h"
@@ -46,11 +45,14 @@
 #include <iterator>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo {
 namespace {
+
+using namespace std::literals::string_view_literals;
 
 const auto getTop = ServiceContext::declareDecoration<Top>();
 const auto getServiceLatencyTracker = Service::declareDecoration<ServiceLatencyTracker>();
@@ -62,8 +64,8 @@ const auto getServiceLatencyTracker = Service::declareDecoration<ServiceLatencyT
 // inclusive upper bounds (e.g. (-inf, 2]), while OperationLatencyHistogram uses exclusive
 // upper bounds (e.g. [0, 2)), so a value exactly equal to a boundary (e.g. 2 µs) lands in
 // different buckets in the two histograms. For monitoring purposes this is negligible.
-const otel::metrics::AttributeDefinition<StringData> kOpTypeAttrDef{
-    .name = "op_type", .values = {"read"_sd, "write"_sd, "command"_sd}};
+const otel::metrics::AttributeDefinition<std::string_view> kOpTypeAttrDef{
+    .name = "op_type", .values = {"read"sv, "write"sv, "command"sv}};
 
 // Build explicit OTel bucket boundaries from OperationLatencyHistogram's lower bounds.
 // We use lower bounds [1..N-1] as OTel upper bounds, giving the same bucket edges.
@@ -79,8 +81,8 @@ std::vector<double> makeOperationLatencyBucketBoundaries() {
     return boundaries;
 }
 
-otel::metrics::Histogram<int64_t, StringData>& operationLatencyHistogram =
-    otel::metrics::MetricsService::instance().createInt64Histogram<StringData>(
+otel::metrics::Histogram<int64_t, std::string_view>& operationLatencyHistogram =
+    otel::metrics::MetricsService::instance().createInt64Histogram<std::string_view>(
         otel::metrics::MetricNames::kOperationLatency,
         "Wall-clock time of completed user operations excluding storage-engine yield time, "
         "broken down by operation type (read/write/command).",
@@ -91,14 +93,14 @@ otel::metrics::Histogram<int64_t, StringData>& operationLatencyHistogram =
 // Returns the op_type attribute string for OTel recording, or nullopt for op types excluded from
 // this histogram. kTransaction is tracked separately via incrementForTransaction and is
 // intentionally excluded here; if it should appear in future, add it in incrementForTransaction.
-std::optional<StringData> opTypeString(Command::ReadWriteType rwType) {
+std::optional<std::string_view> opTypeString(Command::ReadWriteType rwType) {
     switch (rwType) {
         case Command::ReadWriteType::kRead:
-            return "read"_sd;
+            return "read"sv;
         case Command::ReadWriteType::kWrite:
-            return "write"_sd;
+            return "write"sv;
         case Command::ReadWriteType::kCommand:
-            return "command"_sd;
+            return "command"sv;
         case Command::ReadWriteType::kTransaction:
             return std::nullopt;
         default:
@@ -318,7 +320,7 @@ void Top::collectionDropped(const NamespaceString& nss) {
     _usage.erase(nssStr);
 }
 
-void Top::appendStatsEntry(BSONObjBuilder& b, StringData name, const UsageData& data) {
+void Top::appendStatsEntry(BSONObjBuilder& b, std::string_view name, const UsageData& data) {
     BSONObjBuilder bb(b.subobjStart(name));
     bb.appendNumber("time", data.time.loadRelaxed());
     bb.appendNumber("count", data.count.loadRelaxed());

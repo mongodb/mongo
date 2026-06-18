@@ -68,6 +68,7 @@
 #include <exception>
 #include <fstream>
 #include <queue>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -216,7 +217,7 @@ void ping(AsioWriter& client) {
  * The metricName should be the field name under metrics.network (e.g.,
  * "totalMessageSizeErrorPreAuth").
  */
-long long getNetworkMetric(StringData metricName) {
+long long getNetworkMetric(std::string_view metricName) {
     BSONObjBuilder bob;
     globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
     auto obj = bob.obj();

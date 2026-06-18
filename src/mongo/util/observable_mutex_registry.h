@@ -37,6 +37,8 @@
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -81,9 +83,9 @@ public:
      * the same tag; included in the "mutexes" list when `listAll` is enabled in `report`.
      */
     template <typename MutexType>
-    void add(StringData tag,
+    void add(std::string_view tag,
              const MutexType& mutex,
-             boost::optional<StringData> instanceLabel = boost::none) {
+             boost::optional<std::string_view> instanceLabel = boost::none) {
 // TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
 #if !__has_feature(thread_sanitizer)
         std::list<NewMutexEntry> newNode;

@@ -51,6 +51,8 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/transport_layer.h"
 
+#include <string_view>
+
 #include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -79,7 +81,7 @@ DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemo
                 "spec"_attr = redact(_spec.toBSON()));
 }
 
-StringData DocumentSourceInternalSearchMongotRemote::getSourceName() const {
+std::string_view DocumentSourceInternalSearchMongotRemote::getSourceName() const {
     return kStageName;
 }
 

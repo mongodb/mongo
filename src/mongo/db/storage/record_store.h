@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/record_id.h"
@@ -56,6 +55,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -381,7 +381,7 @@ public:
 
     virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
 
-    virtual StringData getIdent() const = 0;
+    virtual std::string_view getIdent() const = 0;
 
     virtual bool isColdCollection() const = 0;
 

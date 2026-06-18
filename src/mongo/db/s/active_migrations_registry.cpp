@@ -49,6 +49,7 @@
 #include "mongo/util/str.h"
 
 #include <mutex>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -105,7 +106,7 @@ void ActiveMigrationsRegistry::setRecoverable(Recoverable* recoverable) {
 }
 
 void ActiveMigrationsRegistry::lock(OperationContext* opCtx,
-                                    StringData reason,
+                                    std::string_view reason,
                                     boost::optional<BypassRecoveryWait> bypass) {
     // The method requires the requesting operation to be interruptible. Asserted before
     // waitForRecovery() so a misused non-interruptible opCtx fails fast instead of hanging on the
@@ -148,7 +149,7 @@ void ActiveMigrationsRegistry::lock(OperationContext* opCtx,
     unblockMigrationsOnError.dismiss();
 }
 
-void ActiveMigrationsRegistry::unlock(StringData reason) {
+void ActiveMigrationsRegistry::unlock(std::string_view reason) {
     std::lock_guard<std::mutex> lock(_mutex);
 
     LOGV2(467561, "Going to stop blocking migrations", "reason"_attr = reason);

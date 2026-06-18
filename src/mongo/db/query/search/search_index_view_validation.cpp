@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/search/search_index_view_validation.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_function.h"
@@ -37,12 +36,15 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace search_index_view_validation {
+using namespace std::literals::string_view_literals;
 
-static constexpr StringData errorPrefix =
-    "Cannot perform a search operation as the view definition is incompatible with Atlas Search: "_sd;
+static constexpr std::string_view errorPrefix =
+    "Cannot perform a search operation as the view definition is incompatible with Atlas Search: "sv;
 
 namespace {
 
@@ -74,20 +76,20 @@ void validateHelper(const BSONObj& obj, std::function<void(const BSONElement&)> 
     }
 }
 
-void validateOperators(StringData field) {
+void validateOperators(std::string_view field) {
     uassert(10623003,
             str::stream() << errorPrefix << field << " is not allowed",
             !bannedOperators.contains(field));
 }
 
-void validateVariables(StringData value) {
+void validateVariables(std::string_view value) {
     if (value.empty()) {
         return;
     }
 
     // Check for any of the banned variables in the value.
-    bool containsBannedVariable =
-        std::any_of(bannedVariables.begin(), bannedVariables.end(), [&value](StringData variable) {
+    bool containsBannedVariable = std::any_of(
+        bannedVariables.begin(), bannedVariables.end(), [&value](std::string_view variable) {
             return value.find("$$" + std::string{variable}) != std::string::npos;
         });
 
@@ -118,7 +120,7 @@ static const StringDataMap<std::function<void(const BSONObj&)>> stageValidators 
     {DocumentSourceMatch::kStageName, matchValidator}};
 
 // Returns the stage-specific validator.
-std::function<void(const BSONObj&)> getStageValidator(StringData stageName) {
+std::function<void(const BSONObj&)> getStageValidator(std::string_view stageName) {
     auto validator = stageValidators.find(stageName);
 
     uassert(10623000,

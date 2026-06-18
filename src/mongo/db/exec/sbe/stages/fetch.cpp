@@ -53,6 +53,7 @@ MONGO_FAIL_POINT_DEFINE(hangFetchGetNext);
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 FetchStage::FetchStage(std::unique_ptr<PlanStage> child,
                        UUID collectionUuid,
                        DatabaseName dbName,
@@ -60,7 +61,7 @@ FetchStage::FetchStage(std::unique_ptr<PlanStage> child,
                        PlanYieldPolicySBE* yieldPolicy,
                        PlanNodeId nodeId,
                        bool participateInTrialRunTracking)
-    : PlanStage("fetch"_sd,
+    : PlanStage("fetch"sv,
                 yieldPolicy,
                 nodeId,
                 participateInTrialRunTracking,

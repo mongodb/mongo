@@ -34,6 +34,7 @@
 #include "mongo/transport/grpc/util.h"
 
 #include <string>
+#include <string_view>
 
 #include <grpcpp/grpcpp.h>
 
@@ -44,8 +45,8 @@ public:
     explicit GRPCServerContext(::grpc::ServerContext* ctx)
         : _ctx{ctx}, _remote{util::parseGRPCFormattedURI(_ctx->peer())} {
         for (auto& kvp : _ctx->client_metadata()) {
-            _clientMetadata.insert({StringData{kvp.first.data(), kvp.first.length()},
-                                    StringData{kvp.second.data(), kvp.second.length()}});
+            _clientMetadata.insert({std::string_view{kvp.first.data(), kvp.first.length()},
+                                    std::string_view{kvp.second.data(), kvp.second.length()}});
         }
     }
 

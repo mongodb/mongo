@@ -36,21 +36,24 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 
-static constexpr StringData kCmdName = "mockCmd"_sd;
-static constexpr StringData kCmdValue = "abcdefgh"_sd;
-static constexpr StringData kSensitiveFieldName = "sensitive"_sd;
-static constexpr StringData kSensitiveValue = "12345678"_sd;
+static constexpr std::string_view kCmdName = "mockCmd"sv;
+static constexpr std::string_view kCmdValue = "abcdefgh"sv;
+static constexpr std::string_view kSensitiveFieldName = "sensitive"sv;
+static constexpr std::string_view kSensitiveValue = "12345678"sv;
 
 class MockCmd : public BasicCommand {
 public:
     MockCmd() : BasicCommand{kCmdName} {}
 
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {kSensitiveFieldName};
     }
 

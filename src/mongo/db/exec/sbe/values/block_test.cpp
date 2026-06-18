@@ -44,7 +44,10 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 using TypeTags = value::TypeTags;
 using Value = value::Value;
@@ -133,7 +136,7 @@ public:
         using mongo::BSONColumn;
         std::vector<BSONObj> objs;
 
-        std::vector<StringData> fieldNames;
+        std::vector<std::string_view> fieldNames;
         std::vector<BSONColumn> columns;
         for (BSONElement elem : bsonColumns) {
             fieldNames.push_back(elem.fieldNameStringData());
@@ -762,13 +765,13 @@ TEST_F(BsonBlockDecodingTest, PathBasedLegacyInterleaved) {
     // Legacy interleaved encoding is used, meaning we will get an error if we try to use path-based
     // decompression to decompress the scalar 10s. We can use path-based decompression for the 20s
     // though.
-    StringData b64Col = "8BsAAAAEYQAMAAAAEDAACgAAAAAQYgAUAAAAAIALAAAAAAAAAIALAAAAAAAAAAAA"_sd;
+    std::string_view b64Col = "8BsAAAAEYQAMAAAAEDAACgAAAAAQYgAUAAAAAIALAAAAAAAAAIALAAAAAAAAAAAA"sv;
 
     std::string compressedCol = base64::decode(b64Col);
     BSONBinData bd{
         compressedCol.data(), static_cast<int>(compressedCol.size()), BinDataType::Column};
     BSONObjBuilder builder;
-    builder.append("fld"_sd, bd);
+    builder.append("fld"sv, bd);
     BSONObj bucketData = builder.obj();
 
     std::vector<PathTestCase> tests{
@@ -1177,19 +1180,19 @@ TEST_F(ValueBlockTest, EmptyBlockMapTest) {
 TEST_F(ValueBlockTest, TestTokenize) {
     auto block = std::make_unique<TestBlock>();
 
-    auto [tag1, val1] = value::makeNewString("foofoofoo"_sd);
+    auto [tag1, val1] = value::makeNewString("foofoofoo"sv);
     block->push_back(tag1, val1);
-    auto [tag2, val2] = value::makeNewString("bar"_sd);  // StringSmall
+    auto [tag2, val2] = value::makeNewString("bar"sv);  // StringSmall
     block->push_back(tag2, val2);
-    auto [tag3, val3] = value::makeNewString("bazbazbaz"_sd);
+    auto [tag3, val3] = value::makeNewString("bazbazbaz"sv);
     block->push_back(tag3, val3);
-    auto [tag4, val4] = value::makeNewString("bar"_sd);  // StringSmall
+    auto [tag4, val4] = value::makeNewString("bar"sv);  // StringSmall
     block->push_back(tag4, val4);
-    auto [tag5, val5] = value::makeNewString("bar"_sd);  // StringSmall
+    auto [tag5, val5] = value::makeNewString("bar"sv);  // StringSmall
     block->push_back(tag5, val5);
     block->push_back(TypeTags::NumberInt32, value::bitcastFrom<int32_t>(999));
     block->push_back(TypeTags::Nothing, Value{0u});
-    auto [tag6, val6] = value::makeNewString("foofoofoo"_sd);
+    auto [tag6, val6] = value::makeNewString("foofoofoo"sv);
     block->push_back(tag6, val6);
     block->push_back(TypeTags::Nothing, Value{0u});
 
@@ -1207,7 +1210,7 @@ TEST_F(ValueBlockTest, TestTokenize) {
 // Test MonoBlock::tokenize().
 TEST_F(ValueBlockTest, MonoBlockTokenize) {
     {
-        auto [strTag, strVal] = value::makeNewString("not a small string"_sd);
+        auto [strTag, strVal] = value::makeNewString("not a small string"sv);
         auto block = std::make_unique<value::MonoBlock>(4, strTag, strVal);
 
         auto [outTokens, outIdxs] = block->tokenize();

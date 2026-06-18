@@ -36,6 +36,8 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 
 namespace mongo {
 namespace test {
@@ -107,11 +109,11 @@ boost::intrusive_ptr<DocumentSourceLookUp> makeLookUpFromBson(
 }
 
 boost::intrusive_ptr<DocumentSourceLookUp> makeLookUpFromJson(
-    StringData json, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::string_view json, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return makeLookUpFromBson(fromjson(json).firstElement(), expCtx);
 }
 
-BSONObj sequentialCacheStageObj(const StringData status, const long long maxSizeBytes) {
+BSONObj sequentialCacheStageObj(const std::string_view status, const long long maxSizeBytes) {
     return BSON("$sequentialCache" << BSON("maxSizeBytes" << maxSizeBytes << "status" << status));
 }
 

@@ -33,10 +33,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 class SessionCatalogMigration {
 public:
-    static constexpr StringData kSessionMigrateOplogTag = "$sessionMigrateInfo"_sd;
+    static constexpr std::string_view kSessionMigrateOplogTag = "$sessionMigrateInfo"_sd;
     static const BSONObj kSessionOplogTag;
 };
 }  // namespace mongo

@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -56,6 +55,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -132,10 +132,10 @@ public:
     //
     using DBClientBase::find;
 
-    bool connect(const char* hostName, StringData applicationName, std::string& errmsg);
+    bool connect(const char* hostName, std::string_view applicationName, std::string& errmsg);
 
     void connect(const HostAndPort& host,
-                 StringData applicationName,
+                 std::string_view applicationName,
                  const boost::optional<TransientSSLParams>& transientSSLParams) override {
         std::string errmsg;
         if (!connect(host.toString().c_str(), applicationName, errmsg)) {

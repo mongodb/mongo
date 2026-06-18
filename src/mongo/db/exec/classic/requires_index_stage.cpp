@@ -35,9 +35,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
-RequiresIndexStage::RequiresIndexStage(StringData stageType,
+RequiresIndexStage::RequiresIndexStage(std::string_view stageType,
                                        ExpressionContext* expCtx,
                                        CollectionAcquisition collection,
                                        const IndexCatalogEntry* indexEntry,

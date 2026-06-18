@@ -35,6 +35,7 @@
 #include "mongo/util/str.h"
 
 #include <ostream>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -52,7 +53,8 @@ boost::optional<StorageEngineLockFile>& StorageEngineLockFile::get(ServiceContex
     return getLockFile(service);
 }
 
-std::string StorageEngineLockFile::lockFilePath(StringData dbpath, StringData fileName) {
+std::string StorageEngineLockFile::lockFilePath(std::string_view dbpath,
+                                                std::string_view fileName) {
     return (boost::filesystem::path(std::string{dbpath}) / std::string{fileName}).string();
 }
 
@@ -72,7 +74,7 @@ std::string StorageEngineLockFile::_getNonExistentPathMessage() const {
                             "'storage.dbPath' option in the configuration file.";
 }
 
-void StorageEngineLockFile::create(ServiceContext* service, StringData dbpath) {
+void StorageEngineLockFile::create(ServiceContext* service, std::string_view dbpath) {
     auto& lockFile = StorageEngineLockFile::get(service);
     try {
         lockFile.emplace(dbpath);

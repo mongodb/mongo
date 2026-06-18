@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
@@ -38,6 +37,7 @@
 #include "mongo/util/str.h"
 
 #include <bitset>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -126,7 +126,7 @@ public:
      * and false otherwise. For example, the projection {a: 1} will preserve the element located at
      * 'a.b', and the projection {'a.b': 0} will not preserve the element located at 'a'.
      */
-    bool isFieldRetainedExactly(StringData path) const;
+    bool isFieldRetainedExactly(std::string_view path) const;
 
 
     /**

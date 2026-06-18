@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -35,10 +34,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 namespace mongo {
 
-Status CollectionValidateOptionsServerParameter::setFromString(StringData value,
+Status CollectionValidateOptionsServerParameter::setFromString(std::string_view value,
                                                                const boost::optional<TenantId>&) {
     _data = CollectionValidateOptions::parse(fromjson(value),
                                              IDLParserContext("collection validate options"));
@@ -54,7 +55,7 @@ Status CollectionValidateOptionsServerParameter::set(const BSONElement& newValue
 
 void CollectionValidateOptionsServerParameter::append(OperationContext*,
                                                       BSONObjBuilder* bob,
-                                                      StringData name,
+                                                      std::string_view name,
                                                       const boost::optional<TenantId>&) {
     auto subBob = BSONObjBuilder(bob->subobjStart(name));
     _data.serialize(&subBob);

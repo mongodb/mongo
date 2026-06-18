@@ -78,6 +78,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 const BSONObj kEmptyPBRT;
@@ -374,7 +375,7 @@ namespace {
 void hangBeforeShouldWaitForInsertsIfFailpointEnabled(PlanExecutorImpl* exec) {
     if (MONGO_unlikely(
             planExecutorHangBeforeShouldWaitForInserts.shouldFail([exec](const BSONObj& data) {
-                auto fpNss = NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
+                auto fpNss = NamespaceStringUtil::parseFailPointData(data, "namespace"sv);
                 return fpNss.isEmpty() || fpNss == exec->nss();
             }))) {
         LOGV2(20946,
@@ -394,7 +395,7 @@ void PlanExecutorImpl::logWriteConflictAndBackoff(size_t numAttempts) {
         planExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
     }
     mongo::logWriteConflictAndBackoff(
-        numAttempts, "plan execution", ""_sd, NamespaceStringOrUUID(_nss));
+        numAttempts, "plan execution", ""sv, NamespaceStringOrUUID(_nss));
 }
 
 /**

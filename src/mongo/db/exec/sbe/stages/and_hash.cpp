@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/and_hash.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -38,10 +37,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 AndHashStage::AndHashStage(std::unique_ptr<PlanStage> outer,
                            std::unique_ptr<PlanStage> inner,
                            value::SlotVector outerCond,
@@ -52,7 +54,7 @@ AndHashStage::AndHashStage(std::unique_ptr<PlanStage> outer,
                            PlanYieldPolicySBE* yieldPolicy,
                            PlanNodeId planNodeId,
                            bool participateInTrialRunTracking)
-    : PlanStage("and_hash"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
+    : PlanStage("and_hash"sv, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _outerCond(std::move(outerCond)),
       _outerProjects(std::move(outerProjects)),
       _innerCond(std::move(innerCond)),

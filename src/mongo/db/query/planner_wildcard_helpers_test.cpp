@@ -28,13 +28,13 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
+
 #include <set>
 
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
 
 // IWYU pragma: no_include "boost/intrusive/detail/algorithm.hpp"
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,11 +48,14 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 
 namespace mongo::wildcard_planning {
+using namespace std::literals::string_view_literals;
 
 TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithProjection) {
-    WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1), BSON("a" << 1), {FieldRef{"a"_sd}}};
+    WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1), BSON("a" << 1), {FieldRef{"a"sv}}};
 
     std::set<std::string> fields{"a", "b"};
     std::vector<IndexEntry> expandedIndexes{};
@@ -65,7 +68,7 @@ TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithProjection) {
 }
 
 TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithoutProjection) {
-    WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1), BSONObj{}, {FieldRef{"a"_sd}}};
+    WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1), BSONObj{}, {FieldRef{"a"sv}}};
 
     std::set<std::string> fields{"a", "b"};
     std::vector<IndexEntry> expandedIndexes{};
@@ -90,7 +93,7 @@ TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithoutProjection) {
 
 TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithProjection) {
     WildcardIndexEntryMock wildcardIndex{
-        BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1), BSON("a" << 1), {FieldRef{"a"_sd}}};
+        BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1), BSON("a" << 1), {FieldRef{"a"sv}}};
 
     std::set<std::string> fields{"a.c", "b"};
     std::vector<IndexEntry> expandedIndexes{};
@@ -109,7 +112,7 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithoutProjection)
     WildcardIndexEntryMock wildcardIndex{
         BSON("e.f" << 1 << "b.d" << 1 << "prefix.$**" << 1 << "m.n" << 1),
         BSONObj{},
-        {FieldRef{"prefix.a"_sd}}};
+        {FieldRef{"prefix.a"sv}}};
 
     std::set<std::string> fields{"prefix.a", "prefix.b"};
     std::vector<IndexEntry> expandedIndexes{};
@@ -139,7 +142,7 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithoutProjection)
 
 TEST(PlannerWildcardHelpersTest, FinalizeBasicPatternInCompoundWildcardIndexScanConfiguration) {
     WildcardIndexEntryMock wildcardIndex{
-        BSON("a" << 1 << "$**" << 1 << "c" << 1), BSON("b" << 1), {FieldRef{"b"_sd}}};
+        BSON("a" << 1 << "$**" << 1 << "c" << 1), BSON("b" << 1), {FieldRef{"b"sv}}};
     std::vector<IndexEntry> expandedIndexes{};
     std::set<std::string> fields{"b"};
     expandWildcardIndexEntry(*wildcardIndex.indexEntry, fields, &expandedIndexes);
@@ -215,7 +218,7 @@ TEST(PlannerWildcardHelpersTest, GetCorrectWildcardElement) {
 TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_NumericComponents) {
     WildcardIndexEntryMock wildcardIndex{BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1),
                                          BSON("a.0" << 1 << "b" << 1),
-                                         {FieldRef{"a"_sd}}};
+                                         {FieldRef{"a"sv}}};
 
     std::set<std::string> fields{"a.0.b", "b"};
     std::vector<IndexEntry> expandedIndexes{};

@@ -41,6 +41,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -73,7 +74,7 @@ public:
         return _memoryTracker;
     }
 
-    static constexpr StringData kStageType = "OR"_sd;
+    static constexpr std::string_view kStageType = "OR"_sd;
 
 private:
     // Not owned by us.

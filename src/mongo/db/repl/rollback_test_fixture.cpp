@@ -64,6 +64,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -169,7 +170,7 @@ Status RollbackTest::ReplicationCoordinatorRollbackMock::setFollowerModeRollback
 std::pair<BSONObj, RecordId> RollbackTest::makeCRUDOp(OpTypeEnum opType,
                                                       Timestamp ts,
                                                       UUID uuid,
-                                                      StringData nss,
+                                                      std::string_view nss,
                                                       BSONObj o,
                                                       boost::optional<BSONObj> o2,
                                                       int recordId) {
@@ -217,7 +218,7 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(Timestamp ts,
 }
 
 std::pair<BSONObj, RecordId> RollbackTest::makeCommandOpForApplyOps(boost::optional<UUID> uuid,
-                                                                    StringData nss,
+                                                                    std::string_view nss,
                                                                     BSONObj cmdObj,
                                                                     int recordId,
                                                                     boost::optional<BSONObj> o2) {

@@ -58,6 +58,7 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
 #include <type_traits>
 
 #include <boost/move/utility_core.hpp>
@@ -588,11 +589,11 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PersistedCachedDataIsDroppedWhenCorrupted) {
     //  Required fields for documents in config.cache.collections
-    std::vector<StringData> requiredFieldNames = {ShardCollectionType::kEpochFieldName,
-                                                  ShardCollectionType::kTimestampFieldName,
-                                                  ShardCollectionType::kUuidFieldName,
-                                                  ShardCollectionType::kKeyPatternFieldName,
-                                                  ShardCollectionType::kUniqueFieldName};
+    std::vector<std::string_view> requiredFieldNames = {ShardCollectionType::kEpochFieldName,
+                                                        ShardCollectionType::kTimestampFieldName,
+                                                        ShardCollectionType::kUuidFieldName,
+                                                        ShardCollectionType::kKeyPatternFieldName,
+                                                        ShardCollectionType::kUniqueFieldName};
 
     const auto collAndChunks = setUpChunkLoaderWithFiveChunks();
     _shardLoader->waitForCollectionFlush(operationContext(), kNss);

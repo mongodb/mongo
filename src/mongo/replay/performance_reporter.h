@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <fstream>
+#include <string_view>
 
 namespace mongo {
 
@@ -60,7 +61,7 @@ struct PerformanceRecording {
 class PerformanceReporter {
 public:
     using ExecutionCallback = mongo::unique_function<BSONObj(const ReplayCommand&)>;
-    explicit PerformanceReporter(StringData uri,
+    explicit PerformanceReporter(std::string_view uri,
                                  const std::string& perfFileName = "",
                                  size_t diskThreshold = DUMP_TO_DISK_THRESHOLD);
     ~PerformanceReporter();
@@ -75,14 +76,14 @@ private:
     // open is called inside the PerformanceReporter ctor. PerformanceReporter abides to RAII
     // pattern. The file is created before any other bg thread can touch it. Thus no locking is
     // needed.
-    void open(StringData uri, const std::string& filename);
+    void open(std::string_view uri, const std::string& filename);
     // close is designed to be called inside PerformanceReporter dtor (RAII pattern). Which implies
     // that all the bg threads will be joined before closing the file, and all the working threads
     // will have written all the data. For this reason no locking mechanism is needed.
     void close();
     void write(const std::vector<PerformancePacket>&);
     void writePacket(const PerformancePacket&);
-    void writeURI(StringData);
+    void writeURI(std::string_view);
     bool isPerfRecordingEnabled() const;
     static PerformancePacket readPacket(std::ifstream& inFile);
     static std::string readURI(std::ifstream& inFile);

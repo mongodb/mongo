@@ -42,6 +42,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -70,13 +72,15 @@ auto addContextToAssertionException(F&& function, Args... errorContext) {
  * Converts 'value' to TimeUnit for an expression named 'expressionName'. It assumes that the
  * parameter is named "unit". Throws an AssertionException if 'value' contains an invalid value.
  */
-TimeUnit parseTimeUnit(const Value& value, StringData expressionName);
+TimeUnit parseTimeUnit(const Value& value, std::string_view expressionName);
 
 /**
  * Converts 'value' to DayOfWeek for an expression named 'expressionName' with parameter named as
  * 'parameterName'. Throws an AssertionException if 'value' contains an invalid value.
  */
-DayOfWeek parseDayOfWeek(const Value& value, StringData expressionName, StringData parameterName);
+DayOfWeek parseDayOfWeek(const Value& value,
+                         std::string_view expressionName,
+                         std::string_view parameterName);
 
 /**
  * Evaluates the expression in 'timeZone', and loads the corresponding TimeZone object from the

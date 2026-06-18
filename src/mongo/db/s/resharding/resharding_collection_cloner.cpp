@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -89,6 +88,7 @@
 #include <cinttypes>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -105,6 +105,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingCollectionClonerShouldFailWithStaleConfig);
 MONGO_FAIL_POINT_DEFINE(reshardingCollectionClonerPauseBeforeWriteNaturalOrder);
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString& nss) {
@@ -190,7 +191,7 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
 
     sharding::router::CollectionRouter router(opCtx, _sourceNss);
     auto dispatchResults = router.routeWithRoutingContext(
-        "resharding collection cloner fetching with natural order (query stage)"_sd,
+        "resharding collection cloner fetching with natural order (query stage)"sv,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             AsyncRequestsSender::ShardHostMap designatedHostsMap;
             stdx::unordered_map<ShardId, BSONObj> resumeTokenMap;

@@ -39,11 +39,12 @@
 
 #include <limits>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
 NearStage::NearStage(ExpressionContext* expCtx,
-                     StringData typeName,
+                     std::string_view typeName,
                      StageType type,
                      WorkingSet* workingSet,
                      CollectionAcquisition collection,

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameter.h"
@@ -38,6 +37,7 @@
 #include <concepts>
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -51,6 +51,8 @@ struct DeleteQueryKnobOverride {
 
 // Enum-typed knobs are stored as int.
 using QueryKnobValue = std::variant<DeleteQueryKnobOverride, int, long long, double, bool>;
+
+using ReadGlobalFn = QueryKnobValue (*)(std::string_view);
 
 template <typename S>
 concept AtomicLoadable = requires(const S& s) {
@@ -84,7 +86,7 @@ struct ConverterTraits<T> {
     static QueryKnobValue fromBSON(const BSONElement& elem) {
         return static_cast<int>(idl::deserialize<T>(elem.str()));
     }
-    static void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) {
+    static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, idl::serialize(static_cast<T>(std::get<int>(val))));
     }
 };
@@ -94,7 +96,7 @@ struct ConverterTraits<int> {
     static QueryKnobValue fromBSON(const BSONElement& elem) {
         return elem.Int();
     }
-    static void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) {
+    static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, std::get<int>(val));
     }
 };
@@ -104,7 +106,7 @@ struct ConverterTraits<long long> {
     static QueryKnobValue fromBSON(const BSONElement& elem) {
         return elem.Long();
     }
-    static void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) {
+    static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, std::get<long long>(val));
     }
 };
@@ -116,7 +118,7 @@ struct ConverterTraits<double> {
         uassert(ErrorCodes::BadValue, "query knob double value must not be NaN", !std::isnan(val));
         return val;
     }
-    static void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) {
+    static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, std::get<double>(val));
     }
 };
@@ -126,7 +128,7 @@ struct ConverterTraits<bool> {
     static QueryKnobValue fromBSON(const BSONElement& elem) {
         return elem.Bool();
     }
-    static void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) {
+    static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.appendBool(field, std::get<bool>(val));
     }
 };

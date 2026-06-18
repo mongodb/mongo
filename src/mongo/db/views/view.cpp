@@ -29,19 +29,19 @@
 
 #include "mongo/db/views/view.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
 
 ViewDefinition::ViewDefinition(const DatabaseName& dbName,
-                               StringData viewName,
-                               StringData viewOnName,
+                               std::string_view viewName,
+                               std::string_view viewOnName,
                                const BSONObj& pipeline,
                                std::unique_ptr<CollatorInterface> collator)
     : _viewNss(NamespaceStringUtil::deserialize(dbName, viewName)),

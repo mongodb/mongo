@@ -30,11 +30,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -53,7 +53,7 @@ public:
      * Returns true if the profile filter depends on the given top-level field name and false
      * otherwise.
      */
-    virtual bool dependsOn(StringData topLevelField) const = 0;
+    virtual bool dependsOn(std::string_view topLevelField) const = 0;
 };
 
 }  // namespace mongo

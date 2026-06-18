@@ -33,6 +33,8 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -53,7 +55,7 @@ ShardVersion ShardVersion::parse(const BSONElement& element) {
     return sv;
 }
 
-void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
+void ShardVersion::serialize(std::string_view field, BSONObjBuilder* builder) const {
     builder->append(field, toBSON());
 }
 

@@ -31,17 +31,19 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
+
 namespace mongo {
 
-constexpr StringData ExplainOptions::kVerbosityName;
+constexpr std::string_view ExplainOptions::kVerbosityName;
 
-StringData ExplainOptions::verbosityString(ExplainOptions::Verbosity verbosity) {
+std::string_view ExplainOptions::verbosityString(ExplainOptions::Verbosity verbosity) {
     return idl::serialize(verbosity);
 }
 
 BSONObj ExplainOptions::toBSON(ExplainOptions::Verbosity verbosity) {
     BSONObjBuilder explainOptionsBuilder;
-    explainOptionsBuilder.append(kVerbosityName, StringData(verbosityString(verbosity)));
+    explainOptionsBuilder.append(kVerbosityName, std::string_view(verbosityString(verbosity)));
     return explainOptionsBuilder.obj();
 }
 

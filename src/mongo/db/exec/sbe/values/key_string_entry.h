@@ -34,6 +34,7 @@
 #include "mongo/util/modules.h"
 
 #include <span>
+#include <string_view>
 
 namespace mongo::sbe::value {
 class KeyStringEntry {

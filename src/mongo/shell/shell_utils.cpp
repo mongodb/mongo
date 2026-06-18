@@ -40,6 +40,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -236,6 +237,7 @@ bool isOpSymbol(char c) {
 }  // namespace
 
 namespace shell_utils {
+using namespace std::literals::string_view_literals;
 
 
 bool isBalanced(const std::string& code) {
@@ -302,7 +304,7 @@ bool isBalanced(const std::string& code) {
             danglingOp = false;
             break;
         }
-        if ("~!%^&*-+=|:,<>/?."_sd.find(code[i]) != std::string::npos)
+        if ("~!%^&*-+=|:,<>/?."sv.find(code[i]) != std::string::npos)
             danglingOp = true;
         else if (!ctype::isSpace(code[i]))
             danglingOp = false;
@@ -427,14 +429,14 @@ BSONObj computeSHA256Block(const BSONObj& a, void* data) {
         case BSONType::binData: {
             int len;
             const char* ptr = ele.binData(len);
-            SHA256Block::computeHash({ConstDataRange(ptr, len)}).appendAsBinData(bob, ""_sd);
+            SHA256Block::computeHash({ConstDataRange(ptr, len)}).appendAsBinData(bob, ""sv);
 
             break;
         }
         case BSONType::string: {
             auto str = ele.valueStringData();
             SHA256Block::computeHash({ConstDataRange(str.data(), str.size())})
-                .appendAsBinData(bob, ""_sd);
+                .appendAsBinData(bob, ""sv);
             break;
         }
         default:
@@ -459,8 +461,8 @@ BSONObj computeSHA256Hmac(const BSONObj& a, void* data) {
     }
 
     auto cmdObj = a.firstElement().Obj();
-    static constexpr StringData kComputeSha256HmacKeyField = "key";
-    static constexpr StringData kComputeSha256HmacPayloadField = "payload";
+    static constexpr std::string_view kComputeSha256HmacKeyField = "key";
+    static constexpr std::string_view kComputeSha256HmacPayloadField = "payload";
 
     uassert(
         ErrorCodes::BadValue,
@@ -546,8 +548,8 @@ BSONObj _createTenantToken(const BSONObj& args, void* data) {
     const auto obj = args.firstElement().Obj();
     uassert(8154401,
             "_createTenantToken requires field `tenant` of type ObjectId",
-            obj.hasField("tenant"_sd) && obj["tenant"_sd].type() == BSONType::oid);
-    const auto tenant = TenantId::parseFromBSON(obj["tenant"_sd]);
+            obj.hasField("tenant"sv) && obj["tenant"sv].type() == BSONType::oid);
+    const auto tenant = TenantId::parseFromBSON(obj["tenant"sv]);
     const auto expectPrefix = obj["expectPrefix"].booleanSafe();
     const auto token = auth::ValidatedTenancyScopeFactory::create(
         tenant,
@@ -832,7 +834,7 @@ namespace {
 // Intel's implementation supports magic strings for
 // Infinity and NaN, but not for maximum and minimum size.
 // Intel's match is case insensitive, so ours should be too.
-const std::array<std::pair<StringData, Decimal128>, 6> magicMatches{{
+const std::array<std::pair<std::string_view, Decimal128>, 6> magicMatches{{
     {"max", Decimal128::kLargestPositive},
     {"min", Decimal128::kSmallestPositive},
     {"+max", Decimal128::kLargestPositive},
@@ -1399,7 +1401,7 @@ bool Prompter::confirm() {
 
 ConnectionRegistry::ConnectionRegistry() = default;
 
-void ConnectionRegistry::registerConnection(DBClientBase& client, StringData uri) {
+void ConnectionRegistry::registerConnection(DBClientBase& client, std::string_view uri) {
     BSONObj info;
     BSONObj command;
     // If apiStrict is set override it, whatsmyuri is not in the Stable API.
@@ -1478,7 +1480,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
 
 ConnectionRegistry connectionRegistry;
 
-void onConnect(DBClientBase& c, StringData uri) {
+void onConnect(DBClientBase& c, std::string_view uri) {
     if (shellGlobalParams.nokillop.load()) {
         return;
     }

@@ -34,6 +34,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
@@ -141,7 +143,9 @@ std::unique_ptr<IntegerKeyedContainer::Cursor> WiredTigerIntegerKeyedContainer::
     return std::make_unique<Cursor>(ru, tableId(), uri());
 }
 
-WiredTigerIntegerKeyedContainer::Cursor::Cursor(RecoveryUnit& ru, uint64_t tableId, StringData uri)
+WiredTigerIntegerKeyedContainer::Cursor::Cursor(RecoveryUnit& ru,
+                                                uint64_t tableId,
+                                                std::string_view uri)
     : _cursor(getWiredTigerCursorParams(WiredTigerRecoveryUnit::get(ru), tableId),
               uri,
               *WiredTigerRecoveryUnit::get(ru).getSession()) {}
@@ -234,7 +238,9 @@ std::unique_ptr<StringKeyedContainer::Cursor> WiredTigerStringKeyedContainer::ge
     return std::make_unique<Cursor>(ru, tableId(), uri());
 }
 
-WiredTigerStringKeyedContainer::Cursor::Cursor(RecoveryUnit& ru, uint64_t tableId, StringData uri)
+WiredTigerStringKeyedContainer::Cursor::Cursor(RecoveryUnit& ru,
+                                               uint64_t tableId,
+                                               std::string_view uri)
     : _cursor(getWiredTigerCursorParams(WiredTigerRecoveryUnit::get(ru), tableId),
               uri,
               *WiredTigerRecoveryUnit::get(ru).getSession()) {}

@@ -60,6 +60,7 @@
 #include "mongo/util/scopeguard.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -139,7 +140,7 @@ struct TimeseriesModifyParams {
  */
 class TimeseriesModifyStage : public RequiresWritableCollectionStage {
 public:
-    static constexpr StringData kStageType = "TS_MODIFY"_sd;
+    static constexpr std::string_view kStageType = "TS_MODIFY"_sd;
 
     TimeseriesModifyStage(ExpressionContext* expCtx,
                           TimeseriesModifyParams&& params,

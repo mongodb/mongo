@@ -52,6 +52,7 @@
 #include <memory>
 #include <ostream>
 #include <set>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -108,7 +109,7 @@ bool DBClientReplicaSet::_authPooledSecondaryConn = true;
 
 DBClientReplicaSet::DBClientReplicaSet(const string& name,
                                        const vector<HostAndPort>& servers,
-                                       StringData applicationName,
+                                       std::string_view applicationName,
                                        double so_timeout,
                                        MongoURI uri,
                                        const ClientAPIVersionParameters* apiParameters)
@@ -209,7 +210,7 @@ bool DBClientReplicaSet::isStillConnected() {
 
 namespace {
 
-bool _isSecondaryCommand(StringData commandName, const BSONObj& commandArgs) {
+bool _isSecondaryCommand(std::string_view commandName, const BSONObj& commandArgs) {
     if (_secOkCmdList.count(std::string{commandName})) {
         return true;
     }
@@ -241,7 +242,7 @@ bool _isSecondaryQuery(const NamespaceString& ns,
     // This is a command with secondary-possible read pref
     // Only certain commands are supported for secondary operation.
 
-    StringData commandName = filter.firstElementFieldName();
+    std::string_view commandName = filter.firstElementFieldName();
     return _isSecondaryCommand(commandName, filter);
 }
 

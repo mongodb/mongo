@@ -41,6 +41,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -118,13 +119,13 @@ private:
 class DocumentSourceVectorSearch : public DocumentSource {
 public:
     const BSONObj kSortSpec = BSON("$vectorSearchScore" << -1);
-    static constexpr StringData kStageName = "$vectorSearch"_sd;
-    static constexpr StringData kLimitFieldName = "limit"_sd;
-    static constexpr StringData kFilterFieldName = "filter"_sd;
-    static constexpr StringData kIndexFieldName = "index"_sd;
-    static constexpr StringData kNumCandidatesFieldName = "numCandidates"_sd;
-    static constexpr StringData kViewFieldName = "view"_sd;
-    static constexpr StringData kReturnStoredSourceFieldName = "returnStoredSource"_sd;
+    static constexpr std::string_view kStageName = "$vectorSearch"_sd;
+    static constexpr std::string_view kLimitFieldName = "limit"_sd;
+    static constexpr std::string_view kFilterFieldName = "filter"_sd;
+    static constexpr std::string_view kIndexFieldName = "index"_sd;
+    static constexpr std::string_view kNumCandidatesFieldName = "numCandidates"_sd;
+    static constexpr std::string_view kViewFieldName = "view"_sd;
+    static constexpr std::string_view kReturnStoredSourceFieldName = "returnStoredSource"_sd;
 
     DocumentSourceVectorSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -135,7 +136,7 @@ public:
 
     std::list<boost::intrusive_ptr<DocumentSource>> desugar();
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     }
 

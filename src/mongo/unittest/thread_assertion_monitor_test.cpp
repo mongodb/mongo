@@ -30,7 +30,6 @@
 
 #include "mongo/unittest/thread_assertion_monitor.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/framework.h"
 

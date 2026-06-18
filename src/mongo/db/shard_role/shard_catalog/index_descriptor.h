@@ -47,6 +47,7 @@
 #include <cstdint>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/intrusive_ptr.hpp>
@@ -81,35 +82,35 @@ public:
         kIdentical    // Indicates that all applicable index options match.
     };
 
-    static constexpr StringData k2dIndexBitsFieldName = "bits"_sd;
-    static constexpr StringData k2dIndexMinFieldName = "min"_sd;
-    static constexpr StringData k2dIndexMaxFieldName = "max"_sd;
-    static constexpr StringData k2dsphereCoarsestIndexedLevel = "coarsestIndexedLevel"_sd;
-    static constexpr StringData k2dsphereFinestIndexedLevel = "finestIndexedLevel"_sd;
-    static constexpr StringData k2dsphereVersionFieldName = "2dsphereIndexVersion"_sd;
-    static constexpr StringData kBackgroundFieldName = "background"_sd;
-    static constexpr StringData kBucketSizeFieldName = "bucketSize"_sd;
-    static constexpr StringData kCollationFieldName = "collation"_sd;
-    static constexpr StringData kDefaultLanguageFieldName = "default_language"_sd;
-    static constexpr StringData kDropDuplicatesFieldName = "dropDups"_sd;
-    static constexpr StringData kExpireAfterSecondsFieldName = "expireAfterSeconds"_sd;
-    static constexpr StringData kHiddenFieldName = "hidden"_sd;
-    static constexpr StringData kIndexNameFieldName = "name"_sd;
-    static constexpr StringData kIndexVersionFieldName = "v"_sd;
-    static constexpr StringData kKeyPatternFieldName = "key"_sd;
-    static constexpr StringData kLanguageOverrideFieldName = "language_override"_sd;
+    static constexpr std::string_view k2dIndexBitsFieldName = "bits"_sd;
+    static constexpr std::string_view k2dIndexMinFieldName = "min"_sd;
+    static constexpr std::string_view k2dIndexMaxFieldName = "max"_sd;
+    static constexpr std::string_view k2dsphereCoarsestIndexedLevel = "coarsestIndexedLevel"_sd;
+    static constexpr std::string_view k2dsphereFinestIndexedLevel = "finestIndexedLevel"_sd;
+    static constexpr std::string_view k2dsphereVersionFieldName = "2dsphereIndexVersion"_sd;
+    static constexpr std::string_view kBackgroundFieldName = "background"_sd;
+    static constexpr std::string_view kBucketSizeFieldName = "bucketSize"_sd;
+    static constexpr std::string_view kCollationFieldName = "collation"_sd;
+    static constexpr std::string_view kDefaultLanguageFieldName = "default_language"_sd;
+    static constexpr std::string_view kDropDuplicatesFieldName = "dropDups"_sd;
+    static constexpr std::string_view kExpireAfterSecondsFieldName = "expireAfterSeconds"_sd;
+    static constexpr std::string_view kHiddenFieldName = "hidden"_sd;
+    static constexpr std::string_view kIndexNameFieldName = "name"_sd;
+    static constexpr std::string_view kIndexVersionFieldName = "v"_sd;
+    static constexpr std::string_view kKeyPatternFieldName = "key"_sd;
+    static constexpr std::string_view kLanguageOverrideFieldName = "language_override"_sd;
     // TODO(SERVER-100328): remove after 9.0 is branched.
-    static constexpr StringData kNamespaceFieldName = "ns"_sd;  // Removed in 4.4
-    static constexpr StringData kPartialFilterExprFieldName = "partialFilterExpression"_sd;
-    static constexpr StringData kWildcardProjectionFieldName = "wildcardProjection"_sd;
-    static constexpr StringData kSparseFieldName = "sparse"_sd;
-    static constexpr StringData kStorageEngineFieldName = "storageEngine"_sd;
-    static constexpr StringData kTextVersionFieldName = "textIndexVersion"_sd;
-    static constexpr StringData kUniqueFieldName = "unique"_sd;
-    static constexpr StringData kWeightsFieldName = "weights"_sd;
-    static constexpr StringData kOriginalSpecFieldName = "originalSpec"_sd;
-    static constexpr StringData kPrepareUniqueFieldName = "prepareUnique"_sd;
-    static constexpr StringData kClusteredFieldName = "clustered"_sd;
+    static constexpr std::string_view kNamespaceFieldName = "ns"_sd;  // Removed in 4.4
+    static constexpr std::string_view kPartialFilterExprFieldName = "partialFilterExpression"_sd;
+    static constexpr std::string_view kWildcardProjectionFieldName = "wildcardProjection"_sd;
+    static constexpr std::string_view kSparseFieldName = "sparse"_sd;
+    static constexpr std::string_view kStorageEngineFieldName = "storageEngine"_sd;
+    static constexpr std::string_view kTextVersionFieldName = "textIndexVersion"_sd;
+    static constexpr std::string_view kUniqueFieldName = "unique"_sd;
+    static constexpr std::string_view kWeightsFieldName = "weights"_sd;
+    static constexpr std::string_view kOriginalSpecFieldName = "originalSpec"_sd;
+    static constexpr std::string_view kPrepareUniqueFieldName = "prepareUnique"_sd;
+    static constexpr std::string_view kClusteredFieldName = "clustered"_sd;
 
     /**
      * infoObj is a copy of the index-describing BSONObj contained in the catalog.
@@ -289,8 +290,8 @@ public:
         return _shared->_prepareUnique;
     }
 
-    boost::optional<StringData> compressor() const {
-        return _shared->_compressor ? boost::make_optional<StringData>(*_shared->_compressor)
+    boost::optional<std::string_view> compressor() const {
+        return _shared->_compressor ? boost::make_optional<std::string_view>(*_shared->_compressor)
                                     : boost::none;
     }
 

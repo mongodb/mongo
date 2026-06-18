@@ -29,7 +29,6 @@
 
 #include "mongo/db/stats/api_version_metrics.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/validate_api_parameters.h"
@@ -40,6 +39,7 @@
 #include <algorithm>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -67,7 +67,7 @@ void APIVersionMetrics::set(ServiceContext* service,
     handle(service) = std::move(apiVersionMetrics);
 }
 
-void APIVersionMetrics::update(StringData appName, const APIParameters& apiParams) {
+void APIVersionMetrics::update(std::string_view appName, const APIParameters& apiParams) {
     Date_t now = getGlobalServiceContext()->getFastClockSource()->now();
     boost::optional<int> parsedVersion;
 
@@ -190,7 +190,7 @@ void APIVersionMetrics::cloneAPIVersionMetrics_forTest(
 
 namespace {
 struct ApiVersionsMetricPolicy {
-    void appendTo(BSONObjBuilder& b, StringData leafName) const {
+    void appendTo(BSONObjBuilder& b, std::string_view leafName) const {
         BSONObjBuilder bob{b.subobjStart(leafName)};
         auto&& instance = APIVersionMetrics::get(getGlobalServiceContext());
         instance.appendAPIVersionMetricsInfo(&bob);

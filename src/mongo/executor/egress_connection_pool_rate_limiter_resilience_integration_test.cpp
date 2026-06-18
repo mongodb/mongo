@@ -60,6 +60,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <fmt/format.h>
@@ -131,7 +132,8 @@ public:
         return BSONObj();
     }
 
-    void waitForRateLimiterStat(std::function<bool(const BSONObj&)> pred, StringData description) {
+    void waitForRateLimiterStat(std::function<bool(const BSONObj&)> pred,
+                                std::string_view description) {
         const auto deadline = Date_t::now() + Seconds{30};
         int pollIterations = 0;
         BSONObj lastServerStatus;
@@ -219,7 +221,7 @@ public:
         assertCommandOK(DatabaseName::kAdmin, BSON("ping" << 1));
     }
 
-    void assertPoolHasEstablishedConnection(StringData context) {
+    void assertPoolHasEstablishedConnection(std::string_view context) {
         assertConnectionStats(
             getFactory(),
             getServer(),
@@ -228,7 +230,7 @@ public:
             context);
     }
 
-    void assertPoolHasNoEstablishedConnection(StringData context) {
+    void assertPoolHasNoEstablishedConnection(std::string_view context) {
         assertConnectionStats(
             getFactory(),
             getServer(),

@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -62,6 +61,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -73,10 +73,11 @@
 namespace mongo {
 namespace executor {
 namespace {
-constexpr auto kNetworkInterfaceInstanceName = "TaskExecutorCursorTest"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kNetworkInterfaceInstanceName = "TaskExecutorCursorTest"sv;
 
 std::pair<int, int> getCreatedAndOpenConnectionStats(std::shared_ptr<TaskExecutor> executor,
-                                                     StringData subObjName,
+                                                     std::string_view subObjName,
                                                      const HostAndPort& remote,
                                                      bool collectGRPCStats) {
     int created = 0;

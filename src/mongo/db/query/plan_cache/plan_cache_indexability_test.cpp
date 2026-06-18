@@ -48,6 +48,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -111,7 +112,7 @@ auto makeWildcardEntry(BSONObj keyPattern, const MatchExpression* filterExpr = n
 }
 
 IndexEntry makeIndexEntry(BSONObj keyPattern,
-                          StringData indexName,
+                          std::string_view indexName,
                           bool multikey = false,
                           bool sparse = false,
                           bool unique = false,

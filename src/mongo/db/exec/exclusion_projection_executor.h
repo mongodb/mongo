@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,6 +55,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -95,7 +95,8 @@ public:
      * 'oldName'. Also returns a bool indicating whether this entire project is extracted. In the
      * extracted $project, 'oldName' is renamed to 'newName'. 'oldName' should not be dotted.
      */
-    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName, StringData newName);
+    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(std::string_view oldName,
+                                                            std::string_view newName);
 
 protected:
     Type getType() const override {
@@ -199,7 +200,7 @@ public:
         // ambiguity in the expected behavior of the serialized projection.
         _root->serialize(&output, options);
         auto idFieldName = options.serializeFieldPath("_id");
-        if (output.peek()[StringData{idFieldName}].missing()) {
+        if (output.peek()[std::string_view{idFieldName}].missing()) {
             output.addField(idFieldName, Value{true});
         }
         return output.freeze();
@@ -270,8 +271,8 @@ public:
         return boost::none;
     }
 
-    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName,
-                                                            StringData newName) final {
+    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(std::string_view oldName,
+                                                            std::string_view newName) final {
         return _root->extractProjectOnFieldAndRename(oldName, newName);
     }
 

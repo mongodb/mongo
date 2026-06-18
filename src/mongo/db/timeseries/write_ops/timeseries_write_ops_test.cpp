@@ -29,7 +29,6 @@
 
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/commands/query_cmd/bulk_write.h"
@@ -52,8 +51,11 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class TimeseriesWriteOpsTest : public timeseries::TimeseriesTestFixture {};
 
@@ -224,7 +226,7 @@ public:
         const std::vector<ChunkType> chunks{
             ChunkType(_uuid, cr, _shardVersion.placementVersion(), shardName)};
 
-        constexpr StringData shardKey("skey");
+        constexpr std::string_view shardKey("skey");
         const ShardKeyPattern shardKeyPattern{BSON(shardKey << 1)};
 
         const auto epoch = chunks.front().getVersion().epoch();
@@ -326,7 +328,7 @@ DEATH_TEST_F(TimeseriesWriteOpsDeathTest,
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-    OID bucketId = OID::createFromString("629e1e680958e279dc29a517"_sd);
+    OID bucketId = OID::createFromString("629e1e680958e279dc29a517"sv);
     auto compressionResult = timeseries::compressBucket(bucketDoc, "time", _nsNoMeta, false);
     ASSERT_TRUE(compressionResult.compressedBucket.has_value());
     const BSONObj compressedBucket = compressionResult.compressedBucket.value();

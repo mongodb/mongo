@@ -44,6 +44,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -59,8 +60,8 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Project);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceProject final {
 public:
-    static constexpr StringData kStageName = "$project"_sd;
-    static constexpr StringData kAliasNameUnset = "$unset"_sd;
+    static constexpr std::string_view kStageName = "$project"_sd;
+    static constexpr std::string_view kAliasNameUnset = "$unset"_sd;
 
     /**
      * Method to create a $project stage from a Projection AST.
@@ -68,7 +69,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> create(
         projection_ast::Projection projection,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        StringData specifiedName);
+        std::string_view specifiedName);
 
     /**
      * Convenience method to create a $project stage from 'projectSpec'.
@@ -76,7 +77,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> create(
         BSONObj projectSpec,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        StringData specifiedName) try {
+        std::string_view specifiedName) try {
 
         auto projection = projection_ast::parseAndAnalyze(
             expCtx, projectSpec, ProjectionPolicies::aggregateProjectionPolicies());

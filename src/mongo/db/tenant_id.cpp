@@ -37,11 +37,13 @@
 #include "mongo/bson/oid.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo {
 
-TenantId TenantId::parseFromString(StringData tenantId) {
+TenantId TenantId::parseFromString(std::string_view tenantId) {
     uassert(ErrorCodes::BadValue, "Failed to parse empty tenantId string.", !tenantId.empty());
 
     const auto res = OID::parse(tenantId);
@@ -66,7 +68,7 @@ TenantId TenantId::parseFromBSON(const BSONElement& elem) {
     return TenantId(elem.OID());
 }
 
-void TenantId::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+void TenantId::serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
     // Append objectid to the builder.
     builder->append(fieldName, _oid);
 }

@@ -29,7 +29,6 @@
 
 #include "mongo/db/fts/fts_unicode_phrase_matcher.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

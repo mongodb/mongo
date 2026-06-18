@@ -42,6 +42,7 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -88,7 +89,7 @@ REGISTER_AGG_STAGE_MAPPING(reshardingIterateTransactionStage,
                            documentSourceReshardingIterateTransactionToStageFn);
 
 ReshardingIterateTransactionStage::ReshardingIterateTransactionStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     bool includeCommitTransactionTimestamp)
     : Stage(stageName, expCtx),

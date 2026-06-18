@@ -63,6 +63,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -337,7 +338,7 @@ public:
          * must unpack the cursor from the returned guard.
          */
         ClusterClientCursorGuard releaseCursor(OperationContext* opCtx,
-                                               StringData commandName = "") {
+                                               std::string_view commandName = "") {
             invariant(!_operationUsingCursor);
             tassert(11052336, "Expected CursorEntry to own a cursor", _cursor);
             invariant(opCtx);
@@ -358,7 +359,7 @@ public:
             return _operationUsingCursor;
         }
 
-        StringData getCommandUsingCursor() const {
+        std::string_view getCommandUsingCursor() const {
             return _commandUsingCursor;
         }
 
@@ -497,7 +498,7 @@ public:
                                             OperationContext* opCtx,
                                             std::function<Status(T)> authChecker,
                                             AuthCheck checkSessionAuth = kCheckSession,
-                                            StringData commandName = "");
+                                            std::string_view commandName = "");
 
     /**
      * Moves the given cursor to the 'pinned' state, and transfers ownership of the cursor to the
@@ -515,7 +516,7 @@ public:
      */
     StatusWith<PinnedCursor> checkOutCursorNoAuthCheck(CursorId cursorId,
                                                        OperationContext* opCtx,
-                                                       StringData commandName = "");
+                                                       std::string_view commandName = "");
 
     /**
      * This method will find the given cursor, and if it exists, call 'authChecker', passing the

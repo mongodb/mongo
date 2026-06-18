@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -55,7 +56,8 @@ namespace MONGO_MOD_PUBLIC rpc {
  *
  * This metadata should only appear in requests from mongos to mongod.
  */
-MONGO_MOD_FILE_PRIVATE static constexpr auto kImpersonationMetadataSectionName = "$audit"_sd;
+MONGO_MOD_FILE_PRIVATE inline constexpr std::string_view kImpersonationMetadataSectionName{
+    "$audit"};
 
 /*
  * Sets the provided audit metadata on the AuditClientAttrs decorator (via

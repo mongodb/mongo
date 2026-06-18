@@ -64,12 +64,14 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
 
-const StringData kDefaultExecutorDescriptionSuffix = "Default";
+const std::string_view kDefaultExecutorDescriptionSuffix = "Default";
 
 class ReshardingChangeStreamsMonitorTest : public ShardServerTestFixtureWithCatalogCacheMock {
 public:
@@ -381,7 +383,7 @@ public:
                 auto opStr = doc.getStringField("op");
                 auto command = doc["command"].Obj();
 
-                StringData targetedNS;
+                std::string_view targetedNS;
                 if (opStr == "getmore") {
                     targetedNS = command.getStringField("collection");
                 } else if (opStr == "command") {
@@ -400,19 +402,19 @@ public:
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(
-        const StringData descSuffix = kDefaultExecutorDescriptionSuffix) {
+        const std::string_view descSuffix = kDefaultExecutorDescriptionSuffix) {
         return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestExecutor" +
                                  std::string{descSuffix});
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeCleanupTaskExecutor(
-        const StringData descSuffix = kDefaultExecutorDescriptionSuffix) {
+        const std::string_view descSuffix = kDefaultExecutorDescriptionSuffix) {
         return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestCleanupExecutor" +
                                  std::string{descSuffix});
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeMarkKilledTaskExecutor(
-        const StringData descSuffix = kDefaultExecutorDescriptionSuffix) {
+        const std::string_view descSuffix = kDefaultExecutorDescriptionSuffix) {
         return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestMarkKilledExecutor" +
                                  std::string{descSuffix});
     }

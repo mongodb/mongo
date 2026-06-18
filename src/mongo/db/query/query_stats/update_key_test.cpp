@@ -38,11 +38,14 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_stats {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using write_ops::UpdateCommandRequest;
 
@@ -58,7 +61,7 @@ public:
     }
 
     std::vector<std::unique_ptr<const Key>> makeUpdateKeys(
-        const boost::intrusive_ptr<ExpressionContext>&, StringData cmd) {
+        const boost::intrusive_ptr<ExpressionContext>&, std::string_view cmd) {
         auto ucr = UpdateCommandRequest::parseOwned(fromjson(cmd));
 
         std::vector<std::unique_ptr<const Key>> keys;
@@ -88,7 +91,7 @@ public:
     }
 
     std::unique_ptr<const Key> makeOneUpdateKey(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData cmd) {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, std::string_view cmd) {
         auto keys = makeUpdateKeys(expCtx, cmd);
         ASSERT_EQ(keys.size(), 1);
         return std::move(keys.front());
@@ -108,7 +111,7 @@ TEST_F(UpdateKeyTest, ReplacementUpdateCmdComponents) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" } } ],
         "$db": "testDB"
-    })"_sd));
+    })"sv));
 
     auto updateComponents = std::make_unique<UpdateCmdComponents>(ucr);
 
@@ -128,7 +131,7 @@ TEST_F(UpdateKeyTest, IncludesOptionalValues) {
         bypassDocumentValidation: true,
         ordered: false,
         "$db": "testDB"
-    })"_sd));
+    })"sv));
 
     auto updateComponents = std::make_unique<UpdateCmdComponents>(ucr);
 
@@ -144,7 +147,7 @@ TEST_F(UpdateKeyTest, SizeOfUpdateCmdComponents) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     auto ucr = UpdateCommandRequest::parse(std::move(update));
 
     auto updateComponents = std::make_unique<UpdateCmdComponents>(ucr);
@@ -160,7 +163,7 @@ TEST_F(UpdateKeyTest, EquivalentUpdateCmdComponentSizes) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" } } ],
         "$db": "testDB"
-    })"_sd));
+    })"sv));
 
     auto updateComponentsNoValues = std::make_unique<UpdateCmdComponents>(ucrNoSetValues);
 
@@ -171,7 +174,7 @@ TEST_F(UpdateKeyTest, EquivalentUpdateCmdComponentSizes) {
         bypassDocumentValidation: true,
         ordered: false,
         "$db": "testDB"
-    })"_sd));
+    })"sv));
 
     auto updateComponentsAllValues = std::make_unique<UpdateCmdComponents>(ucrAllValues);
 
@@ -187,7 +190,7 @@ TEST_F(UpdateKeyTest, SizeOfUpdateKeyWithAndWithoutComment) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" } } ],
         "$db": "testDB"
-    })"_sd;
+    })"sv;
     auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
     auto keyWithoutComment = makeOneUpdateKey(expCtx, cmd);
 
@@ -203,7 +206,7 @@ TEST_F(UpdateKeyTest, SizeOfUpdateKeyWithAndWithoutReadConcern) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" } } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     auto keyWithReadConcern = makeOneUpdateKey(expCtx, R"({
         update: "testColl",
@@ -213,7 +216,7 @@ TEST_F(UpdateKeyTest, SizeOfUpdateKeyWithAndWithoutReadConcern) {
             afterClusterTime: Timestamp(1654272333, 13),
             level: "majority"
         }
-    })"_sd);
+    })"sv);
     ASSERT_LT(keyWithoutReadConcern->size(), keyWithReadConcern->size());
 }
 }  // namespace

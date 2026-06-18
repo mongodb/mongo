@@ -45,6 +45,7 @@
 #include "mongo/db/query/write_ops/write_ops.h"
 
 namespace mongo::query_stats {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -304,12 +305,12 @@ bool WriteCmdQueryStatsRegistrar::shouldSetIncludeQueryStatsMetricsField(Operati
 
 bool WriteCmdQueryStatsRegistrar::isAggregationPipeline(const CurOp* curOp) {
     if (auto cmd = curOp->getCommand()) {
-        if (cmd->getName() == "aggregate"_sd || cmd->getName() == "clusterAggregate"_sd) {
+        if (cmd->getName() == "aggregate"sv || cmd->getName() == "clusterAggregate"sv) {
             return true;
         }
     }
     if (auto cmd = curOp->originatingCommand(); !cmd.isEmpty()) {
-        if (cmd.hasField("aggregate"_sd) || cmd.hasField("clusterAggregate"_sd)) {
+        if (cmd.hasField("aggregate"sv) || cmd.hasField("clusterAggregate"sv)) {
             return true;
         }
     }

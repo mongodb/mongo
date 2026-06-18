@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
@@ -45,6 +44,8 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -81,14 +82,14 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
-        StringData reason) = 0;
+        std::string_view reason) = 0;
 
     virtual MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
-        StringData reason,
+        std::string_view reason,
         const ShardId& fromShardId) = 0;
 
     virtual MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(
@@ -96,12 +97,12 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         Timestamp afterClusterTime,
-        StringData reason,
+        std::string_view reason,
         bool expandSimpleCollation = true) = 0;
 
     virtual void route(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       StringData reason,
+                       std::string_view reason,
                        unique_function<void(OperationContext* opCtx,
                                             const CollectionRoutingInfo& cri)> callback) = 0;
 
@@ -157,14 +158,14 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
-        StringData reason) override;
+        std::string_view reason) override;
 
     MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const UUID& uuid,
         boost::optional<Timestamp> afterClusterTime,
-        StringData reason,
+        std::string_view reason,
         const ShardId& fromShardId) override;
 
     MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(
@@ -172,13 +173,13 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         Timestamp afterClusterTime,
-        StringData reason,
+        std::string_view reason,
         bool expandSimpleCollation = true) override;
 
 
     void route(OperationContext* opCtx,
                const NamespaceString& nss,
-               StringData reason,
+               std::string_view reason,
                unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)>
                    callback) override;
 

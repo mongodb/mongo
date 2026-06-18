@@ -50,6 +50,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -92,7 +93,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
 
     for (const auto& fieldSpec : outputFields) {
         // Each object is a fieldname with a single element object value.
-        StringData fieldName = fieldSpec.fieldName();
+        std::string_view fieldName = fieldSpec.fieldName();
         uassert(6050200,
                 "Each fill output specification must be an object with exactly one field",
                 fieldSpec.type() == BSONType::object);

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/cumulative_metrics_state_tracker.h"
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <mutex>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -135,7 +135,7 @@ public:
         _stateTracker.onStateTransition(before, after);
     }
 
-    static boost::optional<StringData> fieldNameFor(AnyState state);
+    static boost::optional<std::string_view> fieldNameFor(AnyState state);
     void reportForServerStatus(BSONObjBuilder* bob) const;
 
     void onStarted(bool isSameKeyResharding, const UUID& reshardingUUID);

@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/vm/vm_datetime.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/vm/vm.h"

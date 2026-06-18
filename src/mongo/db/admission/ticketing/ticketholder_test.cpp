@@ -43,6 +43,7 @@
 
 #include <concepts>
 #include <memory>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -164,11 +165,11 @@ private:
  */
 class TicketHolderTest::Stats {
 public:
-    static constexpr auto kNormalPriorityName = "normalPriority"_sd;
-    static constexpr auto kExemptPriorityName = "exempt"_sd;
+    static constexpr auto kNormalPriorityName = "normalPriority"sv;
+    static constexpr auto kExemptPriorityName = "exempt"sv;
     Stats(TicketHolder* holder) : _holder(holder) {};
 
-    long long operator[](StringData field) const {
+    long long operator[](std::string_view field) const {
         BSONObjBuilder bob;
         _holder->appendTicketStats(bob);
         {

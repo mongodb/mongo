@@ -29,7 +29,6 @@
 
 #include "mongo/db/op_observer/batched_write_policy.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"

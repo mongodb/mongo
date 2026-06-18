@@ -49,6 +49,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -236,7 +237,7 @@ protected:
         };
     }
 
-    virtual StringData serializePhase(const Phase& phase) const = 0;
+    virtual std::string_view serializePhase(const Phase& phase) const = 0;
 
     void _enterPhase(Phase newPhase) {
         auto newDoc = _doc;

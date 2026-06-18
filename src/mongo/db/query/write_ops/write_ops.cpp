@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -64,6 +63,7 @@
 #include <algorithm>
 #include <memory>
 #include <numeric>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -216,11 +216,13 @@ bool readMultiDeleteProperty(const BSONElement& limitElement) {
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder* builder) {
+void writeMultiDeleteProperty(bool isMulti, std::string_view fieldName, BSONObjBuilder* builder) {
     builder->append(fieldName, isMulti ? 0 : 1);
 }
 
-void opTimeSerializerWithTermCheck(repl::OpTime opTime, StringData fieldName, BSONObjBuilder* bob) {
+void opTimeSerializerWithTermCheck(repl::OpTime opTime,
+                                   std::string_view fieldName,
+                                   BSONObjBuilder* bob) {
     if (opTime.getTerm() == repl::OpTime::kUninitializedTerm) {
         bob->append(fieldName, opTime.getTimestamp());
     } else {
@@ -291,7 +293,7 @@ int estimateRuntimeConstantsSize(const mongo::LegacyRuntimeConstants& constants)
 }
 
 int getArrayFiltersFieldSize(const std::vector<mongo::BSONObj>& arrayFilters,
-                             const StringData arrayFiltersFieldName) {
+                             const std::string_view arrayFiltersFieldName) {
     auto size = BSONObj::kMinBSONLength + arrayFiltersFieldName.size() + kPerElementOverhead;
     for (auto&& filter : arrayFilters) {
         // For each filter, we not only need to account for the size of the filter itself,
@@ -821,7 +823,7 @@ UpdateModification::Type UpdateModification::type() const {
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void UpdateModification::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+void UpdateModification::serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const {
 
     visit(OverloadedVisitor{
               [fieldName, bob](const ReplacementUpdate& replacement) {

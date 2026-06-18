@@ -36,6 +36,8 @@
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/util/base64.h"
 
+#include <string_view>
+
 // There are two decoding APIs. For all data that pass validation, both decoder implementations
 // must produce the same results.
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
@@ -62,7 +64,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     } catch (const DBException& e) {
         blockBasedError = e.toString();
         invariant(e.code() == ErrorCodes::InvalidBSONColumn,
-                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                  str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ", the block based API failed with unexpected error code "
                                 << e.code());
     }
@@ -75,7 +77,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     } catch (const DBException& e) {
         iteratorError = e.toString();
         invariant(e.code() == ErrorCodes::InvalidBSONColumn,
-                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                  str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ", the iterator API failed with unexpected error code "
                                 << e.code());
     }
@@ -90,7 +92,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     // If one API failed, then all APIs must fail.
     if (!iteratorError.empty() || !blockBasedError.empty() || !reopenError.empty()) {
         invariant(!(iteratorError.empty() || blockBasedError.empty() || reopenError.empty()),
-                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                  str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ". Iterator API returned "
                                 << (iteratorError.empty() ? "results" : iteratorError)
                                 << ". The block based API returned "
@@ -102,13 +104,13 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
 
     // If both APIs succeeded, the results must be the same.
     invariant(iteratorElems.size() == blockBasedElems.size(),
-              str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+              str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                             << " the number of elements decompressed is different.");
 
     auto it = iteratorElems.begin();
     for (auto&& elem : blockBasedElems) {
         invariant(elem.binaryEqualValues(*it),
-                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                  str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ". The block-based API returned: " << elem.toString()
                                 << ". The iterator API returned: " << (*it).toString());
         ++it;
@@ -123,37 +125,39 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         auto minResult =
             bsoncolumn::min<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
         invariant(minResult.first.binaryEqualValues(expected.min.first),
-                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                  str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ". min() returned: " << minResult.first.toString()
                                 << " but expected: " << expected.min.first.toString());
         if (!minResult.first.eoo()) {
             invariant(minResult.second == expected.min.second,
-                      str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
-                                    << ". min() returned index " << minResult.second
-                                    << " but expected index " << expected.min.second);
+                      str::stream()
+                          << "For the input: " << base64::encode(std::string_view(Data, Size))
+                          << ". min() returned index " << minResult.second << " but expected index "
+                          << expected.min.second);
         }
 
         auto maxResult =
             bsoncolumn::max<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
         invariant(maxResult.first.binaryEqualValues(expected.max.first),
-                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                  str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ". max() returned: " << maxResult.first.toString()
                                 << " but expected: " << expected.max.first.toString());
         if (!maxResult.first.eoo()) {
             invariant(maxResult.second == expected.max.second,
-                      str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
-                                    << ". max() returned index " << maxResult.second
-                                    << " but expected index " << expected.max.second);
+                      str::stream()
+                          << "For the input: " << base64::encode(std::string_view(Data, Size))
+                          << ". max() returned index " << maxResult.second << " but expected index "
+                          << expected.max.second);
         }
 
         auto [minmaxMin, minmaxMax] =
             bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
         invariant(minmaxMin.binaryEqualValues(expected.min.first),
-                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                  str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ". minmax().first returned: " << minmaxMin.toString()
                                 << " but expected: " << expected.min.first.toString());
         invariant(minmaxMax.binaryEqualValues(expected.max.first),
-                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                  str::stream() << "For the input: " << base64::encode(std::string_view(Data, Size))
                                 << ". minmax().second returned: " << minmaxMax.toString()
                                 << " but expected: " << expected.max.first.toString());
     }
@@ -166,7 +170,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         bool result = bsoncolumn::dense(Data, Size);
         invariant(result != hasMissing,
                   str::stream() << "dense() returned " << result << " but hasMissing=" << hasMissing
-                                << ". Column: " << base64::encode(StringData(Data, Size)));
+                                << ". Column: " << base64::encode(std::string_view(Data, Size)));
     }
 
     return 0;

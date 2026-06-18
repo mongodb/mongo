@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -80,6 +79,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -207,7 +207,7 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
         ReplSetConfig rsc = *_rsConfig.makeSnapshot();
         request.target = rsc.getMemberAt(targetIndex).getHostAndPort();
 
-        StringData replSetName = rsc.getReplSetName();
+        std::string_view replSetName = rsc.getReplSetName();
         // Simulate preparing a heartbeat request so that the target's ping stats are initialized.
         _topCoord->prepareHeartbeatRequestV1(_replExecutor->now(), replSetName, request.target);
 
@@ -235,7 +235,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     pauseInHandleHeartbeatResponse.executeIf(
         [](const BSONObj& data) { pauseInHandleHeartbeatResponse.pauseWhileSet(); },
         [&cbData](const BSONObj& data) -> bool {
-            StringData dtarget = data["target"].valueStringDataSafe();
+            std::string_view dtarget = data["target"].valueStringDataSafe();
             return dtarget == cbData.request.target.toString();
         });
     std::unique_lock lk(_mutex);

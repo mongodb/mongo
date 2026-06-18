@@ -37,6 +37,8 @@
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 /**
@@ -85,7 +87,7 @@ REGISTER_AGG_STAGE_MAPPING(reshardingAddResumeIdStage,
                            documentSourceReshardingAddResumeIdToStageFn);
 
 ReshardingAddResumeIdStage::ReshardingAddResumeIdStage(
-    StringData stageName, const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    std::string_view stageName, const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : Stage(stageName, expCtx) {}
 
 GetNextResult ReshardingAddResumeIdStage::doGetNext() {

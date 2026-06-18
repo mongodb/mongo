@@ -43,6 +43,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -52,6 +53,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using SPT = ServerParameterType;
 
@@ -68,7 +70,7 @@ void ASSERT_EQ_OR_NAN(const T& a, const U& b) {
 }
 
 template <typename T, ServerParameterType spt>
-void doStorageTest(StringData name,
+void doStorageTest(std::string_view name,
                    const std::vector<std::string>& valid,
                    const std::vector<std::string>& invalid) {
     T val = T();
@@ -392,7 +394,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     updatedPrePostImgs.setExpireAfterSeconds(40);
     LogicalTime updateTime = LogicalTime(Timestamp(Date_t::now()));
     baseCSP.setClusterParameterTime(updateTime);
-    baseCSP.set_id("testClusterServerParameter"_sd);
+    baseCSP.set_id("testClusterServerParameter"sv);
 
     updatedParam.setClusterServerParameter(baseCSP);
     updatedParam.setPreAndPostImages(updatedPrePostImgs);
@@ -412,10 +414,10 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
         clusterParam->append(nullptr, &b, clusterParam->name(), boost::none);
         auto obj = b.obj();
         ASSERT_EQ(obj.nFields(), 4);
-        ASSERT_EQ(obj["_id"_sd].String(), "testClusterServerParameter");
-        ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 40);
-        ASSERT_EQ(obj["testStringField"_sd].String(), "testString");
-        ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), updateTime.asTimestamp());
+        ASSERT_EQ(obj["_id"sv].String(), "testClusterServerParameter");
+        ASSERT_EQ(obj["preAndPostImages"sv].Obj()["expireAfterSeconds"].Long(), 40);
+        ASSERT_EQ(obj["testStringField"sv].String(), "testString");
+        ASSERT_EQ(obj["clusterParameterTime"sv].timestamp(), updateTime.asTimestamp());
     }
 
     // setFromString should fail for cluster server parameters.
@@ -510,19 +512,19 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
         BSONObjBuilder b;
         clusterParam->append(nullptr, &b, clusterParam->name(), boost::none);
         auto obj = b.obj();
-        ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 40);
+        ASSERT_EQ(obj["preAndPostImages"sv].Obj()["expireAfterSeconds"].Long(), 40);
     }
     {
         BSONObjBuilder b;
         clusterParam->append(nullptr, &b, clusterParam->name(), tenant1);
         auto obj = b.obj();
-        ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 35);
+        ASSERT_EQ(obj["preAndPostImages"sv].Obj()["expireAfterSeconds"].Long(), 35);
     }
     {
         BSONObjBuilder b;
         clusterParam->append(nullptr, &b, clusterParam->name(), tenant2);
         auto obj = b.obj();
-        ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 45);
+        ASSERT_EQ(obj["preAndPostImages"sv].Obj()["expireAfterSeconds"].Long(), 45);
     }
 }
 

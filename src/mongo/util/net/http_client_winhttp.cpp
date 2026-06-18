@@ -36,7 +36,6 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
@@ -48,6 +47,7 @@
 #include "mongo/util/winutil.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <versionhelpers.h>
@@ -147,7 +147,9 @@ public:
         _headers = toNativeString(header.c_str());
     }
 
-    HttpReply request(HttpMethod methodType, StringData urlSD, ConstDataRange cdrData) const final {
+    HttpReply request(HttpMethod methodType,
+                      std::string_view urlSD,
+                      ConstDataRange cdrData) const final {
         LPCWSTR method = L"GET";
         LPVOID data = const_cast<void*>(static_cast<const void*>(cdrData.data()));
         DWORD data_len = cdrData.length();
@@ -176,7 +178,7 @@ public:
                 MONGO_UNREACHABLE;
         }
 
-        const auto uassertWithLastSystemError = [](StringData reason, bool ok) {
+        const auto uassertWithLastSystemError = [](std::string_view reason, bool ok) {
             auto ec = lastSystemError();
             uassert(ErrorCodes::OperationFailed,
                     str::stream() << reason << ": " << errorMessage(ec),

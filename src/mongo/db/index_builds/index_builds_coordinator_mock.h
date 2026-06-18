@@ -32,6 +32,8 @@
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUBLIC mongo {
 
 class IndexBuildsCoordinatorMock : public IndexBuildsCoordinator {
@@ -58,7 +60,7 @@ public:
     Status voteAbortIndexBuild(OperationContext* opCtx,
                                const UUID& buildUUID,
                                const HostAndPort& hostAndPort,
-                               StringData reason) override;
+                               std::string_view reason) override;
 
     Status voteCommitIndexBuild(OperationContext* opCtx,
                                 const UUID& buildUUID,
@@ -66,7 +68,7 @@ public:
 
     Status setCommitQuorum(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           const std::vector<StringData>& indexNames,
+                           const std::vector<std::string_view>& indexNames,
                            const CommitQuorumOptions& newCommitQuorum) override;
 
 private:

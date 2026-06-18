@@ -38,16 +38,18 @@
 #include <array>
 #include <cstdint>
 #include <iterator>
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
 
 namespace mongo::str {
+using namespace std::literals::string_view_literals;
 namespace {
 constexpr char kHexChar[] = "0123456789abcdef";
 
 /** UTF8 encoding of Unicode REPLACEMENT CHARACTER U+FFFD, or "\xef\xbf\xbd". */
-const StringData unicodeReplacementCharacterUtf8{u8"\ufffd"_as_char_ptr};
+const std::string_view unicodeReplacementCharacterUtf8{u8"\ufffd"_as_char_ptr};
 
 struct NoopBuffer {
     void append(const char* begin, const char* end) {}
@@ -78,7 +80,7 @@ template <typename Buffer,
           typename InvalidByteHandler,
           typename TwoByteEscaper>
 void escape(Buffer& buffer,
-            StringData str,
+            std::string_view str,
             SingleByteHandler singleHandler,
             InvalidByteHandler invalidByteHandler,
             TwoByteEscaper twoEscaper,
@@ -100,7 +102,7 @@ void escape(Buffer& buffer,
     // escaped. 'it' is assumed to be at the beginning of the input sequence represented by the
     // escaped data.
     // 'numHandled' the number of bytes of unescaped data being written escaped in 'escapeSequence'
-    auto flushAndWrite = [&](size_t numHandled, StringData escapeSequence) {
+    auto flushAndWrite = [&](size_t numHandled, std::string_view escapeSequence) {
         // Appends the range [wFirst, wLast) to the output if the result is within the max length.
         // 'canTruncate' controls the behavior if appending the entire range would exceed the limit.
         // If true, this appends input up to the length limit. Otherwise, none is appended.
@@ -221,110 +223,113 @@ void escape(Buffer& buffer,
 }  // namespace
 
 template <typename Buffer>
-void escapeForTextCommon(Buffer& buffer, StringData str, size_t maxLength, size_t* wouldWrite) {
+void escapeForTextCommon(Buffer& buffer,
+                         std::string_view str,
+                         size_t maxLength,
+                         size_t* wouldWrite) {
     auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {
         switch (unescaped) {
             case '\0':
-                writer(1, "\\0"_sd);
+                writer(1, "\\0"sv);
                 break;
             case 0x01:
-                writer(1, "\\x01"_sd);
+                writer(1, "\\x01"sv);
                 break;
             case 0x02:
-                writer(1, "\\x02"_sd);
+                writer(1, "\\x02"sv);
                 break;
             case 0x03:
-                writer(1, "\\x03"_sd);
+                writer(1, "\\x03"sv);
                 break;
             case 0x04:
-                writer(1, "\\x04"_sd);
+                writer(1, "\\x04"sv);
                 break;
             case 0x05:
-                writer(1, "\\x05"_sd);
+                writer(1, "\\x05"sv);
                 break;
             case 0x06:
-                writer(1, "\\x06"_sd);
+                writer(1, "\\x06"sv);
                 break;
             case 0x07:
-                writer(1, "\\a"_sd);
+                writer(1, "\\a"sv);
                 break;
             case 0x08:
-                writer(1, "\\b"_sd);
+                writer(1, "\\b"sv);
                 break;
             case 0x09:
-                writer(1, "\\t"_sd);
+                writer(1, "\\t"sv);
                 break;
             case 0x0a:
-                writer(1, "\\n"_sd);
+                writer(1, "\\n"sv);
                 break;
             case 0x0b:
-                writer(1, "\\v"_sd);
+                writer(1, "\\v"sv);
                 break;
             case 0x0c:
-                writer(1, "\\f"_sd);
+                writer(1, "\\f"sv);
                 break;
             case 0x0d:
-                writer(1, "\\r"_sd);
+                writer(1, "\\r"sv);
                 break;
             case 0x0e:
-                writer(1, "\\x0e"_sd);
+                writer(1, "\\x0e"sv);
                 break;
             case 0x0f:
-                writer(1, "\\x0f"_sd);
+                writer(1, "\\x0f"sv);
                 break;
             case 0x10:
-                writer(1, "\\x10"_sd);
+                writer(1, "\\x10"sv);
                 break;
             case 0x11:
-                writer(1, "\\x11"_sd);
+                writer(1, "\\x11"sv);
                 break;
             case 0x12:
-                writer(1, "\\x12"_sd);
+                writer(1, "\\x12"sv);
                 break;
             case 0x13:
-                writer(1, "\\x13"_sd);
+                writer(1, "\\x13"sv);
                 break;
             case 0x14:
-                writer(1, "\\x14"_sd);
+                writer(1, "\\x14"sv);
                 break;
             case 0x15:
-                writer(1, "\\x15"_sd);
+                writer(1, "\\x15"sv);
                 break;
             case 0x16:
-                writer(1, "\\x16"_sd);
+                writer(1, "\\x16"sv);
                 break;
             case 0x17:
-                writer(1, "\\x17"_sd);
+                writer(1, "\\x17"sv);
                 break;
             case 0x18:
-                writer(1, "\\x18"_sd);
+                writer(1, "\\x18"sv);
                 break;
             case 0x19:
-                writer(1, "\\x19"_sd);
+                writer(1, "\\x19"sv);
                 break;
             case 0x1a:
-                writer(1, "\\x1a"_sd);
+                writer(1, "\\x1a"sv);
                 break;
             case 0x1b:
-                writer(1, "\\e"_sd);
+                writer(1, "\\e"sv);
                 break;
             case 0x1c:
-                writer(1, "\\x1c"_sd);
+                writer(1, "\\x1c"sv);
                 break;
             case 0x1d:
-                writer(1, "\\x1d"_sd);
+                writer(1, "\\x1d"sv);
                 break;
             case 0x1e:
-                writer(1, "\\x1e"_sd);
+                writer(1, "\\x1e"sv);
                 break;
             case 0x1f:
-                writer(1, "\\x1f"_sd);
+                writer(1, "\\x1f"sv);
                 break;
             case '\\':
-                writer(1, "\\\\"_sd);
+                writer(1, "\\\\"sv);
                 break;
             case 0x7f:
-                writer(1, "\\x7f"_sd);
+                writer(1, "\\x7f"sv);
                 break;
             default:
                 break;
@@ -332,7 +337,7 @@ void escapeForTextCommon(Buffer& buffer, StringData str, size_t maxLength, size_
     };
     auto invalidByteHandler = [](const auto& writer, uint8_t invalid) {
         std::array<char, 4> buffer = {'\\', 'x', kHexChar[invalid >> 4], kHexChar[invalid & 0xf]};
-        writer(1, StringData(buffer.data(), buffer.size()));
+        writer(1, std::string_view(buffer.data(), buffer.size()));
     };
     auto twoByteEscaper = [](const auto& writer, uint8_t first, uint8_t second) {
         std::array<char, 8> buffer = {'\\',
@@ -343,7 +348,7 @@ void escapeForTextCommon(Buffer& buffer, StringData str, size_t maxLength, size_
                                       'x',
                                       kHexChar[second >> 4],
                                       kHexChar[second & 0xf]};
-        writer(2, StringData(buffer.data(), buffer.size()));
+        writer(2, std::string_view(buffer.data(), buffer.size()));
     };
     return escape(buffer,
                   str,
@@ -355,126 +360,129 @@ void escapeForTextCommon(Buffer& buffer, StringData str, size_t maxLength, size_
 }
 
 void escapeForText(fmt::memory_buffer& buffer,
-                   StringData str,
+                   std::string_view str,
                    size_t maxLength,
                    size_t* wouldWrite) {
     escapeForTextCommon(buffer, str, maxLength, wouldWrite);
 }
 
-std::string escapeForText(StringData str, size_t maxLength, size_t* wouldWrite) {
+std::string escapeForText(std::string_view str, size_t maxLength, size_t* wouldWrite) {
     std::string buffer;
     escapeForTextCommon(buffer, str, maxLength, wouldWrite);
     return buffer;
 }
 
 template <typename Buffer>
-void escapeForJSONCommon(Buffer& buffer, StringData str, size_t maxLength, size_t* wouldWrite) {
+void escapeForJSONCommon(Buffer& buffer,
+                         std::string_view str,
+                         size_t maxLength,
+                         size_t* wouldWrite) {
     auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {
         switch (unescaped) {
             case '\0':
-                writer(1, "\\u0000"_sd);
+                writer(1, "\\u0000"sv);
                 break;
             case 0x01:
-                writer(1, "\\u0001"_sd);
+                writer(1, "\\u0001"sv);
                 break;
             case 0x02:
-                writer(1, "\\u0002"_sd);
+                writer(1, "\\u0002"sv);
                 break;
             case 0x03:
-                writer(1, "\\u0003"_sd);
+                writer(1, "\\u0003"sv);
                 break;
             case 0x04:
-                writer(1, "\\u0004"_sd);
+                writer(1, "\\u0004"sv);
                 break;
             case 0x05:
-                writer(1, "\\u0005"_sd);
+                writer(1, "\\u0005"sv);
                 break;
             case 0x06:
-                writer(1, "\\u0006"_sd);
+                writer(1, "\\u0006"sv);
                 break;
             case 0x07:
-                writer(1, "\\u0007"_sd);
+                writer(1, "\\u0007"sv);
                 break;
             case 0x08:
-                writer(1, "\\b"_sd);
+                writer(1, "\\b"sv);
                 break;
             case 0x09:
-                writer(1, "\\t"_sd);
+                writer(1, "\\t"sv);
                 break;
             case 0x0a:
-                writer(1, "\\n"_sd);
+                writer(1, "\\n"sv);
                 break;
             case 0x0b:
-                writer(1, "\\u000b"_sd);
+                writer(1, "\\u000b"sv);
                 break;
             case 0x0c:
-                writer(1, "\\f"_sd);
+                writer(1, "\\f"sv);
                 break;
             case 0x0d:
-                writer(1, "\\r"_sd);
+                writer(1, "\\r"sv);
                 break;
             case 0x0e:
-                writer(1, "\\u000e"_sd);
+                writer(1, "\\u000e"sv);
                 break;
             case 0x0f:
-                writer(1, "\\u000f"_sd);
+                writer(1, "\\u000f"sv);
                 break;
             case 0x10:
-                writer(1, "\\u0010"_sd);
+                writer(1, "\\u0010"sv);
                 break;
             case 0x11:
-                writer(1, "\\u0011"_sd);
+                writer(1, "\\u0011"sv);
                 break;
             case 0x12:
-                writer(1, "\\u0012"_sd);
+                writer(1, "\\u0012"sv);
                 break;
             case 0x13:
-                writer(1, "\\u0013"_sd);
+                writer(1, "\\u0013"sv);
                 break;
             case 0x14:
-                writer(1, "\\u0014"_sd);
+                writer(1, "\\u0014"sv);
                 break;
             case 0x15:
-                writer(1, "\\u0015"_sd);
+                writer(1, "\\u0015"sv);
                 break;
             case 0x16:
-                writer(1, "\\u0016"_sd);
+                writer(1, "\\u0016"sv);
                 break;
             case 0x17:
-                writer(1, "\\u0017"_sd);
+                writer(1, "\\u0017"sv);
                 break;
             case 0x18:
-                writer(1, "\\u0018"_sd);
+                writer(1, "\\u0018"sv);
                 break;
             case 0x19:
-                writer(1, "\\u0019"_sd);
+                writer(1, "\\u0019"sv);
                 break;
             case 0x1a:
-                writer(1, "\\u001a"_sd);
+                writer(1, "\\u001a"sv);
                 break;
             case 0x1b:
-                writer(1, "\\u001b"_sd);
+                writer(1, "\\u001b"sv);
                 break;
             case 0x1c:
-                writer(1, "\\u001c"_sd);
+                writer(1, "\\u001c"sv);
                 break;
             case 0x1d:
-                writer(1, "\\u001d"_sd);
+                writer(1, "\\u001d"sv);
                 break;
             case 0x1e:
-                writer(1, "\\u001e"_sd);
+                writer(1, "\\u001e"sv);
                 break;
             case 0x1f:
-                writer(1, "\\u001f"_sd);
+                writer(1, "\\u001f"sv);
                 break;
             case '\\':
-                writer(1, "\\\\"_sd);
+                writer(1, "\\\\"sv);
                 break;
             case '\"':
-                writer(1, "\\\""_sd);
+                writer(1, "\\\""sv);
                 break;
             case 0x7f:
-                writer(1, "\\u007f"_sd);
+                writer(1, "\\u007f"sv);
                 break;
             default:
                 break;
@@ -482,7 +490,7 @@ void escapeForJSONCommon(Buffer& buffer, StringData str, size_t maxLength, size_
     };
     auto invalidByteHandler = [](const auto& writer, uint8_t) {
         // Write Unicode Replacement Character when the encoding is bad
-        writer(1, "\\ufffd"_sd);
+        writer(1, "\\ufffd"sv);
     };
     auto twoByteEscaper = [](const auto& writer, uint8_t first, uint8_t second) {
         // Decode the UTF-8 and write the codepoint with \u
@@ -493,7 +501,7 @@ void escapeForJSONCommon(Buffer& buffer, StringData str, size_t maxLength, size_
                                       kHexChar[(codepoint >> 8) & 0b0000'1111],
                                       kHexChar[(codepoint >> 4) & 0b0000'1111],
                                       kHexChar[codepoint & 0b0000'1111]};
-        writer(2, StringData(buffer.data(), buffer.size()));
+        writer(2, std::string_view(buffer.data(), buffer.size()));
     };
     return escape(buffer,
                   str,
@@ -505,19 +513,19 @@ void escapeForJSONCommon(Buffer& buffer, StringData str, size_t maxLength, size_
 }
 
 void escapeForJSON(fmt::memory_buffer& buffer,
-                   StringData str,
+                   std::string_view str,
                    size_t maxLength,
                    size_t* wouldWrite) {
     escapeForJSONCommon(buffer, str, maxLength, wouldWrite);
 }
 
-std::string escapeForJSON(StringData str, size_t maxLength, size_t* wouldWrite) {
+std::string escapeForJSON(std::string_view str, size_t maxLength, size_t* wouldWrite) {
     std::string buffer;
     escapeForJSONCommon(buffer, str, maxLength, wouldWrite);
     return buffer;
 }
 
-bool validUTF8(StringData str) {
+bool validUTF8(std::string_view str) {
     // No-op buffer and handlers, defined to re-use escape method logic.
     NoopBuffer buffer;
     auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {
@@ -544,7 +552,7 @@ bool validUTF8(StringData str) {
     }
 }
 
-std::string scrubInvalidUTF8(StringData str) {
+std::string scrubInvalidUTF8(std::string_view str) {
     std::string buffer;
     auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {
     };

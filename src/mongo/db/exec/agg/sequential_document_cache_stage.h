@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/sequential_document_cache.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -43,7 +43,7 @@ namespace mongo::exec::agg {
 class SequentialDocumentCacheStage final : public Stage {
 public:
     using SequentialDocumentCachePtr = std::shared_ptr<SequentialDocumentCache>;
-    SequentialDocumentCacheStage(StringData stageName,
+    SequentialDocumentCacheStage(std::string_view stageName,
                                  const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                  SequentialDocumentCachePtr cache);
 

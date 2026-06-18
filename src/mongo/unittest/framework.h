@@ -74,6 +74,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -243,14 +244,14 @@ inline const testing::TestInfo* getTestInfo() {
 /**
  * Returns the suite name of the test currently executing.
  */
-inline StringData getSuiteName() {
+inline std::string_view getSuiteName() {
     return getTestInfo()->test_suite_name();
 }
 
 /**
  * Returns the name of the test currently executing.
  */
-inline StringData getTestName() {
+inline std::string_view getTestName() {
     return getTestInfo()->name();
 }
 
@@ -325,11 +326,11 @@ void setDefaultMockBehavior(MockBehavior behavior);
 
 namespace mongo {
 /**
- * A gtest printer for `mongo::StringData`.
+ * A gtest printer for `std::string_view`.
  * Renders it as if it was a `std::string_view`.
  * https://google.github.io/googletest/advanced.html#teaching-googletest-how-to-print-your-values
  */
-inline void PrintTo(StringData s, std::ostream* os) {
+inline void PrintTo(std::string_view s, std::ostream* os) {
     unittest::universalPrint(s, *os);
 }
 

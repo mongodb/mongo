@@ -30,7 +30,6 @@
 #include "mongo/s/query/exec/blocking_results_merger.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"

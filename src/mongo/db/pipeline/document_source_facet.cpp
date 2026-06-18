@@ -31,7 +31,6 @@
 #include "mongo/db/pipeline/document_source_facet.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/database_name_util.h"
@@ -58,6 +57,7 @@
 #include <algorithm>
 #include <list>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -138,7 +138,8 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
  * Helper function to find the stage that violates the $facet requirement. The 'source' is not
  * allowed either directly or because of some of the sources inside its sub-pipelines.
  */
-std::string getStageNameNotAllowedInFacet(const DocumentSource& source, StringData parentName) {
+std::string getStageNameNotAllowedInFacet(const DocumentSource& source,
+                                          std::string_view parentName) {
     auto sourceName = source.getSourceName();
     if (auto* sub = source.getSubPipeline()) {
         for (const auto& substage : *sub) {
@@ -185,7 +186,7 @@ bool facetSubPipelinesTargetView(const vector<pair<string, vector<BSONObj>>>& ra
 
     for (const auto& [facetName, pipeline] : rawFacetPipelines) {
         for (const auto& stageObj : pipeline) {
-            StringData stageName = stageObj.firstElementFieldNameStringData();
+            std::string_view stageName = stageObj.firstElementFieldNameStringData();
             boost::optional<NamespaceString> targetNss;
 
             if (stageName == "$unionWith") {

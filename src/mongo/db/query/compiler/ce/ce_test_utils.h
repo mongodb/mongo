@@ -36,6 +36,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::ce {
 // Enable this flag to log all estimates, and let all tests pass.
 constexpr bool kCETestLogOnly = false;
@@ -373,7 +375,7 @@ std::vector<BSONObj> transformSBEValueVectorOfVectorsToBSONObjVector(
 std::unique_ptr<MatchExpression> createQueryMatchExpression(QueryType queryType,
                                                             const stats::SBEValue& sbeValLow,
                                                             const stats::SBEValue& sbeValHigh,
-                                                            StringData fieldName = "a");
+                                                            std::string_view fieldName = "a");
 
 /**
  * Translate a query over multiple fields as defined by histogram/sampling CE accuracy and

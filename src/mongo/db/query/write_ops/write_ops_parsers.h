@@ -47,6 +47,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -78,13 +79,15 @@ bool readMultiDeleteProperty(const BSONElement& limitElement);
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder* builder);
+void writeMultiDeleteProperty(bool isMulti, std::string_view fieldName, BSONObjBuilder* builder);
 
 /**
  * Serializes the opTime fields to specified BSON builder. A 'term' field will be included only
  * when it is intialized.
  */
-void opTimeSerializerWithTermCheck(repl::OpTime opTime, StringData fieldName, BSONObjBuilder* bob);
+void opTimeSerializerWithTermCheck(repl::OpTime opTime,
+                                   std::string_view fieldName,
+                                   BSONObjBuilder* bob);
 
 /**
  * Method to deserialize the specified BSON element to opTime. This method is used by the IDL
@@ -153,7 +156,7 @@ public:
      * IMPORTANT: The method should not be modified, as API version input/output guarantees could
      * break because of it.
      */
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
 
     int objsize() const;
 

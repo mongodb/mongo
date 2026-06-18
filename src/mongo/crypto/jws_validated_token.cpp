@@ -30,7 +30,6 @@
 #include "mongo/crypto/jws_validated_token.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -41,6 +40,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/move/utility_core.hpp>
@@ -48,17 +48,18 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::crypto {
+using namespace std::literals::string_view_literals;
 namespace {
 struct ParsedTokenView {
-    StringData header;
-    StringData body;
-    StringData signature;
+    std::string_view header;
+    std::string_view body;
+    std::string_view signature;
 
-    StringData payload;
+    std::string_view payload;
 };
 
 // Split "header.body.signature" into {"header", "body", "signature", "header.body"}
-ParsedTokenView parseSignedToken(StringData token) {
+ParsedTokenView parseSignedToken(std::string_view token) {
     ParsedTokenView pt;
 
     auto split = token.find('.', 0);
@@ -113,14 +114,14 @@ Status JWSValidatedToken::validate(JWKManager* keyMgr) const {
     return swValidator.getValue().get()->validate(_header.getAlgorithm(), payload, signature);
 }
 
-JWSValidatedToken::JWSValidatedToken(JWKManager* keyMgr, StringData token)
+JWSValidatedToken::JWSValidatedToken(JWKManager* keyMgr, std::string_view token)
     : _originalToken(std::string{token}) {
     auto tokenSplit = parseSignedToken(token);
 
     auto headerString = base64url::decode(tokenSplit.header);
     _headerBSON = fromjson(headerString);
     _header = JWSHeader::parse(_headerBSON, IDLParserContext("JWSHeader"));
-    uassert(7095401, "Unknown type of token", !_header.getType() || _header.getType() == "JWT"_sd);
+    uassert(7095401, "Unknown type of token", !_header.getType() || _header.getType() == "JWT"sv);
 
     auto bodyString = base64url::decode(tokenSplit.body);
     _bodyBSON = fromjson(bodyString);
@@ -130,7 +131,7 @@ JWSValidatedToken::JWSValidatedToken(JWKManager* keyMgr, StringData token)
 };
 
 StatusWith<IssuerAudiencePair> JWSValidatedToken::extractIssuerAndAudienceFromCompactSerialization(
-    StringData token) try {
+    std::string_view token) try {
     auto tokenSplit = parseSignedToken(token);
     auto payload = fromjson(base64url::decode(tokenSplit.body));
     auto jwt = JWT::parse(payload, IDLParserContext{"JWT"});

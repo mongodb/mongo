@@ -45,6 +45,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 bool isEquals(ConstDataRange left, ConstDataRange right) {
     return std::equal(
@@ -77,7 +78,7 @@ TEST(KmsTest, TestGoodKey) {
 
     auto service = KMSServiceController::createFromClient("local", config);
 
-    auto myKey = "My Secret Key"_sd;
+    auto myKey = "My Secret Key"sv;
 
     auto material = service->encryptDataKeyByString(ConstDataRange(myKey.data(), myKey.size()), "");
 

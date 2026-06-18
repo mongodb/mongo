@@ -60,6 +60,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -135,7 +136,7 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
                 auto errorContext = fmt::format("Failed command {} for database '{}' on shard '{}'",
                                                 command.toString(),
                                                 dbName.toStringForErrorMsg(),
-                                                StringData{ShardId(response.shardId)});
+                                                std::string_view{ShardId(response.shardId)});
 
                 uassertStatusOKWithContext(response.swResponse.getStatus(), errorContext);
                 const auto& respBody = response.swResponse.getValue().data;
@@ -261,7 +262,7 @@ void invokeCommandOnShardWithIdempotentRetryPolicy(OperationContext* opCtx,
 
 void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     OperationContext* opCtx,
-    StringData taskDescription,
+    std::string_view taskDescription,
     std::function<void(OperationContext*)> doWork,
     boost::optional<Backoff> backoff) {
     const std::string newClientName = fmt::format("{}-{}", getThreadName(), taskDescription);

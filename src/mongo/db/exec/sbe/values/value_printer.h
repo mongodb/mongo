@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -39,6 +38,7 @@
 
 #include <cstddef>
 #include <ostream>
+#include <string_view>
 
 namespace mongo::sbe::value {
 
@@ -68,7 +68,7 @@ class ValuePrinter {
 
 public:
     void writeTagToStream(TypeTags tag);
-    void writeStringDataToStream(StringData sd, bool addQuotes = true);
+    void writeStringDataToStream(std::string_view sd, bool addQuotes = true);
     void writeArrayToStream(TypeTags tag, Value val, size_t depth = 1);
     void writeSortedArraySetToStream(TypeTags tag, Value val, size_t depth = 1);
     void writeObjectToStream(TypeTags tag, Value val, size_t depth = 1);

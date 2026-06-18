@@ -34,13 +34,15 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 void assertLanguageFeatureIsAllowed(
     const OperationContext* opCtx,
-    StringData operatorName,
+    std::string_view operatorName,
     AllowedWithApiStrict allowedWithApiStrict,
     AllowedWithClientType allowedWithClientType,
     boost::optional<std::function<void(const APIParameters&)>> conditionalCallback) {
@@ -96,7 +98,7 @@ bool isInternalClient(Client* client) {
  * If the AllowedWithClientType requires that the session be internal assert that it is.
  */
 void assertAllowedInternalIfRequired(const OperationContext* opCtx,
-                                     StringData operatorName,
+                                     std::string_view operatorName,
                                      AllowedWithClientType allowedWithClientType) {
     const auto isInternal = isInternalClient(opCtx->getClient());
 

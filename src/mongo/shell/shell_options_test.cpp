@@ -33,6 +33,7 @@
 
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -40,46 +41,69 @@ namespace mongo {
 namespace {
 
 TEST(ShellOptions, RedactPasswords) {
-    std::vector<std::pair<std::vector<std::string>, const std::vector<StringData>>> testData = {
-        // Check that just passwords get redacted correctly
-        {{"-u", "admin", "-p", "password", "--port", "27017"},                     // NOLINT
-         {"-u"_sd, "admin"_sd, "-p"_sd, "xxxxxxxx"_sd, "--port"_sd, "27017"_sd}},  // NOLINT
-        // Check that passwords and URIs get redacted correctly
-        {{"-p", "password", "mongodb://admin:password@localhost"},  // NOLINT
-         {"-p"_sd, "xxxxxxxx", "mongodb://admin@localhost"_sd}},    // NOLINT
-        // Check that just URIs get redacted correctly
-        {{"mongodb://admin:password@localhost"},  // NOLINT
-         {"mongodb://admin@localhost"_sd}},       // NOLINT
-        // Sanity check that non-passwords don't get redacted
-        {{"localhost"},      // NOLINT
-         {"localhost"_sd}},  // NOLINT
-        // Sanity check that we don't overflow argv
-        {{"-p"},      // NOLINT
-         {"-p"_sd}},  // NOLINT
-        // Check for --passsword=foo
-        {{"--password=foo"},      // NOLINT
-         {"--password=xxx"_sd}},  // NOLINT
-        {{"-ppassword"},          // NOLINT
-         {"-pxxxxxxxx"}},         // NOLINT
-        // Having --password at the end of the parameters list should do nothing since it means
-        // prompt for password
-        {{"mongodb://admin@localhost/admin", "--password"},         // NOLINT
-         {"mongodb://admin@localhost/admin"_sd, "--password"_sd}},  // NOLINT
+    struct TestSpec {
+        std::vector<std::string> in;
+        std::vector<std::string_view> expected;
+        std::string note;
+    };
+    std::vector<TestSpec> testData{
+        {
+            {"-u", "admin", "-p", "password", "--port", "27017"},
+            {"-u", "admin", "-p", "xxxxxxxx", "--port", "27017"},
+            "Check that just passwords get redacted correctly",
+        },
+        {
+            {"-p", "password", "mongodb://admin:password@localhost"},
+            {"-p", "xxxxxxxx", "mongodb://admin@localhost"},
+            "Check that passwords and URIs get redacted correctly",
+        },
+        {
+            {"mongodb://admin:password@localhost"},
+            {"mongodb://admin@localhost"},
+            "Check that just URIs get redacted correctly",
+        },
+        {
+            {"localhost"},
+            {"localhost"},
+            "Sanity check that non-passwords don't get redacted",
+        },
+        {
+            {"-p"},
+            {"-p"},
+            "Sanity check that we don't overflow argv",
+        },
+        {
+            {"--password=foo"},
+            {"--password=xxx"},
+            "Check for --passsword=foo",
+        },
+        {
+            {"-ppassword"},
+            {"-pxxxxxxxx"},
+        },
+        {
+            {"mongodb://admin@localhost/admin", "--password"},
+            {"mongodb://admin@localhost/admin", "--password"},
+            "Having --password at the end of the parameters list should do nothing since it means "
+            "prompt for password",
+        },
     };
 
-    for (auto& testCase : testData) {
+    for (auto& [in, expected, note] : testData) {
+        SCOPED_TRACE(note);
         // Sanity check for the test data
-        ASSERT_EQ(testCase.first.size(), testCase.second.size());
+        ASSERT_EQ(in.size(), expected.size());
         std::vector<char*> argv;
-        for (const auto& arg : testCase.first) {
+        for (const auto& arg : in) {
             argv.push_back(const_cast<char*>(&arg.front()));
         }
 
         redactPasswordOptions(argv.size(), &argv.front());
-        for (size_t i = 0; i < testCase.first.size(); i++) {
-            auto shrunkArg = testCase.first[i];
-            shrunkArg.resize(::strlen(shrunkArg.c_str()));
-            ASSERT_EQ(shrunkArg, testCase.second[i]);
+        for (size_t i = 0; i < in.size(); i++) {
+            SCOPED_TRACE(fmt::format("i: {}", i));
+            auto shrunkArg = in[i];
+            shrunkArg.resize(strlen(shrunkArg.c_str()));
+            ASSERT_EQ(shrunkArg, expected[i]);
         }
     }
 }

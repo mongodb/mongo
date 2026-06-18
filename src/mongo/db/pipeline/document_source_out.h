@@ -67,6 +67,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -83,7 +84,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Out);
  */
 class DocumentSourceOut final : public DocumentSourceWriter {
 public:
-    static constexpr StringData kStageName = "$out"_sd;
+    static constexpr std::string_view kStageName = "$out"_sd;
 
     /**
      * A "lite parsed" $out stage is similar to other stages involving foreign collections except in
@@ -160,7 +161,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

@@ -37,6 +37,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -63,7 +64,7 @@ public:
                                                                  FieldRef* pathTaken);
 
     UpdateArrayNode(
-        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters)
+        const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters)
         : UpdateInternalNode(Type::Array), _arrayFilters(arrayFilters) {}
 
     std::unique_ptr<UpdateNode> clone() const final {
@@ -100,7 +101,7 @@ public:
     }
 
 private:
-    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& _arrayFilters;
+    const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>& _arrayFilters;
     std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes> _children;
 
     // When calling apply() causes us to merge elements of '_children', we store the result of the

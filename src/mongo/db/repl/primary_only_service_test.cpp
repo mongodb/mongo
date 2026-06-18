@@ -64,6 +64,7 @@
 #include <memory>
 #include <mutex>
 #include <ostream>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 
@@ -77,7 +78,8 @@ using namespace mongo::repl;
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace {
-constexpr StringData kTestServiceName = "TestService"_sd;
+using namespace std::literals::string_view_literals;
+constexpr std::string_view kTestServiceName = "TestService"sv;
 
 MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringInitialization);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringStateOne);
@@ -100,7 +102,7 @@ public:
     explicit TestService(ServiceContext* serviceContext) : PrimaryOnlyService(serviceContext) {}
     ~TestService() override = default;
 
-    StringData getServiceName() const override {
+    std::string_view getServiceName() const override {
         return kTestServiceName;
     }
 

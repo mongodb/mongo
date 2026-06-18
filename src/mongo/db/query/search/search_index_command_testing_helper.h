@@ -50,6 +50,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/stacktrace.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -58,10 +60,10 @@ namespace mongo {
 
 namespace search_index_testing_helper {
 
-constexpr mongo::StringData kListCommand = "$listSearchIndexes"_sd;
-constexpr mongo::StringData kCreateCommand = "createSearchIndexes"_sd;
-constexpr mongo::StringData kUpdateCommand = "updateSearchIndex"_sd;
-constexpr mongo::StringData kDropCommand = "dropSearchIndex"_sd;
+constexpr std::string_view kListCommand = "$listSearchIndexes"_sd;
+constexpr std::string_view kCreateCommand = "createSearchIndexes"_sd;
+constexpr std::string_view kUpdateCommand = "updateSearchIndex"_sd;
+constexpr std::string_view kDropCommand = "dropSearchIndex"_sd;
 // In production sharded clusters, search index commands are received by the router which forwards
 // them to the SearchIndexManagement service (Envoy) which are then routed to MMS and stored in the
 // control plane DB. The mongots makes regular calls to the control plane to get the updated set of

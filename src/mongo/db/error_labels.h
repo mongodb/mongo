@@ -39,14 +39,15 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
-static constexpr StringData kErrorLabelsFieldName = "errorLabels"_sd;
-static constexpr StringData kRetryAfterMSFieldName = "retryAfterMS"_sd;
+static constexpr std::string_view kErrorLabelsFieldName = "errorLabels"_sd;
+static constexpr std::string_view kRetryAfterMSFieldName = "retryAfterMS"_sd;
 namespace ErrorLabel {
 // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
 constexpr inline auto kTransientTransaction = "TransientTransactionError"_sd;

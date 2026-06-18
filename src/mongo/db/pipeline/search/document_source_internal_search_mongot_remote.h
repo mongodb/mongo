@@ -43,6 +43,7 @@
 #include "mongo/util/stacktrace.h"
 
 #include <queue>
+#include <string_view>
 
 namespace mongo {
 
@@ -56,7 +57,7 @@ struct InternalSearchMongotRemoteSharedState {
  */
 class DocumentSourceInternalSearchMongotRemote : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalSearchMongotRemote"_sd;
+    static constexpr std::string_view kStageName = "$_internalSearchMongotRemote"_sd;
 
     static StageConstraints getSearchDefaultConstraints() {
         StageConstraints constraints(StreamType::kStreaming,
@@ -82,7 +83,7 @@ public:
         return getSearchDefaultConstraints();
     }
 
-    StringData getSourceName() const override;
+    std::string_view getSourceName() const override;
 
     static const Id& id;
 

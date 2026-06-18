@@ -37,6 +37,8 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -50,7 +52,7 @@ namespace mongo {
  */
 class ExpressionTestFeatureFlags : public Expression {
 public:
-    ExpressionTestFeatureFlags(ExpressionContext* const expCtx, StringData exprName)
+    ExpressionTestFeatureFlags(ExpressionContext* const expCtx, std::string_view exprName)
         : Expression(expCtx), _exprName(exprName) {};
 
     Value evaluate(const Document& root,
@@ -62,15 +64,15 @@ public:
     }
 
 protected:
-    static void _validateInternal(const BSONElement& expr, StringData testExpressionName);
+    static void _validateInternal(const BSONElement& expr, std::string_view testExpressionName);
 
 private:
-    const StringData _exprName;
+    const std::string_view _exprName;
 };
 
 class ExpressionTestFeatureFlagLatest final : public ExpressionTestFeatureFlags {
 public:
-    static constexpr StringData kName = "$_testFeatureFlagLatest"_sd;
+    static constexpr std::string_view kName = "$_testFeatureFlagLatest"_sd;
 
     ExpressionTestFeatureFlagLatest(ExpressionContext* const expCtx)
         : ExpressionTestFeatureFlags(expCtx, kName) {};
@@ -94,7 +96,7 @@ public:
 
 class ExpressionTestFeatureFlagLastLTS final : public ExpressionTestFeatureFlags {
 public:
-    static constexpr StringData kName = "$_testFeatureFlagLastLTS"_sd;
+    static constexpr std::string_view kName = "$_testFeatureFlagLastLTS"_sd;
 
     ExpressionTestFeatureFlagLastLTS(ExpressionContext* const expCtx)
         : ExpressionTestFeatureFlags(expCtx, kName) {};

@@ -48,6 +48,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <string_view>
 
 #include <jsapi.h>
 #include <jscustomallocator.h>
@@ -251,13 +252,13 @@ JSObject* ModuleLoader::loadRootModuleFromPath(JSContext* cx, const std::string&
 
 JSObject* ModuleLoader::loadRootModuleFromSource(JSContext* cx,
                                                  const std::string& path,
-                                                 StringData source) {
+                                                 std::string_view source) {
     return loadRootModule(cx, path, source);
 }
 
 JSObject* ModuleLoader::loadRootModule(JSContext* cx,
                                        const std::string& path,
-                                       boost::optional<StringData> source) {
+                                       boost::optional<std::string_view> source) {
     JS::RootedString baseUrl(cx, JS_NewStringCopyN(cx, _baseUrl.c_str(), _baseUrl.size()));
     if (!baseUrl) {
         uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create baseUrl");
@@ -727,7 +728,7 @@ JSString* ModuleLoader::fileAsString(JSContext* cx, JS::HandleString pathnameStr
 
 JSObject* ModuleLoader::createScriptPrivateInfo(JSContext* cx,
                                                 JS::Handle<JSString*> path,
-                                                boost::optional<StringData> source) {
+                                                boost::optional<std::string_view> source) {
     JS::Rooted<JSObject*> info(cx, JS_NewPlainObject(cx));
     if (!info) {
         return nullptr;

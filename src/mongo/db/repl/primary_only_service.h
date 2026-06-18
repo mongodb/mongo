@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -59,6 +58,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -234,7 +234,7 @@ public:
     /**
      * Returns the name of this Primary Only Service.
      */
-    virtual StringData getServiceName() const = 0;
+    virtual std::string_view getServiceName() const = 0;
 
     /**
      * Returns the collection where state documents corresponding to instances of this service are
@@ -520,7 +520,7 @@ private:
     /**
      * Returns a string representation of the current state.
      */
-    StringData _getStateString(WithLock) const;
+    std::string_view _getStateString(WithLock) const;
 
     /**
      *  Blocks until `_state` is not equal to `kRebuilding`. May release the mutex, but always
@@ -615,7 +615,7 @@ public:
      * Since all services live for the lifetime of the mongod process (unlike their Instance
      * objects), there's no concern about the returned pointer becoming invalid.
      */
-    PrimaryOnlyService* lookupServiceByName(StringData serviceName);
+    PrimaryOnlyService* lookupServiceByName(std::string_view serviceName);
 
     /**
      * Looks up a registered service by the namespace of its state document collection. Returns

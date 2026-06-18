@@ -46,6 +46,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -155,7 +156,7 @@ public:
         }
 
         template <typename T>
-        Options setParameter(StringData parameter, T value) {
+        Options setParameter(std::string_view parameter, T value) {
             _parameters.emplace_back(parameter, value);
             return std::move(*this);
         }

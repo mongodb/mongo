@@ -36,6 +36,7 @@
 
 namespace mongo {
 namespace unittest {
+using namespace std::literals::string_view_literals;
 
 std::string formatJsonStr(const std::string& input) {
     BSONObj obj = fromjson(input);
@@ -45,7 +46,7 @@ std::string formatJsonStr(const std::string& input) {
     // Raw JSON strings additionally have `fromjson(R())`, so subtract that from the auto-update max
     // line length.
     static constexpr size_t kRawJsonMaxLineLength =
-        kAutoUpdateMaxLineLength - "fromjson(R())"_sd.size();
+        kAutoUpdateMaxLineLength - "fromjson(R())"sv.size();
     if (str.size() > kRawJsonMaxLineLength) {
         str = obj.jsonString(format, 1);
     }

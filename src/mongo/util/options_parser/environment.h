@@ -39,6 +39,7 @@
 
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 MONGO_MOD_PUBLIC;
@@ -154,13 +155,13 @@ public:
      *  status if the value was found, or an error status if the value was not found.
      *  Leaves the Value unchanged on error.
      */
-    Status get(StringData key, Value* value) const;
+    Status get(std::string_view key, Value* value) const;
 
     /** Same as the above get interface, but supports directly getting C++ types without the
      *  intermediate Value and has the added failure case of the value being the wrong type
      */
     template <typename T>
-    Status get(StringData key, T* value_contents) const;
+    Status get(std::string_view key, T* value_contents) const;
 
     /** Runs all registered Constraints and returns the result.  If "setValid" is true and
      * validation succeeds, marks this as a valid Environment so that any modifications will
@@ -178,13 +179,13 @@ public:
      */
 
     /** Returns true if the given Key exists in this Environment. */
-    bool count(StringData key) const;
+    bool count(std::string_view key) const;
 
     /**
      *  @return the Value for the given Key in this Environment.  Returns an empty Value if
      *  Key is not set.
      */
-    Value operator[](StringData key) const;
+    Value operator[](std::string_view key) const;
 
     /**
      * Gets the BSON representation of this Environment.  This will collapse dotted fields
@@ -235,7 +236,7 @@ protected:
 };
 
 template <typename T>
-Status Environment::get(StringData get_key, T* get_value) const {
+Status Environment::get(std::string_view get_key, T* get_value) const {
     Value value;
     Status ret = get(get_key, &value);
     if (!ret.isOK()) {

@@ -30,7 +30,6 @@
 #include "mongo/db/storage/storage_engine.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -82,6 +81,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -96,6 +96,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 void callbackMock() {}
 
@@ -104,8 +105,8 @@ TEST_F(StorageEngineTest, DirectWritesInsertTest) {
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
 
     const int64_t intKey{1};
-    const std::span<const char> strKey{"key"_sd};
-    const std::span<const char> value{"test"_sd};
+    const std::span<const char> strKey{"key"sv};
+    const std::span<const char> value{"test"sv};
 
     auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
     auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
@@ -142,8 +143,8 @@ TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
 
     const int64_t intKey{1};
-    const std::span<const char> strKey{"key"_sd};
-    const std::span<const char> value{"test"_sd};
+    const std::span<const char> strKey{"key"sv};
+    const std::span<const char> value{"test"sv};
 
     auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
     auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
@@ -199,10 +200,10 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
 
     const int64_t intKey{1};
     const int64_t nonExistentIntKey{2};
-    const std::span<const char> strKey{"key"_sd};
-    const std::span<const char> nonExistentStrKey{"nonExistentKey"_sd};
-    const std::span<const char> value1{"test1"_sd};
-    const std::span<const char> value2{"test2"_sd};
+    const std::span<const char> strKey{"key"sv};
+    const std::span<const char> nonExistentStrKey{"nonExistentKey"sv};
+    const std::span<const char> value1{"test1"sv};
+    const std::span<const char> value2{"test2"sv};
 
     auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
     auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
@@ -395,7 +396,7 @@ TEST_F(StorageEngineTest, InternalRecordStoreClustered) {
     ASSERT(identExists(opCtx.get(), rs->getIdent()));
 
     // Insert record with RecordId of KeyFormat::String.
-    const auto id = StringData{"1"};
+    const auto id = std::string_view{"1"};
     const auto rid = RecordId(id);
     const auto data = "data";
     WriteUnitOfWork wuow(opCtx.get());
@@ -449,7 +450,7 @@ protected:
     }
 
     // Creates a table in the KV engine with a specific ident name, not reflected in the catalog.
-    void createTableWithIdent(OperationContext* opCtx, StringData ident) {
+    void createTableWithIdent(OperationContext* opCtx, std::string_view ident) {
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         Lock::GlobalLock lk(opCtx, MODE_IS);
@@ -1456,7 +1457,7 @@ StorageEngine* reconfigureStorageEngine(OperationContext* opCtx, auto fn) {
 
 std::pair<std::string, std::string> createCollectionAndIndex(OperationContext* opCtx,
                                                              StorageEngineTest& fixture,
-                                                             StringData ns) {
+                                                             std::string_view ns) {
 
     Lock::GlobalLock lk(opCtx, MODE_X);
     auto collNs = NamespaceString::createNamespaceString_forTest(ns);

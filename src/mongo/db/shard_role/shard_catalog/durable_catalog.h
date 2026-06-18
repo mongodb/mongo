@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -47,6 +46,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -116,7 +116,7 @@ MONGO_MOD_PRIVATE Status createIndex(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      const CollectionOptions& collectionOptions,
                                      const IndexConfig& indexConfig,
-                                     StringData ident);
+                                     std::string_view ident);
 
 /**
  * Import a collection by inserting the given metadata into the durable catalog and instructing
@@ -174,7 +174,7 @@ dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const CollectionOptions& options,
                                    const IndexConfig& indexConfig,
-                                   StringData ident);
+                                   std::string_view ident);
 
 MONGO_MOD_PRIVATE void getReadyIndexes(OperationContext* opCtx,
                                        RecordId catalogId,
@@ -183,7 +183,7 @@ MONGO_MOD_PRIVATE void getReadyIndexes(OperationContext* opCtx,
 
 MONGO_MOD_PRIVATE bool isIndexPresent(OperationContext* opCtx,
                                       const RecordId& catalogId,
-                                      StringData indexName,
+                                      std::string_view indexName,
                                       const MDBCatalog* mdbCatalog);
 
 MONGO_MOD_NEEDS_REPLACEMENT void sanitizeTimeseriesOptions(

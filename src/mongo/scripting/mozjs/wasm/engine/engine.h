@@ -57,6 +57,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include "error.h"
@@ -246,7 +247,7 @@ private:
 class MozJSScriptEngine : private MozJSCommonRuntimeInterface {
 public:
     MozJSScriptEngine() = default;
-    ~MozJSScriptEngine();
+    ~MozJSScriptEngine() override;
 
     MozJSScriptEngine(const MozJSScriptEngine&) = delete;
     MozJSScriptEngine& operator=(const MozJSScriptEngine&) = delete;
@@ -254,7 +255,7 @@ public:
     err_code_t init(const wasm_mozjs_startup_options_t* opt, wasm_mozjs_error_t* err);
     err_code_t shutdown(wasm_mozjs_error_t* err);
     err_code_t interrupt(wasm_mozjs_error_t* err);
-    bool exec(StringData code, const std::string& name);
+    bool exec(std::string_view code, const std::string& name);
 
     err_code_t createFunction(const uint8_t* src,
                               size_t len,
@@ -326,7 +327,7 @@ public:
 
     void setStatus(Status status) override;
     bool isJavaScriptProtectionEnabled() const override;
-    void newFunction(StringData code, JS::MutableHandleValue out) override;
+    void newFunction(std::string_view code, JS::MutableHandleValue out) override;
     bool requiresOwnedObjects() const override;
     void trackNewPointer(void* ptr) override;
     void trackDeletePointer(void* ptr) override;
@@ -337,7 +338,7 @@ private:
     // Call __parseJSFunctionOrExpression (installed during init) with `raw` and write the
     // properly-wrapped function source into `*out`.  Must be called inside a JSAutoRealm.
     // Returns false and populates `err` (if non-null) on failure; a JS exception is left pending.
-    bool _parseFunctionSource(StringData raw, std::string* out, wasm_mozjs_error_t* err);
+    bool _parseFunctionSource(std::string_view raw, std::string* out, wasm_mozjs_error_t* err);
 
     bool _initialized = false;
     bool _javascriptProtection = false;

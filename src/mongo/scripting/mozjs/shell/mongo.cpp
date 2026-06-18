@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -78,6 +77,7 @@
 #include <initializer_list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -95,6 +95,7 @@
 
 namespace mongo {
 namespace mozjs {
+using namespace std::literals::string_view_literals;
 
 const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(auth, MongoExternalInfo),
@@ -413,7 +414,7 @@ void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
 
     auto reply = std::get<0>(res)->getCommandReply();
     if constexpr (Params::kHoistReply) {
-        constexpr auto kCommandReplyField = "commandReply"_sd;
+        constexpr auto kCommandReplyField = "commandReply"sv;
         reply = BSON(kCommandReplyField << reply);
     } else {
         // The returned object is not read only as some of our tests depend on modifying it.
@@ -438,12 +439,12 @@ void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
 
 struct RunCommandParams {
     static constexpr bool kHoistReply = false;
-    static constexpr auto kCommandName = "runCommand"_sd;
-    static constexpr auto kArg1Name = "cmdObj"_sd;
+    static constexpr auto kCommandName = "runCommand"sv;
+    static constexpr auto kArg1Name = "cmdObj"sv;
 };
 
 void MongoBase::Functions::_runCommandImpl::call(JSContext* cx, JS::CallArgs args) {
-    doRunCommand<RunCommandParams>(cx, args, [&](StringData database, BSONObj cmd) {
+    doRunCommand<RunCommandParams>(cx, args, [&](std::string_view database, BSONObj cmd) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "The options parameter to runCommand must be a number",
                 args.get(2).isNumber());
@@ -932,7 +933,7 @@ void MongoBase::Functions::_setOIDCIdPAuthCallback::call(JSContext* cx, JS::Call
     // the function as a string, stash it into a lambda, and execute it directly when needed.
     std::string stringifiedFn = ValueWriter(cx, args.get(0)).toString();
     SaslOIDCClientConversation::setOIDCIdPAuthCallback(
-        [=](StringData userName, StringData idpEndpoint, StringData userCode) {
+        [=](std::string_view userName, std::string_view idpEndpoint, std::string_view userCode) {
             std::unique_ptr<Scope> jsScope{getGlobalScriptEngine()->newScope()};
             BSONObj authInfo = BSON("userName" << userName << "userCode" << userCode
                                                << "activationEndpoint" << idpEndpoint);

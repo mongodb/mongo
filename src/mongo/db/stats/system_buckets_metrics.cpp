@@ -41,17 +41,18 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 // TODO SERVER-119235: Remove chunk-related commands once they support rawData.
-static const StringDataSet kCommandsAllowedToTargetBuckets = {"moveChunk"_sd,
-                                                              "split"_sd,
-                                                              "mergeChunks"_sd,
-                                                              "moveRange"_sd,
-                                                              "clearJumboFlag"_sd,
-                                                              "cleanupOrphaned"_sd,
-                                                              "mergeAllChunksOnShard"_sd,
-                                                              "configureCollectionBalancing"_sd,
-                                                              "balancerCollectionStatus"_sd};
+static const StringDataSet kCommandsAllowedToTargetBuckets = {"moveChunk"sv,
+                                                              "split"sv,
+                                                              "mergeChunks"sv,
+                                                              "moveRange"sv,
+                                                              "clearJumboFlag"sv,
+                                                              "cleanupOrphaned"sv,
+                                                              "mergeAllChunksOnShard"sv,
+                                                              "configureCollectionBalancing"sv,
+                                                              "balancerCollectionStatus"sv};
 
 SystemBucketsMetricsCommandHooks::SystemBucketsMetricsCommandHooks() {
     _commandsExecuted = &*MetricBuilder<Counter64>("numCommandsTargetingSystemBuckets");

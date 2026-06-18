@@ -130,6 +130,7 @@
 
 #include <array>
 #include <mutex>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -413,7 +414,7 @@ void MigrationDestinationManager::_setState(State newState) {
     _stateChangedCV.notify_all();
 }
 
-void MigrationDestinationManager::_setStateFailNoLog(StringData msg) {
+void MigrationDestinationManager::_setStateFailNoLog(std::string_view msg) {
     {
         std::lock_guard<std::mutex> sl(_mutex);
         _errmsg = std::string{msg};
@@ -426,7 +427,7 @@ void MigrationDestinationManager::_setStateFailNoLog(StringData msg) {
     }
 }
 
-void MigrationDestinationManager::_setStateFail(StringData msg) {
+void MigrationDestinationManager::_setStateFail(std::string_view msg) {
     static StaticImmortal<logv2::SeveritySuppressor> logSuppressor{
         Seconds{1}, logv2::LogSeverity::Log(), logv2::LogSeverity::Debug(2)};
     LOGV2_DEBUG(21998,
@@ -437,7 +438,7 @@ void MigrationDestinationManager::_setStateFail(StringData msg) {
     _setStateFailNoLog(msg);
 }
 
-void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
+void MigrationDestinationManager::_setStateFailWarn(std::string_view msg) {
     static StaticImmortal<logv2::SeveritySuppressor> logSuppressor{
         Seconds{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
     LOGV2_DEBUG(22010,

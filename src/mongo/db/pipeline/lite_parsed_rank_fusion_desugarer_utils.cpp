@@ -33,29 +33,34 @@
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/lite_parsed_hybrid_search_desugarer_utils.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer::rank_fusion_utils {
+using namespace std::literals::string_view_literals;
 
 BSONObj buildSetWindowFieldsBson(const std::string& rankFieldName) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder swfBob(bob.subobjStart("$_internalSetWindowFields"_sd));
+        BSONObjBuilder swfBob(bob.subobjStart("$_internalSetWindowFields"sv));
         swfBob.append("sortBy", BSON("order" << 1));
-        BSONObjBuilder outputBob(swfBob.subobjStart("output"_sd));
+        BSONObjBuilder outputBob(swfBob.subobjStart("output"sv));
         outputBob.append(rankFieldName, BSON("$rank" << BSONObj()));
     }
     return bob.obj();
 }
 
-BSONObj buildScoreAddFieldsBson(StringData inputPipelineName, int rankConstant, double weight) {
+BSONObj buildScoreAddFieldsBson(std::string_view inputPipelineName,
+                                int rankConstant,
+                                double weight) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         const std::string scoreField = hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
             kInternalFieldsName, fmt::format("{}_score", inputPipelineName));
         BSONObjBuilder scoreBob(addFieldsBob.subobjStart(scoreField));
-        BSONArrayBuilder multArr(scoreBob.subarrayStart("$multiply"_sd));
+        BSONArrayBuilder multArr(scoreBob.subarrayStart("$multiply"sv));
         const std::string rankPath =
             fmt::format("${}",
                         hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
@@ -67,14 +72,14 @@ BSONObj buildScoreAddFieldsBson(StringData inputPipelineName, int rankConstant, 
     return bob.obj();
 }
 
-BSONObj buildAddInputPipelineScoreDetailsBson(StringData inputPipelineName,
+BSONObj buildAddInputPipelineScoreDetailsBson(std::string_view inputPipelineName,
                                               bool inputGeneratesScore,
                                               bool inputGeneratesScoreDetails) {
     const std::string scoreDetailsField = hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
         kInternalFieldsName, fmt::format("{}_scoreDetails", inputPipelineName));
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         if (inputGeneratesScoreDetails) {
             addFieldsBob.append(scoreDetailsField, BSON("$meta" << "scoreDetails"));
         } else if (inputGeneratesScore) {
@@ -91,7 +96,7 @@ BSONObj buildAddInputPipelineScoreDetailsBson(StringData inputPipelineName,
 BSONObj buildRankAddFieldsBson(const std::vector<std::string>& pipelineNames) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         for (const auto& pipelineName : pipelineNames) {
             const std::string rankField = hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
                 kInternalFieldsName, fmt::format("{}_rank", pipelineName));
@@ -107,9 +112,9 @@ BSONObj buildRankAddFieldsBson(const std::vector<std::string>& pipelineNames) {
 BSONObj buildSetMetadataScoreBson(const std::vector<std::string>& pipelineNames) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder smBob(bob.subobjStart("$setMetadata"_sd));
-        BSONObjBuilder scoreBob(smBob.subobjStart("score"_sd));
-        BSONArrayBuilder addArr(scoreBob.subarrayStart("$add"_sd));
+        BSONObjBuilder smBob(bob.subobjStart("$setMetadata"sv));
+        BSONObjBuilder scoreBob(smBob.subobjStart("score"sv));
+        BSONArrayBuilder addArr(scoreBob.subarrayStart("$add"sv));
         for (const auto& pipelineName : pipelineNames) {
             addArr.append(
                 fmt::format("${}",
@@ -123,9 +128,9 @@ BSONObj buildSetMetadataScoreBson(const std::vector<std::string>& pipelineNames)
 BSONObj buildAddFieldsScoreBson(const std::vector<std::string>& pipelineNames) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder afBob(bob.subobjStart("$addFields"_sd));
-        BSONObjBuilder scoreBob(afBob.subobjStart("score"_sd));
-        BSONArrayBuilder addArr(scoreBob.subarrayStart("$add"_sd));
+        BSONObjBuilder afBob(bob.subobjStart("$addFields"sv));
+        BSONObjBuilder scoreBob(afBob.subobjStart("score"sv));
+        BSONArrayBuilder addArr(scoreBob.subarrayStart("$add"sv));
         for (const auto& pipelineName : pipelineNames) {
             addArr.append(
                 fmt::format("${}",
@@ -140,9 +145,9 @@ BSONObj buildCalculatedFinalScoreDetailsBson(const std::vector<std::string>& pip
                                              const StringMap<double>& weights) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         BSONObjBuilder internalFieldsBob(addFieldsBob.subobjStart(kInternalFieldsName));
-        BSONArrayBuilder calcArr(internalFieldsBob.subarrayStart("calculatedScoreDetails"_sd));
+        BSONArrayBuilder calcArr(internalFieldsBob.subarrayStart("calculatedScoreDetails"sv));
         for (const auto& pipelineName : pipelineNames) {
             // Path of the pipeline's scoreDetails subobject: <INTERNAL_FIELDS>.<p>
             const std::string internalFieldsPipelineName =
@@ -152,8 +157,8 @@ BSONObj buildCalculatedFinalScoreDetailsBson(const std::vector<std::string>& pip
             double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
 
             BSONObjBuilder mergeSub;
-            mergeSub.append("inputPipelineName"_sd, pipelineName);
-            mergeSub.append("rank"_sd, rankPath);
+            mergeSub.append("inputPipelineName"sv, pipelineName);
+            mergeSub.append("rank"sv, rankPath);
             mergeSub.append("weight",
                             BSON("$cond" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY(rankPath << "NA"))
                                                        << "$$REMOVE" << weight)));
@@ -170,8 +175,8 @@ BSONObj buildCalculatedFinalScoreDetailsBson(const std::vector<std::string>& pip
 BSONObj buildSetMetadataScoreDetailsBson() {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder smBob(bob.subobjStart("$setMetadata"_sd));
-        BSONObjBuilder sdBob(smBob.subobjStart("scoreDetails"_sd));
+        BSONObjBuilder smBob(bob.subobjStart("$setMetadata"sv));
+        BSONObjBuilder sdBob(smBob.subobjStart("scoreDetails"sv));
         sdBob.append("value", BSON("$meta" << "score"));
         sdBob.append("description", kScoreDetailsDescription);
         sdBob.append("details",

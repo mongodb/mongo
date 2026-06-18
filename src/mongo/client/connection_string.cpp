@@ -37,6 +37,7 @@
 #include "mongo/util/str.h"
 
 #include <set>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -46,7 +47,8 @@ ConnectionString::ConnectionString(HostAndPort server) : _type(ConnectionType::k
     _finishInit();
 }
 
-ConnectionString::ConnectionString(StringData replicaSetName, std::vector<HostAndPort> servers)
+ConnectionString::ConnectionString(std::string_view replicaSetName,
+                                   std::vector<HostAndPort> servers)
     : _type(ConnectionType::kReplicaSet),
       _servers(std::move(servers)),
       _replicaSetName(std::string{replicaSetName}) {
@@ -76,7 +78,7 @@ ConnectionString::ConnectionString(ConnectionType connType) : _type(connType), _
     invariant(_type == ConnectionType::kLocal);
 }
 
-ConnectionString ConnectionString::forReplicaSet(StringData replicaSetName,
+ConnectionString ConnectionString::forReplicaSet(std::string_view replicaSetName,
                                                  std::vector<HostAndPort> servers) {
     return ConnectionString(replicaSetName, std::move(servers));
 }
@@ -232,7 +234,7 @@ StatusWith<ConnectionString> ConnectionString::parse(const std::string& url) {
     return Status(ErrorCodes::FailedToParse, str::stream() << "invalid url [" << url << "]");
 }
 
-ConnectionString ConnectionString::deserialize(StringData url) {
+ConnectionString ConnectionString::deserialize(std::string_view url) {
     return uassertStatusOK(parse(std::string{url}));
 }
 

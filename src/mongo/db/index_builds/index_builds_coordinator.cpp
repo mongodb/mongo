@@ -109,6 +109,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <string_view>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -117,6 +118,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 using otel::metrics::MetricNames;
 using otel::metrics::MetricsService;
@@ -238,19 +240,19 @@ public:
 IndexBuildsSSS& indexBuildsSSS =
     *ServerStatusSectionBuilder<IndexBuildsSSS>("indexBuilds").forShard();
 
-constexpr StringData kCreateIndexesFieldName = "createIndexes"_sd;
-constexpr StringData kCommitIndexBuildFieldName = "commitIndexBuild"_sd;
-constexpr StringData kAbortIndexBuildFieldName = "abortIndexBuild"_sd;
-constexpr StringData kIndexesFieldName = "indexes"_sd;
-constexpr StringData kKeyFieldName = "key"_sd;
-constexpr StringData kUniqueFieldName = "unique"_sd;
-constexpr StringData kPrepareUniqueFieldName = "prepareUnique"_sd;
-constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillis =
-    "lastTimeBetweenCommitOplogAndCommitMillis"_sd;
-constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillisStartupRecovery =
-    "lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery"_sd;
-constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillisRestore =
-    "lastTimeBetweenCommitOplogAndCommitMillisRestore"_sd;
+constexpr std::string_view kCreateIndexesFieldName = "createIndexes"sv;
+constexpr std::string_view kCommitIndexBuildFieldName = "commitIndexBuild"sv;
+constexpr std::string_view kAbortIndexBuildFieldName = "abortIndexBuild"sv;
+constexpr std::string_view kIndexesFieldName = "indexes"sv;
+constexpr std::string_view kKeyFieldName = "key"sv;
+constexpr std::string_view kUniqueFieldName = "unique"sv;
+constexpr std::string_view kPrepareUniqueFieldName = "prepareUnique"sv;
+constexpr std::string_view kLastTimeBetweenCommitOplogAndCommitMillis =
+    "lastTimeBetweenCommitOplogAndCommitMillis"sv;
+constexpr std::string_view kLastTimeBetweenCommitOplogAndCommitMillisStartupRecovery =
+    "lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery"sv;
+constexpr std::string_view kLastTimeBetweenCommitOplogAndCommitMillisRestore =
+    "lastTimeBetweenCommitOplogAndCommitMillisRestore"sv;
 
 /**
  * Returns true if we should build the indexes an empty collection using the IndexCatalog and
@@ -479,7 +481,7 @@ void logFailure(Status status,
  */
 void forEachIndexBuild(
     const std::vector<std::shared_ptr<ReplIndexBuildState>>& indexBuilds,
-    StringData context,
+    std::string_view context,
     std::function<void(std::shared_ptr<ReplIndexBuildState> replState)> onIndexBuild) {
     if (indexBuilds.empty()) {
         return;
@@ -487,17 +489,17 @@ void forEachIndexBuild(
 
     auto indexBuildLogger = [](const auto& indexBuild) {
         BSONObjBuilder builder;
-        builder.append("buildUUID"_sd, indexBuild->buildUUID.toBSON());
-        builder.append("collectionUUID"_sd, indexBuild->collectionUUID.toBSON());
+        builder.append("buildUUID"sv, indexBuild->buildUUID.toBSON());
+        builder.append("collectionUUID"sv, indexBuild->collectionUUID.toBSON());
 
         BSONArrayBuilder names;
         for (const auto& indexName : toIndexNames(indexBuild->getIndexes())) {
             names.append(indexName);
         }
-        builder.append("indexNames"_sd, names.arr());
-        builder.append("protocol"_sd,
-                       indexBuild->protocol == IndexBuildProtocol::kTwoPhase ? "two phase"_sd
-                                                                             : "single phase"_sd);
+        builder.append("indexNames"sv, names.arr());
+        builder.append("protocol"sv,
+                       indexBuild->protocol == IndexBuildProtocol::kTwoPhase ? "two phase"sv
+                                                                             : "single phase"sv);
 
         return builder.obj();
     };
@@ -519,7 +521,9 @@ void forEachIndexBuild(
 /**
  * Updates currentOp for commitIndexBuild or abortIndexBuild.
  */
-void updateCurOpForCommitOrAbort(OperationContext* opCtx, StringData fieldName, UUID buildUUID) {
+void updateCurOpForCommitOrAbort(OperationContext* opCtx,
+                                 std::string_view fieldName,
+                                 UUID buildUUID) {
     BSONObjBuilder builder;
     buildUUID.appendToBuilder(&builder, fieldName);
     std::unique_lock<Client> lk(*opCtx->getClient());
@@ -677,7 +681,7 @@ void storeLastTimeBetweenVoteAndCommitMillis(const ReplIndexBuildState& replStat
  * build, parameterized for the different scenarios that we could be applying the entry from.
  */
 void storeLastTimeBetweenCommitOplogAndCommit(const ReplIndexBuildState& replState,
-                                              StringData metricName,
+                                              std::string_view metricName,
                                               AtomicWord<int64_t>& metric) {
     const auto metrics = replState.getIndexBuildMetrics();
     const auto now = Date_t::now();
@@ -1592,7 +1596,7 @@ boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNames(
         }
     };
     forEachIndexBuild(
-        indexBuilds, "IndexBuildsCoordinator::abortIndexBuildByIndexNames"_sd, onIndexBuild);
+        indexBuilds, "IndexBuildsCoordinator::abortIndexBuildByIndexNames"sv, onIndexBuild);
     return buildUUID;
 }
 
@@ -1648,7 +1652,7 @@ bool IndexBuildsCoordinator::hasIndexBuilder(OperationContext* opCtx,
 
         foundIndexBuilder = true;
     };
-    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::hasIndexBuilder"_sd, onIndexBuild);
+    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::hasIndexBuilder"sv, onIndexBuild);
     return foundIndexBuilder;
 }
 
@@ -1995,7 +1999,7 @@ std::size_t IndexBuildsCoordinator::getActiveIndexBuildCount(OperationContext* o
     auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
     // We use forEachIndexBuild() to log basic details on the current index builds and don't intend
     // to modify any of the index builds, hence the no-op.
-    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::getActiveIndexBuildCount"_sd, nullptr);
+    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::getActiveIndexBuildCount"sv, nullptr);
 
     return indexBuilds.size();
 }
@@ -2167,7 +2171,7 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
 
         auto builds = activeIndexBuilds.getAllIndexBuilds();
         forEachIndexBuild(builds,
-                          "IndexBuildsCoordinator::_onStepUpAsyncTaskFn"_sd,
+                          "IndexBuildsCoordinator::_onStepUpAsyncTaskFn"sv,
                           signalCommitQuorumAndRetrySkippedRecords);
     } catch (const DBException& ex) {
         LOGV2_DEBUG(7333100, 1, "Step-up task interrupted", "status"_attr = ex);
@@ -2286,7 +2290,7 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
         buildsStopped.insert({replState->buildUUID, aborted});
     };
     forEachIndexBuild(
-        indexBuilds, "IndexBuildsCoordinator::stopIndexBuildsForRollback"_sd, onIndexBuild);
+        indexBuilds, "IndexBuildsCoordinator::stopIndexBuildsForRollback"sv, onIndexBuild);
 
     return buildsStopped;
 }

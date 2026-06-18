@@ -31,7 +31,6 @@
 #include "mongo/db/index_builds/index_build_block.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/audit.h"

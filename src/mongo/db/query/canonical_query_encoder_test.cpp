@@ -58,6 +58,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -224,13 +225,14 @@ protected:
     }
 
     void testComputeKeyForPipeline(unittest::GoldenTestContext& gctx,
-                                   StringData matchStr,
-                                   StringData projStr) {
+                                   std::string_view matchStr,
+                                   std::string_view projStr) {
         auto& stream = gctx.outStream();
         stream << "==== VARIATION: sbe pipeline: " << matchStr << ", " << projStr;
         stream << std::endl;
 
-        auto pipelineObj = [](StringData matchStr, StringData projStr) -> std::vector<BSONObj> {
+        auto pipelineObj = [](std::string_view matchStr,
+                              std::string_view projStr) -> std::vector<BSONObj> {
             auto matchObj = fromjson(matchStr);
             if (projStr == "{}") {
                 return {matchObj};
@@ -669,7 +671,9 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeySBEWithPipeline) {
     unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
 
 
-    auto getLookupBson = [](StringData localField, StringData foreignField, StringData asField) {
+    auto getLookupBson = [](std::string_view localField,
+                            std::string_view foreignField,
+                            std::string_view asField) {
         return BSON("$lookup" << BSON("from" << foreignNss.coll() << "localField" << localField
                                              << "foreignField" << foreignField << "as" << asField));
     };

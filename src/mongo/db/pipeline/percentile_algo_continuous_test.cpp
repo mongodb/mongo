@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/percentile_algo_continuous.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"

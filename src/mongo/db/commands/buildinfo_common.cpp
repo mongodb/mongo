@@ -34,6 +34,8 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/util/buildinfo.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 Atomic<BuildInfoAuthModeEnum> gBuildInfoAuthMode{BuildInfoAuthModeEnum::kRequiresAuth};
@@ -41,12 +43,12 @@ Atomic<BuildInfoAuthModeEnum> gBuildInfoAuthMode{BuildInfoAuthModeEnum::kRequire
 
 void BuildInfoAuthModeServerParameter::append(OperationContext*,
                                               BSONObjBuilder* builder,
-                                              StringData fieldName,
+                                              std::string_view fieldName,
                                               const boost::optional<TenantId>&) {
     builder->append(fieldName, idl::serialize(gBuildInfoAuthMode.load()));
 }
 
-Status BuildInfoAuthModeServerParameter::setFromString(StringData strMode,
+Status BuildInfoAuthModeServerParameter::setFromString(std::string_view strMode,
                                                        const boost::optional<TenantId>&) try {
     gBuildInfoAuthMode.store(
         idl::deserialize<BuildInfoAuthModeEnum>(strMode, IDLParserContext{"buildInfoAuthMode"}));

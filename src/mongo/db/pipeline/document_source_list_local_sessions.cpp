@@ -47,6 +47,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -132,7 +133,7 @@ mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(
     }
 }
 
-mongo::ListSessionsSpec mongo::listSessionsParseSpec(StringData stageName,
+mongo::ListSessionsSpec mongo::listSessionsParseSpec(std::string_view stageName,
                                                      const BSONElement& spec) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << stageName << " options must be specified in an object, but found: "

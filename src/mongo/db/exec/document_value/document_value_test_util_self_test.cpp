@@ -27,66 +27,68 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(DocumentValueTestUtilSelfTest, DocumentEQ) {
-    ASSERT_DOCUMENT_EQ(Document({{"foo", "bar"_sd}}), Document({{"foo", "bar"_sd}}));
+    ASSERT_DOCUMENT_EQ(Document({{"foo", "bar"sv}}), Document({{"foo", "bar"sv}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentNE) {
-    ASSERT_DOCUMENT_NE(Document({{"foo", "bar"_sd}}), Document({{"foo", "baz"_sd}}));
+    ASSERT_DOCUMENT_NE(Document({{"foo", "bar"sv}}), Document({{"foo", "baz"sv}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentLT) {
-    ASSERT_DOCUMENT_LT(Document({{"foo", "bar"_sd}}), Document({{"foo", "baz"_sd}}));
+    ASSERT_DOCUMENT_LT(Document({{"foo", "bar"sv}}), Document({{"foo", "baz"sv}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentLTE) {
-    ASSERT_DOCUMENT_LTE(Document({{"foo", "bar"_sd}}), Document({{"foo", "baz"_sd}}));
-    ASSERT_DOCUMENT_LTE(Document({{"foo", "bar"_sd}}), Document({{"foo", "bar"_sd}}));
+    ASSERT_DOCUMENT_LTE(Document({{"foo", "bar"sv}}), Document({{"foo", "baz"sv}}));
+    ASSERT_DOCUMENT_LTE(Document({{"foo", "bar"sv}}), Document({{"foo", "bar"sv}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentGT) {
-    ASSERT_DOCUMENT_GT(Document({{"foo", "baz"_sd}}), Document({{"foo", "bar"_sd}}));
+    ASSERT_DOCUMENT_GT(Document({{"foo", "baz"sv}}), Document({{"foo", "bar"sv}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentGTE) {
-    ASSERT_DOCUMENT_GTE(Document({{"foo", "baz"_sd}}), Document({{"foo", "bar"_sd}}));
-    ASSERT_DOCUMENT_GTE(Document({{"foo", "bar"_sd}}), Document({{"foo", "bar"_sd}}));
+    ASSERT_DOCUMENT_GTE(Document({{"foo", "baz"sv}}), Document({{"foo", "bar"sv}}));
+    ASSERT_DOCUMENT_GTE(Document({{"foo", "bar"sv}}), Document({{"foo", "bar"sv}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueEQ) {
-    ASSERT_VALUE_EQ(Value("bar"_sd), Value("bar"_sd));
+    ASSERT_VALUE_EQ(Value("bar"sv), Value("bar"sv));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueNE) {
-    ASSERT_VALUE_NE(Value("bar"_sd), Value("baz"_sd));
+    ASSERT_VALUE_NE(Value("bar"sv), Value("baz"sv));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueLT) {
-    ASSERT_VALUE_LT(Value("bar"_sd), Value("baz"_sd));
+    ASSERT_VALUE_LT(Value("bar"sv), Value("baz"sv));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueLTE) {
-    ASSERT_VALUE_LTE(Value("bar"_sd), Value("baz"_sd));
-    ASSERT_VALUE_LTE(Value("bar"_sd), Value("bar"_sd));
+    ASSERT_VALUE_LTE(Value("bar"sv), Value("baz"sv));
+    ASSERT_VALUE_LTE(Value("bar"sv), Value("bar"sv));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueGT) {
-    ASSERT_VALUE_GT(Value("baz"_sd), Value("bar"_sd));
+    ASSERT_VALUE_GT(Value("baz"sv), Value("bar"sv));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueGTE) {
-    ASSERT_VALUE_GTE(Value("baz"_sd), Value("bar"_sd));
-    ASSERT_VALUE_GTE(Value("bar"_sd), Value("bar"_sd));
+    ASSERT_VALUE_GTE(Value("baz"sv), Value("bar"sv));
+    ASSERT_VALUE_GTE(Value("bar"sv), Value("bar"sv));
 }
 
 }  // namespace

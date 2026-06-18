@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
@@ -40,6 +39,8 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 /**
@@ -52,7 +53,7 @@ class DuplicateKeyTracker {
 
 public:
     DuplicateKeyTracker(OperationContext* opCtx,
-                        StringData ident,
+                        std::string_view ident,
                         LazyRecordStore::CreateMode createMode);
 
     /**

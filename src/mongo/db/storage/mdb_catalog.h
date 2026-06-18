@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 class MONGO_MOD_FILE_PRIVATE MDBCatalogTest;
@@ -112,19 +112,19 @@ public:
 
     std::string getIndexIdent(OperationContext* opCtx,
                               const RecordId& catalogId,
-                              StringData idxName) const;
+                              std::string_view idxName) const;
 
     std::vector<std::string> getIndexIdents(OperationContext* opCtx, const RecordId& catalogId);
 
     /**
      * Checks if any collection tracked in the catalog is using the given ident.
      */
-    bool hasCollectionIdent(OperationContext* opCtx, StringData ident) const;
+    bool hasCollectionIdent(OperationContext* opCtx, std::string_view ident) const;
 
     /**
      * Checks if any index tracked in the catalog is using the given ident.
      */
-    bool hasIndexIdent(OperationContext* opCtx, StringData ident) const;
+    bool hasIndexIdent(OperationContext* opCtx, std::string_view ident) const;
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward = true) const;

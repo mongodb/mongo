@@ -32,6 +32,7 @@
 #include "mongo/bson/util/builder.h"
 
 #include <iosfwd>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -51,7 +52,7 @@ void RuntimeEnvironment::registerSlot(value::TypeTags tag,
     _accessors.at(slotId).reset(value::TagValueMaybeOwned::fromRaw(owned, tag, val));
 }
 
-value::SlotId RuntimeEnvironment::registerSlot(StringData name,
+value::SlotId RuntimeEnvironment::registerSlot(std::string_view name,
                                                value::TypeTags tag,
                                                value::Value val,
                                                bool owned,
@@ -71,13 +72,13 @@ value::SlotId RuntimeEnvironment::registerSlot(value::TypeTags tag,
     return slot;
 }
 
-value::SlotId RuntimeEnvironment::getSlot(StringData name) const {
+value::SlotId RuntimeEnvironment::getSlot(std::string_view name) const {
     auto slot = getSlotIfExists(name);
     uassert(4946305, str::stream() << "environment slot is not registered: " << name, slot);
     return *slot;
 }
 
-boost::optional<value::SlotId> RuntimeEnvironment::getSlotIfExists(StringData name) const {
+boost::optional<value::SlotId> RuntimeEnvironment::getSlotIfExists(std::string_view name) const {
     if (auto it = _state->namedSlots.find(name); it != _state->namedSlots.end()) {
         return it->second;
     }
@@ -152,7 +153,7 @@ void RuntimeEnvironment::debugString(StringBuilder* builder,
                                      boost::optional<size_t> lengthCap /*= boost::none*/) const {
     using namespace std::literals;
 
-    value::SlotMap<StringData> slotName;
+    value::SlotMap<std::string_view> slotName;
     for (const auto& [name, slot] : _state->namedSlots) {
         slotName[slot] = name;
     }

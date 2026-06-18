@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression.h"
@@ -39,12 +38,14 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 
 class InternalSetWindowFieldsStage final : public Stage {
 public:
     InternalSetWindowFieldsStage(
-        StringData stageName,
+        std::string_view stageName,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::optional<boost::intrusive_ptr<Expression>>& partitionBy,
         const boost::optional<SortPattern>& sortBy,

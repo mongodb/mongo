@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/lru_key_value.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 

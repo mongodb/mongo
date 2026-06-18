@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/metrics/phase_duration.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 

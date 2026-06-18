@@ -96,7 +96,7 @@ runAndValidate(targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
 
 ```
 template <class F>
-auto routeWithRoutingContext(StringData comment, F&& callbackFn);
+auto routeWithRoutingContext(std::string_view comment, F&& callbackFn);
 
 // Sample Usage
 sharding::router::CollectionRouter router(serviceCtx, "test.foo");

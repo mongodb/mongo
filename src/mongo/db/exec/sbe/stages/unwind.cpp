@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/unwind.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -39,10 +38,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 UnwindStage::UnwindStage(std::unique_ptr<PlanStage> input,
                          value::SlotId inField,
                          value::SlotId outField,
@@ -51,7 +52,7 @@ UnwindStage::UnwindStage(std::unique_ptr<PlanStage> input,
                          PlanNodeId planNodeId,
                          PlanYieldPolicySBE* yieldPolicy,
                          bool participateInTrialRunTracking)
-    : PlanStage("unwind"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
+    : PlanStage("unwind"sv, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _inField(inField),
       _outField(outField),
       _outIndex(outIndex),

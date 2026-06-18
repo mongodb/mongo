@@ -39,6 +39,8 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::extension::sdk::shared_test_stages {
 /**
  * =====================================================================

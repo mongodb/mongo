@@ -54,6 +54,7 @@
 #include "mongo/util/pcre_util.h"
 
 #include <algorithm>
+#include <string_view>
 #include <vector>
 
 #include <fmt/format.h>
@@ -63,6 +64,7 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 MONGO_FAIL_POINT_DEFINE(initializePlacementHistoryHangAfterSettingSnapshotReadConcern);
 
 // Index hint that is used for timestamp-based queries. This is necessary because the placement
@@ -633,16 +635,16 @@ public:
         //   placementAtInitTime: <arrayofShardIds or null>,
         // }
         const auto isComputedPlacementAccurate =
-            result.getBoolField("isComputedPlacementAccurate"_sd);
+            result.getBoolField("isComputedPlacementAccurate"sv);
 
         // No placement data may be returned if no response may be computed 'atClusterTime' and no
         // approximate data is available from the initialization doc.
-        if (!isComputedPlacementAccurate && result.getField("placementAtInitTime"_sd).isNull()) {
+        if (!isComputedPlacementAccurate && result.getField("placementAtInitTime"sv).isNull()) {
             return HistoricalPlacement{{}, HistoricalPlacementStatus::NotAvailable};
         }
 
-        const StringData sourceField =
-            isComputedPlacementAccurate ? "computedPlacement"_sd : "placementAtInitTime"_sd;
+        const std::string_view sourceField =
+            isComputedPlacementAccurate ? "computedPlacement"sv : "placementAtInitTime"sv;
 
         std::vector<ShardRef> shardRefs = [&]() {
             // Extract all shard refs from the 'fieldName' field of 'result'. The 'sourceField'
@@ -890,7 +892,7 @@ private:
 
         auto aggResult = _runLocalCatalogSnapshotQuery(*pipeline, kIndexHintForTimestampQuery);
         if (!aggResult.empty()) {
-            return aggResult.front().getField("timestamp"_sd).timestamp();
+            return aggResult.front().getField("timestamp"sv).timestamp();
         }
         return boost::none;
     }
@@ -907,7 +909,7 @@ private:
         auto sortStage = DocumentSourceSort::create(_expCtx, BSON("timestamp" << -1));
         auto limitStage = DocumentSourceLimit::create(_expCtx, 1);
 
-        constexpr auto kConsistentMetadataAvailable = "consistentMetadataAvailable"_sd;
+        constexpr auto kConsistentMetadataAvailable = "consistentMetadataAvailable"sv;
 
         // b. Reformat the content of the initialization document:
         //  - the 'kConsistentMetadataAvailable' field gives an indication on whether the
@@ -1042,8 +1044,8 @@ private:
         std::unique_ptr<Pipeline> initializationDocumentSubPipeline,
         std::unique_ptr<Pipeline> retrievePlacementSubPipeline) const {
 
-        constexpr auto kInitMetadataRetrievalSubPipelineName = "metadataFromInitDoc"_sd;
-        constexpr auto kPlacementRetrievalSubPipelineName = "computedPlacement"_sd;
+        constexpr auto kInitMetadataRetrievalSubPipelineName = "metadataFromInitDoc"sv;
+        constexpr auto kPlacementRetrievalSubPipelineName = "computedPlacement"sv;
 
         // Compose the main aggregation; first, combine the two sub pipelines within a $facets
         // stage...
@@ -1147,7 +1149,7 @@ private:
         tassert(11314301,
                 "expecting placement history initialization point to be present",
                 aggResult.size() == 1);
-        return aggResult.front().getField("timestamp"_sd).timestamp();
+        return aggResult.front().getField("timestamp"sv).timestamp();
     }
 
     // OperationContext used for executing operations. Managed externally, but guaranteed to remain

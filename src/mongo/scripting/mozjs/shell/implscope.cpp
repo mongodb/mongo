@@ -88,6 +88,8 @@
 #include <mutex>
 
 #ifdef __linux__
+#include <string_view>
+
 #include <unistd.h>
 
 #include <sys/syscall.h>
@@ -140,7 +142,7 @@ constexpr size_t kMaxErrorStringSize = logv2::constants::kDefaultMaxAttributeOut
 
 constexpr const char* kTestDataFieldName = "TestData";
 constexpr const char* kExtraAttrFieldName = "extraAttr";
-constexpr StringData kLogFormatFieldName = "logFormat";
+constexpr std::string_view kLogFormatFieldName = "logFormat";
 
 /**
  * Runtime's can race on first creation (on some function statics), so we just
@@ -758,7 +760,7 @@ void MozJSImplScope::setNumber(const char* field, double val) {
     _runSafely([&] { ObjectWrapper(_context, _global).setNumber(field, val); });
 }
 
-void MozJSImplScope::setString(const char* field, StringData val) {
+void MozJSImplScope::setString(const char* field, std::string_view val) {
     _runSafely([&] { ObjectWrapper(_context, _global).setString(field, val); });
 }
 
@@ -828,13 +830,13 @@ JSRegEx MozJSImplScope::getRegEx(const char* field) {
     return _runSafely([&] { return ObjectWrapper(_context, _global).getRegEx(field); });
 }
 
-void MozJSImplScope::newFunction(StringData raw, JS::MutableHandleValue out) {
+void MozJSImplScope::newFunction(std::string_view raw, JS::MutableHandleValue out) {
     _runSafely([&] { _MozJSCreateFunction(raw, std::move(out)); });
 }
 
-void MozJSImplScope::_MozJSCreateFunction(StringData raw, JS::MutableHandleValue fun) {
+void MozJSImplScope::_MozJSCreateFunction(std::string_view raw, JS::MutableHandleValue fun) {
     std::string code = str::stream()
-        << "(" << parseJSFunctionOrExpression(_context, StringData(raw)) << ")";
+        << "(" << parseJSFunctionOrExpression(_context, std::string_view(raw)) << ")";
 
     JS::CompileOptions co(_context);
     setCompileOptions(&co);
@@ -972,7 +974,7 @@ BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
     return wout.toBSON();
 }
 
-bool hasFunctionIdentifier(StringData code) {
+bool hasFunctionIdentifier(std::string_view code) {
     if (code.size() < 9 || code.find("function") != 0)
         return false;
 
@@ -982,7 +984,7 @@ bool hasFunctionIdentifier(StringData code) {
 ScriptingFunction MozJSImplScope::_createFunction(const char* raw) {
     return _runSafely([&] {
         JS::RootedValue fun(_context);
-        auto it = _funcCodeToHandleMap.find(StringData(raw));
+        auto it = _funcCodeToHandleMap.find(std::string_view(raw));
         if (it != _funcCodeToHandleMap.end()) {
             return it->second;
         }
@@ -1111,7 +1113,7 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
     return JS_InstanceOf(cx, obj, syntaxError, nullptr);
 }
 
-bool MozJSImplScope::exec(StringData code,
+bool MozJSImplScope::exec(std::string_view code,
                           const std::string& name,
                           bool printResult,
                           bool reportError,

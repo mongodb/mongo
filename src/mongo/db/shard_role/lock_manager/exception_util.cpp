@@ -42,6 +42,7 @@
 #include "mongo/util/log_and_backoff.h"
 
 #include <cstddef>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -67,7 +68,7 @@ Dur floatScaleDuration(double scale, Dur dur) {
 
 void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
                                                 RecoveryUnit& ru,
-                                                StringData opStr,
+                                                std::string_view opStr,
                                                 const NamespaceStringOrUUID& nssOrUUID,
                                                 const Status& s,
                                                 size_t writeConflictAttempts) {
@@ -103,8 +104,8 @@ void recordTemporarilyUnavailableErrors(OperationContext* opCtx, int64_t n) {
 }
 
 void logWriteConflictAndBackoff(size_t attempt,
-                                StringData operation,
-                                StringData reason,
+                                std::string_view operation,
+                                std::string_view reason,
                                 const NamespaceStringOrUUID& nssOrUUID) {
     auto severity = ((attempt != 0) && ((attempt % 1000) == 0)) ? logv2::LogSeverity::Info()
                                                                 : logv2::LogSeverity::Debug(1);
@@ -121,8 +122,8 @@ void logWriteConflictAndBackoff(size_t attempt,
 
 void logAndRecordWriteConflictAndBackoff(OperationContext* opCtx,
                                          size_t attempt,
-                                         StringData operation,
-                                         StringData reason,
+                                         std::string_view operation,
+                                         std::string_view reason,
                                          const NamespaceStringOrUUID& nssOrUUID) {
     recordWriteConflict(opCtx);
     logWriteConflictAndBackoff(attempt, operation, reason, nssOrUUID);
@@ -130,7 +131,7 @@ void logAndRecordWriteConflictAndBackoff(OperationContext* opCtx,
 
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            size_t tempUnavailAttempts,
-                                           StringData opStr,
+                                           std::string_view opStr,
                                            const NamespaceStringOrUUID& nssOrUUID,
                                            const Status& s,
                                            size_t& writeConflictAttempts) {
@@ -145,7 +146,7 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            RecoveryUnit& ru,
                                            size_t tempUnavailAttempts,
-                                           StringData opStr,
+                                           std::string_view opStr,
                                            const NamespaceStringOrUUID& nssOrUUID,
                                            const Status& s,
                                            size_t& writeConflictAttempts) {
@@ -194,7 +195,7 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
 }
 
 void convertToWCEAndRethrow(OperationContext* opCtx,
-                            StringData opStr,
+                            std::string_view opStr,
                             const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e) {
     // For multi-document transactions, since WriteConflicts are tagged as
     // TransientTransactionErrors and TemporarilyUnavailable errors are not, convert the error to a
@@ -205,7 +206,7 @@ void convertToWCEAndRethrow(OperationContext* opCtx,
     throwWriteConflictException(e.reason());
 }
 
-void WriteConflictRetryAlgorithm::_emitLog(StringData reason) {
+void WriteConflictRetryAlgorithm::_emitLog(std::string_view reason) {
     logv2::detail::doLog(46404,
                          _logSeverity(),
                          {logv2::LogComponent::kWrite},

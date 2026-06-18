@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"

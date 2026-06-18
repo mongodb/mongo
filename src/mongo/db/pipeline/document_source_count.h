@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -47,7 +48,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Count);
  */
 class DocumentSourceCount final {
 public:
-    static constexpr StringData kStageName = "$count"_sd;
+    static constexpr std::string_view kStageName = "$count"_sd;
 
     /**
      * Returns a $group stage followed by a $project stage.

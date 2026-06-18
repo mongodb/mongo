@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 /**
@@ -59,7 +59,7 @@ protected:
     }
 
     std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj);
-    std::unique_ptr<CanonicalQuery> canonicalize(StringData queryStr);
+    std::unique_ptr<CanonicalQuery> canonicalize(std::string_view queryStr);
     std::unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
                                                  BSONObj sort,
                                                  BSONObj proj,

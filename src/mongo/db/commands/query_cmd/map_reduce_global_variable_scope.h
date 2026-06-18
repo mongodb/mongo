@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -55,7 +56,7 @@ public:
     MapReduceGlobalVariableScope() = default;
     MapReduceGlobalVariableScope(const BSONObj& obj) : obj(boost::make_optional(obj.getOwned())) {}
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
         if (obj == boost::none) {
             builder->append(fieldName, "null");
         }

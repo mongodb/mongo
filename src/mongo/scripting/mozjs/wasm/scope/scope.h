@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <atomic>
+#include <string_view>
 #include <unordered_set>
 
 #include <boost/optional.hpp>
@@ -75,7 +76,7 @@ public:
     JSRegEx getRegEx(const char* field) override;
     void setElement(const char* field, const BSONElement& e, const BSONObj& parent) override;
     void setNumber(const char* field, double val) override;
-    void setString(const char* field, StringData val) override;
+    void setString(const char* field, std::string_view val) override;
     void setObject(const char* field, const BSONObj& obj, bool readOnly = true) override;
     void setBoolean(const char* field, bool val) override;
     void setFunction(const char* field, const char* code) override;
@@ -92,7 +93,7 @@ public:
     void advanceGeneration() override {}
     void requireOwnedObjects() override {}
 
-    bool exec(StringData code,
+    bool exec(std::string_view code,
               const std::string& name,
               bool printResult,
               bool reportError,
@@ -103,7 +104,7 @@ public:
     std::string getBaseURL() const override {
         uasserted(11605402,
                   "Calls to `getBaseURL()` are unsupported with this JS engine configuration");
-    };
+    }
     void externalSetup() override {
         uasserted(11605403,
                   "Calls to `externalSetup` are unsupported with this JS engine configuration.");

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/util/modules.h"
@@ -38,6 +37,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -66,7 +66,7 @@ public:
      */
     typedef StringMap<Definition> Definitions;
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
     static ReplSetWriteConcernModeDefinitions parseFromBSON(BSONElement patternMapElement);
 
     /**

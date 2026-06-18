@@ -31,6 +31,7 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
+#include <string_view>
 #include <thread>
 
 /**

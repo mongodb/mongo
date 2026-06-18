@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/column/bsoncolumn.h"
@@ -48,6 +47,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -109,7 +109,7 @@ public:
     /**
      * Returns the number of measurements in the bucket in O(1) time.
      */
-    static int computeMeasurementCount(const BSONObj& bucket, StringData timeField) {
+    static int computeMeasurementCount(const BSONObj& bucket, std::string_view timeField) {
         auto&& controlField = bucket[kBucketControlFieldName];
         uassert(5857904,
                 "The $_internalUnpackBucket stage requires 'control' object to be present",
@@ -148,7 +148,7 @@ public:
     }
 
     // Set of field names reserved for time-series buckets.
-    static const std::set<StringData> reservedBucketFieldNames;
+    static const std::set<std::string_view> reservedBucketFieldNames;
 
     BucketUnpacker();
     explicit BucketUnpacker(BucketSpec spec);
@@ -243,11 +243,11 @@ public:
         return _spec.metaField();
     }
 
-    std::string getMinField(StringData field) const {
+    std::string getMinField(std::string_view field) const {
         return std::string{kControlMinFieldNamePrefix} + std::string{field};
     }
 
-    std::string getMaxField(StringData field) const {
+    std::string getMaxField(std::string_view field) const {
         return std::string{kControlMaxFieldNamePrefix} + std::string{field};
     }
 
@@ -259,7 +259,7 @@ public:
         return _closedBucket;
     }
 
-    bool providesField(StringData field) const {
+    bool providesField(std::string_view field) const {
         auto& metaField = getMetaField();
         if (metaField && *metaField == field) {
             return _includeMetaField;
@@ -270,7 +270,7 @@ public:
         return _spec.doesBucketSpecProvideField(static_cast<std::string>(field));
     }
 
-    bool providesFieldWithoutModification(StringData field) const {
+    bool providesFieldWithoutModification(std::string_view field) const {
         return providesField(field) && !_spec.fieldIsComputed(field);
     }
 
@@ -291,7 +291,7 @@ public:
     void setIncludeMaxTimeAsMetadata();
 
     // Add computed meta projection names to the bucket specification.
-    void addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames);
+    void addComputedMetaProjFields(const std::vector<std::string_view>& computedFieldNames);
 
     // Fill _spec.unpackFieldsToIncludeExclude with final list of fields to include/exclude during
     // unpacking. Only calculates the list the first time it is called.

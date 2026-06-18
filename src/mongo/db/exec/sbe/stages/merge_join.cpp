@@ -29,18 +29,19 @@
 
 #include "mongo/db/exec/sbe/stages/merge_join.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <tuple>
 
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 namespace {
 /**
  * Returns a materialized row with values owned by the caller.
@@ -81,7 +82,7 @@ MergeJoinStage::MergeJoinStage(std::unique_ptr<PlanStage> outer,
                                std::vector<value::SortDirection> sortDirs,
                                PlanNodeId planNodeId,
                                bool participateInTrialRunTracking)
-    : PlanStage("mj"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("mj"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _outerKeys(std::move(outerKeys)),
       _outerProjects(std::move(outerProjects)),
       _innerKeys(std::move(innerKeys)),

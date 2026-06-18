@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 // TODO(SERVER-114140): Remove all MONGO_MOD_NEEDS_REPLACEMENT annotations
 
@@ -89,7 +89,7 @@ inline const char* advance(const char* be, size_t fieldNameSize) {
 }
 
 inline auto fieldNameAndLength(const char* be) noexcept {
-    return StringData{be + 1, strlen(be + 1)};
+    return std::string_view{be + 1, strlen(be + 1)};
 }
 
 // add 1(typetag) + stringlength + 1(nullptr) to skip the null byte should give the value
@@ -97,7 +97,7 @@ inline const char* getValue(const char* be) noexcept {
     return be + 1 + strlen(be + 1) + 1;
 }
 
-inline value::TagValueView getField(const char* be, StringData fieldStr) noexcept {
+inline value::TagValueView getField(const char* be, std::string_view fieldStr) noexcept {
     const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
     be += sizeof(int);
     const auto targetSize = fieldStr.size();
@@ -189,7 +189,7 @@ void convertToBsonObj(ObjBuilder& builder, value::Object* obj);
 
 template <class ObjBuilder>
 void appendValueToBsonObj(ObjBuilder& builder,
-                          StringData name,
+                          std::string_view name,
                           value::TypeTags tag,
                           value::Value val);
 

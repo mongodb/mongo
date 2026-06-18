@@ -49,6 +49,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -269,9 +270,9 @@ public:
     };
 
     struct Options {
-        boost::optional<StringData> tlsCAFile;
-        boost::optional<StringData> tlsCertificateKeyFile;
-        boost::optional<StringData> tlsCertificatePassword;
+        boost::optional<std::string_view> tlsCAFile;
+        boost::optional<std::string_view> tlsCertificateKeyFile;
+        boost::optional<std::string_view> tlsCertificatePassword;
         bool tlsAllowInvalidCertificates = false;
         bool tlsAllowInvalidHostnames = false;
     };

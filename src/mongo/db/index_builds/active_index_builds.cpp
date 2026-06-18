@@ -50,6 +50,7 @@
 #include <algorithm>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -85,11 +86,11 @@ auto& startedIndexBuildsCounter = otel::metrics::MetricsService::instance().crea
     otel::metrics::MetricUnit::kOperations);
 
 auto& resumeSucceededCounter =
-    otel::metrics::MetricsService::instance().createInt64Counter<StringData>(
+    otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
         otel::metrics::MetricNames::kIndexBuildResumeSucceeded,
         "Number of primary-driven index builds successfully resumed",
         otel::metrics::MetricUnit::kOperations,
-        otel::metrics::AttributeDefinition<StringData>{
+        otel::metrics::AttributeDefinition<std::string_view>{
             .name = "phase",
             .values = {
                 idl::serialize(IndexBuildPhaseEnum::kInitialized),

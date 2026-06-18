@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -107,6 +106,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <tuple>
 #include <utility>
@@ -467,7 +467,7 @@ public:
     void waitUntilSnapshotCommitted(OperationContext* opCtx,
                                     const Timestamp& untilSnapshot) override;
 
-    void appendDiagnosticBSON(BSONObjBuilder*, StringData) override;
+    void appendDiagnosticBSON(BSONObjBuilder*, std::string_view) override;
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 

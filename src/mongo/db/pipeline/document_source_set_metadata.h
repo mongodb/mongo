@@ -35,6 +35,8 @@
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -91,7 +93,7 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(SetMetadata);
  */
 class DocumentSourceSetMetadata final {
 public:
-    static constexpr StringData kStageName = "$setMetadata"_sd;
+    static constexpr std::string_view kStageName = "$setMetadata"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);

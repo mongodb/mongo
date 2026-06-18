@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authentication_metrics.h"
 #include "mongo/util/modules.h"
 
@@ -38,6 +37,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -89,7 +89,7 @@ public:
      *
      * The session object makes and owns a copy of the data in "value".
      */
-    virtual void setParameter(Parameter id, StringData value);
+    virtual void setParameter(Parameter id, std::string_view value);
 
     /**
      * Returns true if "id" identifies a parameter previously set by a call to setParameter().
@@ -99,14 +99,15 @@ public:
     /**
      * Returns the value of a previously set parameter.
      *
-     * If parameter "id" was never set, returns an empty StringData.  Note that a parameter may
-     * be explicitly set to StringData(), so use hasParameter() to distinguish those cases.
+     * If parameter "id" was never set, returns an empty std::string_view.  Note that a parameter
+     * may be explicitly set to std::string_view(), so use hasParameter() to distinguish those
+     * cases.
      *
-     * The session object owns the storage behind the returned StringData, which will remain
+     * The session object owns the storage behind the returned std::string_view, which will remain
      * valid until setParameter() is called with the same value of "id", or the session object
      * goes out of scope.
      */
-    virtual StringData getParameter(Parameter id);
+    virtual std::string_view getParameter(Parameter id);
 
     /**
      * Initializes a session for use.
@@ -119,7 +120,7 @@ public:
      * Takes one step of the SASL protocol on behalf of the client.
      *
      * Caller should provide data from the server side of the conversation in "inputData", or an
-     * empty StringData() if none is available.  If the client should make a response to the
+     * empty std::string_view() if none is available.  If the client should make a response to the
      * server, stores the response into "*outputData".
      *
      * Returns Status::OK() on success.  Any other return value indicates a failed
@@ -130,7 +131,7 @@ public:
      * When step() returns Status::OK() and isSuccess() returns true,
      * authentication has completed successfully.
      */
-    virtual Status step(StringData inputData, std::string* outputData) = 0;
+    virtual Status step(std::string_view inputData, std::string* outputData) = 0;
 
     virtual boost::optional<std::uint32_t> currentStep() const {
         return boost::none;

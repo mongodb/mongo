@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -58,7 +58,7 @@ public:
     static ShardingLogging* get(OperationContext* operationContext);
 
     Status logAction(OperationContext* opCtx,
-                     StringData what,
+                     std::string_view what,
                      const NamespaceString& ns,
                      const BSONObj& detail,
                      std::shared_ptr<Shard> configShard = nullptr,
@@ -66,7 +66,7 @@ public:
 
     Status logChangeChecked(
         OperationContext* opCtx,
-        StringData what,
+        std::string_view what,
         const NamespaceString& ns,
         const BSONObj& detail = BSONObj(),
         const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse(),
@@ -74,7 +74,7 @@ public:
         ShardingCatalogClient* catalogClient = nullptr);
 
     void logChange(OperationContext* const opCtx,
-                   const StringData what,
+                   const std::string_view what,
                    const NamespaceString& ns,
                    const BSONObj& detail = BSONObj(),
                    const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse(),
@@ -92,7 +92,7 @@ private:
      * Creates the specified collection name in the config database.
      */
     Status _createCappedConfigCollection(OperationContext* opCtx,
-                                         StringData collName,
+                                         std::string_view collName,
                                          int cappedSize,
                                          const WriteConcernOptions& writeConcern,
                                          std::shared_ptr<Shard> configShard);
@@ -110,8 +110,8 @@ private:
      * @param writeConcern Write concern options to use for logging
      */
     Status _log(OperationContext* opCtx,
-                StringData logCollName,
-                StringData what,
+                std::string_view logCollName,
+                std::string_view what,
                 const NamespaceString& operationNSS,
                 const BSONObj& detail,
                 const WriteConcernOptions& writeConcern,

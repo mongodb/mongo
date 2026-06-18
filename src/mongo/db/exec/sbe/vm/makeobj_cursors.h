@@ -31,7 +31,6 @@
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
@@ -45,6 +44,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -75,7 +75,7 @@ public:
             _nextBe = bson::advance(_be, _name.size());
         }
     }
-    MONGO_COMPILER_ALWAYS_INLINE StringData fieldName() const {
+    MONGO_COMPILER_ALWAYS_INLINE std::string_view fieldName() const {
         return _name;
     }
     MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> value() const {
@@ -99,7 +99,7 @@ private:
     const char* _nextBe{nullptr};
     const char* _last{nullptr};
 
-    StringData _name;
+    std::string_view _name;
 };
 
 // MakeObj input cursor for SBE objects.
@@ -109,7 +109,7 @@ public:
         : _objRoot(objRoot), _idx(0), _endIdx(_objRoot->size()) {
         if (_idx != _endIdx) {
             // Initialize '_name'.
-            _name = StringData(_objRoot->field(_idx));
+            _name = std::string_view(_objRoot->field(_idx));
         }
     }
 
@@ -120,10 +120,10 @@ public:
         ++_idx;
         if (_idx != _endIdx) {
             // Update '_name'.
-            _name = StringData(_objRoot->field(_idx));
+            _name = std::string_view(_objRoot->field(_idx));
         }
     }
-    MONGO_COMPILER_ALWAYS_INLINE StringData fieldName() const {
+    MONGO_COMPILER_ALWAYS_INLINE std::string_view fieldName() const {
         return _name;
     }
     MONGO_COMPILER_ALWAYS_INLINE value::TagValueView value() const {
@@ -143,7 +143,7 @@ private:
     size_t _idx{0};
     size_t _endIdx{0};
 
-    StringData _name;
+    std::string_view _name;
 };
 
 }  // namespace mongo::sbe::vm

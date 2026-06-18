@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/oauth_authorization_server_metadata_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/http_client.h"
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -50,7 +50,7 @@ public:
     /**
      * Resolve the issuer provided into its metadata payload.
      */
-    OAuthAuthorizationServerMetadata acquire(StringData issuer);
+    OAuthAuthorizationServerMetadata acquire(std::string_view issuer);
 
 private:
     std::unique_ptr<HttpClient> _client;

@@ -50,6 +50,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -94,7 +95,7 @@ SHA256Block getLogicalSessionUserDigestForLoggedInUser(const OperationContext* o
     }
 }
 
-SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db) {
+SHA256Block getLogicalSessionUserDigestFor(std::string_view user, std::string_view db) {
     if (user.empty() && db.empty()) {
         return kNoAuthDigest;
     }

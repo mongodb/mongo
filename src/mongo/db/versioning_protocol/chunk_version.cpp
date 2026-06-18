@@ -33,9 +33,11 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
-constexpr StringData ChunkVersion::kChunkVersionField;
+constexpr std::string_view ChunkVersion::kChunkVersionField;
 
 bool CollectionGeneration::isSameCollection(const CollectionGeneration& other) const {
     if (_timestamp == other._timestamp) {
@@ -65,7 +67,7 @@ ChunkVersion ChunkVersion::parse(const BSONElement& element) {
                         {version.getSecs(), version.getInc()});
 }
 
-void ChunkVersion::serialize(StringData field, BSONObjBuilder* builder) const {
+void ChunkVersion::serialize(std::string_view field, BSONObjBuilder* builder) const {
     ChunkVersion60Format version;
     version.setGeneration({_epoch, _timestamp});
     version.setPlacement(Timestamp(majorVersion(), minorVersion()));

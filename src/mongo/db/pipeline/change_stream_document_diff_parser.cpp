@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/field_ref.h"
@@ -38,6 +37,7 @@
 #include <cstddef>
 #include <list>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -51,7 +51,7 @@ using doc_diff::DocumentDiffReader;
 
 namespace {
 using DeltaUpdateDescription = change_stream_document_diff_parser::DeltaUpdateDescription;
-using FieldNameOrArrayIndex = std::variant<StringData, size_t>;
+using FieldNameOrArrayIndex = std::variant<std::string_view, size_t>;
 
 /**
  * DeltaUpdateDescriptionBuilder is responsible both for tracking the current path as we traverse
@@ -66,7 +66,7 @@ struct DeltaUpdateDescriptionBuilder {
     }
 
     // Adds the specified entry to the 'removedFields' vector in the DeltaUpdateDescription.
-    void addToRemovedFields(StringData terminalFieldName) {
+    void addToRemovedFields(std::string_view terminalFieldName) {
         DeltaUpdateDescriptionBuilder::TempAppendToPath tmpAppend(*this, terminalFieldName);
         _updateDesc.removedFields.push_back(Value(_fieldRef.dottedField()));
         _addToDisambiguatedPathsIfRequired();
@@ -88,7 +88,7 @@ struct DeltaUpdateDescriptionBuilder {
     }
 
     // Returns the last field in the current path.
-    StringData lastPart() const {
+    std::string_view lastPart() const {
         return _fieldRef.getPart(_fieldRef.numParts() - 1);
     }
 
@@ -130,7 +130,7 @@ private:
         // Resolve the FieldNameOrArrayIndex to one or the other, and append it to the path.
         const bool isArrayIndex = holds_alternative<size_t>(field);
         _fieldRef.appendPart(isArrayIndex ? std::to_string(get<size_t>(field))
-                                          : get<StringData>(field));
+                                          : get<std::string_view>(field));
 
         // Once a path has become ambiguous, it will remain so as new fields are added. If the final
         // path component is marked ambiguous, retain that value and add the type of the new field.

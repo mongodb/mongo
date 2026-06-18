@@ -50,6 +50,7 @@
 #include "mongo/util/future_impl.h"
 
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -139,7 +140,7 @@ BSONObj convertDocumentIntoQuery(const BSONObj& document) {
     BSONArrayBuilder exprQuery;
 
     for (BSONElement elem : document) {
-        const StringData fieldName = elem.fieldNameStringData();
+        const std::string_view fieldName = elem.fieldNameStringData();
 
         const bool shouldWrapIntoGetField = fieldName.starts_with("$");
         if (MONGO_unlikely(shouldWrapIntoGetField)) {

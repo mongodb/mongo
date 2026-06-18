@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/str.h"
 
 #include <cstring>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -76,7 +76,7 @@ namespace {
 /**
  * Extracts an Object value from 'obj's field 'fieldName'. Sets the result to 'bsonElement'.
  */
-Status extractObject(const BSONObj& obj, StringData fieldName, BSONElement* bsonElement) {
+Status extractObject(const BSONObj& obj, std::string_view fieldName, BSONElement* bsonElement) {
     Status elementStatus = bsonExtractTypedField(obj, fieldName, BSONType::object, bsonElement);
     if (!elementStatus.isOK()) {
         return elementStatus.withContext(str::stream()

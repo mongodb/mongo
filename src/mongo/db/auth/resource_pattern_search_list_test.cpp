@@ -43,20 +43,21 @@
 
 namespace mongo::auth {
 namespace {
+using namespace std::literals::string_view_literals;
 
 struct TestCase {
     ResourcePattern target;
     std::set<ResourcePattern> lookups;
 };
 
-const auto kAdminDB = DatabaseName::createDatabaseName_forTest(boost::none, "admin"_sd);
-const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
-const auto kTestFooNSS = NamespaceString::createNamespaceString_forTest(kTestDB, "foo"_sd);
+const auto kAdminDB = DatabaseName::createDatabaseName_forTest(boost::none, "admin"sv);
+const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"sv);
+const auto kTestFooNSS = NamespaceString::createNamespaceString_forTest(kTestDB, "foo"sv);
 const auto kTestViewsNSS =
-    NamespaceString::createNamespaceString_forTest(kTestDB, "system.views"_sd);
+    NamespaceString::createNamespaceString_forTest(kTestDB, "system.views"sv);
 const auto kTestBarBucketNSS =
-    NamespaceString::createNamespaceString_forTest(kTestDB, "system.buckets.bar"_sd);
-const auto kTestBarNSS = NamespaceString::createNamespaceString_forTest(kTestDB, "bar"_sd);
+    NamespaceString::createNamespaceString_forTest(kTestDB, "system.buckets.bar"sv);
+const auto kTestBarNSS = NamespaceString::createNamespaceString_forTest(kTestDB, "bar"sv);
 
 const auto kAnyRsrc = ResourcePattern::forAnyResource(boost::none);
 const auto kAnyNormalRsrc = ResourcePattern::forAnyNormalResource(boost::none);
@@ -65,18 +66,18 @@ const auto kAnySystemBuckets = ResourcePattern::forAnySystemBuckets(boost::none)
 
 const auto kAdminDBRsrc = ResourcePattern::forDatabaseName(kAdminDB);
 const auto kTestDBRsrc = ResourcePattern::forDatabaseName(kTestDB);
-const auto kFooCollRsrc = ResourcePattern::forCollectionName(boost::none, "foo"_sd);
+const auto kFooCollRsrc = ResourcePattern::forCollectionName(boost::none, "foo"sv);
 const auto kTestFooRsrc = ResourcePattern::forExactNamespace(kTestFooNSS);
-const auto kViewsCollRsrc = ResourcePattern::forCollectionName(boost::none, "system.views"_sd);
+const auto kViewsCollRsrc = ResourcePattern::forCollectionName(boost::none, "system.views"sv);
 const auto kTestViewsRsrc = ResourcePattern::forExactNamespace(kTestViewsNSS);
 const auto kTestBarBucketRsrc = ResourcePattern::forExactNamespace(kTestBarBucketNSS);
 const auto kTestBarSystemBucketsRsrc =
     ResourcePattern::forExactSystemBucketsCollection(kTestBarNSS);
 const auto kTestDBSystemBucketsRsrc = ResourcePattern::forAnySystemBucketsInDatabase(kTestDB);
 const auto kBarCollSystemBucketsRsrc =
-    ResourcePattern::forAnySystemBucketsInAnyDatabase(boost::none, "bar"_sd);
+    ResourcePattern::forAnySystemBucketsInAnyDatabase(boost::none, "bar"sv);
 const auto kBucketsBarCollRsrc =
-    ResourcePattern::forCollectionName(boost::none, "system.buckets.bar"_sd);
+    ResourcePattern::forCollectionName(boost::none, "system.buckets.bar"sv);
 
 const TestCase kTestCases[] = {
     {kAnyRsrc, {kAnyRsrc}},

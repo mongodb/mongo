@@ -34,6 +34,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_level.h"
 
+#include <string_view>
+
 namespace mongo {
 
 KeysCollectionClientSharded::KeysCollectionClientSharded(ShardingCatalogClient* client)
@@ -41,7 +43,7 @@ KeysCollectionClientSharded::KeysCollectionClientSharded(ShardingCatalogClient* 
 
 StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientSharded::getNewInternalKeys(
     OperationContext* opCtx,
-    StringData purpose,
+    std::string_view purpose,
     const LogicalTime& newerThanThis,
     bool tryUseMajority) {
     return _catalogClient->getNewInternalKeys(
@@ -49,7 +51,7 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientSharded::get
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
-KeysCollectionClientSharded::getAllExternalKeys(OperationContext* opCtx, StringData purpose) {
+KeysCollectionClientSharded::getAllExternalKeys(OperationContext* opCtx, std::string_view purpose) {
     return _catalogClient->getAllExternalKeys(
         opCtx, purpose, repl::ReadConcernLevel::kMajorityReadConcern);
 }

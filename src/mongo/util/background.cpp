@@ -32,7 +32,6 @@
 #include "mongo/util/background.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/condition_variable.h"

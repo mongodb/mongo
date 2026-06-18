@@ -29,14 +29,16 @@
 
 #include "mongo/db/validate/validate_results.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/validate/bson_utf8.h"
 #include "mongo/db/validate/validate_options.h"
 
+#include <string_view>
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -145,7 +147,7 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
     }
 
     static constexpr std::size_t kMaxErrorWarningSizeBytes = 2 * 1024 * 1024;
-    auto appendRangeSizeLimited = [&](StringData fieldName, auto valueGetter) {
+    auto appendRangeSizeLimited = [&](std::string_view fieldName, auto valueGetter) {
         std::size_t usedSize = 0;
         BSONArrayBuilder arr(resultObj->subarrayStart(fieldName));
         for (const auto& value : valueGetter(*this)) {
@@ -169,23 +171,22 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         }
     };
 
-    appendRangeSizeLimited("warnings"_sd,
-                           [](const auto& results) { return results.getWarnings(); });
-    appendRangeSizeLimited("errors"_sd, [](const auto& results) { return results.getErrors(); });
+    appendRangeSizeLimited("warnings"sv, [](const auto& results) { return results.getWarnings(); });
+    appendRangeSizeLimited("errors"sv, [](const auto& results) { return results.getErrors(); });
 
     // appendScrubInvalidUTF8Values recursively ranges through each BSONObj and scrubs invalid UTF-8
     // string data in the BSONObj with"\xef\xbf\xbd", which is the UTF-8 encoding of the replacement
     // character U+FFFD.
     // https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-    auto appendScrubInvalidUTF8Values = [&](StringData fieldName, const auto& values) {
+    auto appendScrubInvalidUTF8Values = [&](std::string_view fieldName, const auto& values) {
         BSONArrayBuilder arr(resultObj->subarrayStart(fieldName));
         for (auto&& v : values) {
             arr.append(checkAndScrubInvalidUTF8(v));
         }
     };
 
-    appendScrubInvalidUTF8Values("extraIndexEntries"_sd, getExtraIndexEntries());
-    appendScrubInvalidUTF8Values("missingIndexEntries"_sd, getMissingIndexEntries());
+    appendScrubInvalidUTF8Values("extraIndexEntries"sv, getExtraIndexEntries());
+    appendScrubInvalidUTF8Values("missingIndexEntries"sv, getMissingIndexEntries());
     if (_numInvalidDocuments.has_value()) {
         resultObj->appendNumber("nInvalidDocuments", _numInvalidDocuments.value());
     }

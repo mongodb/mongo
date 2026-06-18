@@ -28,7 +28,6 @@
  */
 
 #pragma once
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,6 +45,7 @@
 #include <functional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -77,7 +77,7 @@ enum class LiteralSerializationPolicy {
  * A struct with options for how you want to serialize a match or aggregation expression.
  */
 struct SerializationOptions {
-    using TokenizeIdentifierFunc = std::function<std::string(StringData)>;
+    using TokenizeIdentifierFunc = std::function<std::string(std::string_view)>;
 
     // The default serialization options for a query shape. No need to redact identifiers for the
     // this purpose. We may do that on the $queryStats read path.
@@ -103,7 +103,7 @@ struct SerializationOptions {
     // Helper function for removing identifiable information (like collection/db names).
     // Note: serializeFieldPath/serializeFieldPathFromString should be used for field
     // names.
-    std::string serializeIdentifier(StringData str) const {
+    std::string serializeIdentifier(std::string_view str) const {
         if (transformIdentifiers) {
             return transformIdentifier(str);
         }
@@ -128,19 +128,19 @@ struct SerializationOptions {
         return "$" + serializeFieldPath(path);
     }
 
-    std::string transformIdentifier(StringData fieldPathPart) const {
+    std::string transformIdentifier(std::string_view fieldPathPart) const {
         // Update paths may contain array filter identifiers like "$[identifier]".
         if (serializeForUpdateArrayFilters && fieldPathPart.size() >= 3 &&
             fieldPathPart[0] == '$' && fieldPathPart[1] == '[' &&
             fieldPathPart[fieldPathPart.size() - 1] == ']') {
-            StringData identifier = fieldPathPart.substr(2, fieldPathPart.size() - 3);
+            std::string_view identifier = fieldPathPart.substr(2, fieldPathPart.size() - 3);
             return std::string{"$[" + transformIdentifiersCallback(identifier) + "]"};
         } else {
             return std::string{transformIdentifiersCallback(fieldPathPart)};
         }
     }
 
-    std::string serializeFieldPathFromString(StringData path) const;
+    std::string serializeFieldPathFromString(std::string_view path) const;
 
     std::string serializeFieldRef(const FieldRef& fieldRef) const;
 
@@ -195,13 +195,13 @@ struct SerializationOptions {
      * using the same name as 'e'.
      */
     void appendLiteral(BSONObjBuilder* bob, const BSONElement& e) const;
-    void appendLiteral(BSONObjBuilder* bob, StringData name, const BSONElement& e) const;
+    void appendLiteral(BSONObjBuilder* bob, std::string_view name, const BSONElement& e) const;
     /**
      * Helper method to call 'serializeLiteral()' on 'v' and append the result to 'bob' using field
      * name 'fieldName'.
      */
     void appendLiteral(BSONObjBuilder* bob,
-                       StringData fieldName,
+                       std::string_view fieldName,
                        const ImplicitValue& v,
                        const boost::optional<Value>& representativeValue = boost::none) const;
 
@@ -222,7 +222,7 @@ struct SerializationOptions {
                            const boost::optional<Value>& representativeValue = boost::none) const;
 
     // Should never be called, throw to ensure we catch this in tests.
-    static std::string defaultHmacStrategy(StringData s) {
+    static std::string defaultHmacStrategy(std::string_view s) {
         MONGO_UNREACHABLE_TASSERT(7332410);
     }
 
@@ -241,7 +241,7 @@ struct SerializationOptions {
     // with a strategy the redaction strategy will be called on any personal identifiable
     // information (e.g., field paths/names, collection names) encountered before serializing them.
     bool transformIdentifiers = false;
-    std::function<std::string(StringData)> transformIdentifiersCallback = defaultHmacStrategy;
+    std::function<std::string(std::string_view)> transformIdentifiersCallback = defaultHmacStrategy;
 
     // For aggregation indicate whether we should use the more verbose serialization format.
     boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;

@@ -52,6 +52,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -175,11 +176,11 @@ public:
         return hasRenameablePath;
     }
 
-    StringData path() const final {
+    std::string_view path() const final {
         if (_path) {
-            return StringData(_path.get());
+            return std::string_view(_path.get());
         }
-        return StringData();
+        return std::string_view();
     }
 
     /**

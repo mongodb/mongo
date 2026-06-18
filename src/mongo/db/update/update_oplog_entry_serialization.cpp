@@ -37,10 +37,12 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo::update_oplog_entry {
+using namespace std::literals::string_view_literals;
 BSONObj makeDeltaOplogEntry(const doc_diff::Diff& diff) {
     BSONObjBuilder builder;
     builder.append("$v", static_cast<int>(UpdateOplogEntryVersion::kDeltaV2));
@@ -58,7 +60,7 @@ BSONObj makeReplacementOplogEntry(const BSONObj& replacement) {
         return replacement;
     }
     BSONElement first = it.next();
-    if (first.fieldNameStringData() == "_id"_sd) {
+    if (first.fieldNameStringData() == "_id"sv) {
         return replacement;
     }
     BSONElement idElem = replacement["_id"];
@@ -71,7 +73,7 @@ BSONObj makeReplacementOplogEntry(const BSONObj& replacement) {
     builder.append(first);
     while (it.more()) {
         BSONElement next = it.next();
-        if (next.fieldNameStringData() == "_id"_sd) {
+        if (next.fieldNameStringData() == "_id"sv) {
             continue;
         }
         builder.append(next);
@@ -80,7 +82,7 @@ BSONObj makeReplacementOplogEntry(const BSONObj& replacement) {
 }
 
 namespace {
-BSONElement extractNewValueForFieldFromV2Entry(const BSONObj& oField, StringData fieldName) {
+BSONElement extractNewValueForFieldFromV2Entry(const BSONObj& oField, std::string_view fieldName) {
     auto diffField = oField[kDiffObjectFieldName];
 
     // Every $v:2 oplog entry should have a 'diff' field that is an object.
@@ -98,14 +100,14 @@ BSONElement extractNewValueForFieldFromV2Entry(const BSONObj& oField, StringData
     return BSONElement();
 }
 
-FieldRemovedStatus isFieldRemovedByV2Update(const BSONObj& oField, StringData fieldName) {
+FieldRemovedStatus isFieldRemovedByV2Update(const BSONObj& oField, std::string_view fieldName) {
     auto diffField = oField[kDiffObjectFieldName];
 
     // Every $v:2 oplog entry should have a 'diff' field that is an object.
     invariant(diffField.type() == BSONType::object);
     doc_diff::DocumentDiffReader reader(diffField.embeddedObject());
 
-    boost::optional<StringData> nextDelete;
+    boost::optional<std::string_view> nextDelete;
     while ((nextDelete = reader.nextDelete())) {
         if (*nextDelete == fieldName) {
             return FieldRemovedStatus::kFieldRemoved;
@@ -133,7 +135,7 @@ UpdateType extractUpdateType(const BSONObj& updateDocument) {
     tasserted(6448500, str::stream() << "Unsupported or missing oplog version, " << vElt);
 }
 
-BSONElement extractNewValueForField(const BSONObj& oField, StringData fieldName) {
+BSONElement extractNewValueForField(const BSONObj& oField, std::string_view fieldName) {
     invariant(fieldName.find('.') == std::string::npos, "field name cannot contain dots");
 
     auto type = extractUpdateType(oField);
@@ -148,7 +150,7 @@ BSONElement extractNewValueForField(const BSONObj& oField, StringData fieldName)
     MONGO_UNREACHABLE;
 }
 
-FieldRemovedStatus isFieldRemovedByUpdate(const BSONObj& oField, StringData fieldName) {
+FieldRemovedStatus isFieldRemovedByUpdate(const BSONObj& oField, std::string_view fieldName) {
     invariant(fieldName.find('.') == std::string::npos, "field name cannot contain dots");
 
     auto type = extractUpdateType(oField);

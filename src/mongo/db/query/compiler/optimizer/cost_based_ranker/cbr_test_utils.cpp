@@ -39,6 +39,8 @@
 #include "mongo/db/query/compiler/stats/collection_statistics_mock.h"
 #include "mongo/platform/compiler.h"
 
+#include <string_view>
+
 namespace mongo::cost_based_ranker {
 
 CardinalityEstimate makeCard(double d) {
@@ -210,7 +212,7 @@ OrderedIntervalList makePointInterval(double point, std::string fieldName) {
     return oil;
 }
 
-OrderedIntervalList makePointInterval(StringData str, std::string fieldName) {
+OrderedIntervalList makePointInterval(std::string_view str, std::string fieldName) {
     OrderedIntervalList oil(fieldName);
     oil.intervals.emplace_back(IndexBoundsBuilder::makePointInterval(str));
     return oil;
@@ -228,7 +230,7 @@ IndexBounds makePointIntervalBounds(double point, std::string fieldName) {
     return bounds;
 }
 
-IndexBounds makePointIntervalBounds(StringData str, std::string fieldName) {
+IndexBounds makePointIntervalBounds(std::string_view str, std::string fieldName) {
     IndexBounds bounds;
     bounds.fields.emplace_back(makePointInterval(str, fieldName));
     return bounds;

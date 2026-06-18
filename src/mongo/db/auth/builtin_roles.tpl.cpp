@@ -31,8 +31,8 @@
 #include "mongo/db/auth/builtin_roles.h"
 
 #include <map>
+#include <string_view>
 
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -40,8 +40,9 @@
 #include "mongo/db/multitenancy_gen.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
-constexpr auto kAdminDB = "admin"_sd;
+constexpr auto kAdminDB = "admin"sv;
 
 /* Forward declarations so that inheritance calls don't have to worry about order.
  * Warning: Potential for infinite recursion here, so inherit your roles wisely.
@@ -59,7 +60,7 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName&
 //#if $db is None
 //#echo 'dbName'
 //#else
-//#echo 'DatabaseNameUtil::deserialize(dbName.tenantId(), "' + $db + '"_sd,'
+//#echo 'DatabaseNameUtil::deserialize(dbName.tenantId(), "' + $db + '"sv,'
 //#echo 'SerializationContext::stateDefault())'
 //#end if
 //#end def
@@ -105,18 +106,18 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName&
                 //#elif $priv.matchType == 'database'
                 ResourcePattern::forDatabaseName($dbName($priv.db)),
                 //#elif $priv.matchType == 'collection'
-                ResourcePattern::forCollectionName(dbName.tenantId(), "$priv.collection"_sd),
+                ResourcePattern::forCollectionName(dbName.tenantId(), "$priv.collection"sv),
                 //#elif $priv.matchType == 'exact_namespace'
                 ResourcePattern::forExactNamespace(
-                    NamespaceStringUtil::deserialize($dbName($priv.db), "$priv.collection"_sd)),
+                    NamespaceStringUtil::deserialize($dbName($priv.db), "$priv.collection"sv)),
                 //#elif $priv.matchType == 'any_system_buckets'
                 ResourcePattern::forAnySystemBuckets(dbName.tenantId()),
                 //#elif $priv.matchType == 'system_buckets_in_any_db'
                 ResourcePattern::forAnySystemBucketsInAnyDatabase(dbName.tenantId(),
-                                                                  "$priv.system_buckets"_sd),
+                                                                  "$priv.system_buckets"sv),
                 //#elif $priv.matchType == 'system_buckets'
                 ResourcePattern::forExactSystemBucketsCollection($dbName($priv.db),
-                                                                 "$priv.system_buckets"_sd),
+                                                                 "$priv.system_buckets"sv),
                 //#elif $priv.matchType == 'any_system_buckets_in_db'
                 ResourcePattern::forAnySystemBucketsInDatabase($dbName($priv.db)),
                 //#else
@@ -157,15 +158,15 @@ struct BuiltinRoleAttributes {
 //#end if
 //#end def
 
-const std::map<StringData, BuiltinRoleAttributes> kBuiltinRoleMap = {
+const std::map<std::string_view, BuiltinRoleAttributes> kBuiltinRoleMap = {
     //#for $role in $roles
-    {"$role.name"_sd, {$boolval($role.adminOnly), addPrivileges_${role.name}}},
+    {"$role.name"sv, {$boolval($role.adminOnly), addPrivileges_${role.name}}},
     //#end for
 };
 
 const stdx::unordered_set<RoleName> kAdminBuiltinRolesNoTenant = {
     //#for $role in $roles
-    RoleName("$role.name"_sd, DatabaseName::kAdmin.db(omitTenant)),
+    RoleName("$role.name"sv, DatabaseName::kAdmin.db(omitTenant)),
     //#end for
 };
 
@@ -194,14 +195,14 @@ stdx::unordered_set<RoleName> auth::getBuiltinRoleNamesForDB(const DatabaseName&
         }
         return stdx::unordered_set<RoleName>({
             //#for $role in $roles
-            RoleName("$role.name"_sd, dbName),
+            RoleName("$role.name"sv, dbName),
             //#end for
         });
 
     } else {
         return stdx::unordered_set<RoleName>({
             //#for $role in $global_roles
-            RoleName("$role.name"_sd, dbName),
+            RoleName("$role.name"sv, dbName),
             //#end for
         });
     }

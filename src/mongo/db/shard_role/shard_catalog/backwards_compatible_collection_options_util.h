@@ -35,6 +35,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -51,9 +53,10 @@ namespace mongo {
  */
 namespace MONGO_MOD_NEEDS_REPLACEMENT backwards_compatible_collection_options {
 
-constexpr inline auto kTimeseriesBucketsMayHaveMixedSchemaData =
-    "timeseriesBucketsMayHaveMixedSchemaData"_sd;
-constexpr inline auto additionalCollModO2Field = "backwardsIncompatibleCollModParameters"_sd;
+constexpr inline std::string_view kTimeseriesBucketsMayHaveMixedSchemaData =
+    "timeseriesBucketsMayHaveMixedSchemaData";
+constexpr inline std::string_view additionalCollModO2Field =
+    "backwardsIncompatibleCollModParameters";
 
 /**
  * Strips backwards incompatible fields from a collMod command and places them into a

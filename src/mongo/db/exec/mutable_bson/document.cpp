@@ -42,6 +42,7 @@
 
 #include <limits>
 #include <new>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -412,10 +413,11 @@ namespace mutablebson {
 #if defined(__clang__) || !defined(__GNUC__) || (__GNUC__ > 4) || \
     (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
 namespace {
+using namespace std::literals::string_view_literals;
 #endif
 
 // The designated field name for the root element.
-constexpr auto kRootFieldName = ""_sd;
+constexpr auto kRootFieldName = ""sv;
 
 // How many reps do we cache before we spill to heap. Use a power of two. For debug
 // builds we make this very small so it is less likely to mask vector invalidation
@@ -732,16 +734,16 @@ public:
 
     // A helper method that either inserts the field name into the field name heap and
     // updates element.
-    void insertFieldName(ElementRep& rep, StringData fieldName) {
+    void insertFieldName(ElementRep& rep, std::string_view fieldName) {
         dassert(!rep.serialized);
         rep.offset = insertFieldName(fieldName);
     }
 
     // Retrieve the fieldName, given a rep.
-    StringData getFieldName(const ElementRep& rep) const {
+    std::string_view getFieldName(const ElementRep& rep) const {
         // The root element has no field name.
         if (&rep == &getElementRep(kRootRepIdx))
-            return StringData();
+            return std::string_view();
 
         if (rep.serialized || (rep.objIdx != kInvalidObjIdx))
             return getSerializedElement(rep).fieldNameStringData();
@@ -749,11 +751,11 @@ public:
         return getFieldName(rep.offset);
     }
 
-    StringData getFieldNameForNewElement(const ElementRep& rep) {
-        StringData result = getFieldName(rep);
+    std::string_view getFieldNameForNewElement(const ElementRep& rep) {
+        std::string_view result = getFieldName(rep);
         if (rep.objIdx == kLeafObjIdx) {
             _fieldNameScratch.assign(result.data(), result.size());
-            result = StringData(_fieldNameScratch);
+            result = std::string_view(_fieldNameScratch);
         }
         return result;
     }
@@ -935,16 +937,16 @@ public:
         }
     }
 
-    inline bool doesNotAlias(StringData s) const {
-        // StringData may come from either the field name heap or the leaf builder.
+    inline bool doesNotAlias(std::string_view s) const {
+        // std::string_view may come from either the field name heap or the leaf builder.
         return doesNotAliasLeafBuilder(s) && doesNotAliasFieldNameHeap(s);
     }
 
-    inline bool doesNotAliasFieldNameHeap(StringData s) const {
+    inline bool doesNotAliasFieldNameHeap(std::string_view s) const {
         return !inFieldNameHeap(s.data());  // NOLINT(bugprone-suspicious-stringview-data-usage)
     }
 
-    inline bool doesNotAliasLeafBuilder(StringData s) const {
+    inline bool doesNotAliasLeafBuilder(std::string_view s) const {
         return !inLeafBuilder(s.data());  // NOLINT(bugprone-suspicious-stringview-data-usage)
     }
 
@@ -1069,7 +1071,7 @@ public:
     template <typename Builder>
     void writeElement(Element::RepIdx repIdx,
                       Builder* builder,
-                      const StringData* fieldName = nullptr) const;
+                      const std::string_view* fieldName = nullptr) const;
 
     template <typename Builder>
     void writeChildren(Element::RepIdx repIdx, Builder* builder) const;
@@ -1077,7 +1079,7 @@ public:
 private:
     // Insert the given field name into the field name heap, and return an ID for this
     // field name.
-    int32_t insertFieldName(StringData fieldName) {
+    int32_t insertFieldName(std::string_view fieldName) {
         str::uassertNoEmbeddedNulBytes(fieldName);
         const uint32_t id = _fieldNames.size();
         if (!fieldName.empty())
@@ -1093,7 +1095,7 @@ private:
     }
 
     // Retrieve the field name with the given id.
-    StringData getFieldName(uint32_t fieldNameId) const {
+    std::string_view getFieldName(uint32_t fieldNameId) const {
         dassert(fieldNameId < _fieldNames.size());
         return &_fieldNames[fieldNameId];
     }
@@ -1282,7 +1284,7 @@ Status Element::remove() {
     return Status::OK();
 }
 
-Status Element::rename(StringData newName) {
+Status Element::rename(std::string_view newName) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
 
@@ -1410,7 +1412,7 @@ Element Element::findNthChild(size_t n) const {
     return Element(_doc, current);
 }
 
-Element Element::findFirstChildNamed(StringData name) const {
+Element Element::findFirstChildNamed(std::string_view name) const {
     invariant(ok());
     Document::Impl& impl = _doc->getImpl();
     invariant(getType() != BSONType::array);
@@ -1422,7 +1424,7 @@ Element Element::findFirstChildNamed(StringData name) const {
     return Element(_doc, current);
 }
 
-Element Element::findElementNamed(StringData name) const {
+Element Element::findElementNamed(std::string_view name) const {
     invariant(ok());
     Document::Impl& impl = _doc->getImpl();
     Element::RepIdx current = _repIdx;
@@ -1711,19 +1713,19 @@ Status Element::setValueDouble(const double value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     ElementRep thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementDouble(fieldName, value);
     return setValue(newValue._repIdx);
 }
 
-Status Element::setValueString(StringData value) {
+Status Element::setValueString(std::string_view value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
 
     dassert(impl.doesNotAlias(value));
 
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementString(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1735,7 +1737,7 @@ Status Element::setValueObject(const BSONObj& value) {
     dassert(impl.doesNotAlias(value));
 
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementObject(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1747,7 +1749,7 @@ Status Element::setValueArray(const BSONObj& value) {
     dassert(impl.doesNotAlias(value));
 
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementArray(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1761,7 +1763,7 @@ Status Element::setValueBinary(const uint32_t len,
     // TODO: Alias check for binary data?
 
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementBinary(fieldName, len, binType, data);
     return setValue(newValue._repIdx);
 }
@@ -1770,7 +1772,7 @@ Status Element::setValueUndefined() {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementUndefined(fieldName);
     return setValue(newValue._repIdx);
 }
@@ -1779,7 +1781,7 @@ Status Element::setValueOID(const OID value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementOID(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1788,7 +1790,7 @@ Status Element::setValueBool(const bool value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     ElementRep thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementBool(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1797,7 +1799,7 @@ Status Element::setValueDate(const Date_t value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementDate(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1806,12 +1808,12 @@ Status Element::setValueNull() {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementNull(fieldName);
     return setValue(newValue._repIdx);
 }
 
-Status Element::setValueRegex(StringData re, StringData flags) {
+Status Element::setValueRegex(std::string_view re, std::string_view flags) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
 
@@ -1819,48 +1821,48 @@ Status Element::setValueRegex(StringData re, StringData flags) {
     dassert(impl.doesNotAlias(flags));
 
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementRegex(fieldName, re, flags);
     return setValue(newValue._repIdx);
 }
 
-Status Element::setValueDBRef(StringData ns, const OID oid) {
+Status Element::setValueDBRef(std::string_view ns, const OID oid) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
 
     dassert(impl.doesNotAlias(ns));
 
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementDBRef(fieldName, ns, oid);
     return setValue(newValue._repIdx);
 }
 
-Status Element::setValueCode(StringData value) {
+Status Element::setValueCode(std::string_view value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
 
     dassert(impl.doesNotAlias(value));
 
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementCode(fieldName, value);
     return setValue(newValue._repIdx);
 }
 
-Status Element::setValueSymbol(StringData value) {
+Status Element::setValueSymbol(std::string_view value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
 
     dassert(impl.doesNotAlias(value));
 
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementSymbol(fieldName, value);
     return setValue(newValue._repIdx);
 }
 
-Status Element::setValueCodeWithScope(StringData code, const BSONObj& scope) {
+Status Element::setValueCodeWithScope(std::string_view code, const BSONObj& scope) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
 
@@ -1868,7 +1870,7 @@ Status Element::setValueCodeWithScope(StringData code, const BSONObj& scope) {
     dassert(impl.doesNotAlias(scope));
 
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementCodeWithScope(fieldName, code, scope);
     return setValue(newValue._repIdx);
 }
@@ -1877,7 +1879,7 @@ Status Element::setValueInt(const int32_t value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     ElementRep thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementInt(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1886,7 +1888,7 @@ Status Element::setValueTimestamp(const Timestamp value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementTimestamp(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1895,7 +1897,7 @@ Status Element::setValueLong(const int64_t value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     ElementRep thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementLong(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1904,7 +1906,7 @@ Status Element::setValueDecimal(const Decimal128 value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     ElementRep thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementDecimal(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1913,7 +1915,7 @@ Status Element::setValueMinKey() {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementMinKey(fieldName);
     return setValue(newValue._repIdx);
 }
@@ -1922,7 +1924,7 @@ Status Element::setValueMaxKey() {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementMaxKey(fieldName);
     return setValue(newValue._repIdx);
 }
@@ -1938,7 +1940,7 @@ Status Element::setValueBSONElement(const BSONElement& value) {
     dassert(impl.doesNotAlias(value));
 
     ElementRep thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementWithNewFieldName(fieldName, value);
     return setValue(newValue._repIdx);
 }
@@ -1979,7 +1981,7 @@ Status Element::setValueElement(ConstElement setFrom) {
 
     Document::Impl& impl = getDocument().getImpl();
     ElementRep thisRep = impl.getElementRep(_repIdx);
-    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementWithNewFieldName(fieldName, setFrom);
     return setValue(newValue._repIdx);
 }
@@ -1991,7 +1993,7 @@ BSONType Element::getType() const {
     return impl.getType(thisRep);
 }
 
-StringData Element::getFieldName() const {
+std::string_view Element::getFieldName() const {
     invariant(ok());
     const Document::Impl& impl = getDocument().getImpl();
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
@@ -2132,7 +2134,7 @@ struct SubBuilder;
 
 template <>
 struct SubBuilder<BSONObjBuilder> {
-    SubBuilder(BSONObjBuilder* builder, BSONType type, StringData fieldName)
+    SubBuilder(BSONObjBuilder* builder, BSONType type, std::string_view fieldName)
         : buffer((type == BSONType::array) ? builder->subarrayStart(fieldName)
                                            : builder->subobjStart(fieldName)) {}
     BufBuilder& buffer;
@@ -2140,14 +2142,14 @@ struct SubBuilder<BSONObjBuilder> {
 
 template <>
 struct SubBuilder<BSONArrayBuilder> {
-    SubBuilder(BSONArrayBuilder* builder, BSONType type, StringData)
+    SubBuilder(BSONArrayBuilder* builder, BSONType type, std::string_view)
         : buffer((type == BSONType::array) ? builder->subarrayStart() : builder->subobjStart()) {}
     BufBuilder& buffer;
 };
 
 static void appendElement(BSONObjBuilder* builder,
                           const BSONElement& element,
-                          const StringData* fieldName) {
+                          const std::string_view* fieldName) {
     if (fieldName)
         builder->appendAs(element, *fieldName);
     else
@@ -2157,7 +2159,7 @@ static void appendElement(BSONObjBuilder* builder,
 // BSONArrayBuilder should not be appending elements with a fieldName
 static void appendElement(BSONArrayBuilder* builder,
                           const BSONElement& element,
-                          const StringData* fieldName) {
+                          const std::string_view* fieldName) {
     invariant(!fieldName);
     builder->append(element);
 }
@@ -2167,14 +2169,14 @@ static void appendElement(BSONArrayBuilder* builder,
 template <typename Builder>
 void Document::Impl::writeElement(Element::RepIdx repIdx,
                                   Builder* builder,
-                                  const StringData* fieldName) const {
+                                  const std::string_view* fieldName) const {
     const ElementRep& rep = getElementRep(repIdx);
 
     if (hasValue(rep)) {
         appendElement(builder, getSerializedElement(rep), fieldName);
     } else {
         const BSONType type = getType(rep);
-        const StringData subName = fieldName ? *fieldName : getFieldName(rep);
+        const std::string_view subName = fieldName ? *fieldName : getFieldName(rep);
         SubBuilder<Builder> subBuilder(builder, type, subName);
 
         // Otherwise, this is a 'dirty leaf', which is impossible.
@@ -2301,7 +2303,7 @@ Document::InPlaceMode Document::getCurrentInPlaceMode() const {
     return getImpl().getCurrentInPlaceMode();
 }
 
-Element Document::makeElementDouble(StringData fieldName, const double value) {
+Element Document::makeElementDouble(std::string_view fieldName, const double value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2311,7 +2313,7 @@ Element Document::makeElementDouble(StringData fieldName, const double value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementString(StringData fieldName, StringData value) {
+Element Document::makeElementString(std::string_view fieldName, std::string_view value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
     dassert(impl.doesNotAliasLeafBuilder(value));
@@ -2322,7 +2324,7 @@ Element Document::makeElementString(StringData fieldName, StringData value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementObject(StringData fieldName) {
+Element Document::makeElementObject(std::string_view fieldName) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasFieldNameHeap(fieldName));
 
@@ -2332,7 +2334,7 @@ Element Document::makeElementObject(StringData fieldName) {
     return Element(this, newEltIdx);
 }
 
-Element Document::makeElementObject(StringData fieldName, const BSONObj& value) {
+Element Document::makeElementObject(std::string_view fieldName, const BSONObj& value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
     dassert(impl.doesNotAlias(value));
@@ -2350,7 +2352,7 @@ Element Document::makeElementObject(StringData fieldName, const BSONObj& value) 
     return Element(this, newEltIdx);
 }
 
-Element Document::makeElementArray(StringData fieldName) {
+Element Document::makeElementArray(std::string_view fieldName) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasFieldNameHeap(fieldName));
 
@@ -2361,7 +2363,7 @@ Element Document::makeElementArray(StringData fieldName) {
     return Element(this, newEltIdx);
 }
 
-Element Document::makeElementArray(StringData fieldName, const BSONObj& value) {
+Element Document::makeElementArray(std::string_view fieldName, const BSONObj& value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
     dassert(impl.doesNotAlias(value));
@@ -2377,7 +2379,7 @@ Element Document::makeElementArray(StringData fieldName, const BSONObj& value) {
     return Element(this, newEltIdx);
 }
 
-Element Document::makeElementBinary(StringData fieldName,
+Element Document::makeElementBinary(std::string_view fieldName,
                                     const uint32_t len,
                                     const mongo::BinDataType binType,
                                     const void* const data) {
@@ -2391,7 +2393,7 @@ Element Document::makeElementBinary(StringData fieldName,
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementUndefined(StringData fieldName) {
+Element Document::makeElementUndefined(std::string_view fieldName) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2401,13 +2403,13 @@ Element Document::makeElementUndefined(StringData fieldName) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementNewOID(StringData fieldName) {
+Element Document::makeElementNewOID(std::string_view fieldName) {
     OID newOID;
     newOID.init();
     return makeElementOID(fieldName, newOID);
 }
 
-Element Document::makeElementOID(StringData fieldName, const OID value) {
+Element Document::makeElementOID(std::string_view fieldName, const OID value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2417,7 +2419,7 @@ Element Document::makeElementOID(StringData fieldName, const OID value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementBool(StringData fieldName, const bool value) {
+Element Document::makeElementBool(std::string_view fieldName, const bool value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2427,7 +2429,7 @@ Element Document::makeElementBool(StringData fieldName, const bool value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementDate(StringData fieldName, const Date_t value) {
+Element Document::makeElementDate(std::string_view fieldName, const Date_t value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2437,7 +2439,7 @@ Element Document::makeElementDate(StringData fieldName, const Date_t value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementNull(StringData fieldName) {
+Element Document::makeElementNull(std::string_view fieldName) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2447,7 +2449,9 @@ Element Document::makeElementNull(StringData fieldName) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementRegex(StringData fieldName, StringData re, StringData flags) {
+Element Document::makeElementRegex(std::string_view fieldName,
+                                   std::string_view re,
+                                   std::string_view flags) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
     dassert(impl.doesNotAliasLeafBuilder(re));
@@ -2459,7 +2463,9 @@ Element Document::makeElementRegex(StringData fieldName, StringData re, StringDa
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementDBRef(StringData fieldName, StringData ns, const OID value) {
+Element Document::makeElementDBRef(std::string_view fieldName,
+                                   std::string_view ns,
+                                   const OID value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
     dassert(impl.doesNotAliasLeafBuilder(ns));
@@ -2469,7 +2475,7 @@ Element Document::makeElementDBRef(StringData fieldName, StringData ns, const OI
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementCode(StringData fieldName, StringData value) {
+Element Document::makeElementCode(std::string_view fieldName, std::string_view value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
     dassert(impl.doesNotAliasLeafBuilder(value));
@@ -2480,7 +2486,7 @@ Element Document::makeElementCode(StringData fieldName, StringData value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementSymbol(StringData fieldName, StringData value) {
+Element Document::makeElementSymbol(std::string_view fieldName, std::string_view value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
     dassert(impl.doesNotAliasLeafBuilder(value));
@@ -2491,8 +2497,8 @@ Element Document::makeElementSymbol(StringData fieldName, StringData value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementCodeWithScope(StringData fieldName,
-                                           StringData code,
+Element Document::makeElementCodeWithScope(std::string_view fieldName,
+                                           std::string_view code,
                                            const BSONObj& scope) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
@@ -2505,7 +2511,7 @@ Element Document::makeElementCodeWithScope(StringData fieldName,
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementInt(StringData fieldName, const int32_t value) {
+Element Document::makeElementInt(std::string_view fieldName, const int32_t value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2515,7 +2521,7 @@ Element Document::makeElementInt(StringData fieldName, const int32_t value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementTimestamp(StringData fieldName, const Timestamp value) {
+Element Document::makeElementTimestamp(std::string_view fieldName, const Timestamp value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2525,7 +2531,7 @@ Element Document::makeElementTimestamp(StringData fieldName, const Timestamp val
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementLong(StringData fieldName, const int64_t value) {
+Element Document::makeElementLong(std::string_view fieldName, const int64_t value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2535,7 +2541,7 @@ Element Document::makeElementLong(StringData fieldName, const int64_t value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementDecimal(StringData fieldName, const Decimal128 value) {
+Element Document::makeElementDecimal(std::string_view fieldName, const Decimal128 value) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2545,7 +2551,7 @@ Element Document::makeElementDecimal(StringData fieldName, const Decimal128 valu
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementMinKey(StringData fieldName) {
+Element Document::makeElementMinKey(std::string_view fieldName) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2555,7 +2561,7 @@ Element Document::makeElementMinKey(StringData fieldName) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
-Element Document::makeElementMaxKey(StringData fieldName) {
+Element Document::makeElementMaxKey(std::string_view fieldName) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAliasLeafBuilder(fieldName));
 
@@ -2587,7 +2593,8 @@ Element Document::makeElement(const BSONElement& value) {
     }
 }
 
-Element Document::makeElementWithNewFieldName(StringData fieldName, const BSONElement& value) {
+Element Document::makeElementWithNewFieldName(std::string_view fieldName,
+                                              const BSONElement& value) {
     Impl& impl = getImpl();
 
     // See the above makeElement for notes on these cases.
@@ -2607,7 +2614,7 @@ Element Document::makeElementWithNewFieldName(StringData fieldName, const BSONEl
     }
 }
 
-Element Document::makeElementSafeNum(StringData fieldName, SafeNum value) {
+Element Document::makeElementSafeNum(std::string_view fieldName, SafeNum value) {
     dassert(getImpl().doesNotAliasLeafBuilder(fieldName));
 
     switch (value.type()) {
@@ -2629,7 +2636,7 @@ Element Document::makeElement(ConstElement element) {
     return makeElement(element, nullptr);
 }
 
-Element Document::makeElementWithNewFieldName(StringData fieldName, ConstElement element) {
+Element Document::makeElementWithNewFieldName(std::string_view fieldName, ConstElement element) {
     return makeElement(element, &fieldName);
 }
 
@@ -2664,7 +2671,7 @@ Element Document::makeRootElement(const BSONObj& value) {
     return Element(this, newEltIdx);
 }
 
-Element Document::makeElement(ConstElement element, const StringData* fieldName) {
+Element Document::makeElement(ConstElement element, const std::string_view* fieldName) {
     Impl& impl = getImpl();
 
     if (this == &element.getDocument()) {

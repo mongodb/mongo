@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -58,11 +57,13 @@
 #include <memory>
 #include <queue>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 namespace {
 using SBEKeyStringTest = EExpressionTestFixture;
@@ -220,9 +221,9 @@ TEST_F(SBEKeyStringTest, Basic) {
 TEST(SimpleSBEKeyStringTest, KeyComponentInclusion) {
     key_string::Builder keyStringBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
     keyStringBuilder.appendNumberLong(12345);  // Included
-    keyStringBuilder.appendString("I've information vegetable, animal, and mineral"_sd);
+    keyStringBuilder.appendString("I've information vegetable, animal, and mineral"sv);
     keyStringBuilder.appendString(
-        "I know the kings of England, and I quote the fights historical"_sd);  // Included
+        "I know the kings of England, and I quote the fights historical"sv);  // Included
     keyStringBuilder.appendString("From Marathon to Waterloo, in order categorical");
     keyStringBuilder.appendRecordId(RecordId{0});
 

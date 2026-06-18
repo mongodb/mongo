@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/skip_and_limit.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>

@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -116,6 +115,7 @@
 #include "mongo/util/scopeguard.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -131,9 +131,10 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCheckingMongosShutdownInterrupt);
-const auto kOperationTime = "operationTime"_sd;
+const auto kOperationTime = "operationTime"sv;
 
 void runCommandInvocation(const RequestExecutionContext* rec, CommandInvocation* invocation) {
     CommandHelpers::runCommandInvocation(rec->getOpCtx(), invocation, rec->getReplyBuilder());
@@ -209,10 +210,10 @@ void invokeInTransactionRouter(TransactionRouter::Router& txnRouter,
 /**
  * Adds info from the active transaction and the given reason as context to the active exception.
  */
-void addContextForTransactionAbortingError(StringData txnIdAsString,
+void addContextForTransactionAbortingError(std::string_view txnIdAsString,
                                            StmtId latestStmtId,
                                            Status& status,
-                                           StringData reason) {
+                                           std::string_view reason) {
     status.addContext(fmt::format("Transaction {} was aborted on statement {} due to: {}",
                                   txnIdAsString,
                                   latestStmtId,
@@ -286,7 +287,7 @@ void ExecCommandClient::_epilogue() {
         failCommand.executeIf(
             [&](const BSONObj& data) {
                 rpc::RewriteStateChangeErrors::onActiveFailCommand(opCtx, data);
-                result->getBodyBuilder().append(data["writeConcernError"_sd]);
+                result->getBodyBuilder().append(data["writeConcernError"sv]);
                 if (data.hasField(kErrorLabelsFieldName) &&
                     data[kErrorLabelsFieldName].type() == BSONType::array) {
                     auto labels = data.getObjectField(kErrorLabelsFieldName).getOwned();
@@ -298,8 +299,8 @@ void ExecCommandClient::_epilogue() {
             [&](const BSONObj& data) {
                 return CommandHelpers::shouldActivateFailCommandFailPoint(
                            data, _invocation, opCtx->getClient()) &&
-                    data.hasField("writeConcernError"_sd) &&
-                    !result->getBodyBuilder().hasField("writeConcernError"_sd);
+                    data.hasField("writeConcernError"sv) &&
+                    !result->getBodyBuilder().hasField("writeConcernError"sv);
             });
     }
 
@@ -379,7 +380,7 @@ private:
     RequestExecutionContext* _rec;
     BSONObjBuilder* _errorBuilder;
     const NetworkOp _opType;
-    const StringData _commandName;
+    const std::string_view _commandName;
 
     std::shared_ptr<CommandInvocation> _invocation;
     boost::optional<rpc::ImpersonatedClientSessionGuard> _clientSessionGuard;
@@ -495,7 +496,7 @@ void ParseAndRunCommand::_parseCommand() {
 
     _rec->setCommand(command);
 
-    _isHello.emplace(command->getName() == "hello"_sd || command->getName() == "isMaster"_sd);
+    _isHello.emplace(command->getName() == "hello"sv || command->getName() == "isMaster"sv);
 
     opCtx->setExhaust(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
     Client* client = opCtx->getClient();
@@ -659,7 +660,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
             hangBeforeCheckingMongosShutdownInterrupt.shouldFail([&](const BSONObj& data) {
                 if (data.hasField("cmdName") && data.hasField("ns")) {
                     const auto cmdNss = _parc->_ns.value();
-                    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"sv);
                     return (data.getStringField("cmdName") == _parc->_commandName &&
                             fpNss == cmdNss);
                 }
@@ -1209,7 +1210,7 @@ public:
     DbResponse run();
 
 private:
-    StringData _getDatabaseStringForLogging() const {
+    std::string_view _getDatabaseStringForLogging() const {
         return _rec->getRequest().readDatabaseForLogging();
     }
 
@@ -1308,10 +1309,10 @@ void ClientCommand::_handleException(Status status) {
     if (status.code() == ErrorCodes::ClusterUMCErrorWithWriteConcernError) {
         auto ei = status.extraInfo<ClusterUMCErrorWithWriteConcernErrorInfo>();
         status = ei->getMainStatus();
-        wceBuilder.append("writeConcernError"_sd, ei->getWriteConcernErrorDetail().toBSON());
+        wceBuilder.append("writeConcernError"sv, ei->getWriteConcernErrorDetail().toBSON());
     } else {
         auto bob = reply->getBodyBuilder().asTempObj();
-        if (auto f = bob.getField("writeConcernError"_sd); !f.eoo()) {
+        if (auto f = bob.getField("writeConcernError"sv); !f.eoo()) {
             wceBuilder.append(f);
             wceBuilder.done();
         }

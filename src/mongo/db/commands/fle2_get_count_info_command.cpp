@@ -29,7 +29,6 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/fle_stats_gen.h"
@@ -51,6 +50,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -233,7 +233,7 @@ public:
         return true;
     }
 
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {GetQueryableEncryptionCountInfo::kTokensFieldName};
     }
 

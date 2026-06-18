@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -52,13 +52,13 @@ namespace mongo {
 
 class ServerParameterService {
 public:
-    virtual ServerParameter* get(StringData parameterName) = 0;
+    virtual ServerParameter* get(std::string_view parameterName) = 0;
     virtual ~ServerParameterService() = default;
 };
 
 class ClusterParameterService final : public ServerParameterService {
 public:
-    ServerParameter* get(StringData parameterName) override;
+    ServerParameter* get(std::string_view parameterName) override;
 };
 
 class DBClientService {

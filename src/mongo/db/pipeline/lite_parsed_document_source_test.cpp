@@ -45,10 +45,11 @@
 #include "mongo/unittest/framework.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 const NamespaceString kTestNss =
-    NamespaceString::createNamespaceString_forTest("test.liteParsedDocSource"_sd);
+    NamespaceString::createNamespaceString_forTest("test.liteParsedDocSource"sv);
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Mock);
 ALLOCATE_STAGE_PARAMS_ID(mock, MockStageParams::id);
@@ -114,7 +115,7 @@ TEST_F(LiteParserRegistrationTest, SetFallbackParser) {
     LiteParsedDocumentSource::LiteParserRegistration registration;
 
     // Create a mock IncrementalRolloutFeatureFlag.
-    IncrementalRolloutFeatureFlag mockFlag("testFlag"_sd, RolloutPhase::inDevelopment, false);
+    IncrementalRolloutFeatureFlag mockFlag("testFlag"sv, RolloutPhase::inDevelopment, false);
     registration.setFallbackParser(std::move(fallbackParser), &mockFlag);
 
     // Verify primary is still not set.
@@ -135,7 +136,7 @@ TEST_F(LiteParserRegistrationTest, GetParserWithoutFeatureFlag) {
 TEST_F(LiteParserRegistrationTest, GetParserWithFeatureFlagEnabled) {
     LiteParsedDocumentSource::LiteParserRegistration registration;
 
-    IncrementalRolloutFeatureFlag mockFlag("testFlag"_sd, RolloutPhase::inDevelopment, true);
+    IncrementalRolloutFeatureFlag mockFlag("testFlag"sv, RolloutPhase::inDevelopment, true);
     registration.setFallbackParser(std::move(fallbackParser), &mockFlag);
     registration.setPrimaryParser(std::move(primaryParser));
 
@@ -147,7 +148,7 @@ TEST_F(LiteParserRegistrationTest, GetParserWithFeatureFlagEnabled) {
 TEST_F(LiteParserRegistrationTest, GetParserWithFeatureFlagDisabled) {
     LiteParsedDocumentSource::LiteParserRegistration registration;
 
-    IncrementalRolloutFeatureFlag mockFlag("testFlag"_sd, RolloutPhase::inDevelopment, false);
+    IncrementalRolloutFeatureFlag mockFlag("testFlag"sv, RolloutPhase::inDevelopment, false);
     registration.setFallbackParser(std::move(fallbackParser), &mockFlag);
     registration.setPrimaryParser(std::move(primaryParser));
 
@@ -159,7 +160,7 @@ TEST_F(LiteParserRegistrationTest, GetParserWithFeatureFlagDisabled) {
 TEST_F(LiteParserRegistrationTest, GetParserWithChangingFeatureFlag) {
     LiteParsedDocumentSource::LiteParserRegistration registration;
 
-    IncrementalRolloutFeatureFlag mockFlag("testFlag"_sd, RolloutPhase::inDevelopment, false);
+    IncrementalRolloutFeatureFlag mockFlag("testFlag"sv, RolloutPhase::inDevelopment, false);
     registration.setFallbackParser(std::move(fallbackParser), &mockFlag);
     registration.setPrimaryParser(std::move(primaryParser));
 
@@ -177,7 +178,7 @@ TEST_F(LiteParserRegistrationTest, GetParserWithChangingFeatureFlag) {
 
 TEST_F(LiteParserRegistrationTest, GetParserWithIfrContextFlagEnabled) {
     static IncrementalRolloutFeatureFlag mockFlag(
-        "testFlag1"_sd, RolloutPhase::inDevelopment, false);
+        "testFlag1"sv, RolloutPhase::inDevelopment, false);
     const auto& [registration, options] = makeRegistrationWithOptions(mockFlag, true);
 
     // Should return primary parser because ifrContext overrides to enabled.
@@ -186,8 +187,7 @@ TEST_F(LiteParserRegistrationTest, GetParserWithIfrContextFlagEnabled) {
 }
 
 TEST_F(LiteParserRegistrationTest, GetParserWithIfrContextFlagDisabled) {
-    static IncrementalRolloutFeatureFlag mockFlag(
-        "testFlag2"_sd, RolloutPhase::inDevelopment, true);
+    static IncrementalRolloutFeatureFlag mockFlag("testFlag2"sv, RolloutPhase::inDevelopment, true);
     const auto& [registration, options] = makeRegistrationWithOptions(mockFlag, false);
 
     // Should return fallback parser because ifrContext overrides to disabled.
@@ -196,8 +196,7 @@ TEST_F(LiteParserRegistrationTest, GetParserWithIfrContextFlagDisabled) {
 }
 
 TEST_F(LiteParserRegistrationTest, GetParserWithEmptyIfrContextFlag) {
-    static IncrementalRolloutFeatureFlag mockFlag(
-        "testFlag3"_sd, RolloutPhase::inDevelopment, true);
+    static IncrementalRolloutFeatureFlag mockFlag("testFlag3"sv, RolloutPhase::inDevelopment, true);
     const auto& [registration, options] = makeRegistrationWithOptions(mockFlag);
 
     // Should use checkEnabled() and return fallback parser.
@@ -240,7 +239,7 @@ protected:
 TEST_F(LiteParsedDocumentSourceParseTest, CanRegisterBothPrimaryAndFallback) {
     _stageName = "$canRegisterBothPrimaryAndFallback";
 
-    IncrementalRolloutFeatureFlag mockFlag("testFlag"_sd, RolloutPhase::inDevelopment, false);
+    IncrementalRolloutFeatureFlag mockFlag("testFlag"sv, RolloutPhase::inDevelopment, false);
     registerFallbackParser(&mockFlag);
     registerPrimaryParser();
 }
@@ -250,7 +249,7 @@ using LiteParsedDocumentSourceParseDeathTest = LiteParsedDocumentSourceParseTest
 DEATH_TEST_F(LiteParsedDocumentSourceParseDeathTest, MustRegisterPrimaryAfterFallback, "11395100") {
     _stageName = "$mustRegisterPrimaryAfterFallback";
 
-    IncrementalRolloutFeatureFlag mockFlag("testFlag"_sd, RolloutPhase::inDevelopment, false);
+    IncrementalRolloutFeatureFlag mockFlag("testFlag"sv, RolloutPhase::inDevelopment, false);
     registerPrimaryParser();
     registerFallbackParser(&mockFlag);
 }
@@ -269,7 +268,7 @@ TEST_F(LiteParsedDocumentSourceParseTest, FirstFallbackParserTakesPrecedence) {
     _stageName = "$firstFallbackParserTakesPrecedence";
 
     // Disable the feature flag such that the parser returns the fallback parser.
-    IncrementalRolloutFeatureFlag mockFlag("testFlag"_sd, RolloutPhase::inDevelopment, false);
+    IncrementalRolloutFeatureFlag mockFlag("testFlag"sv, RolloutPhase::inDevelopment, false);
     registerFallbackParser(&mockFlag);
     registerPrimaryParser();
 
@@ -291,7 +290,7 @@ TEST_F(LiteParsedDocumentSourceParseTest, FirstFallbackParserTakesPrecedenceWith
     _stageName = "$firstFallbackParserTakesPrecedenceWithNoPrimary";
 
     // Disable the feature flag such that the parser returns the fallback parser.
-    IncrementalRolloutFeatureFlag mockFlag("testFlag"_sd, RolloutPhase::inDevelopment, false);
+    IncrementalRolloutFeatureFlag mockFlag("testFlag"sv, RolloutPhase::inDevelopment, false);
     registerFallbackParser(&mockFlag);
 
     // Try creating another fallback parser.
@@ -1002,7 +1001,7 @@ protected:
 };
 
 TEST_F(IsRegisteredExtensionStageTest, ReturnsFalseForUnregisteredStage) {
-    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$unregisteredStage"_sd));
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$unregisteredStage"sv));
 }
 
 TEST_F(IsRegisteredExtensionStageTest, ReturnsFalseForNonExtensionStage) {
@@ -1027,9 +1026,9 @@ TEST_F(IsRegisteredExtensionStageTest,
 }
 
 TEST_F(IsRegisteredExtensionStageTest, ReturnsFalseForBuiltInStages) {
-    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$match"_sd));
-    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$project"_sd));
-    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$limit"_sd));
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$match"sv));
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$project"sv));
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$limit"sv));
 }
 
 }  // namespace mongo

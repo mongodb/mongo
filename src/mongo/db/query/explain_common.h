@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 /**
  * Namespace for static methods that are shared between explain on mongod and on mongos.
@@ -80,11 +81,11 @@ void generatePeakTrackedMemBytes(const OperationContext* opCtx, BSONObjBuilder* 
  * Conditionally appends a BSONObj to 'bob' depending on whether or not the maximum user size for a
  * BSON object will be exceeded.
  */
-bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out);
+bool appendIfRoom(const BSONObj& toAppend, std::string_view fieldName, BSONObjBuilder* out);
 
 /**
  * Conditionally appends a BSONArray to 'bob' depending on whether or not the maximum user size for
  * a BSON object will be exceeded.
  */
-bool appendIfRoom(const BSONArray& toAppend, StringData fieldName, BSONObjBuilder* out);
+bool appendIfRoom(const BSONArray& toAppend, std::string_view fieldName, BSONObjBuilder* out);
 }  // namespace mongo::explain_common

@@ -32,6 +32,8 @@
 #include "mongo/config.h"
 #include "mongo/stdx/unordered_map.h"
 
+#include <string_view>
+
 #include <opentelemetry/sdk/trace/exporter.h>
 #include <opentelemetry/sdk/trace/recordable.h>
 

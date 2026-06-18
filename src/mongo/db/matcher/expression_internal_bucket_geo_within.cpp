@@ -31,8 +31,10 @@
 
 #include "mongo/db/matcher/expression_geo_serializer.h"
 
+#include <string_view>
+
 namespace mongo {
-constexpr StringData InternalBucketGeoWithinMatchExpression::kName;
+constexpr std::string_view InternalBucketGeoWithinMatchExpression::kName;
 
 void InternalBucketGeoWithinMatchExpression::debugString(StringBuilder& debug,
                                                          int indentationLevel) const {

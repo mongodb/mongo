@@ -49,6 +49,7 @@
 #include <cstddef>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -136,7 +137,7 @@ int CatalogEntryMetaData::getTotalIndexCount() const {
         indexes.cbegin(), indexes.cend(), [](const auto& index) { return index.isPresent(); });
 }
 
-int CatalogEntryMetaData::findIndexOffset(StringData name) const {
+int CatalogEntryMetaData::findIndexOffset(std::string_view name) const {
     for (unsigned i = 0; i < indexes.size(); i++)
         if (indexes[i].nameStringData() == name)
             return i;
@@ -156,7 +157,7 @@ void CatalogEntryMetaData::insertIndex(IndexMetaData indexMetaData) {
     indexes[indexOffset] = std::move(indexMetaData);
 }
 
-bool CatalogEntryMetaData::eraseIndex(StringData name) {
+bool CatalogEntryMetaData::eraseIndex(std::string_view name) {
     int indexOffset = findIndexOffset(name);
 
     if (indexOffset < 0) {

@@ -29,12 +29,12 @@
 
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_set.h>
@@ -50,7 +50,7 @@ WriteBatch::WriteBatch(TrackingContexts& tcs,
                        BucketKey k,
                        OperationId o,
                        ExecutionStatsController& s,
-                       StringData timeField)
+                       std::string_view timeField)
     : opId(o),
       trackingContexts(tcs),
       timeField(timeField),

@@ -31,15 +31,17 @@
 
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace otel {
 
-OtelStringView asOtelStringView(StringData data) {
+OtelStringView asOtelStringView(std::string_view data) {
     return OtelStringView{data.data(), data.length()};
 }
 
-StringData asStringData(OtelStringView view) {
-    return StringData{view.data(), view.length()};
+std::string_view asStringData(OtelStringView view) {
+    return std::string_view{view.data(), view.length()};
 }
 
 stdx::unordered_set<OtelStringView> getKeySet(const TextMapCarrier& carrier) {

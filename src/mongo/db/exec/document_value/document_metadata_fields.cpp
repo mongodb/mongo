@@ -38,6 +38,7 @@
 #include "mongo/util/string_map.h"
 
 #include <ostream>
+#include <string_view>
 #include <vector>
 
 #include <fmt/format.h>
@@ -46,33 +47,34 @@ namespace mongo {
 using MetaType = DocumentMetadataFields::MetaType;
 
 namespace {
+using namespace std::literals::string_view_literals;
 Value missingToNull(Value maybeMissing) {
     return maybeMissing.missing() ? Value(BSONNULL) : maybeMissing;
 }
 
-constexpr StringData kTextScoreName = "textScore"_sd;
-constexpr StringData kRandValName = "randVal"_sd;
-constexpr StringData kSearchScoreName = "searchScore"_sd;
-constexpr StringData kSearchHighlightsName = "searchHighlights"_sd;
-constexpr StringData kGeoNearDistanceName = "geoNearDistance"_sd;
-constexpr StringData kGeoNearPointName = "geoNearPoint"_sd;
-constexpr StringData kRecordIdName = "recordId"_sd;
-constexpr StringData kIndexKeyName = "indexKey"_sd;
-constexpr StringData kSortKeyName = "sortKey"_sd;
-constexpr StringData kSearchScoreDetailsName = "searchScoreDetails"_sd;
-constexpr StringData kSearchRootDocumentIdName = "searchRootDocumentId"_sd;
-constexpr StringData kSearchSequenceTokenName = "searchSequenceToken"_sd;
-constexpr StringData kTimeseriesBucketMinTimeName = "timeseriesBucketMinTime"_sd;
-constexpr StringData kTimeseriesBucketMaxTimeName = "timeseriesBucketMaxTime"_sd;
-constexpr StringData kVectorSearchScoreName = "vectorSearchScore"_sd;
-constexpr StringData kScoreName = "score"_sd;
-constexpr StringData kScoreDetailsName = "scoreDetails"_sd;
+constexpr std::string_view kTextScoreName = "textScore"sv;
+constexpr std::string_view kRandValName = "randVal"sv;
+constexpr std::string_view kSearchScoreName = "searchScore"sv;
+constexpr std::string_view kSearchHighlightsName = "searchHighlights"sv;
+constexpr std::string_view kGeoNearDistanceName = "geoNearDistance"sv;
+constexpr std::string_view kGeoNearPointName = "geoNearPoint"sv;
+constexpr std::string_view kRecordIdName = "recordId"sv;
+constexpr std::string_view kIndexKeyName = "indexKey"sv;
+constexpr std::string_view kSortKeyName = "sortKey"sv;
+constexpr std::string_view kSearchScoreDetailsName = "searchScoreDetails"sv;
+constexpr std::string_view kSearchRootDocumentIdName = "searchRootDocumentId"sv;
+constexpr std::string_view kSearchSequenceTokenName = "searchSequenceToken"sv;
+constexpr std::string_view kTimeseriesBucketMinTimeName = "timeseriesBucketMinTime"sv;
+constexpr std::string_view kTimeseriesBucketMaxTimeName = "timeseriesBucketMaxTime"sv;
+constexpr std::string_view kVectorSearchScoreName = "vectorSearchScore"sv;
+constexpr std::string_view kScoreName = "score"sv;
+constexpr std::string_view kScoreDetailsName = "scoreDetails"sv;
 
 // This field ("value") is extracted from the 'scoreDetails' Document to set the 'score' field too.
-constexpr StringData kScoreDetailsScoreField = "value"_sd;
-constexpr StringData kStreamName = "stream"_sd;
+constexpr std::string_view kScoreDetailsScoreField = "value"sv;
+constexpr std::string_view kStreamName = "stream"sv;
 
-constexpr StringData kChangeStreamControlEventName = "changeStreamControlEvent"_sd;
+constexpr std::string_view kChangeStreamControlEventName = "changeStreamControlEvent"sv;
 
 static const StringDataMap<MetaType> kMetaNameToMetaType = {
     {kScoreName, MetaType::kScore},
@@ -96,7 +98,7 @@ static const StringDataMap<MetaType> kMetaNameToMetaType = {
     {kChangeStreamControlEventName, MetaType::kChangeStreamControlEvent},
 };
 
-static const stdx::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
+static const stdx::unordered_map<MetaType, std::string_view> kMetaTypeToMetaName = {
     {MetaType::kScore, kScoreName},
     {MetaType::kVectorSearchScore, kVectorSearchScoreName},
     {MetaType::kGeoNearDist, kGeoNearDistanceName},
@@ -146,14 +148,14 @@ DocumentMetadataFields& DocumentMetadataFields::operator=(DocumentMetadataFields
     return *this;
 }
 
-MetaType DocumentMetadataFields::parseMetaType(StringData name) {
+MetaType DocumentMetadataFields::parseMetaType(std::string_view name) {
     const auto iter = kMetaNameToMetaType.find(name);
     uassert(
         17308, fmt::format("Unsupported $meta field: {}", name), iter != kMetaNameToMetaType.end());
     return iter->second;
 }
 
-StringData DocumentMetadataFields::serializeMetaType(MetaType type) {
+std::string_view DocumentMetadataFields::serializeMetaType(MetaType type) {
     const auto nameIter = kMetaTypeToMetaName.find(type);
     tassert(9733900,
             str::stream() << "No name found for meta type: " << type,
@@ -161,7 +163,7 @@ StringData DocumentMetadataFields::serializeMetaType(MetaType type) {
     return nameIter->second;
 }
 
-bool DocumentMetadataFields::isScoreProducingMetaType(StringData name) {
+bool DocumentMetadataFields::isScoreProducingMetaType(std::string_view name) {
     return kScoreMetadataFields.contains(DocumentMetadataFields::parseMetaType(name));
 }
 

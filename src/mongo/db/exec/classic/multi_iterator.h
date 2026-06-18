@@ -41,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -77,7 +78,7 @@ public:
         return STAGE_MULTI_ITERATOR;
     }
 
-    static constexpr StringData kStageType = "MULTI_ITERATOR"_sd;
+    static constexpr std::string_view kStageType = "MULTI_ITERATOR"_sd;
 
 protected:
     void doSaveStateRequiresCollection() final;

@@ -36,11 +36,13 @@
 
 #include <algorithm>
 #include <sstream>
+#include <string_view>
 #include <tuple>
 
 #include <absl/container/inlined_vector.h>
 
 namespace mongo::stage_builder {
+using namespace std::literals::string_view_literals;
 FieldEffect FieldEffects::getComposedEffect(FieldEffect child, FieldEffect parent) {
     if (child == FieldEffect::kKeep ||
         (parent == FieldEffect::kGeneric || parent == FieldEffect::kDrop ||
@@ -350,22 +352,22 @@ bool FieldEffects::hasCreatedFields() const {
 std::string FieldEffects::toString() const {
     std::stringstream ss;
 
-    auto effectToString = [&](FieldEffect e) -> StringData {
+    auto effectToString = [&](FieldEffect e) -> std::string_view {
         switch (e) {
             case FieldEffect::kKeep:
-                return "Keep"_sd;
+                return "Keep"sv;
             case FieldEffect::kDrop:
-                return "Drop"_sd;
+                return "Drop"sv;
             case FieldEffect::kModify:
-                return "Modify"_sd;
+                return "Modify"sv;
             case FieldEffect::kSet:
-                return "Set"_sd;
+                return "Set"sv;
             case FieldEffect::kAdd:
-                return "Add"_sd;
+                return "Add"sv;
             case FieldEffect::kGeneric:
-                return "Generic"_sd;
+                return "Generic"sv;
             default:
-                return "UNKNOWN"_sd;
+                return "UNKNOWN"sv;
         }
     };
 
@@ -735,9 +737,9 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
             bool hasDuplicateNames = false;
 
             // Add "_id" to 'groupFields' and 'createdFieldVec'.
-            groupFields.emplace_back("_id"_sd);
-            createdFieldVec.emplace_back("_id"_sd, FieldEffect::kAdd);
-            dedup.emplace("_id"_sd);
+            groupFields.emplace_back("_id"sv);
+            createdFieldVec.emplace_back("_id"sv, FieldEffect::kAdd);
+            dedup.emplace("_id"sv);
 
             // Add each accumulator's output field to 'groupFields' and 'createdFieldVec'.
             for (const auto& accStmt : groupNode->accumulators) {

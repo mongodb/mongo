@@ -51,6 +51,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -62,7 +63,7 @@ namespace mongo {
 class MONGO_MOD_NEEDS_REPLACEMENT RenameCollectionParticipantService final
     : public repl::PrimaryOnlyService {
 public:
-    static constexpr StringData kServiceName = "RenameCollectionParticipantService"_sd;
+    static constexpr std::string_view kServiceName = "RenameCollectionParticipantService"_sd;
 
     explicit RenameCollectionParticipantService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext) {}
@@ -71,7 +72,7 @@ public:
 
     static RenameCollectionParticipantService* getService(OperationContext* opCtx);
 
-    StringData getServiceName() const override {
+    std::string_view getServiceName() const override {
         return kServiceName;
     }
 

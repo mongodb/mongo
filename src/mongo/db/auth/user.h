@@ -56,6 +56,7 @@
 #include <cstdint>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -130,8 +131,8 @@ public:
     virtual const boost::optional<std::set<RoleName>>& getRoles() const = 0;
     virtual UserRequestType getType() const = 0;
     virtual void setRoles(boost::optional<std::set<RoleName>> roles) = 0;
-    virtual void setAuthenticatedMechanism(StringData mechanism) = 0;
-    virtual boost::optional<StringData> getAuthenticatedMechanism() const = 0;
+    virtual void setAuthenticatedMechanism(std::string_view mechanism) = 0;
+    virtual boost::optional<std::string_view> getAuthenticatedMechanism() const = 0;
     virtual std::unique_ptr<UserRequest> clone() const = 0;
 
     /**
@@ -153,7 +154,7 @@ class UserRequestGeneral : public UserRequest {
 public:
     UserRequestGeneral(UserName name,
                        boost::optional<std::set<RoleName>> roles,
-                       boost::optional<StringData> authMechanism = boost::none)
+                       boost::optional<std::string_view> authMechanism = boost::none)
         : name(std::move(name)), roles(std::move(roles)) {
         if (authMechanism) {
             uassert(ErrorCodes::BadValue,
@@ -179,7 +180,7 @@ public:
         this->roles = std::move(roles);
     }
 
-    void setAuthenticatedMechanism(StringData mechanism) final {
+    void setAuthenticatedMechanism(std::string_view mechanism) final {
         if (mechanism.empty()) {
             authenticatedMechanism = boost::none;
             return;
@@ -190,8 +191,8 @@ public:
         authenticatedMechanism = std::string{mechanism};
     }
 
-    boost::optional<StringData> getAuthenticatedMechanism() const final {
-        return authenticatedMechanism ? boost::optional<StringData>(*authenticatedMechanism)
+    boost::optional<std::string_view> getAuthenticatedMechanism() const final {
+        return authenticatedMechanism ? boost::optional<std::string_view>(*authenticatedMechanism)
                                       : boost::none;
     }
 
@@ -313,8 +314,8 @@ public:
             }
         }
 
-        std::vector<StringData> toMechanismsVector() const {
-            std::vector<StringData> mechanismsVec;
+        std::vector<std::string_view> toMechanismsVector() const {
+            std::vector<std::string_view> mechanismsVec;
             if (scram_sha1.isValid()) {
                 mechanismsVec.push_back(kSHA1FieldName);
             }

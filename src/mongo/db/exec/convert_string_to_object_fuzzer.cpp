@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/convert_utils.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -40,7 +41,7 @@ namespace {
 void doFuzz(const char* data, size_t size) try {
     Value val;
     try {
-        val = exec::expression::convert_utils::parseJson(StringData{data, size},
+        val = exec::expression::convert_utils::parseJson(std::string_view{data, size},
                                                          boost::none /*expectedType*/);
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         return;
@@ -50,7 +51,7 @@ void doFuzz(const char* data, size_t size) try {
 } catch (...) {
     LOGV2_FATAL(10508700,
                 "Exception",
-                "input"_attr = StringData{data, size},
+                "input"_attr = std::string_view{data, size},
                 "error"_attr = exceptionToStatus());
 }
 

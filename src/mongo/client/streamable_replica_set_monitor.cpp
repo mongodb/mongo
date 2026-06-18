@@ -54,6 +54,7 @@
 #include <mutex>
 #include <ostream>
 #include <set>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 
@@ -498,7 +499,7 @@ void StreamableReplicaSetMonitor::_failedHost(const HostAndPort& host,
 
 void StreamableReplicaSetMonitor::_doErrorActions(
     const HostAndPort& host,
-    const StringData reason,
+    const std::string_view reason,
     const StreamableReplicaSetMonitorErrorHandler::ErrorActions& errorActions) const {
     {
         std::lock_guard lock(_mutex);

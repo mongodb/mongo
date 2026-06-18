@@ -30,7 +30,6 @@
 
 #include "mongo/db/index/geo/2d_key_generator.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"

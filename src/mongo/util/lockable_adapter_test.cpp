@@ -30,7 +30,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/util/lockable_adapter.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/unittest.h"
 

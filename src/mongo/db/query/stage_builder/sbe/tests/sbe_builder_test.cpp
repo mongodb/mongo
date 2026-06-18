@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -53,11 +52,13 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class SbeStageBuilderTest : public SbeStageBuilderTestFixture {
 protected:
@@ -527,7 +528,7 @@ TEST_F(GoldenSbeStageBuilderTest, TestUnwind) {
     boost::optional<FieldPath> fp = boost::none;
     auto unwindNode = std::make_unique<UnwindNode>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
-        UnwindNode::UnwindSpec{"a"_sd, true, fp});
+        UnwindNode::UnwindSpec{"a"sv, true, fp});
     runTest(std::move(unwindNode), BSON_ARRAY(BSON("a" << 1) << BSON("a" << 2) << BSON("a" << 3)));
 }
 
@@ -536,7 +537,7 @@ TEST_F(GoldenSbeStageBuilderTest, TestUnwindIndexPath) {
     boost::optional<FieldPath> fp = FieldPath("idx");
     auto unwindNode = std::make_unique<UnwindNode>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
-        UnwindNode::UnwindSpec{"a"_sd, true, fp});
+        UnwindNode::UnwindSpec{"a"sv, true, fp});
     runTest(std::move(unwindNode),
             BSON_ARRAY(BSON("a" << 1 << "idx" << 0)
                        << BSON("a" << 2 << "idx" << 1) << BSON("a" << 3 << "idx" << 2)));
@@ -548,7 +549,7 @@ TEST_F(GoldenSbeStageBuilderTest, TestUnwindIndexPathConflict) {
     boost::optional<FieldPath> fp = FieldPath("a.idx");
     auto unwindNode = std::make_unique<UnwindNode>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
-        UnwindNode::UnwindSpec{"a.val"_sd, true, fp});
+        UnwindNode::UnwindSpec{"a.val"sv, true, fp});
     runTest(std::move(unwindNode),
             BSON_ARRAY(BSON("a" << BSON("val" << 1 << "idx" << 0))
                        << BSON("a" << BSON("val" << 2 << "idx" << 1))

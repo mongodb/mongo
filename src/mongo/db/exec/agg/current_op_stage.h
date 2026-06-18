@@ -34,6 +34,8 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -48,7 +50,7 @@ public:
     using TruncationMode = MongoProcessInterface::CurrentOpTruncateMode;
     using CursorMode = MongoProcessInterface::CurrentOpCursorMode;
 
-    static constexpr StringData kStageName = "$currentOp"_sd;
+    static constexpr std::string_view kStageName = "$currentOp"_sd;
 
     static constexpr ConnMode kDefaultConnMode = ConnMode::kExcludeIdle;
     static constexpr SessionMode kDefaultSessionMode = SessionMode::kIncludeIdle;

@@ -39,6 +39,7 @@
 #include "mongo/util/base64.h"
 
 #include <charconv>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -156,7 +157,7 @@ IngressSession::IngressSession(TransportLayer* tl,
                                ServerStream* stream,
                                boost::optional<UUID> clientId,
                                boost::optional<std::string> authToken,
-                               boost::optional<StringData> encodedClientMetadata)
+                               boost::optional<std::string_view> encodedClientMetadata)
     : GRPCSession(/*isIngress=*/true, tl, ctx->getRemote()),
       _ctx(ctx),
       _stream(stream),

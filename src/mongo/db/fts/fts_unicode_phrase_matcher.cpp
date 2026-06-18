@@ -31,6 +31,8 @@
 
 #include "mongo/db/fts/unicode/string.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace fts {
 
@@ -44,8 +46,8 @@ UnicodeFTSPhraseMatcher::UnicodeFTSPhraseMatcher(const string& language) {
     }
 }
 
-bool UnicodeFTSPhraseMatcher::phraseMatches(StringData phrase,
-                                            StringData haystack,
+bool UnicodeFTSPhraseMatcher::phraseMatches(std::string_view phrase,
+                                            std::string_view haystack,
                                             Options options) const {
     unicode::String::SubstrMatchOptions matchOptions = unicode::String::kNone;
 

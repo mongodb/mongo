@@ -35,6 +35,8 @@
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -63,11 +65,11 @@ public:
     virtual ~BucketLevelComparisonPredicateGeneratorBase() {}
 
     virtual Output generateTimeFieldPredicate(const ComparisonMatchExpressionBase* matchExpr,
-                                              StringData minPathStringData,
-                                              StringData maxPathStringData,
+                                              std::string_view minPathStringData,
+                                              std::string_view maxPathStringData,
                                               Date_t timeField,
                                               BSONObj maxTime,
-                                              StringData matchExprPath,
+                                              std::string_view matchExprPath,
                                               const BSONElement& matchExprData) const = 0;
 
     Output createLoosePredicate(const ComparisonMatchExpressionBase* matchExpr) const;
@@ -89,11 +91,11 @@ public:
         : BucketLevelComparisonPredicateGeneratorBase(std::move(params)) {};
 
     Output generateTimeFieldPredicate(const ComparisonMatchExpressionBase* matchExpr,
-                                      StringData minPathStringData,
-                                      StringData maxPathStringData,
+                                      std::string_view minPathStringData,
+                                      std::string_view maxPathStringData,
                                       Date_t timeField,
                                       BSONObj maxTime,
-                                      StringData matchExprPath,
+                                      std::string_view matchExprPath,
                                       const BSONElement& matchExprData) const override;
 };
 
@@ -108,11 +110,11 @@ public:
         : BucketLevelComparisonPredicateGeneratorBase(std::move(params)) {};
 
     Output generateTimeFieldPredicate(const ComparisonMatchExpressionBase* matchExpr,
-                                      StringData minPathStringData,
-                                      StringData maxPathStringData,
+                                      std::string_view minPathStringData,
+                                      std::string_view maxPathStringData,
                                       Date_t timeField,
                                       BSONObj maxTime,
-                                      StringData matchExprPath,
+                                      std::string_view matchExprPath,
                                       const BSONElement& matchExprData) const override;
 };
 
@@ -140,7 +142,7 @@ public:
  * Helper function to make comparison match expressions.
  */
 template <typename T, typename V>
-static auto makeCmpMatchExpr(StringData path, V val) {
+static auto makeCmpMatchExpr(std::string_view path, V val) {
     return std::make_unique<T>(path, val);
 }
 }  // namespace mongo::timeseries

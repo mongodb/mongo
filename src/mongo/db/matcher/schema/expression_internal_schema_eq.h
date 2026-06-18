@@ -44,6 +44,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -60,9 +61,9 @@ namespace mongo {
  */
 class InternalSchemaEqMatchExpression final : public LeafMatchExpression {
 public:
-    static constexpr StringData kName = "$_internalSchemaEq"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaEq"_sd;
 
-    InternalSchemaEqMatchExpression(boost::optional<StringData> path,
+    InternalSchemaEqMatchExpression(boost::optional<std::string_view> path,
                                     BSONElement rhs,
                                     clonable_ptr<ErrorAnnotation> annotation = nullptr);
 

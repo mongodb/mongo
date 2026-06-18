@@ -30,7 +30,6 @@
 
 #include "mongo/db/query/fle/query_rewriter.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/json.h"
 #include "mongo/crypto/fle_crypto_types.h"
@@ -55,6 +54,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 #include <typeindex>
 #include <vector>
 
@@ -62,6 +62,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /*
  *  The server rewrite itself is only responsible for traversing agg and MatchExpressions and
@@ -84,7 +85,7 @@ protected:
         if (!elt.isABSONObj()) {
             return false;
         }
-        return elt.Obj().hasField("encrypt"_sd);
+        return elt.Obj().hasField("encrypt"sv);
     }
     bool isPayload(const Value& v) const override {
         if (!v.isObject()) {
@@ -180,7 +181,7 @@ protected:
         if (!elt.isABSONObj()) {
             return false;
         }
-        return elt.Obj().hasField("foo"_sd);
+        return elt.Obj().hasField("foo"sv);
     }
     bool isPayload(const Value& v) const override {
         if (!v.isObject()) {
@@ -436,7 +437,7 @@ private:
     }
 
     fle::TagMap _tags;
-    std::set<StringData> _encryptedFields;
+    std::set<std::string_view> _encryptedFields;
     // _forceCollectionScanOnAggAsMatchRewrite indicates that the _textSearchPredicate we initialize
     // for this QueryRewriter will throw an exception for tag limit exceeded when generating tags.
     const bool _forceCollectionScanOnAggAsMatchRewrite;
@@ -463,7 +464,7 @@ protected:
 
     std::unique_ptr<MockQueryRewriter> _mock;
     boost::intrusive_ptr<ExpressionContext> _expCtx{new ExpressionContextForTest()};
-    NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("test.mock"_sd);
+    NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("test.mock"sv);
     std::map<NamespaceString, EncryptedFieldConfig> _mockEfcMap{{_mockNss, makeMockEfc()}};
 };
 
@@ -1131,7 +1132,7 @@ public:
 
     auto jsonToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const NamespaceString& nss,
-                        StringData jsonArray) {
+                        std::string_view jsonArray) {
         const auto inputBson = fromjson(fmt::format("{{pipeline: {}}}", jsonArray));
 
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
@@ -1144,7 +1145,7 @@ public:
     void assertExpectedPipeline(const Pipeline& rewrittenPipeline,
                                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 const NamespaceString& nss,
-                                StringData expectedPipelineJsonArray) {
+                                std::string_view expectedPipelineJsonArray) {
         query_shape::SerializationOptions opts{.serializeForFLE2 = true};
         auto serializedRewrittenPipeline = rewrittenPipeline.serializeToBson(opts);
         auto serializedExpectedPipeline =
@@ -1154,7 +1155,7 @@ public:
 
 protected:
     boost::intrusive_ptr<ExpressionContext> _expCtx{new ExpressionContextForTest()};
-    NamespaceString _primaryNss = NamespaceString::createNamespaceString_forTest("test.coll_a"_sd);
+    NamespaceString _primaryNss = NamespaceString::createNamespaceString_forTest("test.coll_a"sv);
 };
 
 #define TEST_FLE_REWRITE_PIPELINE(name,                                                        \
@@ -1266,12 +1267,13 @@ TEST_FLE_REWRITE_PIPELINE(LookupSinglyNestedMatch,
                                     {$match:
                                         {$and: [{b_ssn: {$gt: 2}}, {b_age: {$gt: 4}}]}
                                     }]}}])",
-                          {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd)},
+                          {NamespaceString::createNamespaceString_forTest("test.coll_b"sv)},
                           FLEServerRewritePipelineTest::kTwoEncryptionSchemaEncryptionInfo,
                           true);
 
-TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatch,
-                          R"([{ $lookup: {
+TEST_FLE_REWRITE_PIPELINE(
+    LookupDoublyNestedMatch,
+    R"([{ $lookup: {
                                 from: "coll_b",
                                 localField: "foo",
                                 foreignField: "b_foo",
@@ -1292,7 +1294,7 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatch,
                                     {$match:
                                         {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]}
                                     }]}}])",
-                          R"([{ $lookup: {
+    R"([{ $lookup: {
                                 from: "coll_b",
                                 localField: "foo",
                                 foreignField: "b_foo",
@@ -1313,11 +1315,10 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatch,
                                     {$match:
                                         {$and: [{b_ssn: {$gt: 2}}, {b_age: {$gt: 4}}]}
                                     }]}}])",
-                          std::vector<NamespaceString>(
-                              {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd),
-                               NamespaceString::createNamespaceString_forTest("test.coll_c"_sd)}),
-                          FLEServerRewritePipelineTest::kThreeEncryptionSchemaEncryptionInfo,
-                          true);
+    std::vector<NamespaceString>({NamespaceString::createNamespaceString_forTest("test.coll_b"sv),
+                                  NamespaceString::createNamespaceString_forTest("test.coll_c"sv)}),
+    FLEServerRewritePipelineTest::kThreeEncryptionSchemaEncryptionInfo,
+    true);
 
 // Test that no rewrites take place when feature flag is disabled.
 TEST_FLE_REWRITE_PIPELINE(LookupSinglyNestedMatch_FeatureFlagDisabled,
@@ -1341,12 +1342,13 @@ TEST_FLE_REWRITE_PIPELINE(LookupSinglyNestedMatch_FeatureFlagDisabled,
                                     {$match:
                                         {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]}
                                     }]}}])",
-                          {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd)},
+                          {NamespaceString::createNamespaceString_forTest("test.coll_b"sv)},
                           FLEServerRewritePipelineTest::kTwoEncryptionSchemaEncryptionInfo,
                           false);
 
-TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatch_FeatureFlagDisabled,
-                          R"([{ $lookup: {
+TEST_FLE_REWRITE_PIPELINE(
+    LookupDoublyNestedMatch_FeatureFlagDisabled,
+    R"([{ $lookup: {
                                 from: "coll_b",
                                 localField: "foo",
                                 foreignField: "b_foo",
@@ -1367,7 +1369,7 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatch_FeatureFlagDisabled,
                                     {$match:
                                         {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]}
                                     }]}}])",
-                          R"([{ $lookup: {
+    R"([{ $lookup: {
                                 from: "coll_b",
                                 localField: "foo",
                                 foreignField: "b_foo",
@@ -1388,11 +1390,10 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatch_FeatureFlagDisabled,
                                     {$match:
                                         {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]}
                                     }]}}])",
-                          std::vector<NamespaceString>(
-                              {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd),
-                               NamespaceString::createNamespaceString_forTest("test.coll_c"_sd)}),
-                          FLEServerRewritePipelineTest::kThreeEncryptionSchemaEncryptionInfo,
-                          false);
+    std::vector<NamespaceString>({NamespaceString::createNamespaceString_forTest("test.coll_b"sv),
+                                  NamespaceString::createNamespaceString_forTest("test.coll_c"sv)}),
+    FLEServerRewritePipelineTest::kThreeEncryptionSchemaEncryptionInfo,
+    false);
 
 TEST_F(FLEServerRewritePipelineTest, MissingEscPrimaryCollectionFails_PipelineRewrite) {
     unittest::ServerParameterGuard _scopedFeature{"featureFlagLookupEncryptionSchemasFLE", true};
@@ -1428,7 +1429,7 @@ TEST_F(FLEServerRewritePipelineTest, BuildsEfcMapForAllSchemas_PipelineRewrite) 
 TEST_F(FLEServerRewritePipelineTest, MissingEscForeignCollectionFails_PipelineRewrite) {
     unittest::ServerParameterGuard _scopedFeature{"featureFlagLookupEncryptionSchemasFLE", true};
 
-    const auto foreignNss = NamespaceString::createNamespaceString_forTest("test.coll_d"_sd);
+    const auto foreignNss = NamespaceString::createNamespaceString_forTest("test.coll_d"sv);
     setResolvedNamespacesForTest({foreignNss});
     auto pipeline = jsonToPipeline(_expCtx, _primaryNss, R"([{ $lookup: {
                                                                             from: "coll_d",
@@ -1448,8 +1449,9 @@ TEST_F(FLEServerRewritePipelineTest, MissingEscForeignCollectionFails_PipelineRe
     ASSERT_THROWS_CODE(pipelineRewrite.doRewrite(nullptr), AssertionException, 10026006);
 }
 
-TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatchMissingUnencryptedForeignCollection,
-                          R"([{ $lookup: {
+TEST_FLE_REWRITE_PIPELINE(
+    LookupDoublyNestedMatchMissingUnencryptedForeignCollection,
+    R"([{ $lookup: {
                                 from: "coll_d",
                                 localField: "foo",
                                 foreignField: "d_foo",
@@ -1471,7 +1473,7 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatchMissingUnencryptedForeignCollec
                                     {$match:
                                         {$and: [{d_ssn: 2}, {d_age: 4}]}
                                     }]}}])",
-                          R"([{ $lookup: {
+    R"([{ $lookup: {
                                 from: "coll_d",
                                 localField: "foo",
                                 foreignField: "d_foo",
@@ -1492,14 +1494,14 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatchMissingUnencryptedForeignCollec
                                     {$match:
                                         {$and: [{d_ssn: 2}, {d_age: 4}]}
                                     }]}}])",
-                          std::vector<NamespaceString>(
-                              {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd),
-                               NamespaceString::createNamespaceString_forTest("test.coll_d"_sd)}),
-                          FLEServerRewritePipelineTest::kTwoEncryptionSchemaEncryptionInfo,
-                          true);
+    std::vector<NamespaceString>({NamespaceString::createNamespaceString_forTest("test.coll_b"sv),
+                                  NamespaceString::createNamespaceString_forTest("test.coll_d"sv)}),
+    FLEServerRewritePipelineTest::kTwoEncryptionSchemaEncryptionInfo,
+    true);
 
-TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatchMissingUnencryptedPrimarySchema,
-                          R"([{ $lookup: {
+TEST_FLE_REWRITE_PIPELINE(
+    LookupDoublyNestedMatchMissingUnencryptedPrimarySchema,
+    R"([{ $lookup: {
                                 from: "coll_e",
                                 localField: "foo",
                                 foreignField: "e_foo",
@@ -1523,7 +1525,7 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatchMissingUnencryptedPrimarySchema
                             {$match:
                                 {$and: [{ssn: 2}, {age: 4}]}
                             }])",
-                          R"([{ $lookup: {
+    R"([{ $lookup: {
                                 from: "coll_e",
                                 localField: "foo",
                                 foreignField: "e_foo",
@@ -1547,11 +1549,10 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatchMissingUnencryptedPrimarySchema
                                     {$match:
                                         {$and: [{ssn: 2}, {age: 4}]}
                                     }])",
-                          std::vector<NamespaceString>(
-                              {NamespaceString::createNamespaceString_forTest("test.coll_d"_sd),
-                               NamespaceString::createNamespaceString_forTest("test.coll_e"_sd)}),
-                          FLEServerRewritePipelineTest::kSingleEncryptionSchemaEncryptionCollD,
-                          true);
+    std::vector<NamespaceString>({NamespaceString::createNamespaceString_forTest("test.coll_d"sv),
+                                  NamespaceString::createNamespaceString_forTest("test.coll_e"sv)}),
+    FLEServerRewritePipelineTest::kSingleEncryptionSchemaEncryptionCollD,
+    true);
 
 // Begin encrypted text search FLE and/or rewrite optimization testing.
 /**

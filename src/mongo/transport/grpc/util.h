@@ -34,6 +34,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
+#include <string_view>
 #include <type_traits>
 
 #include <grpcpp/security/server_credentials.h>
@@ -52,22 +53,22 @@ static constexpr auto kUnauthenticatedCommandStreamMethodName =
     "/mongodb.CommandService/UnauthenticatedCommandStream";
 
 // Server-provided metadata keys.
-// This is defined as a std::string instead of StringData to avoid having to copy it when passing to
-// gRPC APIs that expect a const std::string&.
+// This is defined as a std::string instead of std::string_view to avoid having to copy it when
+// passing to gRPC APIs that expect a const std::string&.
 extern const std::string kClusterMaxWireVersionKey;
 
 // Client-provided metadata keys.
-static constexpr StringData kAuthenticationTokenKey = "authorization"_sd;
-static constexpr StringData kClientIdKey = "mongodb-clientid"_sd;
-static constexpr StringData kClientMetadataKey = "mongodb-client"_sd;
-static constexpr StringData kWireVersionKey = "mongodb-wireversion"_sd;
+static constexpr std::string_view kAuthenticationTokenKey = "authorization"_sd;
+static constexpr std::string_view kClientIdKey = "mongodb-clientid"_sd;
+static constexpr std::string_view kClientMetadataKey = "mongodb-client"_sd;
+static constexpr std::string_view kWireVersionKey = "mongodb-wireversion"_sd;
 }  // namespace constants
 
 /**
  * Parse a PEM-encoded file that contains a single certificate and its associated private key
  * into a PemKeyCertPair.
  */
-::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(StringData filePath);
+::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(std::string_view filePath);
 
 /**
  * Converts a Mongo URI into a gRPC formatted string.
@@ -75,7 +76,7 @@ static constexpr StringData kWireVersionKey = "mongodb-wireversion"_sd;
 std::string toGRPCFormattedURI(const HostAndPort& address);
 
 // See: https://grpc.github.io/grpc/cpp/md_doc_naming.html
-inline bool isUnixSchemeGRPCFormattedURI(StringData uri) {
+inline bool isUnixSchemeGRPCFormattedURI(std::string_view uri) {
     return uri.starts_with("unix:");
 }
 
@@ -83,7 +84,7 @@ inline bool isUnixSchemeGRPCFormattedURI(StringData uri) {
  * Parses a gRPC-formatted URI to a HostAndPort, throwing an exception on failure.
  * See: https://grpc.github.io/grpc/cpp/md_doc_naming.html
  */
-HostAndPort parseGRPCFormattedURI(StringData uri);
+HostAndPort parseGRPCFormattedURI(std::string_view uri);
 
 /**
  * Converts a gRPC status code into its corresponding MongoDB error code.

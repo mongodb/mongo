@@ -29,23 +29,25 @@
 
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
+
 namespace mongo::query_stats {
+using namespace std::literals::string_view_literals;
 namespace agg_metric_detail {
 template void AggregatedMetric<uint64_t>::appendTo(BSONObjBuilder& builder,
-                                                   StringData fieldName) const;
+                                                   std::string_view fieldName) const;
 }  // namespace agg_metric_detail
 
-void AggregatedBool::appendTo(BSONObjBuilder& builder, StringData fieldName) const {
+void AggregatedBool::appendTo(BSONObjBuilder& builder, std::string_view fieldName) const {
     BSONObjBuilder{builder.subobjStart(fieldName)}
-        .append("true"_sd, static_cast<long long>(trueCount))
-        .append("false"_sd, static_cast<long long>(falseCount));
+        .append("true"sv, static_cast<long long>(trueCount))
+        .append("false"sv, static_cast<long long>(falseCount));
 }
 
 void AggregatedCardinalityEstimationMethods::appendTo(BSONObjBuilder& builder,
-                                                      StringData fieldName) const {
+                                                      std::string_view fieldName) const {
     BSONObjBuilder{builder.subobjStart(fieldName)}
         .append("Histogram", static_cast<long long>(counts.getHistogram().value_or(0)))
         .append("Sampling", static_cast<long long>(counts.getSampling().value_or(0)))

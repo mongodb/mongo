@@ -45,6 +45,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>

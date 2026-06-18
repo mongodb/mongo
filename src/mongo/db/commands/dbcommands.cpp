@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -103,6 +102,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -115,6 +115,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Will cause 'CmdDatasize' to hang as it starts executing.
 MONGO_FAIL_POINT_DEFINE(hangBeforeDatasizeCount);
@@ -152,7 +153,7 @@ public:
             const bool hasMin = cmd.getMin() != boost::none;
             const bool hasMax = cmd.getMax() != boost::none;
 
-            const StringData negation = hasMin ? ""_sd : "not "_sd;
+            const std::string_view negation = hasMin ? ""sv : "not "sv;
             uassert(ErrorCodes::BadValue,
                     str::stream() << "Max must " << negation << "be set if min is " << negation
                                   << "set.",

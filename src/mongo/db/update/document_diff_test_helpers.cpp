@@ -29,7 +29,6 @@
 
 #include "mongo/db/update/document_diff_test_helpers.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -42,9 +41,11 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo::doc_diff {
+using namespace std::literals::string_view_literals;
 
 BSONObj createObjWithLargePrefix(const std::string& suffix) {
     const static auto largeObj = BSON("prefixLargeField" << std::string(200, 'a'));
@@ -58,7 +59,7 @@ std::string getFieldName(int level, int fieldNum) {
 Value getScalarFieldValue(PseudoRandom* rng) {
     switch (rng->nextInt32(10)) {
         case 0:
-            return Value("val"_sd);
+            return Value("val"sv);
         case 1:
             return Value(BSONNULL);
         case 2:

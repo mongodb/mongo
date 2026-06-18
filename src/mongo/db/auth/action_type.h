@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/util/modules.h"
 
@@ -39,6 +38,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -52,8 +52,8 @@ namespace MONGO_MOD_PUBLIC mongo {
 using ActionType = ActionTypeEnum;
 constexpr inline size_t kNumActionTypes = idlEnumCount<ActionTypeEnum>;
 
-StatusWith<ActionType> parseActionFromString(StringData action);
-StringData toStringData(ActionType a);
+StatusWith<ActionType> parseActionFromString(std::string_view action);
+std::string_view toStringData(ActionType a);
 std::string toString(ActionType a);
 std::ostream& operator<<(std::ostream& os, const ActionType& a);
 

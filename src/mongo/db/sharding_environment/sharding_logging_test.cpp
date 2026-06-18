@@ -44,6 +44,7 @@
 #include "mongo/util/text.h"  // IWYU pragma: keep
 
 #include <string>
+#include <string_view>
 #include <system_error>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -76,7 +77,7 @@ protected:
      * capped size.
      */
     void expectConfigCollectionCreate(const HostAndPort& configHost,
-                                      StringData collName,
+                                      std::string_view collName,
                                       int cappedSize,
                                       const BSONObj& response) {
         onCommand([&](const RemoteCommandRequest& request) {
@@ -99,7 +100,7 @@ protected:
      * contents and return a successful response.
      */
     void expectConfigCollectionInsert(const HostAndPort& configHost,
-                                      StringData collName,
+                                      std::string_view collName,
                                       Date_t timestamp,
                                       const std::string& what,
                                       const boost::optional<VersionContext>& vCtx,

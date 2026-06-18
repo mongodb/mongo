@@ -35,6 +35,8 @@
 #include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamSplitLargeEventToStageFn(
@@ -64,7 +66,7 @@ REGISTER_AGG_STAGE_MAPPING(changeStreamSplitLargeEvent,
                            documentSourceChangeStreamSplitLargeEventToStageFn)
 
 ChangeStreamSplitLargeEventStage::ChangeStreamSplitLargeEventStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     boost::optional<ResumeTokenData> resumeAfterSplit)
     : Stage(stageName, pExpCtx), _resumeAfterSplit(std::move(resumeAfterSplit)) {}

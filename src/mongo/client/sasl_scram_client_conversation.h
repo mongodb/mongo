@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/client/scram_client_cache.h"
@@ -45,6 +44,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -68,7 +68,7 @@ public:
      * authentication conversation is finished or not.
      *
      **/
-    StatusWith<bool> step(StringData inputData, std::string* outputData) override;
+    StatusWith<bool> step(std::string_view inputData, std::string* outputData) override;
 
     boost::optional<std::uint32_t> currentStep() const override {
         return _step;
@@ -87,12 +87,12 @@ public:
     /**
      * Verify the server's signature.
      */
-    virtual bool verifyServerSignature(StringData sig) const = 0;
+    virtual bool verifyServerSignature(std::string_view sig) const = 0;
 
     /**
      * Runs saslPrep except on SHA-1.
      */
-    virtual StatusWith<std::string> saslPrep(StringData val) const = 0;
+    virtual StatusWith<std::string> saslPrep(std::string_view val) const = 0;
 
 private:
     /**
@@ -103,12 +103,12 @@ private:
     /**
      * Parses server-first-message and generate client-final-message.
      **/
-    StatusWith<bool> _secondStep(StringData input, std::string* outputData);
+    StatusWith<bool> _secondStep(std::string_view input, std::string* outputData);
 
     /**
      * Generates client-first-message.
      **/
-    StatusWith<bool> _thirdStep(StringData input, std::string* outputData);
+    StatusWith<bool> _thirdStep(std::string_view input, std::string* outputData);
 
 protected:
     std::uint32_t _step{0};
@@ -149,11 +149,11 @@ public:
         return _credentials.generateClientProof(_authMessage);
     }
 
-    bool verifyServerSignature(StringData sig) const final {
+    bool verifyServerSignature(std::string_view sig) const final {
         return _credentials.verifyServerSignature(_authMessage, sig);
     }
 
-    StatusWith<std::string> saslPrep(StringData val) const final {
+    StatusWith<std::string> saslPrep(std::string_view val) const final {
         if (std::is_same<SHA1Block, HashBlock>::value) {
             return std::string{val};
         } else {

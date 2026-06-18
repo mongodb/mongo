@@ -34,8 +34,10 @@
 #include "mongo/db/commands/query_cmd/cmd_specific_metric_helpers.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 
+#include <string_view>
+
 namespace mongo {
-UpdateMetrics::UpdateMetrics(StringData commandName, ClusterRole role)
+UpdateMetrics::UpdateMetrics(std::string_view commandName, ClusterRole role)
     : _commandsWithAggregationPipeline(
           getSingletonMetricPtrWithinCmd(commandName, "pipeline", role)),
       _commandsWithArrayFilters(getSingletonMetricPtrWithinCmd(commandName, "arrayFilters", role)) {

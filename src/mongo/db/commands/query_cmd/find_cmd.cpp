@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -146,6 +145,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>
@@ -157,13 +157,14 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 // Ticks for server-side Javascript deprecation log messages.
 Rarely _samplerFunctionJs, _samplerWhereClause;
 
 MONGO_FAIL_POINT_DEFINE(allowExternalReadsForReverseOplogScanRule);
 MONGO_FAIL_POINT_DEFINE(hangBeforeFetcherFindCommandOnOplog);
 
-const auto kTermField = "term"_sd;
+const auto kTermField = "term"sv;
 
 /**
  * Fills out the CurOp for "opCtx" with information about this query.

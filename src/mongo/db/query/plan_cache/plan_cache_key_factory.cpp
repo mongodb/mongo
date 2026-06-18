@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/canonical_query_encoder.h"
@@ -44,6 +43,7 @@
 
 #include <cstddef>
 #include <map>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -64,12 +64,12 @@ void encodeIndexabilityForDiscriminators(const MatchExpression* tree,
 void encodeIndexabilityRecursive(const MatchExpression* tree,
                                  const PlanCacheIndexabilityState& indexabilityState,
                                  StringBuilder* keyBuilder,
-                                 StringData parentPath = {}) {
+                                 std::string_view parentPath = {}) {
     std::string fullPath;
     // Accumulate the path components from any ancestors with partial paths (eg. $elemMatch) through
     // the tree to the leaves. Leaf expressions as children of these partial-path expressions will
     // have an empty path and would otherwise fail to include the discriminators in the key.
-    StringData path;
+    std::string_view path;
     if (!tree->path().empty()) {
         // This expression has a path component. Either use it, or append it to the parent path.
         if (parentPath.empty()) {

@@ -33,6 +33,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::find_command_idl_utils {
@@ -47,9 +49,9 @@ void assertType(BSONElement element, BSONType type) {
 }
 }  // namespace
 
-void noOpSerializer(bool, StringData fieldName, BSONObjBuilder* bob) {}
+void noOpSerializer(bool, std::string_view fieldName, BSONObjBuilder* bob) {}
 
-void serializeBSONWhenNotEmpty(BSONObj obj, StringData fieldName, BSONObjBuilder* bob) {
+void serializeBSONWhenNotEmpty(BSONObj obj, std::string_view fieldName, BSONObjBuilder* bob) {
     if (!obj.isEmpty()) {
         bob->append(fieldName, obj);
     }

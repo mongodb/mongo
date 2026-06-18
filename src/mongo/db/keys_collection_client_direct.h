@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/keys_collection_client.h"
@@ -48,6 +47,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -68,7 +68,7 @@ public:
      */
     MONGO_MOD_PRIVATE StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
-        StringData purpose,
+        std::string_view purpose,
         const LogicalTime& newerThanThis,
         bool tryUseMajority) override;
 
@@ -76,7 +76,7 @@ public:
      * Returns all external (i.e. validation-only) keys for the given purpose.
      */
     MONGO_MOD_PRIVATE StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
-        OperationContext* opCtx, StringData purpose) override;
+        OperationContext* opCtx, std::string_view purpose) override;
 
     /**
      * Directly inserts a key document to the storage
@@ -99,7 +99,7 @@ private:
     template <typename KeyDocumentType>
     StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
                                                          const NamespaceString& nss,
-                                                         StringData purpose,
+                                                         std::string_view purpose,
                                                          const LogicalTime& newerThanThis,
                                                          bool tryUseMajority);
 

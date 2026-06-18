@@ -36,6 +36,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
                                  value::SlotVector blocks,
                                  value::SlotVector valsOut,
@@ -43,7 +44,7 @@ BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
                                  PlanNodeId nodeId,
                                  PlanYieldPolicySBE* yieldPolicy,
                                  bool participateInTrialRunTracking)
-    : PlanStage("block_to_row"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
+    : PlanStage("block_to_row"sv, yieldPolicy, nodeId, participateInTrialRunTracking),
       _blockSlotIds(std::move(blocks)),
       _valsOutSlotIds(std::move(valsOut)),
       _bitmapSlotId(bitmapSlotId) {

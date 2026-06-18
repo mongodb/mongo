@@ -32,6 +32,8 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo::document_transformation {
 
 /**
@@ -41,7 +43,7 @@ namespace mongo::document_transformation {
  */
 class ExpressionModifyPath final : public ModifyPath {
 public:
-    ExpressionModifyPath(StringData path, boost::intrusive_ptr<Expression> expr)
+    ExpressionModifyPath(std::string_view path, boost::intrusive_ptr<Expression> expr)
         : ModifyPath(path, ModifiedPrefixPolicy::kPreserveArrays), _expr(expr) {}
 
     bool isRemoved() const override {
@@ -71,7 +73,7 @@ private:
  */
 class RemovePath final : public ModifyPath {
 public:
-    explicit RemovePath(StringData path)
+    explicit RemovePath(std::string_view path)
         : ModifyPath(path, ModifiedPrefixPolicy::kPreserveArrays) {}
 
     bool isRemoved() const override {
@@ -87,7 +89,9 @@ public:
 
 namespace detail {
 
-void describeProjectedPath(DocumentOperationVisitor& visitor, StringData path, bool isInclusion) {
+void describeProjectedPath(DocumentOperationVisitor& visitor,
+                           std::string_view path,
+                           bool isInclusion) {
     if (isInclusion) {
         visitor(document_transformation::PreservePath{path});
     } else {
@@ -107,7 +111,7 @@ public:
     using SelectiveConstExpressionVisitorBase::visit;
 
     explicit SpecializedExpressionOperationVisitor(DocumentOperationVisitor& visitor,
-                                                   StringData path,
+                                                   std::string_view path,
                                                    BSONDepthIndex depth)
         : _visitor(visitor), _path(path), _depth(depth) {}
 
@@ -127,7 +131,7 @@ public:
             return;
         }
         _handled = true;
-        StringData oldPath = oldFieldPath.tailPath();
+        std::string_view oldPath = oldFieldPath.tailPath();
         BSONDepthIndex oldPathMaxArrayTraversals = std::count(oldPath.begin(), oldPath.end(), '.');
         _visitor(RenamePathWithFixedArrayness{_path, oldPath, _depth, oldPathMaxArrayTraversals});
     }
@@ -147,7 +151,7 @@ public:
 
 private:
     DocumentOperationVisitor& _visitor;
-    const StringData _path;
+    const std::string_view _path;
     const BSONDepthIndex _depth;
     bool _handled{false};
 };
@@ -181,8 +185,8 @@ void describeComputedPath(DocumentOperationVisitor& visitor,
     }
 }
 
-RenamePathWithFixedArrayness::RenamePathWithFixedArrayness(StringData newPath,
-                                                           StringData oldPath,
+RenamePathWithFixedArrayness::RenamePathWithFixedArrayness(std::string_view newPath,
+                                                           std::string_view oldPath,
                                                            BSONDepthIndex newPathMaxArrayTraversals,
                                                            BSONDepthIndex oldPathMaxArrayTraversals)
     : RenamePath(newPath, oldPath),

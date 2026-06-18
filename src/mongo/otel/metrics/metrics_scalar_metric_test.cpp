@@ -38,10 +38,12 @@
 
 #include <algorithm>
 #include <limits>
+#include <string_view>
 #include <vector>
 
 namespace mongo::otel::metrics {
 namespace {
+using namespace std::literals::string_view_literals;
 using testing::_;
 using testing::DoubleEq;
 using testing::ElementsAre;
@@ -138,9 +140,10 @@ TYPED_TEST(ScalarMetricImplTest, ThrowsIfAttributeNamesDuplicated) {
 }
 
 TYPED_TEST(ScalarMetricImplTest, ThrowsOnEmptyAttributeValues) {
-    ASSERT_THROWS_CODE((ScalarMetricImpl<TypeParam, StringData>({.name = "type", .values = {}})),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        (ScalarMetricImpl<TypeParam, std::string_view>({.name = "type", .values = {}})),
+        DBException,
+        ErrorCodes::BadValue);
 }
 
 TYPED_TEST(ScalarMetricImplTest, ThrowsOnInvalidAttributes) {
@@ -208,12 +211,12 @@ TYPED_TEST(ScalarMetricImplTest, ValuesSkipsZeroAttributes) {
 TYPED_TEST(ScalarMetricImplTest, StringDataAttributeValueIsCopied) {
     auto sourceValues = std::make_unique<std::vector<std::string>>(
         std::initializer_list<std::string>{"foo", "bar"});
-    ScalarMetricImpl<TypeParam, StringData> impl(
+    ScalarMetricImpl<TypeParam, std::string_view> impl(
         {.name = "temperature", .values = {(*sourceValues)[0], (*sourceValues)[1]}});
-    Counter<TypeParam, StringData>& counter = impl;
+    Counter<TypeParam, std::string_view>& counter = impl;
     sourceValues = nullptr;
 
-    counter.add(5, {"foo"_sd});
+    counter.add(5, {"foo"sv});
     EXPECT_THAT(impl.values(), ElementsAre(IsAttributesAndValue(_, 5)));
 }
 
@@ -222,24 +225,24 @@ TYPED_TEST(ScalarMetricImplTest, SpanAttributeValueIsCopied) {
         std::vector<std::vector<int32_t>>{{1, 2}, {3, 4}});
     auto string1 = std::make_unique<std::string>("a");
     auto string2 = std::make_unique<std::string>("b");
-    auto sourceStringData = std::make_unique<std::vector<std::vector<StringData>>>(
-        std::vector<std::vector<StringData>>{{*string1}, {*string1, *string2}});
-    ScalarMetricImpl<TypeParam, std::span<int32_t>, std::span<StringData>> impl(
+    auto sourceStringData = std::make_unique<std::vector<std::vector<std::string_view>>>(
+        std::vector<std::vector<std::string_view>>{{*string1}, {*string1, *string2}});
+    ScalarMetricImpl<TypeParam, std::span<int32_t>, std::span<std::string_view>> impl(
         {.name = "intData",
          .values = {std::span<int32_t>((*sourceIntData)[0]),
                     std::span<int32_t>((*sourceIntData)[1])}},
         {.name = "stringData",
-         .values = {std::span<StringData>((*sourceStringData)[0]),
-                    std::span<StringData>((*sourceStringData)[1])}});
-    Counter<TypeParam, std::span<int32_t>, std::span<StringData>>& counter = impl;
+         .values = {std::span<std::string_view>((*sourceStringData)[0]),
+                    std::span<std::string_view>((*sourceStringData)[1])}});
+    Counter<TypeParam, std::span<int32_t>, std::span<std::string_view>>& counter = impl;
     sourceIntData = nullptr;
     string1 = nullptr;
     string2 = nullptr;
     sourceStringData = nullptr;
 
     std::vector<int32_t> intInput{1, 2};
-    std::vector<StringData> stringInput{"a"_sd, "b"_sd};
-    counter.add(5, {std::span<int32_t>(intInput), std::span<StringData>(stringInput)});
+    std::vector<std::string_view> stringInput{"a"sv, "b"sv};
+    counter.add(5, {std::span<int32_t>(intInput), std::span<std::string_view>(stringInput)});
     EXPECT_THAT(impl.values(), ElementsAre(IsAttributesAndValue(_, 5)));
 }
 

@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 /*
@@ -82,7 +83,7 @@ boost::optional<BSONObj> FTDCMetadataCompressor::addSample(const BSONObj& sample
         auto sampleElement = sampleItr.next();
         auto fieldName = sampleElement.fieldNameStringData();
 
-        if (fieldName == "start"_sd || fieldName == "end"_sd) {
+        if (fieldName == "start"sv || fieldName == "end"sv) {
             dassert(sampleElement.type() == BSONType::date);
             deltaDocBuilder.append(sampleElement);
             continue;
@@ -110,7 +111,7 @@ boost::optional<BSONObj> FTDCMetadataCompressor::addSample(const BSONObj& sample
             auto sampleLvl2Element = sampleLvl2Itr.next();
             auto lvl2FieldName = sampleLvl2Element.fieldNameStringData();
 
-            if (lvl2FieldName == "start"_sd || lvl2FieldName == "end"_sd) {
+            if (lvl2FieldName == "start"sv || lvl2FieldName == "end"sv) {
                 dassert(sampleLvl2Element.type() == BSONType::date);
                 deltaElements.push_back(sampleLvl2Element);
                 continue;

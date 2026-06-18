@@ -43,6 +43,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 #include <boost/container/small_vector.hpp>
 #include <boost/optional/optional.hpp>
@@ -86,7 +87,7 @@ struct WriteBatch {
                BucketKey bucketKey,
                OperationId opId,
                ExecutionStatsController& stats,
-               StringData timeField);
+               std::string_view timeField);
 
     // Only used in testing.
     BSONObj toBSON() const;
@@ -111,8 +112,8 @@ struct WriteBatch {
 
     TrackingContexts& trackingContexts;
 
-    StringData timeField;  // Necessary so we can compress on writes, since the compression
-                           // algorithm sorts on the timeField. See compressBucket().
+    std::string_view timeField;  // Necessary so we can compress on writes, since the compression
+                                 // algorithm sorts on the timeField. See compressBucket().
 
     BSONObj min;  // Batch-local min; full if first batch, updates otherwise.
     BSONObj max;  // Batch-local max; full if first batch, updates otherwise.

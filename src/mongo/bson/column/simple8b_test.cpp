@@ -37,7 +37,6 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/column/simple8b_builder.h"
 #include "mongo/bson/column/simple8b_type_util.h"
 #include "mongo/bson/util/builder.h"

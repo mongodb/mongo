@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/pipeline_metadata_tree.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -59,12 +58,14 @@
 #include <numeric>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <typeinfo>
 #include <vector>
 
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class PipelineMetadataTreeTest : public AggregationContextFixture {
 protected:
@@ -72,7 +73,7 @@ protected:
         ShardingState::create(getServiceContext());
     }
 
-    auto jsonToPipeline(StringData jsonArray) {
+    auto jsonToPipeline(std::string_view jsonArray) {
         const auto inputBson = fromjson("{pipeline: " + std::string(jsonArray) + "}");
 
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
@@ -94,7 +95,7 @@ protected:
         return v;
     }
 
-    void introduceCollection(StringData collectionName) {
+    void introduceCollection(std::string_view collectionName) {
         NamespaceString fromNs =
             NamespaceString::createNamespaceString_forTest("test", collectionName);
         _resolvedNamespaces.insert({fromNs, {fromNs, std::vector<BSONObj>()}});
@@ -535,7 +536,7 @@ TEST_F(PipelineMetadataTreeTest, MakeTreeWithEmptyPipeline) {
                                             return std::string("not called");
                                         });
     ASSERT_FALSE(result.first);
-    ASSERT_EQ(result.second, "input"_sd);
+    ASSERT_EQ(result.second, "input"sv);
 }
 
 TEST_F(PipelineMetadataTreeTest, BranchingPipelineMissesInitialStageContents) {

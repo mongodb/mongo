@@ -36,6 +36,8 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
 
 using namespace cost_based_ranker;
@@ -160,7 +162,7 @@ std::unique_ptr<ce::SamplingEstimator> JoinOrderingTestFixture::samplingEstimato
     return samplingEstimator;
 }
 
-NamespaceString makeNSS(StringData collName) {
+NamespaceString makeNSS(std::string_view collName) {
     return NamespaceString::makeLocalCollection(collName);
 }
 
@@ -192,7 +194,7 @@ void JoinOrderingTestFixture::initGraph(size_t numNodes, bool withIndexes) {
 }
 
 namespace {
-std::vector<BSONObj> pipelineFromJsonArray(StringData jsonArray) {
+std::vector<BSONObj> pipelineFromJsonArray(std::string_view jsonArray) {
     auto inputBson = fromjson("{pipeline: " + std::string(jsonArray) + "}");
     ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
     std::vector<BSONObj> rawPipeline;
@@ -206,7 +208,7 @@ std::vector<BSONObj> pipelineFromJsonArray(StringData jsonArray) {
 
 std::unique_ptr<Pipeline> makePipelineForTest(
     std::vector<BSONObj> bsonStages,
-    std::vector<StringData> collNames,
+    std::vector<std::string_view> collNames,
     boost::intrusive_ptr<ExpressionContextForTest> expCtx) {
     stdx::unordered_set<NamespaceString> secondaryNamespaces;
     for (auto&& collName : collNames) {
@@ -224,8 +226,8 @@ std::unique_ptr<Pipeline> makePipelineForTest(
 }
 
 std::unique_ptr<Pipeline> makePipelineForTest(
-    StringData query,
-    std::vector<StringData> collNames,
+    std::string_view query,
+    std::vector<std::string_view> collNames,
     boost::intrusive_ptr<ExpressionContextForTest> expCtx) {
     const auto bsonStages = pipelineFromJsonArray(query);
     return makePipelineForTest(std::move(bsonStages), std::move(collNames), expCtx);

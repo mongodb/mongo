@@ -99,6 +99,7 @@
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <string_view>
 #include <utility>
 
 #include <wiredtiger.h>
@@ -363,8 +364,8 @@ void setKeyOnCursor(WT_CURSOR* c, const std::variant<std::span<const char>, int6
 }  // namespace
 
 std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerConfig& wtConfig,
-                                       StringData extensionsConfig,
-                                       StringData providerConfig) {
+                                       std::string_view extensionsConfig,
+                                       std::string_view providerConfig) {
     std::stringstream ss;
     ss << "create,";
     ss << "cache_size=" << wtConfig.cacheSizeMB << "M,";
@@ -512,7 +513,7 @@ void WiredTigerKVEngineBase::setRecordStoreExtraOptions(const std::string& optio
     _rsOptions = options;
 }
 
-uint64_t WiredTigerKVEngineBase::_getTableIdForIdent(StringData ident) {
+uint64_t WiredTigerKVEngineBase::_getTableIdForIdent(std::string_view ident) {
     std::lock_guard lk(_identTableIdMutex);
     auto& id = _identTableIds[ident];
     if (id == 0) {
@@ -531,7 +532,7 @@ BlindWritePolicy WiredTigerKVEngineBase::chooseBlindWritePolicy(OperationContext
 }
 
 Status WiredTigerKVEngineBase::insertIntoIdent(RecoveryUnit& ru,
-                                               StringData ident,
+                                               std::string_view ident,
                                                std::variant<std::span<const char>, int64_t> key,
                                                std::span<const char> value,
                                                BlindWritePolicy policy) {
@@ -555,7 +556,7 @@ Status WiredTigerKVEngineBase::insertIntoIdent(RecoveryUnit& ru,
 }
 
 Status WiredTigerKVEngineBase::updateInIdent(RecoveryUnit& ru,
-                                             StringData ident,
+                                             std::string_view ident,
                                              std::variant<std::span<const char>, int64_t> key,
                                              std::span<const char> value,
                                              BlindWritePolicy policy) {
@@ -581,7 +582,7 @@ Status WiredTigerKVEngineBase::updateInIdent(RecoveryUnit& ru,
 }
 
 StatusWith<UniqueBuffer> WiredTigerKVEngineBase::getFromIdent(
-    RecoveryUnit& ru, StringData ident, std::variant<std::span<const char>, int64_t> key) {
+    RecoveryUnit& ru, std::string_view ident, std::variant<std::span<const char>, int64_t> key) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, _getTableIdForIdent(ident)),
@@ -608,7 +609,7 @@ StatusWith<UniqueBuffer> WiredTigerKVEngineBase::getFromIdent(
 }
 
 Status WiredTigerKVEngineBase::deleteFromIdent(RecoveryUnit& ru,
-                                               StringData ident,
+                                               std::string_view ident,
                                                std::variant<std::span<const char>, int64_t> key,
                                                BlindWritePolicy policy) {
     invariant(ru.inUnitOfWork());
@@ -667,15 +668,15 @@ std::vector<std::string> WiredTigerKVEngineBase::_wtGetAllIdents(WiredTigerSessi
     while ((ret = c->next(c)) == 0) {
         const char* raw;
         c->get_key(c, &raw);
-        StringData key(raw);
+        std::string_view key(raw);
         size_t idx = key.find(':');
         if (idx == string::npos)
             continue;
-        StringData type = key.substr(0, idx);
+        std::string_view type = key.substr(0, idx);
         if (type != "table")
             continue;
 
-        StringData ident = key.substr(idx + 1);
+        std::string_view ident = key.substr(idx + 1);
         if (ident == ident::kSizeStorer)
             continue;
 
@@ -881,7 +882,7 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(RecoveryUnit& ru) {
 
     // Exclude the oplog table, if it exists.
     invariant(_oplogManager);
-    std::vector<StringData> excludedIdents;
+    std::vector<std::string_view> excludedIdents;
     if (auto oplogIdent = _oplogManager->getIdent(); !oplogIdent.empty()) {
         LOGV2_DEBUG(
             9611300, 1, "Excluding oplog table for auto compact", "ident"_attr = oplogIdent);
@@ -1066,12 +1067,12 @@ void WiredTigerKVEngine::cleanShutdown(bool memLeakAllowed) {
     _conn = nullptr;
 }
 
-int64_t WiredTigerKVEngine::getIdentSize(RecoveryUnit& ru, StringData ident) {
+int64_t WiredTigerKVEngine::getIdentSize(RecoveryUnit& ru, std::string_view ident) {
     return WiredTigerUtil::getIdentSize(*WiredTigerRecoveryUnit::get(ru).getSession(),
                                         WiredTigerUtil::buildTableUri(ident));
 }
 
-Status WiredTigerKVEngine::repairIdent(RecoveryUnit& ru, StringData ident) {
+Status WiredTigerKVEngine::repairIdent(RecoveryUnit& ru, std::string_view ident) {
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSession();
     string uri = WiredTigerUtil::buildTableUri(ident);
     session->closeAllCursors(uri);
@@ -1133,7 +1134,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
 Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char* uri) {
     invariant(_inRepairMode);
 
-    StringData uriStr{uri};
+    std::string_view uriStr{uri};
     invariant(uriStr.starts_with(WiredTigerUtil::kTableUriPrefix));
     uriStr.remove_prefix(WiredTigerUtil::kTableUriPrefix.size());
 
@@ -1664,7 +1665,7 @@ void WiredTigerKVEngine::setSortedDataInterfaceExtraOptions(const std::string& o
 Status WiredTigerKVEngine::_createRecordStore(const rss::PersistenceProvider& provider,
                                               RecoveryUnit& ru,
                                               const NamespaceString& nss,
-                                              StringData ident,
+                                              std::string_view ident,
                                               KeyFormat keyFormat,
                                               const BSONObj& storageEngineCollectionOptions,
                                               boost::optional<std::string> customBlockCompressor) {
@@ -1713,7 +1714,7 @@ Status WiredTigerKVEngine::_createRecordStore(const rss::PersistenceProvider& pr
 }
 
 Status WiredTigerKVEngine::importRecordStore(RecoveryUnit& ru,
-                                             StringData ident,
+                                             std::string_view ident,
                                              const BSONObj& storageMetadata,
                                              bool panicOnCorruptWtMetadata,
                                              bool repair) {
@@ -1737,7 +1738,7 @@ Status WiredTigerKVEngine::importRecordStore(RecoveryUnit& ru,
 Status WiredTigerKVEngine::recoverOrphanedIdent(const rss::PersistenceProvider& provider,
                                                 RecoveryUnit& ru,
                                                 const NamespaceString& nss,
-                                                StringData ident,
+                                                std::string_view ident,
                                                 const RecordStore::Options& options) {
 #ifdef _WIN32
     return {ErrorCodes::CommandNotSupported, "Orphan file recovery is not supported on Windows"};
@@ -1818,7 +1819,7 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(const rss::PersistenceProvider& 
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
                                                                 const NamespaceString& nss,
-                                                                StringData ident,
+                                                                std::string_view ident,
                                                                 const RecordStore::Options& options,
                                                                 boost::optional<UUID> uuid) {
     std::unique_ptr<WiredTigerRecordStore> ret;
@@ -1893,7 +1894,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(
     RecoveryUnit& ru,
     const NamespaceString& nss,
     const UUID& uuid,
-    StringData ident,
+    std::string_view ident,
     const IndexConfig& indexConfig,
     const boost::optional<mongo::BSONObj>& storageEngineIndexOptions) {
 
@@ -1933,7 +1934,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(
 }
 
 Status WiredTigerKVEngine::importSortedDataInterface(RecoveryUnit& ru,
-                                                     StringData ident,
+                                                     std::string_view ident,
                                                      const BSONObj& storageMetadata,
                                                      bool panicOnCorruptWtMetadata,
                                                      bool repair) {
@@ -1954,7 +1955,7 @@ Status WiredTigerKVEngine::importSortedDataInterface(RecoveryUnit& ru,
         WiredTigerRecoveryUnit::get(ru), WiredTigerUtil::buildTableUri(ident), config);
 }
 
-Status WiredTigerKVEngine::dropSortedDataInterface(RecoveryUnit& ru, StringData ident) {
+Status WiredTigerKVEngine::dropSortedDataInterface(RecoveryUnit& ru, std::string_view ident) {
     return WiredTigerIndex::Drop(WiredTigerRecoveryUnit::get(ru),
                                  WiredTigerUtil::buildTableUri(ident));
 }
@@ -1964,7 +1965,7 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
     RecoveryUnit& ru,
     const NamespaceString& nss,
     const UUID& uuid,
-    StringData ident,
+    std::string_view ident,
     const IndexConfig& config,
     KeyFormat keyFormat) {
     auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
@@ -2006,7 +2007,7 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::getInternalRecordStore(RecoveryUnit& ru,
-                                                                        StringData ident,
+                                                                        std::string_view ident,
                                                                         KeyFormat keyFormat) {
     // We don't log writes to temporary record stores.
     const bool isLogged = false;
@@ -2027,7 +2028,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getInternalRecordStore(Recovery
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeInternalRecordStore(RecoveryUnit& ru,
-                                                                         StringData ident,
+                                                                         std::string_view ident,
                                                                          KeyFormat keyFormat) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
@@ -2056,7 +2057,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeInternalRecordStore(Recover
 }
 
 void WiredTigerKVEngine::alterIdentMetadata(RecoveryUnit& ru,
-                                            StringData ident,
+                                            std::string_view ident,
                                             const IndexConfig& config,
                                             bool isForceUpdateMetadata) {
     std::string uri = WiredTigerUtil::buildTableUri(ident);
@@ -2080,7 +2081,7 @@ void WiredTigerKVEngine::alterIdentMetadata(RecoveryUnit& ru,
     invariantStatusOK(status);
 }
 
-Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
+Status WiredTigerKVEngine::alterMetadata(std::string_view uri, std::string_view config) {
     // Use a dedicated session in an alter operation to avoid transaction issues.
     WiredTigerSession session(_connection.get());
 
@@ -2100,7 +2101,7 @@ Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
 }
 
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
-                                     StringData ident,
+                                     std::string_view ident,
                                      bool identHasSizeInfo,
                                      const StorageEngine::DropIdentCallback& onDrop,
                                      boost::optional<uint64_t> schemaEpoch) {
@@ -2145,7 +2146,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
 
 void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
                                             RecoveryUnit& ru,
-                                            StringData ident) {
+                                            std::string_view ident) {
     const std::string uri = WiredTigerUtil::buildTableUri(ident);
 
     WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(&ru);
@@ -2322,7 +2323,7 @@ void WiredTigerKVEngine::forceCheckpoint(bool useStableTimestamp) {
     }
 }
 
-bool WiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {
+bool WiredTigerKVEngine::hasIdent(RecoveryUnit& ru, std::string_view ident) const {
     return _wtHasUri(*WiredTigerRecoveryUnit::get(ru).getSession(),
                      WiredTigerUtil::buildTableUri(ident));
 }
@@ -2333,7 +2334,7 @@ std::vector<std::string> WiredTigerKVEngine::getAllIdents(RecoveryUnit& ru) cons
 }
 
 boost::optional<boost::filesystem::path> WiredTigerKVEngine::getDataFilePathForIdent(
-    StringData ident) const {
+    std::string_view ident) const {
     boost::filesystem::path identPath = _path;
     identPath /= std::string{ident} + ".wt";
 
@@ -2344,7 +2345,7 @@ boost::optional<boost::filesystem::path> WiredTigerKVEngine::getDataFilePathForI
     return identPath;
 }
 
-std::unique_lock<std::mutex> WiredTigerKVEngine::_ensureIdentPath(StringData ident) {
+std::unique_lock<std::mutex> WiredTigerKVEngine::_ensureIdentPath(std::string_view ident) {
     size_t idx = ident.find('/');
     if (idx == string::npos) {
         // If there is no directory for this ident, we don't need to take the lock.
@@ -2352,7 +2353,7 @@ std::unique_lock<std::mutex> WiredTigerKVEngine::_ensureIdentPath(StringData ide
     }
     std::unique_lock<std::mutex> directoryModifyLock(_directoryModificationMutex);
     do {
-        StringData dir = ident.substr(0, idx);
+        std::string_view dir = ident.substr(0, idx);
 
         boost::filesystem::path subdir = _path;
         subdir /= std::string{dir};
@@ -2373,7 +2374,7 @@ std::unique_lock<std::mutex> WiredTigerKVEngine::_ensureIdentPath(StringData ide
     return directoryModifyLock;
 }
 
-bool WiredTigerKVEngine::_removeIdentDirectoryIfEmpty(StringData ident, size_t startPos) {
+bool WiredTigerKVEngine::_removeIdentDirectoryIfEmpty(std::string_view ident, size_t startPos) {
     size_t separatorPos = ident.find('/', startPos);
     if (separatorPos == string::npos) {
         return true;
@@ -2428,7 +2429,7 @@ void WiredTigerKVEngine::setLastMaterializedLsn(uint64_t lsn) {
                   nullptr);
 }
 
-void WiredTigerKVEngine::setRecoveryCheckpointMetadata(StringData checkpointMetadata) {
+void WiredTigerKVEngine::setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
     auto getCkptMetaConfigString =
         fmt::format("disaggregated=(checkpoint_meta=\"{}\")", checkpointMetadata);
     invariantWTOK(_conn->reconfigure(_conn, getCkptMetaConfigString.c_str()), nullptr);
@@ -2731,7 +2732,7 @@ void WiredTigerKVEngine::unpinAllDurableTimestamp(uint64_t ts) {
 }
 
 void WiredTigerKVEngine::publishIdent(WiredTigerRecoveryUnit& ru,
-                                      StringData ident,
+                                      std::string_view ident,
                                       uint64_t schemaEpoch) {
     // TODO: SERVER-122163: Call WT session->publish_at_schema_epoch(uri, schemaEpoch) when the API
     // is available.
@@ -3161,7 +3162,7 @@ void WiredTigerKVEngine::dump() const {
     }
 }
 
-StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(StringData ident) const {
+StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(std::string_view ident) const {
     auto session = _connection->getUninterruptibleSession();
 
     auto tableMetadata = WiredTigerUtil::getMetadata(*session, fmt::format("table:{}", ident));
@@ -3178,7 +3179,7 @@ StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(StringData ident) con
                                 << fileMetadata.getValue());
 }
 
-KeyFormat WiredTigerKVEngine::getKeyFormat(RecoveryUnit& ru, StringData ident) const {
+KeyFormat WiredTigerKVEngine::getKeyFormat(RecoveryUnit& ru, std::string_view ident) const {
 
     const std::string wtTableConfig = uassertStatusOK(WiredTigerUtil::getMetadataCreate(
         *WiredTigerRecoveryUnit::get(ru).getSessionNoTxn(), fmt::format("table:{}", ident)));
@@ -3194,13 +3195,13 @@ bool WiredTigerKVEngine::underCachePressure(int concurrentOpOuts) {
 }
 
 BSONObj WiredTigerKVEngine::setFlagToStorageOptions(const BSONObj& storageEngineOptions,
-                                                    StringData flagName,
+                                                    std::string_view flagName,
                                                     boost::optional<bool> flagValue) const {
     return setFlagToWiredTigerStorageOptions(storageEngineOptions, flagName, flagValue);
 }
 
 boost::optional<bool> WiredTigerKVEngine::getFlagFromStorageOptions(
-    const BSONObj& storageEngineOptions, StringData flagName) const {
+    const BSONObj& storageEngineOptions, std::string_view flagName) const {
     return getFlagFromWiredTigerStorageOptions(storageEngineOptions, flagName);
 }
 
@@ -3214,10 +3215,11 @@ BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storag
         WiredTigerConfigParser parser(*configString);
         WT_CONFIG_ITEM disaggValue;
         if (parser.get("disaggregated", &disaggValue) == 0) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "Storage tier options must be set either via the create command 'storageTier' "
-                    "argument or via the WT config string, no mix allowed",
-                    !str::contains(StringData(disaggValue.str, disaggValue.len), "storage_tier"));
+            uassert(
+                ErrorCodes::InvalidOptions,
+                "Storage tier options must be set either via the create command 'storageTier' "
+                "argument or via the WT config string, no mix allowed",
+                !str::contains(std::string_view(disaggValue.str, disaggValue.len), "storage_tier"));
         }
     }
 
@@ -3254,14 +3256,14 @@ boost::optional<StorageTierLevelEnum> WiredTigerKVEngine::getStorageTierFromStor
         return boost::none;
     }
 
-    WiredTigerConfigParser disaggParser(StringData(disaggValue.str, disaggValue.len));
+    WiredTigerConfigParser disaggParser(std::string_view(disaggValue.str, disaggValue.len));
     WT_CONFIG_ITEM storageTierValue;
     if (disaggParser.get("storage_tier", &storageTierValue) != 0) {
         return boost::none;
     }
 
     // Copy into a std::string to ensure null-termination, which the IDL-generated deserializer
-    // requires (its memcmp reads one byte past the StringData length).
+    // requires (its memcmp reads one byte past the std::string_view length).
     const std::string storageTierStrOwned(storageTierValue.str, storageTierValue.len);
     try {
         return idl::deserialize<StorageTierLevelEnum>(storageTierStrOwned);

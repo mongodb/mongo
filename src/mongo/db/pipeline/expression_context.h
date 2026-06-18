@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/basic_types_gen.h"
@@ -74,6 +73,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -422,22 +422,22 @@ public:
     /**
      * Increment the counter for the match expression with a given name.
      */
-    void incrementMatchExprCounter(StringData name);
+    void incrementMatchExprCounter(std::string_view name);
 
     /**
      * Increment the counter for the aggregate expression with a given name.
      */
-    void incrementAggExprCounter(StringData name);
+    void incrementAggExprCounter(std::string_view name);
 
     /**
      * Increment the counter for the $group accumulator expression with a given name.
      */
-    void incrementGroupAccumulatorExprCounter(StringData name);
+    void incrementGroupAccumulatorExprCounter(std::string_view name);
 
     /**
      * Increment the counter for the $setWindowFields accumulator expression with a given name.
      */
-    void incrementWindowAccumulatorExprCounter(StringData name);
+    void incrementWindowAccumulatorExprCounter(std::string_view name);
 
     /**
      * Merge expression counters from the current expression context into the global maps
@@ -484,7 +484,7 @@ public:
      * VersionContext and IncrementalFeatureRolloutContext. This function assumes the caller has
      * verified that the feature flag should be checked.
      */
-    void throwIfParserShouldRejectFeature(StringData name, FeatureFlag& flag);
+    void throwIfParserShouldRejectFeature(std::string_view name, FeatureFlag& flag);
 
     /**
      * Returns true if parsers should not check if feature flags are enabled on the expressions
@@ -505,7 +505,7 @@ public:
      * Throws only if the parser should check the feature flag and the feature flag provided is not
      * enabled in the expressions VersionContext and IncrementalFeatureRolloutContext
      */
-    void ignoreFeatureInParserOrRejectAndThrow(StringData name, FeatureFlag& flag);
+    void ignoreFeatureInParserOrRejectAndThrow(std::string_view name, FeatureFlag& flag);
 
     void setOperationContext(OperationContext* opCtx) {
         _params.opCtx = opCtx;

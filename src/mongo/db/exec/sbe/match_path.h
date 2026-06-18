@@ -33,6 +33,7 @@
 #include "mongo/util/modules.h"
 
 #include <ostream>
+#include <string_view>
 
 namespace mongo::sbe {
 
@@ -50,7 +51,7 @@ public:
     MatchPath(const FieldRef& other) : FieldRef(other) {}
     MatchPath(FieldRef&& other) : FieldRef(other) {}
 
-    explicit MatchPath(StringData path) : FieldRef(path) {}
+    explicit MatchPath(std::string_view path) : FieldRef(path) {}
 
     MatchPath& operator=(const FieldRef& other) {
         *static_cast<FieldRef*>(this) = other;
@@ -67,29 +68,29 @@ public:
         return n ? n : 1;
     }
 
-    StringData getPart(FieldIndex i) const {
+    std::string_view getPart(FieldIndex i) const {
         return FieldRef::numParts() == 0 && i == 0 ? ""_sd : FieldRef::getPart(i);
     }
 
-    StringData operator[](int index) const {
+    std::string_view operator[](int index) const {
         return getPart(index);
     }
 
-    bool equalsDottedField(StringData other) const {
+    bool equalsDottedField(std::string_view other) const {
         return FieldRef::numParts() == 0 ? other == ""_sd : FieldRef::equalsDottedField(other);
     }
 
-    StringData dottedField(FieldIndex offsetFromStart = 0) const {
+    std::string_view dottedField(FieldIndex offsetFromStart = 0) const {
         if (FieldRef::numParts() == 0) {
-            return (offsetFromStart == 0) ? ""_sd : StringData();
+            return (offsetFromStart == 0) ? ""_sd : std::string_view();
         }
 
         return FieldRef::dottedField(offsetFromStart);
     }
 
-    StringData dottedSubstring(FieldIndex startPart, FieldIndex endPart) const {
+    std::string_view dottedSubstring(FieldIndex startPart, FieldIndex endPart) const {
         if (!FieldRef::numParts()) {
-            return (startPart == 0 && endPart == 1) ? ""_sd : StringData();
+            return (startPart == 0 && endPart == 1) ? ""_sd : std::string_view();
         }
 
         return FieldRef::dottedSubstring(startPart, endPart);

@@ -58,6 +58,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -117,8 +118,8 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Facet);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceFacet final : public DocumentSource {
 public:
-    MONGO_MOD_NEEDS_REPLACEMENT static constexpr StringData kStageName = "$facet"_sd;
-    static constexpr StringData kTeeConsumerStageName = "$internalFacetTeeConsumer"_sd;
+    MONGO_MOD_NEEDS_REPLACEMENT static constexpr std::string_view kStageName = "$facet"_sd;
+    static constexpr std::string_view kTeeConsumerStageName = "$internalFacetTeeConsumer"_sd;
     struct FacetPipeline {
         FacetPipeline(std::string name, std::unique_ptr<Pipeline> pipeline)
             : name(std::move(name)), pipeline(std::move(pipeline)) {}
@@ -170,7 +171,7 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return DocumentSourceFacet::kStageName;
     }
 

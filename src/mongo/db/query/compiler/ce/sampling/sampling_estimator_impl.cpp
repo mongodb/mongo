@@ -64,12 +64,14 @@
 #include "mongo/util/fail_point.h"
 
 #include <cmath>
+#include <string_view>
 
 #include <boost/container/flat_set.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
 namespace mongo::ce {
+using namespace std::literals::string_view_literals;
 
 using CardinalityType = mongo::cost_based_ranker::CardinalityType;
 using EstimationSource = mongo::cost_based_ranker::EstimationSource;
@@ -661,7 +663,7 @@ void SamplingEstimatorImpl::generateSampleForTesting(
                 sbe::makeEs(sbe::makeE<sbe::EFunction>(
                     sbe::EFn::kGetField,
                     sbe::makeEs(sbe::makeE<sbe::EVariable>(staticData->resultSlot.get()),
-                                sbe::makeE<sbe::EConstant>("_id"_sd)))));
+                                sbe::makeE<sbe::EConstant>("_id"sv)))));
             auto modded = sbe::makeE<sbe::EFunction>(
                 sbe::EFn::kMod,
                 sbe::makeEs(
@@ -723,7 +725,7 @@ namespace {
  *
  * This is the common shape produced when parsing $all
  */
-boost::optional<std::pair<StringData, std::vector<BSONElement>>> tryExtractAllEqualities(
+boost::optional<std::pair<std::string_view, std::vector<BSONElement>>> tryExtractAllEqualities(
     const MatchExpression* expr) {
     if (expr->matchType() != MatchExpression::AND || expr->numChildren() == 0) {
         return boost::none;
@@ -751,7 +753,7 @@ boost::optional<std::pair<StringData, std::vector<BSONElement>>> tryExtractAllEq
 
     // All children share the same path (verified by the check above).
     // We still need to scan every child for collation and null/undefined rejections.
-    StringData commonPath = static_cast<const EqualityMatchExpression*>(first)->path();
+    std::string_view commonPath = static_cast<const EqualityMatchExpression*>(first)->path();
     std::vector<BSONElement> values;
     values.reserve(expr->numChildren());
 
@@ -790,7 +792,7 @@ boost::optional<std::pair<StringData, std::vector<BSONElement>>> tryExtractAllEq
  * iterating through each vector once.
  */
 bool documentMatchesAllEqualities(const BSONObj& doc,
-                                  StringData path,
+                                  std::string_view path,
                                   const std::vector<BSONElement>& sortedRequiredValues) {
     BSONElementCmpWithoutField cmp;
 
@@ -974,7 +976,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
         checkSampleContainsIndexBoundsFields(_topLevelSampleFieldNames, bounds);
     }
     // Precompute the fast-path info for AND-of-same-path-equalities outside the bounds loop.
-    boost::optional<std::pair<StringData, std::vector<BSONElement>>> allEqInfo;
+    boost::optional<std::pair<std::string_view, std::vector<BSONElement>>> allEqInfo;
     std::vector<BSONElement> sortedRequiredValues;
     if (expr) {
         allEqInfo = tryExtractAllEqualities(expr);

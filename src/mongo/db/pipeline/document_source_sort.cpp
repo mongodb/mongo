@@ -55,6 +55,7 @@
 #include <iterator>
 #include <list>
 #include <memory>
+#include <string_view>
 #include <tuple>
 
 #include <boost/cstdint.hpp>
@@ -65,6 +66,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 struct BoundMakerMin {
@@ -78,7 +80,7 @@ struct BoundMakerMin {
 
     Document serialize(const query_shape::SerializationOptions& opts) const {
         // Convert from millis to seconds.
-        return Document{{{"base"_sd, DocumentSourceSort::kMin},
+        return Document{{{"base"sv, DocumentSourceSort::kMin},
                          {DocumentSourceSort::kOffset, opts.serializeLiteral(offset / 1000)}}};
     }
 };
@@ -94,7 +96,7 @@ struct BoundMakerMax {
 
     Document serialize(const query_shape::SerializationOptions& opts) const {
         // Convert from millis to seconds.
-        return Document{{{"base"_sd, DocumentSourceSort::kMax},
+        return Document{{{"base"sv, DocumentSourceSort::kMax},
                          {DocumentSourceSort::kOffset, opts.serializeLiteral(offset / 1000)}}};
     }
 };
@@ -189,11 +191,11 @@ void DocumentSourceSort::serializeForBoundedSort(
         SortPattern::SortKeySerialization::kForPipelineSerialization, opts);
 
     MutableDocument mutDoc{Document{{
-        {"$_internalBoundedSort"_sd,
+        {"$_internalBoundedSort"sv,
          Document{
-             {{"sortKey"_sd, std::move(sortKey)},
-              {"bound"_sd, _timeSorter->serializeBound(opts)},
-              {"limit"_sd, opts.serializeLiteral(static_cast<long long>(_timeSorter->limit()))}}}},
+             {{"sortKey"sv, std::move(sortKey)},
+              {"bound"sv, _timeSorter->serializeBound(opts)},
+              {"limit"sv, opts.serializeLiteral(static_cast<long long>(_timeSorter->limit()))}}}},
     }}};
 
     if (opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -414,7 +416,7 @@ auto makeSorter(const ExpressionContext& expCtx,
 
 boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     SortPattern pat,
-    StringData boundBase,
+    std::string_view boundBase,
     long long boundOffset,
     boost::optional<long long> limit,
     bool outputSortKeyMetadata,
@@ -503,7 +505,7 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     uassert(6460201,
             "$_internalBoundedSort bound.base must be a string",
             boundBaseElem && boundBaseElem.type() == BSONType::string);
-    StringData boundBase = boundBaseElem.valueStringData();
+    std::string_view boundBase = boundBaseElem.valueStringData();
     uassert(6460202,
             str::stream() << "$_internalBoundedSort bound.base must be '" << kMin << "' or '"
                           << kMax << "'",

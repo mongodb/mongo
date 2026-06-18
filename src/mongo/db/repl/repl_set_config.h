@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
@@ -53,6 +52,7 @@
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -458,14 +458,14 @@ public:
      * Returns a ReplSetTag with the given "key" and "value", or an invalid
      * tag if the configuration describes no such tag.
      */
-    ReplSetTag findTag(StringData key, StringData value) const;
+    ReplSetTag findTag(std::string_view key, std::string_view value) const;
 
     /**
      * Returns the pattern corresponding to "patternName" in this configuration.
      * If "patternName" is not a valid pattern in this configuration, returns
      * ErrorCodes::NoSuchKey.
      */
-    StatusWith<ReplSetTagPattern> findCustomWriteMode(StringData patternName) const;
+    StatusWith<ReplSetTagPattern> findCustomWriteMode(std::string_view patternName) const;
 
     /**
      * Returns a pattern constructed from a raw set of tags provided as the `w` value

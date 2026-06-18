@@ -41,14 +41,16 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 #include <variant>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo::admission::execution_control {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kFieldName = "executionAdmissionContextType"_sd;
+constexpr std::string_view kFieldName = "executionAdmissionContextType"sv;
 
 using TaskType = ExecutionAdmissionContext::TaskType;
 using ScopedTaskTypeVariant =

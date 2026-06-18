@@ -29,19 +29,21 @@
 
 #include "mongo/db/pipeline/field_path.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 const StringDataSet kAllowedDollarPrefixedFields = {
     // For DBRef
-    "$id"_sd,
-    "$ref"_sd,
-    "$db"_sd,
+    "$id"sv,
+    "$ref"sv,
+    "$db"sv,
 
     // Metadata fields.
 
@@ -53,14 +55,14 @@ const StringDataSet kAllowedDollarPrefixedFields = {
     "$recordId",
 
     // This is necessary for $search queries with a specified sort.
-    "$searchSortValues"_sd,
-    "$searchScore"_sd,
-    "$searchRootDocumentId"_sd,
+    "$searchSortValues"sv,
+    "$searchScore"sv,
+    "$searchRootDocumentId"sv,
 };
 
 }  // namespace
 
-std::string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
+std::string FieldPath::getFullyQualifiedPath(std::string_view prefix, std::string_view suffix) {
     if (prefix.empty()) {
         return std::string{suffix};
     }
@@ -130,7 +132,7 @@ StatusWith<FieldPath> fieldPathWithValidationStatus(std::string inputPath,
     return {FieldPath(std::move(inputPath), std::move(dotPositions), std::move(fieldHash))};
 }
 
-Status FieldPath::validateFieldName(StringData fieldName) {
+Status FieldPath::validateFieldName(std::string_view fieldName) {
     if (fieldName.empty()) {
         return Status(ErrorCodes::Error{15998}, "FieldPath field names may not be empty strings.");
     }

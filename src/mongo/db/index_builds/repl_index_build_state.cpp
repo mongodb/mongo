@@ -31,7 +31,6 @@
 #include "mongo/db/index_builds/repl_index_build_state.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -50,10 +49,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -76,24 +78,24 @@ std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs) {
 
 }  // namespace
 
-StringData indexBuildProtocolToString(IndexBuildProtocol protocol) {
+std::string_view indexBuildProtocolToString(IndexBuildProtocol protocol) {
     switch (protocol) {
         case IndexBuildProtocol::kSinglePhase:
-            return "single phase"_sd;
+            return "single phase"sv;
         case IndexBuildProtocol::kTwoPhase:
-            return "two phase"_sd;
+            return "two phase"sv;
         case IndexBuildProtocol::kPrimaryDriven:
-            return "primary driven"_sd;
+            return "primary driven"sv;
     }
     MONGO_UNREACHABLE;
 }
 
-IndexBuildProtocol parseIndexBuildProtocol(StringData str) {
-    if (str == "single phase"_sd) {
+IndexBuildProtocol parseIndexBuildProtocol(std::string_view str) {
+    if (str == "single phase"sv) {
         return IndexBuildProtocol::kSinglePhase;
-    } else if (str == "two phase"_sd) {
+    } else if (str == "two phase"sv) {
         return IndexBuildProtocol::kTwoPhase;
-    } else if (str == "primary driven"_sd) {
+    } else if (str == "primary driven"sv) {
         return IndexBuildProtocol::kPrimaryDriven;
     }
     uasserted(ErrorCodes::BadValue,

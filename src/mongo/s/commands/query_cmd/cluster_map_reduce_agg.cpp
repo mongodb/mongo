@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -79,6 +78,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -91,6 +91,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using sharded_agg_helpers::PipelineDataSource;
 
@@ -334,7 +335,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     sharding::router::CollectionRouter router(opCtx, nss);
     return router.routeWithRoutingContext(
-        "mapReduce"_sd, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+        "mapReduce"sv, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             // Clear the `result` BSONObjBuilder since this lambda function may be retried if the
             // router cache is stale.
             result.resetToEmpty();

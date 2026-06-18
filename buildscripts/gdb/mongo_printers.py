@@ -100,32 +100,6 @@ class StatusWithPrinter(object):
         return "StatusWith(%s, %s)" % StatusPrinter.generate_error_details(error)
 
 
-class StringDataPrinter(object):
-    """Pretty-printer for mongo::StringData."""
-
-    def __init__(self, val):
-        """Initialize StringDataPrinter."""
-        self.val = val
-
-    @staticmethod
-    def display_hint():
-        """Display hint."""
-        return "string"
-
-    def to_string(self):
-        """Return data for printing."""
-        # As of SERVER-82604, StringData is based on std::string_view, so try with that first
-        sv = self.val["_sv"]
-        if sv is not None:
-            return sv
-
-        # ... back-off to the legacy format otherwise
-        size = self.val["_size"]
-        if size == -1:
-            return self.val["_data"].lazy_string()
-        return self.val["_data"].lazy_string(length=size)
-
-
 class BoostOptionalPrinter(object):
     """Pretty-printer for boost::optional."""
 
@@ -1406,7 +1380,6 @@ def build_pretty_printer():
     pp.add("Decorable", "mongo::Decorable", True, DecorablePrinter)
     pp.add("Status", "mongo::Status", False, StatusPrinter)
     pp.add("StatusWith", "mongo::StatusWith", True, StatusWithPrinter)
-    pp.add("StringData", "mongo::StringData", False, StringDataPrinter)
     pp.add(
         "node_hash_map",
         absl_insert_version_after_absl("absl::node_hash_map"),

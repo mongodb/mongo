@@ -65,6 +65,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 using std::string;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
@@ -510,7 +511,7 @@ TEST_F(DocumentSourceMatchTest, DoesNotPushProjectBeforeSelf) {
     DocumentSourceContainer container;
     auto match = DocumentSourceMatch::create(BSON("_id" << 1), getExpCtx());
     auto project =
-        DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);
+        DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"sv);
 
     container.push_back(match);
     container.push_back(project);
@@ -695,7 +696,7 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
         fromjson("{$jsonSchema: {properties: {a: {type: 'number'}}}}"), getExpCtx());
 
     const auto mock = DocumentSourceMock::createForTest(
-        {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{{}, 1}}}}}},
+        {Document{{"a", 1}}, Document{{"a", "str"sv}}, Document{{"a", {Document{{{}, 1}}}}}},
         getExpCtx());
 
     auto mockStage = exec::agg::buildStage(mock);

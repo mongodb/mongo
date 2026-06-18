@@ -58,6 +58,7 @@
 #include <limits>
 #include <ostream>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -962,7 +963,7 @@ void TopologyCoordinator::prepareSyncFromResponse(const HostAndPort& target,
 StatusWith<bool> TopologyCoordinator::prepareHeartbeatResponseV1(
     Date_t now,
     const ReplSetHeartbeatArgsV1& args,
-    StringData ourSetName,
+    std::string_view ourSetName,
     ReplSetHeartbeatResponse* response) {
     // Verify that replica set names match
     const std::string rshb = args.getSetName();
@@ -1076,7 +1077,7 @@ int TopologyCoordinator::_getMemberIndex(int id) const {
 }
 
 std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHeartbeatRequestV1(
-    Date_t now, StringData ourSetName, const HostAndPort& target) {
+    Date_t now, std::string_view ourSetName, const HostAndPort& target) {
     PingStats& hbStats = _pings[target];
     Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
     if ((!_rsConfig.isInitialized()) || !hbStats.trying() ||
@@ -2450,7 +2451,7 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
 }
 
 void TopologyCoordinator::fillHelloForReplSet(std::shared_ptr<HelloResponse> response,
-                                              StringData horizonString) const {
+                                              std::string_view horizonString) const {
     invariant(_rsConfig.isInitialized());
     response->setTopologyVersion(getTopologyVersion());
     const MemberState myState = getMemberState();

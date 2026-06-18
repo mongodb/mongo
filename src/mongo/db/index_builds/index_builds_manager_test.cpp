@@ -29,7 +29,6 @@
 
 #include "mongo/db/index_builds/index_builds_manager.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/primary_driven/registry.h"

@@ -42,6 +42,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -79,7 +80,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "FETCH"_sd;
+    static constexpr std::string_view kStageType = "FETCH"_sd;
 
 protected:
     void doSaveStateRequiresCollection() final;

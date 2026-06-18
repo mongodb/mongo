@@ -48,6 +48,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -73,7 +74,7 @@ constexpr int kElementValueOffset = 2;
 
 // Write a BSON sub-object header into the allocator: type byte + field name + null + 4-byte size
 // placeholder. Returns the offset of the size field for later fill-in.
-int writeSubObjHeader(BSONElementStorage& allocator, StringData fieldName, BSONType type) {
+int writeSubObjHeader(BSONElementStorage& allocator, std::string_view fieldName, BSONType type) {
     auto fieldNameSize = fieldName.size();
     char* objdata = allocator.allocate(6 + fieldNameSize);
     objdata[0] = stdx::to_underlying(type);
@@ -90,7 +91,7 @@ int writeSubObjHeader(BSONElementStorage& allocator, StringData fieldName, BSONT
 // Finalize a sub-object: write EOO + fill in size, or deallocate if empty and not allowed.
 void writeSubObjFooter(BSONElementStorage& allocator,
                        int sizeOffset,
-                       StringData fieldName,
+                       std::string_view fieldName,
                        bool allowEmpty) {
     // No scalars were written — empty subobject not present in this element.
     if (!allowEmpty && allocator.position() == allocator.contiguous() + sizeOffset + 4) {
@@ -199,7 +200,7 @@ int BSONElementStorage::_endContiguous() {
 }
 
 BSONElementStorage::Element BSONElementStorage::allocate(BSONType type,
-                                                         StringData fieldName,
+                                                         std::string_view fieldName,
                                                          int valueSize) {
     // Size needed for this BSONElement
     auto fieldNameSize = fieldName.size();
@@ -237,7 +238,7 @@ void BSONColumn::Iterator::_initializeInterleaving() {
     BSONObjTraversal t(
         interleaved.arrays,
         interleaved.rootType,
-        [](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
+        [](std::string_view fieldName, const BSONObj& obj, BSONType type) { return true; },
         [&interleaved](const BSONElement& elem) {
             interleaved.states.emplace_back();
             interleaved.states.back().loadUncompressed(elem);
@@ -364,7 +365,7 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
     _decompressed = obj;
 }
 
-bool BSONColumn::Iterator::_processScalar(DecodingState& state, StringData fieldName) {
+bool BSONColumn::Iterator::_processScalar(DecodingState& state, std::string_view fieldName) {
     auto allocatorPosition = _allocator->position();
     BSONElement elem;
 
@@ -625,7 +626,7 @@ BSONElement BSONColumn::Iterator::DecodingState::loadDelta(BSONElementStorage& a
 }
 
 BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
-    BSONElementStorage& allocator, BSONElement last, StringData fieldName) const {
+    BSONElementStorage& allocator, BSONElement last, std::string_view fieldName) const {
     // Decoder state is now setup, materialize new value. We allocate a new BSONElement that fits
     // same value size as previous
     BSONType type = last.type();
@@ -672,7 +673,7 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
 }
 
 BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
-    BSONElementStorage& allocator, BSONElement last, StringData fieldName) const {
+    BSONElementStorage& allocator, BSONElement last, std::string_view fieldName) const {
     // Decoder state is now setup, write value depending on type
     return [&]() -> BSONElementStorage::Element {
         BSONType type = last.type();
@@ -908,7 +909,7 @@ BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
  */
 BSONElement BSONElementMaterializer::writeStringData(BSONElementStorage& allocator,
                                                      BSONType bsonType,
-                                                     StringData val) {
+                                                     std::string_view val) {
     // Add 5 bytes to size, strings begin with a 4 byte count and ends with a null terminator
     BSONElementStorage::Element elem = allocator.allocate(bsonType, "", val.size() + 5);
     // Write count, size includes null terminator
@@ -920,7 +921,8 @@ BSONElement BSONElementMaterializer::writeStringData(BSONElementStorage& allocat
     return elem.element();
 }
 
-BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, StringData val) {
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
+                                                 std::string_view val) {
     return writeStringData(allocator, BSONType::string, val);
 }
 

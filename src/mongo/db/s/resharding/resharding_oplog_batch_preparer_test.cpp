@@ -30,7 +30,6 @@
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"

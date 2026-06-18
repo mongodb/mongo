@@ -35,6 +35,8 @@
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 using namespace query_stats;
@@ -43,7 +45,7 @@ namespace exec::agg {
 
 class QueryStatsStage final : public Stage {
 public:
-    QueryStatsStage(StringData stageName,
+    QueryStatsStage(std::string_view stageName,
                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
                     TransformAlgorithmEnum algorithm,
                     std::string hmacKey,

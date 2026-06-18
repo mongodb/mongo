@@ -29,7 +29,6 @@
 
 #include "mongo/db/commands/query_cmd/plan_cache_commands.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
@@ -41,13 +40,15 @@
 #include "mongo/db/shard_role/shard_role_mock.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
 #include <utility>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 static const NamespaceString nss =
-    NamespaceString::createNamespaceString_forTest("test.collection"_sd);
+    NamespaceString::createNamespaceString_forTest("test.collection"sv);
 
 class PlanCacheCommandsTest : public ServiceContextTest {
 public:

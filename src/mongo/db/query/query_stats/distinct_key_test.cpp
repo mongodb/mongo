@@ -39,6 +39,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 
 #include <absl/hash/hash.h>
 
@@ -225,7 +226,7 @@ TEST_F(DistinctKeyTest, OriginalQueryShapeHashAppearsInKey) {
 }
 
 TEST_F(DistinctKeyTest, DifferentOriginalQueryShapeHashesProduceDifferentKeys) {
-    auto makeKeyWithHash = [](StringData hexHash) {
+    auto makeKeyWithHash = [](std::string_view hexHash) {
         auto expCtx = make_intrusive<ExpressionContextForTest>();
         auto dcr = std::make_unique<DistinctCommandRequest>(kDefaultTestNss);
         dcr->setKey("name");

@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <memory.h>
 
@@ -43,7 +44,7 @@ namespace mongo::exec::agg {
 
 class QueueStage final : public Stage {
 public:
-    QueueStage(StringData stageName,
+    QueueStage(std::string_view stageName,
                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                std::deque<GetNextResult> queue);
 

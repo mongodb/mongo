@@ -43,6 +43,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -54,7 +55,7 @@ namespace mongo::stage_builder {
 class PlanStageReqs;
 class PlanStageSlots;
 
-constexpr StringData kIdIndexName = IndexConstants::kIdIndexName;
+constexpr std::string_view kIdIndexName = IndexConstants::kIdIndexName;
 
 /**
  * A list of low and high key values representing ranges over a particular index.

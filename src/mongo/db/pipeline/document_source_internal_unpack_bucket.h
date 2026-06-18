@@ -53,6 +53,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -82,19 +83,19 @@ struct MONGO_MOD_PRIVATE InternalUnpackBucketSharedState {
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceInternalUnpackBucket : public DocumentSource {
 public:
-    static constexpr StringData kStageNameInternal = "$_internalUnpackBucket"_sd;
-    static constexpr StringData kStageNameExternal = "$_unpackBucket"_sd;
-    static constexpr StringData kInclude = "include"_sd;
-    static constexpr StringData kExclude = "exclude"_sd;
-    static constexpr StringData kAssumeNoMixedSchemaData = "assumeNoMixedSchemaData"_sd;
-    static constexpr StringData kUsesExtendedRange = "usesExtendedRange"_sd;
-    static constexpr StringData kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"_sd;
-    static constexpr StringData kIncludeMinTimeAsMetadata = "includeMinTimeAsMetadata"_sd;
-    static constexpr StringData kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"_sd;
-    static constexpr StringData kWholeBucketFilter = "wholeBucketFilter"_sd;
-    static constexpr StringData kEventFilter = "eventFilter"_sd;
-    static constexpr StringData kFixedBuckets = "fixedBuckets"_sd;
-    static constexpr StringData kSbeCompatible = "sbeCompatible"_sd;
+    static constexpr std::string_view kStageNameInternal = "$_internalUnpackBucket"_sd;
+    static constexpr std::string_view kStageNameExternal = "$_unpackBucket"_sd;
+    static constexpr std::string_view kInclude = "include"_sd;
+    static constexpr std::string_view kExclude = "exclude"_sd;
+    static constexpr std::string_view kAssumeNoMixedSchemaData = "assumeNoMixedSchemaData"_sd;
+    static constexpr std::string_view kUsesExtendedRange = "usesExtendedRange"_sd;
+    static constexpr std::string_view kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"_sd;
+    static constexpr std::string_view kIncludeMinTimeAsMetadata = "includeMinTimeAsMetadata"_sd;
+    static constexpr std::string_view kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"_sd;
+    static constexpr std::string_view kWholeBucketFilter = "wholeBucketFilter"_sd;
+    static constexpr std::string_view kEventFilter = "eventFilter"_sd;
+    static constexpr std::string_view kFixedBuckets = "fixedBuckets"_sd;
+    static constexpr std::string_view kSbeCompatible = "sbeCompatible"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBsonInternal(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -117,7 +118,7 @@ public:
                                        bool fixedBuckets = false,
                                        boost::optional<bool> sbeCompatible = boost::none);
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageNameInternal;
     }
 

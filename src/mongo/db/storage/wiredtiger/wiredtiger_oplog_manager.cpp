@@ -43,6 +43,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -278,7 +279,7 @@ void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimest
                 "newOplogReadTimestamp"_attr = Timestamp(newTimestamp));
 }
 
-StringData WiredTigerOplogManager::getIdent() const {
+std::string_view WiredTigerOplogManager::getIdent() const {
     return _oplogIdent;
 }
 

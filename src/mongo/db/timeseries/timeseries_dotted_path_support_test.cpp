@@ -39,11 +39,13 @@
 
 #include <functional>
 #include <ostream>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 namespace tdps = ::mongo::timeseries::dotted_path_support;
 
@@ -410,7 +412,7 @@ TEST_F(TimeseriesDottedPathSupportTest, ExtractAllElementsAlongBucketPath) {
 })");
 
     runTest(input, [this](const BSONObj& obj) {
-        auto assertExtractionMatches = [&](StringData path, const BSONArray expectedStorage) {
+        auto assertExtractionMatches = [&](std::string_view path, const BSONArray expectedStorage) {
             BSONElementSet actual;
             auto actualStorage = tdps::extractAllElementsAlongBucketPath(obj, path, actual);
 
@@ -433,26 +435,25 @@ TEST_F(TimeseriesDottedPathSupportTest, ExtractAllElementsAlongBucketPath) {
             }
         };
 
-        assertExtractionMatches("data.a"_sd, BSONArray());
-        assertExtractionMatches("data.b"_sd, BSONArray());
-        assertExtractionMatches("data.c"_sd, BSON_ARRAY(true << false));
-        assertExtractionMatches("data.d"_sd, BSON_ARRAY(false));
-        assertExtractionMatches("data.e"_sd, BSON_ARRAY("foo" << 1 << 2));
-        assertExtractionMatches("data.f"_sd, BSON_ARRAY(BSON("a" << BSON_ARRAY(true << false))));
-        assertExtractionMatches("data.f.a"_sd, BSON_ARRAY(true << false));
-        assertExtractionMatches("data.g"_sd,
-                                BSON_ARRAY(BSON("a" << BSON_ARRAY(BSON("a" << true)))));
-        assertExtractionMatches("data.g.a"_sd, BSON_ARRAY(BSON("a" << true)));
-        assertExtractionMatches("data.g.a.a"_sd, BSON_ARRAY(true));
+        assertExtractionMatches("data.a"sv, BSONArray());
+        assertExtractionMatches("data.b"sv, BSONArray());
+        assertExtractionMatches("data.c"sv, BSON_ARRAY(true << false));
+        assertExtractionMatches("data.d"sv, BSON_ARRAY(false));
+        assertExtractionMatches("data.e"sv, BSON_ARRAY("foo" << 1 << 2));
+        assertExtractionMatches("data.f"sv, BSON_ARRAY(BSON("a" << BSON_ARRAY(true << false))));
+        assertExtractionMatches("data.f.a"sv, BSON_ARRAY(true << false));
+        assertExtractionMatches("data.g"sv, BSON_ARRAY(BSON("a" << BSON_ARRAY(BSON("a" << true)))));
+        assertExtractionMatches("data.g.a"sv, BSON_ARRAY(BSON("a" << true)));
+        assertExtractionMatches("data.g.a.a"sv, BSON_ARRAY(true));
         assertExtractionMatches(
-            "data.h"_sd,
+            "data.h"sv,
             BSON_ARRAY(BSON("a" << BSON("b" << true)) << BSON("a" << BSON("b" << false))));
-        assertExtractionMatches("data.h.a"_sd, BSON_ARRAY(BSON("b" << true) << BSON("b" << false)));
-        assertExtractionMatches("data.h.a.b"_sd, BSON_ARRAY(true << false));
-        assertExtractionMatches("data.i.a"_sd, BSON_ARRAY(true << false));
+        assertExtractionMatches("data.h.a"sv, BSON_ARRAY(BSON("b" << true) << BSON("b" << false)));
+        assertExtractionMatches("data.h.a.b"sv, BSON_ARRAY(true << false));
+        assertExtractionMatches("data.i.a"sv, BSON_ARRAY(true << false));
 
         // Do not check dotted field names
-        assertExtractionMatches("data.j.k.a"_sd, BSONArray());
+        assertExtractionMatches("data.j.k.a"sv, BSONArray());
     });
 }
 }  // namespace

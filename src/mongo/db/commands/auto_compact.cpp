@@ -42,6 +42,8 @@
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #include <boost/cstdint.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -88,7 +90,7 @@ Status autoCompact(OperationContext* opCtx,
     }
 
     std::shared_ptr<const CollectionCatalog> catalog = CollectionCatalog::get(opCtx);
-    std::vector<StringData> excludedIdents;
+    std::vector<std::string_view> excludedIdents;
 
     if (enable) {
         // The oplog is always excluded when enabling auto compaction. If this is a replica set,

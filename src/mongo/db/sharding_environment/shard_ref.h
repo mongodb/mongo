@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 #include <variant>
 
 namespace mongo {
@@ -156,10 +156,10 @@ public:
     }
 
     static ShardRef parse(const BSONElement& element);
-    void serialize(StringData fieldName, BSONObjBuilder* builder) const;
+    void serialize(std::string_view fieldName, BSONObjBuilder* builder) const;
     void serialize(BSONArrayBuilder* builder) const;
 
-    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, const ShardRef& ref) {
+    friend void appendToBson(BSONObjBuilder& bob, std::string_view fieldName, const ShardRef& ref) {
         ref.serialize(fieldName, &bob);
     }
 

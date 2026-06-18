@@ -33,7 +33,6 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/secure_allocator.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -91,6 +90,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -99,6 +99,9 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
+using namespace std::literals::string_view_literals;
+
+using namespace std::literals::string_view_literals;
 namespace mongo {
 
 namespace fle {
@@ -107,8 +110,8 @@ size_t sizeArrayElementsMemory(size_t tagCount);
 
 namespace {
 
-constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
-constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
+constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"sv;
+constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"sv;
 static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId));
 static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId));
 
@@ -117,14 +120,14 @@ std::vector<char> testValue2 = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 
 
 const FLEIndexKey& getIndexKey() {
     static std::string indexVec = hexblob::decode(
-        "f502e66502ff5d4559452ce928a0f08557a9853c4dfeacca77cff482434f0ca1251fbd60d200bc35f24309521b45ad781b2d3c4df788cacef3c0e7beca8170b6cfc514ecfcf27e217ed697ae65c08272886324def514b14369c7c60414e80f22"_sd);
+        "f502e66502ff5d4559452ce928a0f08557a9853c4dfeacca77cff482434f0ca1251fbd60d200bc35f24309521b45ad781b2d3c4df788cacef3c0e7beca8170b6cfc514ecfcf27e217ed697ae65c08272886324def514b14369c7c60414e80f22"sv);
     static FLEIndexKey indexKey(KeyMaterial(indexVec.begin(), indexVec.end()));
     return indexKey;
 }
 
 const FLEUserKey& getUserKey() {
     static std::string userVec = hexblob::decode(
-        "cbebdf05fe16099fef502a6d045c1cbb77d29d2fe19f51aec5079a81008305d8868358845d2e3ab38e4fa9cbffcd651a0fc07201d7c9ed9ca3279bfa7cd673ec37b362a0aaa92f95062405a999afd49e4b1f7f818f766c49715407011ac37fa9"_sd);
+        "cbebdf05fe16099fef502a6d045c1cbb77d29d2fe19f51aec5079a81008305d8868358845d2e3ab38e4fa9cbffcd651a0fc07201d7c9ed9ca3279bfa7cd673ec37b362a0aaa92f95062405a999afd49e4b1f7f818f766c49715407011ac37fa9"sv);
     static FLEUserKey userKey(KeyMaterial(userVec.begin(), userVec.end()));
     return userKey;
 }
@@ -205,7 +208,7 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
     return makeKeyStoreRecord(uuid, ciphertext).toBSON();
 }
 
-UUID fieldNameToUUID(StringData field) {
+UUID fieldNameToUUID(std::string_view field) {
     std::array<char, UUID::kNumBytes> buf;
     murmur3(field, 123456 /*seed*/, buf);
     return UUID::fromCDR(buf);
@@ -226,7 +229,7 @@ int32_t getTestSeed() {
     return rnd->nextInt32();
 }
 
-BSONObj insertUpdatePayloadAsDocument(StringData path, const FLE2InsertUpdatePayloadV2& iup) {
+BSONObj insertUpdatePayloadAsDocument(std::string_view path, const FLE2InsertUpdatePayloadV2& iup) {
     auto payload = iup.toBSON();
     std::vector<uint8_t> buf(payload.objsize() + 1);
     buf[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2InsertUpdatePayloadV2);
@@ -271,7 +274,7 @@ protected:
 
     void doFindAndModify(write_ops::FindAndModifyCommandRequest& request, Fle2AlgorithmInt alg);
 
-    using ValueGenerator = std::function<std::string(StringData fieldName, uint64_t row)>;
+    using ValueGenerator = std::function<std::string(std::string_view fieldName, uint64_t row)>;
 
     void doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator func);
 
@@ -282,9 +285,9 @@ protected:
 
     ESCTwiceDerivedTagToken getTestESCToken(BSONElement value);
     ESCTwiceDerivedTagToken getTestESCToken(BSONObj obj);
-    ESCTwiceDerivedTagToken getTestESCToken(StringData name, StringData value);
+    ESCTwiceDerivedTagToken getTestESCToken(std::string_view name, std::string_view value);
 
-    void assertECOCDocumentCountByField(StringData fieldName, uint64_t expect);
+    void assertECOCDocumentCountByField(std::string_view fieldName, uint64_t expect);
 
     std::vector<char> generatePlaceholder(UUID keyId, BSONElement value);
 
@@ -393,7 +396,8 @@ ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(BSONObj obj) {
     return getTestESCToken(obj.firstElement());
 }
 
-ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(StringData name, StringData value) {
+ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(std::string_view name,
+                                                     std::string_view value) {
 
     auto doc = BSON("i" << value);
     auto element = doc.firstElement();
@@ -410,7 +414,7 @@ ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(StringData name, StringData
     return ESCTwiceDerivedTagToken::deriveFrom(escContentionToken);
 }
 
-void FleCrudTest::assertECOCDocumentCountByField(StringData fieldName, uint64_t expect) {
+void FleCrudTest::assertECOCDocumentCountByField(std::string_view fieldName, uint64_t expect) {
     auto query = BSON(EcocDocument::kFieldNameFieldName << fieldName);
     auto results = _queryImpl->findDocuments(_ecocNs, query);
     ASSERT_EQ(results.size(), expect);
@@ -480,7 +484,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
     return EncryptedFieldConfig::parse(fromjson(rangeSchemaV2), IDLParserContext("root"));
 }
 
-void parseEncryptedInvalidFieldConfig(StringData esc, StringData ecoc) {
+void parseEncryptedInvalidFieldConfig(std::string_view esc, std::string_view ecoc) {
 
     auto invalidCollectionNameSchema =
         // "{" +
@@ -891,7 +895,7 @@ TEST_F(FleCrudTest, InsertTwoDifferent) {
 TEST_F(FleCrudTest, Insert100Fields) {
 
     uint64_t fieldCount = 100;
-    ValueGenerator valueGenerator = [](StringData fieldName, uint64_t row) {
+    ValueGenerator valueGenerator = [](std::string_view fieldName, uint64_t row) {
         return std::string{fieldName};
     };
     doSingleWideInsert(1, fieldCount, valueGenerator);
@@ -920,7 +924,7 @@ TEST_F(FleCrudTest, Insert20Fields50Rows) {
     uint64_t fieldCount = 20;
     uint64_t rowCount = 50;
 
-    ValueGenerator valueGenerator = [](StringData fieldName, uint64_t row) {
+    ValueGenerator valueGenerator = [](std::string_view fieldName, uint64_t row) {
         return std::string{fieldName} + std::to_string(row % 7);
     };
 
@@ -1512,7 +1516,7 @@ TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
     ASSERT_THROWS_CODE(doFindAndModify(req, Fle2AlgorithmInt::kEquality), DBException, 6666200);
 }
 
-BSONObj makeInsertUpdatePayload(StringData path, const UUID& uuid) {
+BSONObj makeInsertUpdatePayload(std::string_view path, const UUID& uuid) {
     // Actual values don't matter for these tests (apart from indexKeyId).
     auto encryptedTokens = StateCollectionTokensV2({{}}, boost::none, boost::none).encrypt({{}});
     auto iup = FLE2InsertUpdatePayloadV2({},
@@ -1894,7 +1898,7 @@ protected:
                              uint64_t cpos,
                              boost::optional<QueryTypeEnum> qtype);
 
-    void verifyESCEntriesForString(StringData testString,
+    void verifyESCEntriesForString(std::string_view testString,
                                    uint32_t expectedCount,
                                    boost::optional<QueryTypeEnum> type = boost::none,
                                    bool padding = false);
@@ -1917,7 +1921,7 @@ protected:
                                                          uint32_t lb,
                                                          uint32_t ub);
     void verifyExpectationsAfterInsertions(
-        const std::vector<std::pair<StringData, StringData>>& inserted);
+        const std::vector<std::pair<std::string_view, std::string_view>>& inserted);
 
     /**
      * Given an array of unfolded & folded string pairs, inserts each unfolded string
@@ -1926,9 +1930,9 @@ protected:
      * verified to have the correct number of entries.
      */
     void doInsertsAndVerifyExpectations(
-        const std::vector<std::pair<StringData, StringData>>& inserts);
+        const std::vector<std::pair<std::string_view, std::string_view>>& inserts);
 
-    static constexpr StringData kTestFieldName = "field"_sd;
+    static constexpr std::string_view kTestFieldName = "field"sv;
     std::vector<TextSearchSchema> _schemas;
     StackBufBuilder _stackBuf;
     boost::optional<unittest::ServerParameterGuard> _ffctrl;
@@ -1950,7 +1954,7 @@ EncryptedFieldConfig QETextSearchCrudTest::getEFC() {
     }
     EncryptedField ef(UUID::gen(), std::string{kTestFieldName});
     std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig> vqtcs = std::move(qtcs);
-    ef.setBsonType("string"_sd);
+    ef.setBsonType("string"sv);
     ef.setQueries(vqtcs);
     EncryptedFieldConfig efc({std::move(ef)});
     efc.setEscCollection(_escNs.coll());
@@ -2172,7 +2176,7 @@ BSONObj QETextSearchCrudTest::findESCNonAnchor(BSONElement element,
                                    &hmacCtx, getTestESCTwiceDerivedToken(element, qtype), cpos));
 }
 
-void QETextSearchCrudTest::verifyESCEntriesForString(StringData testString,
+void QETextSearchCrudTest::verifyESCEntriesForString(std::string_view testString,
                                                      uint32_t expectedCount,
                                                      boost::optional<QueryTypeEnum> qtype,
                                                      bool padding) {
@@ -2246,7 +2250,7 @@ stdx::unordered_set<std::string> QETextSearchCrudTest::getExpectedPrefixes(
 }
 
 void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
-    const std::vector<std::pair<StringData, StringData>>& inserted) {
+    const std::vector<std::pair<std::string_view, std::string_view>>& inserted) {
     stdx::unordered_map<std::string, int> affixCounts[3];
     stdx::unordered_map<std::string, int> exactCounts;
     stdx::unordered_map<std::string, uint32_t> paddingCounts[3];
@@ -2329,8 +2333,8 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
 }
 
 void QETextSearchCrudTest::doInsertsAndVerifyExpectations(
-    const std::vector<std::pair<StringData, StringData>>& inserts) {
-    std::vector<std::pair<StringData, StringData>> inserted;
+    const std::vector<std::pair<std::string_view, std::string_view>>& inserts) {
+    std::vector<std::pair<std::string_view, std::string_view>> inserted;
     verifyExpectationsAfterInsertions(inserted);
 
     for (size_t i = 0; i < inserts.size(); i++) {

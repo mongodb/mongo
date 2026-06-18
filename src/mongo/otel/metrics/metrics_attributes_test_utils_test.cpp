@@ -31,6 +31,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo::otel::metrics {
 namespace {
@@ -54,11 +55,11 @@ TEST(AttributeNameAndValueEqualsTest, Equals) {
     EXPECT_EQ((AttributeNameAndValue{.name = "foo", .value = intVec1}),
               (AttributeNameAndValue{.name = "foo", .value = intVec2}));
 
-    std::vector<StringData> stringDataVec1{"foo", "bar", "baz"};
+    std::vector<std::string_view> stringDataVec1{"foo", "bar", "baz"};
     // Make these explicit strings to help guarantee that they don't reside in the same spot in
     // memory.
     std::vector<std::string> stringVec{"foo", "bar", "baz"};
-    std::vector<StringData> stringDataVec2{stringVec[0], stringVec[1], stringVec[2]};
+    std::vector<std::string_view> stringDataVec2{stringVec[0], stringVec[1], stringVec[2]};
     EXPECT_EQ((AttributeNameAndValue{.name = "foo", .value = stringDataVec1}),
               (AttributeNameAndValue{.name = "foo", .value = stringDataVec2}));
 }
@@ -82,11 +83,11 @@ TEST(AttributeNameAndValueEqualsTest, NotEquals) {
     EXPECT_NE((AttributeNameAndValue{.name = "foo", .value = intVec1}),
               (AttributeNameAndValue{.name = "foo", .value = intVec2}));
 
-    std::vector<StringData> stringDataVec1{"foo", "bar", "baz"};
+    std::vector<std::string_view> stringDataVec1{"foo", "bar", "baz"};
     // Make these explicit strings to help guarantee that they don't reside in the same spot in
     // memory.
     std::vector<std::string> stringVec{"foo", "baz", "baz"};
-    std::vector<StringData> stringDataVec2{stringVec[0], stringVec[1], stringVec[2]};
+    std::vector<std::string_view> stringDataVec2{stringVec[0], stringVec[1], stringVec[2]};
     EXPECT_NE((AttributeNameAndValue{.name = "foo", .value = stringDataVec1}),
               (AttributeNameAndValue{.name = "foo", .value = stringDataVec2}));
 }

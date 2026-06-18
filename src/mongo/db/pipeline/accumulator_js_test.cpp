@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -50,6 +49,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -87,6 +87,7 @@ void MapReduceFixture::tearDown() {
 }
 
 namespace InternalJsReduce {
+using namespace std::literals::string_view_literals;
 
 template <typename AccName>
 static void assertProcessFailsWithCode(ExpressionContext* const expCtx,
@@ -340,7 +341,7 @@ TEST_F(MapReduceFixture, AccumulatorJs) {
     // Process a string input. Should uassert that the input must be an array when 'merging'
     // argument is false.
     ASSERT_THROWS_CODE(
-        acc.processInternal(Value("xxx_"_sd), false /* merging */), AssertionException, 4544712);
+        acc.processInternal(Value("xxx_"sv), false /* merging */), AssertionException, 4544712);
 
     // Process an array input, which must be const. Should succeed. This will be queued in
     // 'AccumulateorJs::_pendingCalls' until getValue() is called.

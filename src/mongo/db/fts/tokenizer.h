@@ -30,11 +30,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -42,14 +42,15 @@ namespace fts {
 
 struct Token {
     enum Type { WHITESPACE, DELIMITER, TEXT, INVALID };
-    Token(Type type, StringData data, unsigned offset) : type(type), data(data), offset(offset) {}
+    Token(Type type, std::string_view data, unsigned offset)
+        : type(type), data(data), offset(offset) {}
 
     bool ok() const {
         return type != INVALID;
     }
 
     Type type;
-    StringData data;
+    std::string_view data;
     unsigned offset;
 };
 
@@ -58,7 +59,7 @@ class Tokenizer {
     Tokenizer& operator=(const Tokenizer&) = delete;
 
 public:
-    Tokenizer(const FTSLanguage* language, StringData str);
+    Tokenizer(const FTSLanguage* language, std::string_view str);
 
     bool more() const;
     Token next();
@@ -68,7 +69,7 @@ private:
     bool _skipWhitespace();
 
     unsigned _pos;
-    const StringData _raw;
+    const std::string_view _raw;
     bool _english;
 };
 }  // namespace fts

@@ -45,6 +45,8 @@
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -60,7 +62,7 @@ using ChangeStreamOplogMatchLiteParsed =
  */
 class DocumentSourceChangeStreamOplogMatch final : public DocumentSourceInternalChangeStreamMatch {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamOplogMatch"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamOplogMatch"_sd;
 
     DocumentSourceChangeStreamOplogMatch(Timestamp clusterTime,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -86,7 +88,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 

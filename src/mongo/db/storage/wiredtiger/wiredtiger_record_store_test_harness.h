@@ -42,6 +42,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -51,10 +52,10 @@ class WiredTigerHarnessHelper final : public RecordStoreHarnessHelper {
 public:
     WiredTigerHarnessHelper() : WiredTigerHarnessHelper(Options::ReplicationEnabled, ""_sd) {}
     WiredTigerHarnessHelper(Options options) : WiredTigerHarnessHelper(options, ""_sd) {}
-    WiredTigerHarnessHelper(StringData extraStrings)
+    WiredTigerHarnessHelper(std::string_view extraStrings)
         : WiredTigerHarnessHelper(Options::ReplicationEnabled, extraStrings) {}
 
-    WiredTigerHarnessHelper(Options options, StringData extraStrings);
+    WiredTigerHarnessHelper(Options options, std::string_view extraStrings);
     ~WiredTigerHarnessHelper() override {
 #if __has_feature(address_sanitizer)
         constexpr bool memLeakAllowed = false;
@@ -80,7 +81,7 @@ public:
     }
 
     std::unique_ptr<RecordStore> newRecordStore(const NamespaceString& nss,
-                                                StringData ident,
+                                                std::string_view ident,
                                                 const RecordStore::Options& recordStoreOptions,
                                                 boost::optional<UUID> uuid);
 
@@ -106,7 +107,7 @@ public:
     }
 
 private:
-    std::string _identForNs(StringData ns) {
+    std::string _identForNs(std::string_view ns) {
         auto ident = fmt::format("collection-{}", ns);
         std::replace(ident.begin(), ident.end(), '.', '_');
         return ident;

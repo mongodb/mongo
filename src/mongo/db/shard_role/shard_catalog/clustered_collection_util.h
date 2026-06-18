@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
@@ -37,6 +36,8 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -95,7 +96,7 @@ MONGO_MOD_PUBLIC bool isClusteredOnId(const boost::optional<ClusteredCollectionI
 /**
  * Returns the field name of a cluster key.
  */
-MONGO_MOD_PUBLIC StringData getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec);
+MONGO_MOD_PUBLIC std::string_view getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec);
 
 /**
  * Returns the sort pattern and directions for use by the planner

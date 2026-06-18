@@ -30,7 +30,6 @@
 #include "mongo/db/exec/classic/collection_scan.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
@@ -85,7 +84,7 @@ const char* getStageName(const CollectionAcquisition& coll, const CollectionScan
 void handleCollScanDoWorkFailpoint() {
     if (auto fp = hangCollScanDoWork.scoped(); MONGO_unlikely(fp.isActive())) {
         const BSONObj& data = fp.getData();
-        if (auto delay = data.getField("delay"_sd); delay.isNumber()) {
+        if (auto delay = data.getField("delay"); delay.isNumber()) {
             sleepFor(Milliseconds(delay.numberInt()));
         } else {
             hangCollScanDoWork.pauseWhileSet();

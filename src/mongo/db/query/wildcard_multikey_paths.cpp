@@ -30,12 +30,12 @@
 #include <cstddef>
 #include <iterator>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -87,6 +87,7 @@
  * the position of the value "1" in a multikey metadata key.
  */
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Extracts the multikey path from a metadata key stored within a wildcard index.
@@ -119,7 +120,7 @@ static FieldRef extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {
  * Returns IndexBoundsChecker's key pattern for the given Wildcard Index's key pattern.
  */
 static BSONObj buildIndexBoundsKeyPattern(const BSONObj& wiKeyPattern) {
-    static constexpr StringData emptyFieldName = ""_sd;
+    static constexpr std::string_view emptyFieldName = ""sv;
 
     BSONObjBuilder builder{};
 
@@ -380,7 +381,7 @@ std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
  * Return key range to retrieve all multikey metadata keys.
  */
 static std::pair<BSONObj, BSONObj> buildMetadataKeyRange(const BSONObj& keyPattern) {
-    static constexpr StringData emptyFieldName = ""_sd;
+    static constexpr std::string_view emptyFieldName = ""sv;
 
     BSONObjBuilder rangeBeginBuilder{};
     BSONObjBuilder rangeEndBuilder{};

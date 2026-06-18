@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/modules.h"
@@ -41,6 +40,7 @@
 #include <functional>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -237,12 +237,12 @@ public:
          * The returned Iterator may be outside of the range [start, last).
          * If the element is not found 'last' is returned.
          */
-        Iterator search(Iterator first, Iterator last, StringData fieldName);
+        Iterator search(Iterator first, Iterator last, std::string_view fieldName);
 
         /**
          * As above but last = end()
          */
-        Iterator search(Iterator first, StringData fieldName);
+        Iterator search(Iterator first, std::string_view fieldName);
 
         /**
          * Insert a new element before the position 'pos'. Invalidates all previously returned
@@ -309,7 +309,7 @@ public:
      */
     MONGO_MOD_PUBLIC
     UpdateStatus update(const BSONObj& doc,
-                        boost::optional<StringData> metaField,
+                        boost::optional<std::string_view> metaField,
                         const StringDataComparator* stringComparator);
 
 protected:
@@ -328,7 +328,7 @@ protected:
                             const BSONObj& doc,
                             typename Element::UpdateContext updateContext,
                             const StringDataComparator* stringComparator,
-                            std::function<bool(StringData)> skipFieldFn);
+                            std::function<bool(std::string_view)> skipFieldFn);
 
     /**
      * Appends the BSONObj represented by the FlatBSONStore to the builder.
@@ -393,7 +393,7 @@ public:
     /**
      * Field name component
      */
-    StringData fieldName() const;
+    std::string_view fieldName() const;
 
     void setFieldName(std::string&& fieldName);
 

@@ -30,7 +30,6 @@
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/operation_context.h"

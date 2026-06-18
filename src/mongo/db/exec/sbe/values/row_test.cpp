@@ -33,10 +33,12 @@
 #include "mongo/unittest/unittest.h"
 
 #include <iterator>
+#include <string_view>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
-static StringData longStrings[3] = {"long_string_1"_sd, "long_string_2"_sd, "long_string_3"_sd};
+static std::string_view longStrings[3] = {"long_string_1"sv, "long_string_2"sv, "long_string_3"sv};
 static size_t longStringsSize = std::end(longStrings) - std::begin(longStrings);
 
 template <typename RowType, size_t N>
@@ -105,7 +107,7 @@ public:
 
         RowType row(N);
         if (N > 0) {
-            setValue(row, 0, true, value::makeNewString("other_long_string"_sd));
+            setValue(row, 0, true, value::makeNewString("other_long_string"sv));
         }
 
         row = mkRow();

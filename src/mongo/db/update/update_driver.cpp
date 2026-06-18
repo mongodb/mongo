@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/mutable_bson/document.h"
@@ -55,6 +54,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -91,7 +91,7 @@ bool parseUpdateExpression(
     BSONObj updateExpr,
     UpdateObjectNode* root,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters) {
+    const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters) {
     bool positional = false;
     std::set<std::string> foundIdentifiers;
     bool foundVersionField = false;
@@ -136,7 +136,7 @@ UpdateDriver::UpdateDriver(const boost::intrusive_ptr<ExpressionContext>& expCtx
 
 void UpdateDriver::parse(
     const write_ops::UpdateModification& updateMod,
-    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+    const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
     boost::optional<BSONObj> constants,
     const bool multi) {
     invariant(!_updateExecutor, "Multiple calls to parse() on same UpdateDriver");
@@ -270,7 +270,7 @@ Status UpdateDriver::populateDocumentWithQueryFields(const MatchExpression& quer
 }
 
 Status UpdateDriver::update(OperationContext* opCtx,
-                            StringData matchedField,
+                            std::string_view matchedField,
                             mutablebson::Document* doc,
                             bool validateForStorage,
                             const FieldRefSet& immutablePaths,

@@ -36,17 +36,18 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
 struct RemoveAllMetadataFieldsPolicy {
-    static bool shouldRemove(StringData name) {
+    static bool shouldRemove(std::string_view name) {
         return Document::isMetadataFieldName(name);
     }
 };
 
 struct RemoveSortKeyPolicy {
-    static bool shouldRemove(StringData name) {
+    static bool shouldRemove(std::string_view name) {
         return name.starts_with('$') && name == Document::metaFieldSortKey;
     }
 };

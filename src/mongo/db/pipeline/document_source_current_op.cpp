@@ -39,25 +39,28 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
-const StringData kAllUsersFieldName = "allUsers"_sd;
-const StringData kIdleConnectionsFieldName = "idleConnections"_sd;
-const StringData kIdleSessionsFieldName = "idleSessions"_sd;
-const StringData kLocalOpsFieldName = "localOps"_sd;
-const StringData kTruncateOpsFieldName = "truncateOps"_sd;
-const StringData kIdleCursorsFieldName = "idleCursors"_sd;
-const StringData kBacktraceFieldName = "backtrace"_sd;
-const StringData kTargetAllNodesFieldName = "targetAllNodes"_sd;
+const std::string_view kAllUsersFieldName = "allUsers"sv;
+const std::string_view kIdleConnectionsFieldName = "idleConnections"sv;
+const std::string_view kIdleSessionsFieldName = "idleSessions"sv;
+const std::string_view kLocalOpsFieldName = "localOps"sv;
+const std::string_view kTruncateOpsFieldName = "truncateOps"sv;
+const std::string_view kIdleCursorsFieldName = "idleCursors"sv;
+const std::string_view kBacktraceFieldName = "backtrace"sv;
+const std::string_view kTargetAllNodesFieldName = "targetAllNodes"sv;
 
-const StringData kOpIdFieldName = "opid"_sd;
-const StringData kClientFieldName = "client"_sd;
-const StringData kMongosClientFieldName = "client_s"_sd;
-const StringData kShardFieldName = "shard"_sd;
+const std::string_view kOpIdFieldName = "opid"sv;
+const std::string_view kClientFieldName = "client"sv;
+const std::string_view kMongosClientFieldName = "client_s"sv;
+const std::string_view kShardFieldName = "shard"sv;
 }  // namespace
 
 using boost::intrusive_ptr;
@@ -72,7 +75,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(currentOp,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(currentOp, DocumentSourceCurrentOp::id)
 
-constexpr StringData DocumentSourceCurrentOp::kStageName;
+constexpr std::string_view DocumentSourceCurrentOp::kStageName;
 
 std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
@@ -93,7 +96,7 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
     // the presence of a 'localOps' field, which instructs this $currentOp to list local mongoS
     // operations rather than forwarding the request to the shards.
     for (auto&& elem : spec.embeddedObject()) {
-        if (elem.fieldNameStringData() == "allUsers"_sd) {
+        if (elem.fieldNameStringData() == "allUsers"sv) {
             if (elem.type() != BSONType::boolean) {
                 uasserted(ErrorCodes::TypeMismatch,
                           str::stream() << "The 'allUsers' parameter of the $currentOp stage "
@@ -121,7 +124,7 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
         spec, nss.tenantId(), allUsers, localOps);
 }
 
-StringData DocumentSourceCurrentOp::getSourceName() const {
+std::string_view DocumentSourceCurrentOp::getSourceName() const {
     return kStageName;
 }
 

@@ -33,6 +33,8 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 
+#include <string_view>
+
 namespace mongo::query_shape {
 namespace {
 
@@ -65,7 +67,7 @@ BSONObj sortShape(
         : BSONObj();
 }
 
-void maybeAddWithName(const OptionalBool& optBool, BSONObjBuilder& bob, StringData name) {
+void maybeAddWithName(const OptionalBool& optBool, BSONObjBuilder& bob, std::string_view name) {
     if (optBool.has_value()) {
         bob.append(name, bool(optBool));
     }

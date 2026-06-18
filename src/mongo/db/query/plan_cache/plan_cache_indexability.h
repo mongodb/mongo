@@ -30,12 +30,12 @@
 #pragma once
 
 #include "mongo/base/error_extra_info.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -108,7 +108,7 @@ public:
      * The object returned by reference is valid until the next call to updateDiscriminators() or
      * until destruction of 'this', whichever is first.
      */
-    const IndexToDiscriminatorMap& getPathDiscriminators(StringData path) const;
+    const IndexToDiscriminatorMap& getPathDiscriminators(std::string_view path) const;
 
     /**
      * Returns a map of index name to discriminator set. These discriminators are not
@@ -122,7 +122,7 @@ public:
      * Construct an IndexToDiscriminator map for the given path, only for the wildcard indexes
      * which have been included in the indexability state.
      */
-    IndexToDiscriminatorMap buildWildcardDiscriminators(StringData path) const;
+    IndexToDiscriminatorMap buildWildcardDiscriminators(std::string_view path) const;
 
     /**
      * Clears discriminators for all paths, and regenerates them from 'indexCores'.

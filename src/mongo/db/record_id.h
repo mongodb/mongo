@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -55,6 +54,7 @@
 #include <ostream>
 #include <span>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -243,7 +243,7 @@ public:
      * Returns the raw value to be used as a key in a RecordStore. Requires that this RecordId was
      * constructed with a binary string value, and invariants otherwise.
      */
-    StringData getStr() const {
+    std::string_view getStr() const {
         dassert(isStr(),
                 fmt::format("expected RecordID string format, got: {}", _formatToString(_format)));
         if (_format == Format::kSmallStr) {
@@ -332,10 +332,11 @@ public:
 
     size_t hash() const {
         size_t hash = 0;
-        withFormat(
-            [](Null n) {},
-            [&](int64_t rid) { boost::hash_combine(hash, rid); },
-            [&](const char* str, int size) { boost::hash_combine(hash, StringData(str, size)); });
+        withFormat([](Null n) {},
+                   [&](int64_t rid) { boost::hash_combine(hash, rid); },
+                   [&](const char* str, int size) {
+                       boost::hash_combine(hash, std::string_view(str, size));
+                   });
         return hash;
     }
 
@@ -362,12 +363,12 @@ public:
             case Format::kLong:
                 return std::to_string(_getLongNoCheck());
             case Format::kSmallStr: {
-                StringData str = _getSmallStrNoCheck();
+                std::string_view str = _getSmallStrNoCheck();
                 return "kSmallStr size: " + std::to_string(str.size()) + " string: '" +
                     std::string(str.data(), str.size()) + "'";
             }
             case Format::kBigStr: {
-                StringData str = _getBigStrNoCheck();
+                std::string_view str = _getBigStrNoCheck();
                 return "kBigStr size: " + std::to_string(str.size()) + " string: '" +
                     std::string(str.data(), str.size()) + "'";
             }
@@ -401,7 +402,7 @@ public:
      * deserialized with deserializeToken().
      * Note: This is not to be used as a key to a RecordStore.
      */
-    void serializeToken(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToken(std::string_view fieldName, BSONObjBuilder* builder) const {
         // Preserve the underlying format by using a different BSON type for each format.
         withFormat([&](Null n) { builder->appendNull(fieldName); },
                    [&](int64_t rid) { builder->append(fieldName, rid); },
@@ -529,13 +530,14 @@ private:
         return LongId::getIdFrom(_data);
     }
 
-    StringData _getSmallStrNoCheck() const {
-        return StringData(InlineStr::getArrayFrom(_data).data(), InlineStr::getSizeFrom(_data));
+    std::string_view _getSmallStrNoCheck() const {
+        return std::string_view(InlineStr::getArrayFrom(_data).data(),
+                                InlineStr::getSizeFrom(_data));
     }
 
-    StringData _getBigStrNoCheck() const {
+    std::string_view _getBigStrNoCheck() const {
         const auto& buffer = HeapStr::getBufferFrom(_data);
-        return StringData(buffer.get(), buffer.capacity());
+        return std::string_view(buffer.get(), buffer.capacity());
     }
 
     static constexpr auto kTargetSizeInBytes = 32;

@@ -52,6 +52,7 @@
 #include <cstdlib>
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/optional.hpp>
@@ -356,22 +357,22 @@ T readType(BufReader* reader, bool inverted) {
     return t;
 }
 
-StringData readCString(BufReader* reader) {
+std::string_view readCString(BufReader* reader) {
     const char* start = static_cast<const char*>(reader->pos());
     const char* end = static_cast<const char*>(memchr(start, 0x0, reader->remaining()));
     keyStringAssert(50816, "Failed to find null terminator in string.", end);
     size_t actualBytes = end - start;
     reader->skip(1 + actualBytes);
-    return StringData(start, actualBytes);
+    return std::string_view(start, actualBytes);
 }
 
 /**
  * scratch must be empty when passed in. It will be used if there is a NUL byte in the
- * output string. In that case the returned StringData will point into scratch, otherwise
+ * output string. In that case the returned std::string_view will point into scratch, otherwise
  * it will point directly into the input buffer.
  */
-StringData readCStringWithNuls(BufReader* reader, std::string* scratch) {
-    const StringData initial = readCString(reader);
+std::string_view readCStringWithNuls(BufReader* reader, std::string* scratch) {
+    const std::string_view initial = readCString(reader);
     if (!reader->remaining() || reader->peek<unsigned char>() != 0xFF)
         return initial;  // Don't alloc or copy for simple case with no NUL bytes.
 
@@ -381,7 +382,7 @@ StringData readCStringWithNuls(BufReader* reader, std::string* scratch) {
         *scratch += '\0';
         reader->skip(1);
 
-        const StringData nextPart = readCString(reader);
+        const std::string_view nextPart = readCString(reader);
         scratch->append(nextPart.data(), nextPart.size());
     }
 
@@ -485,21 +486,21 @@ void BuilderBase<BufferT>::appendBool(bool val) {
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::appendString(StringData val, const StringTransformFn& f) {
+void BuilderBase<BufferT>::appendString(std::string_view val, const StringTransformFn& f) {
     _verifyAppendingState();
     _appendString(val, _shouldInvertOnAppend(), f);
     _elemCount++;
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::appendSymbol(StringData val) {
+void BuilderBase<BufferT>::appendSymbol(std::string_view val) {
     _verifyAppendingState();
     _appendSymbol(val, _shouldInvertOnAppend());
     _elemCount++;
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::appendCode(StringData val) {
+void BuilderBase<BufferT>::appendCode(std::string_view val) {
     _verifyAppendingState();
     _appendCode(val, _shouldInvertOnAppend());
     _elemCount++;
@@ -804,7 +805,9 @@ void BuilderBase<BufferT>::_appendOID(OID val, bool invert) {
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::_appendString(StringData val, bool invert, const StringTransformFn& f) {
+void BuilderBase<BufferT>::_appendString(std::string_view val,
+                                         bool invert,
+                                         const StringTransformFn& f) {
     _typeBits.appendString();
     _append(CType::kStringLike, invert);
     if (f) {
@@ -815,14 +818,14 @@ void BuilderBase<BufferT>::_appendString(StringData val, bool invert, const Stri
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::_appendSymbol(StringData val, bool invert) {
+void BuilderBase<BufferT>::_appendSymbol(std::string_view val, bool invert) {
     _typeBits.appendSymbol();
     _append(CType::kStringLike, invert);  // Symbols and Strings compare equally
     _appendStringLike(val, invert);
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::_appendCode(StringData val, bool invert) {
+void BuilderBase<BufferT>::_appendCode(std::string_view val, bool invert) {
     _append(CType::kCode, invert);
     _appendStringLike(val, invert);
 }
@@ -1156,7 +1159,7 @@ void BuilderBase<BufferT>::_appendNumberDecimal(const Decimal128 dec, bool inver
 template <class BufferT>
 void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
                                             bool invert,
-                                            const StringData* name,
+                                            const std::string_view* name,
                                             const StringTransformFn& f) {
     if (name) {
         _appendBytes(name->data(), name->size() + 1, invert);  // + 1 for NUL
@@ -1220,10 +1223,10 @@ void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
             _appendCode(elem.valueStringData(), invert);
             break;
         case BSONType::codeWScope: {
-            _appendCodeWString(
-                BSONCodeWScope(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1),
-                               BSONObj(elem.codeWScopeScopeData())),
-                invert);
+            _appendCodeWString(BSONCodeWScope(std::string_view(elem.codeWScopeCode(),
+                                                               elem.codeWScopeCodeLen() - 1),
+                                              BSONObj(elem.codeWScopeScopeData())),
+                               invert);
             break;
         }
         case BSONType::numberInt:
@@ -1245,9 +1248,9 @@ void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
 /// -- lowest level
 
 template <class BufferT>
-void BuilderBase<BufferT>::_appendStringLike(StringData str, bool invert) {
+void BuilderBase<BufferT>::_appendStringLike(std::string_view str, bool invert) {
     while (true) {
-        StringData pre = str.substr(0, str.find('\0'));
+        std::string_view pre = str.substr(0, str.find('\0'));
         _appendBytes(pre.data(), pre.size(), invert);
         if (pre.size() == str.size())
             break;
@@ -1264,7 +1267,7 @@ void BuilderBase<BufferT>::_appendBson(const BSONObj& obj,
     for (auto&& elem : obj) {
         // Force the order to be based on (ctype, name, value).
         _append(bsonTypeToGenericKeyStringType(elem.type()), invert);
-        StringData name = elem.fieldNameStringData();
+        std::string_view name = elem.fieldNameStringData();
         _appendBsonValue(elem, invert, &name, f);
     }
     _append(int8_t(0), invert);
@@ -1503,7 +1506,7 @@ void toBson(BufReader* reader,
                         *builder << name,
                         depth);
         } else {
-            StringData name = readCString(reader);
+            std::string_view name = readCString(reader);
             toBsonValue(readType<uint8_t>(reader, inverted),
                         reader,
                         typeBits,
@@ -1634,7 +1637,7 @@ void toBsonValue(uint8_t ctype,
 
         case CType::kCodeWithScope: {
             std::string scratch;
-            StringData code;  // will point to either scratch or the raw encoded bytes.
+            std::string_view code;  // will point to either scratch or the raw encoded bytes.
             if (inverted) {
                 scratch = readInvertedCStringWithNuls(reader);
                 code = scratch;
@@ -1685,8 +1688,8 @@ void toBsonValue(uint8_t ctype,
                 std::string flags = readInvertedCString(reader);
                 stream << BSONRegEx(pattern, flags);
             } else {
-                StringData pattern = readCString(reader);
-                StringData flags = readCString(reader);
+                std::string_view pattern = readCString(reader);
+                std::string_view flags = readCString(reader);
                 stream << BSONRegEx(pattern, flags);
             }
             break;
@@ -1700,11 +1703,11 @@ void toBsonValue(uint8_t ctype,
                 char oidBytes[OID::kOIDSize];
                 memcpy_flipBits(oidBytes, reader->skip(OID::kOIDSize), OID::kOIDSize);
                 OID oid = OID::from(oidBytes);
-                stream << BSONDBRef(StringData(ns.get(), size), oid);
+                stream << BSONDBRef(std::string_view(ns.get(), size), oid);
             } else {
                 const char* ns = static_cast<const char*>(reader->skip(size));
                 OID oid = OID::from(reader->skip(OID::kOIDSize));
-                stream << BSONDBRef(StringData(ns, size), oid);
+                stream << BSONDBRef(std::string_view(ns, size), oid);
             }
             break;
         }
@@ -1725,7 +1728,7 @@ void toBsonValue(uint8_t ctype,
                             typeBits,
                             inverted,
                             version,
-                            subArr << StringData{index},
+                            subArr << std::string_view{index},
                             depth + 1);
                 ++index;
             }
@@ -3013,8 +3016,11 @@ bool readValue(BufReader* reader,
     return false;
 }
 
-void appendSingleFieldToBSONAs(
-    const char* buf, int len, StringData fieldName, BSONObjBuilder* builder, Version version) {
+void appendSingleFieldToBSONAs(const char* buf,
+                               int len,
+                               std::string_view fieldName,
+                               BSONObjBuilder* builder,
+                               Version version) {
     const bool inverted = false;
 
     BufReader reader(buf, len);

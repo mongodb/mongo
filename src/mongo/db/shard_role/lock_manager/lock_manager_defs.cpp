@@ -41,6 +41,8 @@
 // is not a C++ one since otherwise it will fail to find it and cause linking issues.
 namespace {
 extern "C" {
+#include <string_view>
+
 #include <siphash.h>
 }
 }  // namespace
@@ -108,7 +110,7 @@ MONGO_INITIALIZER(HashingSaltInitialization)(InitializerContext*) {
 
 }  // namespace
 
-uint64_t hashStringDataForResourceId(StringData str, const std::array<std::byte, 16>& salt) {
+uint64_t hashStringDataForResourceId(std::string_view str, const std::array<std::byte, 16>& salt) {
     // We salt the hash with a given random value to generate randomness in ResourceId selection on
     // every restart. This aids in testing for detecting lock ordering issues.
     uint8_t result[8];

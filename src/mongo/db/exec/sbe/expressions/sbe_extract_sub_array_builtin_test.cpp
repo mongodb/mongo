@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -38,12 +37,14 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 class SBEBuiltinExtractSubArrayTest : public EExpressionTestFixture {
 protected:
@@ -248,9 +249,9 @@ TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
         const auto [objTag, objVal] = value::makeNewObject();
         auto obj = value::getObjectView(objVal);
 
-        const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"_sd);
+        const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"sv);
         ASSERT_EQ(value::TypeTags::StringBig, fieldTag);
-        obj->push_back_raw("field"_sd, fieldTag, fieldVal);
+        obj->push_back_raw("field"sv, fieldTag, fieldVal);
         const auto [arrTag, arrVal] = value::makeNewArray();
         auto arr = value::getArrayView(arrVal);
         arr->push_back_raw(objTag, objVal);
@@ -265,14 +266,14 @@ TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
                                                makeEs(makeC(arrTag, arrVal),
                                                       makeC(value::TypeTags::NumberInt32, 1))),
                               makeC(value::TypeTags::NumberInt32, 0))),
-                   makeC(value::makeNewString("field"_sd))));
+                   makeC(value::makeNewString("field"sv))));
 
         auto compiledExpr = compileExpression(*extractFromSubArrayExpr);
 
         auto [tag, value] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(tag, value);
         ASSERT_TRUE(value::isString(tag));
-        ASSERT_EQ("not so small string"_sd, value::getStringView(tag, value));
+        ASSERT_EQ("not so small string"sv, value::getStringView(tag, value));
     }
 }
 }  // namespace mongo::sbe

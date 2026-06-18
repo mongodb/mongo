@@ -50,6 +50,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -95,7 +96,7 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    StringData getNameForLogging() const override {
+    std::string_view getNameForLogging() const override {
         return "mock"_sd;
     }
 

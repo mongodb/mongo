@@ -42,12 +42,13 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const NamespaceString kTestNss =
-    NamespaceString::createNamespaceString_forTest("test.liteParsedPipeline"_sd);
-const NamespaceString kViewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
+    NamespaceString::createNamespaceString_forTest("test.liteParsedPipeline"sv);
+const NamespaceString kViewNss = NamespaceString::createNamespaceString_forTest("test.view"sv);
 const NamespaceString kResolvedNss =
-    NamespaceString::createNamespaceString_forTest("test.collection"_sd);
+    NamespaceString::createNamespaceString_forTest("test.collection"sv);
 
 /**
  * Helper function to create a view ResolvedNamespace with a simple pipeline.

@@ -61,12 +61,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 /**
  * This function replaces field names in *replace* with those from the object
  * *fieldNames*, preserving field ordering.  Both objects must have the same
@@ -150,12 +152,12 @@ void statsToBSONHelper(const sbe::PlanStageStats* stats,
     }
 
     // For some stages we may want to output its children under different field names.
-    auto overridenNames = [stageType]() -> std::vector<StringData> {
-        if (stageType == "branch"_sd) {
-            return {"thenStage"_sd, "elseStage"_sd};
-        } else if (stageType == "nlj"_sd || stageType == "traverse"_sd || stageType == "mj"_sd ||
-                   stageType == "hj"_sd) {
-            return {"outerStage"_sd, "innerStage"_sd};
+    auto overridenNames = [stageType]() -> std::vector<std::string_view> {
+        if (stageType == "branch"sv) {
+            return {"thenStage"sv, "elseStage"sv};
+        } else if (stageType == "nlj"sv || stageType == "traverse"sv || stageType == "mj"sv ||
+                   stageType == "hj"sv) {
+            return {"outerStage"sv, "innerStage"sv};
         }
         return {};
     }();
@@ -171,7 +173,7 @@ void statsToBSONHelper(const sbe::PlanStageStats* stats,
 
     // There is more than one child. Recursively call statsToBSON(...) on each
     // of them and add them to the 'inputStages' array.
-    BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"_sd));
+    BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"sv));
     for (auto&& child : stats->children) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
         statsToBSONHelper(child.get(), &childBob, topLevelBob, currentDepth + 2);

@@ -53,6 +53,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -117,7 +118,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "SUBPLAN"_sd;
+    static constexpr std::string_view kStageType = "SUBPLAN"_sd;
 
     /**
      * Selects a plan using subplanning. First uses the query planning results from

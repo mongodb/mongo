@@ -38,6 +38,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -47,6 +48,7 @@ using boost::intrusive_ptr;
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamCheckResumability,
                                               ChangeStreamCheckResumabilityLiteParsed::parse);
@@ -83,7 +85,7 @@ DocumentSourceChangeStreamCheckResumability::createFromBson(
                                                            parsed.getResumeToken().getData());
 }
 
-StringData DocumentSourceChangeStreamCheckResumability::getSourceName() const {
+std::string_view DocumentSourceChangeStreamCheckResumability::getSourceName() const {
     return kStageName;
 }
 
@@ -92,8 +94,8 @@ Value DocumentSourceChangeStreamCheckResumability::doSerialize(
     BSONObjBuilder builder;
     if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
-        sub.append("stage"_sd, kStageName);
-        sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));
+        sub.append("stage"sv, kStageName);
+        sub << "resumeToken"sv << Value(ResumeToken(_tokenFromClient).toDocument(opts));
         sub.done();
     } else {
         builder.append(

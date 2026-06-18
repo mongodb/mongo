@@ -31,26 +31,28 @@
 
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 namespace mongo {
 namespace repl {
 std::tuple<std::string, std::vector<HostAndPort>> parseReplSetSeedList(
-    ReplicationCoordinatorExternalState* externalState, const StringData replSetString) {
+    ReplicationCoordinatorExternalState* externalState, const std::string_view replSetString) {
     uassert(10283305, "bad --replSet command line config string (empty)", !replSetString.empty());
 
     std::string setName;
     std::vector<HostAndPort> seeds;
 
     const auto slash = replSetString.find('/');
-    if (slash == StringData::npos) {
+    if (slash == std::string_view::npos) {
         // replSet name with no seed hosts is valid.
         return {std::string{replSetString}, seeds};
     } else {
         setName = std::string{replSetString}.substr(0, slash);
     }
 
-    const auto parseSeed = [&seeds, &externalState](const StringData seedRaw) {
+    const auto parseSeed = [&seeds, &externalState](const std::string_view seedRaw) {
         if (seedRaw.empty()) {
             return;
         }
@@ -76,7 +78,7 @@ std::tuple<std::string, std::vector<HostAndPort>> parseReplSetSeedList(
     auto seedsRaw = replSetString.substr(slash + 1);
     while (!seedsRaw.empty()) {
         const auto nextSeparator = seedsRaw.find(',');
-        if (nextSeparator == StringData::npos) {
+        if (nextSeparator == std::string_view::npos) {
             break;
         }
         parseSeed(seedsRaw.substr(0, nextSeparator));

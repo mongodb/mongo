@@ -30,7 +30,6 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -83,6 +82,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -99,6 +99,7 @@ using namespace mongo::idl::test;
 using namespace mongo::idl::import;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -183,7 +184,7 @@ void assertOpMsgEqualsExact(const OpMsgRequest& left, const OpMsgRequest& right)
 }
 
 
-BSONObj appendDB(const BSONObj& obj, StringData dbName) {
+BSONObj appendDB(const BSONObj& obj, std::string_view dbName) {
     BSONObjBuilder builder;
     builder.appendElements(obj);
     builder.append("$db", dbName);
@@ -263,7 +264,7 @@ void TestLoopback(TestT test_value) {
 /// Type tests:
 // Positive: Test we can serialize the type out and back again
 TEST(IDLOneTypeTests, TestLoopbackTest) {
-    TestLoopback<One_string, StringData, BSONType::string>("test_value");
+    TestLoopback<One_string, std::string_view, BSONType::string>("test_value");
     TestLoopback<One_int, std::int32_t, BSONType::numberInt>(123);
     TestLoopback<One_long, std::int64_t, BSONType::numberLong>(456);
     TestLoopback<One_double, double, BSONType::numberDouble>(3.14159);
@@ -326,7 +327,7 @@ void TestParse(TestT test_value) {
 // Test each of types either fail or succeeded based on the parser's bson type
 template <typename ParserT, BSONType Parser_bson_type>
 void TestParsers() {
-    TestParse<ParserT, Parser_bson_type, StringData, BSONType::string>("test_value");
+    TestParse<ParserT, Parser_bson_type, std::string_view, BSONType::string>("test_value");
     TestParse<ParserT, Parser_bson_type, std::int32_t, BSONType::numberInt>(123);
     TestParse<ParserT, Parser_bson_type, std::int64_t, BSONType::numberLong>(456);
     TestParse<ParserT, Parser_bson_type, double, BSONType::numberDouble>(3.14159);
@@ -377,7 +378,7 @@ TEST(IDLOneTypeTests, TestNegativeRequiredUndefinedTypes) {
 
 // Mixed: test a type that accepts multiple bson types
 TEST(IDLOneTypeTests, TestSafeInt64) {
-    TestParse<One_safeint64, BSONType::numberInt, StringData, BSONType::string>("test_value");
+    TestParse<One_safeint64, BSONType::numberInt, std::string_view, BSONType::string>("test_value");
     TestParse<One_safeint64, BSONType::numberInt, std::int32_t, BSONType::numberInt>(123);
     TestParse<One_safeint64, BSONType::numberLong, std::int64_t, BSONType::numberLong>(456);
     TestParse<One_safeint64, BSONType::numberDouble, double, BSONType::numberDouble>(3.14159);
@@ -421,7 +422,7 @@ TEST(IDLOneTypeTests, TestNamespaceString) {
 
     // Negative: invalid namespace
     {
-        auto testBadDoc = BSON("value" << StringData("foo\0bar", 7));
+        auto testBadDoc = BSON("value" << std::string_view("foo\0bar", 7));
 
         ASSERT_THROWS(One_namespacestring::parse(testBadDoc), AssertionException);
     }
@@ -433,8 +434,8 @@ TEST(IDLOneTypeTests, TestBase64StringPositive) {
                             << "url"
                             << "1234-_0");
     auto parsed = Two_base64string::parse(doc);
-    ASSERT_EQ(parsed.getBasic(), "\x00\x10\x83\xFB\xFD"_sd);
-    ASSERT_EQ(parsed.getUrl(), "\xD7m\xF8\xFB\xFD"_sd);
+    ASSERT_EQ(parsed.getBasic(), "\x00\x10\x83\xFB\xFD"sv);
+    ASSERT_EQ(parsed.getUrl(), "\xD7m\xF8\xFB\xFD"sv);
 
     BSONObjBuilder builder;
     parsed.serialize(&builder);
@@ -484,7 +485,7 @@ TEST(IDLParserContext, SpecifiedRoot) {
         expected);
 }
 
-constexpr auto kNANRepr = "nan"_sd;
+constexpr auto kNANRepr = "nan"sv;
 
 TEST(IDLStructTests, DurationParse) {
     auto justAMinuteDoc = BSON("secs" << 60);
@@ -530,7 +531,7 @@ TEST(IDLStructTests, DurationSerialize) {
     allDay.serialize(&builder);
     auto obj = builder.obj();
 
-    auto intervalElem = obj["secs"_sd];
+    auto intervalElem = obj["secs"sv];
     ASSERT_EQ(intervalElem.numberLong(), 86400);
 }
 
@@ -1417,7 +1418,7 @@ TEST(IDLFieldTests, TestOptionalFields) {
     {
         auto testDoc = BSON("field1" << "Foo");
         auto testStruct = Optional_field::parse(testDoc);
-        assert_same_types<decltype(testStruct.getField1()), boost::optional<StringData>>();
+        assert_same_types<decltype(testStruct.getField1()), boost::optional<std::string_view>>();
         assert_same_types<decltype(testStruct.getField2()), boost::optional<int>>();
         assert_same_types<decltype(testStruct.getField3()), const boost::optional<BSONObj>&>();
         assert_same_types<decltype(testStruct.getField4()), boost::optional<ConstDataRange>>();
@@ -1432,7 +1433,7 @@ TEST(IDLFieldTests, TestOptionalFields) {
     {
         BSONObjBuilder builder;
         Optional_field testStruct;
-        auto field1 = boost::optional<StringData>("Foo");
+        auto field1 = boost::optional<std::string_view>("Foo");
         testStruct.setField1(field1);
         testStruct.serialize(&builder);
         auto loopbackDoc = builder.obj();
@@ -1468,7 +1469,7 @@ TEST(IDLFieldTests, TestAlwaysSerializeFields) {
                                  << "field3" << BSON("a" << 1234));
     auto testStruct = Always_serialize_field::parse(testDoc);
 
-    assert_same_types<decltype(testStruct.getField1()), boost::optional<mongo::StringData>>();
+    assert_same_types<decltype(testStruct.getField1()), boost::optional<std::string_view>>();
     assert_same_types<decltype(testStruct.getField2()), boost::optional<std::int32_t>>();
     assert_same_types<decltype(testStruct.getField3()), const boost::optional<mongo::BSONObj>&>();
     assert_same_types<decltype(testStruct.getField4()), const boost::optional<mongo::BSONObj>&>();
@@ -1518,8 +1519,8 @@ struct ImplicitlyConvertsToString {
     operator std::string() const {
         return "ImplicitlyConvertsToString";
     }
-    operator StringData() const {
-        ASSERT(false) << "Conversion to StringData should not be used.";
+    operator std::string_view() const {
+        ASSERT(false) << "Conversion to std::string_view should not be used.";
         MONGO_UNREACHABLE;
     }
 };
@@ -1528,8 +1529,8 @@ struct ImplicitlyConvertsToOptionalString {
     operator boost::optional<std::string>() const {
         return boost::optional<std::string>{"ImplicitlyConvertsToOptionalString"};
     }
-    operator boost::optional<StringData>() const {
-        ASSERT(false) << "Conversion to optional<StringData> should not be used.";
+    operator boost::optional<std::string_view>() const {
+        ASSERT(false) << "Conversion to optional<std::string_view> should not be used.";
         MONGO_UNREACHABLE;
     }
 };
@@ -1538,8 +1539,8 @@ struct ImplicitlyConvertsToVectorString {
     operator std::vector<std::string>() const {
         return {"ImplicitlyConvertsToVectorString"};
     }
-    operator std::vector<StringData>() const {
-        ASSERT(false) << "Conversion to vector<StringData> should not be used.";
+    operator std::vector<std::string_view>() const {
+        ASSERT(false) << "Conversion to vector<std::string_view> should not be used.";
         MONGO_UNREACHABLE;
     }
 };
@@ -1549,8 +1550,8 @@ struct ImplicitlyConvertsToOptionalVectorString {
         return boost::optional<std::vector<std::string>>(
             {"ImplicitlyConvertsToOptionalVectorString"});
     }
-    operator boost::optional<std::vector<StringData>>() const {
-        ASSERT(false) << "Conversion to optional<vector<StringData>> should not be used.";
+    operator boost::optional<std::vector<std::string_view>>() const {
+        ASSERT(false) << "Conversion to optional<vector<std::string_view>> should not be used.";
         MONGO_UNREACHABLE;
     }
 };
@@ -1586,9 +1587,9 @@ void testSetterOverloadsForStringField() {
     }
 
     {
-        // Set from StringData.
+        // Set from std::string_view.
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        testStruct.setFieldString("baz"_sd);
+        testStruct.setFieldString("baz"sv);
         ASSERT_EQ(testStruct.getFieldString(), "baz");
     }
 
@@ -1627,7 +1628,7 @@ void testSetterOverloadsForStringFieldWithValidator() {
         // Set from various types with validation failure.
         auto testStruct = makeSetterOverloadTestStruct<T>();
         ASSERT_THROWS(testStruct.setFieldStringWithValidator("one"), AssertionException);
-        ASSERT_THROWS(testStruct.setFieldStringWithValidator("one"_sd), AssertionException);
+        ASSERT_THROWS(testStruct.setFieldStringWithValidator("one"sv), AssertionException);
         ASSERT_THROWS(testStruct.setFieldStringWithValidator(std::string{"one"}),
                       AssertionException);
         ASSERT_THROWS(testStruct.setFieldStringWithValidator(ImplicitlyConvertsToString{}),
@@ -1642,9 +1643,9 @@ void testSetterOverloadsForStringFieldWithValidator() {
     }
 
     {
-        // Set from StringData.
+        // Set from std::string_view.
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        testStruct.setFieldStringWithValidator("xtwo"_sd);
+        testStruct.setFieldStringWithValidator("xtwo"sv);
         ASSERT_EQ(testStruct.getFieldStringWithValidator(), "xtwo");
     }
 
@@ -1689,9 +1690,9 @@ void testSetterOverloadsForOptionalStringField() {
     }
 
     {
-        // Set from StringData.
+        // Set from std::string_view.
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        testStruct.setFieldOptionalString("two"_sd);
+        testStruct.setFieldOptionalString("two"sv);
         ASSERT_EQ(*testStruct.getFieldOptionalString(), "two");
     }
 
@@ -1727,7 +1728,7 @@ void testSetterOverloadsForOptionalStringFieldWithValidator() {
         auto testStruct = makeSetterOverloadTestStruct<T>();
         ASSERT_THROWS(testStruct.setFieldOptionalStringWithValidator(std::string{"one"}),
                       AssertionException);
-        ASSERT_THROWS(testStruct.setFieldOptionalStringWithValidator("one"_sd), AssertionException);
+        ASSERT_THROWS(testStruct.setFieldOptionalStringWithValidator("one"sv), AssertionException);
         ASSERT_THROWS(
             testStruct.setFieldOptionalStringWithValidator(ImplicitlyConvertsToOptionalString{}),
             AssertionException);
@@ -1741,9 +1742,9 @@ void testSetterOverloadsForOptionalStringFieldWithValidator() {
     }
 
     {
-        // Set from StringData.
+        // Set from std::string_view.
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        testStruct.setFieldOptionalStringWithValidator("xtwo"_sd);
+        testStruct.setFieldOptionalStringWithValidator("xtwo"sv);
         ASSERT_EQ(*testStruct.getFieldOptionalStringWithValidator(), "xtwo");
     }
 
@@ -1768,7 +1769,7 @@ template <typename T>
 void testSetterOverloadsForArrayOfStringField() {
     {
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        ASSERT_EQ(testStruct.getFieldArrayString(), (std::vector{"foo"_sd, "bar"_sd}));
+        ASSERT_EQ(testStruct.getFieldArrayString(), (std::vector{"foo"sv, "bar"sv}));
     }
 
     {
@@ -1776,21 +1777,21 @@ void testSetterOverloadsForArrayOfStringField() {
         auto testStruct = makeSetterOverloadTestStruct<T>();
         testStruct.setFieldArrayString(ImplicitlyConvertsToVectorString{});
         ASSERT_EQ(testStruct.getFieldArrayString(),
-                  std::vector{"ImplicitlyConvertsToVectorString"_sd});
+                  std::vector{"ImplicitlyConvertsToVectorString"sv});
     }
 
     {
         // Set from vector<string>.
         auto testStruct = makeSetterOverloadTestStruct<T>();
         testStruct.setFieldArrayString(std::vector<std::string>{"one"});
-        ASSERT_EQ(testStruct.getFieldArrayString(), std::vector{"one"_sd});
+        ASSERT_EQ(testStruct.getFieldArrayString(), std::vector{"one"sv});
     }
 
     {
-        // Set from vector<StringData>.
+        // Set from vector<std::string_view>.
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        testStruct.setFieldArrayString(std::vector{"two"_sd});
-        ASSERT_EQ(testStruct.getFieldArrayString(), std::vector{"two"_sd});
+        testStruct.setFieldArrayString(std::vector{"two"sv});
+        ASSERT_EQ(testStruct.getFieldArrayString(), std::vector{"two"sv});
     }
 }
 
@@ -1807,7 +1808,7 @@ void testSetterOverloadsForArrayOfStringFieldWithValidator() {
     // The validator requires the elements to be all caps.
     {
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        ASSERT_EQ(testStruct.getFieldArrayStringWithValidator(), (std::vector{"FOO"_sd, "BAR"_sd}));
+        ASSERT_EQ(testStruct.getFieldArrayStringWithValidator(), (std::vector{"FOO"sv, "BAR"sv}));
     }
 
     {
@@ -1818,7 +1819,7 @@ void testSetterOverloadsForArrayOfStringFieldWithValidator() {
             AssertionException);
         ASSERT_THROWS(testStruct.setFieldArrayStringWithValidator(std::vector<std::string>{"one"}),
                       AssertionException);
-        ASSERT_THROWS(testStruct.setFieldArrayStringWithValidator(std::vector{"one"_sd}),
+        ASSERT_THROWS(testStruct.setFieldArrayStringWithValidator(std::vector{"one"sv}),
                       AssertionException);
     }
 
@@ -1826,14 +1827,14 @@ void testSetterOverloadsForArrayOfStringFieldWithValidator() {
         // Set from vector<string>.
         auto testStruct = makeSetterOverloadTestStruct<T>();
         testStruct.setFieldArrayStringWithValidator(std::vector<std::string>{"ONE"});
-        ASSERT_EQ(testStruct.getFieldArrayStringWithValidator(), std::vector{"ONE"_sd});
+        ASSERT_EQ(testStruct.getFieldArrayStringWithValidator(), std::vector{"ONE"sv});
     }
 
     {
-        // Set from vector<StringData>.
+        // Set from vector<std::string_view>.
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        testStruct.setFieldArrayStringWithValidator(std::vector{"TWO"_sd});
-        ASSERT_EQ(testStruct.getFieldArrayStringWithValidator(), std::vector{"TWO"_sd});
+        testStruct.setFieldArrayStringWithValidator(std::vector{"TWO"sv});
+        ASSERT_EQ(testStruct.getFieldArrayStringWithValidator(), std::vector{"TWO"sv});
     }
 }
 
@@ -1850,7 +1851,7 @@ template <typename T>
 void testSetterOverloadsForOptionalArrayOfStringField() {
     {
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        ASSERT_EQ(testStruct.getFieldOptionalArrayString(), (std::vector{"baz"_sd, "qux"_sd}));
+        ASSERT_EQ(testStruct.getFieldOptionalArrayString(), (std::vector{"baz"sv, "qux"sv}));
     }
 
     {
@@ -1865,21 +1866,21 @@ void testSetterOverloadsForOptionalArrayOfStringField() {
         auto testStruct = makeSetterOverloadTestStruct<T>();
         testStruct.setFieldOptionalArrayString(ImplicitlyConvertsToOptionalVectorString{});
         ASSERT_EQ(*testStruct.getFieldOptionalArrayString(),
-                  std::vector{"ImplicitlyConvertsToOptionalVectorString"_sd});
+                  std::vector{"ImplicitlyConvertsToOptionalVectorString"sv});
     }
 
     {
         // Set from vector<string>.
         auto testStruct = makeSetterOverloadTestStruct<T>();
         testStruct.setFieldOptionalArrayString(std::vector<std::string>{"one"});
-        ASSERT_EQ(*testStruct.getFieldOptionalArrayString(), std::vector{"one"_sd});
+        ASSERT_EQ(*testStruct.getFieldOptionalArrayString(), std::vector{"one"sv});
     }
 
     {
-        // Set from vector<StringData>.
+        // Set from vector<std::string_view>.
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        testStruct.setFieldOptionalArrayString(std::vector{"two"_sd});
-        ASSERT_EQ(*testStruct.getFieldOptionalArrayString(), std::vector{"two"_sd});
+        testStruct.setFieldOptionalArrayString(std::vector{"two"sv});
+        ASSERT_EQ(*testStruct.getFieldOptionalArrayString(), std::vector{"two"sv});
     }
 }
 
@@ -1897,7 +1898,7 @@ void testSetterOverloadsForOptionalArrayOfStringFieldWithValidator() {
     {
         auto testStruct = makeSetterOverloadTestStruct<T>();
         ASSERT_EQ(testStruct.getFieldOptionalArrayStringWithValidator(),
-                  (std::vector{"BAZ"_sd, "QUX"_sd}));
+                  (std::vector{"BAZ"sv, "QUX"sv}));
     }
 
     {
@@ -1909,7 +1910,7 @@ void testSetterOverloadsForOptionalArrayOfStringFieldWithValidator() {
         ASSERT_THROWS(
             testStruct.setFieldOptionalArrayStringWithValidator(std::vector<std::string>{"one"}),
             AssertionException);
-        ASSERT_THROWS(testStruct.setFieldOptionalArrayStringWithValidator(std::vector{"one"_sd}),
+        ASSERT_THROWS(testStruct.setFieldOptionalArrayStringWithValidator(std::vector{"one"sv}),
                       AssertionException);
     }
 
@@ -1924,14 +1925,14 @@ void testSetterOverloadsForOptionalArrayOfStringFieldWithValidator() {
         // Set from vector<string>.
         auto testStruct = makeSetterOverloadTestStruct<T>();
         testStruct.setFieldOptionalArrayStringWithValidator(std::vector<std::string>{"ONE"});
-        ASSERT_EQ(*testStruct.getFieldOptionalArrayStringWithValidator(), std::vector{"ONE"_sd});
+        ASSERT_EQ(*testStruct.getFieldOptionalArrayStringWithValidator(), std::vector{"ONE"sv});
     }
 
     {
-        // Set from vector<StringData>.
+        // Set from vector<std::string_view>.
         auto testStruct = makeSetterOverloadTestStruct<T>();
-        testStruct.setFieldOptionalArrayStringWithValidator(std::vector{"TWO"_sd});
-        ASSERT_EQ(*testStruct.getFieldOptionalArrayStringWithValidator(), std::vector{"TWO"_sd});
+        testStruct.setFieldOptionalArrayStringWithValidator(std::vector{"TWO"sv});
+        ASSERT_EQ(*testStruct.getFieldOptionalArrayStringWithValidator(), std::vector{"TWO"sv});
     }
 }
 
@@ -2071,14 +2072,14 @@ TEST(IDLArrayTests, TestSimpleArrays) {
     }();
     auto testStruct = Simple_array_fields::parse(testDoc);
 
-    assert_same_types<decltype(testStruct.getField1()), std::vector<StringData>>();
+    assert_same_types<decltype(testStruct.getField1()), std::vector<std::string_view>>();
     assert_same_types<decltype(testStruct.getField2()), const std::vector<std::int32_t>&>();
     assert_same_types<decltype(testStruct.getField3()), const std::vector<double>&>();
     assert_same_types<decltype(testStruct.getField4()), std::vector<ConstDataRange>>();
     assert_same_types<decltype(testStruct.getField5()),
                       const std::vector<std::array<std::uint8_t, 16>>&>();
 
-    std::vector<StringData> field1{"Foo", "Bar", "???"};
+    std::vector<std::string_view> field1{"Foo", "Bar", "???"};
     ASSERT_TRUE(field1 == testStruct.getField1());
     std::vector<std::int32_t> field2{1, 2, 3};
     ASSERT_TRUE(field2 == testStruct.getField2());
@@ -2149,7 +2150,8 @@ TEST(IDLArrayTests, TestSimpleOptionalArrays) {
     );
     auto testStruct = Optional_array_fields::parse(testDoc);
 
-    assert_same_types<decltype(testStruct.getField1()), boost::optional<std::vector<StringData>>>();
+    assert_same_types<decltype(testStruct.getField1()),
+                      boost::optional<std::vector<std::string_view>>>();
     assert_same_types<decltype(testStruct.getField2()),
                       const boost::optional<std::vector<std::int32_t>>&>();
     assert_same_types<decltype(testStruct.getField3()),
@@ -2159,7 +2161,7 @@ TEST(IDLArrayTests, TestSimpleOptionalArrays) {
     assert_same_types<decltype(testStruct.getField5()),
                       const boost::optional<std::vector<std::array<std::uint8_t, 16>>>&>();
 
-    std::vector<StringData> field1{"Foo", "Bar", "???"};
+    std::vector<std::string_view> field1{"Foo", "Bar", "???"};
     ASSERT_TRUE(field1 == testStruct.getField1().value());
     std::vector<std::int32_t> field2{1, 2, 3};
     ASSERT_TRUE(field2 == testStruct.getField2().value());
@@ -2952,7 +2954,7 @@ TEST(IDLCommand, TestConcatenateWithDbNegative) {
 
     // Negative - bad ns with embedded null
     {
-        StringData sd1("db\0foo", 6);
+        std::string_view sd1("db\0foo", 6);
         auto testDoc = BSON("BasicConcatenateWithDbCommand" << sd1 << "field1" << 3 << "field2"
                                                             << "five");
         ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(makeOMR(testDoc)), AssertionException);
@@ -3186,7 +3188,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUIDNegative) {
 
     // Negative - bad ns with embedded null
     {
-        StringData sd1("db\0foo", 6);
+        std::string_view sd1("db\0foo", 6);
         auto testDoc =
             BSON("BasicConcatenateWithDbOrUUIDCommand" << sd1 << "field1" << 3 << "field2"
                                                        << "five");
@@ -3408,7 +3410,7 @@ TEST(IDLDocSequence, TestMissingDB) {
 
 // Positive: Test a command read and written to OpMsgRequest with content in DocumentSequence works
 template <typename TestT>
-void TestDocSequence(StringData name) {
+void TestDocSequence(std::string_view name) {
 
     auto testTempDoc = BSON(name << "coll1"
                                  << "field1" << 3 << "field2"
@@ -3446,7 +3448,7 @@ TEST(IDLDocSequence, TestDocSequence) {
 
 // Negative: Bad Doc Sequences
 template <typename TestT>
-void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
+void TestBadDocSequences(std::string_view name, bool extraFieldAllowed) {
 
     auto testTempDoc = BSON(name << "coll1"
                                  << "field1" << 3 << "field2"
@@ -3516,7 +3518,7 @@ TEST(IDLDocSequence, TestBadDocSequences) {
 
 // Negative: Duplicate field across body and document sequence
 template <typename TestT>
-void TestDuplicateDocSequences(StringData name) {
+void TestDuplicateDocSequences(std::string_view name) {
 
     // Negative: Duplicate fields in doc sequence and body
     {
@@ -3695,8 +3697,8 @@ TEST(IDLChainedStruct, TestInline) {
     ASSERT_EQUALS(testStruct.getField3(), "foo");
 
     assert_same_types<decltype(testStruct.getChained_string_inline_basic_type().getStringField()),
-                      StringData>();
-    assert_same_types<decltype(testStruct.getField3()), StringData>();
+                      std::string_view>();
+    assert_same_types<decltype(testStruct.getField3()), std::string_view>();
 
     // Positive: Test we can round trip to a document from the just parsed document
     {
@@ -3910,7 +3912,7 @@ TEST(IDLValidatedField, Callback_validators) {
 
     // Positive case parsing.
     const auto tryPass =
-        [](std::int32_t int_even, double double_nearly_int, StringData string_starts_with_x) {
+        [](std::int32_t int_even, double double_nearly_int, std::string_view string_starts_with_x) {
             auto doc = BSON("int_even" << int_even << "double_nearly_int" << double_nearly_int
                                        << "string_starts_with_x" << string_starts_with_x);
             auto obj = Callback_validators::parse(doc);
@@ -3921,7 +3923,7 @@ TEST(IDLValidatedField, Callback_validators) {
 
     // Negative case parsing.
     const auto tryFail =
-        [](std::int32_t int_even, double double_nearly_int, StringData string_starts_with_x) {
+        [](std::int32_t int_even, double double_nearly_int, std::string_view string_starts_with_x) {
             auto doc = BSON("int_even" << int_even << "double_nearly_int" << double_nearly_int
                                        << "string_starts_with_x" << string_starts_with_x);
             ASSERT_THROWS(Callback_validators::parse(doc), AssertionException);
@@ -4009,7 +4011,7 @@ TEST(IDLTypeCommand, TestString) {
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getCommandParameter(), "foo");
 
-    assert_same_types<decltype(testStruct.getCommandParameter()), StringData>();
+    assert_same_types<decltype(testStruct.getCommandParameter()), std::string_view>();
 
     // Positive: Test we can roundtrip from the just parsed document
     ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
@@ -4136,7 +4138,7 @@ TEST(IDLTypeCommand, TestUnderscoreCommand) {
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getCommandParameter(), "foo");
 
-    assert_same_types<decltype(testStruct.getCommandParameter()), StringData>();
+    assert_same_types<decltype(testStruct.getCommandParameter()), std::string_view>();
 
     // Positive: Test we can roundtrip from the just parsed document
     ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
@@ -4319,10 +4321,10 @@ TEST(IDLTypeCommand, ReplyTypeKnowsItIsReplyAtCompileTime) {
 TEST(IDLTypeCommand, ReplyTypeCanParseWithGenericFields) {
     // $clusterTime is not a field of Rely_type_struct, but is
     // a field that could be part of any reply.
-    StringData genericField = "$clusterTime"_sd;
+    std::string_view genericField = "$clusterTime"sv;
     // This field is not part of Reply_type_struct and is also
     // not a generic field.
-    StringData nonGenericField = "xyz123"_sd;
+    std::string_view nonGenericField = "xyz123"sv;
     // This contains only fields part of Reply_type_struct and generic fields
     auto bsonValidReply = BSON("reply_field" << 42 << genericField << 1);
     auto parsed = CommandWithReplyType::Reply::parse(bsonValidReply);
@@ -4412,9 +4414,9 @@ TEST(IDLCommand, TestCommandGenericArguments) {
         ASSERT_TRUE(testStruct.getGenericArg());
         ASSERT_EQ(testStruct.getGenericArg()->getElement().String(), "now here");
 
-        ASSERT_EQ(testStruct.getUnstableGenericArg(), "also here"_sd);
-        testStruct.setUnstableGenericArg("unstable here"_sd);
-        ASSERT_EQ(testStruct.getUnstableGenericArg(), "unstable here"_sd);
+        ASSERT_EQ(testStruct.getUnstableGenericArg(), "also here"sv);
+        testStruct.setUnstableGenericArg("unstable here"sv);
+        ASSERT_EQ(testStruct.getUnstableGenericArg(), "unstable here"sv);
 
         // Verify that apiStrict validation fails due to the presence of the unstable argument.
         ASSERT_THROWS_CODE(dctx.validateApiStrict(), DBException, ErrorCodes::APIStrictError);
@@ -4555,7 +4557,7 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
             const std::string ns1 = "db.coll1";
             const std::string ns2 = "a.b";
             const std::string ns3 = "c.d";
-            auto nsInfoStructBSON = [&](StringData ns) {
+            auto nsInfoStructBSON = [&](std::string_view ns) {
                 BSONObjBuilder builder;
                 builder.append("ns", ns);
                 return builder.obj();
@@ -4638,7 +4640,7 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
             const std::string ns1 = "db.coll1";
             const std::string ns2 = "a.b";
             const std::string ns3 = "c.d";
-            auto nsInfoStructBSON = [&](StringData ns) {
+            auto nsInfoStructBSON = [&](std::string_view ns) {
                 BSONObjBuilder builder;
                 builder.append("ns", ns);
                 return builder.obj();
@@ -4701,7 +4703,7 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
             const std::string ns1 = "db.coll1";
             const std::string ns2 = "a.b";
             const std::string ns3 = "c.d";
-            auto nsInfoStructBSON = [&](StringData ns) {
+            auto nsInfoStructBSON = [&](std::string_view ns) {
                 BSONObjBuilder builder;
                 builder.append("ns", ns);
                 return builder.obj();
@@ -4986,7 +4988,7 @@ TEST(IDLAccessCheck, TestSimplePrivilegeAccessCheck) {
 }
 
 TEST(IDLAccessCheck, TestComplexAccessCheck) {
-    const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
+    const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"sv);
     AuthorizationContract ac;
     ac.addPrivilege(
         Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::addShard));
@@ -5163,7 +5165,7 @@ TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
         std::string testNamespaceString = NamespaceString(testDatabaseName).toString_forTest();
         std::string testConnectionString = ConnectionString::forLocal().toString();
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-        StringData testFCVstring = multiversion::toString(multiversion::GenericFCV::kLastLTS);
+        std::string_view testFCVstring = multiversion::toString(multiversion::GenericFCV::kLastLTS);
         TenantId testTenantId = TenantId(testOID);
         std::string testTenantIdStr = testTenantId.toString();
         std::string testDatabaseNameStr = testDatabaseName.toString_forTest();
@@ -5346,7 +5348,7 @@ TEST(IDLNestedChaining, NoInline) {
 }
 
 template <typename StructType, typename ParseValueType>
-void testBasicTypeSerialization(StringData fieldName, ParseValueType value) {
+void testBasicTypeSerialization(std::string_view fieldName, ParseValueType value) {
     // Positive: parse correct type.
     {
         auto testDoc = BSON(fieldName << value);

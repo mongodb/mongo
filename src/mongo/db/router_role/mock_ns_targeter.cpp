@@ -30,7 +30,6 @@
 #include "mongo/db/router_role/mock_ns_targeter.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -48,7 +48,7 @@ namespace mongo {
 namespace {
 
 ChunkRange parseRange(const BSONObj& query) {
-    const StringData fieldName(query.firstElement().fieldName());
+    const std::string_view fieldName(query.firstElement().fieldName());
 
     if (query.firstElement().isNumber()) {
         return {BSON(fieldName << query.firstElement().numberInt()),

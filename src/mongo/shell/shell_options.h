@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -120,7 +120,7 @@ struct ShellGlobalParams {
 
 extern ShellGlobalParams shellGlobalParams;
 
-std::string getMongoShellHelp(StringData name, const moe::OptionSection& options);
+std::string getMongoShellHelp(std::string_view name, const moe::OptionSection& options);
 
 /**
  * Handle options that should come before validation, such as "help".

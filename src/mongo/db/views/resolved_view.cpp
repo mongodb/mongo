@@ -47,6 +47,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -71,7 +73,7 @@ ResolvedView ResolvedView::parseFromBSON(const BSONElement& elem) {
     return ResolvedView(ResolvedNamespace::parseFromBSON(elem));
 }
 
-void ResolvedView::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+void ResolvedView::serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
     serialize(builder);
 }
 

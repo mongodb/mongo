@@ -35,6 +35,8 @@
 #include "mongo/db/extension/sdk/test_extension_factory.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 
+#include <string_view>
+
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
@@ -45,7 +47,7 @@ using namespace mongo;
  */
 
 namespace {
-bool isAllowedViewPipelineStage(StringData stageName) {
+bool isAllowedViewPipelineStage(std::string_view stageName) {
     return stageName == "$match" || stageName == "$addFields" || stageName == "$set";
 }
 }  // namespace
@@ -155,7 +157,7 @@ public:
             if (stage.isEmpty()) {
                 continue;
             }
-            StringData stageName = stage.firstElement().fieldNameStringData();
+            std::string_view stageName = stage.firstElement().fieldNameStringData();
             if (!isAllowedViewPipelineStage(stageName)) {
                 sdk_uasserted(11905602,
                               "View pipeline only permits $match, $addFields, and $set stages.");

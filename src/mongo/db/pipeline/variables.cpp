@@ -45,12 +45,14 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -63,7 +65,7 @@ namespace {
 // "$notAFieldName"}, not simply "$notAFieldName", since the latter will be treated as a field name
 // by mongods.
 Value serializeValue(Value val) {
-    return val.missing() ? Value("$$REMOVE"_sd) : Value(DOC("$literal" << val));
+    return val.missing() ? Value("$$REMOVE"sv) : Value(DOC("$literal" << val));
 }
 }  // namespace
 
@@ -92,41 +94,42 @@ const std::map<Variables::Id, std::string> Variables::kIdToBuiltinVarName = {
     {kSearchMetaId, kSearchMetaName.data()},
     {kUserRolesId, kUserRolesName.data()}};
 
-const std::map<StringData, std::function<void(const Value&)>> Variables::kSystemVarValidators = {
-    {kNowName,
-     [](const auto& value) {
-         uassert(ErrorCodes::TypeMismatch,
-                 str::stream() << "$$NOW must have a date value, found "
-                               << typeName(value.getType()),
-                 value.getType() == BSONType::date);
-     }},
-    {kClusterTimeName,
-     [](const auto& value) {
-         uassert(ErrorCodes::TypeMismatch,
-                 str::stream() << "$$CLUSTER_TIME must have a timestamp value, found "
-                               << typeName(value.getType()),
-                 value.getType() == BSONType::timestamp);
-     }},
-    {kJsScopeName,
-     [](const auto& value) {
-         uassert(ErrorCodes::TypeMismatch,
-                 str::stream() << "$$JS_SCOPE must have an object value, found "
-                               << typeName(value.getType()),
-                 value.getType() == BSONType::object);
-     }},
-    {kIsMapReduceName,
-     [](const auto& value) {
-         uassert(ErrorCodes::TypeMismatch,
-                 str::stream() << "$$IS_MR must have a bool value, found "
-                               << typeName(value.getType()),
-                 value.getType() == BSONType::boolean);
-     }},
-    {kUserRolesName, [](const auto& value) {
-         uassert(ErrorCodes::TypeMismatch,
-                 str::stream() << "$$USER_ROLES must have an array value, found "
-                               << typeName(value.getType()),
-                 value.getType() == BSONType::array);
-     }}};
+const std::map<std::string_view, std::function<void(const Value&)>>
+    Variables::kSystemVarValidators = {
+        {kNowName,
+         [](const auto& value) {
+             uassert(ErrorCodes::TypeMismatch,
+                     str::stream()
+                         << "$$NOW must have a date value, found " << typeName(value.getType()),
+                     value.getType() == BSONType::date);
+         }},
+        {kClusterTimeName,
+         [](const auto& value) {
+             uassert(ErrorCodes::TypeMismatch,
+                     str::stream() << "$$CLUSTER_TIME must have a timestamp value, found "
+                                   << typeName(value.getType()),
+                     value.getType() == BSONType::timestamp);
+         }},
+        {kJsScopeName,
+         [](const auto& value) {
+             uassert(ErrorCodes::TypeMismatch,
+                     str::stream() << "$$JS_SCOPE must have an object value, found "
+                                   << typeName(value.getType()),
+                     value.getType() == BSONType::object);
+         }},
+        {kIsMapReduceName,
+         [](const auto& value) {
+             uassert(ErrorCodes::TypeMismatch,
+                     str::stream()
+                         << "$$IS_MR must have a bool value, found " << typeName(value.getType()),
+                     value.getType() == BSONType::boolean);
+         }},
+        {kUserRolesName, [](const auto& value) {
+             uassert(ErrorCodes::TypeMismatch,
+                     str::stream() << "$$USER_ROLES must have an array value, found "
+                                   << typeName(value.getType()),
+                     value.getType() == BSONType::array);
+         }}};
 
 void Variables::setValue(Id id, const Value& value, bool isConstant) {
     uassert(17199, "can't use Variables::setValue to set a reserved builtin variable", id >= 0);
@@ -268,7 +271,7 @@ namespace {
  * variables.
  */
 boost::optional<std::function<void(const Value&)>> validateVariable(OperationContext* opCtx,
-                                                                    StringData varName) {
+                                                                    std::string_view varName) {
     auto validateStatus = variableValidation::isValidNameForUserWrite(varName);
     if (validateStatus.isOK()) {
         return boost::none;
@@ -328,7 +331,7 @@ void Variables::seedVariablesWithLetParameters(
 BSONObj Variables::toBSON(const VariablesParseState& vps, const BSONObj& varsToSerialize) const {
     BSONObjBuilder result;
     for (BSONElement elem : varsToSerialize) {
-        StringData name = elem.fieldNameStringData();
+        std::string_view name = elem.fieldNameStringData();
         result << name << serializeValue(getUserDefinedValue(vps.getVariable(name)));
     }
     return result.obj();
@@ -432,9 +435,9 @@ void Variables::defineUserRoles(OperationContext* opCtx) {
         // {_id: ..., db: ..., role: ...} objects for the $$USER_ROLES variable.
         for (const auto& roleName : auditUserAttrs->getRoles()) {
             BSONObjBuilder bob(builder.subobjStart());
-            bob.append("_id"_sd, roleName.getUnambiguousName());
-            bob.append("role"_sd, roleName.getRole());
-            bob.append("db"_sd, roleName.getDB());
+            bob.append("_id"sv, roleName.getUnambiguousName());
+            bob.append("role"sv, roleName.getRole());
+            bob.append("db"sv, roleName.getDB());
             bob.doneFast();
         }
     }
@@ -458,7 +461,7 @@ LetVariable::LetVariable(std::string attributeName,
                          Variables::Id varId)
     : name(std::move(attributeName)), expression(std::move(attributeExpression)), id(varId) {}
 
-Variables::Id VariablesParseState::defineVariable(StringData name) {
+Variables::Id VariablesParseState::defineVariable(std::string_view name) {
     // Caller should have validated before hand by using
     // variableValidation::validateNameForUserWrite.
     massert(17275,
@@ -472,7 +475,7 @@ Variables::Id VariablesParseState::defineVariable(StringData name) {
     return id;
 }
 
-Variables::Id VariablesParseState::getVariable(StringData name) const {
+Variables::Id VariablesParseState::getVariable(std::string_view name) const {
     auto it = _variables.find(name);
     if (it != _variables.end()) {
         // Found a user-defined variable.

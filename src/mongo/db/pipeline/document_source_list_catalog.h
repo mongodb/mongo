@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -46,6 +45,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -64,7 +64,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListCatalog);
  */
 class DocumentSourceListCatalog final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$listCatalog"_sd;
+    static constexpr std::string_view kStageName = "$listCatalog"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
@@ -98,9 +98,8 @@ public:
     };
 
     // virtuals from DocumentSource
-    StringData getSourceName() const final;
-    Value serialize(const query_shape::SerializationOptions& opts =
-                        query_shape::SerializationOptions{}) const final;
+    std::string_view getSourceName() const final;
+    Value serialize(const query_shape::SerializationOptions& opts = {}) const final;
 
     static const Id& id;
 

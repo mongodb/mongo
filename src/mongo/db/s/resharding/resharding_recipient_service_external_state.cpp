@@ -50,6 +50,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -60,6 +61,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 void ReshardingRecipientService::RecipientStateMachineExternalState::
     ensureTempReshardingCollectionExistsWithIndexes(OperationContext* opCtx,
@@ -79,14 +81,14 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
         metadata.getSourceNss(),
         metadata.getSourceUUID(),
         cloneTimestamp,
-        "loading collection options to create temporary resharding collection"_sd);
+        "loading collection options to create temporary resharding collection"sv);
 
     auto [indexes, idIndex] =
         getCollectionIndexes(opCtx,
                              metadata.getSourceNss(),
                              metadata.getSourceUUID(),
                              cloneTimestamp,
-                             "loading indexes to create temporary resharding collection"_sd);
+                             "loading indexes to create temporary resharding collection"sv);
 
     // Set the temporary resharding collection's UUID to the resharding UUID. Note that
     // BSONObj::addFields() replaces any fields that already exist.
@@ -147,7 +149,7 @@ RecipientStateMachineExternalStateImpl::getCollectionOptions(
     const NamespaceString& nss,
     const UUID& uuid,
     boost::optional<Timestamp> afterClusterTime,
-    StringData reason) {
+    std::string_view reason) {
     // Load the collection options from the primary shard for the database.
     sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
     return router.route(reason, [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
@@ -166,7 +168,7 @@ RecipientStateMachineExternalStateImpl::getCollectionOptions(
     const NamespaceString& nss,
     const UUID& uuid,
     boost::optional<Timestamp> afterClusterTime,
-    StringData reason,
+    std::string_view reason,
     const ShardId& fromShardId) {
     // Load the collection options from the specified shard for the database.
     const auto nssOrUUID = NamespaceStringOrUUID{nss.dbName(), uuid};
@@ -179,7 +181,7 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
                                                              const NamespaceString& nss,
                                                              const UUID& uuid,
                                                              Timestamp afterClusterTime,
-                                                             StringData reason,
+                                                             std::string_view reason,
                                                              bool expandSimpleCollation) {
     // Load the list of indexes from the shard which owns the global minimum chunk.
     sharding::router::CollectionRouter router(opCtx, nss);
@@ -206,7 +208,7 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
 void RecipientStateMachineExternalStateImpl::route(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    StringData reason,
+    std::string_view reason,
     unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)> callback) {
     sharding::router::CollectionRouter router(opCtx, nss);
     router.route(reason, callback);

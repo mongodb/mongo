@@ -39,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -63,7 +64,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "EOF"_sd;
+    static constexpr std::string_view kStageType = "EOF"_sd;
 
 private:
     EofStats _specificStats;

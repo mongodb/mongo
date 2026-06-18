@@ -52,6 +52,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Convert a desugared StageSpecs vector into a single BSONObj of the form
 // {expectedStages: [<stage>, <stage>, ...]} so it can be compared via ASSERT_BSONOBJ_EQ_AUTO.
@@ -86,7 +87,7 @@ protected:
         const NamespaceString& nss = getExpCtx()->getNamespaceString();
         auto lprf = parseRankFusion(nss, rankFusionSpecObj);
         auto desugared =
-            lite_parsed_hybrid_search_desugarer::desugarRankFusion(*lprf, nss, "pipeline_test"_sd);
+            lite_parsed_hybrid_search_desugarer::desugarRankFusion(*lprf, nss, "pipeline_test"sv);
         return toExpectedStagesBson(desugared);
     }
 

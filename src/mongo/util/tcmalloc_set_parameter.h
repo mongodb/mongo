@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <functional>
+#include <string_view>
 
 namespace mongo {
 
@@ -44,14 +45,15 @@ using TcmallocReleaseRateT = long long;
 using TcmallocReleaseRateT = double;
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 
-constexpr inline auto kMaxPerCPUCacheSizePropertyName = "tcmalloc.max_per_cpu_cache_size"_sd;
-constexpr inline auto kMaxTotalThreadCacheBytesPropertyName =
-    "tcmalloc.max_total_thread_cache_bytes"_sd;
-constexpr inline auto kAggressiveMemoryDecommitPropertyName =
-    "tcmalloc.aggressive_memory_decommit"_sd;
+constexpr inline std::string_view kMaxPerCPUCacheSizePropertyName{
+    "tcmalloc.max_per_cpu_cache_size"};
+constexpr inline std::string_view kMaxTotalThreadCacheBytesPropertyName{
+    "tcmalloc.max_total_thread_cache_bytes"};
+constexpr inline std::string_view kAggressiveMemoryDecommitPropertyName{
+    "tcmalloc.aggressive_memory_decommit"};
 
-size_t getTcmallocProperty(StringData propname);
-void setTcmallocProperty(StringData propname, size_t value);
+size_t getTcmallocProperty(std::string_view propname);
+void setTcmallocProperty(std::string_view propname, size_t value);
 TcmallocReleaseRateT getMemoryReleaseRate();
 void setMemoryReleaseRate(TcmallocReleaseRateT val);
 

@@ -50,6 +50,8 @@
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
+
 namespace mongo::replicated_fast_count {
 namespace {
 
@@ -186,7 +188,7 @@ TEST_F(ReplicatedFastCountManagerLegacyMetricsTest,
     _fastCountManager->flushSync_ForTest(operationContext());
 
     const BSONObj report = ObservableMutexRegistry::get().report(false);
-    const StringData name = "ReplicatedFastCountManager::_lifecycleMutex";
+    const std::string_view name = "ReplicatedFastCountManager::_lifecycleMutex";
     EXPECT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
     const BSONObj exclusive =
         report.getObjectField(name).getObjectField(ObservableMutexRegistry::kExclusiveFieldName);
@@ -644,7 +646,7 @@ protected:
         recordAppliedOpTime(Timestamp{1000, 1});
     }
 
-    void scheduleAndCommit(StringData identArg, std::span<const char> valueBytes) {
+    void scheduleAndCommit(std::string_view identArg, std::span<const char> valueBytes) {
         WriteUnitOfWork wuow(opCtx);
         recordContainerWriteForFastCountTimestamp(opCtx, identArg, valueBytes);
         wuow.commit();

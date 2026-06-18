@@ -31,6 +31,8 @@
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class MONGO_MOD_PRIVATE ChunkOperationShardingCoordinatorMixin {
@@ -90,7 +92,7 @@ private:
 
     void _releaseLocks(OperationContext* opCtx) override {}
 
-    StringData serializeGenericPhase(CoordinatorGenericPhase phase) const final {
+    std::string_view serializeGenericPhase(CoordinatorGenericPhase phase) const final {
         return this->serializePhase(phase);
     }
 

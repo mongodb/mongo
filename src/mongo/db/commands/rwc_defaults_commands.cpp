@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
@@ -67,6 +66,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -103,7 +103,7 @@ void updatePersistedDefaultRWConcernDocument(OperationContext* opCtx, const RWCo
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }
 
-void assertNotStandaloneOrShardServer(OperationContext* opCtx, StringData cmdName) {
+void assertNotStandaloneOrShardServer(OperationContext* opCtx, std::string_view cmdName) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     uassert(51300,
             str::stream() << "'" << cmdName << "' is not supported on standalone nodes.",
@@ -183,7 +183,7 @@ public:
                             "missing on: {}.",
                             [&]() {
                                 std::ostringstream stream;
-                                StringData sep;
+                                std::string_view sep;
                                 for (auto&& shard : shardsWithMissingWCDefinition) {
                                     stream << sep << "'" << shard.toString() << "'";
                                     sep = ", ";

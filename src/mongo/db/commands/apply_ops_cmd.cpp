@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -54,6 +53,7 @@
 #include <cstddef>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -63,13 +63,14 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
-bool checkCOperationType(const BSONObj& opObj, const StringData opName) {
+bool checkCOperationType(const BSONObj& opObj, const std::string_view opName) {
     BSONElement opTypeElem = opObj["op"];
     checkBSONType(BSONType::string, opTypeElem);
-    const StringData opType = opTypeElem.checkAndGetStringData();
+    const std::string_view opType = opTypeElem.checkAndGetStringData();
 
-    if (opType == "c"_sd) {
+    if (opType == "c"sv) {
         BSONElement oElem = opObj["o"];
         checkBSONType(BSONType::object, oElem);
         BSONObj o = oElem.Obj();
@@ -114,9 +115,9 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
 
         BSONElement opTypeElem = opObj["op"];
         checkBSONType(BSONType::string, opTypeElem);
-        const StringData opType = opTypeElem.checkAndGetStringData();
+        const std::string_view opType = opTypeElem.checkAndGetStringData();
 
-        if (opType == "c"_sd) {
+        if (opType == "c"sv) {
             BSONElement oElem = opObj["o"];
             checkBSONType(BSONType::object, oElem);
             BSONObj o = oElem.Obj();
@@ -158,8 +159,8 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
             for (const BSONElement& e : applyOpsObj.firstElement().Array()) {
                 checkBSONType(BSONType::object, e);
                 auto oplogEntry = e.Obj();
-                if (checkCOperationType(oplogEntry, "create"_sd) ||
-                    checkCOperationType(oplogEntry, "renameCollection"_sd)) {
+                if (checkCOperationType(oplogEntry, "create"sv) ||
+                    checkCOperationType(oplogEntry, "renameCollection"sv)) {
                     demandAuthorization(OplogApplicationValidity::kNeedsSuperuser);
                 }
             }
@@ -184,13 +185,13 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
             if (opHasUUIDs) {
                 demandAuthorization(OplogApplicationValidity::kNeedsUseUUID);
             }
-            if (opHasUUIDs && checkCOperationType(opObj, "create"_sd)) {
+            if (opHasUUIDs && checkCOperationType(opObj, "create"sv)) {
                 // If the op is 'c' and forces the server to ingest a collection
                 // with a specific, user defined UUID.
                 demandAuthorization(OplogApplicationValidity::kNeedsForceAndUseUUID);
             }
 
-            if (checkCOperationType(opObj, "dropDatabase"_sd)) {
+            if (checkCOperationType(opObj, "dropDatabase"sv)) {
                 // dropDatabase is not allowed to run inside a nested applyOps command.
                 // Typically applyOps takes the global write lock, but dropDatabase requires the
                 // lock not to be taken. We allow it on a top-level applyOps as a special case,
@@ -200,7 +201,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
             }
 
             // If the op contains a nested applyOps...
-            if (checkCOperationType(opObj, "applyOps"_sd)) {
+            if (checkCOperationType(opObj, "applyOps"sv)) {
                 // And we've recursed too far, then bail out.
                 uassert(ErrorCodes::FailedToParse,
                         "Too many nested applyOps",
@@ -235,12 +236,12 @@ void _removeRidFieldFromOps(const BSONObj& applyOpsObj, BSONObjBuilder& builder)
             BSONObj opObj = element.Obj();
 
             // If the op contains a nested applyOps, filter it recursively
-            if (checkCOperationType(opObj, "applyOps"_sd)) {
+            if (checkCOperationType(opObj, "applyOps"sv)) {
                 BSONObjBuilder opBuilder(arr.subobjStart());
                 // Copy all non-'o', non-'rid' elements
                 for (auto&& elem : opObj) {
-                    if (elem.fieldNameStringData() != "o"_sd &&
-                        elem.fieldNameStringData() != "rid"_sd) {
+                    if (elem.fieldNameStringData() != "o"sv &&
+                        elem.fieldNameStringData() != "rid"sv) {
                         opBuilder.append(elem);
                     }
                 }
@@ -255,7 +256,7 @@ void _removeRidFieldFromOps(const BSONObj& applyOpsObj, BSONObjBuilder& builder)
                 // Strip 'rid' from all ops unconditionally
                 BSONObjBuilder opBuilder(arr.subobjStart());
                 for (auto&& elem : opObj) {
-                    if (elem.fieldNameStringData() != "rid"_sd) {
+                    if (elem.fieldNameStringData() != "rid"sv) {
                         opBuilder.append(elem);
                     }
                 }
@@ -267,7 +268,7 @@ void _removeRidFieldFromOps(const BSONObj& applyOpsObj, BSONObjBuilder& builder)
     // These are unknown to this function but must be preserved so the command
     // remains structurally equivalent after filtering.
     for (auto&& elem : applyOpsObj) {
-        if (elem.fieldNameStringData() != "applyOps"_sd) {
+        if (elem.fieldNameStringData() != "applyOps"sv) {
             builder.append(elem);
         }
     }

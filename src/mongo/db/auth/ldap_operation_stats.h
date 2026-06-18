@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
@@ -43,6 +42,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 /**
@@ -134,8 +134,10 @@ private:
      * of the LDAP Operations.
      */
     struct Stats {
-        void report(BSONObjBuilder* builder, TickSource* tickSource, StringData statsName) const;
-        void toString(StringBuilder* sb, TickSource* tickSource, StringData statsName) const;
+        void report(BSONObjBuilder* builder,
+                    TickSource* tickSource,
+                    std::string_view statsName) const;
+        void toString(StringBuilder* sb, TickSource* tickSource, std::string_view statsName) const;
         Microseconds timeElapsed(TickSource* tickSource) const;
 
         int64_t numOps{0};

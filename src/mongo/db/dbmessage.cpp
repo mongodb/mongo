@@ -40,6 +40,7 @@
 #include "mongo/util/str.h"
 
 #include <cstring>
+#include <string_view>
 
 namespace mongo {
 
@@ -137,7 +138,7 @@ T DbMessage::readAndAdvance() {
     return t;
 }
 
-Message makeUnsupportedOpInsertMessage(StringData ns,
+Message makeUnsupportedOpInsertMessage(std::string_view ns,
                                        const BSONObj* objs,
                                        size_t count,
                                        int flags) {
@@ -155,7 +156,7 @@ Message makeUnsupportedOpInsertMessage(StringData ns,
     });
 }
 
-DbResponse makeErrorResponseToUnsupportedOpQuery(StringData errorMsg) {
+DbResponse makeErrorResponseToUnsupportedOpQuery(std::string_view errorMsg) {
     BSONObjBuilder err;
     err.append("$err",
                str::stream() << errorMsg

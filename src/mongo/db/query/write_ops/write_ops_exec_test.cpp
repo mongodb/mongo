@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
@@ -51,6 +50,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/cstdint.hpp>
@@ -59,6 +59,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WriteOpsExecTest : public CatalogTestFixture {
 protected:
@@ -67,7 +68,7 @@ protected:
 
 TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
     // Basic test case.
-    OID id = OID::createFromString("629e1e680958e279dc29a989"_sd);
+    OID id = OID::createFromString("629e1e680958e279dc29a989"sv);
     BSONObj updateStmt = fromjson("{$set: {a: 5}}");
     write_ops::UpdateModification mod(std::move(updateStmt));
     write_ops::UpdateOpEntry updateOpEntry(BSON("_id" << id), std::move(mod));
@@ -129,7 +130,7 @@ TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
 
 TEST_F(WriteOpsExecTest, TestDeleteSizeEstimationLogic) {
     // Basic test case.
-    OID id = OID::createFromString("629e1e680958e279dc29a989"_sd);
+    OID id = OID::createFromString("629e1e680958e279dc29a989"sv);
     write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << id), false /* multi */);
     ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
 

@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -43,12 +42,14 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 struct ClusterInsertCmdD {
-    static constexpr StringData kName = "clusterInsert"_sd;
+    static constexpr std::string_view kName = "clusterInsert"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;
@@ -80,7 +81,7 @@ struct ClusterInsertCmdD {
 MONGO_REGISTER_COMMAND(ClusterInsertCmdBase<ClusterInsertCmdD>).forShard();
 
 struct ClusterUpdateCmdD {
-    static constexpr StringData kName = "clusterUpdate"_sd;
+    static constexpr std::string_view kName = "clusterUpdate"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;
@@ -111,7 +112,7 @@ struct ClusterUpdateCmdD {
 MONGO_REGISTER_COMMAND(ClusterUpdateCmdBase<ClusterUpdateCmdD>).forShard();
 
 struct ClusterDeleteCmdD {
-    static constexpr StringData kName = "clusterDelete"_sd;
+    static constexpr std::string_view kName = "clusterDelete"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;

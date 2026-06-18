@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -90,6 +89,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <type_traits>
 #include <utility>
@@ -114,9 +114,9 @@ namespace mozjs {
  * Error messages or error message prefixes.
  */
 namespace ErrorMessage {
-const StringData kUncaughtException = "uncaught exception";
-const StringData kOutOfMemory = "Out of memory";
-const StringData kUnknownError = "Unknown Failure from JSInterpreter";
+const std::string_view kUncaughtException = "uncaught exception";
+const std::string_view kOutOfMemory = "Out of memory";
+const std::string_view kUnknownError = "Unknown Failure from JSInterpreter";
 }  // namespace ErrorMessage
 
 /**
@@ -257,7 +257,7 @@ public:
     JSRegEx getRegEx(const char* field) override;
 
     void setNumber(const char* field, double val) override;
-    void setString(const char* field, StringData val) override;
+    void setString(const char* field, std::string_view val) override;
     void setBoolean(const char* field, bool val) override;
     void setElement(const char* field, const BSONElement& e, const BSONObj& parent) override;
     void setObject(const char* field, const BSONObj& obj, bool readOnly) override;
@@ -275,7 +275,7 @@ public:
                bool readOnlyArgs = false,
                bool readOnlyRecv = false) override;
 
-    bool exec(StringData code,
+    bool exec(std::string_view code,
               const std::string& name,
               bool printResult,
               bool reportError,
@@ -286,7 +286,7 @@ public:
 
     ScriptingFunction _createFunction(const char* code) override;
 
-    void newFunction(StringData code, JS::MutableHandleValue out) override;
+    void newFunction(std::string_view code, JS::MutableHandleValue out) override;
 
     BSONObj callThreadArgs(const BSONObj& obj);
 
@@ -568,7 +568,7 @@ private:
     template <typename ImplScopeFunction>
     auto _runSafely(ImplScopeFunction&& functionToRun) -> decltype(functionToRun());
 
-    void _MozJSCreateFunction(StringData raw, JS::MutableHandleValue fun);
+    void _MozJSCreateFunction(std::string_view raw, JS::MutableHandleValue fun);
 
     /**
      * This structure exists exclusively to construct the runtime and context

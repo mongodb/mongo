@@ -44,6 +44,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -655,10 +656,11 @@ private:
  *
  * Usage example:
  *
- *     StatusWith<StringData> result = runWithRetryStrategy(
+ *     StatusWith<std::string_view> result = runWithRetryStrategy(
  *         opCtx,
  *         strategy,
- *         [](const TargetingMetadata& targetingMetadata) -> RetryStrategy::Result<StringData> {
+ *         [](const TargetingMetadata& targetingMetadata) -> RetryStrategy::Result<std::string_view>
+ * {
  *             // on success.
  *             return "value"_sd;
  *             // on failure. Target is the host and port on which the request was performed.

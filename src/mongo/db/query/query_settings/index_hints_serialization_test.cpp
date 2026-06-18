@@ -34,9 +34,14 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
+using namespace std::literals::string_view_literals;
+
+using namespace std::literals::string_view_literals;
 namespace mongo::query_settings::index_hints {
 
-auto makeDbName(StringData dbName) {
+auto makeDbName(std::string_view dbName) {
     return DatabaseNameUtil::deserialize(
         boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
 }
@@ -46,13 +51,13 @@ TEST(IndexHintSpecsSerialization, TestSerialization) {
     {
         NamespaceSpec ns;
         ns.setDb(makeDbName("testDbA"));
-        ns.setColl("testCollA"_sd);
+        ns.setColl("testCollA"sv);
         indexHints.emplace_back(IndexHintSpec(ns, {IndexHint("a_1"), IndexHint("b_1")}));
     }
     {
         NamespaceSpec ns;
         ns.setDb(makeDbName("testDbB"));
-        ns.setColl("testCollB"_sd);
+        ns.setColl("testCollB"sv);
         indexHints.emplace_back(IndexHintSpec(
             ns, {IndexHint(NaturalOrderHint(NaturalOrderHint::Direction::kForward))}));
     }
@@ -82,7 +87,7 @@ TEST(IndexHintSpecsSerialization, TestSerialization) {
 
 TEST(IndexHintSpecsSerialization, TestDeserializationSingleSpec) {
     auto testDbName = "testDb";
-    auto testCollName = "testColl"_sd;
+    auto testCollName = "testColl"sv;
     auto dbName = makeDbName(testDbName);
     NamespaceSpec ns;
     ns.setDb(dbName);
@@ -105,14 +110,14 @@ TEST(IndexHintSpecsSerialization, TestDeserializationSingleSpec) {
 
 TEST(IndexHintSpecsSerialization, TestDeserializationMultipleSpecs) {
     auto testDbNameA = "testDbA";
-    auto testCollNameA = "testCollA"_sd;
+    auto testCollNameA = "testCollA"sv;
     auto dbNameA = makeDbName(testDbNameA);
     NamespaceSpec nsA;
     nsA.setDb(dbNameA);
     nsA.setColl(testCollNameA);
 
     auto testDbNameB = "testDbB";
-    auto testCollNameB = "testCollB"_sd;
+    auto testCollNameB = "testCollB"sv;
     auto dbNameB = makeDbName(testDbNameB);
     NamespaceSpec nsB;
     nsB.setDb(dbNameB);

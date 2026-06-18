@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/util/memory_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdlib>

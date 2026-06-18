@@ -36,6 +36,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>
@@ -53,7 +54,7 @@ enum class MONGO_MOD_PUBLIC ShardTargeterDecision {
     kSwitchToV1,
 };
 
-MONGO_MOD_NEEDS_REPLACEMENT inline StringData toString(ShardTargeterDecision decision) {
+MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view toString(ShardTargeterDecision decision) {
     switch (decision) {
         case ShardTargeterDecision::kContinue:
             return "continue"_sd;

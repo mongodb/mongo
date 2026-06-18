@@ -30,7 +30,6 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -46,6 +45,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -54,6 +54,7 @@
 
 namespace mongo::sbe {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using TagValue = std::pair<value::TypeTags, value::Value>;
 
@@ -121,7 +122,7 @@ public:
     }
 
     value::SlotId setCollator(const CollatorInterface* collator) {
-        auto collatorSlot = _env->getSlotIfExists("collator"_sd);
+        auto collatorSlot = _env->getSlotIfExists("collator"sv);
         if (collatorSlot) {
             _env->getAccessor(*collatorSlot)
                 ->reset(
@@ -129,7 +130,7 @@ public:
                                         value::bitcastFrom<const CollatorInterface*>(collator)});
             return *collatorSlot;
         }
-        return _env->registerSlot("collator"_sd,
+        return _env->registerSlot("collator"sv,
                                   value::TypeTags::collator,
                                   value::bitcastFrom<const CollatorInterface*>(collator),
                                   false,
@@ -153,13 +154,13 @@ public:
 private:
     SbeVmBenchmark(std::unique_ptr<RuntimeEnvironment> env)
         : _env(env.get()), _compileCtx(std::move(env)), _random(kSeed) {
-        _env->registerSlot("timeZoneDB"_sd,
+        _env->registerSlot("timeZoneDB"sv,
                            value::TypeTags::timeZoneDB,
                            value::bitcastFrom<TimeZoneDatabase*>(&_timeZoneDB),
                            false,
                            &_slotIdGenerator);
         _inputSlotId =
-            _env->registerSlot("input"_sd, value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
+            _env->registerSlot("input"sv, value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
     }
 
     RuntimeEnvironment* _env;

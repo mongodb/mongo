@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -83,6 +82,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -100,10 +100,11 @@ MONGO_FAIL_POINT_DEFINE(routerWaitInHello);
 MONGO_FAIL_POINT_DEFINE(routerAppendHelloOkToHelloResponse);
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kHelloString = "hello"_sd;
-constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
-constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
+constexpr auto kHelloString = "hello"sv;
+constexpr auto kCamelCaseIsMasterString = "isMaster"sv;
+constexpr auto kLowerCaseIsMasterString = "ismaster"sv;
 const std::string kAutomationServiceDescriptorFieldName =
     std::string{HelloCommandReply::kAutomationServiceDescriptorFieldName};
 
@@ -338,7 +339,7 @@ public:
     }
 
 protected:
-    CmdHello(const StringData cmdName, const std::initializer_list<StringData>& alias)
+    CmdHello(const std::string_view cmdName, const std::initializer_list<std::string_view>& alias)
         : BasicCommandWithReplyBuilderInterface(cmdName, alias) {}
 
     virtual bool useLegacyResponseFields() const {

@@ -45,7 +45,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet_impl.h"
@@ -66,6 +65,7 @@
 #include "mongo/util/str.h"
 
 #include <mutex>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 
@@ -73,6 +73,7 @@
 namespace mongo {
 
 namespace process_health {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -442,7 +443,7 @@ void FaultManager::schedulePeriodicHealthCheckThread() {
             _updateWithCheckStatus(HealthCheckStatus(
                 observer->getType(),
                 Severity::kFailure,
-                "Health observer failed to start because it was not configured properly."_sd));
+                "Health observer failed to start because it was not configured properly."sv));
             setState(FaultState::kActiveFault, HealthCheckStatus(observer->getType()));
             return;
         }

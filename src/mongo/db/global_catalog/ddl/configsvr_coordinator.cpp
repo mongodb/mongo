@@ -31,7 +31,6 @@
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator_gen.h"
 #include "mongo/idl/idl_parser.h"
@@ -42,6 +41,8 @@
 #include "mongo/util/future_util.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
+
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -51,6 +52,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningConfigsvrCoordinatorInstance);
 MONGO_FAIL_POINT_DEFINE(hangAndEndBeforeRunningConfigsvrCoordinatorInstance);
@@ -142,7 +144,7 @@ SemiFuture<void> ConfigsvrCoordinator::run(std::shared_ptr<executor::ScopedTaskE
                 LOGV2_WARNING(6347302,
                               "Failed to remove ConfigsvrCoordinator state document",
                               "error"_attr = redact(ex));
-                ex.addContext("Failed to remove ConfigsvrCoordinator state document"_sd);
+                ex.addContext("Failed to remove ConfigsvrCoordinator state document"sv);
                 std::lock_guard<std::mutex> lg(_mutex);
                 if (!_completionPromise.getFuture().isReady()) {
                     _completionPromise.setError(ex.toStatus());

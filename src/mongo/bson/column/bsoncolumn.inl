@@ -151,19 +151,19 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
                         });
                     break;
                 case BSONType::string:
-                    buffer.template append<StringData>(literal);
-                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDelta<StringData,
-                                                                               int128_t,
-                                                                               Buffer>(
-                        ptr,
-                        end,
-                        buffer,
-                        Simple8bTypeUtil::encodeString(literal.valueStringData()).value_or(0),
-                        literal,
-                        [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
-                            auto string = Simple8bTypeUtil::decodeString(v);
-                            buffer.append(StringData((const char*)string.str.data(), string.size));
-                        });
+                    buffer.template append<std::string_view>(literal);
+                    ptr = BSONColumnBlockDecompressHelpers::
+                        decompressAllDelta<std::string_view, int128_t, Buffer>(
+                            ptr,
+                            end,
+                            buffer,
+                            Simple8bTypeUtil::encodeString(literal.valueStringData()).value_or(0),
+                            literal,
+                            [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
+                                auto string = Simple8bTypeUtil::decodeString(v);
+                                buffer.append(
+                                    std::string_view((const char*)string.str.data(), string.size));
+                            });
                     break;
                 case BSONType::binData: {
                     buffer.template append<BSONBinData>(literal);
@@ -190,19 +190,18 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
                 }
                 case BSONType::code:
                     buffer.template append<BSONCode>(literal);
-                    ptr = BSONColumnBlockDecompressHelpers::decompressAllDelta<BSONCode,
-                                                                               int128_t,
-                                                                               Buffer>(
-                        ptr,
-                        end,
-                        buffer,
-                        Simple8bTypeUtil::encodeString(literal.valueStringData()).value_or(0),
-                        literal,
-                        [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
-                            auto string = Simple8bTypeUtil::decodeString(v);
-                            buffer.append(
-                                BSONCode(StringData((const char*)string.str.data(), string.size)));
-                        });
+                    ptr = BSONColumnBlockDecompressHelpers::
+                        decompressAllDelta<BSONCode, int128_t, Buffer>(
+                            ptr,
+                            end,
+                            buffer,
+                            Simple8bTypeUtil::encodeString(literal.valueStringData()).value_or(0),
+                            literal,
+                            [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
+                                auto string = Simple8bTypeUtil::decodeString(v);
+                                buffer.append(BSONCode(
+                                    std::string_view((const char*)string.str.data(), string.size)));
+                            });
                     break;
                 case BSONType::object:
                 case BSONType::array:

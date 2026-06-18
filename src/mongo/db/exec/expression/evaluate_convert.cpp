@@ -35,6 +35,8 @@
 #include "mongo/util/str_escape.h"
 #include "mongo/util/text.h"
 
+#include <string_view>
+
 #include <fmt/compile.h>
 #include <fmt/format.h>
 
@@ -43,6 +45,7 @@ namespace mongo {
 namespace exec::expression {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 std::string stringifyObjectOrArray(ExpressionContext* expCtx, Value val);
 
@@ -180,7 +183,7 @@ public:
             };
         table[stdx::to_underlying(BSONType::boolean)][stdx::to_underlying(BSONType::string)] =
             [](ExpressionContext* const expCtx, Value inputValue) {
-                return inputValue.getBool() ? Value("true"_sd) : Value("false"_sd);
+                return inputValue.getBool() ? Value("true"sv) : Value("false"sv);
             };
         table[stdx::to_underlying(BSONType::boolean)][stdx::to_underlying(BSONType::boolean)] =
             &performIdentityConversion;
@@ -661,15 +664,15 @@ private:
         double doubleValue = inputValue.getDouble();
         if (!base) {
             if (std::isinf(doubleValue)) {
-                return Value(std::signbit(doubleValue) ? "-Infinity"_sd : "Infinity"_sd);
+                return Value(std::signbit(doubleValue) ? "-Infinity"sv : "Infinity"sv);
             } else if (std::isnan(doubleValue)) {
-                return Value("NaN"_sd);
+                return Value("NaN"sv);
             } else if (doubleValue == 0.0 && std::signbit(doubleValue)) {
-                return Value("-0"_sd);
+                return Value("-0"sv);
             } else {
                 str::stream str;
                 str << fmt::format("{}", doubleValue);
-                return Value(StringData(str));
+                return Value(std::string_view(str));
             }
         }
 
@@ -695,7 +698,7 @@ private:
                                   boost::optional<ConversionBase> base) {
         int intValue = inputValue.getInt();
         if (!base)
-            return Value(StringData(str::stream() << intValue));
+            return Value(std::string_view(str::stream() << intValue));
         return performFormatNumberWithBase(expCtx, intValue, *base);
     }
 
@@ -704,7 +707,7 @@ private:
                                    boost::optional<ConversionBase> base) {
         long long longValue = inputValue.getLong();
         if (!base)
-            return Value(StringData(str::stream() << longValue));
+            return Value(std::string_view(str::stream() << longValue));
         return performFormatNumberWithBase(expCtx, longValue, *base);
     }
 
@@ -882,8 +885,8 @@ private:
                     return Value(encoded);
                 }
                 case BinDataFormat::kUtf8: {
-                    auto encoded = StringData{static_cast<const char*>(binData.data),
-                                              static_cast<size_t>(binData.length)};
+                    auto encoded = std::string_view{static_cast<const char*>(binData.data),
+                                                    static_cast<size_t>(binData.length)};
                     uassert(4341122,
                             "BinData does not represent a valid UTF-8 string",
                             isValidUTF8(encoded));
@@ -1095,7 +1098,7 @@ private:
         }
         auto thisBinData = BSONBinData(byteArray.data(), byteArray.size(), BinDataType::Vector);
         // Note that the Value internals copy the data inside of the binData vector into a new
-        // StringData so we do not have to worry about ownership semantics here.
+        // std::string_view so we do not have to worry about ownership semantics here.
         return Value(std::move(thisBinData));
     }
 
@@ -1393,10 +1396,10 @@ public:
             case BSONType::null:
             case BSONType::undefined:
                 // Existing behavior in $convert is to treat all nullish values as null.
-                appendTo(buffer, "null"_sd);
+                appendTo(buffer, "null"sv);
                 break;
             case BSONType::boolean:
-                appendTo(buffer, val.getBool() ? "true"_sd : "false"_sd);
+                appendTo(buffer, val.getBool() ? "true"sv : "false"sv);
                 break;
             case BSONType::numberDecimal:
             case BSONType::numberDouble:
@@ -1439,17 +1442,17 @@ public:
     }
 
 private:
-    static void appendTo(fmt::memory_buffer& buffer, StringData data) {
+    static void appendTo(fmt::memory_buffer& buffer, std::string_view data) {
         buffer.append(data.data(), data.data() + data.size());
     }
 
-    static void writeEscapedString(fmt::memory_buffer& buffer, StringData str) {
+    static void writeEscapedString(fmt::memory_buffer& buffer, std::string_view str) {
         buffer.push_back('"');
         str::escapeForJSON(buffer, str);
         buffer.push_back('"');
     }
 
-    static void writeUnescapedString(fmt::memory_buffer& buffer, StringData str) {
+    static void writeUnescapedString(fmt::memory_buffer& buffer, std::string_view str) {
         buffer.push_back('"');
         appendTo(buffer, str);
         buffer.push_back('"');

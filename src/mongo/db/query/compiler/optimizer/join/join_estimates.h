@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -53,7 +54,7 @@ enum class MackertLohmanCase {
     kPartialEviction,
 };
 
-StringData toStringData(MackertLohmanCase c);
+std::string_view toStringData(MackertLohmanCase c);
 
 /**
  * Convert a CPU cost into an equivalent 'numDocsProcessed' cardinality based on the per-document

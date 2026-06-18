@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
@@ -40,6 +39,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -53,7 +53,7 @@ namespace mongo::timeseries {
  * all occurrences of metaField in query are replaced with the literal "meta". Requires that the
  * given metaField is not empty.
  */
-BSONObj translateQuery(const BSONObj& query, StringData metaField);
+BSONObj translateQuery(const BSONObj& query, std::string_view metaField);
 
 /**
  * Translates the given update on the time-series collection to an update on the time-series
@@ -63,12 +63,12 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField);
  * invalid status if the update cannot be translated.
  */
 StatusWith<write_ops::UpdateModification> translateUpdate(
-    const write_ops::UpdateModification& updateMod, boost::optional<StringData> metaField);
+    const write_ops::UpdateModification& updateMod, boost::optional<std::string_view> metaField);
 
 /**
  * Returns the function to use to count the number of documents updated or deleted.
  */
-std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData timeField);
+std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(std::string_view timeField);
 
 /**
  * Translates the query into a query on the time-series collection's underlying buckets collection

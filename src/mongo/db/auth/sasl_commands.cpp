@@ -34,7 +34,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -64,6 +63,7 @@
 #include <ratio>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -77,12 +77,13 @@
 namespace mongo {
 namespace auth {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using std::stringstream;
 
 class CmdSaslStart : public SaslStartCmdVersion1Gen<CmdSaslStart> {
 public:
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {SaslStartCommand::kPayloadFieldName};
     }
 
@@ -125,7 +126,7 @@ MONGO_REGISTER_COMMAND(CmdSaslStart).forRouter().forShard();
 
 class CmdSaslContinue : public SaslContinueCmdVersion1Gen<CmdSaslContinue> {
 public:
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {SaslContinueCommand::kPayloadFieldName};
     }
 
@@ -277,7 +278,7 @@ SaslReply runSaslContinue(OperationContext* opCtx,
     return doSaslStep(opCtx, cmd.getPayload(), session);
 }
 
-constexpr auto kDBFieldName = "db"_sd;
+constexpr auto kDBFieldName = "db"sv;
 }  // namespace
 
 SaslReply runSaslStart(OperationContext* opCtx,

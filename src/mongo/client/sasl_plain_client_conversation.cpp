@@ -34,6 +34,8 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/sasl_client_session.h"
 
+#include <string_view>
+
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
@@ -43,7 +45,8 @@ SaslPLAINClientConversation::SaslPLAINClientConversation(SaslClientSession* sasl
 
 SaslPLAINClientConversation::~SaslPLAINClientConversation() {};
 
-StatusWith<bool> SaslPLAINClientConversation::step(StringData inputData, std::string* outputData) {
+StatusWith<bool> SaslPLAINClientConversation::step(std::string_view inputData,
+                                                   std::string* outputData) {
     // Create PLAIN message on the form: user\0user\0pwd
 
     StringBuilder sb;

@@ -31,7 +31,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -73,6 +72,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -229,7 +229,7 @@ public:
                 // Collections to restore should be defined in kCollectionEntries.
                 auto collInfos = client.getCollectionInfos(DatabaseName::kConfig);
                 for (auto&& info : collInfos) {
-                    StringData collName = info.getStringField("name");
+                    std::string_view collName = info.getStringField("name");
                     // Ignore cache collections as they will be dropped later in the restore
                     // procedure.
                     if (kConfigCollections.find(collName) == kConfigCollections.end() &&

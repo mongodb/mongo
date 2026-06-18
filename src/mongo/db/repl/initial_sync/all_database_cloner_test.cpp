@@ -31,7 +31,6 @@
 #include "mongo/db/repl/initial_sync/all_database_cloner.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"

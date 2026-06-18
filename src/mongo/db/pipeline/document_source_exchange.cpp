@@ -30,12 +30,13 @@
 
 #include "mongo/db/pipeline/document_source_exchange.h"
 
+#include <string_view>
 #include <utility>
 namespace mongo {
 
 ALLOCATE_DOCUMENT_SOURCE_ID(exchange, DocumentSourceExchange::id)
 
-StringData DocumentSourceExchange::getSourceName() const {
+std::string_view DocumentSourceExchange::getSourceName() const {
     return kStageName;
 }
 

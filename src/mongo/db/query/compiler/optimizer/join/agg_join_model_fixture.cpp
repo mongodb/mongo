@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
 std::string AggJoinModelFixture::toString(const std::unique_ptr<Pipeline>& pipeline) {
     auto bson = pipeline->serializeToBson();

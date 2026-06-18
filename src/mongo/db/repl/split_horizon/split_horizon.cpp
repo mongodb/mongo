@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <iterator>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -107,7 +108,7 @@ SplitHorizon::ForwardMapping computeForwardMappings(
 
         // Process all of the BSON description of horizons into a linear list.
         auto convert = [](auto&& horizonObj) -> MapMember {
-            const StringData horizonName = horizonObj.fieldName();
+            const std::string_view horizonName = horizonObj.fieldName();
 
             if (horizonObj.type() != BSONType::string) {
                 uasserted(ErrorCodes::TypeMismatch,
@@ -210,7 +211,7 @@ void SplitHorizon::toBSON(BSONObjBuilder& configBuilder) const {
         return;
 
     // StringMaps are iterated in arbitrary order, so we sort before returning the horizons.
-    std::vector<std::pair<StringData, std::string>> sortedHorizons;
+    std::vector<std::pair<std::string_view, std::string>> sortedHorizons;
     for (const auto& horizon : _forwardMapping) {
         // The "__default" horizon should never be emitted in the horizon table.
         if (horizon.first == SplitHorizon::kDefaultHorizon)

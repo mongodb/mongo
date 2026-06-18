@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
@@ -37,15 +36,17 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the cluster commitTransaction command on mongos.
  */
 struct ClusterCommitTransactionCmdS {
-    static constexpr StringData kName = "commitTransaction"_sd;
+    static constexpr std::string_view kName = "commitTransaction"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;

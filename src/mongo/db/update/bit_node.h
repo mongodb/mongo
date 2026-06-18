@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,6 +45,7 @@
 #include "mongo/util/safe_num.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -79,7 +79,7 @@ protected:
     }
 
 private:
-    StringData operatorName() const final {
+    std::string_view operatorName() const final {
         return "$bit";
     }
 

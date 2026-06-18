@@ -49,6 +49,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 KeyStringSet makeKeySet(std::initializer_list<BSONObj> init = {}, RecordId id = RecordId()) {
     KeyStringSet keys;
@@ -1180,10 +1181,10 @@ TEST_F(WildcardKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
                                 rsKeyFormat};
 
     // Verify that the collation is only applied to String values, but all types are indexed.
-    auto dateVal = "{'$date': 1529453450288}"_sd;
-    auto oidVal = "{'$oid': '520e6431b7fa4ea22d6b1872'}"_sd;
-    auto tsVal = "{'$timestamp': {'t': 1, 'i': 100}}"_sd;
-    auto undefVal = "{'$undefined': true}"_sd;
+    auto dateVal = "{'$date': 1529453450288}"sv;
+    auto oidVal = "{'$oid': '520e6431b7fa4ea22d6b1872'}"sv;
+    auto tsVal = "{'$timestamp': {'t': 1, 'i': 100}}"sv;
+    auto undefVal = "{'$undefined': true}"sv;
 
     auto inputDoc = fromjson(
         "{a: [1, null, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: " + std::string(dateVal) +

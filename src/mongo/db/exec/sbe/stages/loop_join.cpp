@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -38,10 +37,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              std::unique_ptr<PlanStage> inner,
                              value::SlotVector outerProjects,
@@ -68,7 +69,7 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              JoinType joinType,
                              PlanNodeId nodeId,
                              bool participateInTrialRunTracking)
-    : PlanStage("nlj"_sd, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
+    : PlanStage("nlj"sv, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
       _outerProjects(std::move(outerProjects)),
       _outerCorrelated(std::move(outerCorrelated)),
       _innerProjects(std::move(innerProjects)),

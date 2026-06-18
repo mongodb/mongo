@@ -29,7 +29,6 @@
 
 #include "mongo/logv2/log_detail.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -61,6 +60,7 @@
 #include <functional>
 #include <new>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <variant>
@@ -93,7 +93,7 @@ bool loggingInProgress() {
     return loggingDepth > 0;
 }
 
-void signalSafeWriteToStderr(StringData message) {
+void signalSafeWriteToStderr(std::string_view message) {
     while (!message.empty()) {
 #if defined(_WIN32)
         auto ret = _write(_fileno(stderr), message.data(), message.size());
@@ -111,6 +111,7 @@ void signalSafeWriteToStderr(StringData message) {
 }
 
 namespace detail {
+using namespace std::literals::string_view_literals;
 
 namespace {
 GetTenantIDFn& getTenantID() {
@@ -210,21 +211,21 @@ static void checkUniqueAttrs(int32_t id, const TypeErasedAttributeStorage& attrs
         ++first;
         if (std::find_if(first, last, [&](auto&& a) { return a.name == it->name; }) == last)
             continue;
-        StringData sep;
+        std::string_view sep;
         std::string msg;
         for (auto&& a : attrs) {
             msg.append(fmt::format(R"({}"{}")", sep, a.name));
-            sep = ","_sd;
+            sep = ","sv;
         }
         uasserted(4793301, fmt::format("LOGV2 (id={}) attribute collision: [{}]", id, msg));
     }
 }
 
-static void doSafeLog(StringData reason,
+static void doSafeLog(std::string_view reason,
                       int32_t id,
                       LogSeverity const& severity,
                       LogOptions const& options,
-                      StringData message,
+                      std::string_view message,
                       TypeErasedAttributeStorage const& attrs) {
     std::string s;
     s += fmt::format("SafeLog: {{\n");
@@ -237,14 +238,14 @@ static void doSafeLog(StringData reason,
     s += fmt::format("    message: {:?},\n", message);
     if (!attrs.empty()) {
         s += fmt::format("    attrs: {{\n");
-        attrs.apply([&]<typename T>(StringData name, const T& val) {
+        attrs.apply([&]<typename T>(std::string_view name, const T& val) {
             s += fmt::format("        {{\n");
             s += fmt::format("            name: {:?},\n", name);
             s += fmt::format("            type: {:?},\n", demangleName(typeid(T)));
             if constexpr (std::is_integral_v<T>) {
                 s += fmt::format("            value: {},\n", val);
-            } else if constexpr (std::is_convertible_v<T, StringData>) {
-                s += fmt::format("            value: {:?},\n", StringData{val});
+            } else if constexpr (std::is_convertible_v<T, std::string_view>) {
+                s += fmt::format("            value: {:?},\n", std::string_view{val});
             } else {
                 s += fmt::format("            value: {:?},\n", "<unsupported>");
             }
@@ -259,7 +260,7 @@ static void doSafeLog(StringData reason,
 void _doLogImpl(int32_t id,
                 LogSeverity const& severity,
                 LogOptions const& options,
-                StringData message,
+                std::string_view message,
                 TypeErasedAttributeStorage const& attrs,
                 bool devStacktraces = false) {
     dassert(options.component() != LogComponent::kNumLogComponents);
@@ -283,7 +284,7 @@ void _doLogImpl(int32_t id,
         record.attribute_values().insert(
             attributes::message(),
             boost::log::attribute_value(
-                new boost::log::attributes::attribute_value_impl<StringData>(message)));
+                new boost::log::attributes::attribute_value_impl<std::string_view>(message)));
 
         record.attribute_values().insert(
             attributes::attributes(),
@@ -316,7 +317,7 @@ void _doLogImpl(int32_t id,
 void doLogImpl(int32_t id,
                LogSeverity const& severity,
                LogOptions const& options,
-               StringData message,
+               std::string_view message,
                TypeErasedAttributeStorage const& attrs,
                bool devStacktraces) {
     if (loggingInProgress()) {
@@ -335,7 +336,7 @@ void doLogImpl(int32_t id,
         _doLogImpl(4638200,
                    LogSeverity::Error(),
                    LogOptions(LogComponent::kAssert),
-                   "Exception during log"_sd,
+                   "Exception during log"sv,
                    AttributeStorage{"original_msg"_attr = message, "what"_attr = ex.what()});
 
         invariant(!kDebugBuild, fmt::format("Exception during log: {}", ex.what()));
@@ -352,7 +353,7 @@ void doLogImpl(int32_t id,
 
 void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
                            LogOptions const& options,
-                           StringData message,
+                           std::string_view message,
                            TypeErasedAttributeStorage const& attrs) {
 
     UnstructuredValueExtractor extractor;

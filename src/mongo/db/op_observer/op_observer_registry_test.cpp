@@ -30,7 +30,6 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context_test_fixture.h"

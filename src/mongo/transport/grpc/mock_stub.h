@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/transport/grpc/mock_client_context.h"
 #include "mongo/transport/grpc/mock_server_context.h"
 #include "mongo/transport/grpc/mock_server_stream.h"

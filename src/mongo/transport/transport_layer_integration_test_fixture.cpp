@@ -41,6 +41,8 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
+#include <string_view>
+
 namespace mongo::transport {
 
 std::shared_ptr<AsyncDBClient> AsyncClientIntegrationTestFixture::makeClient() {
@@ -90,7 +92,7 @@ executor::RemoteCommandRequest AsyncClientIntegrationTestFixture::makeExhaustHel
 
 AsyncClientIntegrationTestFixture::FailPointGuard
 AsyncClientIntegrationTestFixture::configureFailPoint(const std::shared_ptr<AsyncDBClient>& client,
-                                                      StringData fp,
+                                                      std::string_view fp,
                                                       BSONObj data) {
     auto configureFailPointRequest = makeTestRequest(DatabaseName::kAdmin,
                                                      BSON("configureFailPoint" << fp << "mode"
@@ -103,7 +105,7 @@ AsyncClientIntegrationTestFixture::configureFailPoint(const std::shared_ptr<Asyn
 AsyncClientIntegrationTestFixture::FailPointGuard
 AsyncClientIntegrationTestFixture::configureFailCommand(
     const std::shared_ptr<AsyncDBClient>& client,
-    StringData failCommand,
+    std::string_view failCommand,
     boost::optional<ErrorCodes::Error> errorCode,
     boost::optional<Milliseconds> blockTime) {
     auto data = BSON("failCommands" << BSON_ARRAY(failCommand));

@@ -28,9 +28,10 @@
  */
 #include "mongo/db/version_context.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -181,13 +182,13 @@ constexpr auto kLatestFCVString = multiversion::toString(GenericFCV::kLatest);
 constexpr auto kUninitializedFCVString =
     multiversion::toString(multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
 
-VersionContext makeFromOFCVString(StringData ofcvString) {
+VersionContext makeFromOFCVString(std::string_view ofcvString) {
     return VersionContext{BSON(VersionContextMetadata::kOFCVFieldName << ofcvString)};
 }
-VersionContext makeFromUpgradingOFCVString(StringData from, StringData to) {
+VersionContext makeFromUpgradingOFCVString(std::string_view from, std::string_view to) {
     return makeFromOFCVString(fmt::format("upgrading from {} to {}", from, to));
 }
-VersionContext makeFromDowngradingOFCVString(StringData from, StringData to) {
+VersionContext makeFromDowngradingOFCVString(std::string_view from, std::string_view to) {
     return makeFromOFCVString(fmt::format("downgrading from {} to {}", from, to));
 }
 
@@ -245,9 +246,9 @@ TEST_F(VersionContextTest, DeserializeFromInvalidDocument) {
 
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("invalid"));
     ASSERT_THROWS_BAD_VALUE(
-        makeFromOFCVString(fmt::format(StringData("{}\0", 3), kLastLTSFCVString)));
+        makeFromOFCVString(fmt::format(std::string_view("{}\0", 3), kLastLTSFCVString)));
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(
-        fmt::format(StringData("{}\0{}", 5), kLastLTSFCVString, kLatestFCVString)));
+        fmt::format(std::string_view("{}\0{}", 5), kLastLTSFCVString, kLatestFCVString)));
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(fmt::format(" {}", kLastLTSFCVString)));
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(fmt::format("{} ", kLatestFCVString)));
     ASSERT_THROWS_BAD_VALUE(makeFromUpgradingOFCVString(kLatestFCVString, kLastLTSFCVString));

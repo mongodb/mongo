@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace mongo::query_settings {
@@ -81,7 +81,7 @@ public:
     void simplify();
 
     BSONObj toBSON() const;
-    void toBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    void toBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
         builder->append(fieldName, toBSON());
     }
 

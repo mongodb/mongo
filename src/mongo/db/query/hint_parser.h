@@ -30,10 +30,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -46,6 +47,6 @@ BSONObj parseHint(const BSONElement& element);
 /**
  * Writes the hint object if it is non-empty.
  */
-void serializeHintToBSON(const BSONObj& hint, StringData fieldName, BSONObjBuilder* builder);
+void serializeHintToBSON(const BSONObj& hint, std::string_view fieldName, BSONObjBuilder* builder);
 
 }  // namespace mongo

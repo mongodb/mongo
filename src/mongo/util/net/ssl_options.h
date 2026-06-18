@@ -40,6 +40,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -136,8 +137,8 @@ struct SSLParams {
         SSLMode_requireSSL
     };
 
-    static StatusWith<SSLModes> sslModeParse(StringData strMode);
-    static StatusWith<SSLModes> tlsModeParse(StringData strMode);
+    static StatusWith<SSLModes> sslModeParse(std::string_view strMode);
+    static StatusWith<SSLModes> tlsModeParse(std::string_view strMode);
     static std::string sslModeFormat(int mode);
     static std::string tlsModeFormat(int mode);
 };
@@ -231,7 +232,7 @@ Status storeSSLDisabledProtocols(
 const SSLParams& getSSLGlobalParams();
 
 Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
-                                StringData name,
-                                StringData value);
+                                std::string_view name,
+                                std::string_view value);
 
 }  // namespace MONGO_MOD_PUBLIC mongo

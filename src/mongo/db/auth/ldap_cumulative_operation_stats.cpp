@@ -29,7 +29,6 @@
 
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/ldap_operation_stats.h"
 #include "mongo/db/service_context.h"
@@ -38,24 +37,26 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 /**
  * LDAPOperationStats members
  */
-constexpr auto kNumberOfReferrals = "LDAPNumberOfReferrals"_sd;
-constexpr auto kNumberOfSuccessfulReferrals = "LDAPNumberOfSuccessfulReferrals"_sd;
-constexpr auto kNumberOfFailedReferrals = "LDAPNumberOfFailedReferrals"_sd;
-constexpr auto kBindStats = "bindStats"_sd;
-constexpr auto kSearchStats = "searchStats"_sd;
+constexpr auto kNumberOfReferrals = "LDAPNumberOfReferrals"sv;
+constexpr auto kNumberOfSuccessfulReferrals = "LDAPNumberOfSuccessfulReferrals"sv;
+constexpr auto kNumberOfFailedReferrals = "LDAPNumberOfFailedReferrals"sv;
+constexpr auto kBindStats = "bindStats"sv;
+constexpr auto kSearchStats = "searchStats"sv;
 
 /**
  * Fields of the Stats struct
  */
-constexpr auto kLDAPMetricNumOp = "numOp"_sd;
-constexpr auto kLDAPMetricDuration = "opDurationMicros"_sd;
+constexpr auto kLDAPMetricNumOp = "numOp"sv;
+constexpr auto kLDAPMetricDuration = "opDurationMicros"sv;
 
 const auto getLDAPCumulativeOperationStats =
     ServiceContext::declareDecoration<LDAPCumulativeOperationStats>();
@@ -63,7 +64,7 @@ const auto getLDAPCumulativeOperationStats =
 }  // namespace
 
 void LDAPCumulativeOperationStats::report(BSONObjBuilder* builder) const {
-    auto reportHelper = [=](const Stats& stats, StringData statsName) {
+    auto reportHelper = [=](const Stats& stats, std::string_view statsName) {
         BSONObjBuilder subObjBuildr(builder->subobjStart(statsName));
         subObjBuildr.append(kLDAPMetricNumOp, stats.numOps);
         subObjBuildr.append(kLDAPMetricDuration, durationCount<Microseconds>(stats.totalTime));
@@ -79,7 +80,7 @@ void LDAPCumulativeOperationStats::report(BSONObjBuilder* builder) const {
 }
 
 void LDAPCumulativeOperationStats::toString(StringBuilder* sb) const {
-    auto toStringHelper = [=](const Stats& stats, StringData statsName) {
+    auto toStringHelper = [=](const Stats& stats, std::string_view statsName) {
         *sb << statsName << ":{" << kLDAPMetricNumOp << ":" << stats.numOps << ","
             << kLDAPMetricDuration << ":" << durationCount<Microseconds>(stats.totalTime) << "}";
     };

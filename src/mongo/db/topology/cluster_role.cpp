@@ -33,15 +33,17 @@
 #include "mongo/util/assert_util.h"
 
 #include <iostream>
+#include <string_view>
 
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-const std::array<std::pair<ClusterRole, StringData>, 3> roleNames{{
-    {ClusterRole::ShardServer, "shard"_sd},
-    {ClusterRole::ConfigServer, "config"_sd},
-    {ClusterRole::RouterServer, "router"_sd},
+const std::array<std::pair<ClusterRole, std::string_view>, 3> roleNames{{
+    {ClusterRole::ShardServer, "shard"sv},
+    {ClusterRole::ConfigServer, "config"sv},
+    {ClusterRole::RouterServer, "router"sv},
 }};
 
 }  // namespace
@@ -63,7 +65,7 @@ BSONArray toBSON(ClusterRole role) {
 }
 
 std::ostream& operator<<(std::ostream& os, ClusterRole r) {
-    StringData sep;
+    std::string_view sep;
     os << "ClusterRole{";
     for (auto&& [key, name] : roleNames) {
         if (r.has(key)) {
@@ -76,7 +78,7 @@ std::ostream& operator<<(std::ostream& os, ClusterRole r) {
 }
 
 StringBuilder& operator<<(StringBuilder& s, ClusterRole r) {
-    StringData sep;
+    std::string_view sep;
     s << "ClusterRole{";
     for (auto&& [key, name] : roleNames) {
         if (r.has(key)) {

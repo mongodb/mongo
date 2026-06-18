@@ -34,6 +34,8 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo {
@@ -64,7 +66,7 @@ public:
         return _projectionCovered;
     }
 
-    void setStageName(StringData stageName) {
+    void setStageName(std::string_view stageName) {
         _stageName = std::string{stageName};
     }
 
@@ -76,11 +78,11 @@ public:
         _numDocumentsFetched += amount;
     }
 
-    void setIndexName(StringData indexName) {
+    void setIndexName(std::string_view indexName) {
         _indexName = std::string{indexName};
     }
 
-    void setIndexKeyPattern(StringData indexKeyPattern) {
+    void setIndexKeyPattern(std::string_view indexKeyPattern) {
         _indexKeyPattern = std::string{indexKeyPattern};
     }
 

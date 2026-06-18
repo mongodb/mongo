@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
@@ -55,6 +54,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -110,7 +110,7 @@ public:
                                                    const NamespaceString& nss,
                                                    const CollectionOptions& collectionOptions,
                                                    IndexCatalogEntry* entry,
-                                                   StringData ident);
+                                                   std::string_view ident);
 
     /**
      * Equivalent to (but shorter and faster than): dynamic_cast<SortedDataIndexAccessMethod*>(this)

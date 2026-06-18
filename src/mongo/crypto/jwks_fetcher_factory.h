@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/jwks_fetcher.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -41,7 +42,7 @@ namespace mongo {
 class MONGO_MOD_OPEN JWKSFetcherFactory {
 public:
     virtual ~JWKSFetcherFactory() = default;
-    virtual std::unique_ptr<crypto::JWKSFetcher> makeJWKSFetcher(StringData issuer) const = 0;
+    virtual std::unique_ptr<crypto::JWKSFetcher> makeJWKSFetcher(std::string_view issuer) const = 0;
 };
 
 

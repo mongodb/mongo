@@ -42,6 +42,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <thread>
 #include <utility>
 
@@ -197,7 +198,7 @@ void MozJSProxyScope::setNumber(const char* field, double val) {
     run([&] { _implScope->setNumber(field, val); });
 }
 
-void MozJSProxyScope::setString(const char* field, StringData val) {
+void MozJSProxyScope::setString(const char* field, std::string_view val) {
     run([&] { _implScope->setString(field, val); });
 }
 
@@ -243,7 +244,7 @@ int MozJSProxyScope::invoke(ScriptingFunction func,
     return out;
 }
 
-bool MozJSProxyScope::exec(StringData code,
+bool MozJSProxyScope::exec(std::string_view code,
                            const std::string& name,
                            bool printResult,
                            bool reportError,

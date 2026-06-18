@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
@@ -41,6 +40,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -90,7 +90,7 @@ protected:
     }
 
     template <typename... Rest>
-    void append(StringData arg, Rest&&... rest) {
+    void append(std::string_view arg, Rest&&... rest) {
         buffer.appendCStr(arg);
         append(rest...);
     }

@@ -45,6 +45,7 @@
 #include "mongo/util/scopeguard.h"
 
 #include <fstream>
+#include <string_view>
 
 #include <asio.hpp>
 
@@ -61,6 +62,7 @@ namespace fs = boost::filesystem;
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 #define TEST_CERTS_DIR "jstests/libs/"
 // certs & CRLs rooted in ca.pem
@@ -1161,7 +1163,7 @@ TEST(SSLManager, OpenSSLDecryptBadPEMKey) {
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, true /* isSSLServer */);
 
-    auto sw = manager->decryptPEMKey("badPEMContents"_sd, "password"_sd);
+    auto sw = manager->decryptPEMKey("badPEMContents"sv, "password"sv);
     ASSERT_NOT_OK(sw.getStatus());
     ASSERT_EQ(sw.getStatus().code(), ErrorCodes::InvalidSSLConfiguration);
 }
@@ -1176,7 +1178,7 @@ TEST(SSLManager, OpenSSLDecryptPEMKeyEmbeddedNullInPasswordNotAllowed) {
         SSLManagerInterface::create(params, true /* isSSLServer */);
 
     ASSERT_THROWS_CODE(
-        manager->decryptPEMKey("whatever"_sd, "password\0extrastuff"_sd), DBException, 9527900);
+        manager->decryptPEMKey("whatever"sv, "password\0extrastuff"sv), DBException, 9527900);
 }
 
 TEST(SSLManager, OpenSSLDecryptPEMKeyPasswordWithoutNulTermination) {
@@ -1186,8 +1188,8 @@ TEST(SSLManager, OpenSSLDecryptPEMKeyPasswordWithoutNulTermination) {
     params.sslCAFile = "jstests/libs/ca.pem";
 
     auto pemContents = loadFile("jstests/libs/password_protected.pem");
-    auto fullStr = "qwerty_extra_bytes"_sd;
-    StringData password = fullStr.substr(0, 6);  // no null termination
+    auto fullStr = "qwerty_extra_bytes"sv;
+    std::string_view password = fullStr.substr(0, 6);  // no null termination
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, true /* isSSLServer */);
@@ -1202,7 +1204,7 @@ TEST(SSLManager, OpenSSLDecryptPEMKeyEmptyPasswordShouldFail) {
     params.sslCAFile = "jstests/libs/ca.pem";
 
     auto pemContents = loadFile("jstests/libs/password_protected.pem");
-    auto password = ""_sd;
+    auto password = ""sv;
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, true /* isSSLServer */);
@@ -1222,7 +1224,7 @@ TEST(SSLManager, NonOpenSSLDecryptPEMKeyNotImplemented) {
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, true /* isSSLServer */);
 
-    auto sw = manager->decryptPEMKey("pemContents"_sd, "password"_sd);
+    auto sw = manager->decryptPEMKey("pemContents"sv, "password"sv);
     ASSERT_NOT_OK(sw.getStatus());
     ASSERT_EQ(sw.getStatus().code(), ErrorCodes::NotImplemented);
 }

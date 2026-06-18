@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -49,6 +48,7 @@
 #include <functional>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -74,7 +74,7 @@ public:
      * If the given string represents a valid UUID, constructs and returns the UUID,
      * otherwise returns an error.
      */
-    static StatusWith<UUID> parse(StringData s);
+    static StatusWith<UUID> parse(std::string_view s);
 
     /**
      * If the given BSONElement represents a valid UUID, constructs and returns the UUID,
@@ -103,7 +103,7 @@ public:
     /**
      * Returns whether this string represents a valid UUID.
      */
-    static bool isUUIDString(StringData s);
+    static bool isUUIDString(std::string_view s);
 
     /*
      * Return the underlying 128-bit array.
@@ -122,7 +122,7 @@ public:
     /**
      * Appends to builder as BinData(4, "...") element with the given name.
      */
-    void appendToBuilder(BSONObjBuilder* builder, StringData name) const;
+    void appendToBuilder(BSONObjBuilder* builder, std::string_view name) const;
 
     /**
      * Appends to array builder as BinData(4, "...").
@@ -179,7 +179,7 @@ public:
      * Supports use of UUID with the BSON macro:
      *     BSON("uuid" << uuid) -> { uuid: BinData(4, "...") }
      */
-    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, const UUID& value) {
+    friend void appendToBson(BSONObjBuilder& bob, std::string_view fieldName, const UUID& value) {
         value.appendToBuilder(&bob, fieldName);
     }
 

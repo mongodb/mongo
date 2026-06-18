@@ -35,6 +35,8 @@
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
 
+#include <string_view>
+
 namespace mongo::extension::host_connector {
 
 ::MongoExtensionStatus* PipelineDependenciesAdapter::_hostNeedsMetadata(
@@ -44,7 +46,7 @@ namespace mongo::extension::host_connector {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         const auto sv = byteViewAsStringView(name);
         *result = static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl().getNeedsMetadata(
-            DocumentMetadataFields::parseMetaType(StringData{sv.data(), sv.size()}));
+            DocumentMetadataFields::parseMetaType(sv));
     });
 }
 

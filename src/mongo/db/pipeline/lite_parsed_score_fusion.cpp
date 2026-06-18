@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/lite_parsed_score_fusion.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/extension/host/extension_search_server_status.h"

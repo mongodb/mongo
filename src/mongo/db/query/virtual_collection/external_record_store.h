@@ -49,6 +49,7 @@
 #include <cstdint>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -80,7 +81,7 @@ public:
         return nullptr;
     }
 
-    StringData getIdent() const final {
+    std::string_view getIdent() const final {
         unimplementedTasserted();
         static std::string ident;
         return ident;

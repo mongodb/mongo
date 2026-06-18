@@ -52,6 +52,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -60,6 +61,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using std::unique_ptr;
 
@@ -86,7 +88,7 @@ DeleteStage::DeleteStage(ExpressionContext* expCtx,
                          PlanStage* child)
     : DeleteStage(kStageType, expCtx, std::move(params), ws, collection, child) {}
 
-DeleteStage::DeleteStage(StringData stageType,
+DeleteStage::DeleteStage(std::string_view stageType,
                          ExpressionContext* expCtx,
                          DeleteStageParams params,
                          WorkingSet* ws,
@@ -212,7 +214,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     if (!_params.isExplain && !_params.fromMigrate) {
         auto [immediateReturnStageState, fromMigrate] = _preWriteFilter.checkIfNotWritable(
             member->doc.value(),
-            "delete"_sd,
+            "delete"sv,
             collectionPtr()->ns(),
             [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                 planExecutorShardingState(opCtx()).criticalSectionFuture =

@@ -32,12 +32,15 @@
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
+#include <string_view>
+
 
 namespace mongo {
 
 namespace exec::expression {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Object to hold data that is required when evaluating Regex expressions.
@@ -105,7 +108,7 @@ void extractRegexAndOptions(const Value& regexPattern,
 
     // The 'regex' field can be a RegEx object and may have its own options...
     if (regexPattern.getType() == BSONType::regEx) {
-        StringData regexFlags = regexPattern.getRegexFlags();
+        std::string_view regexFlags = regexPattern.getRegexFlags();
         extractedPattern = regexPattern.getRegex();
         uassert(51107,
                 str::stream()
@@ -233,7 +236,7 @@ pcre::MatchData execute(RegexExecutionState* regexState, const std::string& opNa
     tassert(11103509, "Expected non-nullish regexState", !regexState->nullish());
     tassert(11103510, "Expected regexState to contain a valid pcrePtr", regexState->pcrePtr);
 
-    StringData in = *regexState->input;
+    std::string_view in = *regexState->input;
     auto m = regexState->pcrePtr->matchView(in, {}, regexState->startBytePos);
     uassert(51156,
             str::stream() << "Error occurred while executing the regular expression in " << opName
@@ -269,7 +272,7 @@ Value nextMatch(RegexExecutionState* regexState, const std::string& opName) {
     captures.reserve(m.captureCount());
 
     for (size_t i = 1; i < m.captureCount() + 1; ++i) {
-        if (StringData cap = m[i]; !cap.data()) {
+        if (std::string_view cap = m[i]; !cap.data()) {
             // Use BSONNULL placeholder for unmatched capture groups.
             captures.push_back(Value(BSONNULL));
         } else {
@@ -289,18 +292,18 @@ Value nextMatch(RegexExecutionState* regexState, const std::string& opName) {
  * 'regexState'. This function returns the matched MatchData object and the input substring
  * preceding the match.
  */
-std::pair<pcre::MatchData, StringData> nextMatchAndPrecedingString(RegexExecutionState* regexState,
-                                                                   const std::string& opName) {
+std::pair<pcre::MatchData, std::string_view> nextMatchAndPrecedingString(
+    RegexExecutionState* regexState, const std::string& opName) {
     auto m = execute(regexState, opName);
     if (!m) {
         // No match.
-        return {std::move(m), ""_sd};
+        return {std::move(m), ""sv};
     }
 
     const int matchPos = m[0].data() - m.input().data();
 
-    const StringData beforeMatch = m.input().substr(regexState->beforeMatchStrStart,
-                                                    matchPos - regexState->beforeMatchStrStart);
+    const std::string_view beforeMatch = m.input().substr(
+        regexState->beforeMatchStrStart, matchPos - regexState->beforeMatchStrStart);
 
     // Move indices for next match.
     regexState->beforeMatchStrStart += beforeMatch.size() + m[0].size();
@@ -355,7 +358,7 @@ Value evaluate(const ExpressionRegexFindAll& expr,
     if (executionState.nullish()) {
         return Value(std::move(output));
     }
-    StringData input = *(executionState.input);
+    std::string_view input = *(executionState.input);
     size_t totalDocSize = 0;
 
     // Using do...while loop because, when input is an empty string, we still want to see if there
@@ -458,8 +461,8 @@ Value evaluate(const ExpressionSplit& expr,
 
     if (separatorArg.getType() == BSONType::string) {
         // Split using a string delimiter.
-        StringData input = inputArg.getStringData();
-        StringData separator = separatorArg.getStringData();
+        std::string_view input = inputArg.getStringData();
+        std::string_view separator = separatorArg.getStringData();
 
         uassert(40087, "$split requires a non-empty separator", !separator.empty());
 
@@ -471,13 +474,13 @@ Value evaluate(const ExpressionSplit& expr,
         const char* it = remainingHaystack;
         while ((it = std::search(remainingHaystack, haystackEnd, needle, needleEnd)) !=
                haystackEnd) {
-            StringData sd(remainingHaystack, it - remainingHaystack);
+            std::string_view sd(remainingHaystack, it - remainingHaystack);
             output.push_back(Value(sd));
             remainingHaystack = it + separator.size();
         }
 
-        StringData splitString(remainingHaystack,
-                               input.size() - (remainingHaystack - input.data()));
+        std::string_view splitString(remainingHaystack,
+                                     input.size() - (remainingHaystack - input.data()));
         output.push_back(Value(splitString));
         return Value(std::move(output));
     }
@@ -507,7 +510,7 @@ Value evaluate(const ExpressionSplit& expr,
             break;
         }
         output.push_back(Value(beforeMatch));
-        for (StringData subMatch : match.getCaptures()) {
+        for (std::string_view subMatch : match.getCaptures()) {
             output.push_back(Value(subMatch));
         }
     }
@@ -522,8 +525,8 @@ Value evaluateReplace(
     const Document& root,
     Variables* variables,
     const EvaluationContext& ctx,
-    std::function<Value(StringData, StringData, StringData)> replaceOpStr,
-    std::function<Value(StringData, RegexExecutionState, StringData)> replaceOpRegEx) {
+    std::function<Value(std::string_view, std::string_view, std::string_view)> replaceOpStr,
+    std::function<Value(std::string_view, RegexExecutionState, std::string_view)> replaceOpRegEx) {
     Value input = expr.getInput()->evaluate(root, variables, ctx);
     Value find = expr.getFind()->evaluate(root, variables, ctx);
     Value replacement = expr.getReplacement()->evaluate(root, variables, ctx);
@@ -580,10 +583,11 @@ Value evaluate(const ExpressionReplaceOne& expr,
                const Document& root,
                Variables* variables,
                const EvaluationContext& ctx) {
-    auto replaceOneOp = [](StringData input, StringData find, StringData replacement) -> Value {
+    auto replaceOneOp =
+        [](std::string_view input, std::string_view find, std::string_view replacement) -> Value {
         size_t startIndex = input.find(find);
         if (startIndex == std::string::npos) {
-            return Value(StringData(input));
+            return Value(std::string_view(input));
         }
         // An empty string matches at every position, so replaceOne should insert the replacement
         // text at position 0. input.find correctly returns position 0 when 'find' is empty, so we
@@ -595,8 +599,9 @@ Value evaluate(const ExpressionReplaceOne& expr,
         output << input.substr(endIndex);
         return Value(output.stringData());
     };
-    auto replaceOneOpRegEx =
-        [&](StringData input, RegexExecutionState executionState, StringData replacement) -> Value {
+    auto replaceOneOpRegEx = [&](std::string_view input,
+                                 RegexExecutionState executionState,
+                                 std::string_view replacement) -> Value {
         auto [match, beforeMatch] = nextMatchAndPrecedingString(&executionState, expr.getOpName());
         if (!match) {
             // No match.
@@ -613,7 +618,8 @@ Value evaluate(const ExpressionReplaceAll& expr,
                const Document& root,
                Variables* variables,
                const EvaluationContext& ctx) {
-    auto replaceAllOpStr = [](StringData input, StringData find, StringData replacement) -> Value {
+    auto replaceAllOpStr =
+        [](std::string_view input, std::string_view find, std::string_view replacement) -> Value {
         // An empty string matches at every position, so replaceAll should insert 'replacement'
         // at every position when 'find' is empty. Handling this as a special case lets us
         // assume 'find' is nonempty in the usual case.
@@ -643,8 +649,9 @@ Value evaluate(const ExpressionReplaceAll& expr,
         }
         return Value(output.stringData());
     };
-    auto replaceAllOpRegEx =
-        [&](StringData input, RegexExecutionState executionState, StringData replacement) -> Value {
+    auto replaceAllOpRegEx = [&](std::string_view input,
+                                 RegexExecutionState executionState,
+                                 std::string_view replacement) -> Value {
         StringBuilder output;
 
         // Condition uses <= instead of < to also capture possible empty matches at the end of the

@@ -39,6 +39,7 @@
 
 #include <cstring>
 #include <iosfwd>
+#include <string_view>
 #include <type_traits>
 
 MONGO_MOD_PUBLIC;
@@ -170,10 +171,10 @@ struct DataType {
 };
 
 template <>
-struct DataType::Handler<StringData> {
+struct DataType::Handler<std::string_view> {
     // Consumes all available data, producing
-    // a `StringData(ptr,length)`.
-    static Status load(StringData* sdata,
+    // a `std::string_view(ptr,length)`.
+    static Status load(std::string_view* sdata,
                        const char* ptr,
                        size_t length,
                        size_t* advanced,
@@ -182,11 +183,14 @@ struct DataType::Handler<StringData> {
     // Copies `sdata` fully into the [ptr,ptr+length) range.
     // Does nothing and returns an Overflow status if
     // `sdata` doesn't fit.
-    static Status store(
-        StringData sdata, char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset);
+    static Status store(std::string_view sdata,
+                        char* ptr,
+                        size_t length,
+                        size_t* advanced,
+                        std::ptrdiff_t debug_offset);
 
-    static StringData defaultConstruct() {
-        return StringData();
+    static std::string_view defaultConstruct() {
+        return std::string_view();
     }
 };
 }  // namespace mongo

@@ -40,6 +40,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -100,8 +101,10 @@ std::unique_ptr<RecordStoreHarnessHelper> newRecordStoreHarnessHelper(
 using WriteConflictFailPointFn =
     std::function<std::unique_ptr<FailPointEnableBlock>(FailPoint::ModeOptions)>;
 
-void registerWriteConflictForWritesFactory(StringData engineName, WriteConflictFailPointFn factory);
-void registerWriteConflictForReadsFactory(StringData engineName, WriteConflictFailPointFn factory);
+void registerWriteConflictForWritesFactory(std::string_view engineName,
+                                           WriteConflictFailPointFn factory);
+void registerWriteConflictForReadsFactory(std::string_view engineName,
+                                          WriteConflictFailPointFn factory);
 
 std::unique_ptr<FailPointEnableBlock> enableWriteConflictForWrites(FailPoint::ModeOptions mode);
 std::unique_ptr<FailPointEnableBlock> enableWriteConflictForReads(FailPoint::ModeOptions mode);

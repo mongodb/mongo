@@ -44,6 +44,8 @@
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
@@ -128,7 +130,7 @@ const IndexToDiscriminatorMap emptyDiscriminators{};
 }  // namespace
 
 const IndexToDiscriminatorMap& PlanCacheIndexabilityState::getPathDiscriminators(
-    StringData path) const {
+    std::string_view path) const {
     PathDiscriminatorsMap::const_iterator it = _pathDiscriminatorsMap.find(path);
     if (it == _pathDiscriminatorsMap.end()) {
         return emptyDiscriminators;
@@ -137,7 +139,7 @@ const IndexToDiscriminatorMap& PlanCacheIndexabilityState::getPathDiscriminators
 }
 
 IndexToDiscriminatorMap PlanCacheIndexabilityState::buildWildcardDiscriminators(
-    StringData path) const {
+    std::string_view path) const {
 
     IndexToDiscriminatorMap ret;
     for (auto&& wildcardDiscriminator : _wildcardIndexDiscriminators) {

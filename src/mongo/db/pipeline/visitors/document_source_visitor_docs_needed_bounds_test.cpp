@@ -53,6 +53,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class VisitorDocsNeededBoundsTest : public AggregationContextFixture {
 protected:
     VisitorDocsNeededBoundsTest() {
@@ -111,7 +112,7 @@ protected:
     }
 
     auto project() {
-        return DocumentSourceProject::create(BSON("a" << 1), getExpCtx(), "$project"_sd);
+        return DocumentSourceProject::create(BSON("a" << 1), getExpCtx(), "$project"sv);
     }
 
     auto sample() {

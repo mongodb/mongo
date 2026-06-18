@@ -37,6 +37,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
@@ -55,7 +57,9 @@ KeyStringSet generateMultikeyMetadataIndexKeys(const BSONObj& keyPattern,
     return metadataKeys;
 }
 
-void assertKeyStringSetsEqual(const KeyStringSet& a, const KeyStringSet& b, StringData context) {
+void assertKeyStringSetsEqual(const KeyStringSet& a,
+                              const KeyStringSet& b,
+                              std::string_view context) {
     ASSERT_EQ(a.size(), b.size()) << context;
     auto itA = a.begin();
     auto itB = b.begin();
@@ -67,7 +71,7 @@ void assertKeyStringSetsEqual(const KeyStringSet& a, const KeyStringSet& b, Stri
 void verifyRoundTrip(const BSONObj& keyPattern,
                      const KeyStringSet& originalKeys,
                      KeyFormat rsKeyFormat,
-                     StringData context) {
+                     std::string_view context) {
     const auto ordering = WildcardAccessMethod::makeOrdering(keyPattern);
 
     auto fieldPaths = set_multikey_metadata_oplog_helpers::extractFieldPathsFromMetadataKeys(

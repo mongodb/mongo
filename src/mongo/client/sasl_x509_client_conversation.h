@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 /**
@@ -51,7 +51,7 @@ public:
      **/
     explicit SaslX509ClientConversation(SaslClientSession* saslClientSession);
 
-    StatusWith<bool> step(StringData inputData, std::string* outputData) override;
+    StatusWith<bool> step(std::string_view inputData, std::string* outputData) override;
 
     boost::optional<std::uint32_t> currentStep() const override {
         return 1;

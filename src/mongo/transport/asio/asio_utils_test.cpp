@@ -33,15 +33,20 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
+#include <string_view>
+
 #include <asio.hpp>
 
 namespace mongo::transport {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace unittest::match;
 
 template <typename Stream>
-void writeToSocketAndPollForResponse(Stream& writeSocket, Stream& readSocket, StringData data) {
+void writeToSocketAndPollForResponse(Stream& writeSocket,
+                                     Stream& readSocket,
+                                     std::string_view data) {
     // Write our payload to our socket.
     asio::write(writeSocket, asio::const_buffer(data.data(), data.size()));
 
@@ -65,7 +70,7 @@ void peekEmptySocket(Stream& readSocket) {
 }
 
 template <typename Stream>
-void peekAllSubstrings(Stream& writeSocket, Stream& readSocket, StringData data) {
+void peekAllSubstrings(Stream& writeSocket, Stream& readSocket, std::string_view data) {
     writeToSocketAndPollForResponse(writeSocket, readSocket, data);
 
     // Peek from the socket for all substrings up to and including the full payload size.
@@ -74,12 +79,12 @@ void peekAllSubstrings(Stream& writeSocket, Stream& readSocket, StringData data)
         auto inBuffer = std::make_unique<char[]>(bufferSize);
         const auto bytesRead =
             peekASIOStream(readSocket, asio::mutable_buffer(inBuffer.get(), bufferSize));
-        ASSERT_THAT(StringData(inBuffer.get(), bytesRead), Eq(data.substr(0, bufferSize)));
+        ASSERT_THAT(std::string_view(inBuffer.get(), bytesRead), Eq(data.substr(0, bufferSize)));
     }
 }
 
 template <typename Stream>
-void peekPastBuffer(Stream& writeSocket, Stream& readSocket, StringData data) {
+void peekPastBuffer(Stream& writeSocket, Stream& readSocket, std::string_view data) {
     writeToSocketAndPollForResponse(writeSocket, readSocket, data);
 
     // Peek from the socket more than is available. We should just get what is available.
@@ -88,7 +93,7 @@ void peekPastBuffer(Stream& writeSocket, Stream& readSocket, StringData data) {
         auto inBuffer = std::make_unique<char[]>(bufferSize);
         const auto bytesRead =
             peekASIOStream(readSocket, asio::mutable_buffer(inBuffer.get(), bufferSize));
-        ASSERT_THAT(StringData(inBuffer.get(), bytesRead), Eq(data));
+        ASSERT_THAT(std::string_view(inBuffer.get(), bytesRead), Eq(data));
     }
 }
 
@@ -114,7 +119,7 @@ TEST(ASIOUtils, PeekAvailableBytesUnixBlocking) {
     auto& writeSocket = socks.serverSocket();
     auto& readSocket = socks.clientSocket();
 
-    peekAllSubstrings(writeSocket, readSocket, "example"_sd);
+    peekAllSubstrings(writeSocket, readSocket, "example"sv);
 }
 
 TEST(ASIOUtils, PeekAvailableBytesUnixNonBlocking) {
@@ -123,7 +128,7 @@ TEST(ASIOUtils, PeekAvailableBytesUnixNonBlocking) {
     auto& readSocket = socks.clientSocket();
     readSocket.non_blocking(true);
 
-    peekAllSubstrings(writeSocket, readSocket, "example"_sd);
+    peekAllSubstrings(writeSocket, readSocket, "example"sv);
 }
 
 TEST(ASIOUtils, PeekPastAvailableBytesUnixBlocking) {
@@ -131,7 +136,7 @@ TEST(ASIOUtils, PeekPastAvailableBytesUnixBlocking) {
     auto& writeSocket = socks.serverSocket();
     auto& readSocket = socks.clientSocket();
 
-    peekPastBuffer(writeSocket, readSocket, "example"_sd);
+    peekPastBuffer(writeSocket, readSocket, "example"sv);
 }
 
 TEST(ASIOUtils, PeekPastAvailableBytesUnixNonBlocking) {
@@ -140,7 +145,7 @@ TEST(ASIOUtils, PeekPastAvailableBytesUnixNonBlocking) {
     auto& readSocket = socks.clientSocket();
     readSocket.non_blocking(true);
 
-    peekPastBuffer(writeSocket, readSocket, "example"_sd);
+    peekPastBuffer(writeSocket, readSocket, "example"sv);
 }
 #endif  // ASIO_HAS_LOCAL_SOCKETS
 
@@ -157,24 +162,24 @@ TEST(ASIOUtils, PeekEmptySocketTCPNonBlocking) {
 
 TEST(ASIOUtils, PeekAvailableBytesTCPBlocking) {
     TCPSocketPair sockets;
-    peekAllSubstrings(sockets.serverSocket(), sockets.clientSocket(), "example"_sd);
+    peekAllSubstrings(sockets.serverSocket(), sockets.clientSocket(), "example"sv);
 }
 
 TEST(ASIOUtils, PeekAvailableBytesTCPNonBlocking) {
     TCPSocketPair sockets;
     sockets.clientSocket().non_blocking(true);
-    peekAllSubstrings(sockets.serverSocket(), sockets.clientSocket(), "example"_sd);
+    peekAllSubstrings(sockets.serverSocket(), sockets.clientSocket(), "example"sv);
 }
 
 TEST(ASIOUtils, PeekPastAvailableBytesTCPBlocking) {
     TCPSocketPair sockets;
-    peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"_sd);
+    peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"sv);
 }
 
 TEST(ASIOUtils, PeekPastAvailableBytesTCPNonBlocking) {
     TCPSocketPair sockets;
     sockets.clientSocket().non_blocking(true);
-    peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"_sd);
+    peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"sv);
 }
 }  // namespace
 }  // namespace mongo::transport

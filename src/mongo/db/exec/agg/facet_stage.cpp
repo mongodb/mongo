@@ -34,6 +34,8 @@
 #include "mongo/db/exec/agg/tee_consumer_stage.h"
 #include "mongo/db/pipeline/document_source_facet.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceFacetToStageFn(
@@ -71,7 +73,7 @@ private:
 };
 }  // namespace
 
-FacetStage::FacetStage(StringData stageName,
+FacetStage::FacetStage(std::string_view stageName,
                        const std::vector<DocumentSourceFacet::FacetPipeline>& facetPipelines,
                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        size_t bufferSizeBytes,

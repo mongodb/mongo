@@ -67,6 +67,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -149,7 +150,7 @@ REGISTER_AGG_STAGE_MAPPING(findAndModifyImageLookupStage,
                            findAndModifyImageLookupStageToStageFn);
 
 FindAndModifyImageLookupStage::FindAndModifyImageLookupStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     bool includeCommitTransactionTimestamp)
     : Stage(stageName, pExpCtx),

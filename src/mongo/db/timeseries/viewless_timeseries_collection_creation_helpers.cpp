@@ -34,9 +34,11 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
+#include <string_view>
+
 namespace mongo::timeseries {
 
-BSONObj generateTimeseriesValidator(int bucketVersion, StringData timeField) {
+BSONObj generateTimeseriesValidator(int bucketVersion, std::string_view timeField) {
     if (bucketVersion != timeseries::kTimeseriesControlCompressedSortedVersion &&
         bucketVersion != timeseries::kTimeseriesControlUncompressedVersion &&
         bucketVersion != timeseries::kTimeseriesControlCompressedUnsortedVersion) {
@@ -158,7 +160,7 @@ BSONObj generateTimeseriesValidator(int bucketVersion, StringData timeField) {
     return validator.obj();
 }
 
-void validateTimeseriesValidator(const BSONObj& validator, StringData timeField) {
+void validateTimeseriesValidator(const BSONObj& validator, std::string_view timeField) {
     for (auto bucketVersion = timeseries::kTimeseriesControlLatestVersion;
          bucketVersion > timeseries::kTimeseriesControlMinVersion;
          --bucketVersion) {

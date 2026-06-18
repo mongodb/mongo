@@ -33,7 +33,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -69,6 +68,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -76,7 +76,8 @@
 
 namespace mongo {
 namespace {
-constexpr auto kTimingSection = "timing"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kTimingSection = "timing"sv;
 
 class CmdServerStatus : public BasicCommand {
 public:
@@ -128,7 +129,7 @@ public:
         const auto runStart = clock->now();
         BSONObjBuilder timeBuilder(256);
         Date_t phaseStart = runStart;
-        auto recordPhase = [&](StringData name) {
+        auto recordPhase = [&](std::string_view name) {
             const Date_t t = clock->now();
             timeBuilder.appendNumber(fmt::format("after {}", name),
                                      durationCount<Milliseconds>(t - phaseStart));
@@ -151,7 +152,7 @@ public:
         result.appendDate("localTime", Date_t::now());
 
         // Milliseconds spent building the fixed header fields above (not cumulative since start).
-        recordPhase("basic"_sd);
+        recordPhase("basic"sv);
 
         // Individual section 'includeByDefault()' settings will be bypassed if the caller specified
         // {all: 1}.
@@ -207,7 +208,7 @@ public:
         }
 
         // --- counters
-        auto metricsEl = cmdObj["metrics"_sd];
+        auto metricsEl = cmdObj["metrics"sv];
         if ((!excludeAllSections && metricsEl.eoo()) || metricsEl.trueValue()) {
             // Always gather the role-agnostic metrics. If `opCtx` has a role,
             // additionally merge that role's associated metrics.
@@ -220,7 +221,7 @@ public:
             if (metricsEl.type() == BSONType::object)
                 excludePaths = BSON("metrics" << metricsEl.embeddedObject());
             appendMergedTrees(metricTrees, result, excludePaths);
-            recordPhase("metrics"_sd);
+            recordPhase("metrics"sv);
         }
 
         // --- some hard coded global things hard to pull out
@@ -308,7 +309,7 @@ public:
 auto asserts = *ServerStatusSectionBuilder<Asserts>("asserts");
 
 struct MemBaseMetricPolicy {
-    void appendTo(BSONObjBuilder& bob, StringData leafName) const {
+    void appendTo(BSONObjBuilder& bob, std::string_view leafName) const {
         BSONObjBuilder b{bob.subobjStart(leafName)};
         b.append("bits", static_cast<int>(sizeof(void*) * CHAR_BIT));
 

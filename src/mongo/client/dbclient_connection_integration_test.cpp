@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,16 +48,18 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const auto sleepCmd = fromjson(R"({sleep: 1, locks: 'none', secs: 100})");
-constexpr StringData kAppName = "DBClientConnectionTest"_sd;
+constexpr std::string_view kAppName = "DBClientConnectionTest"sv;
 
 class DBClientConnectionFixture : public unittest::Test {
 public:
-    static std::unique_ptr<DBClientConnection> makeConn(StringData name = kAppName) {
+    static std::unique_ptr<DBClientConnection> makeConn(std::string_view name = kAppName) {
         auto swConn = unittest::getFixtureConnectionString().connect(name);
         uassertStatusOK(swConn.getStatus());
 

@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tracking/string_map.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -59,7 +59,7 @@ public:
      * - An existing data field is missing in this measurement - adds a skip to the builder of the
      * missing data field.
      */
-    void insertOne(const BSONObj& measurement, boost::optional<StringData> metaField);
+    void insertOne(const BSONObj& measurement, boost::optional<std::string_view> metaField);
 
     /**
      * Sets internal state of builders to that of pre-existing compressed builders.
@@ -72,20 +72,21 @@ public:
      * Calls BSONColumnBuilder::intermediate() for all builders. Updates the compressed size both
      * internally as well as the one passed in.
      */
-    std::vector<std::pair<StringData, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>
+    std::vector<
+        std::pair<std::string_view, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>
     intermediate(int32_t& compressedSizeDelta);
 
     /**
      * Returns the date of the last measurement in the time column.
      */
-    Date_t timeOfLastMeasurement(StringData timeField) const;
+    Date_t timeOfLastMeasurement(std::string_view timeField) const;
 
     size_t numFields() const {
         return _builders.size();
     }
 
 private:
-    void _insertNewKey(StringData key, const BSONElement& elem, size_t count);
+    void _insertNewKey(std::string_view key, const BSONElement& elem, size_t count);
 
     std::reference_wrapper<tracking::Context> _trackingContext;
 

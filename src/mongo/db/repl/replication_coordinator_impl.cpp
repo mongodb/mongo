@@ -149,6 +149,7 @@
 #include <iterator>
 #include <mutex>
 #include <ostream>
+#include <string_view>
 #include <type_traits>
 #include <variant>
 
@@ -157,6 +158,7 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 namespace {
 using VersionedConfigType = VersionedValue<ReplSetConfig, WriteRarelyRWMutex>;
@@ -249,8 +251,8 @@ void lockAndCall(std::unique_lock<ObservableMutex<std::mutex>>* lk,
     fn();
 }
 
-constexpr StringData kQuiesceModeShutdownMessage =
-    "The server is in quiesce mode and will shut down"_sd;
+constexpr std::string_view kQuiesceModeShutdownMessage =
+    "The server is in quiesce mode and will shut down"sv;
 
 }  // namespace
 
@@ -568,7 +570,7 @@ OpTime ReplicationCoordinatorImpl::_getCurrentCommittedSnapshotOpTime(WithLock) 
 }
 
 void ReplicationCoordinatorImpl::appendDiagnosticBSON(mongo::BSONObjBuilder* bob,
-                                                      StringData leafName) {
+                                                      std::string_view leafName) {
     BSONObjBuilder eBuilder(bob->subobjStart(leafName));
     _replExecutor->appendDiagnosticBSON(&eBuilder);
 }
@@ -2216,7 +2218,7 @@ bool ReplicationCoordinatorImpl::isCommitQuorumSatisfied(
         return _haveNumNodesSatisfiedCommitQuorum(lock, commitQuorum.numNodes, members);
     }
 
-    StringData patternName;
+    std::string_view patternName;
     if (commitQuorum.mode == CommitQuorumOptions::kMajority) {
         patternName = ReplSetConfig::kMajorityWriteConcernModeName;
     } else if (commitQuorum.mode == CommitQuorumOptions::kVotingMembers) {
@@ -2288,7 +2290,7 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication(
             opTime, std::get<int64_t>(writeConcern.w), useDurableOpTime);
     }
 
-    StringData patternName;
+    std::string_view patternName;
     auto wMode = std::get<std::string>(writeConcern.w);
     if (wMode == WriteConcernOptions::kMajority) {
         if (_externalState->snapshotsEnabled() && !gTestingSnapshotBehaviorInIsolation) {
@@ -3093,13 +3095,13 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
             return Status::OK();
         }
         const auto msg = client->supportsHello()
-            ? "not primary or secondary; cannot currently read from this replSet member"_sd
-            : "not master or secondary; cannot currently read from this replSet member"_sd;
+            ? "not primary or secondary; cannot currently read from this replSet member"sv
+            : "not master or secondary; cannot currently read from this replSet member"sv;
         return Status(ErrorCodes::NotPrimaryOrSecondary, msg);
     }
 
-    const auto msg = client->supportsHello() ? "not primary and secondaryOk=false"_sd
-                                             : "not master and slaveOk=false"_sd;
+    const auto msg = client->supportsHello() ? "not primary and secondaryOk=false"sv
+                                             : "not master and slaveOk=false"sv;
     return Status(ErrorCodes::NotPrimaryNoSecondaryOk, msg);
 }
 

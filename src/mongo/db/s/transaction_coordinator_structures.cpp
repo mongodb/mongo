@@ -34,19 +34,22 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
 
 namespace mongo {
 namespace txn {
+using namespace std::literals::string_view_literals;
 namespace {
 
-constexpr auto kCommitDecision = "commit"_sd;
-constexpr auto kAbortDecision = "abort"_sd;
+constexpr auto kCommitDecision = "commit"sv;
+constexpr auto kAbortDecision = "abort"sv;
 
 }  // namespace
 
-CommitDecision readCommitDecisionEnumProperty(StringData decision) {
+CommitDecision readCommitDecisionEnumProperty(std::string_view decision) {
     // clang-format off
     if (decision == kCommitDecision) return CommitDecision::kCommit;
     if (decision == kAbortDecision)  return CommitDecision::kAbort;
@@ -56,7 +59,7 @@ CommitDecision readCommitDecisionEnumProperty(StringData decision) {
               str::stream() << "'" << decision << "' is not a valid decision");
 }
 
-StringData writeCommitDecisionEnumProperty(CommitDecision decision) {
+std::string_view writeCommitDecisionEnumProperty(CommitDecision decision) {
     // clang-format off
     switch (decision) {
         case CommitDecision::kCommit:     return kCommitDecision;
@@ -66,12 +69,12 @@ StringData writeCommitDecisionEnumProperty(CommitDecision decision) {
     MONGO_UNREACHABLE;
 }
 
-StringData toString(PrepareVote prepareVote) {
+std::string_view toString(PrepareVote prepareVote) {
     switch (prepareVote) {
         case txn::PrepareVote::kCommit:
-            return "kCommit"_sd;
+            return "kCommit"sv;
         case txn::PrepareVote::kAbort:
-            return "kAbort"_sd;
+            return "kAbort"sv;
     };
     MONGO_UNREACHABLE;
 }

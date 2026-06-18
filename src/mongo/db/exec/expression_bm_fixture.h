@@ -42,6 +42,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <benchmark/benchmark.h>
@@ -52,7 +53,7 @@ namespace mongo {
 class ExpressionBenchmarkFixture : public benchmark::Fixture {
 private:
     static constexpr int32_t kSeed = 1;
-    static constexpr StringData _kLongHTMLString =
+    static constexpr std::string_view _kLongHTMLString =
         "<div class='sidenav'> <a href='#about'>About</a> <a href='#services'>Services</a> <a "
         "href='#clients'>Clients</a> <a href='#contact'>Contact</a> <button "
         "class='dropdown-btn'>Dropdown <i class='fa fa-caret-down'></i> </button> <div "
@@ -334,9 +335,9 @@ public:
     void benchmarkJSSplitRegex(benchmark::State& state);
 
     void benchmarkMQLConvertToString(int32_t base, int32_t input, benchmark::State& state);
-    void benchmarkMQLConvertToInt(int32_t base, StringData input, benchmark::State& state);
+    void benchmarkMQLConvertToInt(int32_t base, std::string_view input, benchmark::State& state);
     void benchmarkJSConvertToString(int32_t base, int32_t input, benchmark::State& state);
-    void benchmarkJSConvertToInt(int32_t base, StringData input, benchmark::State& state);
+    void benchmarkJSConvertToInt(int32_t base, std::string_view input, benchmark::State& state);
 
     void benchmarkMQLCreateObjectId(benchmark::State& state);
     void benchmarkJSCreateObjectId(benchmark::State& state);
@@ -416,1079 +417,1079 @@ private:
     int originalPerQueryJSHeapSizeLimit = 0;
 };
 
-#define BENCHMARK_EXPRESSIONS(Fixture)                                                          \
-    BENCHMARK_F(Fixture, NoOp)                                                                  \
-    (benchmark::State & state) {                                                                \
-        noOpBenchmark(state);                                                                   \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ArrayArrayElemAt0)(benchmark::State & state) {                         \
-        benchmarkArrayArrayElemAt0(state);                                                      \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ArrayArrayElemAtLast)(benchmark::State & state) {                      \
-        benchmarkArrayArrayElemAtLast(state);                                                   \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ArrayFilter0)(benchmark::State & state) {                              \
-        benchmarkArrayFilter0(state);                                                           \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ArrayFilter10)(benchmark::State & state) {                             \
-        benchmarkArrayFilter10(state);                                                          \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ReduceSum)(benchmark::State & state) {                                 \
-        benchmarkReduceSum(state);                                                              \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ReduceConcatArrays)(benchmark::State & state) {                        \
-        benchmarkReduceConcatArrays(state);                                                     \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ReduceCreatingNestedObject1)(benchmark::State & state) {               \
-        benchmarkReduceCreatingNestedObject1(state);                                            \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ReduceCreatingNestedObject2)(benchmark::State & state) {               \
-        benchmarkReduceCreatingNestedObject2(state);                                            \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ReduceCreatingNestedObject4)(benchmark::State & state) {               \
-        benchmarkReduceCreatingNestedObject4(state);                                            \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ReduceCreatingNestedObject8)(benchmark::State & state) {               \
-        benchmarkReduceCreatingNestedObject8(state);                                            \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SortArrayInt)(benchmark::State & state) {                              \
-        benchmarkSortArrayInt(state);                                                           \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SortArrayString)(benchmark::State & state) {                           \
-        benchmarkSortArrayString(state);                                                        \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SortArrayBSONObj)(benchmark::State & state) {                          \
-        benchmarkSortArrayBSONObj(state);                                                       \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SortArray2D)(benchmark::State & state) {                               \
-        benchmarkSortArray2D(state);                                                            \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, TopNIntRandom)(benchmark::State & state) {                             \
-        benchmarkTopNIntRandom(state);                                                          \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, TopNIntSequential)(benchmark::State & state) {                         \
-        benchmarkTopNIntSequential(state);                                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, TopNString)(benchmark::State & state) {                                \
-        benchmarkTopNString(state);                                                             \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, TopNBSONObj)(benchmark::State & state) {                               \
-        benchmarkTopNBSONObj(state);                                                            \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, BottomNIntRandom)(benchmark::State & state) {                          \
-        benchmarkBottomNIntRandom(state);                                                       \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, BottomNIntSequential)(benchmark::State & state) {                      \
-        benchmarkBottomNIntSequential(state);                                                   \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, BottomNString)(benchmark::State & state) {                             \
-        benchmarkBottomNString(state);                                                          \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, BottomNBSONObj)(benchmark::State & state) {                            \
-        benchmarkBottomNBSONObj(state);                                                         \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, TopIntRandom)(benchmark::State & state) {                              \
-        benchmarkTopIntRandom(state);                                                           \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, TopIntSequential)(benchmark::State & state) {                          \
-        benchmarkTopIntSequential(state);                                                       \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, TopString)(benchmark::State & state) {                                 \
-        benchmarkTopString(state);                                                              \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, TopBSONObj)(benchmark::State & state) {                                \
-        benchmarkTopBSONObj(state);                                                             \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, BottomIntRandom)(benchmark::State & state) {                           \
-        benchmarkBottomIntRandom(state);                                                        \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, BottomIntSequential)(benchmark::State & state) {                       \
-        benchmarkBottomIntSequential(state);                                                    \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, BottomString)(benchmark::State & state) {                              \
-        benchmarkBottomString(state);                                                           \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, BottomBSONObj)(benchmark::State & state) {                             \
-        benchmarkBottomBSONObj(state);                                                          \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ConditionalCond)(benchmark::State & state) {                           \
-        benchmarkConditionalCond(state);                                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ConditionalIfNullFalse)(benchmark::State & state) {                    \
-        benchmarkConditionalIfNullFalse(state);                                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ConditionalIfNullTrue)(benchmark::State & state) {                     \
-        benchmarkConditionalIfNullTrue(state);                                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ConditionalSwitchCase0)(benchmark::State & state) {                    \
-        benchmarkConditionalSwitchCase0(state);                                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ConditionalSwitchCase1)(benchmark::State & state) {                    \
-        benchmarkConditionalSwitchCase1(state);                                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ConditionalSwitchDefault)(benchmark::State & state) {                  \
-        benchmarkConditionalSwitchDefault(state);                                               \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ArrayInFound0)(benchmark::State & state) {                             \
-        benchmarkArrayInFound0(state);                                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ArrayInFound9)(benchmark::State & state) {                             \
-        benchmarkArrayInFound9(state);                                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ArrayInNotFound)(benchmark::State & state) {                           \
-        benchmarkArrayInNotFound(state);                                                        \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, CompareEq)(benchmark::State & state) {                                 \
-        benchmarkCompareEq(state);                                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, CompareGte)(benchmark::State & state) {                                \
-        benchmarkCompareGte(state);                                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, CompareLte)(benchmark::State & state) {                                \
-        benchmarkCompareLte(state);                                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, CompareNe)(benchmark::State & state) {                                 \
-        benchmarkCompareNe(state);                                                              \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, DateDiffEvaluateMinute300Years)                                        \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateDiffEvaluateMinute300Years(state);                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateDiffEvaluateMinute2Years)                                          \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateDiffEvaluateMinute2Years(state);                                           \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateDiffEvaluateMinute2YearsWithTimezone)                              \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateDiffEvaluateMinute2YearsWithTimezone(state);                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateDiffEvaluateWeek)(benchmark::State & state) {                      \
-        benchmarkDateDiffEvaluateWeek(state);                                                   \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, DateAddEvaluate10Days)(benchmark::State & state) {                     \
-        benchmarkDateAddEvaluate10Days(state);                                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateAddEvaluate600Minutes)(benchmark::State & state) {                 \
-        benchmarkDateAddEvaluate600Minutes(state);                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateAddEvaluate100KSeconds)                                            \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateAddEvaluate100KSeconds(state);                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateAddEvaluate100Years)(benchmark::State & state) {                   \
-        benchmarkDateAddEvaluate100Years(state);                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateAddEvaluate12HoursWithTimezone)                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateAddEvaluate12HoursWithTimezone(state);                                     \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, DateTruncEvaluateMinute15NewYork)                                      \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateMinute15NewYork(state);                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateMinute15UTC)                                          \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateMinute15UTC(state);                                           \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateHour1UTCMinus0700)                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateHour1UTCMinus0700(state);                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateWeek2NewYorkValue2100)                                \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateWeek2NewYorkValue2100(state);                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateWeek2UTCValue2100)                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateWeek2UTCValue2100(state);                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateMonth6NewYorkValue2100)                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateMonth6NewYorkValue2100(state);                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateMonth6NewYorkValue2030)                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateMonth6NewYorkValue2030(state);                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateMonth6UTCValue2030)                                   \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateMonth6UTCValue2030(state);                                    \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateYear1NewYorkValue2020)                                \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateYear1NewYorkValue2020(state);                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateYear1UTCValue2020)                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateYear1UTCValue2020(state);                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, DateTruncEvaluateYear1NewYorkValue2100)                                \
-    (benchmark::State & state) {                                                                \
-        benchmarkDateTruncEvaluateYear1NewYorkValue2100(state);                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, YearNoTZ)                                                              \
-    (benchmark::State & state) {                                                                \
-        benchmarkYearNoTZ(state);                                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, YearConstTzUTC)                                                        \
-    (benchmark::State & state) {                                                                \
-        benchmarkYearConstTzUTC(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, YearConstTzUTCMinus0700)                                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkYearConstTzUTCMinus0700(state);                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, YearConstTzNewYork)                                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkYearConstTzNewYork(state);                                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, YearUTC)                                                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkYearUTC(state);                                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, YearUTCMinus0700)                                                      \
-    (benchmark::State & state) {                                                                \
-        benchmarkYearUTCMinus0700(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, YearNewYork)                                                           \
-    (benchmark::State & state) {                                                                \
-        benchmarkYearNewYork(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MonthNoTZ)                                                             \
-    (benchmark::State & state) {                                                                \
-        benchmarkMonthNoTZ(state);                                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MonthConstTzUTC)                                                       \
-    (benchmark::State & state) {                                                                \
-        benchmarkMonthConstTzUTC(state);                                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MonthConstTzUTCMinus0700)                                              \
-    (benchmark::State & state) {                                                                \
-        benchmarkMonthConstTzUTCMinus0700(state);                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MonthConstTzNewYork)                                                   \
-    (benchmark::State & state) {                                                                \
-        benchmarkMonthConstTzNewYork(state);                                                    \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MonthUTC)                                                              \
-    (benchmark::State & state) {                                                                \
-        benchmarkMonthUTC(state);                                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MonthUTCMinus0700)                                                     \
-    (benchmark::State & state) {                                                                \
-        benchmarkMonthUTCMinus0700(state);                                                      \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MonthNewYork)                                                          \
-    (benchmark::State & state) {                                                                \
-        benchmarkMonthNewYork(state);                                                           \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, HourNoTZ)                                                              \
-    (benchmark::State & state) {                                                                \
-        benchmarkHourNoTZ(state);                                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, HourConstTzUTC)                                                        \
-    (benchmark::State & state) {                                                                \
-        benchmarkHourConstTzUTC(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, HourConstTzUTCMinus0700)                                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkHourConstTzUTCMinus0700(state);                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, HourConstTzNewYork)                                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkHourConstTzNewYork(state);                                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, HourUTC)                                                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkHourUTC(state);                                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, HourUTCMinus0700)                                                      \
-    (benchmark::State & state) {                                                                \
-        benchmarkHourUTCMinus0700(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, HourNewYork)                                                           \
-    (benchmark::State & state) {                                                                \
-        benchmarkHourNewYork(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MinuteNoTZ)                                                            \
-    (benchmark::State & state) {                                                                \
-        benchmarkMinuteNoTZ(state);                                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MinuteConstTzUTC)                                                      \
-    (benchmark::State & state) {                                                                \
-        benchmarkMinuteConstTzUTC(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MinuteConstTzUTCMinus0700)                                             \
-    (benchmark::State & state) {                                                                \
-        benchmarkMinuteConstTzUTCMinus0700(state);                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MinuteConstTzNewYork)                                                  \
-    (benchmark::State & state) {                                                                \
-        benchmarkMinuteConstTzNewYork(state);                                                   \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MinuteUTC)                                                             \
-    (benchmark::State & state) {                                                                \
-        benchmarkMinuteUTC(state);                                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MinuteUTCMinus0700)                                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkMinuteUTCMinus0700(state);                                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MinuteNewYork)                                                         \
-    (benchmark::State & state) {                                                                \
-        benchmarkMinuteNewYork(state);                                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SecondNoTZ)                                                            \
-    (benchmark::State & state) {                                                                \
-        benchmarkSecondNoTZ(state);                                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SecondConstTzUTC)                                                      \
-    (benchmark::State & state) {                                                                \
-        benchmarkSecondConstTzUTC(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SecondConstTzUTCMinus0700)                                             \
-    (benchmark::State & state) {                                                                \
-        benchmarkSecondConstTzUTCMinus0700(state);                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SecondConstTzNewYork)                                                  \
-    (benchmark::State & state) {                                                                \
-        benchmarkSecondConstTzNewYork(state);                                                   \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SecondUTC)                                                             \
-    (benchmark::State & state) {                                                                \
-        benchmarkSecondUTC(state);                                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SecondUTCMinus0700)                                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkSecondUTCMinus0700(state);                                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SecondNewYork)                                                         \
-    (benchmark::State & state) {                                                                \
-        benchmarkSecondNewYork(state);                                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MillisecondNoTZ)                                                       \
-    (benchmark::State & state) {                                                                \
-        benchmarkMillisecondNoTZ(state);                                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MillisecondConstTzUTC)                                                 \
-    (benchmark::State & state) {                                                                \
-        benchmarkMillisecondConstTzUTC(state);                                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MillisecondConstTzUTCMinus0700)                                        \
-    (benchmark::State & state) {                                                                \
-        benchmarkMillisecondConstTzUTCMinus0700(state);                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MillisecondConstTzNewYork)                                             \
-    (benchmark::State & state) {                                                                \
-        benchmarkMillisecondConstTzNewYork(state);                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MillisecondUTC)                                                        \
-    (benchmark::State & state) {                                                                \
-        benchmarkMillisecondUTC(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MillisecondUTCMinus0700)                                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkMillisecondUTCMinus0700(state);                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MillisecondNewYork)                                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkMillisecondNewYork(state);                                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, WeekNoTZ)                                                              \
-    (benchmark::State & state) {                                                                \
-        benchmarkWeekNoTZ(state);                                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, WeekConstTzUTC)                                                        \
-    (benchmark::State & state) {                                                                \
-        benchmarkWeekConstTzUTC(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, WeekConstTzUTCMinus0700)                                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkWeekConstTzUTCMinus0700(state);                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, WeekConstTzNewYork)                                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkWeekConstTzNewYork(state);                                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, WeekUTC)                                                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkWeekUTC(state);                                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, WeekUTCMinus0700)                                                      \
-    (benchmark::State & state) {                                                                \
-        benchmarkWeekUTCMinus0700(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, WeekNewYork)                                                           \
-    (benchmark::State & state) {                                                                \
-        benchmarkWeekNewYork(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekYearNoTZ)                                                       \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekYearNoTZ(state);                                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekYearConstTzUTC)                                                 \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekYearConstTzUTC(state);                                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekYearConstTzUTCMinus0700)                                        \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekYearConstTzUTCMinus0700(state);                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekYearConstTzNewYork)                                             \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekYearConstTzNewYork(state);                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekYearUTC)                                                        \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekYearUTC(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekYearUTCMinus0700)                                               \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekYearUTCMinus0700(state);                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekYearNewYork)                                                    \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekYearNewYork(state);                                                     \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISODayOfWeekNoTZ)                                                      \
-    (benchmark::State & state) {                                                                \
-        benchmarkISODayOfWeekNoTZ(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISODayOfWeekConstTzUTC)                                                \
-    (benchmark::State & state) {                                                                \
-        benchmarkISODayOfWeekConstTzUTC(state);                                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISODayOfWeekConstTzUTCMinus0700)                                       \
-    (benchmark::State & state) {                                                                \
-        benchmarkISODayOfWeekConstTzUTCMinus0700(state);                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISODayOfWeekConstTzNewYork)                                            \
-    (benchmark::State & state) {                                                                \
-        benchmarkISODayOfWeekConstTzNewYork(state);                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISODayOfWeekUTC)                                                       \
-    (benchmark::State & state) {                                                                \
-        benchmarkISODayOfWeekUTC(state);                                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISODayOfWeekUTCMinus0700)                                              \
-    (benchmark::State & state) {                                                                \
-        benchmarkISODayOfWeekUTCMinus0700(state);                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISODayOfWeekNewYork)                                                   \
-    (benchmark::State & state) {                                                                \
-        benchmarkISODayOfWeekNewYork(state);                                                    \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekNoTZ)                                                           \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekNoTZ(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekConstTzUTC)                                                     \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekConstTzUTC(state);                                                      \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekConstTzUTCMinus0700)                                            \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekConstTzUTCMinus0700(state);                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekConstTzNewYork)                                                 \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekConstTzNewYork(state);                                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekUTC)                                                            \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekUTC(state);                                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekUTCMinus0700)                                                   \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekUTCMinus0700(state);                                                    \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ISOWeekNewYork)                                                        \
-    (benchmark::State & state) {                                                                \
-        benchmarkISOWeekNewYork(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, GetFieldEvaluateExpression)                                            \
-    (benchmark::State & state) {                                                                \
-        benchmarkGetFieldEvaluateExpression(state);                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, GetFieldEvaluateShortSyntaxExpression)                                 \
-    (benchmark::State & state) {                                                                \
-        benchmarkGetFieldEvaluateShortSyntaxExpression(state);                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, GetFieldNestedExpression)(benchmark::State & state) {                  \
-        benchmarkGetFieldNestedExpression(state);                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SetFieldEvaluateExpression)                                            \
-    (benchmark::State & state) {                                                                \
-        benchmarkSetFieldEvaluateExpression(state);                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SetFieldWithRemoveExpression)                                          \
-    (benchmark::State & state) {                                                                \
-        benchmarkSetFieldWithRemoveExpression(state);                                           \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, UnsetFieldEvaluateExpression)                                          \
-    (benchmark::State & state) {                                                                \
-        benchmarkUnsetFieldEvaluateExpression(state);                                           \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, LogicalAndFalse0)(benchmark::State & state) {                          \
-        benchmarkLogicalAndFalse0(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, LogicalAndFalse1)(benchmark::State & state) {                          \
-        benchmarkLogicalAndFalse1(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, LogicalAndTrue)(benchmark::State & state) {                            \
-        benchmarkLogicalAndTrue(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, LogicalOrTrue0)(benchmark::State & state) {                            \
-        benchmarkLogicalOrTrue0(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, LogicalOrTrue1)(benchmark::State & state) {                            \
-        benchmarkLogicalOrTrue1(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, LogicalOrFalse)(benchmark::State & state) {                            \
-        benchmarkLogicalOrFalse(state);                                                         \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SetIsSubset_allPresent)(benchmark::State & state) {                    \
-        benchmarkSetIsSubset_allPresent(state);                                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SetIsSubset_nonePresent)(benchmark::State & state) {                   \
-        benchmarkSetIsSubset_nonePresent(state);                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SetIntersection)(benchmark::State & state) {                           \
-        benchmarkSetIntersection(state);                                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SetDifference)(benchmark::State & state) {                             \
-        benchmarkSetDifference(state);                                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SetEquals)(benchmark::State & state) {                                 \
-        benchmarkSetEquals(state);                                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SetUnion)(benchmark::State & state) {                                  \
-        benchmarkSetUnion(state);                                                               \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SubtractIntegers)(benchmark::State & state) {                          \
-        benchmarkSubtractIntegers(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SubtractDoubles)(benchmark::State & state) {                           \
-        benchmarkSubtractDoubles(state);                                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SubtractDecimals)(benchmark::State & state) {                          \
-        benchmarkSubtractDecimals(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SubtractDates)(benchmark::State & state) {                             \
-        benchmarkSubtractDates(state);                                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SubtractNullAndMissing)(benchmark::State & state) {                    \
-        benchmarkSubtractNullAndMissing(state);                                                 \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, AddIntegers)(benchmark::State & state) {                               \
-        benchmarkAddIntegers(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, AddDoubles)(benchmark::State & state) {                                \
-        benchmarkAddDoubles(state);                                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, AddDecimals)(benchmark::State & state) {                               \
-        benchmarkAddDecimals(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, AddDates)(benchmark::State & state) {                                  \
-        benchmarkAddDates(state);                                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, AddNullAndMissing)(benchmark::State & state) {                         \
-        benchmarkAddNullAndMissing(state);                                                      \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, AddArray)(benchmark::State & state) {                                  \
-        benchmarkAddArray(state);                                                               \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MultiplyIntegers)(benchmark::State & state) {                          \
-        benchmarkMultiplyIntegers(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MultiplyDoubles)(benchmark::State & state) {                           \
-        benchmarkMultiplyDoubles(state);                                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MultiplyDecimals)(benchmark::State & state) {                          \
-        benchmarkMultiplyDecimals(state);                                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MultiplyNullAndMissing)(benchmark::State & state) {                    \
-        benchmarkMultiplyNullAndMissing(state);                                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MultiplyArray)(benchmark::State & state) {                             \
-        benchmarkMultiplyArray(state);                                                          \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, ValueConst)(benchmark::State & state) {                                \
-        benchmarkValueConst(state);                                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ValueLiteral)(benchmark::State & state) {                              \
-        benchmarkValueLiteral(state);                                                           \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ObjectToArray)(benchmark::State & state) {                             \
-        benchmarkObjectToArray(state);                                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ArrayToObject1)(benchmark::State & state) {                            \
-        benchmarkArrayToObject1(state);                                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, ArrayToObject2)(benchmark::State & state) {                            \
-        benchmarkArrayToObject2(state);                                                         \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, Percentile_SingleMid_10)(benchmark::State & state) {                   \
-        benchmarkPercentile(state, 10, {0.5});                                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_SingleMid_100)(benchmark::State & state) {                  \
-        benchmarkPercentile(state, 100, {0.5});                                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_Multi_100)(benchmark::State & state) {                      \
-        benchmarkPercentile(state, 100, {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99});   \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_SingleLow_1000)(benchmark::State & state) {                 \
-        benchmarkPercentile(state, 1000, {0.01});                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_SingleMid_1000)(benchmark::State & state) {                 \
-        benchmarkPercentile(state, 1000, {0.5});                                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_SingleHigh_1000)(benchmark::State & state) {                \
-        benchmarkPercentile(state, 1000, {0.99});                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_Multi_1000)(benchmark::State & state) {                     \
-        benchmarkPercentile(state, 1000, {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99});  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_SingleMid_10000)(benchmark::State & state) {                \
-        benchmarkPercentile(state, 10000, {0.5});                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_Multi_10000)(benchmark::State & state) {                    \
-        benchmarkPercentile(state, 10000, {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99}); \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_SingleMid_25000)(benchmark::State & state) {                \
-        benchmarkPercentile(state, 25000, {0.5});                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Percentile_SingleMid_50000)(benchmark::State & state) {                \
-        benchmarkPercentile(state, 50000, {0.5});                                               \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, PowIntegers)(benchmark::State & state) {                               \
-        benchmarkPowIntegers(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, PowDoubles)(benchmark::State & state) {                                \
-        benchmarkPowDoubles(state);                                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, PowDecimals)(benchmark::State & state) {                               \
-        benchmarkPowDecimals(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, PowNullAndMissing)(benchmark::State & state) {                         \
-        benchmarkPowNullAndMissing(state);                                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, StrLenBytes)(benchmark::State & state) {                               \
-        benchmarkStrLenBytes(state);                                                            \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, Trim_Default)(benchmark::State & state) {                              \
-        benchmarkTrim(state);                                                                   \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Trim_NonDefault)(benchmark::State & state) {                           \
-        benchmarkTrim(state, " h");                                                             \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, Trunc_Positive)(benchmark::State & state) {                            \
-        benchmarkTrunc(state, 1);                                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, Trunc_Negative)(benchmark::State & state) {                            \
-        benchmarkTrunc(state, -1);                                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, StrLenCP)(benchmark::State & state) {                                  \
-        benchmarkStrLenCP(state);                                                               \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, StrLenCPMultiByteChars)(benchmark::State & state) {                    \
-        benchmarkStrLenCPMultiBytes(state);                                                     \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, StrLenCPLargeString)(benchmark::State & state) {                       \
-        benchmarkStrLenCPLargeString(state);                                                    \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, Strcasecmp)(benchmark::State & state) {                                \
-        benchmarkStrcasecmp(state);                                                             \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, StrcasecmpLargeString)(benchmark::State & state) {                     \
-        benchmarkStrcasecmpLargeString(state);                                                  \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SubstrBytes)(benchmark::State & state) {                               \
-        benchmarkSubstrBytes(state);                                                            \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SubstrBytesLargeString)(benchmark::State & state) {                    \
-        benchmarkSubstrBytesLargeString(state);                                                 \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SubstrCP)(benchmark::State & state) {                                  \
-        benchmarkSubstrCP(state);                                                               \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SubstrCPMultiBytes)(benchmark::State & state) {                        \
-        benchmarkSubstrCPMultiBytes(state);                                                     \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SubstrCPLargeString)(benchmark::State & state) {                       \
-        benchmarkSubstrCPLargeString(state);                                                    \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, Rand)(benchmark::State & state) {                                      \
-        benchmarkRand(state);                                                                   \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MaxSingleInput)(benchmark::State & state) {                            \
-        benchmarkMaxSingleInput(state);                                                         \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MaxSingleArrayInput)(benchmark::State & state) {                       \
-        benchmarkMaxSingleArrayInput(state);                                                    \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MinSingleInput)(benchmark::State & state) {                            \
-        benchmarkMinSingleInput(state);                                                         \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MinSingleArrayInput)(benchmark::State & state) {                       \
-        benchmarkMinSingleArrayInput(state);                                                    \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, StdDevPop)(benchmark::State & state) {                                 \
-        benchmarkStdDevPop(state);                                                              \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, StdDevSamp)(benchmark::State & state) {                                \
-        benchmarkStdDevSamp(state);                                                             \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, Avg)(benchmark::State & state) {                                       \
-        benchmarkAvg(state);                                                                    \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, Sum)(benchmark::State & state) {                                       \
-        benchmarkSum(state);                                                                    \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, RegexMatch)(benchmark::State & state) {                                \
-        benchmarkRegexMatch(state);                                                             \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, AddWithDottedFieldPath)(benchmark::State & state) {                    \
-        benchmarkAddWithDottedFieldPath(state);                                                 \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLReplaceOneRegex)(benchmark::State & state) {                        \
-        benchmarkMQLReplaceOneRegex(state);                                                     \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSReplaceOneRegex)(benchmark::State & state) {                         \
-        benchmarkJSReplaceOneRegex(state);                                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLReplaceAllRegex)(benchmark::State & state) {                        \
-        benchmarkMQLReplaceAllRegex(state);                                                     \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSReplaceAllRegex)(benchmark::State & state) {                         \
-        benchmarkJSReplaceAllRegex(state);                                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLSplitRegex)(benchmark::State & state) {                             \
-        benchmarkMQLSplitRegex(state);                                                          \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSSplitRegex)(benchmark::State & state) {                              \
-        benchmarkJSSplitRegex(state);                                                           \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLConvertToStringBase2)(benchmark::State & state) {                   \
-        benchmarkMQLConvertToString(2, 2147483647, state);                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLConvertToStringBase8)(benchmark::State & state) {                   \
-        benchmarkMQLConvertToString(8, 2147483647, state);                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLConvertToStringBase10)(benchmark::State & state) {                  \
-        benchmarkMQLConvertToString(10, 2147483647, state);                                     \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLConvertToStringBase16)(benchmark::State & state) {                  \
-        benchmarkMQLConvertToString(16, 2147483647, state);                                     \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLConvertToIntBase2)(benchmark::State & state) {                      \
-        benchmarkMQLConvertToInt(2, "1111111111111111111111111111111"_sd, state);               \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLConvertToIntBase8)(benchmark::State & state) {                      \
-        benchmarkMQLConvertToInt(8, "17777777777"_sd, state);                                   \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLConvertToIntBase10)(benchmark::State & state) {                     \
-        benchmarkMQLConvertToInt(10, "2147483647"_sd, state);                                   \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLConvertToIntBase16)(benchmark::State & state) {                     \
-        benchmarkMQLConvertToInt(16, "7FFFFFFF"_sd, state);                                     \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSConvertToStringBase2)(benchmark::State & state) {                    \
-        benchmarkJSConvertToString(2, 2147483647, state);                                       \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSConvertToStringBase8)(benchmark::State & state) {                    \
-        benchmarkJSConvertToString(8, 2147483647, state);                                       \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSConvertToStringBase10)(benchmark::State & state) {                   \
-        benchmarkJSConvertToString(10, 2147483647, state);                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSConvertToStringBase16)(benchmark::State & state) {                   \
-        benchmarkJSConvertToString(16, 2147483647, state);                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSConvertToIntBase2)(benchmark::State & state) {                       \
-        benchmarkJSConvertToInt(2, "1111111111111111111111111111111"_sd, state);                \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSConvertToIntBase8)(benchmark::State & state) {                       \
-        benchmarkJSConvertToInt(8, "17777777777"_sd, state);                                    \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSConvertToIntBase10)(benchmark::State & state) {                      \
-        benchmarkJSConvertToInt(10, "2147483647"_sd, state);                                    \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSConvertToIntBase16)(benchmark::State & state) {                      \
-        benchmarkJSConvertToInt(16, "7FFFFFFF"_sd, state);                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLCreateObjectId)(benchmark::State & state) {                         \
-        benchmarkMQLCreateObjectId(state);                                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSCreateObjectId)(benchmark::State & state) {                          \
-        benchmarkJSCreateObjectId(state);                                                       \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, MQLSubtype)(benchmark::State & state) {                                \
-        benchmarkMQLSubtype(state);                                                             \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, JSSubtype)(benchmark::State & state) {                                 \
-        benchmarkJSSubtype(state);                                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MQLConvertObjectToString5FieldsDepth1)(benchmark::State & state) {     \
-        benchmarkMQLConvertObjectToString(5, 1, state);                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, JSConvertObjectToString5FieldsDepth1)(benchmark::State & state) {      \
-        benchmarkJSConvertObjectToString(5, 1, state);                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MQLConvertObjectToString50FieldsDepth10)(benchmark::State & state) {   \
-        benchmarkMQLConvertObjectToString(50, 10, state);                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, JSConvertObjectToString50FieldsDepth10)(benchmark::State & state) {    \
-        benchmarkJSConvertObjectToString(50, 10, state);                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MQLConvertStringToObject5FieldsDepth1)(benchmark::State & state) {     \
-        benchmarkMQLConvertStringToObject(5, 1, state);                                         \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, JSConvertStringToObject5FieldsDepth1)(benchmark::State & state) {      \
-        benchmarkJSConvertStringToObject(5, 1, state);                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, MQLConvertStringToObject50FieldsDepth10)(benchmark::State & state) {   \
-        benchmarkMQLConvertStringToObject(50, 10, state);                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, JSConvertStringToObject50FieldsDepth10)(benchmark::State & state) {    \
-        benchmarkJSConvertStringToObject(50, 10, state);                                        \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityDotProduct128)(benchmark::State & state) {                   \
-        benchmarkSimilarityDotProduct(state, 128);                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProduct512)(benchmark::State & state) {                   \
-        benchmarkSimilarityDotProduct(state, 512);                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProduct1536)(benchmark::State & state) {                  \
-        benchmarkSimilarityDotProduct(state, 1536);                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProduct4096)(benchmark::State & state) {                  \
-        benchmarkSimilarityDotProduct(state, 4096);                                             \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityCosine128)(benchmark::State & state) {                       \
-        benchmarkSimilarityCosine(state, 128);                                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosine512)(benchmark::State & state) {                       \
-        benchmarkSimilarityCosine(state, 512);                                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosine1536)(benchmark::State & state) {                      \
-        benchmarkSimilarityCosine(state, 1536);                                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosine4096)(benchmark::State & state) {                      \
-        benchmarkSimilarityCosine(state, 4096);                                                 \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityEuclidean128)(benchmark::State & state) {                    \
-        benchmarkSimilarityEuclidean(state, 128);                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclidean512)(benchmark::State & state) {                    \
-        benchmarkSimilarityEuclidean(state, 512);                                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclidean1536)(benchmark::State & state) {                   \
-        benchmarkSimilarityEuclidean(state, 1536);                                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclidean4096)(benchmark::State & state) {                   \
-        benchmarkSimilarityEuclidean(state, 4096);                                              \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinData128)(benchmark::State & state) {            \
-        benchmarkSimilarityDotProductBinData(state, 128);                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinData512)(benchmark::State & state) {            \
-        benchmarkSimilarityDotProductBinData(state, 512);                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinData1536)(benchmark::State & state) {           \
-        benchmarkSimilarityDotProductBinData(state, 1536);                                      \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinData4096)(benchmark::State & state) {           \
-        benchmarkSimilarityDotProductBinData(state, 4096);                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityCosineBinData128)(benchmark::State & state) {                \
-        benchmarkSimilarityCosineBinData(state, 128);                                           \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosineBinData512)(benchmark::State & state) {                \
-        benchmarkSimilarityCosineBinData(state, 512);                                           \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosineBinData1536)(benchmark::State & state) {               \
-        benchmarkSimilarityCosineBinData(state, 1536);                                          \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosineBinData4096)(benchmark::State & state) {               \
-        benchmarkSimilarityCosineBinData(state, 4096);                                          \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinData128)(benchmark::State & state) {             \
-        benchmarkSimilarityEuclideanBinData(state, 128);                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinData512)(benchmark::State & state) {             \
-        benchmarkSimilarityEuclideanBinData(state, 512);                                        \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinData1536)(benchmark::State & state) {            \
-        benchmarkSimilarityEuclideanBinData(state, 1536);                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinData4096)(benchmark::State & state) {            \
-        benchmarkSimilarityEuclideanBinData(state, 4096);                                       \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinDataInt8_128)(benchmark::State & state) {       \
-        benchmarkSimilarityDotProductBinDataInt8(state, 128);                                   \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinDataInt8_1536)(benchmark::State & state) {      \
-        benchmarkSimilarityDotProductBinDataInt8(state, 1536);                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinDataInt8_4096)(benchmark::State & state) {      \
-        benchmarkSimilarityDotProductBinDataInt8(state, 4096);                                  \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityCosineBinDataInt8_128)(benchmark::State & state) {           \
-        benchmarkSimilarityCosineBinDataInt8(state, 128);                                       \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosineBinDataInt8_1536)(benchmark::State & state) {          \
-        benchmarkSimilarityCosineBinDataInt8(state, 1536);                                      \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosineBinDataInt8_4096)(benchmark::State & state) {          \
-        benchmarkSimilarityCosineBinDataInt8(state, 4096);                                      \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataInt8_128)(benchmark::State & state) {        \
-        benchmarkSimilarityEuclideanBinDataInt8(state, 128);                                    \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataInt8_1536)(benchmark::State & state) {       \
-        benchmarkSimilarityEuclideanBinDataInt8(state, 1536);                                   \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataInt8_4096)(benchmark::State & state) {       \
-        benchmarkSimilarityEuclideanBinDataInt8(state, 4096);                                   \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinDataPackedBit128)(benchmark::State & state) {   \
-        benchmarkSimilarityDotProductBinDataPackedBit(state, 128);                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinDataPackedBit1536)(benchmark::State & state) {  \
-        benchmarkSimilarityDotProductBinDataPackedBit(state, 1536);                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinDataPackedBit4096)(benchmark::State & state) {  \
-        benchmarkSimilarityDotProductBinDataPackedBit(state, 4096);                             \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityCosineBinDataPackedBit128)(benchmark::State & state) {       \
-        benchmarkSimilarityCosineBinDataPackedBit(state, 128);                                  \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosineBinDataPackedBit1536)(benchmark::State & state) {      \
-        benchmarkSimilarityCosineBinDataPackedBit(state, 1536);                                 \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosineBinDataPackedBit4096)(benchmark::State & state) {      \
-        benchmarkSimilarityCosineBinDataPackedBit(state, 4096);                                 \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataPackedBit128)(benchmark::State & state) {    \
-        benchmarkSimilarityEuclideanBinDataPackedBit(state, 128);                               \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataPackedBit1536)(benchmark::State & state) {   \
-        benchmarkSimilarityEuclideanBinDataPackedBit(state, 1536);                              \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataPackedBit4096)(benchmark::State & state) {   \
-        benchmarkSimilarityEuclideanBinDataPackedBit(state, 4096);                              \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, SimilarityDotProductBinDataMixedDtype1536)(benchmark::State & state) { \
-        benchmarkSimilarityDotProductBinDataMixedDtype(state, 1536);                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityCosineBinDataMixedDtype1536)(benchmark::State & state) {     \
-        benchmarkSimilarityCosineBinDataMixedDtype(state, 1536);                                \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataMixedDtype1536)(benchmark::State & state) {  \
-        benchmarkSimilarityEuclideanBinDataMixedDtype(state, 1536);                             \
+#define BENCHMARK_EXPRESSIONS(Fixture)                                                           \
+    BENCHMARK_F(Fixture, NoOp)                                                                   \
+    (benchmark::State & state) {                                                                 \
+        noOpBenchmark(state);                                                                    \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ArrayArrayElemAt0)(benchmark::State & state) {                          \
+        benchmarkArrayArrayElemAt0(state);                                                       \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ArrayArrayElemAtLast)(benchmark::State & state) {                       \
+        benchmarkArrayArrayElemAtLast(state);                                                    \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ArrayFilter0)(benchmark::State & state) {                               \
+        benchmarkArrayFilter0(state);                                                            \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ArrayFilter10)(benchmark::State & state) {                              \
+        benchmarkArrayFilter10(state);                                                           \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ReduceSum)(benchmark::State & state) {                                  \
+        benchmarkReduceSum(state);                                                               \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ReduceConcatArrays)(benchmark::State & state) {                         \
+        benchmarkReduceConcatArrays(state);                                                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ReduceCreatingNestedObject1)(benchmark::State & state) {                \
+        benchmarkReduceCreatingNestedObject1(state);                                             \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ReduceCreatingNestedObject2)(benchmark::State & state) {                \
+        benchmarkReduceCreatingNestedObject2(state);                                             \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ReduceCreatingNestedObject4)(benchmark::State & state) {                \
+        benchmarkReduceCreatingNestedObject4(state);                                             \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ReduceCreatingNestedObject8)(benchmark::State & state) {                \
+        benchmarkReduceCreatingNestedObject8(state);                                             \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SortArrayInt)(benchmark::State & state) {                               \
+        benchmarkSortArrayInt(state);                                                            \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SortArrayString)(benchmark::State & state) {                            \
+        benchmarkSortArrayString(state);                                                         \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SortArrayBSONObj)(benchmark::State & state) {                           \
+        benchmarkSortArrayBSONObj(state);                                                        \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SortArray2D)(benchmark::State & state) {                                \
+        benchmarkSortArray2D(state);                                                             \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, TopNIntRandom)(benchmark::State & state) {                              \
+        benchmarkTopNIntRandom(state);                                                           \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, TopNIntSequential)(benchmark::State & state) {                          \
+        benchmarkTopNIntSequential(state);                                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, TopNString)(benchmark::State & state) {                                 \
+        benchmarkTopNString(state);                                                              \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, TopNBSONObj)(benchmark::State & state) {                                \
+        benchmarkTopNBSONObj(state);                                                             \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, BottomNIntRandom)(benchmark::State & state) {                           \
+        benchmarkBottomNIntRandom(state);                                                        \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, BottomNIntSequential)(benchmark::State & state) {                       \
+        benchmarkBottomNIntSequential(state);                                                    \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, BottomNString)(benchmark::State & state) {                              \
+        benchmarkBottomNString(state);                                                           \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, BottomNBSONObj)(benchmark::State & state) {                             \
+        benchmarkBottomNBSONObj(state);                                                          \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, TopIntRandom)(benchmark::State & state) {                               \
+        benchmarkTopIntRandom(state);                                                            \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, TopIntSequential)(benchmark::State & state) {                           \
+        benchmarkTopIntSequential(state);                                                        \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, TopString)(benchmark::State & state) {                                  \
+        benchmarkTopString(state);                                                               \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, TopBSONObj)(benchmark::State & state) {                                 \
+        benchmarkTopBSONObj(state);                                                              \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, BottomIntRandom)(benchmark::State & state) {                            \
+        benchmarkBottomIntRandom(state);                                                         \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, BottomIntSequential)(benchmark::State & state) {                        \
+        benchmarkBottomIntSequential(state);                                                     \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, BottomString)(benchmark::State & state) {                               \
+        benchmarkBottomString(state);                                                            \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, BottomBSONObj)(benchmark::State & state) {                              \
+        benchmarkBottomBSONObj(state);                                                           \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ConditionalCond)(benchmark::State & state) {                            \
+        benchmarkConditionalCond(state);                                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ConditionalIfNullFalse)(benchmark::State & state) {                     \
+        benchmarkConditionalIfNullFalse(state);                                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ConditionalIfNullTrue)(benchmark::State & state) {                      \
+        benchmarkConditionalIfNullTrue(state);                                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ConditionalSwitchCase0)(benchmark::State & state) {                     \
+        benchmarkConditionalSwitchCase0(state);                                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ConditionalSwitchCase1)(benchmark::State & state) {                     \
+        benchmarkConditionalSwitchCase1(state);                                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ConditionalSwitchDefault)(benchmark::State & state) {                   \
+        benchmarkConditionalSwitchDefault(state);                                                \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ArrayInFound0)(benchmark::State & state) {                              \
+        benchmarkArrayInFound0(state);                                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ArrayInFound9)(benchmark::State & state) {                              \
+        benchmarkArrayInFound9(state);                                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ArrayInNotFound)(benchmark::State & state) {                            \
+        benchmarkArrayInNotFound(state);                                                         \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, CompareEq)(benchmark::State & state) {                                  \
+        benchmarkCompareEq(state);                                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, CompareGte)(benchmark::State & state) {                                 \
+        benchmarkCompareGte(state);                                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, CompareLte)(benchmark::State & state) {                                 \
+        benchmarkCompareLte(state);                                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, CompareNe)(benchmark::State & state) {                                  \
+        benchmarkCompareNe(state);                                                               \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, DateDiffEvaluateMinute300Years)                                         \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateDiffEvaluateMinute300Years(state);                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateDiffEvaluateMinute2Years)                                           \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateDiffEvaluateMinute2Years(state);                                            \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateDiffEvaluateMinute2YearsWithTimezone)                               \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateDiffEvaluateMinute2YearsWithTimezone(state);                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateDiffEvaluateWeek)(benchmark::State & state) {                       \
+        benchmarkDateDiffEvaluateWeek(state);                                                    \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, DateAddEvaluate10Days)(benchmark::State & state) {                      \
+        benchmarkDateAddEvaluate10Days(state);                                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateAddEvaluate600Minutes)(benchmark::State & state) {                  \
+        benchmarkDateAddEvaluate600Minutes(state);                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateAddEvaluate100KSeconds)                                             \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateAddEvaluate100KSeconds(state);                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateAddEvaluate100Years)(benchmark::State & state) {                    \
+        benchmarkDateAddEvaluate100Years(state);                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateAddEvaluate12HoursWithTimezone)                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateAddEvaluate12HoursWithTimezone(state);                                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, DateTruncEvaluateMinute15NewYork)                                       \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateMinute15NewYork(state);                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateMinute15UTC)                                           \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateMinute15UTC(state);                                            \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateHour1UTCMinus0700)                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateHour1UTCMinus0700(state);                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateWeek2NewYorkValue2100)                                 \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateWeek2NewYorkValue2100(state);                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateWeek2UTCValue2100)                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateWeek2UTCValue2100(state);                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateMonth6NewYorkValue2100)                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateMonth6NewYorkValue2100(state);                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateMonth6NewYorkValue2030)                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateMonth6NewYorkValue2030(state);                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateMonth6UTCValue2030)                                    \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateMonth6UTCValue2030(state);                                     \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateYear1NewYorkValue2020)                                 \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateYear1NewYorkValue2020(state);                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateYear1UTCValue2020)                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateYear1UTCValue2020(state);                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, DateTruncEvaluateYear1NewYorkValue2100)                                 \
+    (benchmark::State & state) {                                                                 \
+        benchmarkDateTruncEvaluateYear1NewYorkValue2100(state);                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, YearNoTZ)                                                               \
+    (benchmark::State & state) {                                                                 \
+        benchmarkYearNoTZ(state);                                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, YearConstTzUTC)                                                         \
+    (benchmark::State & state) {                                                                 \
+        benchmarkYearConstTzUTC(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, YearConstTzUTCMinus0700)                                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkYearConstTzUTCMinus0700(state);                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, YearConstTzNewYork)                                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkYearConstTzNewYork(state);                                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, YearUTC)                                                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkYearUTC(state);                                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, YearUTCMinus0700)                                                       \
+    (benchmark::State & state) {                                                                 \
+        benchmarkYearUTCMinus0700(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, YearNewYork)                                                            \
+    (benchmark::State & state) {                                                                 \
+        benchmarkYearNewYork(state);                                                             \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MonthNoTZ)                                                              \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMonthNoTZ(state);                                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MonthConstTzUTC)                                                        \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMonthConstTzUTC(state);                                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MonthConstTzUTCMinus0700)                                               \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMonthConstTzUTCMinus0700(state);                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MonthConstTzNewYork)                                                    \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMonthConstTzNewYork(state);                                                     \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MonthUTC)                                                               \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMonthUTC(state);                                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MonthUTCMinus0700)                                                      \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMonthUTCMinus0700(state);                                                       \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MonthNewYork)                                                           \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMonthNewYork(state);                                                            \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, HourNoTZ)                                                               \
+    (benchmark::State & state) {                                                                 \
+        benchmarkHourNoTZ(state);                                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, HourConstTzUTC)                                                         \
+    (benchmark::State & state) {                                                                 \
+        benchmarkHourConstTzUTC(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, HourConstTzUTCMinus0700)                                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkHourConstTzUTCMinus0700(state);                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, HourConstTzNewYork)                                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkHourConstTzNewYork(state);                                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, HourUTC)                                                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkHourUTC(state);                                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, HourUTCMinus0700)                                                       \
+    (benchmark::State & state) {                                                                 \
+        benchmarkHourUTCMinus0700(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, HourNewYork)                                                            \
+    (benchmark::State & state) {                                                                 \
+        benchmarkHourNewYork(state);                                                             \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MinuteNoTZ)                                                             \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMinuteNoTZ(state);                                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MinuteConstTzUTC)                                                       \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMinuteConstTzUTC(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MinuteConstTzUTCMinus0700)                                              \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMinuteConstTzUTCMinus0700(state);                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MinuteConstTzNewYork)                                                   \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMinuteConstTzNewYork(state);                                                    \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MinuteUTC)                                                              \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMinuteUTC(state);                                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MinuteUTCMinus0700)                                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMinuteUTCMinus0700(state);                                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MinuteNewYork)                                                          \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMinuteNewYork(state);                                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SecondNoTZ)                                                             \
+    (benchmark::State & state) {                                                                 \
+        benchmarkSecondNoTZ(state);                                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SecondConstTzUTC)                                                       \
+    (benchmark::State & state) {                                                                 \
+        benchmarkSecondConstTzUTC(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SecondConstTzUTCMinus0700)                                              \
+    (benchmark::State & state) {                                                                 \
+        benchmarkSecondConstTzUTCMinus0700(state);                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SecondConstTzNewYork)                                                   \
+    (benchmark::State & state) {                                                                 \
+        benchmarkSecondConstTzNewYork(state);                                                    \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SecondUTC)                                                              \
+    (benchmark::State & state) {                                                                 \
+        benchmarkSecondUTC(state);                                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SecondUTCMinus0700)                                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkSecondUTCMinus0700(state);                                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SecondNewYork)                                                          \
+    (benchmark::State & state) {                                                                 \
+        benchmarkSecondNewYork(state);                                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MillisecondNoTZ)                                                        \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMillisecondNoTZ(state);                                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MillisecondConstTzUTC)                                                  \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMillisecondConstTzUTC(state);                                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MillisecondConstTzUTCMinus0700)                                         \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMillisecondConstTzUTCMinus0700(state);                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MillisecondConstTzNewYork)                                              \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMillisecondConstTzNewYork(state);                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MillisecondUTC)                                                         \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMillisecondUTC(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MillisecondUTCMinus0700)                                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMillisecondUTCMinus0700(state);                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MillisecondNewYork)                                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkMillisecondNewYork(state);                                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, WeekNoTZ)                                                               \
+    (benchmark::State & state) {                                                                 \
+        benchmarkWeekNoTZ(state);                                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, WeekConstTzUTC)                                                         \
+    (benchmark::State & state) {                                                                 \
+        benchmarkWeekConstTzUTC(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, WeekConstTzUTCMinus0700)                                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkWeekConstTzUTCMinus0700(state);                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, WeekConstTzNewYork)                                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkWeekConstTzNewYork(state);                                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, WeekUTC)                                                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkWeekUTC(state);                                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, WeekUTCMinus0700)                                                       \
+    (benchmark::State & state) {                                                                 \
+        benchmarkWeekUTCMinus0700(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, WeekNewYork)                                                            \
+    (benchmark::State & state) {                                                                 \
+        benchmarkWeekNewYork(state);                                                             \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekYearNoTZ)                                                        \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekYearNoTZ(state);                                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekYearConstTzUTC)                                                  \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekYearConstTzUTC(state);                                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekYearConstTzUTCMinus0700)                                         \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekYearConstTzUTCMinus0700(state);                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekYearConstTzNewYork)                                              \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekYearConstTzNewYork(state);                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekYearUTC)                                                         \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekYearUTC(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekYearUTCMinus0700)                                                \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekYearUTCMinus0700(state);                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekYearNewYork)                                                     \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekYearNewYork(state);                                                      \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISODayOfWeekNoTZ)                                                       \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISODayOfWeekNoTZ(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISODayOfWeekConstTzUTC)                                                 \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISODayOfWeekConstTzUTC(state);                                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISODayOfWeekConstTzUTCMinus0700)                                        \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISODayOfWeekConstTzUTCMinus0700(state);                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISODayOfWeekConstTzNewYork)                                             \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISODayOfWeekConstTzNewYork(state);                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISODayOfWeekUTC)                                                        \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISODayOfWeekUTC(state);                                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISODayOfWeekUTCMinus0700)                                               \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISODayOfWeekUTCMinus0700(state);                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISODayOfWeekNewYork)                                                    \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISODayOfWeekNewYork(state);                                                     \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekNoTZ)                                                            \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekNoTZ(state);                                                             \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekConstTzUTC)                                                      \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekConstTzUTC(state);                                                       \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekConstTzUTCMinus0700)                                             \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekConstTzUTCMinus0700(state);                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekConstTzNewYork)                                                  \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekConstTzNewYork(state);                                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekUTC)                                                             \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekUTC(state);                                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekUTCMinus0700)                                                    \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekUTCMinus0700(state);                                                     \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ISOWeekNewYork)                                                         \
+    (benchmark::State & state) {                                                                 \
+        benchmarkISOWeekNewYork(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, GetFieldEvaluateExpression)                                             \
+    (benchmark::State & state) {                                                                 \
+        benchmarkGetFieldEvaluateExpression(state);                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, GetFieldEvaluateShortSyntaxExpression)                                  \
+    (benchmark::State & state) {                                                                 \
+        benchmarkGetFieldEvaluateShortSyntaxExpression(state);                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, GetFieldNestedExpression)(benchmark::State & state) {                   \
+        benchmarkGetFieldNestedExpression(state);                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SetFieldEvaluateExpression)                                             \
+    (benchmark::State & state) {                                                                 \
+        benchmarkSetFieldEvaluateExpression(state);                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SetFieldWithRemoveExpression)                                           \
+    (benchmark::State & state) {                                                                 \
+        benchmarkSetFieldWithRemoveExpression(state);                                            \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, UnsetFieldEvaluateExpression)                                           \
+    (benchmark::State & state) {                                                                 \
+        benchmarkUnsetFieldEvaluateExpression(state);                                            \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, LogicalAndFalse0)(benchmark::State & state) {                           \
+        benchmarkLogicalAndFalse0(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, LogicalAndFalse1)(benchmark::State & state) {                           \
+        benchmarkLogicalAndFalse1(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, LogicalAndTrue)(benchmark::State & state) {                             \
+        benchmarkLogicalAndTrue(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, LogicalOrTrue0)(benchmark::State & state) {                             \
+        benchmarkLogicalOrTrue0(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, LogicalOrTrue1)(benchmark::State & state) {                             \
+        benchmarkLogicalOrTrue1(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, LogicalOrFalse)(benchmark::State & state) {                             \
+        benchmarkLogicalOrFalse(state);                                                          \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SetIsSubset_allPresent)(benchmark::State & state) {                     \
+        benchmarkSetIsSubset_allPresent(state);                                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SetIsSubset_nonePresent)(benchmark::State & state) {                    \
+        benchmarkSetIsSubset_nonePresent(state);                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SetIntersection)(benchmark::State & state) {                            \
+        benchmarkSetIntersection(state);                                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SetDifference)(benchmark::State & state) {                              \
+        benchmarkSetDifference(state);                                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SetEquals)(benchmark::State & state) {                                  \
+        benchmarkSetEquals(state);                                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SetUnion)(benchmark::State & state) {                                   \
+        benchmarkSetUnion(state);                                                                \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SubtractIntegers)(benchmark::State & state) {                           \
+        benchmarkSubtractIntegers(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SubtractDoubles)(benchmark::State & state) {                            \
+        benchmarkSubtractDoubles(state);                                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SubtractDecimals)(benchmark::State & state) {                           \
+        benchmarkSubtractDecimals(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SubtractDates)(benchmark::State & state) {                              \
+        benchmarkSubtractDates(state);                                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SubtractNullAndMissing)(benchmark::State & state) {                     \
+        benchmarkSubtractNullAndMissing(state);                                                  \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, AddIntegers)(benchmark::State & state) {                                \
+        benchmarkAddIntegers(state);                                                             \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, AddDoubles)(benchmark::State & state) {                                 \
+        benchmarkAddDoubles(state);                                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, AddDecimals)(benchmark::State & state) {                                \
+        benchmarkAddDecimals(state);                                                             \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, AddDates)(benchmark::State & state) {                                   \
+        benchmarkAddDates(state);                                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, AddNullAndMissing)(benchmark::State & state) {                          \
+        benchmarkAddNullAndMissing(state);                                                       \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, AddArray)(benchmark::State & state) {                                   \
+        benchmarkAddArray(state);                                                                \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MultiplyIntegers)(benchmark::State & state) {                           \
+        benchmarkMultiplyIntegers(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MultiplyDoubles)(benchmark::State & state) {                            \
+        benchmarkMultiplyDoubles(state);                                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MultiplyDecimals)(benchmark::State & state) {                           \
+        benchmarkMultiplyDecimals(state);                                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MultiplyNullAndMissing)(benchmark::State & state) {                     \
+        benchmarkMultiplyNullAndMissing(state);                                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MultiplyArray)(benchmark::State & state) {                              \
+        benchmarkMultiplyArray(state);                                                           \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, ValueConst)(benchmark::State & state) {                                 \
+        benchmarkValueConst(state);                                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ValueLiteral)(benchmark::State & state) {                               \
+        benchmarkValueLiteral(state);                                                            \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ObjectToArray)(benchmark::State & state) {                              \
+        benchmarkObjectToArray(state);                                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ArrayToObject1)(benchmark::State & state) {                             \
+        benchmarkArrayToObject1(state);                                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, ArrayToObject2)(benchmark::State & state) {                             \
+        benchmarkArrayToObject2(state);                                                          \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, Percentile_SingleMid_10)(benchmark::State & state) {                    \
+        benchmarkPercentile(state, 10, {0.5});                                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_SingleMid_100)(benchmark::State & state) {                   \
+        benchmarkPercentile(state, 100, {0.5});                                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_Multi_100)(benchmark::State & state) {                       \
+        benchmarkPercentile(state, 100, {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99});    \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_SingleLow_1000)(benchmark::State & state) {                  \
+        benchmarkPercentile(state, 1000, {0.01});                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_SingleMid_1000)(benchmark::State & state) {                  \
+        benchmarkPercentile(state, 1000, {0.5});                                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_SingleHigh_1000)(benchmark::State & state) {                 \
+        benchmarkPercentile(state, 1000, {0.99});                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_Multi_1000)(benchmark::State & state) {                      \
+        benchmarkPercentile(state, 1000, {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99});   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_SingleMid_10000)(benchmark::State & state) {                 \
+        benchmarkPercentile(state, 10000, {0.5});                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_Multi_10000)(benchmark::State & state) {                     \
+        benchmarkPercentile(state, 10000, {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99});  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_SingleMid_25000)(benchmark::State & state) {                 \
+        benchmarkPercentile(state, 25000, {0.5});                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Percentile_SingleMid_50000)(benchmark::State & state) {                 \
+        benchmarkPercentile(state, 50000, {0.5});                                                \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, PowIntegers)(benchmark::State & state) {                                \
+        benchmarkPowIntegers(state);                                                             \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, PowDoubles)(benchmark::State & state) {                                 \
+        benchmarkPowDoubles(state);                                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, PowDecimals)(benchmark::State & state) {                                \
+        benchmarkPowDecimals(state);                                                             \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, PowNullAndMissing)(benchmark::State & state) {                          \
+        benchmarkPowNullAndMissing(state);                                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, StrLenBytes)(benchmark::State & state) {                                \
+        benchmarkStrLenBytes(state);                                                             \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, Trim_Default)(benchmark::State & state) {                               \
+        benchmarkTrim(state);                                                                    \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Trim_NonDefault)(benchmark::State & state) {                            \
+        benchmarkTrim(state, " h");                                                              \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, Trunc_Positive)(benchmark::State & state) {                             \
+        benchmarkTrunc(state, 1);                                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, Trunc_Negative)(benchmark::State & state) {                             \
+        benchmarkTrunc(state, -1);                                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, StrLenCP)(benchmark::State & state) {                                   \
+        benchmarkStrLenCP(state);                                                                \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, StrLenCPMultiByteChars)(benchmark::State & state) {                     \
+        benchmarkStrLenCPMultiBytes(state);                                                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, StrLenCPLargeString)(benchmark::State & state) {                        \
+        benchmarkStrLenCPLargeString(state);                                                     \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, Strcasecmp)(benchmark::State & state) {                                 \
+        benchmarkStrcasecmp(state);                                                              \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, StrcasecmpLargeString)(benchmark::State & state) {                      \
+        benchmarkStrcasecmpLargeString(state);                                                   \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SubstrBytes)(benchmark::State & state) {                                \
+        benchmarkSubstrBytes(state);                                                             \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SubstrBytesLargeString)(benchmark::State & state) {                     \
+        benchmarkSubstrBytesLargeString(state);                                                  \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SubstrCP)(benchmark::State & state) {                                   \
+        benchmarkSubstrCP(state);                                                                \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SubstrCPMultiBytes)(benchmark::State & state) {                         \
+        benchmarkSubstrCPMultiBytes(state);                                                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SubstrCPLargeString)(benchmark::State & state) {                        \
+        benchmarkSubstrCPLargeString(state);                                                     \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, Rand)(benchmark::State & state) {                                       \
+        benchmarkRand(state);                                                                    \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MaxSingleInput)(benchmark::State & state) {                             \
+        benchmarkMaxSingleInput(state);                                                          \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MaxSingleArrayInput)(benchmark::State & state) {                        \
+        benchmarkMaxSingleArrayInput(state);                                                     \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MinSingleInput)(benchmark::State & state) {                             \
+        benchmarkMinSingleInput(state);                                                          \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MinSingleArrayInput)(benchmark::State & state) {                        \
+        benchmarkMinSingleArrayInput(state);                                                     \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, StdDevPop)(benchmark::State & state) {                                  \
+        benchmarkStdDevPop(state);                                                               \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, StdDevSamp)(benchmark::State & state) {                                 \
+        benchmarkStdDevSamp(state);                                                              \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, Avg)(benchmark::State & state) {                                        \
+        benchmarkAvg(state);                                                                     \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, Sum)(benchmark::State & state) {                                        \
+        benchmarkSum(state);                                                                     \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, RegexMatch)(benchmark::State & state) {                                 \
+        benchmarkRegexMatch(state);                                                              \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, AddWithDottedFieldPath)(benchmark::State & state) {                     \
+        benchmarkAddWithDottedFieldPath(state);                                                  \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLReplaceOneRegex)(benchmark::State & state) {                         \
+        benchmarkMQLReplaceOneRegex(state);                                                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSReplaceOneRegex)(benchmark::State & state) {                          \
+        benchmarkJSReplaceOneRegex(state);                                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLReplaceAllRegex)(benchmark::State & state) {                         \
+        benchmarkMQLReplaceAllRegex(state);                                                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSReplaceAllRegex)(benchmark::State & state) {                          \
+        benchmarkJSReplaceAllRegex(state);                                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLSplitRegex)(benchmark::State & state) {                              \
+        benchmarkMQLSplitRegex(state);                                                           \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSSplitRegex)(benchmark::State & state) {                               \
+        benchmarkJSSplitRegex(state);                                                            \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLConvertToStringBase2)(benchmark::State & state) {                    \
+        benchmarkMQLConvertToString(2, 2147483647, state);                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLConvertToStringBase8)(benchmark::State & state) {                    \
+        benchmarkMQLConvertToString(8, 2147483647, state);                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLConvertToStringBase10)(benchmark::State & state) {                   \
+        benchmarkMQLConvertToString(10, 2147483647, state);                                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLConvertToStringBase16)(benchmark::State & state) {                   \
+        benchmarkMQLConvertToString(16, 2147483647, state);                                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLConvertToIntBase2)(benchmark::State & state) {                       \
+        benchmarkMQLConvertToInt(2, std::string_view{"1111111111111111111111111111111"}, state); \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLConvertToIntBase8)(benchmark::State & state) {                       \
+        benchmarkMQLConvertToInt(8, std::string_view{"17777777777"}, state);                     \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLConvertToIntBase10)(benchmark::State & state) {                      \
+        benchmarkMQLConvertToInt(10, std::string_view{"2147483647"}, state);                     \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLConvertToIntBase16)(benchmark::State & state) {                      \
+        benchmarkMQLConvertToInt(16, std::string_view{"7FFFFFFF"}, state);                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSConvertToStringBase2)(benchmark::State & state) {                     \
+        benchmarkJSConvertToString(2, 2147483647, state);                                        \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSConvertToStringBase8)(benchmark::State & state) {                     \
+        benchmarkJSConvertToString(8, 2147483647, state);                                        \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSConvertToStringBase10)(benchmark::State & state) {                    \
+        benchmarkJSConvertToString(10, 2147483647, state);                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSConvertToStringBase16)(benchmark::State & state) {                    \
+        benchmarkJSConvertToString(16, 2147483647, state);                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSConvertToIntBase2)(benchmark::State & state) {                        \
+        benchmarkJSConvertToInt(2, std::string_view{"1111111111111111111111111111111"}, state);  \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSConvertToIntBase8)(benchmark::State & state) {                        \
+        benchmarkJSConvertToInt(8, std::string_view{"17777777777"}, state);                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSConvertToIntBase10)(benchmark::State & state) {                       \
+        benchmarkJSConvertToInt(10, std::string_view{"2147483647"}, state);                      \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSConvertToIntBase16)(benchmark::State & state) {                       \
+        benchmarkJSConvertToInt(16, std::string_view{"7FFFFFFF"}, state);                        \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLCreateObjectId)(benchmark::State & state) {                          \
+        benchmarkMQLCreateObjectId(state);                                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSCreateObjectId)(benchmark::State & state) {                           \
+        benchmarkJSCreateObjectId(state);                                                        \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, MQLSubtype)(benchmark::State & state) {                                 \
+        benchmarkMQLSubtype(state);                                                              \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, JSSubtype)(benchmark::State & state) {                                  \
+        benchmarkJSSubtype(state);                                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MQLConvertObjectToString5FieldsDepth1)(benchmark::State & state) {      \
+        benchmarkMQLConvertObjectToString(5, 1, state);                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, JSConvertObjectToString5FieldsDepth1)(benchmark::State & state) {       \
+        benchmarkJSConvertObjectToString(5, 1, state);                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MQLConvertObjectToString50FieldsDepth10)(benchmark::State & state) {    \
+        benchmarkMQLConvertObjectToString(50, 10, state);                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, JSConvertObjectToString50FieldsDepth10)(benchmark::State & state) {     \
+        benchmarkJSConvertObjectToString(50, 10, state);                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MQLConvertStringToObject5FieldsDepth1)(benchmark::State & state) {      \
+        benchmarkMQLConvertStringToObject(5, 1, state);                                          \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, JSConvertStringToObject5FieldsDepth1)(benchmark::State & state) {       \
+        benchmarkJSConvertStringToObject(5, 1, state);                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, MQLConvertStringToObject50FieldsDepth10)(benchmark::State & state) {    \
+        benchmarkMQLConvertStringToObject(50, 10, state);                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, JSConvertStringToObject50FieldsDepth10)(benchmark::State & state) {     \
+        benchmarkJSConvertStringToObject(50, 10, state);                                         \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityDotProduct128)(benchmark::State & state) {                    \
+        benchmarkSimilarityDotProduct(state, 128);                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProduct512)(benchmark::State & state) {                    \
+        benchmarkSimilarityDotProduct(state, 512);                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProduct1536)(benchmark::State & state) {                   \
+        benchmarkSimilarityDotProduct(state, 1536);                                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProduct4096)(benchmark::State & state) {                   \
+        benchmarkSimilarityDotProduct(state, 4096);                                              \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityCosine128)(benchmark::State & state) {                        \
+        benchmarkSimilarityCosine(state, 128);                                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosine512)(benchmark::State & state) {                        \
+        benchmarkSimilarityCosine(state, 512);                                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosine1536)(benchmark::State & state) {                       \
+        benchmarkSimilarityCosine(state, 1536);                                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosine4096)(benchmark::State & state) {                       \
+        benchmarkSimilarityCosine(state, 4096);                                                  \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityEuclidean128)(benchmark::State & state) {                     \
+        benchmarkSimilarityEuclidean(state, 128);                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclidean512)(benchmark::State & state) {                     \
+        benchmarkSimilarityEuclidean(state, 512);                                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclidean1536)(benchmark::State & state) {                    \
+        benchmarkSimilarityEuclidean(state, 1536);                                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclidean4096)(benchmark::State & state) {                    \
+        benchmarkSimilarityEuclidean(state, 4096);                                               \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinData128)(benchmark::State & state) {             \
+        benchmarkSimilarityDotProductBinData(state, 128);                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinData512)(benchmark::State & state) {             \
+        benchmarkSimilarityDotProductBinData(state, 512);                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinData1536)(benchmark::State & state) {            \
+        benchmarkSimilarityDotProductBinData(state, 1536);                                       \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinData4096)(benchmark::State & state) {            \
+        benchmarkSimilarityDotProductBinData(state, 4096);                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityCosineBinData128)(benchmark::State & state) {                 \
+        benchmarkSimilarityCosineBinData(state, 128);                                            \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosineBinData512)(benchmark::State & state) {                 \
+        benchmarkSimilarityCosineBinData(state, 512);                                            \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosineBinData1536)(benchmark::State & state) {                \
+        benchmarkSimilarityCosineBinData(state, 1536);                                           \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosineBinData4096)(benchmark::State & state) {                \
+        benchmarkSimilarityCosineBinData(state, 4096);                                           \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinData128)(benchmark::State & state) {              \
+        benchmarkSimilarityEuclideanBinData(state, 128);                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinData512)(benchmark::State & state) {              \
+        benchmarkSimilarityEuclideanBinData(state, 512);                                         \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinData1536)(benchmark::State & state) {             \
+        benchmarkSimilarityEuclideanBinData(state, 1536);                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinData4096)(benchmark::State & state) {             \
+        benchmarkSimilarityEuclideanBinData(state, 4096);                                        \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinDataInt8_128)(benchmark::State & state) {        \
+        benchmarkSimilarityDotProductBinDataInt8(state, 128);                                    \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinDataInt8_1536)(benchmark::State & state) {       \
+        benchmarkSimilarityDotProductBinDataInt8(state, 1536);                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinDataInt8_4096)(benchmark::State & state) {       \
+        benchmarkSimilarityDotProductBinDataInt8(state, 4096);                                   \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityCosineBinDataInt8_128)(benchmark::State & state) {            \
+        benchmarkSimilarityCosineBinDataInt8(state, 128);                                        \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosineBinDataInt8_1536)(benchmark::State & state) {           \
+        benchmarkSimilarityCosineBinDataInt8(state, 1536);                                       \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosineBinDataInt8_4096)(benchmark::State & state) {           \
+        benchmarkSimilarityCosineBinDataInt8(state, 4096);                                       \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataInt8_128)(benchmark::State & state) {         \
+        benchmarkSimilarityEuclideanBinDataInt8(state, 128);                                     \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataInt8_1536)(benchmark::State & state) {        \
+        benchmarkSimilarityEuclideanBinDataInt8(state, 1536);                                    \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataInt8_4096)(benchmark::State & state) {        \
+        benchmarkSimilarityEuclideanBinDataInt8(state, 4096);                                    \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinDataPackedBit128)(benchmark::State & state) {    \
+        benchmarkSimilarityDotProductBinDataPackedBit(state, 128);                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinDataPackedBit1536)(benchmark::State & state) {   \
+        benchmarkSimilarityDotProductBinDataPackedBit(state, 1536);                              \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinDataPackedBit4096)(benchmark::State & state) {   \
+        benchmarkSimilarityDotProductBinDataPackedBit(state, 4096);                              \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityCosineBinDataPackedBit128)(benchmark::State & state) {        \
+        benchmarkSimilarityCosineBinDataPackedBit(state, 128);                                   \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosineBinDataPackedBit1536)(benchmark::State & state) {       \
+        benchmarkSimilarityCosineBinDataPackedBit(state, 1536);                                  \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosineBinDataPackedBit4096)(benchmark::State & state) {       \
+        benchmarkSimilarityCosineBinDataPackedBit(state, 4096);                                  \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataPackedBit128)(benchmark::State & state) {     \
+        benchmarkSimilarityEuclideanBinDataPackedBit(state, 128);                                \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataPackedBit1536)(benchmark::State & state) {    \
+        benchmarkSimilarityEuclideanBinDataPackedBit(state, 1536);                               \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataPackedBit4096)(benchmark::State & state) {    \
+        benchmarkSimilarityEuclideanBinDataPackedBit(state, 4096);                               \
+    }                                                                                            \
+                                                                                                 \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinDataMixedDtype1536)(benchmark::State & state) {  \
+        benchmarkSimilarityDotProductBinDataMixedDtype(state, 1536);                             \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityCosineBinDataMixedDtype1536)(benchmark::State & state) {      \
+        benchmarkSimilarityCosineBinDataMixedDtype(state, 1536);                                 \
+    }                                                                                            \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinDataMixedDtype1536)(benchmark::State & state) {   \
+        benchmarkSimilarityEuclideanBinDataMixedDtype(state, 1536);                              \
     }
 
 

@@ -35,6 +35,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::ce {
+using namespace std::literals::string_view_literals;
 
 namespace {
 namespace value = sbe::value;
@@ -199,7 +200,7 @@ TEST(ScalarHistogramEstimatorInterpolationTest, UniformStrEstimate) {
     const ScalarHistogram hist = createHistogram(data);
 
     // Predicates over value inside of a bucket.
-    const auto [tag, value] = value::makeNewString("TTV"_sd);
+    const auto [tag, value] = value::makeNewString("TTV"sv);
     value::ValueGuard vg(tag, value);
 
     // Query: [{$match: {a: {$eq: 'TTV'}}}].
@@ -233,7 +234,7 @@ TEST(ScalarHistogramEstimatorInterpolationTest, NormalStrEstimate) {
     const ScalarHistogram hist = createHistogram(data);
 
     // Predicates over bucket bound.
-    auto [tag, value] = value::makeNewString("TTV"_sd);
+    auto [tag, value] = value::makeNewString("TTV"sv);
     value::ValueGuard vg(tag, value);
 
     // Query: [{$match: {a: {$eq: 'TTV'}}}].
@@ -249,7 +250,7 @@ TEST(ScalarHistogramEstimatorInterpolationTest, NormalStrEstimate) {
     ASSERT_APPROX_EQUAL(52.0, expectedCard, 0.1);  // Actual: 52.
 
     // Predicates over value inside of a bucket.
-    std::tie(tag, value) = value::makeNewString("Pfa"_sd);
+    std::tie(tag, value) = value::makeNewString("Pfa"sv);
 
     // Query: [{$match: {a: {$eq: 'Pfa'}}}].
     expectedCard = estimateCardinality(hist, tag, value, EstimationType::kEqual).card;
@@ -424,7 +425,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, OneBucketStrHistogram) {
     ASSERT_EQ(30.0, getTotals(hist).card);
 
     // Estimates with bucket bound.
-    auto [tag, value] = value::makeNewString("xyz"_sd);
+    auto [tag, value] = value::makeNewString("xyz"sv);
     value::ValueGuard vg(tag, value);
     ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
     ASSERT_EQ(27.0, estimateCardinality(hist, tag, value, kLess).card);
@@ -435,14 +436,14 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, OneBucketStrHistogram) {
     // Estimates for a value inside the bucket. Since there is no low value bound in the histogram
     // all values smaller than the upper bound will be estimated the same way using half of the
     // bucket cardinality.
-    std::tie(tag, value) = value::makeNewString("a"_sd);
+    std::tie(tag, value) = value::makeNewString("a"sv);
     ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
     ASSERT_EQ(10.5, estimateCardinality(hist, tag, value, kLess).card);
     ASSERT_EQ(13.5, estimateCardinality(hist, tag, value, kLessOrEqual).card);
     ASSERT_EQ(16.5, estimateCardinality(hist, tag, value, kGreater).card);
     ASSERT_EQ(19.5, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
-    std::tie(tag, value) = value::makeNewString(""_sd);
+    std::tie(tag, value) = value::makeNewString(""sv);
     // In the special case of a single string bucket, we estimate empty string equality as for any
     // other string value. In practice if there are at least 2 buckets for the string data and an
     // empty string in the data set, it will be chosen as a bound for the first bucket and produce
@@ -452,7 +453,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, OneBucketStrHistogram) {
     ASSERT_EQ(30.0, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
     // Estimates for a value larger than the upper bound.
-    std::tie(tag, value) = value::makeNewString("z"_sd);
+    std::tie(tag, value) = value::makeNewString("z"sv);
     ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kEqual).card);
     ASSERT_EQ(30.0, estimateCardinality(hist, tag, value, kLess).card);
     ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kGreater).card);
@@ -466,7 +467,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsStrHistogram) {
     ASSERT_EQ(100.0, getTotals(hist).card);
 
     // Estimates for a value smaller than the first bucket bound.
-    auto [tag, value] = value::makeNewString("a"_sd);
+    auto [tag, value] = value::makeNewString("a"sv);
     value::ValueGuard vg(tag, value);
 
     ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kEqual).card);
@@ -476,14 +477,14 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsStrHistogram) {
     ASSERT_EQ(100.0, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
     // Estimates with bucket bounds.
-    std::tie(tag, value) = value::makeNewString("abc"_sd);
+    std::tie(tag, value) = value::makeNewString("abc"sv);
     ASSERT_EQ(2.0, estimateCardinality(hist, tag, value, kEqual).card);
     ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kLess).card);
     ASSERT_EQ(2.0, estimateCardinality(hist, tag, value, kLessOrEqual).card);
     ASSERT_EQ(98.0, estimateCardinality(hist, tag, value, kGreater).card);
     ASSERT_EQ(100.0, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
-    std::tie(tag, value) = value::makeNewString("xyz"_sd);
+    std::tie(tag, value) = value::makeNewString("xyz"sv);
     ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kEqual).card);
     ASSERT_EQ(97.0, estimateCardinality(hist, tag, value, kLess).card);
     ASSERT_EQ(100.0, estimateCardinality(hist, tag, value, kLessOrEqual).card);
@@ -491,7 +492,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsStrHistogram) {
     ASSERT_EQ(3.0, estimateCardinality(hist, tag, value, kGreaterOrEqual).card);
 
     // Estimates for a value inside the bucket.
-    std::tie(tag, value) = value::makeNewString("sun"_sd);
+    std::tie(tag, value) = value::makeNewString("sun"sv);
     ASSERT_APPROX_EQUAL(1.98, estimateCardinality(hist, tag, value, kEqual).card, kErrorBound);
     ASSERT_APPROX_EQUAL(74.39, estimateCardinality(hist, tag, value, kLess).card, kErrorBound);
     ASSERT_APPROX_EQUAL(
@@ -501,7 +502,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsStrHistogram) {
         25.62, estimateCardinality(hist, tag, value, kGreaterOrEqual).card, kErrorBound);
 
     // Estimate for a value very close to the bucket bound.
-    std::tie(tag, value) = value::makeNewString("xyw"_sd);
+    std::tie(tag, value) = value::makeNewString("xyw"sv);
     ASSERT_APPROX_EQUAL(1.98, estimateCardinality(hist, tag, value, kEqual).card, kErrorBound);
     ASSERT_APPROX_EQUAL(95.02, estimateCardinality(hist, tag, value, kLess).card, kErrorBound);
     ASSERT_APPROX_EQUAL(
@@ -664,11 +665,11 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
     std::tie(tag, val) = stats::makeInt64Value(1000);
     data.emplace_back(tag, val);
 
-    auto [strTag, strVal] = value::makeNewString("abc"_sd);
+    auto [strTag, strVal] = value::makeNewString("abc"sv);
     value::ValueGuard strVG(strTag, strVal);
     auto [copyTag, copyVal] = value::copyValue(strTag, strVal);
     data.emplace_back(copyTag, copyVal);
-    std::tie(strTag, strVal) = value::makeNewString("xyz"_sd);
+    std::tie(strTag, strVal) = value::makeNewString("xyz"sv);
     std::tie(copyTag, copyVal) = value::copyValue(strTag, strVal);
     data.emplace_back(copyTag, copyVal);
 
@@ -759,7 +760,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
     ASSERT_EQ(1.0, estimateCardinality(hist, minTsTag, minTsVal, kEqual).card);
 
     // Add minimum values to the data set and create another histogram.
-    const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
+    const auto [tagLowStr, valLowStr] = value::makeNewString(""sv);
     value::ValueGuard vgLowStr(tagLowStr, valLowStr);
     std::tie(copyTag, copyVal) = value::copyValue(tagLowStr, valLowStr);
     data.emplace_back(copyTag, copyVal);
@@ -1060,14 +1061,14 @@ TEST(CEHistogramEstimatorTest, StringHistogram) {
     const auto ceHist =
         CEHistogram::make(hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
 
-    auto [tag, value] = value::makeNewString("testA"_sd);
+    auto [tag, value] = value::makeNewString("testA"sv);
     value::ValueGuard vg(tag, value);
     ASSERT_EQ(5.0, estimateCardinalityEq(*ceHist, tag, value, true).card);
 
-    std::tie(tag, value) = value::makeNewString("testB"_sd);
+    std::tie(tag, value) = value::makeNewString("testB"sv);
     ASSERT_EQ(3.0, estimateCardinalityEq(*ceHist, tag, value, true).card);
 
-    std::tie(tag, value) = value::makeNewString("testC"_sd);
+    std::tie(tag, value) = value::makeNewString("testC"sv);
     ASSERT_EQ(0, estimateCardinalityEq(*ceHist, tag, value, false).card);
 }
 
@@ -1088,7 +1089,7 @@ TEST(CEHistogramEstimatorTest, UniformStrHistogram) {
     const auto ceHist =
         CEHistogram::make(hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
 
-    const auto [tag, value] = value::makeNewString("TTV"_sd);
+    const auto [tag, value] = value::makeNewString("TTV"sv);
     value::ValueGuard vg(tag, value);
 
     ASSERT_APPROX_EQUAL(
@@ -1114,13 +1115,13 @@ TEST(CEHistogramEstimatorTest, NormalStrHistogram) {
     const auto ceHist =
         CEHistogram::make(hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
 
-    auto [tag, value] = value::makeNewString("TTV"_sd);
+    auto [tag, value] = value::makeNewString("TTV"sv);
     value::ValueGuard vg(tag, value);
 
     ASSERT_APPROX_EQUAL(
         5.0, estimateCardinalityEq(*ceHist, tag, value, true).card, 0.1);  // Actual: 5.
 
-    std::tie(tag, value) = value::makeNewString("Pfa"_sd);
+    std::tie(tag, value) = value::makeNewString("Pfa"sv);
     ASSERT_APPROX_EQUAL(
         1.75, estimateCardinalityEq(*ceHist, tag, value, true).card, 0.1);  // Actual: 2.
 }
@@ -1138,7 +1139,7 @@ TEST(CEHistogramEstimatorTest, IntStrHistogram) {
         hist,
         stats::TypeCounts{{NumberInt64, intCnt}, {value::TypeTags::StringSmall, strCnt}},
         totalCnt);
-    auto [tag, value] = value::makeNewString("test"_sd);
+    auto [tag, value] = value::makeNewString("test"sv);
     value::ValueGuard vg(tag, value);
 
     ASSERT_EQ(20.0, estimateCardinalityEq(*ceHist, tag, value, true).card);
@@ -1171,7 +1172,7 @@ TEST(CEHistogramEstimatorTest, UniformIntStrHistogram) {
                         estimateCardinalityEq(*ceHist, NumberInt64, 993, true).card,
                         0.1);  // Actual: 9
 
-    auto [tag, value] = value::makeNewString("04e"_sd);
+    auto [tag, value] = value::makeNewString("04e"sv);
     value::ValueGuard vg(tag, value);
 
     ASSERT_APPROX_EQUAL(
@@ -1209,7 +1210,7 @@ TEST(CEHistogramEstimatorTest, UniformIntStrHistogram) {
     ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
 
     // Value towards the end of the bucket gets the same half bucket estimate.
-    std::tie(tag, value) = value::makeNewString("8B5"_sd);
+    std::tie(tag, value) = value::makeNewString("8B5"sv);
 
     // Query: [{$match: {a: {$lt: '8B5'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
@@ -1274,7 +1275,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
     ASSERT_APPROX_EQUAL(248.4, expectedCard.card, 0.1);  // Actual: 250.
 
     // Predicates over value inside of the first string bucket.
-    auto [tag, value] = value::makeNewString("04e"_sd);
+    auto [tag, value] = value::makeNewString("04e"sv);
     value::ValueGuard vg(tag, value);
 
     // Query: [{$match: {a: {$eq: '04e'}}}].
@@ -1317,7 +1318,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
     ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
 
     // Value towards the end of the bucket gets the same half bucket estimate.
-    std::tie(tag, value) = value::makeNewString("8B5"_sd);
+    std::tie(tag, value) = value::makeNewString("8B5"sv);
 
     // Query: [{$match: {a: {$lt: '8B5'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
@@ -1563,9 +1564,9 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(3.0, expectedCard.card, kErrorBound);
 
-    const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
+    const auto [tagLowStr, valLowStr] = value::makeNewString(""sv);
     value::ValueGuard vgLowStr(tagLowStr, valLowStr);
-    auto [tag, value] = value::makeNewString("a"_sd);
+    auto [tag, value] = value::makeNewString("a"sv);
     value::ValueGuard vg(tag, value);
 
     // [{$match: {a: {$gte: 0, $lt: ""}}}]
@@ -1593,7 +1594,7 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
 
     ASSERT_APPROX_EQUAL(0.0, expectedCard.card, kErrorBound);
 
-    std::tie(tag, value) = value::makeNewString("xyz"_sd);
+    std::tie(tag, value) = value::makeNewString("xyz"sv);
     // [{$match: {a: {$gte: "", $lte: "xyz"}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
                                             true /* lowInclusive */,
@@ -1625,7 +1626,7 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
     ASSERT_EQ(17.0, estimateCardinalityScalarHistogramInteger(hist, 100, EstimationType::kLess));
     ASSERT_EQ(80.0, estimateCardinalityScalarHistogramInteger(hist, 100, EstimationType::kGreater));
 
-    auto [tag, value] = value::makeNewString("pqr"_sd);
+    auto [tag, value] = value::makeNewString("pqr"sv);
     value::ValueGuard vg(tag, value);
     auto expectedCard{estimateCardinality(hist, tag, value, EstimationType::kEqual)};
     ASSERT_EQ(5.0, expectedCard.card);
@@ -1657,7 +1658,7 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
     // Estimates for a value between bucket bounds.
     ASSERT_EQ(0.0, estimateCardinalityScalarHistogramInteger(hist, 105, EstimationType::kEqual));
 
-    std::tie(tag, value) = value::makeNewString("a"_sd);
+    std::tie(tag, value) = value::makeNewString("a"sv);
     expectedCard = {estimateCardinality(hist, tag, value, EstimationType::kEqual)};
     ASSERT_APPROX_EQUAL(3.0, expectedCard.card, kErrorBound);
     expectedCard = {estimateCardinality(hist, tag, value, EstimationType::kLess)};
@@ -1712,7 +1713,7 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(20.0, expectedCard.card, kErrorBound);
 
-    const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
+    const auto [tagLowStr, valLowStr] = value::makeNewString(""sv);
     value::ValueGuard vgLowStr(tagLowStr, valLowStr);
 
     // [{$match: {a: {$gte: NaN, $lt: ""}}}]

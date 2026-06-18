@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace fts {
@@ -65,7 +65,9 @@ public:
     /**
      * Does the string 'phrase' occur in the string 'haystack'?
      */
-    virtual bool phraseMatches(StringData phrase, StringData haystack, Options options) const = 0;
+    virtual bool phraseMatches(std::string_view phrase,
+                               std::string_view haystack,
+                               Options options) const = 0;
 };
 
 }  // namespace fts

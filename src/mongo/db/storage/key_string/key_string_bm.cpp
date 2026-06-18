@@ -30,7 +30,6 @@
 
 #include "mongo/db/storage/key_string/key_string.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"

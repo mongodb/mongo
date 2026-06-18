@@ -28,8 +28,9 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo::otel::traces {
 
@@ -62,10 +63,10 @@ public:
     /**
      * Note that this requires a passkey for construction, which only N&O code is allowed to use.
      */
-    constexpr SpanName(Passkey, StringData name, SampledByDefault sampledByDefault)
+    constexpr SpanName(Passkey, std::string_view name, SampledByDefault sampledByDefault)
         : _name(name), _sampledByDefault{sampledByDefault} {}
 
-    constexpr StringData getName() const {
+    constexpr std::string_view getName() const {
         return _name;
     }
 
@@ -78,7 +79,7 @@ public:
     }
 
 private:
-    StringData _name;
+    std::string_view _name;
     SampledByDefault _sampledByDefault;
 };
 
@@ -179,6 +180,6 @@ SPAN_NAME_(kReshardingRecipientNotifyCoordinatorAndAwaitDecision,
  * The returned reference is stable for the lifetime of the process.
  */
 MONGO_MOD_PUBLIC const SpanName& registerCommandSpanName(
-    StringData name, SampledByDefault sampledByDefault = SampledByDefault{false});
+    std::string_view name, SampledByDefault sampledByDefault = SampledByDefault{false});
 
 }  // namespace mongo::otel::traces

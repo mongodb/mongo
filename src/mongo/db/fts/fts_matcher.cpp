@@ -29,7 +29,6 @@
 
 #include "mongo/db/fts/fts_matcher.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/fts/fts_phrase_matcher.h"
 #include "mongo/db/fts/fts_tokenizer.h"
@@ -37,6 +36,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -83,7 +83,7 @@ bool FTSMatcher::hasPositiveTerm(const BSONObj& obj) const {
     return false;
 }
 
-bool FTSMatcher::_hasPositiveTerm_string(const FTSLanguage* language, StringData raw) const {
+bool FTSMatcher::_hasPositiveTerm_string(const FTSLanguage* language, std::string_view raw) const {
     std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
     tokenizer->reset(raw, _getTokenizerOptions());
 
@@ -113,7 +113,7 @@ bool FTSMatcher::hasNegativeTerm(const BSONObj& obj) const {
     return false;
 }
 
-bool FTSMatcher::_hasNegativeTerm_string(const FTSLanguage* language, StringData raw) const {
+bool FTSMatcher::_hasNegativeTerm_string(const FTSLanguage* language, std::string_view raw) const {
     std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
     tokenizer->reset(raw, _getTokenizerOptions());
 

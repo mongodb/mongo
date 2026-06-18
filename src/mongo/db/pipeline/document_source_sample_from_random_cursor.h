@@ -43,6 +43,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
@@ -57,10 +58,9 @@ namespace mongo {
  */
 class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$sampleFromRandomCursor"_sd;
-    StringData getSourceName() const final;
-    Value serialize(const query_shape::SerializationOptions& opts =
-                        query_shape::SerializationOptions{}) const final;
+    static constexpr std::string_view kStageName{"$sampleFromRandomCursor"};
+    std::string_view getSourceName() const final;
+    Value serialize(const query_shape::SerializationOptions& opts = {}) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     static const Id& id;

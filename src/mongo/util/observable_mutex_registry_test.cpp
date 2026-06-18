@@ -32,6 +32,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <iterator>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -49,7 +50,7 @@ using StatsRecord = ObservableMutexRegistry::StatsRecord;
  * ObservableMutexRegistry::report() docstring for details on report structure.
  */
 struct TaggedStats {
-    StringData tag;
+    std::string_view tag;
     MutexStats data;
 
     // Optional data for listAll if reporting in that mode.
@@ -79,12 +80,12 @@ class ObservableMutexRegistryReportTest : public unittest::Test {
 public:
     using StatsList = std::vector<TaggedStats>;
 
-    static constexpr StringData kInternalMutexTags[] = {
+    static constexpr std::string_view kInternalMutexTags[] = {
         ObservableMutexRegistry::kRegistrationMutexTag,
         ObservableMutexRegistry::kCollectionMutexTag};
 
     std::unique_ptr<MockObservableMutex> makeMutexAndAddToRegistry(
-        TaggedStats stats, boost::optional<StringData> instanceLabel = boost::none) {
+        TaggedStats stats, boost::optional<std::string_view> instanceLabel = boost::none) {
         auto m = std::make_unique<MockObservableMutex>(stats.data);
         _registry.add(stats.tag, m->getMutex(), instanceLabel);
         return m;

@@ -34,6 +34,7 @@
 #include <cstring>
 #include <mutex>
 #include <ratio>
+#include <string_view>
 #include <system_error>
 #include <utility>
 
@@ -84,7 +85,7 @@ const auto getWatchdogMonitorInterface =
 
 }  // namespace
 
-WatchdogPeriodicThread::WatchdogPeriodicThread(Milliseconds period, StringData threadName)
+WatchdogPeriodicThread::WatchdogPeriodicThread(Milliseconds period, std::string_view threadName)
     : _period(period), _enabled(true), _threadName(std::string{threadName}) {}
 
 void WatchdogPeriodicThread::start() {
@@ -688,8 +689,8 @@ void watchdogTerminate() {
 }
 #endif
 
-constexpr StringData DirectoryCheck::kProbeFileName;
-constexpr StringData DirectoryCheck::kProbeFileNameExt;
+constexpr std::string_view DirectoryCheck::kProbeFileName;
+constexpr std::string_view DirectoryCheck::kProbeFileNameExt;
 
 void DirectoryCheck::run(OperationContext* opCtx) {
     // Ensure we have unique file names if multiple processes share the same logging directory

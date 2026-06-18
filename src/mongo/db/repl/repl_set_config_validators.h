@@ -30,7 +30,6 @@
 #pragma once
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/str.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace mongo {
 namespace MONGO_MOD_PUB repl {
@@ -72,7 +72,9 @@ Status validateReplicaSetIdNotNull(OID replicaSetId);
 /**
  * For serialization and deserialization of certain values in the IDL.
  */
-inline void smallExactInt64Append(std::int64_t value, StringData fieldName, BSONObjBuilder* bob) {
+inline void smallExactInt64Append(std::int64_t value,
+                                  std::string_view fieldName,
+                                  BSONObjBuilder* bob) {
     bob->appendNumber(fieldName, static_cast<long long>(value));
 }
 
@@ -92,14 +94,16 @@ inline std::int64_t parseSmallExactInt64(const BSONElement& element) {
 }
 
 // The term field is serialized like a smallExactInt except that -1 is not serialized.
-inline void serializeTermField(std::int64_t value, StringData fieldName, BSONObjBuilder* bob) {
+inline void serializeTermField(std::int64_t value,
+                               std::string_view fieldName,
+                               BSONObjBuilder* bob) {
     if (value != OpTime::kUninitializedTerm) {
         smallExactInt64Append(value, fieldName, bob);
     }
 }
 
 inline void serializeOptionalBoolIfTrue(const OptionalBool& value,
-                                        StringData fieldName,
+                                        std::string_view fieldName,
                                         BSONObjBuilder* bob) {
     if (value) {
         value.serializeToBSON(fieldName, bob);

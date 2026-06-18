@@ -33,12 +33,13 @@
 #include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 ExtractFieldPathsStage::ExtractFieldPathsStage(std::unique_ptr<PlanStage> input,
                                                std::vector<PathSlot> inputs,
                                                std::vector<PathSlot> outputs,
                                                PlanNodeId planNodeId,
                                                bool participateInTrialRunTracking)
-    : PlanStage("extract_field_paths"_sd,
+    : PlanStage("extract_field_paths"sv,
                 nullptr /* yieldPolicy */,
                 planNodeId,
                 participateInTrialRunTracking),

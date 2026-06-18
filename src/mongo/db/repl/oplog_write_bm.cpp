@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -110,6 +109,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -119,6 +119,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 constexpr std::size_t kOplogBufferSize = 256 * 1024 * 1024;
 class TestServiceContext {
@@ -404,7 +405,7 @@ private:
 
     std::vector<repl::OplogEntry> _oplogEntries;
     UUID _foobarUUID;
-    NamespaceString _foobarNs = NamespaceString::createNamespaceString_forTest("foo.bar"_sd);
+    NamespaceString _foobarNs = NamespaceString::createNamespaceString_forTest("foo.bar"sv);
 };
 
 void runBMTest(TestServiceContext& testSvcCtx, Fixture& fixture, benchmark::State& state) {

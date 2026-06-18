@@ -34,14 +34,15 @@
 #include <benchmark/benchmark.h>
 
 namespace mongo::boolean_simplification {
+using namespace std::literals::string_view_literals;
 namespace {
 std::unique_ptr<MatchExpression> buildOrOfLeafs(int value, std::vector<BSONObj>& bsonObjs) {
     BSONObj operand = BSON("$eq" << value);
     bsonObjs.push_back(operand);
     auto expr = std::make_unique<OrMatchExpression>();
-    expr->add(std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]));
-    expr->add(std::make_unique<EqualityMatchExpression>("b"_sd, operand["$eq"]));
-    expr->add(std::make_unique<EqualityMatchExpression>("c"_sd, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("a"sv, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("b"sv, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("c"sv, operand["$eq"]));
     return expr;
 }
 
@@ -75,7 +76,7 @@ void matchExpression_createAnd(benchmark::State& state) {
 
         for (size_t predicateIndex = 0; predicateIndex < numPredicates; ++predicateIndex) {
             root->add(
-                std::make_unique<EqualityMatchExpression>("a"_sd, operands[predicateIndex]["a"]));
+                std::make_unique<EqualityMatchExpression>("a"sv, operands[predicateIndex]["a"]));
         }
     }
 }
@@ -95,7 +96,7 @@ void matchExpression_createOr(benchmark::State& state) {
 
         for (size_t predicateIndex = 0; predicateIndex < numPredicates; ++predicateIndex) {
             root->add(
-                std::make_unique<EqualityMatchExpression>("a"_sd, operands[predicateIndex]["a"]));
+                std::make_unique<EqualityMatchExpression>("a"sv, operands[predicateIndex]["a"]));
         }
     }
 }
@@ -114,8 +115,8 @@ void matchExpression_createAndOfOrs(benchmark::State& state) {
         auto root = std::make_unique<AndMatchExpression>();
         for (size_t index = 0; index < size; ++index) {
             auto orExpr = std::make_unique<OrMatchExpression>();
-            orExpr->add(std::make_unique<EqualityMatchExpression>("a"_sd, operands[index]["a"]));
-            orExpr->add(std::make_unique<GTMatchExpression>("a"_sd, operands[index]["a"]));
+            orExpr->add(std::make_unique<EqualityMatchExpression>("a"sv, operands[index]["a"]));
+            orExpr->add(std::make_unique<GTMatchExpression>("a"sv, operands[index]["a"]));
             root->add(std::move(orExpr));
         }
     }
@@ -130,7 +131,7 @@ void matchExpression_cloneAnd(benchmark::State& state) {
     operands.reserve(numPredicates);
     for (size_t predicateIndex = 0; predicateIndex < numPredicates; ++predicateIndex) {
         operands.emplace_back(BSON("a" << static_cast<int>(predicateIndex)));
-        root->add(std::make_unique<EqualityMatchExpression>("a"_sd, operands.back()["a"]));
+        root->add(std::make_unique<EqualityMatchExpression>("a"sv, operands.back()["a"]));
     }
 
     for (auto _ : state) {
@@ -147,7 +148,7 @@ void matchExpression_cloneOr(benchmark::State& state) {
     operands.reserve(numPredicates);
     for (size_t predicateIndex = 0; predicateIndex < numPredicates; ++predicateIndex) {
         operands.emplace_back(BSON("a" << static_cast<int>(predicateIndex)));
-        root->add(std::make_unique<EqualityMatchExpression>("a"_sd, operands.back()["a"]));
+        root->add(std::make_unique<EqualityMatchExpression>("a"sv, operands.back()["a"]));
     }
 
     for (auto _ : state) {
@@ -165,8 +166,8 @@ void matchExpression_cloneAndOfOrs(benchmark::State& state) {
     for (size_t index = 0; index < size; ++index) {
         auto orExpr = std::make_unique<OrMatchExpression>();
         operands.emplace_back(BSON("a" << static_cast<int>(index)));
-        orExpr->add(std::make_unique<EqualityMatchExpression>("a"_sd, operands.back()["a"]));
-        orExpr->add(std::make_unique<GTMatchExpression>("a"_sd, operands.back()["a"]));
+        orExpr->add(std::make_unique<EqualityMatchExpression>("a"sv, operands.back()["a"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("a"sv, operands.back()["a"]));
         root->add(std::move(orExpr));
     }
 
@@ -183,7 +184,7 @@ BENCHMARK(matchExpression_cloneAndOfOrs)->Args({3})->Args({7})->Args({10})->Args
 template <typename SimplifierStatus>
 void matchExpressionOptimize_triviallySimple(benchmark::State& state) {
     auto operand = BSON("$eq" << 1);
-    auto expr = std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]);
+    auto expr = std::make_unique<EqualityMatchExpression>("a"sv, operand["$eq"]);
 
     for (auto _ : state) {
         benchmark::DoNotOptimize(optimizeMatchExpression(
@@ -201,9 +202,9 @@ template <typename SimplifierStatus>
 void matchExpressionOptimize_simpleAnd(benchmark::State& state) {
     auto operand = BSON("$eq" << 1);
     auto expr = std::make_unique<AndMatchExpression>();
-    expr->add(std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]));
-    expr->add(std::make_unique<EqualityMatchExpression>("b"_sd, operand["$eq"]));
-    expr->add(std::make_unique<EqualityMatchExpression>("c"_sd, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("a"sv, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("b"sv, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("c"sv, operand["$eq"]));
 
     for (auto _ : state) {
         benchmark::DoNotOptimize(optimizeMatchExpression(
@@ -221,9 +222,9 @@ template <typename SimplifierStatus>
 void matchExpressionOptimize_simpleOr(benchmark::State& state) {
     auto operand = BSON("$eq" << 1);
     auto expr = std::make_unique<OrMatchExpression>();
-    expr->add(std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]));
-    expr->add(std::make_unique<EqualityMatchExpression>("b"_sd, operand["$eq"]));
-    expr->add(std::make_unique<EqualityMatchExpression>("c"_sd, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("a"sv, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("b"sv, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("c"sv, operand["$eq"]));
 
     for (auto _ : state) {
         benchmark::DoNotOptimize(optimizeMatchExpression(
@@ -273,12 +274,12 @@ void matchExpressionOptimize_maxComplex(benchmark::State& state) {
         auto operand = BSON("$gt" << 0);
         bsonObjs.push_back(operand);
         auto orExpr = std::make_unique<OrMatchExpression>();
-        orExpr->add(std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]));
-        orExpr->add(std::make_unique<GTMatchExpression>("b"_sd, operand["$gt"]));
-        orExpr->add(std::make_unique<GTMatchExpression>("c"_sd, operand["$gt"]));
-        orExpr->add(std::make_unique<GTMatchExpression>("d"_sd, operand["$gt"]));
-        orExpr->add(std::make_unique<GTMatchExpression>("e"_sd, operand["$gt"]));
-        orExpr->add(std::make_unique<GTMatchExpression>("f"_sd, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("a"sv, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("b"sv, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("c"sv, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("d"sv, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("e"sv, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("f"sv, operand["$gt"]));
         expr->add(std::move(orExpr));
     }
 

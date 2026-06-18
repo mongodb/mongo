@@ -37,6 +37,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer.h"
 
+#include <string_view>
+
 MONGO_MOD_PUBLIC;
 
 /**
@@ -47,7 +49,7 @@ namespace mongo::storage_engine_direct_crud {
 // This function has the same behavior as KVEngine::insertIntoIdent()
 Status insert(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               std::span<const char> key,
               std::span<const char> value,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
@@ -55,7 +57,7 @@ Status insert(StorageEngine& engine,
 // This function has the same behavior as KVEngine::insertIntoIdent()
 Status insert(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               int64_t key,
               std::span<const char> value,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
@@ -63,7 +65,7 @@ Status insert(StorageEngine& engine,
 // This function has the same behavior as KVEngine::updateInIdent()
 Status update(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               std::span<const char> key,
               std::span<const char> value,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
@@ -71,7 +73,7 @@ Status update(StorageEngine& engine,
 // This function has the same behavior as KVEngine::updateInIdent()
 Status update(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               int64_t key,
               std::span<const char> value,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
@@ -79,26 +81,26 @@ Status update(StorageEngine& engine,
 // This function has the same behavior as KVEngine::getFromIdent()
 StatusWith<UniqueBuffer> get(StorageEngine& engine,
                              RecoveryUnit& ru,
-                             StringData ident,
+                             std::string_view ident,
                              std::span<const char> key);
 
 // This function has the same behavior as KVEngine::getFromIdent()
 StatusWith<UniqueBuffer> get(StorageEngine& engine,
                              RecoveryUnit& ru,
-                             StringData ident,
+                             std::string_view ident,
                              int64_t key);
 
 // This function has the same behavior as KVEngine::deleteFromIdent()
 Status remove(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               std::span<const char> key,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
 
 // This function has the same behavior as KVEngine::deleteFromIdent()
 Status remove(StorageEngine& engine,
               RecoveryUnit& ru,
-              StringData ident,
+              std::string_view ident,
               int64_t key,
               BlindWritePolicy policy = BlindWritePolicy::nonBlind);
 

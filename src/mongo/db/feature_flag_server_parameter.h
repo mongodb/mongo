@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_flag.h"
@@ -38,6 +37,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <variant>
 
 #include <boost/optional/optional.hpp>
@@ -51,7 +51,7 @@ namespace mongo {
  */
 class FeatureFlagServerParameter : public ServerParameter {
 public:
-    FeatureFlagServerParameter(StringData name, FeatureFlag* flag);
+    FeatureFlagServerParameter(std::string_view name, FeatureFlag* flag);
 
     /**
      * Encode the setting into BSON object.
@@ -61,7 +61,7 @@ public:
      */
     void append(OperationContext* opCtx,
                 BSONObjBuilder* b,
-                StringData name,
+                std::string_view name,
                 const boost::optional<TenantId>&) final;
 
     void appendDetails(OperationContext* opCtx,
@@ -73,7 +73,7 @@ public:
      */
     void appendSupportingRoundtrip(OperationContext* opCtx,
                                    BSONObjBuilder* b,
-                                   StringData name,
+                                   std::string_view name,
                                    const boost::optional<TenantId>&) override;
 
     /**
@@ -89,7 +89,7 @@ public:
      *
      * Typically invoked from commandline --setParameter usage.
      */
-    Status setFromString(StringData str, const boost::optional<TenantId>&) final;
+    Status setFromString(std::string_view str, const boost::optional<TenantId>&) final;
 
     bool isForIncrementalFeatureRollout() const final;
 

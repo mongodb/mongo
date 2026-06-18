@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log_attr.h"
@@ -45,6 +44,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <tuple>
 
 #include <boost/optional.hpp>
@@ -56,7 +56,7 @@ namespace mongo::logv2 {
 MONGO_MOD_PUBLIC bool loggingInProgress();
 
 // Write message to stderr in a signal-safe manner.
-MONGO_MOD_PUBLIC void signalSafeWriteToStderr(StringData message);
+MONGO_MOD_PUBLIC void signalSafeWriteToStderr(std::string_view message);
 namespace detail {
 
 using GetTenantIDFn = std::function<std::string()>;
@@ -69,13 +69,13 @@ void setLogCounterCallback(LogCounterCallback);
 MONGO_MOD_NEEDS_REPLACEMENT void doLogImpl(int32_t id,
                                            LogSeverity const& severity,
                                            LogOptions const& options,
-                                           StringData message,
+                                           std::string_view message,
                                            TypeErasedAttributeStorage const& attrs,
                                            bool devStacktraces = false);
 
 void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
                            LogOptions const& options,
-                           StringData message,
+                           std::string_view message,
                            TypeErasedAttributeStorage const& attrs);
 
 

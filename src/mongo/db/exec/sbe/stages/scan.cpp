@@ -60,6 +60,7 @@ MONGO_FAIL_POINT_DEFINE(hangScanGetNext);
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 /**
  * Regular constructor. Initializes static '_state' managed by a shared_ptr.
  */
@@ -79,7 +80,7 @@ ScanStageBase::ScanStageBase(UUID collUuid,
                              bool forward,
                              // Optional arguments:
                              bool participateInTrialRunTracking)
-    : PlanStage("scan"_sd,
+    : PlanStage("scan"sv,
                 yieldPolicy,
                 nodeId,
                 participateInTrialRunTracking,
@@ -104,7 +105,7 @@ ScanStageBase::ScanStageBase(std::shared_ptr<ScanStageBaseState> state,
                              PlanYieldPolicySBE* yieldPolicy,
                              PlanNodeId nodeId,
                              bool participateInTrialRunTracking)
-    : PlanStage("scan"_sd,
+    : PlanStage("scan"sv,
                 yieldPolicy,
                 nodeId,
                 participateInTrialRunTracking,

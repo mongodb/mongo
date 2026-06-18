@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <list>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -51,8 +52,8 @@ Document FastPathEligibleExclusionNode::applyToDocument(const Document& inputDoc
     return ExclusionNode::applyToDocument(inputDoc, ctx);
 }
 
-std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(StringData oldName,
-                                                                       StringData newName) {
+std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(std::string_view oldName,
+                                                                       std::string_view newName) {
     BSONObjBuilder extractedExclusion;
 
     // Check for a projection directly on 'oldName'. For example, {oldName: 0}.

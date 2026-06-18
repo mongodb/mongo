@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -47,7 +48,7 @@ struct MONGO_MOD_PUBLIC AutoCompactOptions {
     // Minimum amount of MB to reclaim for compaction to proceed.
     boost::optional<int64_t> freeSpaceTargetMB;
     // Idents that are skipped by background compaction.
-    std::vector<StringData> excludedIdents;
+    std::vector<std::string_view> excludedIdents;
 };
 
 /**

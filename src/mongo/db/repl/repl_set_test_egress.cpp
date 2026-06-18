@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -50,6 +49,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -60,6 +60,7 @@
 namespace mongo {
 namespace repl {
 namespace {
+using namespace std::literals::string_view_literals;
 
 HostAndPort selectTarget(OperationContext* opCtx) {
     auto members = ReplicationCoordinator::get(opCtx)->getMemberData();
@@ -73,7 +74,7 @@ HostAndPort selectTarget(OperationContext* opCtx) {
     uasserted(ErrorCodes::InternalError, "No viable replica set members to conenct to");
 }
 
-HostAndPort validateTarget(OperationContext* opCtx, StringData targetStr) {
+HostAndPort validateTarget(OperationContext* opCtx, std::string_view targetStr) {
     auto members = ReplicationCoordinator::get(opCtx)->getMemberData();
 
     auto target = HostAndPort::parseThrowing(targetStr);
@@ -96,7 +97,7 @@ HostAndPort validateTarget(OperationContext* opCtx, StringData targetStr) {
     uasserted(ErrorCodes::BadValue, str::stream() << targetStr << " is not a replica set member");
 }
 
-constexpr auto kReplSetTestEgress = "replSetTestEgress"_sd;
+constexpr auto kReplSetTestEgress = "replSetTestEgress"sv;
 auto getNetworkInterface() {
     static auto uniqueNI = ([] {
         auto ret = executor::makeNetworkInterface(std::string{kReplSetTestEgress});

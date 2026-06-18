@@ -56,6 +56,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -87,7 +88,7 @@ struct CursorSharedState {
  */
 class DocumentSourceCursor : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$cursor"_sd;
+    static constexpr std::string_view kStageName = "$cursor"_sd;
 
     /**
      * Indicates whether or not this is a count-like operation. If the operation is count-like,
@@ -128,7 +129,7 @@ public:
         const MultipleCollectionAccessor& collections,
         boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher) override;
 
-    StringData getSourceName() const override;
+    std::string_view getSourceName() const override;
 
     static const Id& id;
 
@@ -199,7 +200,7 @@ private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceGeoNearCursorToStageFn(
         const boost::intrusive_ptr<DocumentSource>&);
 
-    static constexpr StringData toString(CursorType type) {
+    static constexpr std::string_view toString(CursorType type) {
         switch (type) {
             case CursorType::kRegular:
                 return "regular"_sd;

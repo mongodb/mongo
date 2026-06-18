@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -55,7 +55,7 @@ public:
         std::unique_ptr<Pipeline> execPipeline;
     };
 
-    FacetStage(StringData stageName,
+    FacetStage(std::string_view stageName,
                const std::vector<DocumentSourceFacet::FacetPipeline>& facetPipelines,
                const boost::intrusive_ptr<ExpressionContext>& expCtx,
                size_t bufferSizeBytes,

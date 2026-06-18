@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
@@ -55,6 +54,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -290,7 +290,7 @@ private:
  */
 class ExchangeStage final : public Stage {
 public:
-    ExchangeStage(StringData stageName,
+    ExchangeStage(std::string_view stageName,
                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                   boost::intrusive_ptr<Exchange> exchange,
                   size_t consumerId,

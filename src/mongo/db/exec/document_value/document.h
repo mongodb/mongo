@@ -51,6 +51,7 @@
 #include <initializer_list>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <typeinfo>
 #include <utility>
 #include <vector>
@@ -114,23 +115,24 @@ public:
         const Document& rhs;
     };
 
-    static constexpr StringData metaFieldTextScore = "$textScore"_sd;
-    static constexpr StringData metaFieldRandVal = "$randVal"_sd;
-    static constexpr StringData metaFieldSortKey = "$sortKey"_sd;
-    static constexpr StringData metaFieldGeoNearDistance = "$dis"_sd;
-    static constexpr StringData metaFieldGeoNearPoint = "$pt"_sd;
-    static constexpr StringData metaFieldSearchScore = "$searchScore"_sd;
-    static constexpr StringData metaFieldSearchHighlights = "$searchHighlights"_sd;
-    static constexpr StringData metaFieldSearchScoreDetails = "$searchScoreDetails"_sd;
-    static constexpr StringData metaFieldSearchRootDocumentId = "$searchRootDocumentId"_sd;
-    static constexpr StringData metaFieldSearchSortValues = "$searchSortValues"_sd;
-    static constexpr StringData metaFieldIndexKey = "$indexKey"_sd;
-    static constexpr StringData metaFieldVectorSearchScore = "$vectorSearchScore"_sd;
-    static constexpr StringData metaFieldSearchSequenceToken = "$searchSequenceToken"_sd;
-    static constexpr StringData metaFieldScore = "$score"_sd;
-    static constexpr StringData metaFieldScoreDetails = "$scoreDetails"_sd;
-    static constexpr StringData metaFieldStream = "$stream"_sd;
-    static constexpr StringData metaFieldChangeStreamControlEvent = "$changeStreamControlEvent"_sd;
+    static constexpr std::string_view metaFieldTextScore = "$textScore"_sd;
+    static constexpr std::string_view metaFieldRandVal = "$randVal"_sd;
+    static constexpr std::string_view metaFieldSortKey = "$sortKey"_sd;
+    static constexpr std::string_view metaFieldGeoNearDistance = "$dis"_sd;
+    static constexpr std::string_view metaFieldGeoNearPoint = "$pt"_sd;
+    static constexpr std::string_view metaFieldSearchScore = "$searchScore"_sd;
+    static constexpr std::string_view metaFieldSearchHighlights = "$searchHighlights"_sd;
+    static constexpr std::string_view metaFieldSearchScoreDetails = "$searchScoreDetails"_sd;
+    static constexpr std::string_view metaFieldSearchRootDocumentId = "$searchRootDocumentId"_sd;
+    static constexpr std::string_view metaFieldSearchSortValues = "$searchSortValues"_sd;
+    static constexpr std::string_view metaFieldIndexKey = "$indexKey"_sd;
+    static constexpr std::string_view metaFieldVectorSearchScore = "$vectorSearchScore"_sd;
+    static constexpr std::string_view metaFieldSearchSequenceToken = "$searchSequenceToken"_sd;
+    static constexpr std::string_view metaFieldScore = "$score"_sd;
+    static constexpr std::string_view metaFieldScoreDetails = "$scoreDetails"_sd;
+    static constexpr std::string_view metaFieldStream = "$stream"_sd;
+    static constexpr std::string_view metaFieldChangeStreamControlEvent =
+        "$changeStreamControlEvent"_sd;
     static constexpr std::array kAllMetadataFields = {metaFieldTextScore,
                                                       metaFieldRandVal,
                                                       metaFieldSortKey,
@@ -150,11 +152,11 @@ public:
                                                       metaFieldChangeStreamControlEvent};
 
 private:
-    static bool isMetadataFieldName_cold(StringData fieldName);
+    static bool isMetadataFieldName_cold(std::string_view fieldName);
 
 public:
     // Returns true iff 'fieldName' is one of the reserved '$'-prefixed metadata field names.
-    static bool isMetadataFieldName(StringData fieldName) {
+    static bool isMetadataFieldName(std::string_view fieldName) {
         return fieldName.starts_with('$') && isMetadataFieldName_cold(fieldName);
     }
 
@@ -177,8 +179,8 @@ public:
      * syntax:
      * auto document = Document{{"hello", "world"}, {"number", 1}};
      */
-    Document(std::initializer_list<std::pair<StringData, ImplicitValue>> initializerList);
-    Document(const std::vector<std::pair<StringData, Value>>& fields);
+    Document(std::initializer_list<std::pair<std::string_view, ImplicitValue>> initializerList);
+    Document(const std::vector<std::pair<std::string_view, Value>>& fields);
 
     void swap(Document& rhs) {
         _storage.swap(rhs._storage);
@@ -237,7 +239,7 @@ public:
     FieldIterator fieldIterator() const;
 
     /// Convenience type for dealing with fields. Used by FieldIterator.
-    typedef std::pair<StringData, Value> FieldPair;
+    typedef std::pair<std::string_view, Value> FieldPair;
 
     /**
      * Get the approximate size of the Document, plus its underlying storage and sub-values. Returns
@@ -435,7 +437,9 @@ public:
     static Document fromBsonWithMetaData(const BSONObj& bson);
 
     // Support BSONObjBuilder and BSONArrayBuilder "stream" API
-    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const Document& doc) {
+    friend void appendToBson(BSONObjBuilder& builder,
+                             std::string_view fieldName,
+                             const Document& doc) {
         BSONObjBuilder subobj(builder.subobjStart(fieldName));
         doc.toBson(&subobj);
         subobj.doneFast();
@@ -444,7 +448,7 @@ public:
     /** Return the abstract Position of a field, suitable to pass to operator[] or getField().
      *  This can potentially save time if you need to refer to a field multiple times.
      */
-    Position positionOf(StringData fieldName) const {
+    Position positionOf(std::string_view fieldName) const {
         return storage().findField(fieldName);
     }
 
@@ -585,14 +589,14 @@ public:
     /** These are designed to allow things like mutDoc["a"]["b"]["c"] = Value(10);
      *  It is safe to use even on nonexistent fields.
      */
-    MutableValue operator[](StringData key) {
+    MutableValue operator[](std::string_view key) {
         return getField(key);
     }
     MutableValue operator[](Position pos) {
         return getField(pos);
     }
 
-    MutableValue getField(StringData key);
+    MutableValue getField(std::string_view key);
     MutableValue getField(Position pos);
 
 private:
@@ -690,14 +694,14 @@ public:
      *        Decide what level of support is needed for duplicate fields.
      *        If duplicates are not allowed, consider removing this method.
      */
-    void addField(StringData name, const Value& val) {
+    void addField(std::string_view name, const Value& val) {
         storage().appendField(name, ValueElement::Kind::kInserted) = val;
     }
     void addField(HashedFieldName field, const Value& val) {
         storage().appendField(field, ValueElement::Kind::kInserted) = val;
     }
 
-    void addField(StringData name, Value&& val) {
+    void addField(std::string_view name, Value&& val) {
         storage().appendField(name, ValueElement::Kind::kInserted) = std::move(val);
     }
     void addField(HashedFieldName field, Value&& val) {
@@ -708,19 +712,19 @@ public:
      *
      *  If the new value is missing(), the field is logically removed.
      */
-    MutableValue operator[](StringData key) {
+    MutableValue operator[](std::string_view key) {
         return getField(key);
     }
-    void setField(StringData key, const Value& val) {
+    void setField(std::string_view key, const Value& val) {
         getField(key) = val;
     }
-    void setField(StringData key, Value&& val) {
+    void setField(std::string_view key, Value&& val) {
         getField(key) = std::move(val);
     }
-    MutableValue getField(StringData key) {
+    MutableValue getField(std::string_view key) {
         return MutableValue(storage().getFieldCacheOnlyOrCreate(key));
     }
-    MutableValue getFieldNonLeaf(StringData key) {
+    MutableValue getFieldNonLeaf(std::string_view key) {
         return MutableValue(storage().getFieldOrCreate(key));
     }
 
@@ -739,7 +743,7 @@ public:
     }
 
     /// Logically remove a field. Note that memory usage does not decrease.
-    void remove(StringData key) {
+    void remove(std::string_view key) {
         getField(key) = Value();
     }
     void removeNestedField(const std::vector<Position>& positions) {
@@ -931,7 +935,7 @@ public:
     /**
      * Returns the name of the field the iterator currently points to, without advancing.
      */
-    StringData fieldName() {
+    std::string_view fieldName() {
         invariant(more());
         return _it.fieldName();
     }
@@ -977,11 +981,11 @@ class DocumentStream {
         }
 
         DocumentStream& builder;
-        StringData name;
+        std::string_view name;
     };
 
 public:
-    ValueStream operator<<(StringData name) {
+    ValueStream operator<<(std::string_view name) {
         return ValueStream{*this, name};
     }
 
@@ -1027,7 +1031,7 @@ inline FieldIterator Document::fieldIterator() const {
 inline MutableValue MutableValue::getField(Position pos) {
     return MutableDocument(*this).getField(pos);
 }
-inline MutableValue MutableValue::getField(StringData key) {
+inline MutableValue MutableValue::getField(std::string_view key) {
     return MutableDocument(*this).getField(key);
 }
 }  // namespace MONGO_MOD_PUBLIC mongo

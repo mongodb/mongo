@@ -33,7 +33,6 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/encoded_value_storage.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
@@ -44,6 +43,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -436,7 +436,7 @@ enum InsertOptions {
  * The OP_INSERT command is no longer supported, so new callers of this function should not be
  * added! This is currently retained for the limited purpose of unit testing.
  */
-Message makeUnsupportedOpInsertMessage(StringData ns,
+Message makeUnsupportedOpInsertMessage(std::string_view ns,
                                        const BSONObj* objs,
                                        size_t count,
                                        int flags = 0);
@@ -461,5 +461,5 @@ struct DbResponse {
 /**
  * Helper to build an error DbResponse for OP_QUERY and OP_GET_MORE.
  */
-DbResponse makeErrorResponseToUnsupportedOpQuery(StringData errorMsg);
+DbResponse makeErrorResponseToUnsupportedOpQuery(std::string_view errorMsg);
 }  // namespace MONGO_MOD_PUBLIC mongo

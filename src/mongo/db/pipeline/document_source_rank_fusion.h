@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/lite_parsed_rank_fusion.h"
 
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -62,7 +63,7 @@ namespace mongo {
  */
 class DocumentSourceRankFusion final {
 public:
-    static constexpr StringData kStageName = "$rankFusion"_sd;
+    static constexpr std::string_view kStageName = "$rankFusion"_sd;
 
     /**
      * Returns a list of stages to execute hybrid scoring with rank fusion.

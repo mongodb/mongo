@@ -64,6 +64,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -168,7 +169,7 @@ public:
 
     // The name of the field where the document key (_id and shard key, if present) will be found
     // after the transformation.
-    static constexpr StringData kDocumentKeyField = "documentKey"_sd;
+    static constexpr std::string_view kDocumentKeyField{"documentKey"};
 
     // The name of the field where the operation description of the non-CRUD operations will be
     // located. This is complementary to the 'documentKey' for CRUD operations.
@@ -176,144 +177,144 @@ public:
     // Thus the operation description for an existing event should never be changed, because
     // otherwise the changestream resumability between different versions of MongoDB may be
     // jeopardized.
-    static constexpr StringData kOperationDescriptionField = "operationDescription"_sd;
+    static constexpr std::string_view kOperationDescriptionField{"operationDescription"};
 
     // The name of the field where the pre-image document will be found, if requested and available.
-    static constexpr StringData kFullDocumentBeforeChangeField = "fullDocumentBeforeChange"_sd;
+    static constexpr std::string_view kFullDocumentBeforeChangeField{"fullDocumentBeforeChange"};
 
     // The name of the field where the full document will be found after the transformation. The
     // full document is only present for certain types of operations, such as an insert.
-    static constexpr StringData kFullDocumentField = "fullDocument"_sd;
+    static constexpr std::string_view kFullDocumentField{"fullDocument"};
 
     // The name of the field where the pre-image id will be found. Needed for fetching the pre-image
     // from the pre-images collection.
-    static constexpr StringData kPreImageIdField = "preImageId"_sd;
+    static constexpr std::string_view kPreImageIdField{"preImageId"};
 
     // The name of the field where the change identifier will be located after the transformation.
-    static constexpr StringData kIdField = "_id"_sd;
+    static constexpr std::string_view kIdField{"_id"};
 
     // The name of the field where the namespace of the change will be located after the
     // transformation.
-    static constexpr StringData kNamespaceField = "ns"_sd;
+    static constexpr std::string_view kNamespaceField{"ns"};
 
     // Name of the field which stores information about updates. Only applies when OperationType
     // is "update". Note that this field will be omitted if the 'showRawUpdateDescription' option
     // is enabled in the change stream spec.
-    static constexpr StringData kUpdateDescriptionField = "updateDescription"_sd;
+    static constexpr std::string_view kUpdateDescriptionField{"updateDescription"};
 
     // Name of the field which stores the raw update description from the oplog about updates.
     // Only applies when OperationType is "update". Note that this field is only present when
     // the 'showRawUpdateDescription' option is enabled in the change stream spec.
-    static constexpr StringData kRawUpdateDescriptionField = "rawUpdateDescription"_sd;
+    static constexpr std::string_view kRawUpdateDescriptionField{"rawUpdateDescription"};
 
     // Name of the field which stores information about the state of the collection before a
     // 'modify' (i.e. collMod) operation.
-    static constexpr StringData kStateBeforeChangeField = "stateBeforeChange"_sd;
+    static constexpr std::string_view kStateBeforeChangeField{"stateBeforeChange"};
 
     // The name of the subfield of '_id' where the UUID of the namespace will be located after the
     // transformation.
-    static constexpr StringData kUuidField = "uuid"_sd;
+    static constexpr std::string_view kUuidField{"uuid"};
 
     // This UUID field represents all of:
     // 1. The UUID for a particular resharding operation.
     // 2. The UUID for the temporary collection that exists during a resharding operation.
     // 3. The UUID for a collection being resharded, once a resharding operation has completed.
-    static constexpr StringData kReshardingUuidField = "reshardingUUID"_sd;
+    static constexpr std::string_view kReshardingUuidField{"reshardingUUID"};
 
     // The name of the field where the type of the operation will be located after the
     // transformation.
-    static constexpr StringData kOperationTypeField = "operationType"_sd;
+    static constexpr std::string_view kOperationTypeField{"operationType"};
 
     // The name of the field where the clusterTime of the change will be located after the
     // transformation. The cluster time will be located inside the change identifier, so the full
     // path to the cluster time will be kIdField + "." + kClusterTimeField.
-    static constexpr StringData kClusterTimeField = "clusterTime"_sd;
+    static constexpr std::string_view kClusterTimeField{"clusterTime"};
 
     // The name of the field where the commit timestamp of a prepared transaction will be located.
     // Only shown if 'showExpandedEvents' is used.
-    static constexpr StringData kCommitTimestampField = "commitTimestamp"_sd;
+    static constexpr std::string_view kCommitTimestampField{"commitTimestamp"};
 
     // The name of the field with the nsType of a changestream create event. Will contain
     // "collection", "view" or "timeseries". Will only be exposed if 'showExpandedEvents' is used.
-    static constexpr StringData kNsTypeField = "nsType"_sd;
+    static constexpr std::string_view kNsTypeField{"nsType"};
 
     // The name of both the "migration marker" field in oplog entries and the output field in change
     // events if the change stream is opened with 'showMigrationEvents=true'.
-    static constexpr StringData kFromMigrateField = "fromMigrate"_sd;
+    static constexpr std::string_view kFromMigrateField{"fromMigrate"};
 
     // The name of this stage.
-    static constexpr StringData kStageName = "$changeStream"_sd;
+    static constexpr std::string_view kStageName{"$changeStream"};
 
-    static constexpr StringData kTxnNumberField = "txnNumber"_sd;
-    static constexpr StringData kLsidField = "lsid"_sd;
-    static constexpr StringData kTxnOpIndexField = "txnOpIndex"_sd;
-    static constexpr StringData kApplyOpsIndexField = "applyOpsIndex"_sd;
-    static constexpr StringData kApplyOpsTsField = "applyOpsTs"_sd;
-    static constexpr StringData kRawOplogUpdateSpecField = "rawOplogUpdateSpec"_sd;
+    static constexpr std::string_view kTxnNumberField{"txnNumber"};
+    static constexpr std::string_view kLsidField{"lsid"};
+    static constexpr std::string_view kTxnOpIndexField{"txnOpIndex"};
+    static constexpr std::string_view kApplyOpsIndexField{"applyOpsIndex"};
+    static constexpr std::string_view kApplyOpsTsField{"applyOpsTs"};
+    static constexpr std::string_view kRawOplogUpdateSpecField{"rawOplogUpdateSpec"};
 
     // The target namespace of a rename operation.
-    static constexpr StringData kRenameTargetNssField = "to"_sd;
+    static constexpr std::string_view kRenameTargetNssField{"to"};
 
     // Wall time of the corresponding oplog entry.
-    static constexpr StringData kWallTimeField = "wallTime"_sd;
+    static constexpr std::string_view kWallTimeField{"wallTime"};
 
     // UUID of a collection corresponding to the event (if applicable).
-    static constexpr StringData kCollectionUuidField = "collectionUUID"_sd;
+    static constexpr std::string_view kCollectionUuidField{"collectionUUID"};
 
     //
     // The different types of operations we can use for the operation type.
     //
 
     // The classic change events.
-    static constexpr StringData kUpdateOpType = "update"_sd;
-    static constexpr StringData kDeleteOpType = "delete"_sd;
-    static constexpr StringData kReplaceOpType = "replace"_sd;
-    static constexpr StringData kInsertOpType = "insert"_sd;
-    static constexpr StringData kDropCollectionOpType = "drop"_sd;
-    static constexpr StringData kRenameCollectionOpType = "rename"_sd;
-    static constexpr StringData kDropDatabaseOpType = "dropDatabase"_sd;
-    static constexpr StringData kInvalidateOpType = "invalidate"_sd;
+    static constexpr std::string_view kUpdateOpType{"update"};
+    static constexpr std::string_view kDeleteOpType{"delete"};
+    static constexpr std::string_view kReplaceOpType{"replace"};
+    static constexpr std::string_view kInsertOpType{"insert"};
+    static constexpr std::string_view kDropCollectionOpType{"drop"};
+    static constexpr std::string_view kRenameCollectionOpType{"rename"};
+    static constexpr std::string_view kDropDatabaseOpType{"dropDatabase"};
+    static constexpr std::string_view kInvalidateOpType{"invalidate"};
 
     // The internal change events that are not exposed to the users.
-    static constexpr StringData kReshardBeginOpType = "reshardBegin"_sd;
-    static constexpr StringData kReshardBlockingWritesOpType = "reshardBlockingWrites"_sd;
-    static constexpr StringData kReshardDoneCatchUpOpType = "reshardDoneCatchUp"_sd;
+    static constexpr std::string_view kReshardBeginOpType{"reshardBegin"};
+    static constexpr std::string_view kReshardBlockingWritesOpType{"reshardBlockingWrites"};
+    static constexpr std::string_view kReshardDoneCatchUpOpType{"reshardDoneCatchUp"};
 
     // Internal op type to signal mongos to open cursors on new shards.
-    static constexpr StringData kNewShardDetectedOpType = "migrateChunkToNewShard"_sd;
+    static constexpr std::string_view kNewShardDetectedOpType{"migrateChunkToNewShard"};
 
     // These events are guarded behind the 'showExpandedEvents' flag.
-    static constexpr StringData kCreateOpType = "create"_sd;
-    static constexpr StringData kCreateIndexesOpType = "createIndexes"_sd;
-    static constexpr StringData kDropIndexesOpType = "dropIndexes"_sd;
-    static constexpr StringData kShardCollectionOpType = "shardCollection"_sd;
-    static constexpr StringData kMigrateLastChunkFromShardOpType = "migrateLastChunkFromShard"_sd;
-    static constexpr StringData kRefineCollectionShardKeyOpType = "refineCollectionShardKey"_sd;
-    static constexpr StringData kReshardCollectionOpType = "reshardCollection"_sd;
-    static constexpr StringData kModifyOpType = "modify"_sd;
-    static constexpr StringData kEndOfTransactionOpType = "endOfTransaction"_sd;
+    static constexpr std::string_view kCreateOpType{"create"};
+    static constexpr std::string_view kCreateIndexesOpType{"createIndexes"};
+    static constexpr std::string_view kDropIndexesOpType{"dropIndexes"};
+    static constexpr std::string_view kShardCollectionOpType{"shardCollection"};
+    static constexpr std::string_view kMigrateLastChunkFromShardOpType{"migrateLastChunkFromShard"};
+    static constexpr std::string_view kRefineCollectionShardKeyOpType{"refineCollectionShardKey"};
+    static constexpr std::string_view kReshardCollectionOpType{"reshardCollection"};
+    static constexpr std::string_view kModifyOpType{"modify"};
+    static constexpr std::string_view kEndOfTransactionOpType{"endOfTransaction"};
 
     // These events are guarded behind the 'showSystemEvents' flag.
-    static constexpr StringData kStartIndexBuildOpType = "startIndexBuild"_sd;
-    static constexpr StringData kAbortIndexBuildOpType = "abortIndexBuild"_sd;
+    static constexpr std::string_view kStartIndexBuildOpType{"startIndexBuild"};
+    static constexpr std::string_view kAbortIndexBuildOpType{"abortIndexBuild"};
 
     // Default regex for collections match which prohibits system collections.
-    static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
+    static constexpr std::string_view kRegexAllCollections{R"((?!(\$|system\.)))"};
 
     // Regex matching all user collections plus collections exposed when 'showSystemEvents' is set.
     // Does not match a collection named $ or a collection with 'system.' in the name.
     // However, it will still match collection names starting with system.buckets or
     // system.resharding, or a collection exactly named system.js
-    static constexpr StringData kRegexAllCollectionsShowSystemEvents =
-        R"((?!(\$|system\.(?!(js$|resharding\.|buckets\.|views$)))))"_sd;
+    static constexpr std::string_view kRegexAllCollectionsShowSystemEvents{
+        R"((?!(\$|system\.(?!(js$|resharding\.|buckets\.|views$)))))"};
 
-    static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
-    static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
+    static constexpr std::string_view kRegexAllDBs{R"(^(?!(admin|config|local)\.)[^.]+)"};
+    static constexpr std::string_view kRegexCmdColl{R"(\$cmd$)"};
 
     /**
      * Helpers for determining which regex to match a change stream against.
      */
-    static StringData resolveAllCollectionsRegex(
+    static std::string_view resolveAllCollectionsRegex(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static std::string getNsRegexForChangeStream(
@@ -381,12 +382,12 @@ public:
      * Helper used by various change stream stages. Used for asserting that a certain Value of a
      * field has a certain type. Will uassert() if the field does not have the expected type.
      */
-    static void checkValueType(Value v, StringData fieldName, BSONType expectedType);
+    static void checkValueType(Value v, std::string_view fieldName, BSONType expectedType);
 
     /**
      * Same as 'checkValueType', except it tolerates the field being missing.
      */
-    static void checkValueTypeOrMissing(Value v, StringData fieldName, BSONType expectedType);
+    static void checkValueTypeOrMissing(Value v, std::string_view fieldName, BSONType expectedType);
 
     /**
      * For a change stream with no resume information supplied by the user, returns the clusterTime
@@ -471,7 +472,7 @@ private:
  */
 class DocumentSourceInternalChangeStreamStage : public DocumentSource {
 public:
-    DocumentSourceInternalChangeStreamStage(StringData stageName,
+    DocumentSourceInternalChangeStreamStage(std::string_view stageName,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx) {}
 

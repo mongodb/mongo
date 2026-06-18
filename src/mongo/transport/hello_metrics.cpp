@@ -40,6 +40,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 // TODO SERVER-84117: Tighten up Session object lifecycle
 const auto transportlessHelloMetrics = ServiceContext::declareDecoration<HelloMetrics>();
@@ -138,9 +139,9 @@ void HelloMetrics::resetNumAwaitingTopologyChangesForAllSessionManagers(ServiceC
 }
 
 void HelloMetrics::serialize(BSONObjBuilder* builder) const {
-    builder->append("exhaustIsMaster"_sd, static_cast<long long>(getNumExhaustIsMaster()));
-    builder->append("exhaustHello"_sd, static_cast<long long>(getNumExhaustHello()));
-    builder->append("awaitingTopologyChanges"_sd,
+    builder->append("exhaustIsMaster"sv, static_cast<long long>(getNumExhaustIsMaster()));
+    builder->append("exhaustHello"sv, static_cast<long long>(getNumExhaustHello()));
+    builder->append("awaitingTopologyChanges"sv,
                     static_cast<long long>(getNumAwaitingTopologyChanges()));
 }
 

@@ -48,6 +48,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // A method to create mock ExpressionContexts with a specified collation
 std::unique_ptr<SortKeyGenerator> makeSortKeyGen(const BSONObj& sortSpec,
@@ -74,28 +75,28 @@ TEST(SortKeyGeneratorTest, ExtractNumberKeyFromDocWithSeveralFields) {
 TEST(SortKeyGeneratorTest, ExtractStringKeyNonCompoundNonNested) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
-        Document{{"_id", 0}, {"z", "thing1"_sd}, {"a", "thing2"_sd}, {"b", 16}});
-    ASSERT_VALUE_EQ(sortKey, Value{"thing2"_sd});
+        Document{{"_id", 0}, {"z", "thing1"sv}, {"a", "thing2"sv}, {"b", 16}});
+    ASSERT_VALUE_EQ(sortKey, Value{"thing2"sv});
 }
 
 TEST(SortKeyGeneratorTest, CompoundSortPattern) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1 << "b" << 1), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
-        Document{{"_id", 0}, {"z", "thing1"_sd}, {"a", 99}, {"c", Document{{"a", 4}}}, {"b", 16}});
+        Document{{"_id", 0}, {"z", "thing1"sv}, {"a", 99}, {"c", Document{{"a", 4}}}, {"b", 16}});
     ASSERT_VALUE_EQ(sortKey, (Value{std::vector<Value>{Value{99}, Value{16}}}));
 }
 
 TEST(SortKeyGeneratorTest, CompoundSortPatternWithDottedPath) {
     auto sortKeyGen = makeSortKeyGen(BSON("c.a" << 1 << "b" << 1), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
-        Document{{"_id", 0}, {"z", "thing1"_sd}, {"a", 99}, {"c", Document{{"a", 4}}}, {"b", 16}});
+        Document{{"_id", 0}, {"z", "thing1"sv}, {"a", 99}, {"c", Document{{"a", 4}}}, {"b", 16}});
     ASSERT_VALUE_EQ(sortKey, (Value{std::vector<Value>{Value{4}, Value{16}}}));
 }
 
 TEST(SortKeyGeneratorTest, CompoundPatternLeadingFieldIsArray) {
     auto sortKeyGen = makeSortKeyGen(BSON("c" << 1 << "b" << 1), nullptr);
-    auto sortKey = sortKeyGen->computeSortKeyFromDocument(Document{
-        {"_id", 0}, {"z", "thing1"_sd}, {"a", 99}, {"c", std::vector{2, 4, 1}}, {"b", 16}});
+    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
+        Document{{"_id", 0}, {"z", "thing1"sv}, {"a", 99}, {"c", std::vector{2, 4, 1}}, {"b", 16}});
     ASSERT_VALUE_EQ(sortKey, (Value{std::vector<Value>{Value{1}, Value{16}}}));
 }
 
@@ -103,8 +104,8 @@ TEST(SortKeyGeneratorTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), &collator);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
-        Document{{"_id", 0}, {"z", "thing1"_sd}, {"a", "thing2"_sd}, {"b", 16}});
-    ASSERT_VALUE_EQ(sortKey, Value{"2gniht"_sd});
+        Document{{"_id", 0}, {"z", "thing1"sv}, {"a", "thing2"sv}, {"b", 16}});
+    ASSERT_VALUE_EQ(sortKey, Value{"2gniht"sv});
 }
 
 TEST(SortKeyGeneratorTest, CollatorHasNoEffectWhenExtractingNonStringSortKey) {
@@ -126,8 +127,8 @@ TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), &collator);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
-        Document{{"_id", {0}}, {"a", {"aaz"_sd, "zza"_sd, "yya"_sd, "zzb"_sd}}});
-    ASSERT_VALUE_EQ(sortKey, Value{"ayy"_sd});
+        Document{{"_id", {0}}, {"a", {"aaz"sv, "zza"sv, "yya"sv, "zzb"sv}}});
+    ASSERT_VALUE_EQ(sortKey, Value{"ayy"sv});
 }
 
 TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
@@ -407,7 +408,7 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateSortKeyFromWSMInIndexKeyStateW
                               << ""
                               << "string2"));
     auto sortKey = sortKeyGen->computeSortKey(member());
-    ASSERT_VALUE_EQ(Value("1gnirts"_sd), sortKey);
+    ASSERT_VALUE_EQ(Value("1gnirts"sv), sortKey);
 }
 
 using SortKeyGeneratorWorkingSetTestDeathTest = SortKeyGeneratorWorkingSetTest;

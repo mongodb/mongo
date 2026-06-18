@@ -34,7 +34,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsontypes.h"
@@ -56,6 +55,7 @@
 #include <cstring>  // strlen
 #include <limits>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -135,7 +135,7 @@ public:
     std::string String() const {
         return chk(BSONType::string).str();
     }
-    StringData checkAndGetStringData() const {
+    std::string_view checkAndGetStringData() const {
         return chk(BSONType::string).valueStringData();
     }
     Date_t Date() const {
@@ -293,7 +293,7 @@ public:
      * retrieve a field within this element
      * throws exception if *this is not an embedded object
      */
-    BSONElement operator[](StringData field) const;
+    BSONElement operator[](std::string_view field) const;
 
     /**
      * See canonicalizeBSONType in bsontypes.h
@@ -325,7 +325,7 @@ public:
     /**
      * Wrap this element up as a singleton object with a new name.
      */
-    BSONObj wrap(StringData newName) const;
+    BSONObj wrap(std::string_view newName) const;
 
     /**
      * field name of the element.  e.g., for
@@ -345,12 +345,12 @@ public:
         return _fieldNameSize;
     }
 
-    StringData fieldNameStringData() const {
+    std::string_view fieldNameStringData() const {
         // if this dassert fails, someone passed bad arguments to the TrustedInit ctor.
         // TODO SERVER-104907: delete this check once the 'dassert' in TrustedInitTag ctor is
         // enabled.
         dassert(bool(eoo()) != bool(fieldNameSize()));
-        return StringData(fieldName(), _fieldNameSize ? _fieldNameSize - 1 : 0);
+        return std::string_view(fieldName(), _fieldNameSize ? _fieldNameSize - 1 : 0);
     }
 
     /**
@@ -597,9 +597,9 @@ public:
      * Get a string's value. Returns a valid empty string if
      * `type() != BSONType::string`.
      */
-    StringData valueStringDataSafe() const {
-        return type() == BSONType::string ? StringData(valuestr(), valuestrsize() - 1)
-                                          : StringData();
+    std::string_view valueStringDataSafe() const {
+        return type() == BSONType::string ? std::string_view(valuestr(), valuestrsize() - 1)
+                                          : std::string_view();
     }
 
     /**
@@ -610,11 +610,11 @@ public:
     }
 
     /**
-     * Returns a StringData pointing into this element's data.  Does not validate that the
+     * Returns a std::string_view pointing into this element's data.  Does not validate that the
      * element is actually of type String.
      */
-    StringData valueStringData() const {
-        return StringData(valuestr(), valuestrsize() - 1);
+    std::string_view valueStringData() const {
+        return std::string_view(valuestr(), valuestrsize() - 1);
     }
 
     /**
@@ -1019,7 +1019,7 @@ private:
     /**
      * This is to enable structured bindings for BSONElement, it should not be used explicitly.
      * When used in a structed binding, BSONElement behaves as-if it is a
-     * std::pair<StringData, BSONElement>.
+     * std::pair<std::string_view, BSONElement>.
      *
      * Example:
      *   for (auto [name, elem] : someBsonObj) {...}
@@ -1372,5 +1372,5 @@ template <>
 struct tuple_size<mongo::BSONElement> : std::integral_constant<size_t, 2> {};
 template <size_t I>
 struct tuple_element<I, mongo::BSONElement>
-    : std::tuple_element<I, std::pair<mongo::StringData, mongo::BSONElement>> {};
+    : std::tuple_element<I, std::pair<std::string_view, mongo::BSONElement>> {};
 }  // namespace std

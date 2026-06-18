@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
@@ -57,6 +56,7 @@
 #include "mongo/util/cancellation.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
@@ -65,6 +65,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using std::string;
 
@@ -83,7 +84,7 @@ using std::string;
  * }
  */
 
-constexpr StringData kCollectionVersionField = "collectionVersion"_sd;
+constexpr std::string_view kCollectionVersionField = "collectionVersion"sv;
 
 class ConfigSvrSplitChunkCommand : public BasicCommand {
 public:

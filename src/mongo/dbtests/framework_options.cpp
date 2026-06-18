@@ -53,6 +53,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -75,7 +76,7 @@ std::vector<std::string>& suitesSingleton() {
     return obj;
 }
 
-std::string getTestFrameworkHelp(StringData name, const moe::OptionSection& options) {
+std::string getTestFrameworkHelp(std::string_view name, const moe::OptionSection& options) {
     return fmt::format(
         "usage: {} [options] [suite]...\n"
         "{}"

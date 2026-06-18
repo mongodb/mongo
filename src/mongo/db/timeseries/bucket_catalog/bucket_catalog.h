@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -59,6 +58,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <variant>
 
 #include <boost/optional/optional.hpp>
@@ -404,8 +404,8 @@ Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
                                      ExecutionStatsController& stats,
                                      bool& bucketOpenedDueToMetadata);
 
-using CompressAndWriteBucketFunc =
-    std::function<void(OperationContext*, const BucketId&, const NamespaceString&, StringData)>;
+using CompressAndWriteBucketFunc = std::function<void(
+    OperationContext*, const BucketId&, const NamespaceString&, std::string_view)>;
 
 /**
  * Given the 'reopeningCandidate', returns:

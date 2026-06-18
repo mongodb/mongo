@@ -37,6 +37,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -63,13 +64,13 @@ inline ElementType findElement(ElementType first, Predicate predicate) {
 /** A predicate for findElement that matches on the field name of Elements. */
 struct FieldNameEquals {
     // The lifetime of this object must be a subset of the lifetime of 'fieldName'.
-    explicit FieldNameEquals(StringData fieldName) : fieldName(fieldName) {}
+    explicit FieldNameEquals(std::string_view fieldName) : fieldName(fieldName) {}
 
     bool operator()(const ConstElement& element) const {
         return (fieldName == element.getFieldName());
     }
 
-    StringData fieldName;
+    std::string_view fieldName;
 };
 
 /** An overload of findElement that delegates to the special implementation
@@ -82,7 +83,8 @@ inline ElementType findElement(ElementType first, FieldNameEquals predicate) {
 
 /** A convenience wrapper around findElement<ElementType, FieldNameEquals>. */
 template <typename ElementType>
-MONGO_MOD_PUBLIC inline ElementType findElementNamed(ElementType first, StringData fieldName) {
+MONGO_MOD_PUBLIC inline ElementType findElementNamed(ElementType first,
+                                                     std::string_view fieldName) {
     return findElement(first, FieldNameEquals(fieldName));
 }
 
@@ -106,7 +108,8 @@ inline ElementType findFirstChild(ElementType parent, FieldNameEquals predicate)
  *  Element is found, the returned Element's 'ok' method will return false.
  */
 template <typename ElementType>
-MONGO_MOD_PUBLIC inline ElementType findFirstChildNamed(ElementType parent, StringData fieldName) {
+MONGO_MOD_PUBLIC inline ElementType findFirstChildNamed(ElementType parent,
+                                                        std::string_view fieldName) {
     return findFirstChild(parent, FieldNameEquals(fieldName));
 }
 
@@ -284,7 +287,7 @@ std::size_t countChildren(ElementType element) {
 /** Return the full (path) name of this element separating each name with the delim string. */
 template <typename ElementType>
 std::string getFullName(ElementType element, char delim = '.') {
-    std::vector<StringData> names;
+    std::vector<std::string_view> names;
     ElementType curr = element;
     while (curr.ok() && curr.parent().ok()) {
         names.push_back(curr.getFieldName());
@@ -293,7 +296,8 @@ std::string getFullName(ElementType element, char delim = '.') {
 
     str::stream name;
     bool first = true;
-    for (std::vector<StringData>::reverse_iterator it = names.rbegin(); it != names.rend(); ++it) {
+    for (std::vector<std::string_view>::reverse_iterator it = names.rbegin(); it != names.rend();
+         ++it) {
         if (!first)
             name << delim;
         name << *it;

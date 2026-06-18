@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/util/builder.h"
@@ -60,6 +59,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -89,10 +89,10 @@ namespace mongo::sbe {
  */
 class IndexScanStageBase : public PlanStage {
 public:
-    IndexScanStageBase(StringData stageType,
+    IndexScanStageBase(std::string_view stageType,
                        UUID collUuid,
                        DatabaseName dbName,
-                       StringData indexName,
+                       std::string_view indexName,
                        bool forward,
                        boost::optional<value::SlotId> indexKeySlot,
                        boost::optional<value::SlotId> recordIdSlot,
@@ -206,10 +206,10 @@ protected:
 template <typename Derived>
 class IndexScanStageBaseImpl : public IndexScanStageBase {
 public:
-    IndexScanStageBaseImpl(StringData stageType,
+    IndexScanStageBaseImpl(std::string_view stageType,
                            UUID collUuid,
                            DatabaseName dbName,
-                           StringData indexName,
+                           std::string_view indexName,
                            bool forward,
                            boost::optional<value::SlotId> indexKeySlot,
                            boost::optional<value::SlotId> recordIdSlot,
@@ -252,7 +252,7 @@ class SimpleIndexScanStage final : public IndexScanStageBaseImpl<SimpleIndexScan
 public:
     SimpleIndexScanStage(UUID collUuid,
                          DatabaseName dbName,
-                         StringData indexName,
+                         std::string_view indexName,
                          bool forward,
                          boost::optional<value::SlotId> indexKeySlot,
                          boost::optional<value::SlotId> recordIdSlot,
@@ -366,7 +366,7 @@ class GenericIndexScanStage final : public IndexScanStageBaseImpl<GenericIndexSc
 public:
     GenericIndexScanStage(UUID collUuid,
                           DatabaseName dbName,
-                          StringData indexName,
+                          std::string_view indexName,
                           GenericIndexScanStageParams params,
                           boost::optional<value::SlotId> indexKeySlot,
                           boost::optional<value::SlotId> recordIdSlot,

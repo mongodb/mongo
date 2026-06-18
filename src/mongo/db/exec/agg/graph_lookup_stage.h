@@ -49,6 +49,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -63,7 +64,7 @@ namespace mongo::exec::agg {
  */
 class GraphLookUpStage final : public Stage {
 public:
-    GraphLookUpStage(StringData stageName,
+    GraphLookUpStage(std::string_view stageName,
                      const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                      GraphLookUpParams params,
                      boost::intrusive_ptr<ExpressionContext> fromExpCtx,
@@ -95,8 +96,8 @@ public:
                                   query_shape::SerializationOptions{}) const final;
 
 private:
-    static constexpr StringData kFrontierValueField = "f"_sd;
-    static constexpr StringData kDepthField = "d"_sd;
+    static constexpr std::string_view kFrontierValueField = "f"_sd;
+    static constexpr std::string_view kDepthField = "d"_sd;
 
     GetNextResult doGetNext() final;
 

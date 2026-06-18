@@ -54,6 +54,7 @@
 
 namespace mongo::projection_executor {
 namespace {
+using namespace std::literals::string_view_literals;
 using std::vector;
 
 auto createProjectionExecutor(const BSONObj& spec, const ProjectionPolicies& policies) {
@@ -223,9 +224,9 @@ TEST(ExclusionProjectionExecutionTest, ShouldCoerceNumericsToBools) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON(
         "a" << Value(0) << "b" << Value(0LL) << "c" << Value(0.0) << "d" << Value(Decimal128(0))));
 
-    auto result = exclusion->applyTransformation(
-        Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}, {"c", 3}}, {});
-    auto expectedResult = Document{{"_id", "ID"_sd}};
+    auto result =
+        exclusion->applyTransformation(Document{{"_id", "ID"sv}, {"a", 1}, {"b", 2}, {"c", 3}}, {});
+    auto expectedResult = Document{{"_id", "ID"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -239,25 +240,22 @@ TEST(ExclusionProjectionExecutionTest, ShouldPreserveOrderOfExistingFields) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a" << false));
-    auto result =
-        exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}}, {});
-    auto expectedResult = Document{{"b", 2}, {"_id", "ID"_sd}};
+    auto result = exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"sv}}, {});
+    auto expectedResult = Document{{"b", 2}, {"_id", "ID"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(BSON("a" << false << "_id" << false));
-    auto result =
-        exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}}, {});
+    auto result = exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"sv}}, {});
     auto expectedResult = Document{{"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdAndKeepAllOtherFields) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("_id" << false));
-    auto result =
-        exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}}, {});
+    auto result = exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"sv}}, {});
     auto expectedResult = Document{{"a", 1}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -308,8 +306,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedExcludedFiel
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should not replace non-documents with documents.
-    result = exclusion->applyTransformation(Document{{"sub", "notADocument"_sd}}, {});
-    expectedResult = Document{{"sub", "notADocument"_sd}};
+    result = exclusion->applyTransformation(Document{{"sub", "notADocument"sv}}, {});
+    expectedResult = Document{{"sub", "notADocument"sv}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -347,14 +345,14 @@ TEST(ExclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
 TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a" << false));
 
-    MutableDocument inputDocBuilder(Document{{"_id", "ID"_sd}, {"a", 1}});
+    MutableDocument inputDocBuilder(Document{{"_id", "ID"sv}, {"a", 1}});
     inputDocBuilder.metadata().setRandVal(1.0);
     inputDocBuilder.metadata().setTextScore(10.0);
     Document inputDoc = inputDocBuilder.freeze();
 
     auto result = exclusion->applyTransformation(inputDoc, {});
 
-    MutableDocument expectedDoc(Document{{"_id", "ID"_sd}});
+    MutableDocument expectedDoc(Document{{"_id", "ID"sv}});
     expectedDoc.copyMetaDataFrom(inputDoc);
     ASSERT_DOCUMENT_EQ(result, expectedDoc.freeze());
 }
@@ -381,7 +379,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
     inputDocBuilder.metadata().setTextScore(0.0);
     inputDocBuilder.metadata().setRandVal(1.0);
     inputDocBuilder.metadata().setSearchScore(2.0);
-    inputDocBuilder.metadata().setSearchHighlights(Value{"foo"_sd});
+    inputDocBuilder.metadata().setSearchHighlights(Value{"foo"sv});
     inputDocBuilder.metadata().setGeoNearDistance(3.0);
     inputDocBuilder.metadata().setGeoNearPoint(Value{BSON_ARRAY(4 << 5)});
     inputDocBuilder.metadata().setRecordId(RecordId{6});

@@ -33,6 +33,8 @@
 #include "mongo/db/s/primary_only_service_helpers/retry_until_success_or_cancel.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUB mongo {
 namespace primary_only_service_helpers {
 
@@ -45,7 +47,7 @@ namespace primary_only_service_helpers {
  */
 class RetryUntilMajorityCommit {
 public:
-    RetryUntilMajorityCommit(StringData serviceName,
+    RetryUntilMajorityCommit(std::string_view serviceName,
                              std::shared_ptr<executor::ScopedTaskExecutor> executor,
                              const CancelState* cancelState,
                              BSONObj metadata = {});

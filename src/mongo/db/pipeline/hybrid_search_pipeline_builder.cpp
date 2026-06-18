@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/hybrid_search_pipeline_builder.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -43,11 +42,14 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 boost::intrusive_ptr<DocumentSource> HybridSearchPipelineBuilder::buildReplaceRootStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -58,7 +60,7 @@ boost::intrusive_ptr<DocumentSource> HybridSearchPipelineBuilder::buildReplaceRo
 BSONObj HybridSearchPipelineBuilder::projectRemoveInternalFieldsObject() {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder projectBob(bob.subobjStart("$project"_sd));
+        BSONObjBuilder projectBob(bob.subobjStart("$project"sv));
         projectBob.append(getInternalFieldsName(), 0);
         projectBob.done();
     }
@@ -73,7 +75,7 @@ HybridSearchPipelineBuilder::constructCalculatedFinalScoreDetails(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         {
             BSONObjBuilder internalFieldsBob(addFieldsBob.subobjStart(getInternalFieldsName()));
             {
@@ -86,7 +88,7 @@ HybridSearchPipelineBuilder::constructCalculatedFinalScoreDetails(
                         fmt::format("${}_scoreDetails", pipelineName);
                     double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
                     BSONObjBuilder mergeObjectsArrSubObj;
-                    mergeObjectsArrSubObj.append("inputPipelineName"_sd, pipelineName);
+                    mergeObjectsArrSubObj.append("inputPipelineName"sv, pipelineName);
                     constructCalculatedFinalScoreDetailsStageSpecificScoreDetails(
                         mergeObjectsArrSubObj, internalFieldsPipelineName, weight);
                     mergeObjectsArrSubObj.done();
@@ -95,7 +97,7 @@ HybridSearchPipelineBuilder::constructCalculatedFinalScoreDetails(
                     mergeObjectsArr.append(
                         fmt::format("${}.{}_scoreDetails", getInternalFieldsName(), pipelineName));
                     mergeObjectsArr.done();
-                    BSONObj mergeObjectsObj = BSON("$mergeObjects"_sd << mergeObjectsArr.arr());
+                    BSONObj mergeObjectsObj = BSON("$mergeObjects"sv << mergeObjectsArr.arr());
                     calculatedScoreDetailsArr.append(mergeObjectsObj);
                 }
                 calculatedScoreDetailsArr.done();
@@ -236,11 +238,11 @@ HybridSearchPipelineBuilder::buildGroupAndReplaceRootStages(
     // }}
     BSONObjBuilder groupSpecBob;
     {
-        BSONObjBuilder gBob(groupSpecBob.subobjStart("$group"_sd));
+        BSONObjBuilder gBob(groupSpecBob.subobjStart("$group"sv));
         gBob.append("_id", fmt::format("${}._id", internalDocsName));
         gBob.append(internalDocsName, BSON("$first" << fmt::format("${}", internalDocsName)));
 
-        auto accumulateScalarField = [&](StringData field, const std::string& internalPath) {
+        auto accumulateScalarField = [&](std::string_view field, const std::string& internalPath) {
             gBob.append(fmt::format("{}{}", kHsFlatFieldPrefix, field),
                         BSON("$max" << BSON("$ifNull"
                                             << BSON_ARRAY(fmt::format("${}", internalPath) << 0))));
@@ -290,17 +292,17 @@ HybridSearchPipelineBuilder::buildGroupAndReplaceRootStages(
 
     BSONObjBuilder rrSpecBob;
     {
-        BSONObjBuilder rrBob(rrSpecBob.subobjStart("$replaceRoot"_sd));
-        BSONObjBuilder newRootBob(rrBob.subobjStart("newRoot"_sd));
+        BSONObjBuilder rrBob(rrSpecBob.subobjStart("$replaceRoot"sv));
+        BSONObjBuilder newRootBob(rrBob.subobjStart("newRoot"sv));
         {
-            BSONArrayBuilder mergeArr(newRootBob.subarrayStart("$mergeObjects"_sd));
+            BSONArrayBuilder mergeArr(newRootBob.subarrayStart("$mergeObjects"sv));
             // Add 'internalDocsName' to promote user doc.
             mergeArr.append(fmt::format("${}", internalDocsName));
             BSONObjBuilder wrapperBob;
             {
                 BSONObjBuilder internalFieldsBob(wrapperBob.subobjStart(internalFieldsName));
 
-                auto appendFlatRef = [&](StringData field) {
+                auto appendFlatRef = [&](std::string_view field) {
                     internalFieldsBob.append(field,
                                              fmt::format("${}{}", kHsFlatFieldPrefix, field));
                 };

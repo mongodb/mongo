@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
@@ -54,6 +53,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -439,7 +439,7 @@ public:
     typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool>
         MultiAccState;
 
-    value::TagValueView getField_test(value::TagValueView obj, StringData fieldStr) {
+    value::TagValueView getField_test(value::TagValueView obj, std::string_view fieldStr) {
         return getField(obj, fieldStr);
     }
 
@@ -491,7 +491,7 @@ private:
 
     value::TagValueView getField(value::TagValueView obj, value::TagValueView field);
 
-    value::TagValueView getField(value::TagValueView obj, StringData fieldStr);
+    value::TagValueView getField(value::TagValueView obj, std::string_view fieldStr);
 
     value::TagValueView getElement(value::TagValueView arr, value::TagValueView idx);
 

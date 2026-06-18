@@ -39,6 +39,7 @@
 #include "mongo/transport/transport_layer_manager.h"
 
 #include <algorithm>
+#include <string_view>
 
 namespace mongo::transport {
 namespace {
@@ -87,7 +88,7 @@ void AsioSessionManager::configureServiceExecutorContext(Client* client,
 void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
     const auto sessionCount = numOpenSessions();
 
-    const auto appendInt = [&](StringData n, auto v) {
+    const auto appendInt = [&](std::string_view n, auto v) {
         bob->append(n, static_cast<int>(v));
     };
 

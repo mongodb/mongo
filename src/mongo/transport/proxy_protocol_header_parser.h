@@ -29,11 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/sockaddr.h"
+
 #include <algorithm>
 #include <cstddef>
+#include <string_view>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -41,23 +44,21 @@
 #include <sys/un.h>
 #endif
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/net/sockaddr.h"
-
 namespace mongo::transport {
 
 // PROXY protocol signature strings. kProxyV2Signature contains an embedded null byte; always use
 // .size() rather than strlen() when working with it.
-constexpr StringData kProxyV1Signature = "PROXY"_sd;
-constexpr StringData kProxyV2Signature = "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A"_sd;
+inline constexpr std::string_view kProxyV1Signature = "PROXY";
+inline constexpr std::string_view kProxyV2Signature = []() {
+    using namespace std::literals::string_view_literals;  // required due to embedded NUL
+    return "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A"sv;
+}();
 
 /**
  * The maximum number of bytes ever needed by a proxy protocol header; represents
  * the minimum TCP MTU.
  */
-constexpr size_t kDefaultProxyProtocolHeaderReadSize = 536;
+inline constexpr size_t kDefaultProxyProtocolHeaderReadSize = 536;
 
 /**
  * Adapted from https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
@@ -156,7 +157,8 @@ struct ParserResults {
  *
  * Will throw eagerly on a malformed header.
  */
-boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool isProxyUnixSock);
+boost::optional<ParserResults> parseProxyProtocolHeader(std::string_view buffer,
+                                                        bool isProxyUnixSock);
 
 /**
  * Peek a buffer for at least 12 bytes to determine if it may be a proxy protocol header.
@@ -166,17 +168,17 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool 
  * To be used in determining appropriate error messages during otherwise failed
  * initial handshakes only.
  */
-bool maybeProxyProtocolHeader(StringData buffer);
+bool maybeProxyProtocolHeader(std::string_view buffer);
 
 namespace proxy_protocol_details {
 static constexpr size_t kMaxUnixPathLength = 108;
 
 template <typename AddrUn = sockaddr_un>
-AddrUn parseSockAddrUn(StringData buffer) {
+AddrUn parseSockAddrUn(std::string_view buffer) {
     AddrUn addr{};
     addr.sun_family = AF_UNIX;
 
-    StringData path = buffer.substr(0, buffer.find('\0'));
+    std::string_view path = buffer.substr(0, buffer.find('\0'));
     uassert(ErrorCodes::FailedToParse,
             fmt::format("Provided unix path longer than system supports: {}", buffer),
             path.size() < sizeof(AddrUn::sun_path));
@@ -184,8 +186,8 @@ AddrUn parseSockAddrUn(StringData buffer) {
     return addr;
 }
 
-void validateIpv4Address(StringData addr);
-void validateIpv6Address(StringData addr);
+void validateIpv4Address(std::string_view addr);
+void validateIpv6Address(std::string_view addr);
 
 }  // namespace proxy_protocol_details
 

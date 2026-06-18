@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -58,7 +58,7 @@ public:
      *  Gets an additional configuration string for the provided table name on a
      *  `WT_SESSION::create` call.
      */
-    virtual std::string getTableCreateConfig(StringData tableName);
+    virtual std::string getTableCreateConfig(std::string_view tableName);
 };
 
 /**
@@ -78,7 +78,7 @@ public:
      * Gets a combined configuration string from all hooks in the registry for
      * the provided table name during the `WT_SESSION::create` call.
      */
-    std::string getTableCreateConfig(StringData tableName) const;
+    std::string getTableCreateConfig(std::string_view tableName) const;
 
 private:
     std::vector<std::unique_ptr<WiredTigerCustomizationHooks>> _hooks;

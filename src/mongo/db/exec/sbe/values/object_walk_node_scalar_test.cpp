@@ -33,6 +33,8 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::sbe {
 
 using Get = value::Get;
@@ -84,7 +86,7 @@ value::Array convertToArray(value::TypeTags inputTag, value::Value inputVal) {
 
 value::Object convertToObject(value::TypeTags inputTag, value::Value inputVal) {
     value::Object ret;
-    auto callback = [&](StringData fieldName,
+    auto callback = [&](std::string_view fieldName,
                         value::TypeTags inTag,
                         value::Value inVal,
                         const char* cur) -> bool {

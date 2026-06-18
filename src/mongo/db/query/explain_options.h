@@ -34,6 +34,8 @@
 #include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -48,12 +50,12 @@ public:
      */
     using Verbosity = explain::VerbosityEnum;
 
-    static constexpr StringData kVerbosityName = "verbosity"_sd;
+    static constexpr std::string_view kVerbosityName = "verbosity"_sd;
 
     /**
      * Converts an explain verbosity to its string representation.
      */
-    static StringData verbosityString(ExplainOptions::Verbosity verbosity);
+    static std::string_view verbosityString(ExplainOptions::Verbosity verbosity);
 
     /**
      * Converts 'verbosity' to its corresponding representation as a BSONObj containing explain

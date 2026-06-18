@@ -57,6 +57,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -283,7 +284,7 @@ public:
 
             ClientLock lk(client);
             if (auto opCtx = client->getOperationContext()) {
-                StringData desc(client->desc());
+                std::string_view desc(client->desc());
 
                 // Resharding coordinator doc changes are run under WithTransaction, which uses
                 // AlternativeSessionRegion.

@@ -29,7 +29,6 @@
 
 #include "mongo/db/auth/auth_op_observer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -66,14 +65,19 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-BSONObj makeUserDocument(
-    StringData id, StringData userName, StringData dbName, BSONObj credentials, BSONArray roles) {
+BSONObj makeUserDocument(std::string_view id,
+                         std::string_view userName,
+                         std::string_view dbName,
+                         BSONObj credentials,
+                         BSONArray roles) {
     return BSON("_id" << id << "user" << userName << "db" << dbName << "credentials" << credentials
                       << "roles" << roles);
 }
@@ -141,7 +145,7 @@ public:
                            << "SCRAM-SHA-256"
                            << scram::Secrets<SHA256Block>::generateCredentials("password", 15000));
 
-        userDocument = makeUserDocument("admin.v2read"_sd,
+        userDocument = makeUserDocument("admin.v2read"sv,
                                         "v2read",
                                         "test",
                                         credentials,
@@ -321,7 +325,7 @@ TEST_F(AuthOpObserverTest, OnRollbackDoesntInvalidateAuthCacheWhenNoAuthNamespac
 
 TEST_F(AuthOpObserverTest, OnUpdate) {
     // Updating a user document should trigger cache invalidation after the WUOW commits.
-    BSONObj updatedUserDoc = makeUserDocument("admin.v2read"_sd,
+    BSONObj updatedUserDoc = makeUserDocument("admin.v2read"sv,
                                               "v2read",
                                               "test",
                                               credentials,

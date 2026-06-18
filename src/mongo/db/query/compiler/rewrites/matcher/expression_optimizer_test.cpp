@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -58,6 +57,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -65,6 +65,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 static const NamespaceString nss =
     NamespaceString::createNamespaceString_forTest("testdb.testcoll");
@@ -362,7 +363,7 @@ TEST(ExpressionOptimizeTest, NormalizeWithInAndRegexPreservesTags) {
 TEST(ExpressionOptimizeTest, NormalizeWithInPreservesCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj obj = fromjson("{'': 'string'}");
-    auto inMatchExpression = std::make_unique<InMatchExpression>(""_sd);
+    auto inMatchExpression = std::make_unique<InMatchExpression>(""sv);
     inMatchExpression->setCollator(&collator);
     std::vector<BSONElement> equalities{obj.firstElement()};
     ASSERT_OK(inMatchExpression->setEqualities(std::move(equalities)));

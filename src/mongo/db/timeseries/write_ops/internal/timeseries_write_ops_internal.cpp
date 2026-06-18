@@ -55,12 +55,14 @@
 #include "mongo/logv2/log.h"
 
 #include <algorithm>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::timeseries::write_ops::internal {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(failAtomicTimeseriesWrites);
 // TODO(SERVER-116453): Remove failpoint
@@ -72,7 +74,7 @@ MONGO_FAIL_POINT_DEFINE(hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimes
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
 
-static constexpr auto errorAcquiringCollectionReason{"Error acquiring collection."_sd};
+static constexpr auto errorAcquiringCollectionReason{"Error acquiring collection."sv};
 
 using TimeseriesBatches =
     std::vector<std::pair<std::shared_ptr<bucket_catalog::WriteBatch>, size_t>>;
@@ -292,7 +294,7 @@ CollectionAcquisition acquireAndValidateBucketsCollection(
 void compressUncompressedBucketOnReopen(OperationContext* opCtx,
                                         const bucket_catalog::BucketId& bucketId,
                                         const NamespaceString& nss,
-                                        StringData timeFieldName) {
+                                        std::string_view timeFieldName) {
     bool validateCompression = gValidateTimeseriesCompression.load();
 
     auto bucketCompressionFunc = [&](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
@@ -791,7 +793,7 @@ OrderedTimeseriesWritesAtomicResult performOrderedTimeseriesWritesAtomically(
             // Don't attempt commit, retry both of these cases as unordered.
             invariant(batches.empty());
             return {.status = Status(ErrorCodes::UnknownError,
-                                     "Error during time-series write staging"_sd),
+                                     "Error during time-series write staging"sv),
                     .doRetry = true};
         case StageWritesStatus::kCollectionAcquisitionError:
             // No retry, an error should be populated by the result

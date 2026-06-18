@@ -33,6 +33,7 @@
 #include "mongo/db/fts/stop_words.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace fts {
@@ -49,7 +50,7 @@ UnicodeFTSTokenizer::UnicodeFTSTokenizer(const FTSLanguage* language)
       _caseFoldMode(_language->str() == "turkish" ? unicode::CaseFoldMode::kTurkish
                                                   : unicode::CaseFoldMode::kNormal) {}
 
-void UnicodeFTSTokenizer::reset(StringData document, Options options) {
+void UnicodeFTSTokenizer::reset(std::string_view document, Options options) {
     _options = options;
     _pos = 0;
     _document.resetData(document);  // Validates that document is valid UTF8.
@@ -101,7 +102,7 @@ bool UnicodeFTSTokenizer::moveNext() {
     }
 }
 
-StringData UnicodeFTSTokenizer::get() const {
+std::string_view UnicodeFTSTokenizer::get() const {
     return _word;
 }
 

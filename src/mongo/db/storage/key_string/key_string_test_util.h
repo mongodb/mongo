@@ -33,6 +33,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PRIVATE mongo {
 namespace key_string_test {
 class KeyStringBuilderTest : public testing::TestWithParam<key_string::Version> {
@@ -103,7 +105,7 @@ std::vector<BSONObj> thinElements(std::vector<BSONObj> elements, unsigned seed, 
 
 RecordId ridFromOid(const OID& oid);
 
-RecordId ridFromStr(StringData str);
+RecordId ridFromStr(std::string_view str);
 
 int compareLongToDouble(long long lhs, double rhs);
 

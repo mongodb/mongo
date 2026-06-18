@@ -38,7 +38,6 @@
 #endif
 #endif
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -50,6 +49,7 @@
 
 #include <climits>
 #include <sstream>
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -77,27 +77,27 @@ public:
         return 0;
     }
 
-    StringData version() const noexcept final {
+    std::string_view version() const noexcept final {
         return "unknown";
     }
 
-    StringData gitVersion() const noexcept final {
+    std::string_view gitVersion() const noexcept final {
         return "none";
     }
 
-    std::vector<StringData> modules() const final {
+    std::vector<std::string_view> modules() const final {
         return {"unknown"};
     }
 
-    StringData allocator() const noexcept final {
+    std::string_view allocator() const noexcept final {
         return "unknown";
     }
 
-    StringData jsEngine() const noexcept final {
+    std::string_view jsEngine() const noexcept final {
         return "unknown";
     }
 
-    StringData targetMinOS() const noexcept final {
+    std::string_view targetMinOS() const noexcept final {
         return "unknown";
     }
 
@@ -131,11 +131,12 @@ const VersionInfoInterface& VersionInfoInterface::instance(NotEnabledAction acti
     LOGV2_FATAL(40278, "Terminating because valid version info has not been configured");
 }
 
-std::string VersionInfoInterface::makeVersionString(StringData binaryName) const {
+std::string VersionInfoInterface::makeVersionString(std::string_view binaryName) const {
     return fmt::format("{} v{}", binaryName, version());
 }
 
-std::string VersionInfoInterface::openSSLVersion(StringData prefix, StringData suffix) const {
+std::string VersionInfoInterface::openSSLVersion(std::string_view prefix,
+                                                 std::string_view suffix) const {
 #if !defined(MONGO_CONFIG_SSL) || MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL
     return "";
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
@@ -172,7 +173,7 @@ void VersionInfoInterface::logBuildInfo(std::ostream* os) const {
     }
 }
 
-std::string formatVersionString(StringData versioned, const VersionInfoInterface& provider) {
+std::string formatVersionString(std::string_view versioned, const VersionInfoInterface& provider) {
     return fmt::format("{} version v{}", versioned, provider.version());
 }
 

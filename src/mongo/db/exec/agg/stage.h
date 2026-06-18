@@ -38,6 +38,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class DocumentSource;
@@ -159,7 +161,7 @@ private:
  */
 class MONGO_MOD_OPEN Stage : public virtual RefCountable {
 public:
-    Stage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    Stage(std::string_view stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
     ~Stage() override {}
 
     /**

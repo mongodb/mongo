@@ -37,6 +37,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo::query_settings::query_framework {
 
@@ -51,7 +52,7 @@ std::string serialize(QueryFrameworkControlEnum queryFramework) {
     }
 }
 
-QueryFrameworkControlEnum parse(StringData queryFrameworkString) {
+QueryFrameworkControlEnum parse(std::string_view queryFrameworkString) {
     if (queryFrameworkString == kClassic)
         return QueryFrameworkControlEnum::kForceClassicEngine;
     if (queryFrameworkString == kSbe)

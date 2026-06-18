@@ -32,6 +32,8 @@
 #include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 namespace mongo {
 
@@ -178,7 +180,7 @@ private:
         this->_releaseDDLLocks(opCtx);
     }
 
-    StringData serializeGenericPhase(CoordinatorGenericPhase phase) const final {
+    std::string_view serializeGenericPhase(CoordinatorGenericPhase phase) const final {
         return this->serializePhase(phase);
     }
 

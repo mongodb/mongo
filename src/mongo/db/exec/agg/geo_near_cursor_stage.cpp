@@ -34,6 +34,8 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceGeoNearCursorToStageFn(
@@ -61,7 +63,7 @@ REGISTER_AGG_STAGE_MAPPING(geoNearCursorStage,
                            documentSourceGeoNearCursorToStageFn);
 
 GeoNearCursorStage::GeoNearCursorStage(
-    StringData sourceName,
+    std::string_view sourceName,
     const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     CursorType cursorType,

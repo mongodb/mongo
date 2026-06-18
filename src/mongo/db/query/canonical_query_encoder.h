@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace mongo {
 
@@ -125,6 +125,6 @@ CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const Pipeline& pi
 /**
  * Returns a hash of the given key (produced from either a QueryShapeString or a PlanCacheKey).
  */
-uint32_t computeHash(StringData key);
+uint32_t computeHash(std::string_view key);
 }  // namespace canonical_query_encoder
 }  // namespace mongo

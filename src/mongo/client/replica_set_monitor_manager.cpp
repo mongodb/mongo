@@ -56,6 +56,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -136,7 +137,7 @@ ReplicaSetMonitorManager* ReplicaSetMonitorManager::get() {
     return &getGlobalRSMMonitorManager(getGlobalServiceContext());
 }
 
-shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
+shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(std::string_view setName) {
     std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
     _doGarbageCollectionLocked(lk);
 
@@ -247,7 +248,7 @@ size_t ReplicaSetMonitorManager::getNumMonitors() const {
     return _monitors.size();
 }
 
-void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
+void ReplicaSetMonitorManager::removeMonitor(std::string_view setName) {
     std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
     ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
     if (it != _monitors.end()) {
@@ -259,7 +260,7 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
     }
 }
 
-void ReplicaSetMonitorManager::registerForGarbageCollection(StringData setName) {
+void ReplicaSetMonitorManager::registerForGarbageCollection(std::string_view setName) {
     std::lock_guard<std::mutex> lk(_gcMutex);
     _gcQueue.emplace_back(setName);
 }

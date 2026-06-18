@@ -29,7 +29,6 @@
 
 #include "mongo/db/update/v2_log_builder.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -39,6 +38,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -50,7 +50,7 @@ namespace mmb = mongo::mutablebson;
  * Given a FieldRef, creates a RuntimeUpdatePath based on it, assuming that every numeric component
  * is an array index.
  */
-RuntimeUpdatePath makeRuntimeUpdatePathAssumeNumericComponentsAreIndexes(StringData path) {
+RuntimeUpdatePath makeRuntimeUpdatePathAssumeNumericComponentsAreIndexes(std::string_view path) {
     FieldRef fr(path);
     std::vector<RuntimeUpdatePath::ComponentType> types;
 

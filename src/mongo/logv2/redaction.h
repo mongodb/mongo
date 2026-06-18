@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 /**
  * The 'redact' methods defined below should be used to redact possibly sensitive
@@ -63,13 +63,15 @@ MONGO_MOD_PUBLIC BSONObj redact(const BSONObj& objectToRedact, bool forceRedacti
  *  In 'redact' mode (or if forceRedaction is true) return '###'.
  *  In normal mode return stringToRedact.
  */
-MONGO_MOD_PUBLIC StringData redact(StringData stringToRedact, bool forceRedaction = false);
-MONGO_MOD_PUBLIC inline StringData redact(const char* stringToRedact, bool forceRedaction = false) {
-    return redact(StringData(stringToRedact), forceRedaction);
+MONGO_MOD_PUBLIC std::string_view redact(std::string_view stringToRedact,
+                                         bool forceRedaction = false);
+MONGO_MOD_PUBLIC inline std::string_view redact(const char* stringToRedact,
+                                                bool forceRedaction = false) {
+    return redact(std::string_view(stringToRedact), forceRedaction);
 }
-MONGO_MOD_PUBLIC inline StringData redact(const std::string& stringToRedact,
-                                          bool forceRedaction = false) {
-    return redact(StringData(stringToRedact), forceRedaction);
+MONGO_MOD_PUBLIC inline std::string_view redact(const std::string& stringToRedact,
+                                                bool forceRedaction = false) {
+    return redact(std::string_view(stringToRedact), forceRedaction);
 }
 
 /**

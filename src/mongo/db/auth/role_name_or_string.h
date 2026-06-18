@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/role_name.h"
@@ -37,6 +36,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -57,12 +57,12 @@ class RoleNameOrString {
 public:
     RoleNameOrString() = delete;
     explicit RoleNameOrString(std::string role) : _roleName(std::move(role)) {}
-    explicit RoleNameOrString(StringData role) : _roleName(std::string{role}) {}
+    explicit RoleNameOrString(std::string_view role) : _roleName(std::string{role}) {}
     explicit RoleNameOrString(RoleName role) : _roleName(std::move(role)) {}
 
     // IDL support.
     static RoleNameOrString parseFromBSON(const BSONElement& elem);
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
     void serializeToBSON(BSONArrayBuilder* bob) const;
 
     /**

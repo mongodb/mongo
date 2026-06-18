@@ -32,7 +32,6 @@
 
 // IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/partitioned.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"

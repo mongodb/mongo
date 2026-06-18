@@ -39,6 +39,7 @@
 namespace mongo::audit {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 class AuditDecorationsTest : public AuthorizationSessionTestFixture {
 protected:
@@ -46,7 +47,7 @@ protected:
         : AuthorizationSessionTestFixture(std::move(options)) {}
 };
 
-const UserName kUser1Test("user1"_sd, "test"_sd);
+const UserName kUser1Test("user1"sv, "test"sv);
 const std::unique_ptr<UserRequest> kUser1TestRequest =
     std::make_unique<UserRequestGeneral>(kUser1Test, boost::none);
 

@@ -42,6 +42,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
+#include <string_view>
+
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -61,11 +63,12 @@ using ChangeStreamInjectControlEventsLiteParsed =
 class DocumentSourceChangeStreamInjectControlEvents final
     : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamInjectControlEvents"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamInjectControlEvents"_sd;
 
     // Constants for action types that this stage can perform.
-    static constexpr StringData kActionNameInjectControlEvent = "injectControlEvent"_sd;
-    static constexpr StringData kActionNameTransformToControlEvent = "transformToControlEvent"_sd;
+    static constexpr std::string_view kActionNameInjectControlEvent = "injectControlEvent"_sd;
+    static constexpr std::string_view kActionNameTransformToControlEvent =
+        "transformToControlEvent"_sd;
 
     enum class Action {
         // Consumes the matching change event, transforms the event into a control one, and emits
@@ -104,7 +107,7 @@ public:
             const DocumentSourceChangeStreamSpec& spec);
     };
 
-    StringData getSourceName() const override;
+    std::string_view getSourceName() const override;
 
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,

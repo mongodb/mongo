@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -37,11 +36,13 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 
 namespace mongo {
 namespace expression_evaluation_test {
+using namespace std::literals::string_view_literals;
 
 //
 // Evaluation.
@@ -54,7 +55,7 @@ TEST(ExpressionObjectEvaluate, EmptyObjectShouldEvaluateToEmptyDocument) {
     ASSERT_VALUE_EQ(Value(Document()),
                     object->evaluate(Document{{"a", 1}}, &(expCtx.variables), {}));
     ASSERT_VALUE_EQ(Value(Document()),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables), {}));
+                    object->evaluate(Document{{"_id", "ID"sv}}, &(expCtx.variables), {}));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
@@ -69,7 +70,7 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
                     object->evaluate(Document{{"a", 1}}, &(expCtx.variables), {}));
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables), {}));
+                    object->evaluate(Document{{"_id", "ID"sv}}, &(expCtx.variables), {}));
 }
 
 TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecification) {
@@ -81,8 +82,8 @@ TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecificat
          {"c",
           ExpressionFieldPath::createPathFromString(&expCtx, "c", expCtx.variablesParseState)}});
     ASSERT_VALUE_EQ(
-        Value(Document{{"a", "A"_sd}, {"b", "B"_sd}, {"c", "C"_sd}}),
-        object->evaluate(Document{{"c", "C"_sd}, {"a", "A"_sd}, {"b", "B"_sd}, {"_id", "ID"_sd}},
+        Value(Document{{"a", "A"sv}, {"b", "B"sv}, {"c", "C"sv}}),
+        object->evaluate(Document{{"c", "C"sv}, {"a", "A"sv}, {"b", "B"sv}, {"_id", "ID"sv}},
                          &(expCtx.variables),
                          {}));
 }
@@ -113,8 +114,8 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
                                          &expCtx, "_id", expCtx.variablesParseState)}})}});
     ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}}}}),
                     object->evaluate(Document(), &(expCtx.variables), {}));
-    ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"_sd}}}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables), {}));
+    ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"sv}}}}),
+                    object->evaluate(Document{{"_id", "ID"sv}}, &(expCtx.variables), {}));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissing) {

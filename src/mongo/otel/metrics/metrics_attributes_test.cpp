@@ -33,6 +33,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <typeindex>
 #include <vector>
@@ -45,6 +46,7 @@
 
 namespace mongo::otel::metrics {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using testing::_;
 using testing::ElementsAre;
@@ -67,44 +69,44 @@ TEST(SafeMakeAttributeTuplesTest, SingleVector) {
 }
 
 TEST(SafeMakeAttributeTuplesTest, TwoVectors) {
-    auto result =
-        safeMakeAttributeTuples(std::vector<StringData>{"a"_sd, "b"_sd, "c"_sd}, std::vector{1, 2});
+    auto result = safeMakeAttributeTuples(std::vector<std::string_view>{"a"sv, "b"sv, "c"sv},
+                                          std::vector{1, 2});
     EXPECT_THAT(result,
-                UnorderedElementsAre(std::make_tuple("a"_sd, 1),
-                                     std::make_tuple("a"_sd, 2),
-                                     std::make_tuple("b"_sd, 1),
-                                     std::make_tuple("b"_sd, 2),
-                                     std::make_tuple("c"_sd, 1),
-                                     std::make_tuple("c"_sd, 2)));
+                UnorderedElementsAre(std::make_tuple("a"sv, 1),
+                                     std::make_tuple("a"sv, 2),
+                                     std::make_tuple("b"sv, 1),
+                                     std::make_tuple("b"sv, 2),
+                                     std::make_tuple("c"sv, 1),
+                                     std::make_tuple("c"sv, 2)));
 }
 
 TEST(SafeMakeAttributeTuplesTest, ThreeVectors) {
     auto result = safeMakeAttributeTuples(
-        std::vector<StringData>{"a"_sd, "b"_sd}, std::vector{1, 2}, std::vector{true, false});
+        std::vector<std::string_view>{"a"sv, "b"sv}, std::vector{1, 2}, std::vector{true, false});
     EXPECT_THAT(result,
-                UnorderedElementsAre(std::make_tuple("a"_sd, 1, true),
-                                     std::make_tuple("a"_sd, 1, false),
-                                     std::make_tuple("a"_sd, 2, true),
-                                     std::make_tuple("a"_sd, 2, false),
-                                     std::make_tuple("b"_sd, 1, true),
-                                     std::make_tuple("b"_sd, 1, false),
-                                     std::make_tuple("b"_sd, 2, true),
-                                     std::make_tuple("b"_sd, 2, false)));
+                UnorderedElementsAre(std::make_tuple("a"sv, 1, true),
+                                     std::make_tuple("a"sv, 1, false),
+                                     std::make_tuple("a"sv, 2, true),
+                                     std::make_tuple("a"sv, 2, false),
+                                     std::make_tuple("b"sv, 1, true),
+                                     std::make_tuple("b"sv, 1, false),
+                                     std::make_tuple("b"sv, 2, true),
+                                     std::make_tuple("b"sv, 2, false)));
 }
 
 TEST(SafeMakeAttributeTuplesTest, VectorsWithSpans) {
     std::vector<int> ints1{1, 2};
     std::vector<int> ints2{3, 4};
-    auto result = safeMakeAttributeTuples(std::vector<StringData>{"a"_sd, "b"_sd, "c"_sd},
+    auto result = safeMakeAttributeTuples(std::vector<std::string_view>{"a"sv, "b"sv, "c"sv},
                                           std::vector<std::span<int>>{ints1, ints2});
     EXPECT_THAT(
         result,
-        UnorderedElementsAre(IsAttributesTuple(std::make_tuple("a"_sd, std::span<int>(ints1))),
-                             IsAttributesTuple(std::make_tuple("a"_sd, std::span<int>(ints2))),
-                             IsAttributesTuple(std::make_tuple("b"_sd, std::span<int>(ints1))),
-                             IsAttributesTuple(std::make_tuple("b"_sd, std::span<int>(ints2))),
-                             IsAttributesTuple(std::make_tuple("c"_sd, std::span<int>(ints1))),
-                             IsAttributesTuple(std::make_tuple("c"_sd, std::span<int>(ints2)))));
+        UnorderedElementsAre(IsAttributesTuple(std::make_tuple("a"sv, std::span<int>(ints1))),
+                             IsAttributesTuple(std::make_tuple("a"sv, std::span<int>(ints2))),
+                             IsAttributesTuple(std::make_tuple("b"sv, std::span<int>(ints1))),
+                             IsAttributesTuple(std::make_tuple("b"sv, std::span<int>(ints2))),
+                             IsAttributesTuple(std::make_tuple("c"sv, std::span<int>(ints1))),
+                             IsAttributesTuple(std::make_tuple("c"sv, std::span<int>(ints2)))));
 }
 
 TEST(SafeMakeAttributeTuplesTest, EmptyFirstVector) {
@@ -151,10 +153,10 @@ TEST(MakeOwnedAttributeValueListsTest, StringDataAttributeOwned) {
     // If source strings are destroyed, owned must have its own copies.
     auto source = std::make_unique<std::vector<std::string>>(
         std::initializer_list<std::string>{"foo", "bar"});
-    OwnedAttributeValueLists<StringData> owned = makeOwnedAttributeValueLists(
-        AttributeDefinition<StringData>{.name = "s", .values = {(*source)[0], (*source)[1]}});
+    OwnedAttributeValueLists<std::string_view> owned = makeOwnedAttributeValueLists(
+        AttributeDefinition<std::string_view>{.name = "s", .values = {(*source)[0], (*source)[1]}});
     source = nullptr;  // Sanitizers catch use-after-free if copies weren't made.
-    EXPECT_THAT(owned.lists, FieldsAre(UnorderedElementsAre(Pointee("foo"_sd), Pointee("bar"_sd))));
+    EXPECT_THAT(owned.lists, FieldsAre(UnorderedElementsAre(Pointee("foo"sv), Pointee("bar"sv))));
 }
 
 TEST(MakeOwnedAttributeValueListsTest, SpanAttributeOwned) {
@@ -172,11 +174,11 @@ TEST(MakeOwnedAttributeValueListsTest, SpanAttributeOwned) {
 }
 
 TEST(MakeOwnedAttributeValueListsTest, MultipleAttributeTypes) {
-    OwnedAttributeValueLists<StringData, bool> owned = makeOwnedAttributeValueLists(
-        AttributeDefinition<StringData>{.name = "s", .values = {"a"_sd, "b"_sd}},
+    OwnedAttributeValueLists<std::string_view, bool> owned = makeOwnedAttributeValueLists(
+        AttributeDefinition<std::string_view>{.name = "s", .values = {"a"sv, "b"sv}},
         AttributeDefinition<bool>{.name = "flag", .values = {true, false}});
     EXPECT_THAT(owned.lists,
-                FieldsAre(UnorderedElementsAre(Pointee("a"_sd), Pointee("b"_sd)),
+                FieldsAre(UnorderedElementsAre(Pointee("a"sv), Pointee("b"sv)),
                           UnorderedElementsAre(Pointee(true), Pointee(false))));
 }
 
@@ -210,15 +212,16 @@ TEST(SafeMakeAttributeTuplesOwnedTest, SingleAttribute) {
 TEST(SafeMakeAttributeTuplesOwnedTest, MultipleAttributes) {
     std::array<bool, 2> boolArr1{true, false};
     std::array<bool, 2> boolArr2{false, true};
-    OwnedAttributeValueLists<StringData, std::span<bool>> owned = makeOwnedAttributeValueLists(
-        AttributeDefinition<StringData>{.name = "s", .values = {"a"_sd, "b"_sd}},
-        AttributeDefinition<std::span<bool>>{.name = "flag", .values = {boolArr1, boolArr2}});
-    EXPECT_THAT(safeMakeAttributeTuples(owned),
-                UnorderedElementsAre(
-                    IsAttributesTuple(std::make_tuple("a"_sd, std::span<bool>{boolArr1})),
-                    IsAttributesTuple(std::make_tuple("a"_sd, std::span<bool>{boolArr2})),
-                    IsAttributesTuple(std::make_tuple("b"_sd, std::span<bool>{boolArr1})),
-                    IsAttributesTuple(std::make_tuple("b"_sd, std::span<bool>{boolArr2}))));
+    OwnedAttributeValueLists<std::string_view, std::span<bool>> owned =
+        makeOwnedAttributeValueLists(
+            AttributeDefinition<std::string_view>{.name = "s", .values = {"a"sv, "b"sv}},
+            AttributeDefinition<std::span<bool>>{.name = "flag", .values = {boolArr1, boolArr2}});
+    EXPECT_THAT(
+        safeMakeAttributeTuples(owned),
+        UnorderedElementsAre(IsAttributesTuple(std::make_tuple("a"sv, std::span<bool>{boolArr1})),
+                             IsAttributesTuple(std::make_tuple("a"sv, std::span<bool>{boolArr2})),
+                             IsAttributesTuple(std::make_tuple("b"sv, std::span<bool>{boolArr1})),
+                             IsAttributesTuple(std::make_tuple("b"sv, std::span<bool>{boolArr2}))));
 }
 
 TEST(SafeMakeAttributeTuplesOwnedTest, ThrowsOnDuplicateValues) {
@@ -245,9 +248,9 @@ TEST(MakeComparableAttributeDefinitionTest, Int64Attribute) {
 
 TEST(MakeComparableAttributeDefinitionTest, StringDataAttribute) {
     auto result = makeComparableAttributeDefinition(
-        AttributeDefinition<StringData>{.name = "env", .values = {"prod"_sd, "staging"_sd}});
+        AttributeDefinition<std::string_view>{.name = "env", .values = {"prod"sv, "staging"sv}});
     EXPECT_EQ(result.name, "env");
-    EXPECT_EQ(result.typeIndex, std::type_index(typeid(StringData)));
+    EXPECT_EQ(result.typeIndex, std::type_index(typeid(std::string_view)));
     EXPECT_THAT(result.formattedValues, ElementsAre("prod", "staging"));
 }
 
@@ -260,11 +263,12 @@ TEST(MakeComparableAttributeDefinitionTest, EqualWhenSameTypeAndValues) {
 }
 
 TEST(MakeComparableAttributeDefinitionTest, NotEqualWhenSameNameDifferentType) {
-    // "true"/"false" format identically for bool and StringData, so only typeIndex distinguishes.
+    // "true"/"false" format identically for bool and std::string_view, so only typeIndex
+    // distinguishes.
     auto boolDef = makeComparableAttributeDefinition(
         AttributeDefinition<bool>{.name = "flag", .values = {true, false}});
     auto stringDef = makeComparableAttributeDefinition(
-        AttributeDefinition<StringData>{.name = "flag", .values = {"true"_sd, "false"_sd}});
+        AttributeDefinition<std::string_view>{.name = "flag", .values = {"true"sv, "false"sv}});
     EXPECT_NE(boolDef, stringDef);
 }
 
@@ -304,8 +308,8 @@ TEST(AttributeValuesEqualTest, ScalarTypes) {
     EXPECT_TRUE(attributeValuesEqual(1.5, 1.5));
     EXPECT_FALSE(attributeValuesEqual(1.5, 1.6));
 
-    EXPECT_TRUE(attributeValuesEqual("hello"_sd, "hello"_sd));
-    EXPECT_FALSE(attributeValuesEqual("hello"_sd, "world"_sd));
+    EXPECT_TRUE(attributeValuesEqual("hello"sv, "hello"sv));
+    EXPECT_FALSE(attributeValuesEqual("hello"sv, "world"sv));
 }
 
 TEST(AttributeValuesEqualTest, SpanTypes) {
@@ -336,12 +340,13 @@ TEST(AttributeValuesEqualTest, SpanTypes) {
     std::string s1 = "foo", s2 = "bar";
     std::string s3 = "foo", s4 = "bar";
     std::string s5 = "foo", s6 = "baz";
-    std::vector<StringData> sdVec1{s1, s2};
-    std::vector<StringData> sdVec2{s3, s4};
-    std::vector<StringData> sdVec3{s5, s6};
-    EXPECT_TRUE(attributeValuesEqual(std::span<StringData>(sdVec1), std::span<StringData>(sdVec2)));
-    EXPECT_FALSE(
-        attributeValuesEqual(std::span<StringData>(sdVec1), std::span<StringData>(sdVec3)));
+    std::vector<std::string_view> sdVec1{s1, s2};
+    std::vector<std::string_view> sdVec2{s3, s4};
+    std::vector<std::string_view> sdVec3{s5, s6};
+    EXPECT_TRUE(attributeValuesEqual(std::span<std::string_view>(sdVec1),
+                                     std::span<std::string_view>(sdVec2)));
+    EXPECT_FALSE(attributeValuesEqual(std::span<std::string_view>(sdVec1),
+                                      std::span<std::string_view>(sdVec3)));
 }
 
 TEST(AttributeValuesEqualTest, SpansDifferentLengths) {
@@ -407,13 +412,13 @@ TEST(AttributesMapTest, SpanKeyDistinctContent) {
 }
 
 TEST(AttributesMapTest, StringDataKey) {
-    AttributesMap<std::tuple<StringData>, int> map;
-    map[{"hello"_sd}] = 1;
-    map[{"world"_sd}] = 2;
+    AttributesMap<std::tuple<std::string_view>, int> map;
+    map[{"hello"sv}] = 1;
+    map[{"world"sv}] = 2;
 
     EXPECT_THAT(map,
-                UnorderedElementsAre(Pair(std::make_tuple("hello"_sd), 1),
-                                     Pair(std::make_tuple("world"_sd), 2)));
+                UnorderedElementsAre(Pair(std::make_tuple("hello"sv), 1),
+                                     Pair(std::make_tuple("world"sv), 2)));
 }
 
 TEST(AttributesMapTest, ScalarAndSpanKeys) {
@@ -527,7 +532,7 @@ TEST(AttributesKeyValueIterableTest, ForEachKeyValueDouble) {
 TEST(AttributesKeyValueIterableTest, ForEachKeyValueStringData) {
     std::string str = "hello";
     AttributesKeyValueIterable attrs(
-        std::vector<AttributeNameAndValue>{{.name = "greeting", .value = StringData(str)}});
+        std::vector<AttributeNameAndValue>{{.name = "greeting", .value = std::string_view(str)}});
     std::vector<KeyAndOtelValue> result;
     attrs.ForEachKeyValue([&](std::string_view key, OtelAttributeValue value) noexcept {
         result.push_back({std::string(key), value});
@@ -538,7 +543,7 @@ TEST(AttributesKeyValueIterableTest, ForEachKeyValueStringData) {
 }
 
 TEST(AttributesKeyValueIterableTest, ForEachKeyValueStringDataSpan) {
-    std::vector<StringData> strings = {"hello", "world"};
+    std::vector<std::string_view> strings = {"hello", "world"};
     AttributesKeyValueIterable attrs(
         std::vector<AttributeNameAndValue>{{.name = "greeting", .value = strings}});
     std::vector<std::string> result;

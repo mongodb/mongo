@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -43,9 +42,11 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the cluster getMore command on mongod.
@@ -53,7 +54,7 @@ namespace {
 struct ClusterGetMoreCmdD {
     using Request = GetMoreCommandRequest;
     using Reply = GetMoreCommandRequest::Reply;
-    static constexpr StringData kCommandName = "clusterGetMore"_sd;
+    static constexpr std::string_view kCommandName = "clusterGetMore"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;

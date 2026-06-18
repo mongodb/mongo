@@ -36,10 +36,12 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/s/transaction_participant_failed_unyield_exception.h"
 
+#include <string_view>
+
 namespace mongo {
 
 std::unique_ptr<TransactionParticipantResourceYielder> TransactionParticipantResourceYielder::make(
-    StringData cmdName) {
+    std::string_view cmdName) {
     return std::make_unique<TransactionParticipantResourceYielder>(cmdName);
 }
 

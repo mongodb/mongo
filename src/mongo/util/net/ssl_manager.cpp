@@ -53,6 +53,7 @@
 #include "mongo/util/text.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
@@ -61,6 +62,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 SSLManagerCoordinator* theSSLManagerCoordinator;
 
@@ -100,12 +102,12 @@ inline bool isMayBeEscaped(char ch) {
 /*
  * This class parses out the components of a DN according to RFC4514.
  *
- * It takes in a StringData to the DN to be parsed, the buffer containing the StringData
+ * It takes in a std::string_view to the DN to be parsed, the buffer containing the std::string_view
  * must remain in scope for the duration that it is being parsed.
  */
 class RFC4514Parser {
 public:
-    explicit RFC4514Parser(StringData sd) : _str(sd), _it(_str.begin()) {}
+    explicit RFC4514Parser(std::string_view sd) : _str(sd), _it(_str.begin()) {}
 
     std::string extractAttributeName();
 
@@ -141,8 +143,8 @@ private:
         return done() ? '\0' : _cur();
     }
 
-    StringData _str;
-    StringData::const_iterator _it;
+    std::string_view _str;
+    std::string_view::const_iterator _it;
 };
 
 // Parses an attribute name according to the rules for the "descr" type defined in
@@ -215,7 +217,7 @@ std::pair<std::string, RFC4514Parser::ValueTerminator> RFC4514Parser::extractVal
                         str::stream() << "Escaped hex value contains invalid character \'"
                                       << hexValStr[1] << "\'",
                         ctype::isXdigit(hexValStr[1]));
-                const char hexVal = hexblob::decodePair(StringData(hexValStr.data(), 2));
+                const char hexVal = hexblob::decodePair(std::string_view(hexValStr.data(), 2));
                 sb << hexVal;
                 if (hexVal != ' ') {
                     trailingSpaces = 0;
@@ -279,9 +281,9 @@ std::pair<std::string, RFC4514Parser::ValueTerminator> RFC4514Parser::extractVal
 
 const auto getTLSVersionCounts = ServiceContext::declareDecoration<TLSVersionCounts>();
 
-constexpr StringData kOID_DC = "0.9.2342.19200300.100.1.25"_sd;
-constexpr StringData kOID_O = "2.5.4.10"_sd;
-constexpr StringData kOID_OU = "2.5.4.11"_sd;
+constexpr std::string_view kOID_DC = "0.9.2342.19200300.100.1.25"sv;
+constexpr std::string_view kOID_O = "2.5.4.10"sv;
+constexpr std::string_view kOID_OU = "2.5.4.11"sv;
 
 static const stdx::unordered_set<std::string> defaultMatchingAttributes = {
     std::string{kOID_DC},
@@ -299,7 +301,7 @@ boost::optional<SSLX509Name> getClusterAuthDNOverrideParameter() {
     return value;
 }
 
-StatusWith<SSLX509Name> parseClusterAuthX509Attributes(StringData attributes) try {
+StatusWith<SSLX509Name> parseClusterAuthX509Attributes(std::string_view attributes) try {
     auto attributesAsDN = uassertStatusOK(parseDN(attributes));
     uassertStatusOK(attributesAsDN.normalizeStrings());
 
@@ -323,7 +325,7 @@ std::shared_ptr<SSLManagerInterface> SSLManagerCoordinator::getSSLManager() {
     return *_manager;
 }
 
-void logCert(const CertInformationToLog& cert, StringData certType, const int logNum) {
+void logCert(const CertInformationToLog& cert, std::string_view certType, const int logNum) {
     auto attrs = cert.getDynamicAttributes();
     attrs.add("type", certType);
     LOGV2(logNum, "Certificate information", attrs);
@@ -333,14 +335,14 @@ logv2::DynamicAttributes CertInformationToLog::getDynamicAttributes() const {
     logv2::DynamicAttributes attrs;
     attrs.add("subject", subject);
     attrs.add("issuer", issuer);
-    attrs.add("thumbprint", StringData(hexEncodedThumbprint));
+    attrs.add("thumbprint", std::string_view(hexEncodedThumbprint));
     attrs.add("notValidBefore", validityNotBefore);
     attrs.add("notValidAfter", validityNotAfter);
     if (keyFile) {
-        attrs.add("keyFile", StringData(*keyFile));
+        attrs.add("keyFile", std::string_view(*keyFile));
     }
     if (targetClusterURI) {
-        attrs.add("targetClusterURI", StringData(*targetClusterURI));
+        attrs.add("targetClusterURI", std::string_view(*targetClusterURI));
     }
     return attrs;
 }
@@ -378,7 +380,7 @@ void SSLManagerCoordinator::rotate() {
     const auto clusterAuthMode = ClusterAuthMode::get(svcCtx);
     if (clusterAuthMode.sendsX509()) {
         auth::setInternalUserAuthParams(auth::createInternalX509AuthCredential(
-            StringData(manager->getSSLConfiguration().clientSubjectName.toString())));
+            std::string_view(manager->getSSLConfiguration().clientSubjectName.toString())));
     }
 
     auto tl = svcCtx->getTransportLayerManager();
@@ -406,7 +408,7 @@ SSLManagerCoordinator::SSLManagerCoordinator()
 
 void ClusterAuthDNOverrideParameter::append(OperationContext* opCtx,
                                             BSONObjBuilder* b,
-                                            StringData name,
+                                            std::string_view name,
                                             const boost::optional<TenantId>&) {
     auto value = clusterAuthDNOverride.get();
     if (value) {
@@ -414,7 +416,7 @@ void ClusterAuthDNOverrideParameter::append(OperationContext* opCtx,
     }
 }
 
-Status ClusterAuthDNOverrideParameter::setFromString(StringData str,
+Status ClusterAuthDNOverrideParameter::setFromString(std::string_view str,
                                                      const boost::optional<TenantId>&) {
     if (str.empty()) {
         *clusterAuthDNOverride = boost::none;
@@ -455,7 +457,7 @@ SSLX509Name filterClusterDN(const SSLX509Name& fullClusterDN,
     return SSLX509Name(ret);
 }
 
-StatusWith<SSLX509Name> parseDN(StringData sd) try {
+StatusWith<SSLX509Name> parseDN(std::string_view sd) try {
     uassert(ErrorCodes::BadValue, "DN strings must be valid UTF-8 strings", isValidUTF8(sd));
     RFC4514Parser parser(sd);
 
@@ -532,75 +534,76 @@ boost::optional<std::string> x509ShortNameToOid(const std::string& name) {
 // Generate the 2.5.4.* portions of this list from OpenSSL sources with:
 // grep -E '^X509 ' "$OPENSSL/crypto/objects/objects.txt" | tr -d '\t' |
 //   sed -e 's/^X509 *\([0-9]\+\) *\(: *\)\+\([[:alnum:]]\+\).*/{"2.5.4.\1", "\3"},/g'
-static const std::initializer_list<std::pair<StringData, StringData>> kX509OidToShortNameMappings =
-    {
-        {"0.9.2342.19200300.100.1.1"_sd, "UID"_sd},
-        {"0.9.2342.19200300.100.1.25"_sd, "DC"_sd},
-        {"1.2.840.113549.1.9.1"_sd, "emailAddress"_sd},
-        {"2.5.29.17"_sd, "subjectAltName"_sd},
+static const std::initializer_list<std::pair<std::string_view, std::string_view>>
+    kX509OidToShortNameMappings = {
+        {"0.9.2342.19200300.100.1.1"sv, "UID"sv},
+        {"0.9.2342.19200300.100.1.25"sv, "DC"sv},
+        {"1.2.840.113549.1.9.1"sv, "emailAddress"sv},
+        {"2.5.29.17"sv, "subjectAltName"sv},
 
         // X509 OIDs Generated from objects.txt
-        {"2.5.4.3"_sd, "CN"_sd},
-        {"2.5.4.4"_sd, "SN"_sd},
-        {"2.5.4.5"_sd, "serialNumber"_sd},
-        {"2.5.4.6"_sd, "C"_sd},
-        {"2.5.4.7"_sd, "L"_sd},
-        {"2.5.4.8"_sd, "ST"_sd},
-        {"2.5.4.9"_sd, "street"_sd},
-        {"2.5.4.10"_sd, "O"_sd},
-        {"2.5.4.11"_sd, "OU"_sd},
-        {"2.5.4.12"_sd, "title"_sd},
-        {"2.5.4.13"_sd, "description"_sd},
-        {"2.5.4.14"_sd, "searchGuide"_sd},
-        {"2.5.4.15"_sd, "businessCategory"_sd},
-        {"2.5.4.16"_sd, "postalAddress"_sd},
-        {"2.5.4.17"_sd, "postalCode"_sd},
-        {"2.5.4.18"_sd, "postOfficeBox"_sd},
-        {"2.5.4.19"_sd, "physicalDeliveryOfficeName"_sd},
-        {"2.5.4.20"_sd, "telephoneNumber"_sd},
-        {"2.5.4.21"_sd, "telexNumber"_sd},
-        {"2.5.4.22"_sd, "teletexTerminalIdentifier"_sd},
-        {"2.5.4.23"_sd, "facsimileTelephoneNumber"_sd},
-        {"2.5.4.24"_sd, "x121Address"_sd},
-        {"2.5.4.25"_sd, "internationaliSDNNumber"_sd},
-        {"2.5.4.26"_sd, "registeredAddress"_sd},
-        {"2.5.4.27"_sd, "destinationIndicator"_sd},
-        {"2.5.4.28"_sd, "preferredDeliveryMethod"_sd},
-        {"2.5.4.29"_sd, "presentationAddress"_sd},
-        {"2.5.4.30"_sd, "supportedApplicationContext"_sd},
-        {"2.5.4.31"_sd, "member"_sd},
-        {"2.5.4.32"_sd, "owner"_sd},
-        {"2.5.4.33"_sd, "roleOccupant"_sd},
-        {"2.5.4.34"_sd, "seeAlso"_sd},
-        {"2.5.4.35"_sd, "userPassword"_sd},
-        {"2.5.4.36"_sd, "userCertificate"_sd},
-        {"2.5.4.37"_sd, "cACertificate"_sd},
-        {"2.5.4.38"_sd, "authorityRevocationList"_sd},
-        {"2.5.4.39"_sd, "certificateRevocationList"_sd},
-        {"2.5.4.40"_sd, "crossCertificatePair"_sd},
-        {"2.5.4.41"_sd, "name"_sd},
-        {"2.5.4.42"_sd, "GN"_sd},
-        {"2.5.4.43"_sd, "initials"_sd},
-        {"2.5.4.44"_sd, "generationQualifier"_sd},
-        {"2.5.4.45"_sd, "x500UniqueIdentifier"_sd},
-        {"2.5.4.46"_sd, "dnQualifier"_sd},
-        {"2.5.4.47"_sd, "enhancedSearchGuide"_sd},
-        {"2.5.4.48"_sd, "protocolInformation"_sd},
-        {"2.5.4.49"_sd, "distinguishedName"_sd},
-        {"2.5.4.50"_sd, "uniqueMember"_sd},
-        {"2.5.4.51"_sd, "houseIdentifier"_sd},
-        {"2.5.4.52"_sd, "supportedAlgorithms"_sd},
-        {"2.5.4.53"_sd, "deltaRevocationList"_sd},
-        {"2.5.4.54"_sd, "dmdName"_sd},
-        {"2.5.4.65"_sd, "pseudonym"_sd},
-        {"2.5.4.72"_sd, "role"_sd},
+        {"2.5.4.3"sv, "CN"sv},
+        {"2.5.4.4"sv, "SN"sv},
+        {"2.5.4.5"sv, "serialNumber"sv},
+        {"2.5.4.6"sv, "C"sv},
+        {"2.5.4.7"sv, "L"sv},
+        {"2.5.4.8"sv, "ST"sv},
+        {"2.5.4.9"sv, "street"sv},
+        {"2.5.4.10"sv, "O"sv},
+        {"2.5.4.11"sv, "OU"sv},
+        {"2.5.4.12"sv, "title"sv},
+        {"2.5.4.13"sv, "description"sv},
+        {"2.5.4.14"sv, "searchGuide"sv},
+        {"2.5.4.15"sv, "businessCategory"sv},
+        {"2.5.4.16"sv, "postalAddress"sv},
+        {"2.5.4.17"sv, "postalCode"sv},
+        {"2.5.4.18"sv, "postOfficeBox"sv},
+        {"2.5.4.19"sv, "physicalDeliveryOfficeName"sv},
+        {"2.5.4.20"sv, "telephoneNumber"sv},
+        {"2.5.4.21"sv, "telexNumber"sv},
+        {"2.5.4.22"sv, "teletexTerminalIdentifier"sv},
+        {"2.5.4.23"sv, "facsimileTelephoneNumber"sv},
+        {"2.5.4.24"sv, "x121Address"sv},
+        {"2.5.4.25"sv, "internationaliSDNNumber"sv},
+        {"2.5.4.26"sv, "registeredAddress"sv},
+        {"2.5.4.27"sv, "destinationIndicator"sv},
+        {"2.5.4.28"sv, "preferredDeliveryMethod"sv},
+        {"2.5.4.29"sv, "presentationAddress"sv},
+        {"2.5.4.30"sv, "supportedApplicationContext"sv},
+        {"2.5.4.31"sv, "member"sv},
+        {"2.5.4.32"sv, "owner"sv},
+        {"2.5.4.33"sv, "roleOccupant"sv},
+        {"2.5.4.34"sv, "seeAlso"sv},
+        {"2.5.4.35"sv, "userPassword"sv},
+        {"2.5.4.36"sv, "userCertificate"sv},
+        {"2.5.4.37"sv, "cACertificate"sv},
+        {"2.5.4.38"sv, "authorityRevocationList"sv},
+        {"2.5.4.39"sv, "certificateRevocationList"sv},
+        {"2.5.4.40"sv, "crossCertificatePair"sv},
+        {"2.5.4.41"sv, "name"sv},
+        {"2.5.4.42"sv, "GN"sv},
+        {"2.5.4.43"sv, "initials"sv},
+        {"2.5.4.44"sv, "generationQualifier"sv},
+        {"2.5.4.45"sv, "x500UniqueIdentifier"sv},
+        {"2.5.4.46"sv, "dnQualifier"sv},
+        {"2.5.4.47"sv, "enhancedSearchGuide"sv},
+        {"2.5.4.48"sv, "protocolInformation"sv},
+        {"2.5.4.49"sv, "distinguishedName"sv},
+        {"2.5.4.50"sv, "uniqueMember"sv},
+        {"2.5.4.51"sv, "houseIdentifier"sv},
+        {"2.5.4.52"sv, "supportedAlgorithms"sv},
+        {"2.5.4.53"sv, "deltaRevocationList"sv},
+        {"2.5.4.54"sv, "dmdName"sv},
+        {"2.5.4.65"sv, "pseudonym"sv},
+        {"2.5.4.72"sv, "role"sv},
 };
 
 std::string x509OidToShortName(const std::string& oid) {
-    auto it = std::find_if(
-        kX509OidToShortNameMappings.begin(),
-        kX509OidToShortNameMappings.end(),
-        [&](const std::pair<StringData, StringData>& entry) { return entry.first == oid; });
+    auto it = std::find_if(kX509OidToShortNameMappings.begin(),
+                           kX509OidToShortNameMappings.end(),
+                           [&](const std::pair<std::string_view, std::string_view>& entry) {
+                               return entry.first == oid;
+                           });
 
     if (it == kX509OidToShortNameMappings.end()) {
         return oid;
@@ -609,10 +612,11 @@ std::string x509OidToShortName(const std::string& oid) {
 }
 
 boost::optional<std::string> x509ShortNameToOid(const std::string& name) {
-    auto it = std::find_if(
-        kX509OidToShortNameMappings.begin(),
-        kX509OidToShortNameMappings.end(),
-        [&](const std::pair<StringData, StringData>& entry) { return entry.second == name; });
+    auto it = std::find_if(kX509OidToShortNameMappings.begin(),
+                           kX509OidToShortNameMappings.end(),
+                           [&](const std::pair<std::string_view, std::string_view>& entry) {
+                               return entry.second == name;
+                           });
 
     if (it == kX509OidToShortNameMappings.end()) {
         // If the name is a known oid in our mapping list then just return it.
@@ -701,7 +705,7 @@ bool SSLX509Name::contains(const SSLX509Name& other) const {
         });
 }
 
-StatusWith<std::string> SSLX509Name::getOID(StringData oid) const {
+StatusWith<std::string> SSLX509Name::getOID(std::string_view oid) const {
     for (const auto& rdn : _entries) {
         for (const auto& entry : rdn) {
             if (entry.oid == oid) {
@@ -797,12 +801,12 @@ Status SSLConfiguration::setClusterAuthX509Config() try {
 
 /**
  * The behavior of isClusterMember() is subtly different when passed
- * an SSLX509Name versus a StringData.
+ * an SSLX509Name versus a std::string_view.
  *
  * The SSLX509Name version (immediately below) compares distinguished
  * names in their normalized, unescaped forms and provides a more reliable match.
  *
- * The StringData version attempts to canonicalize the stringified subject name
+ * The std::string_view version attempts to canonicalize the stringified subject name
  * according to RFC4514 and compare that to the normalized/unescaped version of
  * the server's distinguished name.
  */
@@ -858,7 +862,7 @@ bool SSLConfiguration::isClusterMember(
 }
 
 bool SSLConfiguration::isClusterMember(
-    StringData subjectName, const boost::optional<std::string>& clusterExtensionValue) const {
+    std::string_view subjectName, const boost::optional<std::string>& clusterExtensionValue) const {
     auto swClient = parseDN(subjectName);
     if (!swClient.isOK()) {
         LOGV2_WARNING(
@@ -1283,7 +1287,7 @@ const std::array<char, 7> rfc2253EscapeChars = {',', '+', '"', '\\', '<', '>', '
 }  // namespace
 
 // See section "2.4 Converting an AttributeValue from ASN.1 to a String" in RFC 2243
-std::string escapeRfc2253(StringData str) {
+std::string escapeRfc2253(std::string_view str) {
     std::string ret;
 
     if (str.size() > 0) {
@@ -1324,7 +1328,7 @@ std::string escapeRfc2253(StringData str) {
 }
 
 void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
-    StringData versionString;
+    std::string_view versionString;
     auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());
     switch (version) {
         case TLSVersion::kTLS10:
@@ -1332,7 +1336,7 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
             if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
                           sslGlobalParams.tlsLogVersions.cend(),
                           SSLParams::Protocols::TLS1_0) != sslGlobalParams.tlsLogVersions.cend()) {
-                versionString = "1.0"_sd;
+                versionString = "1.0"sv;
             }
             break;
         case TLSVersion::kTLS11:
@@ -1340,7 +1344,7 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
             if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
                           sslGlobalParams.tlsLogVersions.cend(),
                           SSLParams::Protocols::TLS1_1) != sslGlobalParams.tlsLogVersions.cend()) {
-                versionString = "1.1"_sd;
+                versionString = "1.1"sv;
             }
             break;
         case TLSVersion::kTLS12:
@@ -1348,7 +1352,7 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
             if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
                           sslGlobalParams.tlsLogVersions.cend(),
                           SSLParams::Protocols::TLS1_2) != sslGlobalParams.tlsLogVersions.cend()) {
-                versionString = "1.2"_sd;
+                versionString = "1.2"sv;
             }
             break;
         case TLSVersion::kTLS13:
@@ -1356,13 +1360,13 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
             if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
                           sslGlobalParams.tlsLogVersions.cend(),
                           SSLParams::Protocols::TLS1_3) != sslGlobalParams.tlsLogVersions.cend()) {
-                versionString = "1.3"_sd;
+                versionString = "1.3"sv;
             }
             break;
         default:
             counts.tlsUnknown.addAndFetch(1);
             if (!sslGlobalParams.tlsLogVersions.empty()) {
-                versionString = "unknown"_sd;
+                versionString = "unknown"sv;
             }
             break;
     }

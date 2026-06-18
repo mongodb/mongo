@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_collection_gen.h"
@@ -50,6 +49,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -105,7 +105,7 @@ public:
 
     ~BalancerDefragmentationPolicy() override {}
 
-    StringData getName() const override;
+    std::string_view getName() const override;
 
     boost::optional<BalancerStreamAction> getNextStreamingAction(OperationContext* opCtx) override;
 

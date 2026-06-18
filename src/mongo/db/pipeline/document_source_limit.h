@@ -44,6 +44,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -75,7 +76,7 @@ public:
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceLimit final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$limit"_sd;
+    static constexpr std::string_view kStageName = "$limit"_sd;
 
     /**
      * Create a new $limit stage.
@@ -100,7 +101,7 @@ public:
                                 UnionRequirement::kAllowed};
     }
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

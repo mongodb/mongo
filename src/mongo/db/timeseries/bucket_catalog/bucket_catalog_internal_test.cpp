@@ -39,14 +39,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
+
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
-constexpr StringData kNumClosedDueToCount = "numBucketsClosedDueToCount"_sd;
-constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
-constexpr StringData kNumClosedDueToSchemaChanges = "numBucketsClosedDueToSchemaChange"_sd;
-constexpr StringData kNumClosedDueToSize = "numBucketsClosedDueToSize"_sd;
-constexpr StringData kNumClosedDuetoCachePressure = "numBucketsClosedDueToCachePressure"_sd;
+using namespace std::literals::string_view_literals;
+constexpr std::string_view kNumClosedDueToCount = "numBucketsClosedDueToCount"sv;
+constexpr std::string_view kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"sv;
+constexpr std::string_view kNumClosedDueToSchemaChanges = "numBucketsClosedDueToSchemaChange"sv;
+constexpr std::string_view kNumClosedDueToSize = "numBucketsClosedDueToSize"sv;
+constexpr std::string_view kNumClosedDuetoCachePressure = "numBucketsClosedDueToCachePressure"sv;
 
 class BucketCatalogInternalTest : public TimeseriesTestFixture {
 protected:
@@ -54,7 +57,7 @@ protected:
     ExecutionStats _globalStats;
 
     void _rolloverWithRolloverReason(RolloverReason reason);
-    void _testRolloverWithRolloverReasonUpdatesStats(RolloverReason reason, StringData stat);
+    void _testRolloverWithRolloverReasonUpdatesStats(RolloverReason reason, std::string_view stat);
 };
 
 void BucketCatalogInternalTest::_rolloverWithRolloverReason(RolloverReason reason) {
@@ -93,7 +96,7 @@ void BucketCatalogInternalTest::_rolloverWithRolloverReason(RolloverReason reaso
 }
 
 void BucketCatalogInternalTest::_testRolloverWithRolloverReasonUpdatesStats(RolloverReason reason,
-                                                                            StringData stat) {
+                                                                            std::string_view stat) {
     EXPECT_EQ(0, _getExecutionStat(_uuid1, stat));
     _rolloverWithRolloverReason(reason);
     EXPECT_EQ(1, _getExecutionStat(_uuid1, stat));
@@ -144,7 +147,7 @@ TEST_F(BucketCatalogInternalTest, UpdateRolloverStats) {
 }
 
 TEST_F(BucketCatalogInternalTest, RolloverUpdatesRolloverStats) {
-    std::vector<std::tuple<RolloverReason, StringData>> rolloverReasonAndMetricPairs = {
+    std::vector<std::tuple<RolloverReason, std::string_view>> rolloverReasonAndMetricPairs = {
         std::make_tuple(RolloverReason::kCount, kNumClosedDueToCount),
         std::make_tuple(RolloverReason::kTimeForward, kNumClosedDueToTimeForward),
         std::make_tuple(RolloverReason::kSchemaChange, kNumClosedDueToSchemaChanges),

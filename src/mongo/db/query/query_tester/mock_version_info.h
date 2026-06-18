@@ -32,6 +32,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/version.h"
 
+#include <string_view>
+
 namespace mongo::query_tester {
 class MockVersionInfo : public VersionInfoInterface {
 public:
@@ -51,27 +53,27 @@ public:
         return 0;
     }
 
-    StringData version() const noexcept final {
+    std::string_view version() const noexcept final {
         return "UNKNOWN";
     }
 
-    StringData gitVersion() const noexcept final {
+    std::string_view gitVersion() const noexcept final {
         return "UNKNOWN";
     }
 
-    std::vector<StringData> modules() const final {
+    std::vector<std::string_view> modules() const final {
         return {"mongoTester"};
     }
 
-    StringData allocator() const noexcept final {
+    std::string_view allocator() const noexcept final {
         return "UNKNOWN";
     }
 
-    StringData jsEngine() const noexcept final {
+    std::string_view jsEngine() const noexcept final {
         return "UNKNOWN";
     }
 
-    StringData targetMinOS() const noexcept final {
+    std::string_view targetMinOS() const noexcept final {
         return "UNKNOWN";
     }
 

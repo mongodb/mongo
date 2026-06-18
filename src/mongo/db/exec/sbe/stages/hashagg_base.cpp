@@ -30,7 +30,6 @@
 #include "mongo/db/exec/sbe/stages/hashagg_base.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/storage/storage_options.h"
 
 #include <memory>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -47,7 +47,7 @@ namespace mongo {
 namespace sbe {
 
 template <class Derived>
-HashAggBaseStage<Derived>::HashAggBaseStage(StringData stageName,
+HashAggBaseStage<Derived>::HashAggBaseStage(std::string_view stageName,
                                             PlanYieldPolicySBE* yieldPolicy,
                                             PlanNodeId planNodeId,
                                             value::SlotAccessor* collatorAccessor,

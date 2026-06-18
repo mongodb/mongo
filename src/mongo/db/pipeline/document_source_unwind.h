@@ -50,6 +50,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -63,10 +64,10 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Unwind);
 
 class DocumentSourceUnwind final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$unwind"_sd;
+    static constexpr std::string_view kStageName = "$unwind"_sd;
 
     // virtuals from DocumentSource
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

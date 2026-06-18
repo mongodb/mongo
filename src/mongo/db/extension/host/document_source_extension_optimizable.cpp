@@ -50,7 +50,10 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo::extension::host {
+using namespace std::literals::string_view_literals;
 
 ALLOCATE_STAGE_PARAMS_ID(expandable, ExpandableStageParams::id);
 
@@ -123,7 +126,7 @@ private:
         }
 
         StringBuilder sb;
-        constexpr StringData arrow = " -> "_sd;
+        constexpr std::string_view arrow = " -> "sv;
         // Construct the path starting from the first occurrence.
         for (size_t i = start; i < state.expansionPath.size(); ++i) {
             if (i > start) {
@@ -587,19 +590,19 @@ stdx::unordered_map<std::string, std::vector<PipelineRewriteRule>>
 
 // static
 void DocumentSourceExtensionOptimizable::registerStageRules(
-    StringData stageName, const std::vector<extension::PipelineRewriteRule>& rules) {
+    std::string_view stageName, const std::vector<extension::PipelineRewriteRule>& rules) {
     auto [_, inserted] = _extensionRuleRegistry.emplace(stageName, rules);
     tassert(12201405, "Rules already registered for stage: " + std::string{stageName}, inserted);
 }
 
 // static
-void DocumentSourceExtensionOptimizable::unregisterStageRules_forTest(StringData stageName) {
+void DocumentSourceExtensionOptimizable::unregisterStageRules_forTest(std::string_view stageName) {
     _extensionRuleRegistry.erase(std::string_view(stageName));
 }
 
 // static
 const std::vector<PipelineRewriteRule>* DocumentSourceExtensionOptimizable::getStageRules_forTest(
-    StringData stageName) {
+    std::string_view stageName) {
     auto it = _extensionRuleRegistry.find(std::string_view(stageName));
     if (it == _extensionRuleRegistry.end()) {
         return nullptr;

@@ -29,7 +29,6 @@
 
 #include "mongo/db/collection_crud/collection_write_path.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_pre_image_id_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"

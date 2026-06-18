@@ -31,6 +31,8 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -48,7 +50,7 @@ namespace {
  * returned is true/false.
  */
 value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
-                                        StringData inputString,
+                                        std::string_view inputString,
                                         uint32_t& startBytePos,
                                         uint32_t& codePointPos,
                                         bool isMatch) {
@@ -73,7 +75,7 @@ value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
     // from the pcre::MatchData.
     auto matched = value::TagValueOwned::fromRaw(value::makeNewString(m[0]));
 
-    StringData precedesMatch = m.input().substr(m.startPos());
+    std::string_view precedesMatch = m.input().substr(m.startPos());
     precedesMatch = precedesMatch.substr(0, m[0].data() - precedesMatch.data());
     codePointPos += str::lengthInUTF8CodePoints(precedesMatch);
     startBytePos += precedesMatch.size();
@@ -82,7 +84,7 @@ value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
     auto arrayView = value::getArrayView(arr.value());
     arrayView->reserve(m.captureCount());
     for (size_t i = 0; i < m.captureCount(); ++i) {
-        StringData cap = m[i + 1];
+        std::string_view cap = m[i + 1];
         if (!cap.data()) {
             arrayView->push_back_raw(value::TypeTags::Null, 0);
         } else {

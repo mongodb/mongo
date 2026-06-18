@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -51,6 +50,7 @@
 #include <iomanip>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <jsapi.h>
@@ -151,7 +151,7 @@ void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
         uuid = uassertStatusOK(mongo::UUID::parse(str));
     };
     ConstDataRange cdr = uuid->toCDR();
-    std::string encoded = mongo::base64::encode(StringData(cdr.data(), cdr.length()));
+    std::string encoded = mongo::base64::encode(std::string_view(cdr.data(), cdr.length()));
 
     JS::RootedValueArray<2> newArgs(cx);
     newArgs[0].setInt32(newUUID);

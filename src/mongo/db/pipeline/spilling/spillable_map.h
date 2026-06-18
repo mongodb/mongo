@@ -40,6 +40,7 @@
 #include <cstddef>
 #include <deque>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -47,7 +48,7 @@ class SpillableDocumentMapImpl {
 public:
     SpillableDocumentMapImpl(ExpressionContext* expCtx,
                              MemoryUsageTracker* tracker,
-                             StringData memoryTrackerName = "SpillableDocumentMapImpl")
+                             std::string_view memoryTrackerName = "SpillableDocumentMapImpl")
         : _memTracker((*tracker)[memoryTrackerName]), _expCtx(expCtx) {}
 
     bool contains(const Value& id) const;

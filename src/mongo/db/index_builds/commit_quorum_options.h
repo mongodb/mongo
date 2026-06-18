@@ -30,13 +30,13 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
 /**
@@ -52,9 +52,9 @@ namespace MONGO_MOD_PUBLIC mongo {
  */
 class CommitQuorumOptions {
 public:
-    static const StringData kCommitQuorumField;  // = "commitQuorum"
-    static const char kMajority[];               // = "majority"
-    static const char kVotingMembers[];          // = "votingMembers"
+    static const std::string_view kCommitQuorumField;  // = "commitQuorum"
+    static const char kMajority[];                     // = "majority"
+    static const char kVotingMembers[];                // = "votingMembers"
 
     static constexpr int kUninitializedNumNodes = -1;
     static constexpr int kPrimarySelfVote = 1;  // Primary just needs 1 vote (from itself).
@@ -100,7 +100,7 @@ public:
     /**
      * Appends the commitQuorum value (mode or numNodes) with the given field name "fieldName".
      */
-    void appendToBuilder(StringData fieldName, BSONObjBuilder* builder) const;
+    void appendToBuilder(std::string_view fieldName, BSONObjBuilder* builder) const;
 
     // The 'commitQuorum' parameter to define the required quorum for the index builds to commit.
     // The 'mode' represents the string format and takes precedence over the number format

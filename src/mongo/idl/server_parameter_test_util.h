@@ -31,11 +31,13 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class DeprecatedServerParameterTest : public ServiceContextMongoDTest {
 public:
-    void testParameterIsDeprecated(StringData parameterName) {
+    void testParameterIsDeprecated(std::string_view parameterName) {
         auto&& m = ServerParameterSet::getNodeParameterSet()->getMap();
         auto it = m.find(parameterName);
         ASSERT(it != m.end()) << "Not found: " << parameterName;
@@ -46,7 +48,7 @@ public:
     }
 
     template <typename ValType>
-    void testSetParameterWarnsOnce(StringData parameterName, ValType value) {
+    void testSetParameterWarnsOnce(std::string_view parameterName, ValType value) {
         unittest::LogCaptureGuard logs;
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());

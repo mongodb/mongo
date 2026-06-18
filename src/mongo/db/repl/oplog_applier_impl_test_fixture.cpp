@@ -75,6 +75,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -564,7 +565,7 @@ OplogEntry makeCreateCollectionOplogEntry(
         auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
             createCollCatalogIdentifier->ident, nss.dbName());
         auto idIndexIdentUniqueTag = createCollCatalogIdentifier->idIndexIdent
-            ? boost::optional<StringData>(storageEngine->getIndexIdentUniqueTag(
+            ? boost::optional<std::string_view>(storageEngine->getIndexIdentUniqueTag(
                   *createCollCatalogIdentifier->idIndexIdent, nss.dbName()))
             : boost::none;
         o2 = MutableOplogEntry::makeCreateCollObject2(
@@ -631,7 +632,7 @@ void createCollectionWithPreImages(OperationContext* opCtx, const NamespaceStrin
     createCollection(opCtx, nss, options);
 }
 
-void createDatabase(OperationContext* opCtx, StringData dbName) {
+void createDatabase(OperationContext* opCtx, std::string_view dbName) {
     Lock::GlobalWrite globalLock(opCtx);
     bool justCreated;
     auto databaseHolder = DatabaseHolder::get(opCtx);

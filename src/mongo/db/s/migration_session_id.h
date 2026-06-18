@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -56,7 +56,7 @@ public:
      * Constructs a new migration session identifier with the following format:
      *  DonorId_RecipientId_UniqueIdentifier
      */
-    static MigrationSessionId generate(StringData donor, StringData recipient);
+    static MigrationSessionId generate(std::string_view donor, std::string_view recipient);
 
     /**
      * Extracts the session id from BSON. If the session id is missing from the BSON contents,
@@ -82,7 +82,7 @@ public:
 
     std::string toString() const;
 
-    static MigrationSessionId fromString(StringData sessionId) {
+    static MigrationSessionId fromString(std::string_view sessionId) {
         MigrationSessionId id(std::string{sessionId});
         return id;
     }

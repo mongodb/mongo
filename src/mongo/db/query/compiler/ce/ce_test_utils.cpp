@@ -34,6 +34,8 @@
 #include "mongo/db/query/compiler/stats/rand_utils.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::ce {
@@ -199,7 +201,7 @@ BSONObj createBSONObjOperandWithSBEValue(std::string str, stats::SBEValue value)
 std::unique_ptr<MatchExpression> createQueryMatchExpression(QueryType queryType,
                                                             const stats::SBEValue& sbeValLow,
                                                             const stats::SBEValue& sbeValHigh,
-                                                            StringData fieldName) {
+                                                            std::string_view fieldName) {
     switch (queryType) {
         case kPoint: {
             auto operand = createBSONObjOperandWithSBEValue("$eq", sbeValLow);
@@ -240,7 +242,7 @@ std::unique_ptr<MatchExpression> createQueryMatchExpression(
                 auto operand =
                     createBSONObjOperandWithSBEValue("$eq", queryFieldIntervals[fieldIdx].first);
                 auto eqExpr = std::make_unique<EqualityMatchExpression>(
-                    StringData(fieldNames[fieldIdx].fieldName), mongo::Value(operand["$eq"]));
+                    std::string_view(fieldNames[fieldIdx].fieldName), mongo::Value(operand["$eq"]));
 
                 if (onlyOneExpr) {
                     return std::move(eqExpr);
@@ -252,12 +254,12 @@ std::unique_ptr<MatchExpression> createQueryMatchExpression(
                 auto operand1 =
                     createBSONObjOperandWithSBEValue("$gte", queryFieldIntervals[fieldIdx].first);
                 auto pred1 = std::make_unique<GTEMatchExpression>(
-                    StringData(fieldNames[fieldIdx].fieldName), Value(operand1["$gte"]));
+                    std::string_view(fieldNames[fieldIdx].fieldName), Value(operand1["$gte"]));
 
                 auto operand2 =
                     createBSONObjOperandWithSBEValue("$lte", queryFieldIntervals[fieldIdx].second);
                 auto pred2 = std::make_unique<LTMatchExpression>(
-                    StringData(fieldNames[fieldIdx].fieldName), Value(operand2["$lte"]));
+                    std::string_view(fieldNames[fieldIdx].fieldName), Value(operand2["$lte"]));
 
                 auto andExpr = std::make_unique<AndMatchExpression>();
                 andExpr->add(std::move(pred1));

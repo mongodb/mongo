@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -62,7 +62,7 @@ public:
 
     EncryptSchemaKeyId(std::vector<UUID> keys) : _uuids(std::move(keys)), _type(Type::kUUIDs) {}
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const;
 
     Type type() const {
         return _type;
@@ -129,7 +129,7 @@ class BSONTypeSet {
 public:
     BSONTypeSet(MatcherTypeSet typeSet) : _typeSet(std::move(typeSet)) {}
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const;
 
     const MatcherTypeSet& typeSet() const {
         return _typeSet;

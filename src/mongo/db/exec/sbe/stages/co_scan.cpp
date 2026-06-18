@@ -29,14 +29,16 @@
 
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 
+#include <string_view>
+
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 CoScanStage::CoScanStage(PlanNodeId planNodeId,
                          PlanYieldPolicySBE* yieldPolicy,
                          bool participateInTrialRunTracking)
-    : PlanStage("coscan"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking) {}
+    : PlanStage("coscan"sv, yieldPolicy, planNodeId, participateInTrialRunTracking) {}
 
 std::unique_ptr<PlanStage> CoScanStage::clone() const {
     return std::make_unique<CoScanStage>(

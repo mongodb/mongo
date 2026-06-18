@@ -33,9 +33,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUBLIC mongo {
 
-constexpr inline auto kIsExternalClientOnRouterFieldName = "isExternalClientOnRouter"_sd;
+constexpr inline std::string_view kIsExternalClientOnRouterFieldName{"isExternalClientOnRouter"};
 
 /**
  * Returns a settable boolean indicating whether the given operation context originated from an

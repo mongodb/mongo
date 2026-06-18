@@ -29,12 +29,12 @@
 
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/version.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -42,6 +42,7 @@
 
 namespace mongo {
 namespace {
+    using namespace std::literals::string_view_literals;
 
 class InterpolatedVersionInfo : public VersionInfoInterface {
 public:
@@ -61,27 +62,27 @@ public:
         return kExtraVersion;
     }
 
-    StringData version() const final {
+    std::string_view version() const final {
         return kVersion;
     }
 
-    StringData gitVersion() const final {
+    std::string_view gitVersion() const final {
         return kGitVersion;
     }
 
-    std::vector<StringData> modules() const final {
+    std::vector<std::string_view> modules() const final {
         return modulesList;
     }
 
-    StringData allocator() const final {
+    std::string_view allocator() const final {
         return kAllocator;
     }
 
-    StringData jsEngine() const final {
+    std::string_view jsEngine() const final {
         return kJsEngine;
     }
 
-    StringData targetMinOS() const final {
+    std::string_view targetMinOS() const final {
 #if defined(_WIN32)
 #if (NTDDI_VERSION >= NTDDI_WIN7)
         return "Windows 7/Windows Server 2008 R2";
@@ -99,16 +100,16 @@ public:
 
 private:
     // clang-format off
-    StringData kVersion = "@mongo_version@"_sd;
+    std::string_view kVersion = "@mongo_version@"sv;
     int kMajorVersion = @mongo_version_major@;
     int kMinorVersion = @mongo_version_minor@;
     int kPatchVersion = @mongo_version_patch@;
     int kExtraVersion = @mongo_version_extra@;
-    StringData kVersionExtraStr = "@mongo_version_extra_str@"_sd;
-    StringData kGitVersion = "@mongo_git_hash@"_sd;
-    StringData kAllocator = "@buildinfo_allocator@"_sd;
-    StringData kJsEngine = "@buildinfo_js_engine@"_sd;
-    std::vector<StringData> modulesList{@buildinfo_modules@};
+    std::string_view kVersionExtraStr = "@mongo_version_extra_str@"sv;
+    std::string_view kGitVersion = "@mongo_git_hash@"sv;
+    std::string_view kAllocator = "@buildinfo_allocator@"sv;
+    std::string_view kJsEngine = "@buildinfo_js_engine@"sv;
+    std::vector<std::string_view> modulesList{@buildinfo_modules@};
     std::vector<VersionInfoInterface::BuildInfoField> buildEnvironment{@buildinfo_environment_data@};
     // clang-format on
 };

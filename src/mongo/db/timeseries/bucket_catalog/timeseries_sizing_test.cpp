@@ -31,6 +31,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::timeseries::bucket_catalog {
+using namespace std::literals::string_view_literals;
 /**
  * The tests in this file estimate memory usage constants for time-series deployments. If any tests
  * in this file fail, please update the constant below and update the timeseries sizing sheet.
@@ -58,7 +59,7 @@ TEST(TimeseriesSizingConstants, OpenBucket) {
         contexts,
         BucketId{UUID::gen(), OID{}, BucketKey::Signature{}},
         BucketKey{UUID::gen(), BucketMetadata{contexts.global, BSONElement{}, boost::none}},
-        ""_sd,
+        ""sv,
         Date_t{},
         registry);
 
@@ -138,7 +139,7 @@ TEST(TimeseriesSizingConstants, BSONColumnBuilder) {
         {
             BSONObjBuilder b;
             // Ensure we don't use RLE internally.
-            b.appendNumber(""_sd, i * kDelta + i % 2);
+            b.appendNumber(""sv, i * kDelta + i % 2);
             column.append(b.obj().firstElement());
             // Discard any unused data.
             [[maybe_unused]] auto diff = column.intermediate();

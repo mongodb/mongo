@@ -40,10 +40,12 @@
 #include "mongo/logv2/log.h"
 
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class MDBCatalog::AddIdentChange : public RecoveryUnit::Change {
 public:
@@ -177,7 +179,7 @@ std::vector<std::string> MDBCatalog::getAllIdents(OperationContext* opCtx) const
 
 std::string MDBCatalog::getIndexIdent(OperationContext* opCtx,
                                       const RecordId& catalogId,
-                                      StringData idxName) const {
+                                      std::string_view idxName) const {
     std::string identForIndex;
     auto cursor = _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     BSONObj obj = _findRawEntry(*cursor, catalogId);
@@ -196,7 +198,7 @@ std::vector<std::string> MDBCatalog::getIndexIdents(OperationContext* opCtx,
     return _getIndexIdents(obj);
 }
 
-bool MDBCatalog::hasCollectionIdent(OperationContext* opCtx, StringData ident) const {
+bool MDBCatalog::hasCollectionIdent(OperationContext* opCtx, std::string_view ident) const {
     auto cursor = _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
@@ -207,7 +209,7 @@ bool MDBCatalog::hasCollectionIdent(OperationContext* opCtx, StringData ident) c
     return false;
 }
 
-bool MDBCatalog::hasIndexIdent(OperationContext* opCtx, StringData ident) const {
+bool MDBCatalog::hasIndexIdent(OperationContext* opCtx, std::string_view ident) const {
     auto cursor = _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
@@ -463,7 +465,7 @@ RecordStore::Options MDBCatalog::_parseRecordStoreOptions(const NamespaceString&
                 uassert(10455501,
                         "Timeseries options must be a document",
                         timeseriesElement.type() == mongo::BSONType::object);
-                recordStoreOptions.customBlockCompressor = std::string{"zstd"_sd};
+                recordStoreOptions.customBlockCompressor = std::string{"zstd"sv};
                 recordStoreOptions.forceUpdateWithFullDocument = true;
             }
 

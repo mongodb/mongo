@@ -36,6 +36,8 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
@@ -63,7 +65,7 @@ REGISTER_AGG_STAGE_MAPPING(listSampledQueries,
                            documentSourceListSampledQueriesToStageFn)
 
 ListSampledQueriesStage::ListSampledQueriesStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     boost::optional<mongo::NamespaceString> nss,
     std::shared_ptr<ListSampledQueriesSharedState> sharedState)

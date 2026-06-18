@@ -40,11 +40,12 @@ commentStartToken = //##
 #pragma once
 
 #include <array>
+#include "mongo/base/string_data.h"
 #include <fmt/format.h>
+#include <string_view>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -193,7 +194,7 @@ inline constexpr size_t kSince_$underscores(Version('4.0')) = ${bisect_left(fcvs
 // Last LTS was "$last_lts".
 inline constexpr size_t kSinceLastLTS = ${bisect_left(fcvs, latest) - bisect_left(fcvs, last_lts)};
 
-inline constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
+inline constexpr std::string_view kParameterName = "featureCompatibilityVersion"_sd;
 
 class GenericFCV {
 //#def define_fcv_alias(id, v):
@@ -253,7 +254,7 @@ constexpr decltype(auto) findExtended(FeatureCompatibilityVersion v) {
     return extendedFCVTable[static_cast<size_t>(v)];
 }
 
-constexpr StringData toString(FeatureCompatibilityVersion v) {
+constexpr std::string_view toString(FeatureCompatibilityVersion v) {
     return findExtended(v).second;
 }
 
@@ -312,7 +313,7 @@ constexpr TransitionFCVInfo getTransitionFCVInfo(FeatureCompatibilityVersion v) 
  * Parses 'versionString' to its corresponding FCV enum.
  * Throws 'ErrorCodes::BadValue' when 'versionString' has no matching enum.
  */
-inline FeatureCompatibilityVersion parseVersion(StringData versionString) {
+inline FeatureCompatibilityVersion parseVersion(std::string_view versionString) {
     for (auto&& [fcv, name] : multiversion::extendedFCVTable)
         if (name == versionString)
             return fcv;
@@ -326,7 +327,7 @@ inline FeatureCompatibilityVersion parseVersion(StringData versionString) {
  * Throws 'ErrorCodes::BadValue' when 'versionString' is not of the form "X.Y", and has no matching
  * enum.
  */
-inline FeatureCompatibilityVersion parseVersionForFeatureFlags(StringData versionString) {
+inline FeatureCompatibilityVersion parseVersionForFeatureFlags(std::string_view versionString) {
     for (auto ptr : standardFCVTable)
         if (ptr->second == versionString)
             return ptr->first;

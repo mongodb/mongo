@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,14 +47,16 @@
 #include "mongo/util/intrusive_counter.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kUserDefinedTimeName = "time"_sd;
-constexpr auto kUserDefinedMetaName = "myMeta"_sd;
+constexpr auto kUserDefinedTimeName = "time"sv;
+constexpr auto kUserDefinedMetaName = "myMeta"sv;
 
 using InternalUnpackBucketExecTest = AggregationContextFixture;
 

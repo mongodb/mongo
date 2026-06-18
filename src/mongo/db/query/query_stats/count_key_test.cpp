@@ -35,6 +35,8 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <absl/hash/hash.h>
 
 namespace mongo::query_stats {
@@ -194,7 +196,7 @@ TEST_F(CountKeyTest, DifferentOriginalQueryShapeHashesProduceDifferentKeys) {
     // Build shape once; only the key request needs the hash.
     CountCommandRequest shapeRequest = CountCommandRequest(testNss);
 
-    auto makeKeyWithHash = [&](StringData hexHash) {
+    auto makeKeyWithHash = [&](std::string_view hexHash) {
         auto countShape = makeCountShapeFromRequest(shapeRequest);
         CountCommandRequest keyRequest = CountCommandRequest(testNss);
         keyRequest.setOriginalQueryShapeHash(query_shape::QueryShapeHash::fromHexString(hexHash));

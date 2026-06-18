@@ -42,6 +42,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo::transport {
 /** Transitional for differential benchmarking of ServiceExecutorSynchronous refactor */
@@ -70,7 +71,7 @@ public:
 
     void appendStats(BSONObjBuilder* bob) const override;
 
-    StringData getName() const override {
+    std::string_view getName() const override {
         return "ServiceExecutorSynchronous"_sd;
     }
 

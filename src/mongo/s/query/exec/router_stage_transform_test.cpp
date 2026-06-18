@@ -41,6 +41,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Router stages do not use their OperationContext in these tests.
 OperationContext* opCtx = nullptr;
@@ -197,8 +198,8 @@ TEST(RouterStageTransformTest, TransformIsAppliedToNestedSubDocumentField) {
         }
         BSONObjBuilder builder;
         for (auto&& field : doc) {
-            if (field.fieldNameStringData() == "info"_sd) {
-                builder.append("info"_sd, infoElem.Obj().removeField("internal"_sd));
+            if (field.fieldNameStringData() == "info"sv) {
+                builder.append("info"sv, infoElem.Obj().removeField("internal"sv));
             } else {
                 builder.append(field);
             }

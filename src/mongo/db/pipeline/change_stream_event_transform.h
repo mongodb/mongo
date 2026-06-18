@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -41,6 +40,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -72,7 +72,7 @@ protected:
     ResumeTokenData makeResumeToken(Value tsVal,
                                     Value txnOpIndexVal,
                                     Value uuidVal,
-                                    StringData operationType,
+                                    std::string_view operationType,
                                     Value documentKey,
                                     Value opDescription) const;
 
@@ -86,7 +86,7 @@ protected:
  */
 class ChangeStreamDefaultEventTransformation final : public ChangeStreamEventTransformation {
     struct SupportedEventResult {
-        StringData opType;
+        std::string_view opType;
         Value opDescription;
         bool isBuiltInEvent;
     };

@@ -132,6 +132,7 @@
 #include <iterator>
 #include <list>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -199,9 +200,8 @@ std::unique_ptr<FindCommandRequest> createFindCommand(
  *
  * Returns the field name of a geo-indexed field, or boost::none if none were found.
  */
-boost::optional<StringData> extractGeoNearFieldFromIndexesByType(OperationContext* opCtx,
-                                                                 const CollectionPtr& collection,
-                                                                 const string& indexType) {
+boost::optional<std::string_view> extractGeoNearFieldFromIndexesByType(
+    OperationContext* opCtx, const CollectionPtr& collection, const string& indexType) {
     std::vector<const IndexCatalogEntry*> idxs;
     const IndexDescriptor* idxToUse = nullptr;
     collection->getIndexCatalog()->findIndexByType(opCtx, indexType, idxs);
@@ -237,8 +237,8 @@ boost::optional<StringData> extractGeoNearFieldFromIndexesByType(OperationContex
  *
  * The 'collection' is required to exist. Throws if no usable 2d or 2dsphere index could be found.
  */
-StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx,
-                                          const CollectionPtr& collection) {
+std::string_view extractGeoNearFieldFromIndexes(OperationContext* opCtx,
+                                                const CollectionPtr& collection) {
     tassert(9911911, "", collection);
 
     // Look for relevant 2d index first. If none, look for relevant 2dsphere index.
@@ -1475,7 +1475,7 @@ PipelineD::supportsSort(const timeseries::BucketUnpacker& bucketUnpacker,
                 return scanIsAscending == sortComponent.isAscending;
             };
 
-            auto hasPointPredicate = [&scan](StringData fieldName) -> bool {
+            auto hasPointPredicate = [&scan](std::string_view fieldName) -> bool {
                 for (auto&& field : scan->getBounds().fields) {
                     if (field.name == fieldName)
                         return field.isPoint();
@@ -1608,7 +1608,7 @@ PipelineD::checkTimeHelper(const timeseries::BucketUnpacker& bucketUnpacker,
 
 bool PipelineD::sortAndKeyPatternPartAgreeAndOnMeta(
     const timeseries::BucketUnpacker& bucketUnpacker,
-    StringData keyPatternFieldName,
+    std::string_view keyPatternFieldName,
     const FieldPath& sortFieldPath) {
     FieldPath keyPatternFieldPath = FieldPath(
         keyPatternFieldName, false /* precomputeHashes */, false /* validateFieldNames */);

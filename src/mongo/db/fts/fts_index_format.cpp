@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/db/fts/fts_spec.h"
@@ -47,6 +46,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -95,7 +95,7 @@ const size_t termKeyLengthV3 = termKeyPrefixLengthV3 + termKeySuffixLengthV3;
  * is not legal for there to be an array along the path of the non-text prefix or suffix fields of a
  * text index, unless a particular array index is specified, as in "a.3".
  */
-BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
+BSONElement extractNonFTSKeyElement(const BSONObj& obj, std::string_view path) {
     BSONElementSet indexedElements;
     const bool expandArrayOnTrailingField = true;
     MultikeyComponents arrayComponents;
@@ -118,7 +118,7 @@ BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
 /**
  * Legacy version of extractNonFTSKeyElement that uses pre-SERVER-76875 dotted path extraction.
  */
-BSONElement extractNonFTSKeyElementLegacy(const BSONObj& obj, StringData path) {
+BSONElement extractNonFTSKeyElementLegacy(const BSONObj& obj, std::string_view path) {
     BSONElementSet indexedElements;
     const bool expandArrayOnTrailingField = true;
     MultikeyComponents arrayComponents;
@@ -183,7 +183,7 @@ void FTSIndexFormat::_appendIndexKey(KeyStringBuilder& keyString,
         } else {
             std::array<char, 16> hash;
             uint32_t seed = 0;
-            murmur3(StringData{term}, seed, hash);
+            murmur3(std::string_view{term}, seed, hash);
             string keySuffix = hexblob::encodeLower(hash.data(), hash.size());
             invariant(termKeySuffixLengthV2 == keySuffix.size());
             keyString.appendString(term.substr(0, termKeyPrefixLengthV2) + keySuffix);

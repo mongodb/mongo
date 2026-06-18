@@ -36,6 +36,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class AuthorizationClientHandleRouter final : public AuthorizationClientHandle {
@@ -48,7 +50,7 @@ public:
 
     void notifyDDLOperation(OperationContext* opCtx,
                             AuthorizationRouter* authzRouter,
-                            StringData op,
+                            std::string_view op,
                             const NamespaceString& nss,
                             const BSONObj& o,
                             const BSONObj* o2) final {}

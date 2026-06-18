@@ -44,8 +44,6 @@
 #include "MongoNoUniqueAddressCheck.h"
 #include "MongoRWMutexCheck.h"
 #include "MongoRandCheck.h"
-#include "MongoStringDataConstRefCheck.h"
-#include "MongoStringDataStringViewApi.h"
 #include "MongoTraceCheck.h"
 #include "MongoUninterruptibleLockGuardCheck.h"
 #include "MongoUnstructuredLogCheck.h"
@@ -82,10 +80,6 @@ public:
         CheckFactories.registerCheck<MongoRandCheck>("mongo-rand-check");
         CheckFactories.registerCheck<MongoBannedNamesCheck>("mongo-banned-names-check");
         CheckFactories.registerCheck<MongoNoUniqueAddressCheck>("mongo-no-unique-address-check");
-        CheckFactories.registerCheck<MongoStringDataConstRefCheck>(
-            "mongo-stringdata-const-ref-check");
-        CheckFactories.registerCheck<MongoStringDataStringViewApi>(
-            "mongo-stringdata-stringview-api");
         CheckFactories.registerCheck<MongoRWMutexCheck>("mongo-rwmutex-check");
         CheckFactories.registerCheck<MongoInvariantStatusIsOKCheck>(
             "mongo-invariant-status-is-ok-check");

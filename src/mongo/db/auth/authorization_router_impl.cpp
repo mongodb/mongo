@@ -36,9 +36,12 @@
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/server_feature_flags_gen.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(waitForUserCacheInvalidation);
@@ -106,7 +109,7 @@ Status AuthorizationRouterImpl::getUserDescription(
     BSONObj* result,
     const SharedUserAcquisitionStats& userAcquisitionStats) try {
     bool hasExternalRoles = userRequest.getRoles().has_value();
-    bool hasUserName = userRequest.getUserName().getUser() != ""_sd;
+    bool hasUserName = userRequest.getUserName().getUser() != ""sv;
     if (!hasExternalRoles) {
         // If the userRequest does not have roles, then we need to run usersInfo.
         UsersInfoCommand usersInfoCmd(auth::UsersInfoCommandArg(userRequest.getUserName()));
@@ -118,7 +121,7 @@ Status AuthorizationRouterImpl::getUserDescription(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
             (userRequest.getAuthenticatedMechanism().has_value()) &&
-            (userRequest.getAuthenticatedMechanism().value() != ""_sd)) {
+            (userRequest.getAuthenticatedMechanism().value() != ""sv)) {
             // Ensure that if the feature flag is enabled and the user request has an
             // authenticated mechanism, there is a username argument since that
             // authenticated mechanism must apply to a specific user.
@@ -283,7 +286,7 @@ bool AuthorizationRouterImpl::hasAnyPrivilegeDocuments(OperationContext* opCtx) 
 }
 
 void AuthorizationRouterImpl::notifyDDLOperation(OperationContext* opCtx,
-                                                 StringData op,
+                                                 std::string_view op,
                                                  const NamespaceString& nss,
                                                  const BSONObj& o,
                                                  const BSONObj* o2) {

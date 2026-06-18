@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/unittest/log_test.h"
@@ -38,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace MONGO_MOD_PUB mongo {
 namespace executor {
@@ -61,7 +61,7 @@ public:
      * Validates command name in remote command request. Returns the remote command request from
      * the network interface for further validation if the command name matches.
      */
-    static RemoteCommandRequest assertRemoteCommandNameEquals(StringData cmdName,
+    static RemoteCommandRequest assertRemoteCommandNameEquals(std::string_view cmdName,
                                                               const RemoteCommandRequest& request);
 
     ~TaskExecutorTest() override;

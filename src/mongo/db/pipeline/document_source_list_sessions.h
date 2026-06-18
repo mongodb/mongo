@@ -51,6 +51,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -82,7 +83,7 @@ public:
         return make_intrusive<std::decay_t<decltype(*this)>>(*this, newExpCtx);
     }
 
-    static constexpr StringData kStageName = "$listSessions"_sd;
+    static constexpr std::string_view kStageName = "$listSessions"_sd;
 
     static const Id& id;
 
@@ -134,7 +135,7 @@ public:
         const PrivilegeVector _privileges;
     };
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return DocumentSourceListSessions::kStageName;
     }
 

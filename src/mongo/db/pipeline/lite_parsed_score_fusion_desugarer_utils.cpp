@@ -34,11 +34,13 @@
 #include "mongo/db/pipeline/lite_parsed_hybrid_search_desugarer_utils.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer::score_fusion_utils {
+using namespace std::literals::string_view_literals;
 
 ScoreFusionScoringOptions::ScoreFusionScoringOptions(const ScoreFusionSpec& spec) {
     _normalizationMethod = spec.getInput().getNormalization();
@@ -63,38 +65,38 @@ ScoreFusionScoringOptions::ScoreFusionScoringOptions(const ScoreFusionSpec& spec
     _combinationExpression = std::move(combinationExpression);
 }
 
-StringData ScoreFusionScoringOptions::getNormalizationString() const {
+std::string_view ScoreFusionScoringOptions::getNormalizationString() const {
     switch (_normalizationMethod) {
         case ScoreFusionNormalizationEnum::kSigmoid:
-            return "sigmoid"_sd;
+            return "sigmoid"sv;
         case ScoreFusionNormalizationEnum::kMinMaxScaler:
-            return "minMaxScaler"_sd;
+            return "minMaxScaler"sv;
         case ScoreFusionNormalizationEnum::kNone:
-            return "none"_sd;
+            return "none"sv;
     }
     MONGO_UNREACHABLE_TASSERT(12559408);
 }
 
-StringData ScoreFusionScoringOptions::getCombinationMethodString() const {
+std::string_view ScoreFusionScoringOptions::getCombinationMethodString() const {
     switch (_combinationMethod) {
         case ScoreFusionCombinationMethodEnum::kExpression:
-            return "custom expression"_sd;
+            return "custom expression"sv;
         case ScoreFusionCombinationMethodEnum::kAvg:
-            return "average"_sd;
+            return "average"sv;
     }
     MONGO_UNREACHABLE_TASSERT(12559409);
 }
 
-BSONObj buildScoreAddFieldsBson(StringData inputPipelineName,
+BSONObj buildScoreAddFieldsBson(std::string_view inputPipelineName,
                                 ScoreFusionNormalizationEnum normalization,
                                 double weight) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         const std::string scoreField = hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
             kInternalFieldsName, fmt::format("{}_score", inputPipelineName));
         BSONObjBuilder scoreBob(addFieldsBob.subobjStart(scoreField));
-        BSONArrayBuilder multArr(scoreBob.subarrayStart("$multiply"_sd));
+        BSONArrayBuilder multArr(scoreBob.subarrayStart("$multiply"sv));
         BSONObj scorePath = BSON("$meta" << "score");
         switch (normalization) {
             case ScoreFusionNormalizationEnum::kSigmoid:
@@ -110,10 +112,10 @@ BSONObj buildScoreAddFieldsBson(StringData inputPipelineName,
     return bob.obj();
 }
 
-BSONObj buildRawScoreAddFieldsBson(StringData inputPipelineName) {
+BSONObj buildRawScoreAddFieldsBson(std::string_view inputPipelineName) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         const std::string rawScoreField = hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
             kInternalFieldsName, fmt::format("{}_rawScore", inputPipelineName));
         addFieldsBob.append(rawScoreField, BSON("$meta" << "score"));
@@ -121,11 +123,11 @@ BSONObj buildRawScoreAddFieldsBson(StringData inputPipelineName) {
     return bob.obj();
 }
 
-BSONObj buildAddInputPipelineScoreDetailsBson(StringData inputPipelineName,
+BSONObj buildAddInputPipelineScoreDetailsBson(std::string_view inputPipelineName,
                                               bool inputGeneratesScoreDetails) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         const std::string scoreDetailsField =
             hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
                 kInternalFieldsName, fmt::format("{}_scoreDetails", inputPipelineName));
@@ -139,16 +141,16 @@ BSONObj buildAddInputPipelineScoreDetailsBson(StringData inputPipelineName,
     return bob.obj();
 }
 
-BSONObj buildMinMaxScalerSetWindowFieldsBson(StringData inputPipelineName) {
+BSONObj buildMinMaxScalerSetWindowFieldsBson(std::string_view inputPipelineName) {
     const std::string internalFieldsScore =
         hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
             kInternalFieldsName,
             hybrid_scoring_util::getScoreFieldFromPipelineName(inputPipelineName));
     BSONObjBuilder bob;
     {
-        BSONObjBuilder swfBob(bob.subobjStart("$_internalSetWindowFields"_sd));
+        BSONObjBuilder swfBob(bob.subobjStart("$_internalSetWindowFields"sv));
         swfBob.append("sortBy", BSON(internalFieldsScore << -1));
-        BSONObjBuilder outputBob(swfBob.subobjStart("output"_sd));
+        BSONObjBuilder outputBob(swfBob.subobjStart("output"sv));
         outputBob.append(internalFieldsScore,
                          BSON("$minMaxScaler" << BSON("input" << ("$" + internalFieldsScore))));
     }
@@ -159,12 +161,12 @@ BSONObj buildSetFinalCombinedScoreBson(const std::vector<std::string>& pipelineN
                                        const ScoreFusionScoringOptions& scoringOptions) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder smBob(bob.subobjStart("$setMetadata"_sd));
-        BSONObjBuilder scoreBob(smBob.subobjStart("score"_sd));
+        BSONObjBuilder smBob(bob.subobjStart("$setMetadata"sv));
+        BSONObjBuilder scoreBob(smBob.subobjStart("score"sv));
         switch (scoringOptions.getCombinationMethod()) {
             case ScoreFusionCombinationMethodEnum::kExpression: {
-                BSONObjBuilder letBob(scoreBob.subobjStart("$let"_sd));
-                BSONObjBuilder varsBob(letBob.subobjStart("vars"_sd));
+                BSONObjBuilder letBob(scoreBob.subobjStart("$let"sv));
+                BSONObjBuilder varsBob(letBob.subobjStart("vars"sv));
                 for (const auto& pipelineName : pipelineNames) {
                     const std::string scoreField =
                         hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
@@ -178,7 +180,7 @@ BSONObj buildSetFinalCombinedScoreBson(const std::vector<std::string>& pipelineN
                 break;
             }
             case ScoreFusionCombinationMethodEnum::kAvg: {
-                BSONArrayBuilder avgArr(scoreBob.subarrayStart("$avg"_sd));
+                BSONArrayBuilder avgArr(scoreBob.subarrayStart("$avg"sv));
                 for (const auto& pipelineName : pipelineNames) {
                     avgArr.append(fmt::format(
                         "${}",
@@ -197,9 +199,9 @@ BSONObj buildCalculatedFinalScoreDetailsBson(const std::vector<std::string>& pip
                                              const StringMap<double>& weights) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"sv));
         BSONObjBuilder internalFieldsBob(addFieldsBob.subobjStart(kInternalFieldsName));
-        BSONArrayBuilder calcArr(internalFieldsBob.subarrayStart("calculatedScoreDetails"_sd));
+        BSONArrayBuilder calcArr(internalFieldsBob.subarrayStart("calculatedScoreDetails"sv));
         for (const auto& pipelineName : pipelineNames) {
             const std::string internalFieldsPipelineName =
                 hybrid_scoring_util::applyInternalFieldPrefixToFieldName(kInternalFieldsName,
@@ -207,11 +209,11 @@ BSONObj buildCalculatedFinalScoreDetailsBson(const std::vector<std::string>& pip
             double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
 
             BSONObjBuilder mergeSub;
-            mergeSub.append("inputPipelineName"_sd, pipelineName);
-            mergeSub.append("inputPipelineRawScore"_sd,
+            mergeSub.append("inputPipelineName"sv, pipelineName);
+            mergeSub.append("inputPipelineRawScore"sv,
                             fmt::format("${}_rawScore", internalFieldsPipelineName));
-            mergeSub.append("weight"_sd, weight);
-            mergeSub.append("value"_sd, fmt::format("${}_score", internalFieldsPipelineName));
+            mergeSub.append("weight"sv, weight);
+            mergeSub.append("value"sv, fmt::format("${}_score", internalFieldsPipelineName));
 
             BSONArrayBuilder mergeArr;
             mergeArr.append(mergeSub.obj());
@@ -225,12 +227,12 @@ BSONObj buildCalculatedFinalScoreDetailsBson(const std::vector<std::string>& pip
 BSONObj buildSetMetadataScoreDetailsBson(const ScoreFusionScoringOptions& scoringOptions) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder smBob(bob.subobjStart("$setMetadata"_sd));
-        BSONObjBuilder sdBob(smBob.subobjStart("scoreDetails"_sd));
+        BSONObjBuilder smBob(bob.subobjStart("$setMetadata"sv));
+        BSONObjBuilder sdBob(smBob.subobjStart("scoreDetails"sv));
         sdBob.append("value", BSON("$meta" << "score"));
         sdBob.append("description", kScoreDetailsDescription);
         sdBob.append("normalization", scoringOptions.getNormalizationString());
-        BSONObjBuilder combinationBob(sdBob.subobjStart("combination"_sd));
+        BSONObjBuilder combinationBob(sdBob.subobjStart("combination"sv));
         combinationBob.append("method", scoringOptions.getCombinationMethodString());
         if (scoringOptions.getCombinationMethod() ==
             ScoreFusionCombinationMethodEnum::kExpression) {

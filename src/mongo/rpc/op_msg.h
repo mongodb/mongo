@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -49,6 +48,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -170,7 +170,7 @@ struct OpMsg {
     /**
      * Returns a pointer to the sequence with the given name or nullptr if there are none.
      */
-    const DocumentSequence* getSequence(StringData name) const {
+    const DocumentSequence* getSequence(std::string_view name) const {
         // Getting N sequences is technically O(N**2) but because there currently is at most 2
         // sequences, this does either 1 or 2 comparisons. Consider making sequences a StringMap if
         // there will be many sequences. This problem may also just go away with the IDL project.
@@ -212,13 +212,13 @@ struct OpMsgRequest : public OpMsg {
      * No validation of the value is performed. This method should only be used for logging or
      * error messages, particularly in contexts where the command request has not been parsed yet.
      */
-    StringData readDatabaseForLogging() const {
+    std::string_view readDatabaseForLogging() const {
         return body["$db"].valueStringDataSafe();
     }
 
     DatabaseName parseDbName() const;
 
-    StringData getCommandName() const {
+    std::string_view getCommandName() const {
         return body.firstElementFieldName();
     }
 
@@ -250,7 +250,7 @@ public:
      * See the documentation for DocSequenceBuilder below.
      */
     class DocSequenceBuilder;
-    DocSequenceBuilder beginDocSequence(StringData name);
+    DocSequenceBuilder beginDocSequence(std::string_view name);
 
     /**
      * Returns an empty builder for the body.
@@ -275,7 +275,7 @@ public:
         resumeBody().appendElements(body);
     }
 
-    void setSecurityToken(StringData token);
+    void setSecurityToken(std::string_view token);
 
     /**
      * Finish building and return a Message ready to give to the networking layer for transmission.

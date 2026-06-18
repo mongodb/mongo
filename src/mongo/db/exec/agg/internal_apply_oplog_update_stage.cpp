@@ -39,6 +39,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -62,7 +64,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalApplyOplogUpdateStage,
                            documentSourceInternalApplyOplogUpdateGroupToStageFn)
 
 InternalApplyOplogUpdateStage::InternalApplyOplogUpdateStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const BSONObj& oplogUpdate)
     : Stage(stageName, pExpCtx), _updateDriver(pExpCtx) {
@@ -84,7 +86,7 @@ GetNextResult InternalApplyOplogUpdateStage::doGetNext() {
     // Use _updateDriver to apply the update to the document.
     mutablebson::Document doc(next.getDocument().toBson());
     uassertStatusOK(_updateDriver.update(pExpCtx->getOperationContext(),
-                                         StringData(),
+                                         std::string_view(),
                                          &doc,
                                          true /* validateForStorage */,
                                          FieldRefSet(),

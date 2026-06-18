@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <unicode/coll.h>
 
@@ -51,9 +51,9 @@ public:
     std::unique_ptr<CollatorInterface> clone() const final;
     std::shared_ptr<CollatorInterface> cloneShared() const final;
 
-    int compare(StringData left, StringData right) const final;
+    int compare(std::string_view left, std::string_view right) const final;
 
-    ComparisonKey getComparisonKey(StringData stringData) const final;
+    ComparisonKey getComparisonKey(std::string_view stringData) const final;
 
 private:
     // The ICU implementation of the collator to which we delegate interesting work. Const methods

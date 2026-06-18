@@ -36,6 +36,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <benchmark/benchmark.h>
@@ -76,7 +77,7 @@ protected:
     virtual BSONObj generateDocument(size_t index, size_t approximateSize) = 0;
     virtual std::vector<BSONObj> getIndexSpecs() const = 0;
 
-    static BSONObj buildIndexSpec(StringData fieldName, bool unique) {
+    static BSONObj buildIndexSpec(std::string_view fieldName, bool unique) {
         return BSONObjBuilder{}
             .append("v", IndexConfig::kLatestIndexVersion)
             .append("key", BSON(fieldName << 1))

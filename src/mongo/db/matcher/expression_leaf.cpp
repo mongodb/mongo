@@ -54,13 +54,15 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 template <typename T>
 ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     MatchType type,
-    boost::optional<StringData> path,
+    boost::optional<std::string_view> path,
     T&& rhs,
     ElementPath::LeafArrayBehavior leafArrBehavior,
     ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
@@ -76,7 +78,7 @@ ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
 // Instantiate above constructor for 'Value&&' and 'const BSONElement&' types.
 template ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     MatchType,
-    boost::optional<StringData>,
+    boost::optional<std::string_view>,
     Value&&,
     ElementPath::LeafArrayBehavior,
     ElementPath::NonLeafArrayBehavior,
@@ -84,7 +86,7 @@ template ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     const CollatorInterface*);
 template ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     MatchType,
-    boost::optional<StringData>,
+    boost::optional<std::string_view>,
     const BSONElement&,
     ElementPath::LeafArrayBehavior,
     ElementPath::NonLeafArrayBehavior,
@@ -120,7 +122,7 @@ void ComparisonMatchExpressionBase::appendSerializedRightHandSide(
 
 template <typename T>
 ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
-                                                     boost::optional<StringData> path,
+                                                     boost::optional<std::string_view> path,
                                                      T&& rhs,
                                                      clonable_ptr<ErrorAnnotation> annotation,
                                                      const CollatorInterface* collator)
@@ -148,21 +150,21 @@ ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
 
 // Instantiate above constructor for 'Value&&' and 'const BSONElement&' types.
 template ComparisonMatchExpression::ComparisonMatchExpression(MatchType,
-                                                              boost::optional<StringData>,
+                                                              boost::optional<std::string_view>,
                                                               Value&&,
                                                               clonable_ptr<ErrorAnnotation>,
                                                               const CollatorInterface*);
 template ComparisonMatchExpression::ComparisonMatchExpression(MatchType,
-                                                              boost::optional<StringData>,
+                                                              boost::optional<std::string_view>,
                                                               const BSONElement&,
                                                               clonable_ptr<ErrorAnnotation>,
                                                               const CollatorInterface*);
 
-constexpr StringData EqualityMatchExpression::kName;
-constexpr StringData LTMatchExpression::kName;
-constexpr StringData LTEMatchExpression::kName;
-constexpr StringData GTMatchExpression::kName;
-constexpr StringData GTEMatchExpression::kName;
+constexpr std::string_view EqualityMatchExpression::kName;
+constexpr std::string_view LTMatchExpression::kName;
+constexpr std::string_view LTEMatchExpression::kName;
+constexpr std::string_view GTMatchExpression::kName;
+constexpr std::string_view GTEMatchExpression::kName;
 
 const std::set<char> RegexMatchExpression::kValidRegexFlags = {'i', 'm', 's', 'x'};
 
@@ -176,9 +178,9 @@ std::unique_ptr<pcre::Regex> RegexMatchExpression::makeRegex(const std::string& 
             .matchLimit = static_cast<uint32_t>(internalQueryRegexMatchLimit.loadRelaxed())});
 }
 
-RegexMatchExpression::RegexMatchExpression(boost::optional<StringData> path,
-                                           StringData regex,
-                                           StringData options,
+RegexMatchExpression::RegexMatchExpression(boost::optional<std::string_view> path,
+                                           std::string_view regex,
+                                           std::string_view options,
                                            clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(REGEX, path, std::move(annotation)),
       _regex(std::string{regex}),
@@ -215,13 +217,13 @@ void RegexMatchExpression::appendSerializedRightHandSide(
     BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     // We need to be careful to generate a valid regex representative value, and the default string
     // "?" is not valid.
-    opts.appendLiteral(bob, "$regex", _regex, Value("\\?"_sd));
+    opts.appendLiteral(bob, "$regex", _regex, Value("\\?"sv));
 
     if (!_flags.empty()) {
         // We need to make sure the $options value can be re-parsed as legal regex options, so
         // we'll set the representative value in this case to be the string "i" rather than
         // "?", which is the standard representative for string values.
-        opts.appendLiteral(bob, "$options", _flags, Value("i"_sd));
+        opts.appendLiteral(bob, "$options", _flags, Value("i"sv));
     }
 }
 
@@ -235,7 +237,7 @@ void RegexMatchExpression::shortDebugString(StringBuilder& debug) const {
 
 // ---------
 
-ModMatchExpression::ModMatchExpression(boost::optional<StringData> path,
+ModMatchExpression::ModMatchExpression(boost::optional<std::string_view> path,
                                        long long divisor,
                                        long long remainder,
                                        clonable_ptr<ErrorAnnotation> annotation)
@@ -269,7 +271,7 @@ bool ModMatchExpression::equivalent(const MatchExpression* other) const {
 
 // ------------------
 
-ExistsMatchExpression::ExistsMatchExpression(boost::optional<StringData> path,
+ExistsMatchExpression::ExistsMatchExpression(boost::optional<std::string_view> path,
                                              clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(EXISTS, path, std::move(annotation)) {}
 
@@ -295,12 +297,12 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 
 // ----
 
-InMatchExpression::InMatchExpression(boost::optional<StringData> path,
+InMatchExpression::InMatchExpression(boost::optional<std::string_view> path,
                                      clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(MATCH_IN, path, std::move(annotation)),
       _equalities(std::make_shared<InListData>()) {}
 
-InMatchExpression::InMatchExpression(boost::optional<StringData> path,
+InMatchExpression::InMatchExpression(boost::optional<std::string_view> path,
                                      clonable_ptr<ErrorAnnotation> annotation,
                                      std::shared_ptr<InListData> equalities)
     : LeafMatchExpression(MATCH_IN, path, std::move(annotation)),
@@ -437,7 +439,7 @@ Status InMatchExpression::addRegex(std::unique_ptr<RegexMatchExpression> expr) {
 // -----------
 
 BitTestMatchExpression::BitTestMatchExpression(MatchType type,
-                                               boost::optional<StringData> path,
+                                               boost::optional<std::string_view> path,
                                                std::vector<uint32_t> bitPositions,
                                                clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(type, path, std::move(annotation)),
@@ -453,7 +455,7 @@ BitTestMatchExpression::BitTestMatchExpression(MatchType type,
 }
 
 BitTestMatchExpression::BitTestMatchExpression(MatchType type,
-                                               boost::optional<StringData> path,
+                                               boost::optional<std::string_view> path,
                                                uint64_t bitMask,
                                                clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(type, path, std::move(annotation)), _bitMask(bitMask) {
@@ -466,7 +468,7 @@ BitTestMatchExpression::BitTestMatchExpression(MatchType type,
 }
 
 BitTestMatchExpression::BitTestMatchExpression(MatchType type,
-                                               boost::optional<StringData> path,
+                                               boost::optional<std::string_view> path,
                                                const char* bitMaskBinary,
                                                uint32_t bitMaskLen,
                                                clonable_ptr<ErrorAnnotation> annotation)

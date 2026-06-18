@@ -32,7 +32,6 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
@@ -50,11 +49,13 @@
 #include "mongo/util/str.h"
 
 #include <cstddef>
+#include <string_view>
 
 namespace mongo {
 
 namespace {
-constexpr StringData kIdFieldName = "_id"_sd;
+using namespace std::literals::string_view_literals;
+constexpr std::string_view kIdFieldName = "_id"sv;
 }  // namespace
 
 ObjectReplaceExecutor::ObjectReplaceExecutor(BSONObj replacement, bool bypassEmptyTsReplacement)

@@ -30,7 +30,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -50,6 +49,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -60,11 +60,12 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WiredTigerConnectionTest {
 public:
-    WiredTigerConnectionTest(StringData dbpath,
-                             StringData extraStrings,
+    WiredTigerConnectionTest(std::string_view dbpath,
+                             std::string_view extraStrings,
                              WT_EVENT_HANDLER* eventHandler = nullptr)
         : _conn(nullptr) {
         std::stringstream ss;
@@ -94,7 +95,7 @@ private:
 
 class WiredTigerUtilHarnessHelper {
 public:
-    explicit WiredTigerUtilHarnessHelper(StringData extraStrings,
+    explicit WiredTigerUtilHarnessHelper(std::string_view extraStrings,
                                          WiredTigerEventHandler* eventHandler = nullptr)
         : _connectionTest(_dbpath.path(),
                           extraStrings,
@@ -696,7 +697,7 @@ TEST_F(WiredTigerUtilTest, ConcatTwoConfigs) {
     // expected values.
     auto assertKVConfig = [&](const std::string& keyData, int valData) {
         ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-        ASSERT_EQUALS(StringData(key.str, key.len), keyData);
+        ASSERT_EQUALS(std::string_view(key.str, key.len), keyData);
         ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
         ASSERT_EQUALS(value.val, valData);
     };
@@ -760,86 +761,86 @@ TEST(WiredTigerConfigParserTest, IterationAndKeyLookup) {
     // a=123
     ASSERT_EQUALS(parser.next(&key, &value), 0);
     ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(key.str, key.len), "a"_sd);
+    ASSERT_EQUALS(std::string_view(key.str, key.len), "a"sv);
     ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
     ASSERT_EQUALS(value.val, 123);
 
     // b=abc
     ASSERT_EQUALS(parser.next(&key, &value), 0);
     ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(key.str, key.len), "b"_sd);
+    ASSERT_EQUALS(std::string_view(key.str, key.len), "b"sv);
     ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(value.str, value.len), "abc"_sd);
+    ASSERT_EQUALS(std::string_view(value.str, value.len), "abc"sv);
 
     // c="def"
     ASSERT_EQUALS(parser.next(&key, &value), 0);
     ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(key.str, key.len), "c"_sd);
+    ASSERT_EQUALS(std::string_view(key.str, key.len), "c"sv);
     ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING);
-    ASSERT_EQUALS(StringData(value.str, value.len), "def"_sd);
+    ASSERT_EQUALS(std::string_view(value.str, value.len), "def"sv);
 
     // a=true
     ASSERT_EQUALS(parser.next(&key, &value), 0);
     ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(key.str, key.len), "a"_sd);
+    ASSERT_EQUALS(std::string_view(key.str, key.len), "a"sv);
     ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
     ASSERT_TRUE(value.val);
 
     // d=false
     ASSERT_EQUALS(parser.next(&key, &value), 0);
     ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(key.str, key.len), "d"_sd);
+    ASSERT_EQUALS(std::string_view(key.str, key.len), "d"sv);
     ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
     ASSERT_FALSE(value.val);
 
     // e=
     ASSERT_EQUALS(parser.next(&key, &value), 0);
     ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(key.str, key.len), "e"_sd);
+    ASSERT_EQUALS(std::string_view(key.str, key.len), "e"sv);
     ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
     ASSERT_TRUE(value.val);
 
     // f
     ASSERT_EQUALS(parser.next(&key, &value), 0);
     ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(key.str, key.len), "f"_sd);
+    ASSERT_EQUALS(std::string_view(key.str, key.len), "f"sv);
     ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
     ASSERT_TRUE(value.val);
 
     // g=500M
     ASSERT_EQUALS(parser.next(&key, &value), 0);
     ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(key.str, key.len), "g"_sd);
+    ASSERT_EQUALS(std::string_view(key.str, key.len), "g"sv);
     ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
     ASSERT_EQUALS(value.val, 500 * 1024 * 1024);
 
     // h=(x=7,y=8,z=9)
     ASSERT_EQUALS(parser.next(&key, &value), 0);
     ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-    ASSERT_EQUALS(StringData(key.str, key.len), "h"_sd);
+    ASSERT_EQUALS(std::string_view(key.str, key.len), "h"sv);
     ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT);
-    ASSERT_EQUALS(StringData(value.str, value.len), "(x=7,y=8,z=9)"_sd);
+    ASSERT_EQUALS(std::string_view(value.str, value.len), "(x=7,y=8,z=9)"sv);
     {
         WiredTigerConfigParser structParser(value);
 
         // x=7
         ASSERT_EQUALS(structParser.next(&key, &value), 0);
         ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-        ASSERT_EQUALS(StringData(key.str, key.len), "x"_sd);
+        ASSERT_EQUALS(std::string_view(key.str, key.len), "x"sv);
         ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
         ASSERT_EQUALS(value.val, 7);
 
         // y=8
         ASSERT_EQUALS(structParser.next(&key, &value), 0);
         ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-        ASSERT_EQUALS(StringData(key.str, key.len), "y"_sd);
+        ASSERT_EQUALS(std::string_view(key.str, key.len), "y"sv);
         ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
         ASSERT_EQUALS(value.val, 8);
 
         // z=9
         ASSERT_EQUALS(structParser.next(&key, &value), 0);
         ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-        ASSERT_EQUALS(StringData(key.str, key.len), "z"_sd);
+        ASSERT_EQUALS(std::string_view(key.str, key.len), "z"sv);
         ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
         ASSERT_EQUALS(value.val, 9);
     }
@@ -869,7 +870,7 @@ TEST(WiredTigerConfigParserTest, IsTableLoggingEnabled) {
     ASSERT_FALSE(WiredTigerConfigParser("").isTableLoggingEnabled());
 
     // Test cases below expect non-optional results from isTableLoggingEnabled().
-    auto assertGetEnabled = [](StringData config) {
+    auto assertGetEnabled = [](std::string_view config) {
         WiredTigerConfigParser parser(config);
         auto enabled = parser.isTableLoggingEnabled();
         ASSERT(enabled);
@@ -936,8 +937,8 @@ TEST_F(WiredTigerUtilTest, ReconfigureBackgroundCompaction) {
 
     ASSERT_EQUALS(EINVAL, err.err);
     ASSERT_EQUALS(WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err.sub_level_err);
-    ASSERT_EQUALS("Cannot reconfigure background compaction while it's already running."_sd,
-                  StringData(err.err_msg));
+    ASSERT_EQUALS("Cannot reconfigure background compaction while it's already running."sv,
+                  std::string_view(err.err_msg));
 }
 
 TEST_F(WiredTigerUtilTest, GetLastErrorFromSuccessfulCall) {
@@ -963,7 +964,7 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromSuccessfulCall) {
 
     ASSERT_EQUALS(0, err);
     ASSERT_EQUALS(WT_NONE, sub_level_err);
-    ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
+    ASSERT_EQUALS("last API call was successful"sv, std::string_view(err_msg));
 }
 
 TEST_F(WiredTigerUtilTest, GetLastErrorFromFailedCall) {
@@ -989,8 +990,8 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromFailedCall) {
     // sub-level error code respectively.
     ASSERT_EQUALS(EINVAL, err);
     ASSERT_EQUALS(WT_NONE, sub_level_err);
-    ASSERT_EQUALS("should be passed either a URI or a cursor to duplicate, but not both"_sd,
-                  StringData(err_msg));
+    ASSERT_EQUALS("should be passed either a URI or a cursor to duplicate, but not both"sv,
+                  std::string_view(err_msg));
 }
 
 TEST_F(WiredTigerUtilTest, GetLastErrorFromLatestAPICall) {
@@ -1012,7 +1013,7 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromLatestAPICall) {
 
     ASSERT_EQUALS(0, err);
     ASSERT_EQUALS(WT_NONE, sub_level_err);
-    ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
+    ASSERT_EQUALS("last API call was successful"sv, std::string_view(err_msg));
 
     WT_CURSOR* cursor;
     ASSERT_NOT_EQUALS(0, wtSession.open_cursor(nullptr, nullptr, nullptr, &cursor));
@@ -1021,8 +1022,8 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromLatestAPICall) {
     wtSession.get_last_error(&err, &sub_level_err, &err_msg);
     ASSERT_EQUALS(EINVAL, err);
     ASSERT_EQUALS(WT_NONE, sub_level_err);
-    ASSERT_EQUALS("should be passed either a URI or a cursor to duplicate, but not both"_sd,
-                  StringData(err_msg));
+    ASSERT_EQUALS("should be passed either a URI or a cursor to duplicate, but not both"sv,
+                  std::string_view(err_msg));
 
     ASSERT_EQUALS(0, wtSession.open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
 
@@ -1031,7 +1032,7 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromLatestAPICall) {
     wtSession.get_last_error(&err, &sub_level_err, &err_msg);
     ASSERT_EQUALS(0, err);
     ASSERT_EQUALS(WT_NONE, sub_level_err);
-    ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
+    ASSERT_EQUALS("last API call was successful"sv, std::string_view(err_msg));
 }
 
 TEST_F(WiredTigerUtilTest, CursorWriteConflict) {
@@ -1083,7 +1084,7 @@ TEST_F(WiredTigerUtilTest, CursorWriteConflict) {
 
     ASSERT_EQUALS(WT_ROLLBACK, err);
     ASSERT_EQUALS(WT_WRITE_CONFLICT, sub_level_err);
-    ASSERT_EQUALS("Write conflict between concurrent operations"_sd, StringData(err_msg));
+    ASSERT_EQUALS("Write conflict between concurrent operations"sv, std::string_view(err_msg));
 }
 
 TEST_F(WiredTigerUtilTest, CursorOldestForEviction) {
@@ -1142,7 +1143,8 @@ TEST_F(WiredTigerUtilTest, CursorOldestForEviction) {
 
         ASSERT_EQUALS(WT_ROLLBACK, err);
         ASSERT_EQUALS(WT_OLDEST_FOR_EVICTION, sub_level_err);
-        ASSERT_EQUALS("Transaction has the oldest pinned transaction ID"_sd, StringData(err_msg));
+        ASSERT_EQUALS("Transaction has the oldest pinned transaction ID"sv,
+                      std::string_view(err_msg));
         break;
     } while (tryCount <= kRetryLimit);
 
@@ -1177,8 +1179,8 @@ TEST_F(WiredTigerUtilTest, DropWithConflictingDHandle) {
     wtSession.get_last_error(&err, &sub_level_err, &err_msg);
 
     ASSERT_EQUALS(WT_CONFLICT_DHANDLE, sub_level_err);
-    ASSERT_EQUALS("another thread is currently holding the data handle of the table"_sd,
-                  StringData(err_msg));
+    ASSERT_EQUALS("another thread is currently holding the data handle of the table"sv,
+                  std::string_view(err_msg));
 }
 
 TEST_F(WiredTigerUtilTest, DropWithUncommittedData) {
@@ -1215,8 +1217,8 @@ TEST_F(WiredTigerUtilTest, DropWithUncommittedData) {
     wtSession.get_last_error(&err, &sub_level_err, &err_msg);
 
     ASSERT_EQUALS(WT_UNCOMMITTED_DATA, sub_level_err);
-    ASSERT_EQUALS("the table has uncommitted data and cannot be closed yet"_sd,
-                  StringData(err_msg));
+    ASSERT_EQUALS("the table has uncommitted data and cannot be closed yet"sv,
+                  std::string_view(err_msg));
 }
 
 TEST_F(WiredTigerUtilTest, DropWithDirtyData) {
@@ -1264,7 +1266,8 @@ TEST_F(WiredTigerUtilTest, DropWithDirtyData) {
         // but not checkpointed.
         ASSERT_EQUALS(EBUSY, ret);
         ASSERT_EQUALS(WT_DIRTY_DATA, sub_level_err);
-        ASSERT_EQUALS("the table has dirty data and cannot be closed yet"_sd, StringData(err_msg));
+        ASSERT_EQUALS("the table has dirty data and cannot be closed yet"sv,
+                      std::string_view(err_msg));
         break;
     } while (tryCount <= kRetryLimit);
 

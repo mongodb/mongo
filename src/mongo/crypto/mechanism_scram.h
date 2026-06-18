@@ -49,6 +49,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -199,7 +200,7 @@ class Secrets {
 public:
     Secrets() = default;
 
-    Secrets(StringData client, StringData stored, StringData server)
+    Secrets(std::string_view client, std::string_view stored, std::string_view server)
         : _ptr(std::make_shared<MemoryPolicy<HashBlock>>()) {
         if (!client.empty()) {
             (*_ptr)->clientKey = uassertStatusOK(HashBlock::fromBuffer(
@@ -231,7 +232,7 @@ public:
     Secrets(const Presecrets<HashBlock>& presecrets)
         : Secrets(presecrets.generateSaltedPassword()) {}
 
-    std::string generateClientProof(StringData authMessage) const {
+    std::string generateClientProof(std::string_view authMessage) const {
         // ClientProof := HMAC(StoredKey, AuthMessage) ^ ClientKey
         auto proof =
             HashBlock::computeHmac(storedKey().data(),
@@ -241,7 +242,7 @@ public:
         proof.xorInline(clientKey());
         return proof.toString();
     }
-    bool verifyClientProof(StringData authMessage, StringData proof) const {
+    bool verifyClientProof(std::string_view authMessage, std::string_view proof) const {
         // ClientKey := HMAC(StoredKey, AuthMessage) ^ ClientProof
         auto key =
             HashBlock::computeHmac(storedKey().data(),
@@ -263,7 +264,7 @@ public:
                                  storedKey().data(),
                                  HashBlock::kHashLength);
     }
-    std::string generateServerSignature(StringData authMessage) const {
+    std::string generateServerSignature(std::string_view authMessage) const {
         // ServerSignature := HMAC(ServerKey, AuthMessage)
         return HashBlock::computeHmac(serverKey().data(),
                                       serverKey().size(),
@@ -271,7 +272,7 @@ public:
                                       authMessage.size())
             .toString();
     }
-    bool verifyServerSignature(StringData authMessage, StringData sig) const {
+    bool verifyServerSignature(std::string_view authMessage, std::string_view sig) const {
         // ServerSignature := HMAC(ServerKey, AuthMessage)
         const auto exp =
             HashBlock::computeHmac(serverKey().data(),
@@ -297,8 +298,8 @@ public:
                                        int iterationCount) {
         Secrets<HashBlock, MemoryPolicy> secrets(
             Presecrets<HashBlock>(password, salt, iterationCount));
-        const auto encodedSalt =
-            base64::encode(StringData(reinterpret_cast<const char*>(salt.data()), salt.size()));
+        const auto encodedSalt = base64::encode(
+            std::string_view(reinterpret_cast<const char*>(salt.data()), salt.size()));
         return BSON(kIterationCountFieldName
                     << iterationCount << kSaltFieldName << encodedSalt << kStoredKeyFieldName
                     << secrets.storedKey().toString() << kServerKeyFieldName

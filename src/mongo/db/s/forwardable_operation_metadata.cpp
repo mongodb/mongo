@@ -51,6 +51,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -81,7 +82,7 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
         setVersionContext(VersionContext::getDecoration(opCtx));
     }
 
-    boost::optional<StringData> originalSecurityToken = boost::none;
+    boost::optional<std::string_view> originalSecurityToken = boost::none;
     const auto vts = auth::ValidatedTenancyScope::get(opCtx);
     if (vts != boost::none && !vts->getOriginalToken().empty()) {
         originalSecurityToken = vts->getOriginalToken();

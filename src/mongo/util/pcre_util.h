@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
 
 #include <string>
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -54,7 +54,7 @@ namespace mongo::pcre_util {
  *   'u': UTF (redundant, but accepted)
  *   'x': EXTENDED
  */
-pcre::CompileOptions flagsToOptions(StringData optionFlags, StringData opName = "");
+pcre::CompileOptions flagsToOptions(std::string_view optionFlags, std::string_view opName = "");
 
 /**
  * Builds an std::string of flag characters from the input 'pcre::CompileOptions'.
@@ -67,6 +67,6 @@ std::string optionsToFlags(pcre::CompileOptions opt);
  * Escapes all potentially meaningful regex characters in the provided string.
  * The returned string, used as a `mongo::pcre::Regex`, will match `str`.
  */
-std::string quoteMeta(StringData str);
+std::string quoteMeta(std::string_view str);
 
 }  // namespace mongo::pcre_util

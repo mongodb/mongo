@@ -41,6 +41,7 @@
 #include <cstddef>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>
@@ -74,7 +75,7 @@ struct ResumeTokenData {
                     int versionIn,
                     size_t txnOpIndexIn,
                     const boost::optional<UUID>& uuidIn,
-                    StringData opType,
+                    std::string_view opType,
                     Value documentKey,
                     Value opDescription);
 
@@ -147,8 +148,8 @@ std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
  */
 class MONGO_MOD_PUBLIC ResumeToken {
 public:
-    constexpr static StringData kDataFieldName = "_data"_sd;
-    constexpr static StringData kTypeBitsFieldName = "_typeBits"_sd;
+    constexpr static std::string_view kDataFieldName = "_data"_sd;
+    constexpr static std::string_view kTypeBitsFieldName = "_typeBits"_sd;
 
     /**
      * Parse a resume token from a BSON object; used as an interface to the IDL parser.

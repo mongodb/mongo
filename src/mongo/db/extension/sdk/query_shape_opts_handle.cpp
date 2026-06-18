@@ -34,6 +34,8 @@
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 
+#include <string_view>
+
 namespace mongo::extension::sdk {
 
 template <typename T>
@@ -82,7 +84,7 @@ std::string QueryShapeOptsAPI::serializeFieldPath(const std::string& fieldPath) 
 }
 
 void QueryShapeOptsAPI::appendLiteral(BSONObjBuilder& builder,
-                                      StringData fieldName,
+                                      std::string_view fieldName,
                                       const BSONElement& bsonElement) const {
     uint64_t bufSize = bsonElement.size();
     MongoExtensionByteView byteView{reinterpret_cast<const uint8_t*>(bsonElement.rawdata()),

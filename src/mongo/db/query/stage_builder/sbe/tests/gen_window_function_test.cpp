@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -38,7 +37,10 @@
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 
 class SBESetWindowFieldsTest : public GoldenSbeStageBuilderTestFixture {
@@ -104,7 +106,7 @@ public:
         return getAllResults(stage.get(), &resultAccessors[0]);
     }
 
-    void runSetWindowFieldsTest(StringData windowSpec,
+    void runSetWindowFieldsTest(std::string_view windowSpec,
                                 std::vector<BSONArray> inputDocs,
                                 const mongo::BSONArray& expectedValue,
                                 std::unique_ptr<CollatorInterface> collator = nullptr) {
@@ -125,7 +127,7 @@ public:
     // need to compare.
     enum class ArrayAccumType { kSetUnion, kConcatArrays };
     void runArrayAccumulatorTest(ArrayAccumType accumType,
-                                 StringData windowSpec,
+                                 std::string_view windowSpec,
                                  std::vector<BSONArray> inputDocs,
                                  const mongo::BSONArray& expectedResult,
                                  std::unique_ptr<CollatorInterface> collator = nullptr) {
@@ -156,7 +158,7 @@ public:
                 << "Expected a non-empty result object but got: "
                 << std::make_pair(nextTag, nextVal);
             while (!objEnum.atEnd()) {
-                if (objEnum.getFieldName() == "result"_sd) {
+                if (objEnum.getFieldName() == "result"sv) {
                     auto [arrTag, arrVal] = objEnum.getViewOfValue();
                     ASSERT_EQ(arrTag, TypeTags::bsonArray)
                         << "Expected an array for field 'result' but got: "

@@ -40,6 +40,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -108,7 +109,7 @@ public:
 
     // We don't know the full path from a node unless we keep notes as we traverse from the
     // root.  We do this once and store it.
-    // TODO SERVER-122505: Do a FieldRef / StringData pass.
+    // TODO SERVER-122505: Do a FieldRef / std::string_view pass.
     // TODO SERVER-122506: We might want this inside of the MatchExpression.
     std::string path;
 

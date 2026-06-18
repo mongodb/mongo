@@ -41,8 +41,11 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class MatchExpressionHasherTest : public mongo::unittest::Test {
 public:
@@ -114,7 +117,7 @@ public:
                                                                OperationContext* opCtx) {
         return make_intrusive<ExpressionContextForTest>(
             opCtx,
-            NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+            NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv),
             CollatorInterface::cloneCollator(collator));
     }
 
@@ -240,7 +243,7 @@ TEST_F(MatchExpressionHasherTest, BitsAllSet) {
 TEST_F(MatchExpressionHasherTest, BitsBinDataEquivalentToArray) {
     // Verify that a BinData mask and an array of bit positions that encode the same bits
     // are considered equivalent and hash to the same value, for all four operators.
-    auto makeBinDataFilter = [](StringData op, std::vector<uint32_t> positions) {
+    auto makeBinDataFilter = [](std::string_view op, std::vector<uint32_t> positions) {
         auto buf = bitPositionsToBinData(positions);
         auto binData = BSONBinData(buf.data(), buf.size(), BinDataGeneral);
         return BSON("a" << BSON(op << binData));
@@ -453,9 +456,9 @@ TEST_F(MatchExpressionHasherTest, Text) {
 }
 
 TEST_F(MatchExpressionHasherTest, InternalSchemaAllElemMatchFromIndex) {
-    constexpr StringData json =
+    constexpr std::string_view json =
         "{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}";
-    constexpr StringData jsonWithDifferentChild =
+    constexpr std::string_view jsonWithDifferentChild =
         "{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {b: {$eq: 5}}]}}";
 
     assertNotEquivalent(fromjson(json), fromjson(jsonWithDifferentChild));
@@ -463,7 +466,7 @@ TEST_F(MatchExpressionHasherTest, InternalSchemaAllElemMatchFromIndex) {
 }
 
 TEST_F(MatchExpressionHasherTest, InternalSchemaAllowedPropertiesMatchExpression) {
-    constexpr StringData json = R"(
+    constexpr std::string_view json = R"(
         {
             "$_internalSchemaAllowedProperties": {
                 "properties": ["a"],
@@ -475,7 +478,7 @@ TEST_F(MatchExpressionHasherTest, InternalSchemaAllowedPropertiesMatchExpression
             }
         }
         )";
-    constexpr StringData jsonWithDifferentProp = R"(
+    constexpr std::string_view jsonWithDifferentProp = R"(
         {
             "$_internalSchemaAllowedProperties": {
                 "properties": ["a"],
@@ -487,7 +490,7 @@ TEST_F(MatchExpressionHasherTest, InternalSchemaAllowedPropertiesMatchExpression
             }
         }
         )";
-    constexpr StringData jsonWithDifferentOtherwise = R"(
+    constexpr std::string_view jsonWithDifferentOtherwise = R"(
         {
             "$_internalSchemaAllowedProperties": {
                 "properties": ["a"],
@@ -506,10 +509,10 @@ TEST_F(MatchExpressionHasherTest, InternalSchemaAllowedPropertiesMatchExpression
 }
 
 TEST_F(MatchExpressionHasherTest, InternalSchemaMatchArrayIndexMatchExpression) {
-    constexpr StringData json =
+    constexpr std::string_view json =
         "{foo: {$_internalSchemaMatchArrayIndex:"
         "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'number'}}}}}";
-    constexpr StringData jsonWithDifferentChild =
+    constexpr std::string_view jsonWithDifferentChild =
         "{foo: {$_internalSchemaMatchArrayIndex:"
         "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'string'}}}}}";
 
@@ -518,8 +521,8 @@ TEST_F(MatchExpressionHasherTest, InternalSchemaMatchArrayIndexMatchExpression) 
 }
 
 TEST_F(MatchExpressionHasherTest, InternalSchemaObjectMatchExpression) {
-    constexpr StringData json = "{a: {$_internalSchemaObjectMatch: {c: {$eq: 3}}}}";
-    constexpr StringData jsonWithDifferentChild =
+    constexpr std::string_view json = "{a: {$_internalSchemaObjectMatch: {c: {$eq: 3}}}}";
+    constexpr std::string_view jsonWithDifferentChild =
         "{a: {$_internalSchemaObjectMatch: {c: {$gt: 3}}}}";
 
     assertNotEquivalent(fromjson(json), fromjson(jsonWithDifferentChild));

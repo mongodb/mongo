@@ -34,6 +34,8 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/util/pcre_util.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -83,7 +85,7 @@ boost::optional<ShardRef> resolvePrimaryShard(OperationContext* opCtx,
     return boost::none;
 }
 
-BSONObj constructDbMatchFilterExact(StringData dbNameStr,
+BSONObj constructDbMatchFilterExact(std::string_view dbNameStr,
                                     const boost::optional<ShardRef>& optResolvedPrimaryShard) {
     BSONObjBuilder filterBuilder;
     filterBuilder.append(DatabaseType::kDbNameFieldName, dbNameStr);
@@ -98,7 +100,7 @@ BSONObj constructDbMatchFilterExact(StringData dbNameStr,
 
 boost::optional<DatabaseType> findDatabaseExactMatch(
     OperationContext* opCtx,
-    StringData dbNameStr,
+    std::string_view dbNameStr,
     const boost::optional<ShardRef>& optResolvedPrimaryShard) {
     const auto dbMatchFilterExact = constructDbMatchFilterExact(dbNameStr, optResolvedPrimaryShard);
 
@@ -112,7 +114,7 @@ boost::optional<DatabaseType> findDatabaseExactMatch(
     return boost::none;
 }
 
-BSONObj constructDbMatchFilterCaseInsensitive(StringData dbNameStr) {
+BSONObj constructDbMatchFilterCaseInsensitive(std::string_view dbNameStr) {
     BSONObjBuilder filterBuilder;
     filterBuilder.appendRegex(
         DatabaseType::kDbNameFieldName, fmt::format("^{}$", pcre_util::quoteMeta(dbNameStr)), "i");

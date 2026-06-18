@@ -28,6 +28,7 @@
  */
 
 #pragma once
+#include <string_view>
 
 /**
  * Compiler-targeted macro definitions and utilities.

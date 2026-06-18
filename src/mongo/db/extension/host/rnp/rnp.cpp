@@ -34,6 +34,7 @@
 #include "mongo/util/str.h"
 
 #include <fstream>
+#include <string_view>
 
 #include <fmt/format.h>
 #include <rnp/rnp_err.h>

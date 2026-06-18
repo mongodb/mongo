@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
@@ -75,6 +74,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -394,7 +394,7 @@ void _reportInvalidResults(OperationContext* opCtx,
 }
 
 template <typename T>
-void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* results) {
+void addErrorIfUnequal(T stored, T cached, std::string_view name, ValidateResults* results) {
     if (stored != cached) {
         results->addError(str::stream()
                           << "stored value for " << name
@@ -404,7 +404,7 @@ void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* res
 
 void addErrorIfUnequal(boost::optional<ValidationLevelEnum> stored,
                        boost::optional<ValidationLevelEnum> cached,
-                       StringData name,
+                       std::string_view name,
                        ValidateResults* results) {
     addErrorIfUnequal(idl::serialize(validationLevelOrDefault(stored)),
                       idl::serialize(validationLevelOrDefault(cached)),
@@ -414,7 +414,7 @@ void addErrorIfUnequal(boost::optional<ValidationLevelEnum> stored,
 
 void addErrorIfUnequal(boost::optional<ValidationActionEnum> stored,
                        boost::optional<ValidationActionEnum> cached,
-                       StringData name,
+                       std::string_view name,
                        ValidateResults* results) {
     addErrorIfUnequal(idl::serialize(validationActionOrDefault(stored)),
                       idl::serialize(validationActionOrDefault(cached)),
@@ -519,7 +519,7 @@ boost::optional<std::string> getConfigOverrideOrThrow(const BSONElement& raw) {
     if (!raw) {
         return boost::none;
     }
-    StringData chosenConfig = raw.valueStringDataSafe();
+    std::string_view chosenConfig = raw.valueStringDataSafe();
     // Only a specific subset of valid configurations are allowlisted here. This is mostly to avoid
     // having complex logic to parse/sanitize the user-chosen configuration string.
     static const char* allowed[] = {

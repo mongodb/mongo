@@ -31,6 +31,8 @@
 #include "mongo/db/extension/shared/explain_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
 
+#include <string_view>
+
 namespace mongo::extension {
 
 void ExecAggStageAPI::setSource(const ExecAggStageHandle& input) {

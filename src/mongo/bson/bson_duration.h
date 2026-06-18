@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -57,7 +58,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS Duration parseDurationFromCount(const BSO
  */
 template <typename ToDuration, typename Period>
 MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS void serializeDurationToCount(
-    const Duration<Period>& duration, StringData fieldName, BSONObjBuilder* builder) {
+    const Duration<Period>& duration, std::string_view fieldName, BSONObjBuilder* builder) {
     builder->append(fieldName, durationCount<ToDuration>(duration));
 }
 

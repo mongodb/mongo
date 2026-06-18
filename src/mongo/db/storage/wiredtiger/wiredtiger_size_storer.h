@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
@@ -40,6 +39,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -87,26 +87,26 @@ public:
      * Ensure that the shared SizeInfo will be stored by the next call to flush.
      * Values stored are no older than the values at time of this call, but may be newer.
      */
-    void store(StringData uri, std::shared_ptr<SizeInfo> sizeInfo);
+    void store(std::string_view uri, std::shared_ptr<SizeInfo> sizeInfo);
 
     /**
      * Returns the size info for the given URI. Creates a default-initialized SizeInfo if there is
      * no existing size info for the given URI. Never returns nullptr.
      */
-    std::shared_ptr<SizeInfo> load(WiredTigerSession& session, StringData uri) const;
+    std::shared_ptr<SizeInfo> load(WiredTigerSession& session, std::string_view uri) const;
 
     /**
      * Informs the size storer that the size information about the given ident should be removed
      * upon the next flush.
      */
-    void remove(StringData uri);
+    void remove(std::string_view uri);
 
     /**
      * Writes all changes to the underlying table.
      */
     void flush(bool syncToDisk);
 
-    StringData getStorageUri() {
+    std::string_view getStorageUri() {
         return _storageUri;
     }
 

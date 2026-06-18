@@ -83,6 +83,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -117,7 +118,7 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
 
 }  // namespace
 
-WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData ns)
+WriteContextForTests::WriteContextForTests(OperationContext* opCtx, std::string_view ns)
     : _opCtx(opCtx), _nss(NamespaceString::createNamespaceString_forTest(ns)) {
     // Lock the database and collection
     _autoDb.emplace(opCtx, _nss.dbName(), MODE_IX);

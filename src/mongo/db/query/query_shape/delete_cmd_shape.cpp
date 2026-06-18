@@ -45,6 +45,7 @@
 
 namespace mongo::query_shape {
 namespace {
+using namespace std::literals::string_view_literals;
 
 BSONObj shapifyQuery(const ParsedDelete& parsedDelete,
                      const query_shape::SerializationOptions& opts) {
@@ -64,7 +65,7 @@ BSONObj shapifyQuery(const ParsedDelete& parsedDelete,
 
     BSONElement valueElem = idElem;
     if (idElem.type() == BSONType::object &&
-        idElem.Obj().firstElementFieldNameStringData() == "$eq"_sd) {
+        idElem.Obj().firstElementFieldNameStringData() == "$eq"sv) {
         valueElem = idElem.Obj().firstElement();
     }
 

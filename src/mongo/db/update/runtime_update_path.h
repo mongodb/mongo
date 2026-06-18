@@ -32,6 +32,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -96,7 +97,7 @@ public:
         return _fieldRef.numParts();
     }
 
-    void append(StringData fieldName, ComponentType type) {
+    void append(std::string_view fieldName, ComponentType type) {
         validate();
         _fieldRef.appendPart(fieldName);
         _types.push_back(type);
@@ -143,7 +144,7 @@ private:
 class RuntimeUpdatePathTempAppend {
 public:
     RuntimeUpdatePathTempAppend(RuntimeUpdatePath& typedFieldRef,
-                                StringData part,
+                                std::string_view part,
                                 RuntimeUpdatePath::ComponentType type)
         : _typedFieldRef(typedFieldRef) {
         _typedFieldRef.append(part, type);

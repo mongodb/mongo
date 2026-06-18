@@ -30,7 +30,6 @@
 #include "mongo/db/ttl/ttl_monitor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -99,6 +98,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>
@@ -769,7 +769,7 @@ bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
     auto timeSeriesOptions = collectionPtr->getTimeseriesOptions();
     std::string timeField = std::string{timeseries::kControlMaxFieldNamePrefix} +
         std::string{timeSeriesOptions->getTimeField()};
-    LTEMatchExpression filter(boost::optional<StringData>{timeField},
+    LTEMatchExpression filter(boost::optional<std::string_view>{timeField},
                               Value{at - Seconds(expireAfterSeconds)});
 
     // Delete from the beginning of the clustered _id index. In the typical case we consider

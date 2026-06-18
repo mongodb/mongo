@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/projection_executor.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -47,7 +47,8 @@ namespace mongo::projection_executor_utils {
  * Applies the projection to a single field name. Returns whether or not the projection would
  * allow that field to remain in a document.
  **/
-bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor, StringData field);
+bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor,
+                               std::string_view field);
 
 /**
  * Applies the projection to each field from the 'fields' set and stores it in the returned set

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -39,6 +38,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -77,11 +77,11 @@ public:
     bool equivalent(const ExpressionWithPlaceholder* other) const;
 
     /**
-     * If this object has a placeholder, returns a view of the placeholder as a StringData.
+     * If this object has a placeholder, returns a view of the placeholder as a std::string_view.
      */
-    boost::optional<StringData> getPlaceholder() const {
+    boost::optional<std::string_view> getPlaceholder() const {
         if (_placeholder) {
-            return StringData(*_placeholder);
+            return std::string_view(*_placeholder);
         }
         return boost::none;
     }

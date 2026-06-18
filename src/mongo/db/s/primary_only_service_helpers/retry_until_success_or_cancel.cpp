@@ -29,13 +29,15 @@
 
 #include "mongo/db/s/primary_only_service_helpers/retry_until_success_or_cancel.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace primary_only_service_helpers {
 
 RetryUntilSuccessOrCancel::RetryUntilSuccessOrCancel(
-    StringData serviceName,
+    std::string_view serviceName,
     std::shared_ptr<executor::ScopedTaskExecutor> taskExecutor,
     std::shared_ptr<ThreadPool> markKilledExecutor,
     CancellationToken token,
@@ -47,7 +49,7 @@ RetryUntilSuccessOrCancel::RetryUntilSuccessOrCancel(
       _retryFactory(token, markKilledExecutor, isRetryable),
       _metadata{std::move(metadata)} {}
 
-void RetryUntilSuccessOrCancel::logError(StringData errorKind,
+void RetryUntilSuccessOrCancel::logError(std::string_view errorKind,
                                          const std::string& operationName,
                                          const Status& status) const {
     LOGV2(8126400,

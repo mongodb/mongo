@@ -31,7 +31,6 @@
 #include "mongo/db/topology/cluster_parameters/get_cluster_parameter_invocation.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
@@ -46,12 +45,14 @@
 #include "mongo/util/str.h"
 
 #include <map>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 std::pair<std::vector<std::string>, std::vector<BSONObj>>
 GetClusterParameterInvocation::retrieveRequestedParameters(
@@ -111,7 +112,7 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
     };
 
     visit(OverloadedVisitor{[&](const std::string& strParameterName) {
-                                if (strParameterName == "*"_sd) {
+                                if (strParameterName == "*"sv) {
                                     // Retrieve all cluster parameter values.
                                     const Map& clusterParameterMap = clusterParameters->getMap();
                                     parameterValues.reserve(clusterParameterMap.size());

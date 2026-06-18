@@ -35,12 +35,14 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 class MONGO_MOD_NEEDS_REPLACEMENT WriteBlockBypass {
 public:
     static WriteBlockBypass& get(OperationContext* opCtx);
 
-    static constexpr StringData fieldName() {
+    static constexpr std::string_view fieldName() {
         return "mayBypassWriteBlocking"_sd;
     }
 

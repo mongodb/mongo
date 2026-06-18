@@ -40,6 +40,8 @@
 #include "mongo/util/tcmalloc_parameters_gen.h"
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
+#include <string_view>
+
 #include <tcmalloc/malloc_extension.h>
 #elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 #include <gperftools/malloc_extension.h>
@@ -47,10 +49,11 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 constexpr int testValInt = 753240;
 constexpr bool testValBool = 0;
-constexpr auto testValIntAsStr = "753240"_sd;
-constexpr auto testValBoolAsStr = "0"_sd;
+constexpr auto testValIntAsStr = "753240"sv;
+constexpr auto testValBoolAsStr = "0"sv;
 
 /**
  * This function runs a simple append test that builds up a BSONObj using tcmalloc server
@@ -60,10 +63,10 @@ constexpr auto testValBoolAsStr = "0"_sd;
  * @param name: The name of the server parameter.
  * @param value: A size_t used to initialize param's value.
  * @param setTcmallocValue: The set helper function to use when setting the server parameter. It
- * should take in a StringData parameter name and a size_t value
+ * should take in a std::string_view parameter name and a size_t value
  */
 template <typename T, typename F>
-void runAppendTest(T param, StringData name, size_t value, const F& setTcmallocValue) {
+void runAppendTest(T param, std::string_view name, size_t value, const F& setTcmallocValue) {
     ASSERT_DOES_NOT_THROW(setTcmallocValue(name, value));
 
     BSONObjBuilder bob;
@@ -85,15 +88,15 @@ void runAppendTest(T param, StringData name, size_t value, const F& setTcmallocV
 
     auto obj = bob.obj();
     for (const auto& e : obj) {
-        if (e.fieldName() == "test"_sd) {
+        if (e.fieldName() == "test"sv) {
             ASSERT_EQ(e.numberLong(), value);
-        } else if (e.fieldName() == "sub_doc"_sd) {
+        } else if (e.fieldName() == "sub_doc"sv) {
             for (const auto& subElem : e.embeddedObject()) {
-                if (subElem.fieldName() == "sub_test"_sd) {
+                if (subElem.fieldName() == "sub_test"sv) {
                     ASSERT_EQ(subElem.numberLong(), value + 1);
                 }
             }
-        } else if (e.fieldName() == ""_sd) {
+        } else if (e.fieldName() == ""sv) {
             ASSERT_EQ(e.numberLong(), value + 1);
         }
     }
@@ -107,10 +110,10 @@ void runAppendTest(T param, StringData name, size_t value, const F& setTcmallocV
  * @param name: The name of the server parameter.
  * @param value: The value that is set on the parameter.
  * @param getTcmallocValue: The get helper function to use when getting the server parameter. It
- * should take in a StringData parameter name
+ * should take in a std::string_view parameter name
  */
 template <typename T, typename F>
-void runSetTest(T param, StringData name, int value, const F& getTcmallocValue) {
+void runSetTest(T param, std::string_view name, int value, const F& getTcmallocValue) {
     BSONElement emptyElem;
     ASSERT_EQ(ErrorCodes::TypeMismatch, param.set(emptyElem, boost::none));
 
@@ -135,12 +138,15 @@ void runSetTest(T param, StringData name, int value, const F& getTcmallocValue) 
  *
  * @param param: The server parameter that we are setting the data on.
  * @param name: The name of the server parameter.
- * @param value: The StringData value that is set on the parameter.
+ * @param value: The std::string_view value that is set on the parameter.
  * @param getTcmallocValue: The get helper function to use when getting the server parameter. It
- * should take in a StringData parameter name
+ * should take in a std::string_view parameter name
  */
 template <typename T, typename F>
-void runSetFromStringTest(T param, StringData name, StringData value, const F& getTcmallocValue) {
+void runSetFromStringTest(T param,
+                          std::string_view name,
+                          std::string_view value,
+                          const F& getTcmallocValue) {
     int intVal;
     ASSERT_OK(NumberParser{}(value, &intVal));
 
@@ -174,10 +180,10 @@ void runNoOpAppendTest(T param) {
  * @param param: The server parameter that we are setting the data on.
  * @param name: The name of the server parameter.
  * @param getTcmallocValue: The get helper function to use when getting the server parameter. It
- * should take in a StringData parameter name
+ * should take in a std::string_view parameter name
  */
 template <typename T, typename F>
-void runNoOpSetTest(T param, StringData name, const F& getTcmallocValue) {
+void runNoOpSetTest(T param, std::string_view name, const F& getTcmallocValue) {
     ASSERT_THROWS_CODE(
         getTcmallocValue(name), ExceptionFor<ErrorCodes::InternalError>, ErrorCodes::InternalError);
     BSONObjBuilder bob;
@@ -196,10 +202,10 @@ void runNoOpSetTest(T param, StringData name, const F& getTcmallocValue) {
  * @param param: The server parameter that we are setting the data on.
  * @param name: The name of the server parameter.
  * @param getTcmallocValue: The get helper function to use when getting the server parameter. It
- * should take in a StringData parameter name
+ * should take in a std::string_view parameter name
  */
 template <typename T, typename F>
-void runNoOpSetFromStringTest(T param, StringData name, const F& getTcmallocValue) {
+void runNoOpSetFromStringTest(T param, std::string_view name, const F& getTcmallocValue) {
     ASSERT_THROWS_CODE(
         getTcmallocValue(name), ExceptionFor<ErrorCodes::InternalError>, ErrorCodes::InternalError);
     ASSERT_OK(param.setFromString("1", boost::none));
@@ -207,112 +213,112 @@ void runNoOpSetFromStringTest(T param, StringData name, const F& getTcmallocValu
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 TEST(MaxPerCPUCacheSizeParam, AppendTest) {
-    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"sv,
                                                     ServerParameterType::kStartupAndRuntime);
     runAppendTest(param, kMaxPerCPUCacheSizePropertyName, testValInt, &setTcmallocProperty);
 }
 
 TEST(MaxPerCPUCacheSizeParam, SetTest) {
-    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"sv,
                                                     ServerParameterType::kStartupAndRuntime);
     runSetTest(param, kMaxPerCPUCacheSizePropertyName, testValInt, &getTcmallocProperty);
 }
 
 TEST(MaxPerCPUCacheSizeParam, SetFromStringTest) {
-    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"sv,
                                                     ServerParameterType::kStartupAndRuntime);
     runSetFromStringTest(
         param, kMaxPerCPUCacheSizePropertyName, testValIntAsStr, &getTcmallocProperty);
 }
 
 TEST(MaxTotalThreadCacheBytesParam, NoOpAppendTest) {
-    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runNoOpAppendTest(param);
 }
 
 TEST(MaxTotalThreadCacheBytesParam, NoOpSetTest) {
-    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runNoOpSetTest(param, kMaxTotalThreadCacheBytesPropertyName, &getTcmallocProperty);
 }
 
 TEST(MaxTotalThreadCacheBytesParam, NoOpSetFromStringTest) {
-    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runNoOpSetFromStringTest(param, kMaxTotalThreadCacheBytesPropertyName, &getTcmallocProperty);
 }
 
 TEST(AggressiveMemoryDecommit, NoOpAppendTest) {
-    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
+    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runNoOpAppendTest(param);
 }
 
 TEST(AggressiveMemoryDecommit, NoOpSetTest) {
-    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
+    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runNoOpSetTest(param, kAggressiveMemoryDecommitPropertyName, &getTcmallocProperty);
 }
 
 TEST(AggressiveMemoryDecommit, NoOpSetFromStringTest) {
-    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
+    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runNoOpSetFromStringTest(param, kAggressiveMemoryDecommitPropertyName, &getTcmallocProperty);
 }
 
 #elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 TEST(MaxPerCPUCacheSizeParam, NoOpAppendTest) {
-    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"sv,
                                                     ServerParameterType::kStartupAndRuntime);
     runNoOpAppendTest(param);
 }
 
 TEST(MaxPerCPUCacheSizeParam, NoOpSetTest) {
-    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"sv,
                                                     ServerParameterType::kStartupAndRuntime);
     runNoOpSetTest(param, kMaxPerCPUCacheSizePropertyName, &getTcmallocProperty);
 }
 
 TEST(MaxPerCPUCacheSizeParam, NoOpSetFromStringTest) {
-    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"sv,
                                                     ServerParameterType::kStartupAndRuntime);
     runNoOpSetFromStringTest(param, kMaxPerCPUCacheSizePropertyName, &getTcmallocProperty);
 }
 
 TEST(MaxTotalThreadCacheBytesParam, AppendTest) {
-    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runAppendTest(param, kMaxTotalThreadCacheBytesPropertyName, testValInt, &setTcmallocProperty);
 }
 
 TEST(MaxTotalThreadCacheBytesParam, SetTest) {
-    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runSetTest(param, kMaxTotalThreadCacheBytesPropertyName, testValInt, &getTcmallocProperty);
 }
 
 TEST(MaxTotalThreadCacheBytesParam, SetFromStringTest) {
-    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runSetFromStringTest(
         param, kMaxTotalThreadCacheBytesPropertyName, testValIntAsStr, &getTcmallocProperty);
 }
 
 TEST(AggressiveMemoryDecommit, AppendTest) {
-    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
+    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runAppendTest(param, kAggressiveMemoryDecommitPropertyName, testValBool, &setTcmallocProperty);
 }
 
 TEST(AggressiveMemoryDecommit, SetTest) {
-    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
+    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runSetTest(param, kAggressiveMemoryDecommitPropertyName, testValBool, &getTcmallocProperty);
 }
 
 TEST(AggressiveMemoryDecommit, SetFromStringTest) {
-    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
+    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"sv,
                                                           ServerParameterType::kStartupAndRuntime);
     runSetFromStringTest(
         param, kAggressiveMemoryDecommitPropertyName, testValBoolAsStr, &getTcmallocProperty);
@@ -320,17 +326,17 @@ TEST(AggressiveMemoryDecommit, SetFromStringTest) {
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 
 TEST(ReleaseRate, AppendTest) {
-    TCMallocReleaseRateServerParameter param("tcmallocReleaseRate"_sd,
+    TCMallocReleaseRateServerParameter param("tcmallocReleaseRate"sv,
                                              ServerParameterType::kStartupAndRuntime);
     runAppendTest(
-        param, "", testValInt, [](StringData, size_t value) { setMemoryReleaseRate(value); });
+        param, "", testValInt, [](std::string_view, size_t value) { setMemoryReleaseRate(value); });
 }
 
 TEST(ReleaseRate, SetFromStringTest) {
-    TCMallocReleaseRateServerParameter param("tcmallocReleaseRate"_sd,
+    TCMallocReleaseRateServerParameter param("tcmallocReleaseRate"sv,
                                              ServerParameterType::kStartupAndRuntime);
     runSetFromStringTest(
-        param, "", testValIntAsStr, [](StringData) { return getMemoryReleaseRate(); });
+        param, "", testValIntAsStr, [](std::string_view) { return getMemoryReleaseRate(); });
 }
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
@@ -338,7 +344,7 @@ TEST(SamplingRate, EnsureProfileSamplingRateIsZero) {
     ASSERT_EQ(tcmalloc::MallocExtension::GetProfileSamplingRate(), 0);
 }
 
-ServerStatusSection* getSection(StringData name) {
+ServerStatusSection* getSection(std::string_view name) {
     auto& registry = *ServerStatusSectionRegistry::instance();
     auto section = std::find_if(
         registry.begin(), registry.end(), [&](auto&& kvp) { return kvp.first.first == name; });
@@ -366,7 +372,7 @@ TEST(GoogleTcmalloc, VerifyCacheSize) {
     // Grab the tcmalloc cache sizes via server status
     // This avoids directly including cpu_cache.h which includes logging.h which has ASSERT macros
     // which conflict with MongoDB's ASSERTs.
-    auto section = getSection("tcmalloc"_sd);
+    auto section = getSection("tcmalloc"sv);
     auto config = BSON("tcmalloc" << 2);
     auto metrics = section->generateSection(nullptr, config.firstElement());
 

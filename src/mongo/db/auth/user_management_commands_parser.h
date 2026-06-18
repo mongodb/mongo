@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_format.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -58,7 +58,7 @@ Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
  * Performs syntactic validation of "rolesArray", only.
  */
 Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
-                                   StringData dbname,
+                                   std::string_view dbname,
                                    std::vector<RoleName>* parsedRoleNames);
 
 /**
@@ -67,7 +67,7 @@ Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
  * Performs syntactic validation of "usersArray", only.
  */
 Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
-                                   StringData dbname,
+                                   std::string_view dbname,
                                    std::vector<UserName>* parsedUserNames);
 
 }  // namespace auth

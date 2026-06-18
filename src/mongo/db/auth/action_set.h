@@ -30,13 +30,13 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/util/modules.h"
 
 #include <bitset>
 #include <initializer_list>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -54,7 +54,7 @@ public:
 
     // Parse a human-readable set of ActionTypes into a bitset of actions.
     // unrecognizedActions will be populated with a copy of any unexpected action, if present.
-    static ActionSet parseFromStringVector(const std::vector<StringData>& actions,
+    static ActionSet parseFromStringVector(const std::vector<std::string_view>& actions,
                                            std::vector<std::string>* unrecognizedActions = nullptr);
 
     void addAction(ActionType action);
@@ -90,7 +90,7 @@ public:
     // Returns a vector of strings representing the actions in the ActionSet.
     // The storage for these StringDatas comes from IDL constexpr definitions for
     // ActionTypes and is therefore guaranteed for the life of the process.
-    std::vector<StringData> getActionsAsStringDatas() const;
+    std::vector<std::string_view> getActionsAsStringDatas() const;
 
     friend bool operator==(const ActionSet& lhs, const ActionSet& rhs) {
         return lhs.equals(rhs);

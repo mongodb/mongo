@@ -30,7 +30,6 @@
 #include "mongo/db/stats/storage_stats.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/basic_types_gen.h"
@@ -63,12 +62,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 enum class StorageStatsGroups {
@@ -108,7 +109,7 @@ void _appendRecordStats(OperationContext* opCtx,
                         int scale,
                         bool isTimeseries,
                         BSONObjBuilder* result) {
-    static constexpr auto kOrphanCountField = "numOrphanDocs"_sd;
+    static constexpr auto kOrphanCountField = "numOrphanDocs"sv;
     long long size = collection->dataSize(opCtx) / scale;
     result->appendNumber("size", size);
 
@@ -152,10 +153,10 @@ void _appendRecordStats(OperationContext* opCtx,
  * Returns a document only if "uri" is in the original document
  */
 BSONObj filterQECustomStats(BSONObj obj) {
-    if (obj.firstElementFieldName() == "wiredTiger"_sd) {
-        auto uriElement = obj.firstElement()["uri"_sd];
+    if (obj.firstElementFieldName() == "wiredTiger"sv) {
+        auto uriElement = obj.firstElement()["uri"sv];
         if (uriElement.ok()) {
-            return BSON("wiredTiger"_sd << BSON("uri"_sd << uriElement));
+            return BSON("wiredTiger"sv << BSON("uri"sv << uriElement));
         }
     }
 
@@ -172,9 +173,9 @@ BSONObj filterQECustomStats(BSONObj obj) {
  * Returns a document only if "uri" is in the original document
  */
 BSONObj filterQEIndexStats(BSONObj obj) {
-    auto uriElement = obj["uri"_sd];
+    auto uriElement = obj["uri"sv];
     if (uriElement.ok()) {
-        return BSON("uri"_sd << uriElement);
+        return BSON("uri"sv << uriElement);
     }
 
     return BSONObj();
@@ -318,7 +319,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     bool verbose = storageStatsSpec.getVerbose();
     bool waitForLock = storageStatsSpec.getWaitForLock();
     bool numericOnly = storageStatsSpec.getNumericOnly();
-    static constexpr auto kStorageStatsField = "storageStats"_sd;
+    static constexpr auto kStorageStatsField = "storageStats"sv;
 
     auto failed = [&](const DBException& ex) {
         LOGV2_DEBUG(

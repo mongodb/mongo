@@ -29,7 +29,6 @@
 
 #include "mongo/db/change_stream_pre_image_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/change_stream_options_gen.h"

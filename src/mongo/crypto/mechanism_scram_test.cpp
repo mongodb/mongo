@@ -35,6 +35,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <cstring>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
@@ -47,12 +48,12 @@ namespace scram {
 namespace {
 
 template <typename HashBlock>
-void testBasicVectors(StringData saltedPw,
-                      StringData clientKey,
-                      StringData storedKey,
-                      StringData serverKey,
-                      StringData proof,
-                      StringData signature) {
+void testBasicVectors(std::string_view saltedPw,
+                      std::string_view clientKey,
+                      std::string_view storedKey,
+                      std::string_view serverKey,
+                      std::string_view proof,
+                      std::string_view signature) {
     // Predictable salts yield predictable secrets.
     // salt = {0, 1, 2, 3, ..., n-1}
     std::vector<uint8_t> salt;
@@ -68,7 +69,7 @@ void testBasicVectors(StringData saltedPw,
     ASSERT_EQ(secrets.storedKey().toString(), storedKey);
     ASSERT_EQ(secrets.serverKey().toString(), serverKey);
 
-    const StringData authMessage("secret");
+    const std::string_view authMessage("secret");
     const auto generatedProof = secrets.generateClientProof(authMessage);
     ASSERT_EQ(generatedProof, proof);
     ASSERT_TRUE(secrets.verifyClientProof(authMessage, base64::decode(generatedProof)));

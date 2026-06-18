@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -81,10 +80,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
+using namespace std::literals::string_view_literals;
+
+using namespace std::literals::string_view_literals;
 namespace mongo {
 namespace {
 
@@ -98,7 +101,7 @@ class CollectionTest : public CatalogTestFixture {
 protected:
     void makeCapped(NamespaceString nss, long long cappedSize = 8192);
     void makeTimeseries(NamespaceString nss);
-    void makeCollectionForMultikey(NamespaceString nss, StringData indexName);
+    void makeCollectionForMultikey(NamespaceString nss, std::string_view indexName);
 };
 
 void CollectionTest::makeCapped(NamespaceString nss, long long cappedSize) {
@@ -303,7 +306,7 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
     ASSERT_EQ(notifier->getVersion(), thisVersion);
 }
 
-void CollectionTest::makeCollectionForMultikey(NamespaceString nss, StringData indexName) {
+void CollectionTest::makeCollectionForMultikey(NamespaceString nss, std::string_view indexName) {
     auto opCtx = operationContext();
     {
         auto acq = acquireCollection(
@@ -333,7 +336,7 @@ void CollectionTest::makeCollectionForMultikey(NamespaceString nss, StringData i
 
 TEST_F(CollectionTest, VerifyIndexIsUpdated) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    auto indexName = "myindex"_sd;
+    auto indexName = "myindex"sv;
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
@@ -391,7 +394,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
 
 TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    auto indexName = "myindex"_sd;
+    auto indexName = "myindex"sv;
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
@@ -451,7 +454,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
 
 TEST_F(CollectionTest, SetIndexIsMultikey) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    auto indexName = "myindex"_sd;
+    auto indexName = "myindex"sv;
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
@@ -476,7 +479,7 @@ TEST_F(CollectionTest, SetIndexIsMultikey) {
 
 TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    auto indexName = "myindex"_sd;
+    auto indexName = "myindex"sv;
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
@@ -505,7 +508,7 @@ TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
 
 TEST_F(CollectionTest, ForceSetIndexIsMultikey) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    auto indexName = "myindex"_sd;
+    auto indexName = "myindex"sv;
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
@@ -532,7 +535,7 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikey) {
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 TEST_F(CollectionTest, VerifyConsistentCollectionProperties) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    auto indexName = "myindex"_sd;
+    auto indexName = "myindex"sv;
     makeCollectionForMultikey(nss, indexName);
 
     auto consistentCollection = ConsistentCollection{};
@@ -586,7 +589,7 @@ TEST_F(CollectionTest, VerifyConsistentCollectionProperties) {
 
 TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    auto indexName = "myindex"_sd;
+    auto indexName = "myindex"sv;
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
@@ -1459,7 +1462,7 @@ TEST_F(CatalogTestFixture, TruncateRangeOnClusteredCollection) {
 
     // Should fail if collection has indexes.
     {
-        auto indexName = "myindex"_sd;
+        auto indexName = "myindex"sv;
         {
             CollectionWriter writer{opCtx, &acq};
             WriteUnitOfWork wuow(opCtx);

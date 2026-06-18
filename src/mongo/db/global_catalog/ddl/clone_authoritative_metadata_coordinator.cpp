@@ -45,6 +45,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL);
 
@@ -166,7 +167,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     }
 
     DDLLockManager::ScopedDatabaseDDLLock dbLock(
-        opCtx, dbName, "cloneAuthoritativeMetadata"_sd, MODE_IX);
+        opCtx, dbName, "cloneAuthoritativeMetadata"sv, MODE_IX);
 
     {
         // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata
@@ -185,7 +186,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     for (const auto& nss : getTrackedNamespaces(opCtx, dbName)) {
         try {
             DDLLockManager::ScopedCollectionDDLLock collLock(
-                opCtx, nss, "cloneAuthoritativeMetadata"_sd, MODE_X);
+                opCtx, nss, "cloneAuthoritativeMetadata"sv, MODE_X);
 
             sharding_ddl_util::cloneAuthoritativeCollectionMetadataToShards(
                 opCtx,

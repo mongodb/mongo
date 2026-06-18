@@ -59,6 +59,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -597,7 +598,8 @@ public:
      * Signal all OperationContext(s) that they have been killed except the ones belonging to the
      * excluded clients.
      */
-    void setKillAllOperations(std::function<bool(const StringData)> excludedClientPredicate = {});
+    void setKillAllOperations(
+        std::function<bool(const std::string_view)> excludedClientPredicate = {});
 
     /**
      * Reset the operation kill state after a killAllOperations.

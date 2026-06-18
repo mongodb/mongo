@@ -39,6 +39,8 @@
 // The Intel C library typedefs wchar_t, but it is a distinct fundamental type
 // in C++, so we #define _WCHAR_T here to prevent the library from trying to typedef.
 #define _WCHAR_T
+#include <string_view>
+
 #include <bid_conf.h>
 #include <bid_functions.h>
 
@@ -47,7 +49,6 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
@@ -67,7 +68,7 @@ namespace {
  *  - NaN: /(?i)^[+-]?nan$/
  *  - Infinity: /(?i)^[+-]?inf(inity)?$)
  */
-size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
+size_t validateInputString(std::string_view input, std::uint32_t* signalingFlags) {
     if (input.empty()) {
         *signalingFlags = Decimal128::SignalingFlag::kInvalid;
         return 0;
@@ -77,7 +78,7 @@ size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
     // Check for NaN and Infinity
     size_t start = (isSigned) ? 1 : 0;
     size_t charsConsumed = start;
-    StringData noSign = input.substr(start);
+    std::string_view noSign = input.substr(start);
     if (noSign.empty()) {
         *signalingFlags = Decimal128::SignalingFlag::kInvalid;
         return 0;
@@ -140,7 +141,7 @@ size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
     }
 
     // Check exponent
-    StringData exponent = noSign.substr(i);
+    std::string_view exponent = noSign.substr(i);
 
     if ((exponent[0] != 'e' && exponent[0] != 'E') || exponent.size() < 2) {
         *signalingFlags = Decimal128::SignalingFlag::kInvalid;
@@ -511,7 +512,7 @@ std::string Decimal128::toString() const {
      */
     bid128_to_string(decimalCharRepresentation, dec128, &idec_signaling_flags);
 
-    StringData dec128String(decimalCharRepresentation);
+    std::string_view dec128String(decimalCharRepresentation);
 
     int ePos = dec128String.find('E');
 
@@ -519,7 +520,7 @@ std::string Decimal128::toString() const {
     int precision = 0;
     int exponent = 0;
 
-    StringData exponentString = dec128String.substr(ePos);
+    std::string_view exponentString = dec128String.substr(ePos);
 
     // Get the value of the exponent, start at 2 to ignore the E and the sign
     for (size_t i = 2; i < exponentString.size(); ++i) {
@@ -537,7 +538,7 @@ std::string Decimal128::toString() const {
     if (dec128String[0] == '-')
         result = "-";
 
-    StringData coefficient = dec128String.substr(1, precision);
+    std::string_view coefficient = dec128String.substr(1, precision);
     int adjustedExponent = exponent + precision - 1;
 
     if (exponent > 0 || adjustedExponent < -6) {
@@ -549,7 +550,7 @@ std::string Decimal128::toString() const {
     return result;
 }
 
-std::string Decimal128::_convertToScientificNotation(StringData coefficient,
+std::string Decimal128::_convertToScientificNotation(std::string_view coefficient,
                                                      int adjustedExponent) const {
     int cLength = coefficient.size();
     std::string result;
@@ -567,7 +568,7 @@ std::string Decimal128::_convertToScientificNotation(StringData coefficient,
     return result;
 }
 
-std::string Decimal128::_convertToStandardDecimalNotation(StringData coefficient,
+std::string Decimal128::_convertToStandardDecimalNotation(std::string_view coefficient,
                                                           int exponent) const {
     if (exponent == 0) {
         return std::string{coefficient};

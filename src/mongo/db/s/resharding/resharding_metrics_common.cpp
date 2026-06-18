@@ -32,17 +32,20 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
-const stdx::unordered_map<ReshardingMetricsCommon::Role, StringData> roleToName = {
-    {ReshardingMetricsCommon::Role::kCoordinator, "Coordinator"_sd},
-    {ReshardingMetricsCommon::Role::kDonor, "Donor"_sd},
-    {ReshardingMetricsCommon::Role::kRecipient, "Recipient"_sd},
+using namespace std::literals::string_view_literals;
+const stdx::unordered_map<ReshardingMetricsCommon::Role, std::string_view> roleToName = {
+    {ReshardingMetricsCommon::Role::kCoordinator, "Coordinator"sv},
+    {ReshardingMetricsCommon::Role::kDonor, "Donor"sv},
+    {ReshardingMetricsCommon::Role::kRecipient, "Recipient"sv},
 };
-}
+}  // namespace
 
-StringData ReshardingMetricsCommon::getRoleName(Role role) {
+std::string_view ReshardingMetricsCommon::getRoleName(Role role) {
     auto it = roleToName.find(role);
     invariant(it != roleToName.end());
     return it->second;

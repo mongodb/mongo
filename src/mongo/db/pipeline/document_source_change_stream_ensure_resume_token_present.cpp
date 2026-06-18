@@ -36,11 +36,13 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamEnsureResumeTokenPresent,
                             DocumentSourceChangeStreamEnsureResumeTokenPresent::id)
@@ -61,7 +63,7 @@ DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
     return new DocumentSourceChangeStreamEnsureResumeTokenPresent(expCtx, std::move(resumeToken));
 }
 
-StringData DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() const {
+std::string_view DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() const {
     return kStageName;
 }
 
@@ -98,12 +100,12 @@ Value DocumentSourceChangeStreamEnsureResumeTokenPresent::doSerialize(
     BSONObjBuilder builder;
     if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
-        sub.append("stage"_sd, kStageName);
-        sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));
+        sub.append("stage"sv, kStageName);
+        sub << "resumeToken"sv << Value(ResumeToken(_tokenFromClient).toDocument(opts));
         sub.done();
     } else {
         BSONObjBuilder sub(builder.subobjStart(kStageName));
-        sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));
+        sub << "resumeToken"sv << Value(ResumeToken(_tokenFromClient).toDocument(opts));
         sub.done();
     }
     return Value(builder.obj());

@@ -45,6 +45,7 @@
 #include "mongo/util/time_support.h"
 
 #include <array>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -58,6 +59,7 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -269,9 +271,10 @@ BSONObj MutableOplogEntry::makeCreateCollObject(const NamespaceString& collectio
     return b.obj();
 }
 
-BSONObj MutableOplogEntry::makeCreateCollObject2(const RecordId& catalogId,
-                                                 StringData ident,
-                                                 const boost::optional<StringData>& idIndexIdent) {
+BSONObj MutableOplogEntry::makeCreateCollObject2(
+    const RecordId& catalogId,
+    std::string_view ident,
+    const boost::optional<std::string_view>& idIndexIdent) {
     BSONObjBuilder b;
     catalogId.serializeToken("catalogId", &b);
     b.append("ident", ident);
@@ -570,7 +573,7 @@ bool DurableOplogEntry::isSingleOplogEntryTransactionWithCommand() const {
     // entries with commands at the beginning.
     for (BSONElement e : applyOps.Array()) {
         auto const opType = e.Obj().getStringField(OplogEntry::kOpTypeFieldName);
-        if (opType == "c"_sd) {
+        if (opType == "c"sv) {
             return true;
         }
     }
@@ -749,7 +752,7 @@ const boost::optional<mongo::UUID>& OplogEntry::getUuid() const {
     return _entry.getUuid();
 }
 
-boost::optional<StringData> OplogEntry::getContainer() const {
+boost::optional<std::string_view> OplogEntry::getContainer() const {
     return _entry.getContainer();
 }
 
@@ -890,13 +893,13 @@ bool OplogEntry::isNewPrimaryNoop() const {
 }
 
 bool OplogEntry::shouldLogAsDDLOperation() const {
-    static constexpr std::array ddlOpsToLog{"create"_sd,
-                                            "drop"_sd,
-                                            "renameCollection"_sd,
-                                            "collMod"_sd,
-                                            "dropDatabase"_sd,
-                                            "createIndexes"_sd,
-                                            "dropIndexes"_sd};
+    static constexpr std::array ddlOpsToLog{"create"sv,
+                                            "drop"sv,
+                                            "renameCollection"sv,
+                                            "collMod"sv,
+                                            "dropDatabase"sv,
+                                            "createIndexes"sv,
+                                            "dropIndexes"sv};
     return _entry.isCommand() &&
         std::find(ddlOpsToLog.begin(),
                   ddlOpsToLog.end(),

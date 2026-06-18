@@ -35,8 +35,9 @@
 #include <variant>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 TEST(DocsNeededBoundsTest, DocsNeededBoundsParsesCorrectly) {
-    auto bsonElemFieldName = "docsNeeded"_sd;
+    auto bsonElemFieldName = "docsNeeded"sv;
 
     auto bsonObj = BSON(bsonElemFieldName << "NeedAll");
     auto bounds = docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]);
@@ -58,7 +59,7 @@ TEST(DocsNeededBoundsTest, DocsNeededBoundsParsesCorrectly) {
 }
 
 TEST(DocsNeededBoundsTest, DocsNeededBoundsParseErrors) {
-    auto bsonElemFieldName = "docsNeeded"_sd;
+    auto bsonElemFieldName = "docsNeeded"sv;
 
     auto bsonObj = BSON(bsonElemFieldName << "Invalid");
     ASSERT_THROWS(docs_needed_bounds::parseDocsNeededConstraintFromBSON(bsonObj[bsonElemFieldName]),

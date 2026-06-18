@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 namespace mongo {
@@ -87,18 +88,18 @@ std::string getMetricsPrefix() {
 }
 
 template <typename T>
-std::string getIntervalPrefix(StringData intervalFieldName) {
+std::string getIntervalPrefix(std::string_view intervalFieldName) {
     return getMetricsPrefix<T>() + std::string{intervalFieldName} + ".";
 }
 
 template <typename T>
-std::string getIntervalStartFieldName(StringData intervalFieldName) {
+std::string getIntervalStartFieldName(std::string_view intervalFieldName) {
     return getIntervalPrefix<T>(intervalFieldName) +
         std::string{ReshardingMetricsTimeInterval::kStartFieldName};
 }
 
 template <typename T>
-std::string getIntervalEndFieldName(StringData intervalFieldName) {
+std::string getIntervalEndFieldName(std::string_view intervalFieldName) {
     return getIntervalPrefix<T>(intervalFieldName) +
         std::string{ReshardingMetricsTimeInterval::kStopFieldName};
 }

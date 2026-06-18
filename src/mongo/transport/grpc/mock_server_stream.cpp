@@ -34,6 +34,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/interruptible.h"
 
+#include <string_view>
+
 namespace mongo::transport::grpc {
 
 MockServerStream::MockServerStream(HostAndPort remote,
@@ -51,8 +53,8 @@ MockServerStream::MockServerStream(HostAndPort remote,
       _clientMetadata{std::move(clientMetadata)} {
     // Hold onto the MetadataContainer, but also write out a view for use by the server context API.
     for (auto& kvp : _clientMetadata) {
-        _clientMetadataView.insert({StringData{kvp.first.data(), kvp.first.length()},
-                                    StringData{kvp.second.data(), kvp.second.length()}});
+        _clientMetadataView.insert({std::string_view{kvp.first.data(), kvp.first.length()},
+                                    std::string_view{kvp.second.data(), kvp.second.length()}});
     }
 }
 

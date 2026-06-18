@@ -57,6 +57,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -69,7 +70,7 @@ namespace mongo {
 namespace MONGO_MOD_PUB idl_server_parameter_bounds {
 // Predicate rules for bounds conditions
 struct GT {
-    static constexpr inline StringData description = "greater than"_sd;
+    static constexpr inline std::string_view description = "greater than"_sd;
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a > b;
@@ -77,7 +78,7 @@ struct GT {
 };
 
 struct LT {
-    static constexpr inline StringData description = "less than"_sd;
+    static constexpr inline std::string_view description = "less than"_sd;
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a < b;
@@ -85,7 +86,7 @@ struct LT {
 };
 
 struct GTE {
-    static constexpr inline StringData description = "greater than or equal to"_sd;
+    static constexpr inline std::string_view description = "greater than or equal to"_sd;
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a >= b;
@@ -93,7 +94,7 @@ struct GTE {
 };
 
 struct LTE {
-    static constexpr inline StringData description = "less than or equal to"_sd;
+    static constexpr inline std::string_view description = "less than or equal to"_sd;
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a <= b;
@@ -292,7 +293,7 @@ public:
                       idl_server_parameter_detail::hasClusterServerParameter<element_type>,
                   "Cluster server parameter storage must be chained from ClusterServerParameter");
 
-    IDLServerParameterWithStorage(StringData name, T& storage)
+    IDLServerParameterWithStorage(std::string_view name, T& storage)
         : ServerParameter(name, paramType), _storage(storage) {}
 
     Status validateValue(const element_type& newValue,
@@ -360,7 +361,7 @@ public:
      */
     void append(OperationContext* opCtx,
                 BSONObjBuilder* b,
-                StringData name,
+                std::string_view name,
                 const boost::optional<TenantId>& tenantId) final {
         if (isRedact()) {
             b->append(name, "###");
@@ -436,7 +437,7 @@ public:
      * Typically invoked from commandline --setParameter usage. Prohibited for cluster server
      * parameters.
      */
-    Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) final {
+    Status setFromString(std::string_view str, const boost::optional<TenantId>& tenantId) final {
         if constexpr (paramType == SPT::kClusterWide) {
             return {ErrorCodes::BadValue,
                     "Unable to set a cluster-wide server parameter from the command line or config "

@@ -45,6 +45,7 @@
 #include <iterator>
 #include <list>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -52,6 +53,7 @@
 #include <boost/utility/in_place_factory.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 using std::vector;
@@ -70,13 +72,13 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(redact, DocumentSourceRedact,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(redact, DocumentSourceRedact::id)
 
-StringData DocumentSourceRedact::getSourceName() const {
+std::string_view DocumentSourceRedact::getSourceName() const {
     return kStageName;
 }
 
-static const Value descendVal = Value("descend"_sd);
-static const Value pruneVal = Value("prune"_sd);
-static const Value keepVal = Value("keep"_sd);
+static const Value descendVal = Value("descend"sv);
+static const Value pruneVal = Value("prune"sv);
+static const Value keepVal = Value("keep"sv);
 
 DocumentSourceContainer::iterator DocumentSourceRedact::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {

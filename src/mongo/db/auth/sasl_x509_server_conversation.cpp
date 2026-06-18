@@ -44,16 +44,19 @@
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo::auth {
 
 namespace {
+using namespace std::literals::string_view_literals;
 GlobalSASLMechanismRegisterer<X509ServerFactory> x509Registerer;
 
-constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;
+constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."sv;
 
-std::string unpackName(StringData inputData) {
+std::string unpackName(std::string_view inputData) {
     if (inputData.empty()) {
         return "";
     }
@@ -75,7 +78,7 @@ std::string unpackName(StringData inputData) {
  * 2. Compare the user name to the subject DN from SSLPeerInfo.
  */
 std::string getUserName(Client* client,
-                        StringData inputData,
+                        std::string_view inputData,
                         std::shared_ptr<const SSLPeerInfo> sslPeerInfo) {
     uassert(ErrorCodes::AuthenticationFailed, "No SSLPeerInfo available", sslPeerInfo);
 
@@ -195,7 +198,7 @@ bool SaslX509ServerMechanism::isClusterMember(Client* client) const {
  * 4. We should check that we are correctly authorizing cluster users.
  */
 StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
-    OperationContext* opCtx, StringData inputData) try {
+    OperationContext* opCtx, std::string_view inputData) try {
     _step++;
 
     // We should update the step count for SASL.

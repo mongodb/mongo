@@ -41,6 +41,7 @@
 #include <cstddef>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -93,7 +94,7 @@ public:
      * Serializes the contents of this optime to the specified builder in the form:
      *      subObjName : { ts: <timestamp>, t: <term> }
      */
-    void append(StringData fieldName, BSONObjBuilder* builder) const;
+    void append(std::string_view fieldName, BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
 
     static StatusWith<OpTime> parseFromOplogEntry(const BSONObj& obj);
@@ -166,7 +167,9 @@ public:
         return !(*this < rhs);
     }
 
-    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const OpTime& value) {
+    friend void appendToBson(BSONObjBuilder& builder,
+                             std::string_view fieldName,
+                             const OpTime& value) {
         builder.append(fieldName, value.toBSON());
     }
 

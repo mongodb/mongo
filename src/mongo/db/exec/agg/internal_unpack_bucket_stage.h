@@ -34,6 +34,8 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -42,7 +44,7 @@ namespace agg {
 
 class InternalUnpackBucketStage final : public Stage {
 public:
-    InternalUnpackBucketStage(StringData stageName,
+    InternalUnpackBucketStage(std::string_view stageName,
                               const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                               const std::shared_ptr<InternalUnpackBucketSharedState>& sharedState,
                               DepsTracker _eventFilterDeps,

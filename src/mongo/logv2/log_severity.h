@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <iostream>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC logv2 {
@@ -119,12 +119,12 @@ public:
     }
 
     /**
-     * Returns a StringData naming this security level.
+     * Returns a std::string_view naming this security level.
      *
      * Not all levels are uniquely named.  Debug(N) is named "debug", regardless of "N",
      * e.g.
      */
-    StringData toStringData() const;
+    std::string_view toStringData() const;
 
     /**
      * Returns two characters naming this severity level. For non-debug levels, returns
@@ -134,7 +134,7 @@ public:
      *
      * All levels are uniquely named.
      */
-    StringData toStringDataCompact() const;
+    std::string_view toStringDataCompact() const;
 
     /**
      * Comparison operations.

@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC logv2 {
@@ -151,9 +151,9 @@ MONGO_EXPAND_LOGV2_COMPONENT(X_)
     LogComponent parent() const;
 
     /**
-     * Returns short name as a StringData.
+     * Returns short name as a std::string_view.
      */
-    StringData toStringData() const;
+    std::string_view toStringData() const;
 
     /**
      * Returns short name of log component.
@@ -173,7 +173,7 @@ MONGO_EXPAND_LOGV2_COMPONENT(X_)
      * This is derived from upper-casing the short name with some padding to
      * fit into a fixed length field.
      */
-    StringData getNameForLog() const;
+    std::string_view getNameForLog() const;
 
 private:
     Value _value;

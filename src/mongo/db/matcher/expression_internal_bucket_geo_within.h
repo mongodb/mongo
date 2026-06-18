@@ -47,6 +47,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -77,9 +78,9 @@ namespace mongo {
  */
 class InternalBucketGeoWithinMatchExpression final : public MatchExpression {
 public:
-    static constexpr StringData kName = "$_internalBucketGeoWithin"_sd;
-    static constexpr StringData kWithinRegion = "withinRegion"_sd;
-    static constexpr StringData kField = "field"_sd;
+    static constexpr std::string_view kName = "$_internalBucketGeoWithin"_sd;
+    static constexpr std::string_view kWithinRegion = "withinRegion"_sd;
+    static constexpr std::string_view kField = "field"_sd;
 
     InternalBucketGeoWithinMatchExpression(
         std::shared_ptr<GeometryContainer> container,
@@ -135,7 +136,7 @@ public:
         return _indexVersion;
     }
 
-    StringData path() const final {
+    std::string_view path() const final {
         return _indexField;
     }
 

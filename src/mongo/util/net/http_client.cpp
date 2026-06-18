@@ -33,7 +33,10 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/util/ctype.h"
 
+#include <string_view>
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 HttpClientProvider* _factory{nullptr};
@@ -46,13 +49,13 @@ void registerHTTPClientProvider(HttpClientProvider* factory) {
     _factory = factory;
 }
 
-Status HttpClient::endpointIsSecure(StringData url) {
+Status HttpClient::endpointIsSecure(std::string_view url) {
     return [&] {
         if (url.starts_with("https://"))
             return true;
         if (!getTestCommandsEnabled())
             return false;
-        constexpr StringData localhostPrefix = "http://localhost"_sd;
+        constexpr std::string_view localhostPrefix = "http://localhost"sv;
         if (!url.starts_with(localhostPrefix)) {
             return false;
         }

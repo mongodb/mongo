@@ -47,6 +47,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -83,7 +84,7 @@ public:
      * If there are multiple entries for a mechanism, supports retrieval by index. Used when
      * rotating the security key. Returns boost::none if no credential is available at that index.
      */
-    virtual boost::optional<Credential> get(size_t index, StringData mechanism) = 0;
+    virtual boost::optional<Credential> get(size_t index, std::string_view mechanism) = 0;
 };
 
 std::shared_ptr<InternalAuthParametersProvider> createDefaultInternalAuthProvider();
@@ -142,9 +143,9 @@ Future<void> authenticateInternalClient(
  *     @mechanism: The std::string authentication mechanism to be used
  */
 BSONObj buildAuthParams(const DatabaseName& dbname,
-                        StringData username,
-                        StringData passwordText,
-                        StringData mechanism);
+                        std::string_view username,
+                        std::string_view passwordText,
+                        std::string_view mechanism);
 
 /**
  * Run a "hello" exchange to negotiate a SASL mechanism for authentication.
@@ -157,12 +158,12 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
 /**
  * Return the field name for the database containing credential information.
  */
-StringData getSaslCommandUserDBFieldName();
+std::string_view getSaslCommandUserDBFieldName();
 
 /**
  * Return the field name for the user to authenticate.
  */
-StringData getSaslCommandUserFieldName();
+std::string_view getSaslCommandUserFieldName();
 
 /**
  * Which type of speculative authentication was performed (if any).

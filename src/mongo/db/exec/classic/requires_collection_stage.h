@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace mongo {
 
@@ -57,7 +57,7 @@ namespace mongo {
  */
 class RequiresCollectionStage : public PlanStage {
 public:
-    RequiresCollectionStage(StringData stageType,
+    RequiresCollectionStage(std::string_view stageType,
                             ExpressionContext* expCtx,
                             CollectionAcquisition coll)
         : PlanStage(stageType, expCtx),
@@ -122,7 +122,7 @@ private:
 // Type alias for use by PlanStages that write to a Collection.
 class RequiresWritableCollectionStage : public RequiresCollectionStage {
 public:
-    RequiresWritableCollectionStage(StringData stageType,
+    RequiresWritableCollectionStage(std::string_view stageType,
                                     ExpressionContext* expCtx,
                                     CollectionAcquisition coll)
         : RequiresCollectionStage(stageType, expCtx, coll), _collectionAcquisition(coll) {}

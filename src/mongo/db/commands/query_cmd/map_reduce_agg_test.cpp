@@ -30,7 +30,6 @@
 #include "mongo/db/commands/query_cmd/map_reduce_agg.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/commands/query_cmd/map_reduce_gen.h"
@@ -58,6 +57,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <typeinfo>
 #include <vector>
 
@@ -66,16 +66,17 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace std::string_literals;
 using namespace map_reduce_agg;
 
 // The translator treats Javascript objects as black boxes so there's no need for realistic examples
 // here.
-constexpr auto initJavascript = "init!"_sd;
-constexpr auto mapJavascript = "map!"_sd;
-constexpr auto reduceJavascript = "reduce!"_sd;
-constexpr auto finalizeJavascript = "finalize!"_sd;
+constexpr auto initJavascript = "init!"sv;
+constexpr auto mapJavascript = "map!"sv;
+constexpr auto reduceJavascript = "reduce!"sv;
+constexpr auto finalizeJavascript = "finalize!"sv;
 
 TEST(MapReduceAggTest, testBasicTranslate) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");

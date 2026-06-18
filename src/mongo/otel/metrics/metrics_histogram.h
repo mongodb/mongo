@@ -41,6 +41,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <string_view>
 
 #include <absl/container/flat_hash_set.h>
 #include <fmt/format.h>
@@ -330,7 +331,7 @@ void HistogramImpl<T, AttributeTs...>::record(T value, const Attributes& attribu
             size_t i = 0;
             std::apply(
                 [&](const auto&... vals) {
-                    (nameAndValues.push_back({.name = StringData(_attributeNames[i++]),
+                    (nameAndValues.push_back({.name = std::string_view(_attributeNames[i++]),
                                               .value = AnyAttributeType(vals)}),
                      ...);
                 },

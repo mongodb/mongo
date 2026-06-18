@@ -40,6 +40,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 #include <absl/hash/hash.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -268,7 +270,7 @@ TEST_F(AggKeyTest, OriginalQueryShapeHashAppearsInKey) {
 }
 
 TEST_F(AggKeyTest, DifferentOriginalQueryShapeHashesProduceDifferentKeys) {
-    auto makeKeyWithHash = [](StringData hexHash) {
+    auto makeKeyWithHash = [](std::string_view hexHash) {
         auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
         auto rawPipeline = {fromjson(R"({ $match: { x: 1 } })")};
         AggregateCommandRequest acr(kDefaultTestNss.nss());

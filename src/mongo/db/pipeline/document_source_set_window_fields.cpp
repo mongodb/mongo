@@ -79,6 +79,7 @@ using SortPatternPart = mongo::SortPattern::SortPatternPart;
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 /**
@@ -292,7 +293,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     // sortBy in order to ensure deterministic output.
     if (internalQueryAppendIdToSetWindowFieldsSort.load()) {
         SortPatternPart part;
-        part.fieldPath = "_id"_sd;
+        part.fieldPath = "_id"sv;
         combined.push_back(part);
     }
 

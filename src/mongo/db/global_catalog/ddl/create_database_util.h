@@ -34,6 +34,8 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -56,7 +58,7 @@ boost::optional<DatabaseType> checkDbNameConstraints(const DatabaseName& dbName)
 boost::optional<ShardRef> resolvePrimaryShard(OperationContext* opCtx,
                                               const boost::optional<ShardId>& optPrimaryShard);
 
-BSONObj constructDbMatchFilterExact(StringData dbNameStr,
+BSONObj constructDbMatchFilterExact(std::string_view dbNameStr,
                                     const boost::optional<ShardRef>& optResolvedPrimaryShard);
 
 /**
@@ -64,11 +66,11 @@ BSONObj constructDbMatchFilterExact(StringData dbNameStr,
  */
 boost::optional<DatabaseType> findDatabaseExactMatch(
     OperationContext* opCtx,
-    StringData dbNameStr,
+    std::string_view dbNameStr,
     const boost::optional<ShardRef>& optResolvedPrimaryShard);
 
 
-BSONObj constructDbMatchFilterCaseInsensitive(StringData dbNameStr);
+BSONObj constructDbMatchFilterCaseInsensitive(std::string_view dbNameStr);
 
 void checkAgainstExistingDbDoc(const DatabaseType& existingDb,
                                const DatabaseName& dbName,

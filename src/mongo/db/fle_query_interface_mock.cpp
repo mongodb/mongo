@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -41,12 +40,14 @@
 
 #include <cstddef>
 #include <limits>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 BSONObj FLEQueryInterfaceMock::getById(const NamespaceString& nss, BSONElement element) {
     auto obj = BSON("_id" << element);
@@ -111,10 +112,10 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceMock::deleteW
 
     uassert(6346809,
             "First element field name of delete op entry must be '_id'",
-            "_id"_sd == deleteOpEntry.getQ().firstElementFieldNameStringData());
+            "_id"sv == deleteOpEntry.getQ().firstElementFieldNameStringData());
 
     BSONElement id = deleteOpEntry.getQ().firstElement();
-    if (id.isABSONObj() && id.Obj().firstElementFieldNameStringData() == "$eq"_sd) {
+    if (id.isABSONObj() && id.Obj().firstElementFieldNameStringData() == "$eq"sv) {
         id = id.Obj().firstElement();
     }
 
@@ -147,10 +148,10 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceMock::updateW
 
     uassert(6346811,
             "First element field name of update op entry must be '_id'",
-            "_id"_sd == updateOpEntry.getQ().firstElementFieldNameStringData());
+            "_id"sv == updateOpEntry.getQ().firstElementFieldNameStringData());
 
     BSONElement id = updateOpEntry.getQ().firstElement();
-    if (id.isABSONObj() && id.Obj().firstElementFieldNameStringData() == "$eq"_sd) {
+    if (id.isABSONObj() && id.Obj().firstElementFieldNameStringData() == "$eq"sv) {
         id = id.Obj().firstElement();
     }
     BSONObj preimage = getById(nss, id);
@@ -179,7 +180,7 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceMock::findAndModify(
     // Repl storage interface does not have find and modify support directly. We emulate it, poorly
     uassert(6346812,
             "First element field name of findAndModify query must be '_id'",
-            "_id"_sd == findAndModifyRequest.getQuery().firstElementFieldNameStringData());
+            "_id"sv == findAndModifyRequest.getQuery().firstElementFieldNameStringData());
     uassert(6346813,
             "findAndModify 'new' field must be 'false'",
             findAndModifyRequest.getNew().get_value_or(false) == false);

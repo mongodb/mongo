@@ -31,12 +31,12 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -56,7 +56,7 @@ public:
 
     Status initialize() override;
 
-    Status step(StringData inputData, std::string* outputData) override;
+    Status step(std::string_view inputData, std::string* outputData) override;
 
     boost::optional<std::uint32_t> currentStep() const override;
 

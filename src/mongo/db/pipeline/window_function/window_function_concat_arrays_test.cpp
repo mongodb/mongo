@@ -35,6 +35,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WindowFunctionConcatArraysTest : public AggregationContextFixture {
 public:
@@ -63,17 +64,17 @@ TEST_F(WindowFunctionConcatArraysTest, SingleInsertionShouldReturnAVector) {
     ASSERT_VALUE_EQ(concatArrays.getValue(), Value{std::vector<Value>({Value(1)})});
 
     concatArrays.reset();
-    concatArrays.add(Value{std::vector<Value>({Value("str"_sd)})});
-    ASSERT_VALUE_EQ(concatArrays.getValue(), Value{std::vector<Value>({Value("str"_sd)})});
+    concatArrays.add(Value{std::vector<Value>({Value("str"sv)})});
+    ASSERT_VALUE_EQ(concatArrays.getValue(), Value{std::vector<Value>({Value("str"sv)})});
 }
 
 TEST_F(WindowFunctionConcatArraysTest, ComplexWindowPreservesInsertionOrder) {
     std::vector<Value> values = {Value(std::vector<Value>({Value(1), Value(2)})),
-                                 Value(std::vector<Value>({Value("three"_sd), Value("four"_sd)})),
+                                 Value(std::vector<Value>({Value("three"sv), Value("four"sv)})),
                                  Value(std::vector<Value>({Value(BSONObj())}))};
 
     std::vector<Value> expected = {
-        Value(1), Value(2), Value("three"_sd), Value("four"_sd), Value(BSONObj())};
+        Value(1), Value(2), Value("three"sv), Value("four"sv), Value(BSONObj())};
 
     addValuesToWindow(values);
     ASSERT_VALUE_EQ(concatArrays.getValue(), Value{expected});
@@ -126,23 +127,23 @@ TEST_F(WindowFunctionConcatArraysTest, RemovalDoesNotAffectOrder) {
 TEST_F(WindowFunctionConcatArraysTest, DoubleNestedArraysShouldReturnSingleNestedArrays) {
     std::vector<Value> values = {
         Value(std::vector<Value>({
-            Value(std::vector<Value>({Value("In a double nested array"_sd)})),
-            Value(std::vector<Value>({Value("Also in a double nested array"_sd)})),
+            Value(std::vector<Value>({Value("In a double nested array"sv)})),
+            Value(std::vector<Value>({Value("Also in a double nested array"sv)})),
         })),
-        Value(std::vector<Value>({Value("Only singly nested"_sd)})),
+        Value(std::vector<Value>({Value("Only singly nested"sv)})),
         Value(std::vector<Value>({Value(std::vector<Value>({Value(1), Value(2)}))}))};
 
     std::vector<Value> expected = {
-        Value(std::vector<Value>({Value("In a double nested array"_sd)})),
-        Value(std::vector<Value>({Value("Also in a double nested array"_sd)})),
-        Value("Only singly nested"_sd),
+        Value(std::vector<Value>({Value("In a double nested array"sv)})),
+        Value(std::vector<Value>({Value("Also in a double nested array"sv)})),
+        Value("Only singly nested"sv),
         Value(std::vector<Value>({Value(1), Value(2)}))};
 
     addValuesToWindow(values);
     ASSERT_VALUE_EQ(concatArrays.getValue(), Value{expected});
 
     concatArrays.remove(values[0]);
-    expected = {Value("Only singly nested"_sd), Value(std::vector<Value>({Value(1), Value(2)}))};
+    expected = {Value("Only singly nested"sv), Value(std::vector<Value>({Value(1), Value(2)}))};
     ASSERT_VALUE_EQ(concatArrays.getValue(), Value{expected});
 }
 
@@ -186,7 +187,7 @@ TEST_F(WindowFunctionConcatArraysTest, TracksMemoryUsageOnAddAndRemove) {
     ASSERT_EQ(concatArrays.getApproximateSize(), trackingSize);
 
     auto largeStrInArr =
-        Value(std::vector<Value>({Value("$concatArrays is a great window function"_sd)}));
+        Value(std::vector<Value>({Value("$concatArrays is a great window function"sv)}));
     concatArrays.add(largeStrInArr);
     trackingSize += largeStrInArr.getApproximateSize();
     ASSERT_EQ(concatArrays.getApproximateSize(), trackingSize);

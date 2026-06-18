@@ -44,6 +44,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -89,7 +90,7 @@ public:
 };
 
 const inline std::string kGenFieldName = "_tempDocumentsField";
-constexpr inline StringData kStageName = "$documents"_sd;
+constexpr inline std::string_view kStageName = "$documents"_sd;
 
 std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

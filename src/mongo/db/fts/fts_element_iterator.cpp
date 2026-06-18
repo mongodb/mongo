@@ -29,7 +29,6 @@
 
 #include "mongo/db/fts/fts_element_iterator.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/fts/fts_spec.h"

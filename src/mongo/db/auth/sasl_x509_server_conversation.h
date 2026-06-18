@@ -33,6 +33,8 @@
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::auth {
 
 class SaslX509ServerMechanism final : public MakeServerMechanism<X509Policy> {
@@ -43,7 +45,7 @@ public:
     ~SaslX509ServerMechanism() override = default;
 
     StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                       StringData inputData) override;
+                                                       std::string_view inputData) override;
 
     boost::optional<std::uint32_t> currentStep() const override {
         return _step;

@@ -45,6 +45,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
 
 /**
@@ -289,18 +291,17 @@ public:
 /**
  * Small utility function to make a namepace string from collection name.
  */
-NamespaceString makeNSS(StringData collName);
+NamespaceString makeNSS(std::string_view collName);
 
 /**
  * Pipeline construction helpers for use in tests.
  */
 std::unique_ptr<Pipeline> makePipelineForTest(
     std::vector<BSONObj> bsonStages,
-    std::vector<StringData> collNames,
+    std::vector<std::string_view> collNames,
     boost::intrusive_ptr<ExpressionContextForTest> expCtx);
 std::unique_ptr<Pipeline> makePipelineForTest(
-    StringData query,
-    std::vector<StringData> collNames,
+    std::string_view query,
+    std::vector<std::string_view> collNames,
     boost::intrusive_ptr<ExpressionContextForTest> expCtx);
-
 }  // namespace mongo::join_ordering

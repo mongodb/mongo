@@ -41,6 +41,8 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -48,52 +50,52 @@ namespace mongo {
 class JSONSchemaParser {
 public:
     // Primitive type name constants.
-    static constexpr StringData kSchemaTypeArray = "array"_sd;
-    static constexpr StringData kSchemaTypeBoolean = "boolean"_sd;
-    static constexpr StringData kSchemaTypeNull = "null"_sd;
-    static constexpr StringData kSchemaTypeObject = "object"_sd;
-    static constexpr StringData kSchemaTypeString = "string"_sd;
+    static constexpr std::string_view kSchemaTypeArray{"array"};
+    static constexpr std::string_view kSchemaTypeBoolean{"boolean"};
+    static constexpr std::string_view kSchemaTypeNull{"null"};
+    static constexpr std::string_view kSchemaTypeObject{"object"};
+    static constexpr std::string_view kSchemaTypeString{"string"};
 
     // Explicitly unsupported type name constants.
-    static constexpr StringData kSchemaTypeInteger = "integer"_sd;
+    static constexpr std::string_view kSchemaTypeInteger{"integer"};
 
     // Standard JSON Schema keyword constants.
-    static constexpr StringData kSchemaAdditionalItemsKeyword = "additionalItems"_sd;
-    static constexpr StringData kSchemaAdditionalPropertiesKeyword = "additionalProperties"_sd;
-    static constexpr StringData kSchemaAllOfKeyword = "allOf"_sd;
-    static constexpr StringData kSchemaAnyOfKeyword = "anyOf"_sd;
-    static constexpr StringData kSchemaDependenciesKeyword = "dependencies"_sd;
-    static constexpr StringData kSchemaDescriptionKeyword = "description"_sd;
-    static constexpr StringData kSchemaEnumKeyword = "enum"_sd;
-    static constexpr StringData kSchemaExclusiveMaximumKeyword = "exclusiveMaximum"_sd;
-    static constexpr StringData kSchemaExclusiveMinimumKeyword = "exclusiveMinimum"_sd;
-    static constexpr StringData kSchemaItemsKeyword = "items"_sd;
-    static constexpr StringData kSchemaMaxItemsKeyword = "maxItems"_sd;
-    static constexpr StringData kSchemaMaxLengthKeyword = "maxLength"_sd;
-    static constexpr StringData kSchemaMaxPropertiesKeyword = "maxProperties"_sd;
-    static constexpr StringData kSchemaMaximumKeyword = "maximum"_sd;
-    static constexpr StringData kSchemaMinItemsKeyword = "minItems"_sd;
-    static constexpr StringData kSchemaMinLengthKeyword = "minLength"_sd;
-    static constexpr StringData kSchemaMinPropertiesKeyword = "minProperties"_sd;
-    static constexpr StringData kSchemaMinimumKeyword = "minimum"_sd;
-    static constexpr StringData kSchemaMultipleOfKeyword = "multipleOf"_sd;
-    static constexpr StringData kSchemaNotKeyword = "not"_sd;
-    static constexpr StringData kSchemaOneOfKeyword = "oneOf"_sd;
-    static constexpr StringData kSchemaPatternKeyword = "pattern"_sd;
-    static constexpr StringData kSchemaPatternPropertiesKeyword = "patternProperties"_sd;
-    static constexpr StringData kSchemaPropertiesKeyword = "properties"_sd;
-    static constexpr StringData kSchemaRequiredKeyword = "required"_sd;
-    static constexpr StringData kSchemaTitleKeyword = "title"_sd;
-    static constexpr StringData kSchemaTypeKeyword = "type"_sd;
-    static constexpr StringData kSchemaUniqueItemsKeyword = "uniqueItems"_sd;
+    static constexpr std::string_view kSchemaAdditionalItemsKeyword{"additionalItems"};
+    static constexpr std::string_view kSchemaAdditionalPropertiesKeyword{"additionalProperties"};
+    static constexpr std::string_view kSchemaAllOfKeyword{"allOf"};
+    static constexpr std::string_view kSchemaAnyOfKeyword{"anyOf"};
+    static constexpr std::string_view kSchemaDependenciesKeyword{"dependencies"};
+    static constexpr std::string_view kSchemaDescriptionKeyword{"description"};
+    static constexpr std::string_view kSchemaEnumKeyword{"enum"};
+    static constexpr std::string_view kSchemaExclusiveMaximumKeyword{"exclusiveMaximum"};
+    static constexpr std::string_view kSchemaExclusiveMinimumKeyword{"exclusiveMinimum"};
+    static constexpr std::string_view kSchemaItemsKeyword{"items"};
+    static constexpr std::string_view kSchemaMaxItemsKeyword{"maxItems"};
+    static constexpr std::string_view kSchemaMaxLengthKeyword{"maxLength"};
+    static constexpr std::string_view kSchemaMaxPropertiesKeyword{"maxProperties"};
+    static constexpr std::string_view kSchemaMaximumKeyword{"maximum"};
+    static constexpr std::string_view kSchemaMinItemsKeyword{"minItems"};
+    static constexpr std::string_view kSchemaMinLengthKeyword{"minLength"};
+    static constexpr std::string_view kSchemaMinPropertiesKeyword{"minProperties"};
+    static constexpr std::string_view kSchemaMinimumKeyword{"minimum"};
+    static constexpr std::string_view kSchemaMultipleOfKeyword{"multipleOf"};
+    static constexpr std::string_view kSchemaNotKeyword{"not"};
+    static constexpr std::string_view kSchemaOneOfKeyword{"oneOf"};
+    static constexpr std::string_view kSchemaPatternKeyword{"pattern"};
+    static constexpr std::string_view kSchemaPatternPropertiesKeyword{"patternProperties"};
+    static constexpr std::string_view kSchemaPropertiesKeyword{"properties"};
+    static constexpr std::string_view kSchemaRequiredKeyword{"required"};
+    static constexpr std::string_view kSchemaTitleKeyword{"title"};
+    static constexpr std::string_view kSchemaTypeKeyword{"type"};
+    static constexpr std::string_view kSchemaUniqueItemsKeyword{"uniqueItems"};
 
     // MongoDB-specific (non-standard) JSON Schema keyword constants.
-    static constexpr StringData kSchemaBsonTypeKeyword = "bsonType"_sd;
-    static constexpr StringData kSchemaEncryptKeyword = "encrypt"_sd;
-    static constexpr StringData kSchemaEncryptMetadataKeyword = "encryptMetadata"_sd;
+    static constexpr std::string_view kSchemaBsonTypeKeyword{"bsonType"};
+    static constexpr std::string_view kSchemaEncryptKeyword{"encrypt"};
+    static constexpr std::string_view kSchemaEncryptMetadataKeyword{"encryptMetadata"};
 
     // A name of placeholder used in ExpressionWithPlaceholder expressions.
-    static constexpr StringData kNamePlaceholder = "i"_sd;
+    static constexpr std::string_view kNamePlaceholder{"i"};
 
     /**
      * Converts a JSON schema, represented as BSON, into a semantically equivalent match expression

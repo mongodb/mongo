@@ -36,12 +36,14 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
 
 Status bsonExtractFieldImpl(const BSONObj& object,
-                            StringData fieldName,
+                            std::string_view fieldName,
                             BSONElement* outElement,
                             bool withDefault) {
     BSONElement element = object.getField(fieldName);
@@ -60,7 +62,7 @@ Status bsonExtractFieldImpl(const BSONObj& object,
 }
 
 Status bsonExtractTypedFieldImpl(const BSONObj& object,
-                                 StringData fieldName,
+                                 std::string_view fieldName,
                                  BSONType type,
                                  BSONElement* outElement,
                                  bool withDefault) {
@@ -77,7 +79,7 @@ Status bsonExtractTypedFieldImpl(const BSONObj& object,
 }
 
 Status bsonExtractIntegerFieldImpl(const BSONObj& object,
-                                   StringData fieldName,
+                                   std::string_view fieldName,
                                    long long* out,
                                    bool withDefault) {
     BSONElement element;
@@ -103,7 +105,7 @@ Status bsonExtractIntegerFieldImpl(const BSONObj& object,
 }
 
 Status bsonExtractDoubleFieldImpl(const BSONObj& object,
-                                  StringData fieldName,
+                                  std::string_view fieldName,
                                   double* out,
                                   bool withDefault) {
     BSONElement element;
@@ -122,18 +124,20 @@ Status bsonExtractDoubleFieldImpl(const BSONObj& object,
 }  // namespace
 
 
-Status bsonExtractField(const BSONObj& object, StringData fieldName, BSONElement* outElement) {
+Status bsonExtractField(const BSONObj& object,
+                        std::string_view fieldName,
+                        BSONElement* outElement) {
     return bsonExtractFieldImpl(object, fieldName, outElement, false);
 }
 
 Status bsonExtractTypedField(const BSONObj& object,
-                             StringData fieldName,
+                             std::string_view fieldName,
                              BSONType type,
                              BSONElement* outElement) {
     return bsonExtractTypedFieldImpl(object, fieldName, type, outElement, false);
 }
 
-Status bsonExtractBooleanField(const BSONObj& object, StringData fieldName, bool* out) {
+Status bsonExtractBooleanField(const BSONObj& object, std::string_view fieldName, bool* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, BSONType::boolean, &element);
     if (status.isOK())
@@ -142,7 +146,7 @@ Status bsonExtractBooleanField(const BSONObj& object, StringData fieldName, bool
 }
 
 Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
-                                          StringData fieldName,
+                                          std::string_view fieldName,
                                           bool defaultValue,
                                           bool* out) {
     BSONElement element;
@@ -164,7 +168,7 @@ Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
     return status;
 }
 
-Status bsonExtractStringField(const BSONObj& object, StringData fieldName, std::string* out) {
+Status bsonExtractStringField(const BSONObj& object, std::string_view fieldName, std::string* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, BSONType::string, &element);
     if (status.isOK())
@@ -172,7 +176,9 @@ Status bsonExtractStringField(const BSONObj& object, StringData fieldName, std::
     return status;
 }
 
-Status bsonExtractTimestampField(const BSONObj& object, StringData fieldName, Timestamp* out) {
+Status bsonExtractTimestampField(const BSONObj& object,
+                                 std::string_view fieldName,
+                                 Timestamp* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, BSONType::timestamp, &element);
     if (status.isOK())
@@ -180,7 +186,7 @@ Status bsonExtractTimestampField(const BSONObj& object, StringData fieldName, Ti
     return status;
 }
 
-Status bsonExtractOIDField(const BSONObj& object, StringData fieldName, OID* out) {
+Status bsonExtractOIDField(const BSONObj& object, std::string_view fieldName, OID* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, BSONType::oid, &element);
     if (status.isOK())
@@ -189,8 +195,8 @@ Status bsonExtractOIDField(const BSONObj& object, StringData fieldName, OID* out
 }
 
 Status bsonExtractStringFieldWithDefault(const BSONObj& object,
-                                         StringData fieldName,
-                                         StringData defaultValue,
+                                         std::string_view fieldName,
+                                         std::string_view defaultValue,
                                          std::string* out) {
     BSONElement element;
     Status status = bsonExtractTypedFieldImpl(object, fieldName, BSONType::string, &element, true);
@@ -203,16 +209,16 @@ Status bsonExtractStringFieldWithDefault(const BSONObj& object,
     return status;
 }
 
-Status bsonExtractIntegerField(const BSONObj& object, StringData fieldName, long long* out) {
+Status bsonExtractIntegerField(const BSONObj& object, std::string_view fieldName, long long* out) {
     return bsonExtractIntegerFieldImpl(object, fieldName, out, false);
 }
 
-Status bsonExtractDoubleField(const BSONObj& object, StringData fieldName, double* out) {
+Status bsonExtractDoubleField(const BSONObj& object, std::string_view fieldName, double* out) {
     return bsonExtractDoubleFieldImpl(object, fieldName, out, false);
 }
 
 Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
-                                          StringData fieldName,
+                                          std::string_view fieldName,
                                           long long defaultValue,
                                           long long* out) {
     Status status = bsonExtractIntegerFieldImpl(object, fieldName, out, true);
@@ -226,7 +232,7 @@ Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
 ////////////////////////////////////////////////////////////
 // StatusWith variants of the above.
 
-StatusWith<BSONElement> bsonExtractField(const BSONObj& object, StringData fieldName) {
+StatusWith<BSONElement> bsonExtractField(const BSONObj& object, std::string_view fieldName) {
     BSONElement out;
     if (auto st = bsonExtractField(object, fieldName, &out); !st.isOK())
         return st;
@@ -234,7 +240,7 @@ StatusWith<BSONElement> bsonExtractField(const BSONObj& object, StringData field
 }
 
 StatusWith<BSONElement> bsonExtractTypedField(const BSONObj& object,
-                                              StringData fieldName,
+                                              std::string_view fieldName,
                                               BSONType type) {
     BSONElement out;
     if (auto st = bsonExtractTypedField(object, fieldName, type, &out); !st.isOK())
@@ -242,42 +248,42 @@ StatusWith<BSONElement> bsonExtractTypedField(const BSONObj& object,
     return out;
 }
 
-StatusWith<bool> bsonExtractBooleanField(const BSONObj& object, StringData fieldName) {
+StatusWith<bool> bsonExtractBooleanField(const BSONObj& object, std::string_view fieldName) {
     bool out;
     if (auto st = bsonExtractBooleanField(object, fieldName, &out); !st.isOK())
         return st;
     return out;
 }
 
-StatusWith<long long> bsonExtractIntegerField(const BSONObj& object, StringData fieldName) {
+StatusWith<long long> bsonExtractIntegerField(const BSONObj& object, std::string_view fieldName) {
     long long out;
     if (auto st = bsonExtractIntegerField(object, fieldName, &out); !st.isOK())
         return st;
     return out;
 }
 
-StatusWith<double> bsonExtractDoubleField(const BSONObj& object, StringData fieldName) {
+StatusWith<double> bsonExtractDoubleField(const BSONObj& object, std::string_view fieldName) {
     double out;
     if (auto st = bsonExtractDoubleField(object, fieldName, &out); !st.isOK())
         return st;
     return out;
 }
 
-StatusWith<std::string> bsonExtractStringField(const BSONObj& object, StringData fieldName) {
+StatusWith<std::string> bsonExtractStringField(const BSONObj& object, std::string_view fieldName) {
     std::string out;
     if (auto st = bsonExtractStringField(object, fieldName, &out); !st.isOK())
         return st;
     return out;
 }
 
-StatusWith<Timestamp> bsonExtractTimestampField(const BSONObj& object, StringData fieldName) {
+StatusWith<Timestamp> bsonExtractTimestampField(const BSONObj& object, std::string_view fieldName) {
     Timestamp out;
     if (auto st = bsonExtractTimestampField(object, fieldName, &out); !st.isOK())
         return st;
     return out;
 }
 
-StatusWith<OID> bsonExtractOIDField(const BSONObj& object, StringData fieldName) {
+StatusWith<OID> bsonExtractOIDField(const BSONObj& object, std::string_view fieldName) {
     OID out;
     if (auto st = bsonExtractOIDField(object, fieldName, &out); !st.isOK())
         return st;
@@ -285,7 +291,7 @@ StatusWith<OID> bsonExtractOIDField(const BSONObj& object, StringData fieldName)
 }
 
 StatusWith<bool> bsonExtractBooleanFieldWithDefault(const BSONObj& object,
-                                                    StringData fieldName,
+                                                    std::string_view fieldName,
                                                     bool defaultValue) {
     bool out;
     if (auto st = bsonExtractBooleanFieldWithDefault(object, fieldName, defaultValue, &out);
@@ -295,7 +301,7 @@ StatusWith<bool> bsonExtractBooleanFieldWithDefault(const BSONObj& object,
 }
 
 StatusWith<long long> bsonExtractIntegerFieldWithDefault(const BSONObj& object,
-                                                         StringData fieldName,
+                                                         std::string_view fieldName,
                                                          long long defaultValue) {
     long long out;
     if (auto st = bsonExtractIntegerFieldWithDefault(object, fieldName, defaultValue, &out);
@@ -305,8 +311,8 @@ StatusWith<long long> bsonExtractIntegerFieldWithDefault(const BSONObj& object,
 }
 
 StatusWith<std::string> bsonExtractStringFieldWithDefault(const BSONObj& object,
-                                                          StringData fieldName,
-                                                          StringData defaultValue) {
+                                                          std::string_view fieldName,
+                                                          std::string_view defaultValue) {
     std::string out;
     if (auto st = bsonExtractStringFieldWithDefault(object, fieldName, defaultValue, &out);
         !st.isOK())

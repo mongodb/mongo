@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
-using oidcIdPAuthCallbackT = void(StringData, StringData, StringData);
+using oidcIdPAuthCallbackT = void(std::string_view, std::string_view, std::string_view);
 
 /**
  * OIDC Client parameters

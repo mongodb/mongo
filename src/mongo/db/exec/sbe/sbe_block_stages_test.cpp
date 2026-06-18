@@ -49,10 +49,11 @@
 #include <vector>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 class BlockStagesTest : public PlanStageTestFixture {
 protected:
     BSONObj compressBucket(const BSONObj& bucket) {
-        return *timeseries::compressBucket(bucket, /*timeFieldName*/ "time"_sd, /*nss*/ {}, false)
+        return *timeseries::compressBucket(bucket, /*timeFieldName*/ "time"sv, /*nss*/ {}, false)
                     .compressedBucket;
     }
 

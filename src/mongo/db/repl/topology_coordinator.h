@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -67,6 +66,7 @@
 #include <memory>
 #include <queue>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -427,7 +427,7 @@ public:
     MONGO_MOD_PRIVATE StatusWith<bool> prepareHeartbeatResponseV1(
         Date_t now,
         const ReplSetHeartbeatArgsV1& args,
-        StringData ourSetName,
+        std::string_view ourSetName,
         ReplSetHeartbeatResponse* response);
 
     struct MONGO_MOD_PRIVATE ReplSetStatusArgs {
@@ -462,7 +462,7 @@ public:
     // replset.  Drivers interpret the hello fields according to the Server Discovery and
     // Monitoring Spec, see the "Parsing an isMaster response" section.
     MONGO_MOD_PRIVATE void fillHelloForReplSet(std::shared_ptr<HelloResponse> response,
-                                               StringData horizonString) const;
+                                               std::string_view horizonString) const;
 
     // Produce member data for the serverStatus command and diagnostic logging.
     MONGO_MOD_PRIVATE void fillMemberData(BSONObjBuilder* result);
@@ -508,7 +508,7 @@ public:
      * processHeartbeatResponse for the same "target".
      */
     MONGO_MOD_PRIVATE std::pair<ReplSetHeartbeatArgsV1, Milliseconds> prepareHeartbeatRequestV1(
-        Date_t now, StringData ourSetName, const HostAndPort& target);
+        Date_t now, std::string_view ourSetName, const HostAndPort& target);
 
     /**
      * Processes a heartbeat response from "target" that arrived around "now", having spent

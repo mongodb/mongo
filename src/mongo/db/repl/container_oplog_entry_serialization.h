@@ -37,6 +37,7 @@
 
 #include <cstdint>
 #include <span>
+#include <string_view>
 #include <variant>
 
 namespace mongo::repl {
@@ -68,7 +69,7 @@ public:
         }
     }
 
-    void serialize(StringData fieldName, BSONObjBuilder* builder) const {
+    void serialize(std::string_view fieldName, BSONObjBuilder* builder) const {
         std::visit(OverloadedVisitor{
                        [&](int64_t key) { builder->append(fieldName, key); },
                        [&](std::span<const char> key) {
@@ -122,7 +123,7 @@ public:
         return ContainerVal(std::span<const char>{data, static_cast<size_t>(len)});
     }
 
-    void serialize(StringData fieldName, BSONObjBuilder* builder) const {
+    void serialize(std::string_view fieldName, BSONObjBuilder* builder) const {
         builder->appendBinData(fieldName, _data.size(), BinDataType::BinDataGeneral, _data.data());
     }
 

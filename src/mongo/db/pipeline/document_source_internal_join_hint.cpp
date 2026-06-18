@@ -37,6 +37,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -51,7 +53,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalJoinHint,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalJoinHint, DocumentSourceInternalJoinHint::id);
 
-constexpr StringData DocumentSourceInternalJoinHint::kStageName;
+constexpr std::string_view DocumentSourceInternalJoinHint::kStageName;
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalJoinHint::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

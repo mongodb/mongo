@@ -36,10 +36,12 @@
 
 #include <future>
 #include <random>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::key_string_test {
+using namespace std::literals::string_view_literals;
 
 Ordering ALL_ASCENDING = Ordering::make(BSONObj());
 Ordering ONE_ASCENDING = Ordering::make(BSON("a" << 1));
@@ -71,9 +73,9 @@ const std::vector<BSONObj>& getInterestingElements(key_string::Version version) 
     elements.clear();
 
     // These are used to test strings that include NUL bytes.
-    const auto ball = "ball"_sd;
-    const auto ball00n = "ball\0\0n"_sd;
-    const auto zeroBall = "\0ball"_sd;
+    const auto ball = "ball"sv;
+    const auto ball00n = "ball\0\0n"sv;
+    const auto zeroBall = "\0ball"sv;
 
     elements.push_back(BSON("" << 1));
     elements.push_back(BSON("" << 1.0));
@@ -381,7 +383,7 @@ RecordId ridFromOid(const OID& oid) {
     return RecordId(builder.getView());
 }
 
-RecordId ridFromStr(StringData str) {
+RecordId ridFromStr(std::string_view str) {
     key_string::Builder builder(key_string::Version::kLatestVersion);
     builder.appendString(str);
     return RecordId(builder.getView());

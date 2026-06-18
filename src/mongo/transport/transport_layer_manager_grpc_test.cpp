@@ -52,6 +52,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string_view>
 
 #include <boost/filesystem.hpp>
 
@@ -409,11 +410,11 @@ public:
         });
     }
 
-    StringData getFilePathCA() {
+    std::string_view getFilePathCA() {
         return _tempDir->getCAFile();
     }
 
-    StringData getFilePathPEM() {
+    std::string_view getFilePathPEM() {
         return _tempDir->getPEMKeyFile();
     }
 

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
@@ -47,6 +46,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -167,7 +167,7 @@ public:
      * @param ns the namespace to be associated with the uuid.
      * @param uuid the uuid to associate with the namespace.
      */
-    void assignCollectionUuid(StringData ns, const mongo::UUID& uuid);
+    void assignCollectionUuid(std::string_view ns, const mongo::UUID& uuid);
 
     //
     // DBClientBase methods

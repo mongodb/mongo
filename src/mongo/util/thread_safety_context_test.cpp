@@ -29,7 +29,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/util/thread_safety_context.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

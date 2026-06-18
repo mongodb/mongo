@@ -40,6 +40,8 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::rule_based_rewrites::pipeline {
 namespace {
 
@@ -59,9 +61,9 @@ public:
     }
 
 void runTest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-             std::vector<StringData> input,
-             std::vector<StringData> expected) {
-    auto makePipeline = [&](std::vector<StringData> stages) {
+             std::vector<std::string_view> input,
+             std::vector<std::string_view> expected) {
+    auto makePipeline = [&](std::vector<std::string_view> stages) {
         std::vector<BSONObj> bsonStages;
         for (auto&& stage : stages) {
             bsonStages.push_back(fromjson(stage));

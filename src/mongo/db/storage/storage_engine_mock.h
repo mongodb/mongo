@@ -34,6 +34,8 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -96,7 +98,7 @@ public:
         return {};
     }
 
-    void dropSpillTable(RecoveryUnit& ru, StringData ident) final {
+    void dropSpillTable(RecoveryUnit& ru, std::string_view ident) final {
         _droppedSpillIdents.emplace_back(ident);
     };
 
@@ -105,7 +107,7 @@ public:
     }
 
     std::unique_ptr<RecordStore> makeInternalRecordStore(OperationContext* opCtx,
-                                                         StringData ident,
+                                                         std::string_view ident,
                                                          KeyFormat keyFormat) final {
         return {};
     }
@@ -124,7 +126,7 @@ public:
     bool supportsReadConcernSnapshot() const final {
         return false;
     }
-    Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident) final {
+    Status immediatelyCompletePendingDrop(OperationContext* opCtx, std::string_view ident) final {
         return Status::OK();
     }
     StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) final {
@@ -141,7 +143,7 @@ public:
         _lastSetMaterializedLsn = lsn;
     }
 
-    void setRecoveryCheckpointMetadata(StringData checkpointMetadata) final {
+    void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) final {
         _operations.push_back("setRecoveryCheckpointMetadata");
     }
 
@@ -183,17 +185,17 @@ public:
     size_t getNumDropPendingIdents() const final {
         return 0;
     }
-    void dropIdent(RecoveryUnit& ru, StringData ident) final {}
+    void dropIdent(RecoveryUnit& ru, std::string_view ident) final {}
     void dropIdentTimestamped(OperationContext* opCtx,
-                              StringData ident,
+                              std::string_view ident,
                               Timestamp timestamp) final {}
     void addDropPendingIdent(const DropTime& dropTime,
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) final {}
     void dropUnknownIdent(RecoveryUnit& ru,
                           const Timestamp& stableTimestamp,
-                          StringData ident) final {}
-    std::shared_ptr<Ident> markIdentInUse(StringData ident) final {
+                          std::string_view ident) final {}
+    std::shared_ptr<Ident> markIdentInUse(std::string_view ident) final {
         return nullptr;
     }
     TimestampMonitor* getTimestampMonitor() const final {
@@ -217,25 +219,26 @@ public:
 
     std::string generateNewCollectionIdent(
         const DatabaseName& dbName,
-        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const final {
+        const boost::optional<std::string_view>& optIdentUniqueTag = boost::none) const final {
         return "";
     }
     std::string generateNewIndexIdent(
         const DatabaseName& dbName,
-        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const final {
+        const boost::optional<std::string_view>& optIdentUniqueTag = boost::none) const final {
         return "";
     }
-    StringData getCollectionIdentUniqueTag(StringData ident,
-                                           const DatabaseName& dbName) const final {
+    std::string_view getCollectionIdentUniqueTag(std::string_view ident,
+                                                 const DatabaseName& dbName) const final {
         return "";
     };
-    StringData getIndexIdentUniqueTag(StringData ident, const DatabaseName& dbName) const final {
+    std::string_view getIndexIdentUniqueTag(std::string_view ident,
+                                            const DatabaseName& dbName) const final {
         return "";
     }
     bool storesFilesInDbPath() const final {
         return false;
     }
-    int64_t getIdentSize(RecoveryUnit& ru, StringData ident) const final {
+    int64_t getIdentSize(RecoveryUnit& ru, std::string_view ident) const final {
         return 0;
     }
     KVEngine* getEngine() final {
@@ -288,13 +291,13 @@ public:
     }
 
     BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
-                                    StringData flagName,
+                                    std::string_view flagName,
                                     boost::optional<bool> flagValue) const final {
         return storageEngineOptions;
     }
 
     boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
-                                                    StringData flagName) const final {
+                                                    std::string_view flagName) const final {
         return boost::none;
     }
 

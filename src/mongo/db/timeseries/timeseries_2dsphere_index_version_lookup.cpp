@@ -35,6 +35,8 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
+#include <string_view>
+
 namespace mongo::timeseries {
 
 StringMap<int> build2dsphereIndexVersionMap(const Collection& coll) {
@@ -57,7 +59,7 @@ StringMap<int> build2dsphereIndexVersionMap(const Collection& coll) {
             if (keyElt.valueStringDataSafe() != IndexNames::GEO_2DSPHERE_BUCKET) {
                 continue;
             }
-            StringData keyPath = keyElt.fieldNameStringData();
+            std::string_view keyPath = keyElt.fieldNameStringData();
             if (keyPath.size() <= dataPrefix.size() || !keyPath.starts_with(dataPrefix)) {
                 continue;
             }

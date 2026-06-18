@@ -46,6 +46,7 @@
 #include <cstddef>
 #include <functional>
 #include <iterator>
+#include <string_view>
 #include <variant>
 
 #include <boost/cstdint.hpp>
@@ -59,6 +60,7 @@
 #include <fmt/format.h>
 
 namespace mongo::logv2 {
+using namespace std::literals::string_view_literals;
 namespace {
 
 struct JSONValueExtractor {
@@ -112,7 +114,7 @@ struct JSONValueExtractor {
             } else if (val.stringSerialize) {
                 fmt::memory_buffer intermediate;
                 val.stringSerialize(intermediate);
-                storeQuoted(name, StringData(intermediate.data(), intermediate.size()));
+                storeQuoted(name, std::string_view(intermediate.data(), intermediate.size()));
             } else {
                 // This is a string, surround value with quotes
                 storeQuoted(name, val.toString());
@@ -145,21 +147,21 @@ struct JSONValueExtractor {
         addTruncationReport(name, truncated, val.objsize());
     }
 
-    void operator()(const char* name, StringData value) {
+    void operator()(const char* name, std::string_view value) {
         storeQuoted(name, value);
     }
 
     template <typename Period>
     void operator()(const char* name, const Duration<Period>& value) {
         // A suffix is automatically prepended
-        dassert(!StringData(name).ends_with(value.mongoUnitSuffix()));
+        dassert(!std::string_view(name).ends_with(value.mongoUnitSuffix()));
         fmt::format_to(std::back_inserter(_buffer),
                        FMT_COMPILE(R"({}"{}{}":{})"),
                        _separator,
                        name,
                        value.mongoUnitSuffix(),
                        value.count());
-        _separator = ","_sd;
+        _separator = ","sv;
     }
 
     template <typename T>
@@ -176,20 +178,20 @@ struct JSONValueExtractor {
     }
 
 private:
-    void storeUnquoted(StringData name) {
+    void storeUnquoted(std::string_view name) {
         fmt::format_to(std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":)"), _separator, name);
-        _separator = ","_sd;
+        _separator = ","sv;
     }
 
     template <typename T>
-    void storeUnquotedValue(StringData name, const T& value) {
+    void storeUnquotedValue(std::string_view name, const T& value) {
         fmt::format_to(
             std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":{})"), _separator, name, value);
-        _separator = ","_sd;
+        _separator = ","sv;
     }
 
     template <typename T>
-    void storeQuoted(StringData name, const T& value) {
+    void storeQuoted(std::string_view name, const T& value) {
         fmt::format_to(std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":")"), _separator, name);
         std::size_t before = _buffer.size();
         std::size_t wouldWrite = 0;
@@ -210,15 +212,15 @@ private:
                 str::UTF8SafeTruncation(_buffer.begin() + before, _buffer.end(), written);
 
             BSONObjBuilder truncationInfo = _truncated.subobjStart(name);
-            truncationInfo.append("type"_sd, typeName(BSONType::string));
-            truncationInfo.append("size"_sd, static_cast<int64_t>(wouldWrite));
+            truncationInfo.append("type"sv, typeName(BSONType::string));
+            truncationInfo.append("size"sv, static_cast<int64_t>(wouldWrite));
             truncationInfo.done();
 
             _buffer.resize(truncatedEnd - _buffer.begin());
         }
 
         _buffer.push_back('"');
-        _separator = ","_sd;
+        _separator = ","sv;
     }
 
     std::size_t bufferSizeToTriggerTruncation() const {
@@ -228,7 +230,7 @@ private:
         return _buffer.size() + _attributeMaxSize;
     }
 
-    void addTruncationReport(StringData name, const BSONObj& truncated, int64_t objsize) {
+    void addTruncationReport(std::string_view name, const BSONObj& truncated, int64_t objsize) {
         if (!truncated.isEmpty()) {
             _truncated.append(name, truncated);
             _truncatedSizes.append(name, objsize);
@@ -238,7 +240,7 @@ private:
     fmt::memory_buffer& _buffer;
     BSONObjBuilder _truncated;
     BSONObjBuilder _truncatedSizes;
-    StringData _separator = ""_sd;
+    std::string_view _separator = ""sv;
     size_t _attributeMaxSize;
 };
 }  // namespace
@@ -249,28 +251,28 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
                            Date_t date,
                            int32_t id,
                            LogService service,
-                           StringData context,
-                           StringData message,
+                           std::string_view context,
+                           std::string_view message,
                            const TypeErasedAttributeStorage& attrs,
                            LogTag tags,
                            const std::string& tenant,
                            LogTruncation truncation) const {
     namespace c = constants;
     static constexpr auto kFmt = JsonStringFormat::ExtendedRelaxedV2_0_0;
-    StringData severityString = severity.toStringDataCompact();
-    StringData componentString = component.getNameForLog();
-    StringData serviceString = getNameForLog(service);
+    std::string_view severityString = severity.toStringDataCompact();
+    std::string_view componentString = component.getNameForLog();
+    std::string_view serviceString = getNameForLog(service);
     bool local = _timestampFormat == LogTimestampFormat::kISO8601Local;
     size_t attributeMaxSize = truncation != LogTruncation::Enabled
         ? 0
         : (_maxAttributeSizeKB != 0 ? static_cast<size_t>(_maxAttributeSizeKB->loadRelaxed()) * 1024
                                     : c::kDefaultMaxAttributeOutputSizeKB * 1024);
-    auto write = [&](StringData s) {
+    auto write = [&](std::string_view s) {
         buffer.append(s.data(), s.data() + s.size());
     };
 
     struct CommaTracker {
-        StringData comma;
+        std::string_view comma;
         size_t padDebt = 0;
     };
 
@@ -280,10 +282,10 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
     // debt is cleared.
     auto writeComma = [&](CommaTracker& tracker) {
         write(tracker.comma);
-        tracker.comma = ","_sd;
+        tracker.comma = ","sv;
         while (tracker.padDebt) {
             // Relies on substr's truncation.
-            StringData space = "                "_sd.substr(0, tracker.padDebt);
+            std::string_view space = "                "sv.substr(0, tracker.padDebt);
             write(space);
             tracker.padDebt -= space.size();
         }
@@ -301,12 +303,12 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         };
     };
 
-    auto strFn = [&](StringData s) {
+    auto strFn = [&](std::string_view s) {
         return [&, s] {
             write(s);
         };
     };
-    auto escFn = [&](StringData s) {
+    auto escFn = [&](std::string_view s) {
         return [&, s] {
             str::escapeForJSON(buffer, s);
         };
@@ -314,7 +316,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
     auto intFn = [&](auto x) {
         return [&, x] {
             fmt::format_int s{x};
-            write(StringData{s.data(), s.size()});
+            write(std::string_view{s.data(), s.size()});
         };
     };
 
@@ -326,7 +328,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         };
     };
 
-    auto field = [&](CommaTracker& tracker, StringData name, auto f) {
+    auto field = [&](CommaTracker& tracker, std::string_view name, auto f) {
         writeComma(tracker);
         quote(strFn(name))();
         write(":");
@@ -345,7 +347,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
     auto dateFn = [&](Date_t dateToPrint) {
         return jsobj([&, dateToPrint](CommaTracker& tracker) {
             field(tracker, "$date", quote([&, dateToPrint] {
-                      write(StringData{DateStringBuffer{}.iso8601(dateToPrint, local)});
+                      write(std::string_view{DateStringBuffer{}.iso8601(dateToPrint, local)});
                   }));
         });
     };
@@ -401,8 +403,8 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
            extract<Date_t>(attributes::timeStamp(), rec).get(),
            extract<int32_t>(attributes::id(), rec).get(),
            extract<LogService>(attributes::service(), rec).get(),
-           extract<StringData>(attributes::threadName(), rec).get(),
-           extract<StringData>(attributes::message(), rec).get(),
+           extract<std::string_view>(attributes::threadName(), rec).get(),
+           extract<std::string_view>(attributes::message(), rec).get(),
            extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get(),
            extract<LogTag>(attributes::tags(), rec).get(),
            !tenant.empty() ? tenant.get() : std::string(),

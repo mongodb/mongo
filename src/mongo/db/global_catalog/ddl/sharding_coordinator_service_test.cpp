@@ -61,6 +61,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -172,7 +173,7 @@ protected:
     std::pair<ScopedBaseDDLLock, ScopedBaseDDLLock> acquireDbAndCollDDLLocks(
         OperationContext* opCtx,
         const NamespaceString& ns,
-        StringData reason,
+        std::string_view reason,
         LockMode mode,
         int32_t timeoutMillisecs,
         bool waitForRecovery = true) {
@@ -197,7 +198,7 @@ protected:
     std::pair<ScopedBaseDDLLock, ScopedBaseDDLLock>
     acquireDbAndCollDDLLocksWithoutWaitingForRecovery(OperationContext* opCtx,
                                                       const NamespaceString& ns,
-                                                      StringData reason,
+                                                      std::string_view reason,
                                                       LockMode mode,
                                                       int32_t timeoutMillisecs) {
         return acquireDbAndCollDDLLocks(

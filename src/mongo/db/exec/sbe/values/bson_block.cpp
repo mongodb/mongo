@@ -31,6 +31,8 @@
 
 #include "mongo/db/exec/sbe/values/object_walk_node.h"
 
+#include <string_view>
+
 namespace mongo::sbe::value {
 class BSONExtractorImpl : public BSONCellExtractor {
 public:
@@ -40,7 +42,7 @@ public:
         const std::vector<BSONObj>& bsons) override;
 
     std::vector<std::unique_ptr<CellBlock>> extractFromTopLevelField(
-        StringData topLevelField,
+        std::string_view topLevelField,
         const std::span<const TypeTags>& tags,
         const std::span<const Value>& vals) override;
 
@@ -94,7 +96,7 @@ void visitElementExtractorCallback(ObjectWalkNode<BlockProjectionPositionInfoRec
 }
 
 std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelField(
-    StringData topLevelField,
+    std::string_view topLevelField,
     const std::span<const TypeTags>& tags,
     const std::span<const Value>& vals) {
     tassert(

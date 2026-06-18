@@ -51,6 +51,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -74,7 +75,7 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(MergeCursors);
  */
 class DocumentSourceMergeCursors : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$mergeCursors"_sd;
+    static constexpr std::string_view kStageName = "$mergeCursors"_sd;
 
     /**
      * Parses a serialized version of this stage.
@@ -94,7 +95,7 @@ public:
      */
     std::unique_ptr<RouterStageMerge> convertToRouterStage();
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

@@ -45,6 +45,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -79,9 +80,9 @@ using ChangeStreamCheckResumabilityLiteParsed =
  */
 class DocumentSourceChangeStreamCheckResumability : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamCheckResumability"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamCheckResumability"_sd;
 
-    StringData getSourceName() const override;
+    std::string_view getSourceName() const override;
 
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,

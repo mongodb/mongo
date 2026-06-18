@@ -45,6 +45,7 @@
 
 #include <stack>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo::projection_ast {
@@ -190,7 +191,7 @@ public:
             // wraps the $-prefixed path in "$_internalPath", producing a shape that is not valid
             // projection syntax and cannot be re-parsed for querystats. Therefore we have to
             // construct a re-parseable projection: "{$<path>: {$elemMatch: <rhs of equality>}}".
-            const StringData path = me->path();
+            const std::string_view path = me->path();
             if (path.starts_with('$') && _options.isSerializingForQueryStats()) {
                 BSONObjBuilder fieldSub(
                     _builders.top().subobjStart(_options.serializeFieldPathFromString(path)));

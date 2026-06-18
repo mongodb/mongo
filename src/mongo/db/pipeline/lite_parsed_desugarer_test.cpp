@@ -46,13 +46,16 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Test-only stage that lifts its subpipeline to the top level when desugared. Used to verify
 // desugaring order: if subpipelines are desugared before the stage expands (innermost-first),
 // the lifted content will already be desugared (e.g. [$match] not [$expandToHostParse]).
-static constexpr StringData kLiftSubpipelineStageName = "$liftSubpipeline"_sd;
+static constexpr std::string_view kLiftSubpipelineStageName = "$liftSubpipeline"sv;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(LiftSubpipeline);
 ALLOCATE_STAGE_PARAMS_ID(liftSubpipeline, LiftSubpipelineStageParams::id);

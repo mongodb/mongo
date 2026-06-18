@@ -43,6 +43,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -64,7 +65,7 @@ public:
                                                         BSONElement elem,
                                                         VariablesParseState vps);
 
-    AccumulatorInternalJsReduce(ExpressionContext* const expCtx, StringData funcSource)
+    AccumulatorInternalJsReduce(ExpressionContext* const expCtx, std::string_view funcSource)
         : AccumulatorState(expCtx), _funcSource(funcSource) {
         _memUsageTracker.set(sizeof(*this));
     }

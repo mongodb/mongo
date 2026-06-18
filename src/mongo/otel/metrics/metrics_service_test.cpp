@@ -37,6 +37,8 @@
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/optional.hpp>
 
 #ifdef MONGO_CONFIG_OTEL
@@ -49,6 +51,7 @@
 namespace mongo::otel::metrics {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 class MetricsServiceTest : public testing::Test {
 public:
@@ -907,9 +910,10 @@ TEST_F(CreateCounterWithAttributesValidationTest, ExceptionWhenSameNameButDiffer
 }
 
 TEST_F(CreateCounterWithAttributesValidationTest, ExceptionWhenSameNameButDifferentAttributeType) {
-    // Sanity check that the bool value `true` is formatted to be equal to the StringData value
+    // Sanity check that the bool value `true` is formatted to be equal to the std::string_view
+    // value
     // `"true"`, since this test would fail otherwise.
-    invariant(fmt::format("{}", true) == fmt::format("{}", "true"_sd));
+    invariant(fmt::format("{}", true) == fmt::format("{}", "true"sv));
 
     metricsService.createInt64Counter<bool>(
         MetricNames::kTest1,
@@ -917,11 +921,11 @@ TEST_F(CreateCounterWithAttributesValidationTest, ExceptionWhenSameNameButDiffer
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
     ASSERT_THROWS_CODE(
-        metricsService.createInt64Counter<StringData>(
+        metricsService.createInt64Counter<std::string_view>(
             MetricNames::kTest1,
             "description",
             MetricUnit::kSeconds,
-            AttributeDefinition<StringData>{.name = "cool", .values = {"true", "false"}}),
+            AttributeDefinition<std::string_view>{.name = "cool", .values = {"true", "false"}}),
         DBException,
         ErrorCodes::ObjectAlreadyExists);
 }
@@ -980,13 +984,13 @@ TEST_F(CreateInt64CounterTest, RecordsValuesWithAttributes) {
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
 
-    Counter<int64_t, bool, StringData>& counter2 =
-        metricsService.createInt64Counter<bool, StringData>(
+    Counter<int64_t, bool, std::string_view>& counter2 =
+        metricsService.createInt64Counter<bool, std::string_view>(
             MetricNames::kTest2,
             "description",
             MetricUnit::kSeconds,
             AttributeDefinition<bool>{.name = "cool", .values = {true, false}},
-            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+            AttributeDefinition<std::string_view>{.name = "type", .values = {"foo", "bar"}});
 
     OtelMetricsCapturer metricsCapturer(metricsService);
 
@@ -999,18 +1003,18 @@ TEST_F(CreateInt64CounterTest, RecordsValuesWithAttributes) {
         EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1, std::tuple{false}), 3);
     }
 
-    counter2.add(10, {true, "foo"_sd});
-    counter2.add(5, {false, "bar"_sd});
+    counter2.add(10, {true, "foo"sv});
+    counter2.add(5, {false, "bar"sv});
 
     if (metricsCapturer.canReadMetrics()) {
-        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "foo"_sd}),
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "foo"sv}),
                   10);
-        EXPECT_EQ(
-            metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{false, "bar"_sd}), 5);
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{false, "bar"sv}),
+                  5);
         // Combinations that were never incremented are filtered from the export (value() skips
         // zeros when attributes are present), so reading them throws KeyNotFound.
         ASSERT_THROWS_CODE(
-            metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "bar"sv}),
             DBException,
             ErrorCodes::KeyNotFound);
     }
@@ -1051,13 +1055,13 @@ TEST_F(CreateDoubleCounterTest, RecordsValuesWithAttributes) {
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
 
-    Counter<double, bool, StringData>& counter2 =
-        metricsService.createDoubleCounter<bool, StringData>(
+    Counter<double, bool, std::string_view>& counter2 =
+        metricsService.createDoubleCounter<bool, std::string_view>(
             MetricNames::kTest2,
             "description",
             MetricUnit::kSeconds,
             AttributeDefinition<bool>{.name = "cool", .values = {true, false}},
-            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+            AttributeDefinition<std::string_view>{.name = "type", .values = {"foo", "bar"}});
 
     OtelMetricsCapturer metricsCapturer(metricsService);
 
@@ -1072,20 +1076,20 @@ TEST_F(CreateDoubleCounterTest, RecordsValuesWithAttributes) {
                          3.0);
     }
 
-    counter2.add(10.5, {true, "foo"_sd});
-    counter2.add(5.5, {false, "bar"_sd});
+    counter2.add(10.5, {true, "foo"sv});
+    counter2.add(5.5, {false, "bar"sv});
 
     if (metricsCapturer.canReadMetrics()) {
         EXPECT_DOUBLE_EQ(
-            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "foo"_sd}),
+            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "foo"sv}),
             10.5);
         EXPECT_DOUBLE_EQ(
-            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{false, "bar"_sd}),
+            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{false, "bar"sv}),
             5.5);
         // Combinations that were never incremented are filtered from the export (value() skips
         // zeros when attributes are present), so reading them throws KeyNotFound.
         ASSERT_THROWS_CODE(
-            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "bar"sv}),
             DBException,
             ErrorCodes::KeyNotFound);
     }
@@ -1127,23 +1131,24 @@ TEST_F(CreateUpDownCounterWithAttributesValidationTest,
 
 TEST_F(CreateUpDownCounterWithAttributesValidationTest,
        ExceptionWhenSameNameButDifferentAttributeType) {
-    // Sanity check that the bool value `true` is formatted to be equal to the StringData value
+    // Sanity check that the bool value `true` is formatted to be equal to the std::string_view
+    // value
     // `"true"`, since this test would fail otherwise.
-    invariant(fmt::format("{}", true) == fmt::format("{}", "true"_sd));
+    invariant(fmt::format("{}", true) == fmt::format("{}", "true"sv));
 
     metricsService.createInt64UpDownCounter<bool>(
         MetricNames::kTest1,
         "description",
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "is_active", .values = {true, false}});
-    ASSERT_THROWS_CODE(
-        metricsService.createInt64UpDownCounter<StringData>(
-            MetricNames::kTest1,
-            "description",
-            MetricUnit::kSeconds,
-            AttributeDefinition<StringData>{.name = "is_active", .values = {"true", "false"}}),
-        DBException,
-        ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(metricsService.createInt64UpDownCounter<std::string_view>(
+                           MetricNames::kTest1,
+                           "description",
+                           MetricUnit::kSeconds,
+                           AttributeDefinition<std::string_view>{.name = "is_active",
+                                                                 .values = {"true", "false"}}),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
 }
 
 TEST_F(CreateUpDownCounterWithAttributesValidationTest,
@@ -1202,13 +1207,13 @@ TEST_F(CreateInt64UpDownCounterTest, RecordsValuesWithAttributes) {
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "active", .values = {true, false}});
 
-    UpDownCounter<int64_t, bool, StringData>& u2 =
-        metricsService.createInt64UpDownCounter<bool, StringData>(
+    UpDownCounter<int64_t, bool, std::string_view>& u2 =
+        metricsService.createInt64UpDownCounter<bool, std::string_view>(
             MetricNames::kTest2,
             "description",
             MetricUnit::kSeconds,
             AttributeDefinition<bool>{.name = "active", .values = {true, false}},
-            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+            AttributeDefinition<std::string_view>{.name = "type", .values = {"foo", "bar"}});
 
     OtelMetricsCapturer metricsCapturer(metricsService);
 
@@ -1221,17 +1226,17 @@ TEST_F(CreateInt64UpDownCounterTest, RecordsValuesWithAttributes) {
         EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1, std::tuple{false}), 5);
     }
 
-    u2.add(10, {true, "foo"_sd});
-    u2.add(-4, {true, "foo"_sd});
-    u2.add(5, {false, "bar"_sd});
+    u2.add(10, {true, "foo"sv});
+    u2.add(-4, {true, "foo"sv});
+    u2.add(5, {false, "bar"sv});
 
     if (metricsCapturer.canReadMetrics()) {
-        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "foo"_sd}),
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "foo"sv}),
                   6);
-        EXPECT_EQ(
-            metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{false, "bar"_sd}), 5);
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{false, "bar"sv}),
+                  5);
         ASSERT_THROWS_CODE(
-            metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "bar"sv}),
             DBException,
             ErrorCodes::KeyNotFound);
     }
@@ -1277,13 +1282,13 @@ TEST_F(CreateDoubleUpDownCounterTest, RecordsValuesWithAttributes) {
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "active", .values = {true, false}});
 
-    UpDownCounter<double, bool, StringData>& u2 =
-        metricsService.createDoubleUpDownCounter<bool, StringData>(
+    UpDownCounter<double, bool, std::string_view>& u2 =
+        metricsService.createDoubleUpDownCounter<bool, std::string_view>(
             MetricNames::kTest2,
             "description",
             MetricUnit::kSeconds,
             AttributeDefinition<bool>{.name = "active", .values = {true, false}},
-            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+            AttributeDefinition<std::string_view>{.name = "type", .values = {"foo", "bar"}});
 
     OtelMetricsCapturer metricsCapturer(metricsService);
 
@@ -1298,19 +1303,18 @@ TEST_F(CreateDoubleUpDownCounterTest, RecordsValuesWithAttributes) {
                          5.0);
     }
 
-    u2.add(10.5, {true, "foo"_sd});
-    u2.add(-4.5, {true, "foo"_sd});
-    u2.add(5.5, {false, "bar"_sd});
+    u2.add(10.5, {true, "foo"sv});
+    u2.add(-4.5, {true, "foo"sv});
+    u2.add(5.5, {false, "bar"sv});
 
     if (metricsCapturer.canReadMetrics()) {
         EXPECT_DOUBLE_EQ(
-            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "foo"_sd}),
-            6.0);
+            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "foo"sv}), 6.0);
         EXPECT_DOUBLE_EQ(
-            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{false, "bar"_sd}),
+            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{false, "bar"sv}),
             5.5);
         ASSERT_THROWS_CODE(
-            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "bar"sv}),
             DBException,
             ErrorCodes::KeyNotFound);
     }
@@ -1349,23 +1353,24 @@ TEST_F(CreateGaugeWithAttributesValidationTest, ExceptionWhenSameNameButDifferen
 }
 
 TEST_F(CreateGaugeWithAttributesValidationTest, ExceptionWhenSameNameButDifferentAttributeType) {
-    // Sanity check that the bool value `true` is formatted to be equal to the StringData value
+    // Sanity check that the bool value `true` is formatted to be equal to the std::string_view
+    // value
     // `"true"`, since this test would fail otherwise.
-    invariant(fmt::format("{}", true) == fmt::format("{}", "true"_sd));
+    invariant(fmt::format("{}", true) == fmt::format("{}", "true"sv));
 
     metricsService.createInt64Gauge<bool>(
         MetricNames::kTest1,
         "description",
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
-    ASSERT_THROWS_CODE(
-        metricsService.createInt64Gauge<StringData>(
-            MetricNames::kTest1,
-            "description",
-            MetricUnit::kSeconds,
-            AttributeDefinition<StringData>{.name = "is_primary", .values = {"true", "false"}}),
-        DBException,
-        ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(metricsService.createInt64Gauge<std::string_view>(
+                           MetricNames::kTest1,
+                           "description",
+                           MetricUnit::kSeconds,
+                           AttributeDefinition<std::string_view>{.name = "is_primary",
+                                                                 .values = {"true", "false"}}),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
 }
 
 TEST_F(CreateGaugeWithAttributesValidationTest, SameMetricReturnedWhenAttributeDefinitionsMatch) {
@@ -1417,12 +1422,13 @@ TEST_F(CreateInt64GaugeTest, RecordsValuesWithAttributes) {
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
 
-    Gauge<int64_t, bool, StringData>& g2 = metricsService.createInt64Gauge<bool, StringData>(
-        MetricNames::kTest2,
-        "description",
-        MetricUnit::kSeconds,
-        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}},
-        AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+    Gauge<int64_t, bool, std::string_view>& g2 =
+        metricsService.createInt64Gauge<bool, std::string_view>(
+            MetricNames::kTest2,
+            "description",
+            MetricUnit::kSeconds,
+            AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}},
+            AttributeDefinition<std::string_view>{.name = "type", .values = {"foo", "bar"}});
 
     OtelMetricsCapturer metricsCapturer(metricsService);
 
@@ -1435,16 +1441,16 @@ TEST_F(CreateInt64GaugeTest, RecordsValuesWithAttributes) {
         EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1, std::tuple{false}), 3);
     }
 
-    g2.set(42, {true, "foo"_sd});
-    g2.set(7, {false, "bar"_sd});
+    g2.set(42, {true, "foo"sv});
+    g2.set(7, {false, "bar"sv});
 
     if (metricsCapturer.canReadMetrics()) {
-        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2, std::tuple{true, "foo"_sd}),
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2, std::tuple{true, "foo"sv}),
                   42);
-        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2, std::tuple{false, "bar"_sd}),
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2, std::tuple{false, "bar"sv}),
                   7);
         ASSERT_THROWS_CODE(
-            metricsCapturer.readInt64Gauge(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            metricsCapturer.readInt64Gauge(MetricNames::kTest2, std::tuple{true, "bar"sv}),
             DBException,
             ErrorCodes::KeyNotFound);
     }
@@ -1485,12 +1491,13 @@ TEST_F(CreateDoubleGaugeTest, RecordsValuesWithAttributes) {
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
 
-    Gauge<double, bool, StringData>& g2 = metricsService.createDoubleGauge<bool, StringData>(
-        MetricNames::kTest2,
-        "description",
-        MetricUnit::kSeconds,
-        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}},
-        AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+    Gauge<double, bool, std::string_view>& g2 =
+        metricsService.createDoubleGauge<bool, std::string_view>(
+            MetricNames::kTest2,
+            "description",
+            MetricUnit::kSeconds,
+            AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}},
+            AttributeDefinition<std::string_view>{.name = "type", .values = {"foo", "bar"}});
 
     OtelMetricsCapturer metricsCapturer(metricsService);
 
@@ -1505,16 +1512,16 @@ TEST_F(CreateDoubleGaugeTest, RecordsValuesWithAttributes) {
                          3.5);
     }
 
-    g2.set(42.5, {true, "foo"_sd});
-    g2.set(7.5, {false, "bar"_sd});
+    g2.set(42.5, {true, "foo"sv});
+    g2.set(7.5, {false, "bar"sv});
 
     if (metricsCapturer.canReadMetrics()) {
         EXPECT_DOUBLE_EQ(
-            metricsCapturer.readDoubleGauge(MetricNames::kTest2, std::tuple{true, "foo"_sd}), 42.5);
+            metricsCapturer.readDoubleGauge(MetricNames::kTest2, std::tuple{true, "foo"sv}), 42.5);
         EXPECT_DOUBLE_EQ(
-            metricsCapturer.readDoubleGauge(MetricNames::kTest2, std::tuple{false, "bar"_sd}), 7.5);
+            metricsCapturer.readDoubleGauge(MetricNames::kTest2, std::tuple{false, "bar"sv}), 7.5);
         ASSERT_THROWS_CODE(
-            metricsCapturer.readDoubleGauge(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            metricsCapturer.readDoubleGauge(MetricNames::kTest2, std::tuple{true, "bar"sv}),
             DBException,
             ErrorCodes::KeyNotFound);
     }
@@ -1770,9 +1777,10 @@ TEST_F(CreateHistogramWithAttributesValidationTest,
 
 TEST_F(CreateHistogramWithAttributesValidationTest,
        ExceptionWhenSameNameButDifferentAttributeType) {
-    // Sanity check that the bool value `true` is formatted to be equal to the StringData value
+    // Sanity check that the bool value `true` is formatted to be equal to the std::string_view
+    // value
     // `"true"`, since this test would fail otherwise.
-    invariant(fmt::format("{}", true) == fmt::format("{}", "true"_sd));
+    invariant(fmt::format("{}", true) == fmt::format("{}", "true"sv));
 
     metricsService.createInt64Histogram<bool>(
         MetricNames::kTest1,
@@ -1780,11 +1788,11 @@ TEST_F(CreateHistogramWithAttributesValidationTest,
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
     ASSERT_THROWS_CODE(
-        metricsService.createInt64Histogram<StringData>(
+        metricsService.createInt64Histogram<std::string_view>(
             MetricNames::kTest1,
             "description",
             MetricUnit::kSeconds,
-            AttributeDefinition<StringData>{.name = "cool", .values = {"true", "false"}}),
+            AttributeDefinition<std::string_view>{.name = "cool", .values = {"true", "false"}}),
         DBException,
         ErrorCodes::ObjectAlreadyExists);
 }
@@ -1884,13 +1892,13 @@ TEST_F(CreateHistogramTest, RecordsInt64ValuesWithAttributes) {
         "description",
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}});
-    Histogram<int64_t, bool, StringData>& h2 =
-        metricsService.createInt64Histogram<bool, StringData>(
+    Histogram<int64_t, bool, std::string_view>& h2 =
+        metricsService.createInt64Histogram<bool, std::string_view>(
             MetricNames::kTest2,
             "description",
             MetricUnit::kSeconds,
             AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}},
-            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+            AttributeDefinition<std::string_view>{.name = "type", .values = {"foo", "bar"}});
 
     OtelMetricsCapturer metricsCapturer(metricsService);
 
@@ -1910,22 +1918,22 @@ TEST_F(CreateHistogramTest, RecordsInt64ValuesWithAttributes) {
         EXPECT_EQ(externalData.count, 1u);
     }
 
-    h2.record(10, {true, "foo"_sd});
-    h2.record(5, {false, "bar"_sd});
+    h2.record(10, {true, "foo"sv});
+    h2.record(5, {false, "bar"sv});
 
     if (metricsCapturer.canReadMetrics()) {
         const auto internalFooData =
-            metricsCapturer.readInt64Histogram(MetricNames::kTest2, std::tuple{true, "foo"_sd});
+            metricsCapturer.readInt64Histogram(MetricNames::kTest2, std::tuple{true, "foo"sv});
         EXPECT_EQ(internalFooData.sum, 10);
         EXPECT_EQ(internalFooData.count, 1u);
 
         const auto externalBarData =
-            metricsCapturer.readInt64Histogram(MetricNames::kTest2, std::tuple{false, "bar"_sd});
+            metricsCapturer.readInt64Histogram(MetricNames::kTest2, std::tuple{false, "bar"sv});
         EXPECT_EQ(externalBarData.sum, 5);
         EXPECT_EQ(externalBarData.count, 1u);
 
         ASSERT_THROWS_CODE(
-            metricsCapturer.readInt64Histogram(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            metricsCapturer.readInt64Histogram(MetricNames::kTest2, std::tuple{true, "bar"sv}),
             DBException,
             ErrorCodes::KeyNotFound);
     }
@@ -1937,13 +1945,13 @@ TEST_F(CreateHistogramTest, RecordsDoubleValuesWithAttributes) {
         "description",
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}});
-    Histogram<double, bool, StringData>& h2 =
-        metricsService.createDoubleHistogram<bool, StringData>(
+    Histogram<double, bool, std::string_view>& h2 =
+        metricsService.createDoubleHistogram<bool, std::string_view>(
             MetricNames::kTest2,
             "description",
             MetricUnit::kSeconds,
             AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}},
-            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+            AttributeDefinition<std::string_view>{.name = "type", .values = {"foo", "bar"}});
 
     OtelMetricsCapturer metricsCapturer(metricsService);
 
@@ -1963,22 +1971,22 @@ TEST_F(CreateHistogramTest, RecordsDoubleValuesWithAttributes) {
         EXPECT_EQ(externalData.count, 1u);
     }
 
-    h2.record(10.5, {true, "foo"_sd});
-    h2.record(5.5, {false, "bar"_sd});
+    h2.record(10.5, {true, "foo"sv});
+    h2.record(5.5, {false, "bar"sv});
 
     if (metricsCapturer.canReadMetrics()) {
         const auto internalFooData =
-            metricsCapturer.readDoubleHistogram(MetricNames::kTest2, std::tuple{true, "foo"_sd});
+            metricsCapturer.readDoubleHistogram(MetricNames::kTest2, std::tuple{true, "foo"sv});
         EXPECT_DOUBLE_EQ(internalFooData.sum, 10.5);
         EXPECT_EQ(internalFooData.count, 1u);
 
         const auto externalBarData =
-            metricsCapturer.readDoubleHistogram(MetricNames::kTest2, std::tuple{false, "bar"_sd});
+            metricsCapturer.readDoubleHistogram(MetricNames::kTest2, std::tuple{false, "bar"sv});
         EXPECT_DOUBLE_EQ(externalBarData.sum, 5.5);
         EXPECT_EQ(externalBarData.count, 1u);
 
         ASSERT_THROWS_CODE(
-            metricsCapturer.readDoubleHistogram(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            metricsCapturer.readDoubleHistogram(MetricNames::kTest2, std::tuple{true, "bar"sv}),
             DBException,
             ErrorCodes::KeyNotFound);
     }
@@ -2089,12 +2097,12 @@ TEST_F(GetAttributeNamesForTestingTest, ReturnsSingleAttributeName) {
 }
 
 TEST_F(GetAttributeNamesForTestingTest, ReturnsMultipleAttributeNamesInDefinitionOrder) {
-    metricsService.createInt64Counter<bool, StringData>(
+    metricsService.createInt64Counter<bool, std::string_view>(
         MetricNames::kTest1,
         "description",
         MetricUnit::kSeconds,
         AttributeDefinition<bool>{.name = "first", .values = {true, false}},
-        AttributeDefinition<StringData>{.name = "second", .values = {"foo", "bar"}});
+        AttributeDefinition<std::string_view>{.name = "second", .values = {"foo", "bar"}});
     EXPECT_THAT(metricsService.getAttributeNamesForTests(MetricNames::kTest1),
                 ElementsAre("first", "second"));
 }

@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -82,6 +81,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -96,6 +96,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace resharding;
 using unittest::assertGet;
@@ -183,7 +184,7 @@ protected:
         ShardedClusterCardinalityParam cardinality;
         ClusterServerParameter baseCSP;
         baseCSP.setClusterParameterTime(LogicalTime(Timestamp(Date_t::now())));
-        baseCSP.set_id("shardedClusterCardinalityForDirectConns"_sd);
+        baseCSP.set_id("shardedClusterCardinalityForDirectConns"sv);
         cardinality.setClusterServerParameter(baseCSP);
         cardinality.setHasTwoOrMoreShards(true);
         auto param = ServerParameterSet::getClusterParameterSet()->get(
@@ -1378,7 +1379,7 @@ TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate, _originalEpoch);
 
-    auto assertTempEntryHasNoReshardingFields = [&](StringData phase) {
+    auto assertTempEntryHasNoReshardingFields = [&](std::string_view phase) {
         auto entry = findTempCollectionEntry(operationContext());
         ASSERT(!entry.isEmpty()) << "phase=" << phase;
         ASSERT_FALSE(entry.hasField(CollectionType::kReshardingFieldsFieldName))

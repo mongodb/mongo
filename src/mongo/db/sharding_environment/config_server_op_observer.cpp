@@ -30,7 +30,6 @@
 
 #include "mongo/db/sharding_environment/config_server_op_observer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

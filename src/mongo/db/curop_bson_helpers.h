@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -76,7 +77,7 @@ inline void buildTruncatedObject(const BSONObj& obj, size_t maxSize, BSONObjBuil
  * object that preserves the "comment" field (if it exists) but converts the rest to a string that
  * gets truncated to fit the limit.
  */
-inline void appendObjectTruncatingAsNecessary(StringData fieldName,
+inline void appendObjectTruncatingAsNecessary(std::string_view fieldName,
                                               const BSONObj& obj,
                                               boost::optional<size_t> maxSize,
                                               BSONObjBuilder& builder) {

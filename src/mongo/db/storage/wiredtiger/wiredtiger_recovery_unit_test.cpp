@@ -33,7 +33,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
@@ -57,6 +56,7 @@
 
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <wiredtiger.h>
@@ -1276,7 +1276,7 @@ public:
 
     MOCK_METHOD(void,
                 publishIdent,
-                (WiredTigerRecoveryUnit & ru, StringData ident, uint64_t schemaEpoch),
+                (WiredTigerRecoveryUnit & ru, std::string_view ident, uint64_t schemaEpoch),
                 (override));
 
     MOCK_METHOD(void, pinAllDurableTimestamp, (uint64_t ts), (override));

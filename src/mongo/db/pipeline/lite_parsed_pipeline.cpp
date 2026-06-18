@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
@@ -43,6 +42,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <string_view>
 
 
 namespace mongo {
@@ -197,7 +198,7 @@ void LiteParsedPipeline::validateTimeseries() const {
     for (const auto& stage : _stageSpecs) {
         auto stageConstraints = stage->constraints();
         auto unsupportedStage = stageConstraints.timeseriesUnsupportedStageName.value_or(
-            StringData(stage->getParseTimeName()));
+            std::string_view(stage->getParseTimeName()));
         uassert(12093200,
                 str::stream() << unsupportedStage << " is unsupported for timeseries collections",
                 stageConstraints.canRunOnTimeseries);

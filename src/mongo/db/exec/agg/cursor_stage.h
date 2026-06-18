@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/stage.h"
@@ -44,6 +43,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -60,7 +60,7 @@ public:
     using CursorType = DocumentSourceCursor::CursorType;
     using ResumeTrackingType = DocumentSourceCursor::ResumeTrackingType;
 
-    CursorStage(StringData stageName,
+    CursorStage(std::string_view stageName,
                 const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
                 const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                 CursorType cursorType,

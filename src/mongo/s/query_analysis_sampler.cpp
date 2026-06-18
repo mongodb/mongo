@@ -63,6 +63,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -77,6 +78,7 @@ namespace mongo {
 namespace analyze_shard_key {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 using ConfigurationRefreshSecs =
@@ -88,7 +90,7 @@ MONGO_FAIL_POINT_DEFINE(queryAnalysisSamplerFilterByComment);
 
 const auto getQueryAnalysisSampler = ServiceContext::declareDecoration<QueryAnalysisSampler>();
 
-constexpr auto kActiveCollectionsFieldName = "activeCollections"_sd;
+constexpr auto kActiveCollectionsFieldName = "activeCollections"sv;
 
 bool isApproximatelyEqual(double val0, double val1, double epsilon) {
     return std::fabs(val0 - val1) < (epsilon + std::numeric_limits<double>::epsilon());
@@ -206,7 +208,7 @@ void QueryAnalysisSampler::onShutdown() {
     }
 }
 
-void QueryAnalysisSampler::QueryStats::gotCommand(StringData cmdName) {
+void QueryAnalysisSampler::QueryStats::gotCommand(std::string_view cmdName) {
     if (cmdName == "findAndModify" || cmdName == "findandmodify") {
         _lastFindAndModifyQueriesCount++;
     } else if (cmdName == "count") {

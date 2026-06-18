@@ -32,6 +32,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -41,7 +42,6 @@
 #include <boost/cstdint.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/encryption_fields_util.h"
@@ -310,7 +310,7 @@ uint32_t getNumberOfBitsInDomain(BSONType fieldType,
     }
 }
 
-void validateRangeIndex(BSONType fieldType, StringData fieldPath, QueryTypeConfig& query) {
+void validateRangeIndex(BSONType fieldType, std::string_view fieldPath, QueryTypeConfig& query) {
     uassert(6775201,
             fmt::format("Type '{}' is not a supported range indexed type", typeName(fieldType)),
             isFLE2RangeIndexedSupportedType(fieldType));
@@ -439,7 +439,7 @@ void validateRangeIndex(BSONType fieldType, StringData fieldPath, QueryTypeConfi
 }
 
 void validateTextSearchIndex(BSONType fieldType,
-                             StringData fieldPath,
+                             std::string_view fieldPath,
                              QueryTypeConfig& query,
                              boost::optional<bool> previousCaseSensitivity,
                              boost::optional<bool> previousDiacriticSensitivity,
@@ -721,7 +721,7 @@ bool validateDecimal128PrecisionRange(Decimal128& dec, uint32_t precision) {
     return maybe_integer == trunc_integer;
 }
 
-void setRangeDefaults(BSONType fieldType, StringData fieldPath, QueryTypeConfig* queryp) {
+void setRangeDefaults(BSONType fieldType, std::string_view fieldPath, QueryTypeConfig* queryp) {
     auto& query = *queryp;
 
     // Make sure the QueryTypeConfig is valid before setting defaults

@@ -36,60 +36,61 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <s2cellid.h>
 
 namespace mongo {
 
 // This field must be present, and...
-static constexpr StringData GEOJSON_TYPE = "type"_sd;
+inline constexpr std::string_view GEOJSON_TYPE{"type"};
 // Have one of these values:
-static constexpr StringData GEOJSON_TYPE_POINT = "Point"_sd;
-static constexpr StringData GEOJSON_TYPE_LINESTRING = "LineString"_sd;
-static constexpr StringData GEOJSON_TYPE_POLYGON = "Polygon"_sd;
-static constexpr StringData GEOJSON_TYPE_MULTI_POINT = "MultiPoint"_sd;
-static constexpr StringData GEOJSON_TYPE_MULTI_LINESTRING = "MultiLineString"_sd;
-static constexpr StringData GEOJSON_TYPE_MULTI_POLYGON = "MultiPolygon"_sd;
-static constexpr StringData GEOJSON_TYPE_GEOMETRY_COLLECTION = "GeometryCollection"_sd;
+inline constexpr std::string_view GEOJSON_TYPE_POINT{"Point"};
+inline constexpr std::string_view GEOJSON_TYPE_LINESTRING{"LineString"};
+inline constexpr std::string_view GEOJSON_TYPE_POLYGON{"Polygon"};
+inline constexpr std::string_view GEOJSON_TYPE_MULTI_POINT{"MultiPoint"};
+inline constexpr std::string_view GEOJSON_TYPE_MULTI_LINESTRING{"MultiLineString"};
+inline constexpr std::string_view GEOJSON_TYPE_MULTI_POLYGON{"MultiPolygon"};
+inline constexpr std::string_view GEOJSON_TYPE_GEOMETRY_COLLECTION{"GeometryCollection"};
 // This field must also be present.  The value depends on the type.
-static constexpr StringData GEOJSON_COORDINATES = "coordinates"_sd;
-static constexpr StringData GEOJSON_GEOMETRIES = "geometries"_sd;
+inline constexpr std::string_view GEOJSON_COORDINATES{"coordinates"};
+inline constexpr std::string_view GEOJSON_GEOMETRIES{"geometries"};
 
 // Coordinate System Reference
 // see http://portal.opengeospatial.org/files/?artifact_id=24045
 // and http://spatialreference.org/ref/epsg/4326/
 // and http://www.geojson.org/geojson-spec.html#named-crs
-static constexpr StringData CRS_CRS84 = "urn:ogc:def:crs:OGC:1.3:CRS84"_sd;
-static constexpr StringData CRS_EPSG_4326 = "EPSG:4326"_sd;
-static constexpr StringData CRS_STRICT_WINDING = "urn:x-mongodb:crs:strictwinding:EPSG:4326"_sd;
+inline constexpr std::string_view CRS_CRS84{"urn:ogc:def:crs:OGC:1.3:CRS84"};
+inline constexpr std::string_view CRS_EPSG_4326{"EPSG:4326"};
+inline constexpr std::string_view CRS_STRICT_WINDING{"urn:x-mongodb:crs:strictwinding:EPSG:4326"};
 
 // String constants for field names.
-static constexpr StringData kBoxField = "$box"_sd;
-static constexpr StringData kCenterField = "$center"_sd;
-static constexpr StringData kPolygonField = "$polygon"_sd;
-static constexpr StringData kCenterSphereField = "$centerSphere"_sd;
-static constexpr StringData kGeometryField = "$geometry"_sd;
-static constexpr StringData kGeoWithinField = "$geoWithin"_sd;
-static constexpr StringData kUniqueDocsField = "$uniqueDocs"_sd;
-static constexpr StringData kNearField = "$near"_sd;
-static constexpr StringData kGeoNearField = "$geoNear"_sd;
-static constexpr StringData kNearSphereField = "$nearSphere"_sd;
-static constexpr StringData kMaxDistanceField = "$maxDistance"_sd;
-static constexpr StringData kMinDistanceField = "$minDistance"_sd;
+inline constexpr std::string_view kBoxField{"$box"};
+inline constexpr std::string_view kCenterField{"$center"};
+inline constexpr std::string_view kPolygonField{"$polygon"};
+inline constexpr std::string_view kCenterSphereField{"$centerSphere"};
+inline constexpr std::string_view kGeometryField{"$geometry"};
+inline constexpr std::string_view kGeoWithinField{"$geoWithin"};
+inline constexpr std::string_view kUniqueDocsField{"$uniqueDocs"};
+inline constexpr std::string_view kNearField{"$near"};
+inline constexpr std::string_view kGeoNearField{"$geoNear"};
+inline constexpr std::string_view kNearSphereField{"$nearSphere"};
+inline constexpr std::string_view kMaxDistanceField{"$maxDistance"};
+inline constexpr std::string_view kMinDistanceField{"$minDistance"};
 // "crs": {
 //   "type": "name",
 //   "properties": {
 //     "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
 //    }
 // }
-static constexpr StringData kCrsField = "crs"_sd;
-static constexpr StringData kCrsTypeField = "type"_sd;
-static constexpr StringData kCrsNameField = "name"_sd;
-static constexpr StringData kCrsPropertiesField = "properties"_sd;
-static constexpr StringData kPropertiesNameField = "name"_sd;
+inline constexpr std::string_view kCrsField{"crs"};
+inline constexpr std::string_view kCrsTypeField{"type"};
+inline constexpr std::string_view kCrsNameField{"name"};
+inline constexpr std::string_view kCrsPropertiesField{"properties"};
+inline constexpr std::string_view kPropertiesNameField{"name"};
 // { "type": "Point", "coordinates": [100.0, 0.0] }
-static constexpr StringData kGeometryTypeField = "type"_sd;
-static constexpr StringData kGeometryCoordinatesField = "coordinates"_sd;
+inline constexpr std::string_view kGeometryTypeField{"type"};
+inline constexpr std::string_view kGeometryCoordinatesField{"coordinates"};
 
 // This class parses geographic data.
 // It parses a subset of GeoJSON and creates S2 shapes from it.
@@ -130,8 +131,8 @@ public:
     // Throw an assertion if the passed in object has an invalid 'type', whether the value is
     // non-string or not recognized.
     static void assertValidGeoJSONType(const BSONObj& obj);
-    static GeoJSONType geoJSONTypeStringToEnum(StringData type);
-    static StringData geoJSONTypeEnumToString(GeoParser::GeoJSONType type);
+    static GeoJSONType geoJSONTypeStringToEnum(std::string_view type);
+    static std::string_view geoJSONTypeEnumToString(GeoParser::GeoJSONType type);
 
     // Legacy points can contain extra data as extra fields - these are valid to index
     // e.g. { x: 1, y: 1, z: 1 }

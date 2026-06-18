@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace exec {
 namespace agg {
@@ -45,7 +47,7 @@ namespace agg {
 class SetVariableFromSubPipelineStage final : public Stage {
 public:
     SetVariableFromSubPipelineStage(
-        StringData stageName,
+        std::string_view stageName,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         std::shared_ptr<SetVariableFromSubPipelineSharedState> sharedState,
         std::shared_ptr<mongo::Pipeline> subPipeline,

@@ -38,13 +38,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer::common_utils {
 
 // Prefix for the flat scalar group keys (e.g. "__hs_<p>_score") used in the desugared $group's
 // per-pipeline accumulators and in the subsequent $replaceRoot's wrapper object.
-inline constexpr StringData kHsFlatFieldPrefix = "__hs_"_sd;
+inline constexpr std::string_view kHsFlatFieldPrefix = "__hs_"_sd;
 
 // Parses a synthesized BSONObj stage into an owned LPDS at namespace `nss`. Not for use with
 // stages that hold nested LiteParsedPipelines -- use buildUnionWithLPDS for $unionWith.
@@ -58,23 +59,23 @@ void mutateRightmostSortToOutputSortKey(const NamespaceString& nss, StageSpecs& 
 // Builds a $unionWith LPDS whose subpipeline is `perPipelineStages`, targeting `userCollName`
 // on the same DB as `nss`.
 std::unique_ptr<LiteParsedDocumentSource> buildUnionWithLPDS(const NamespaceString& nss,
-                                                             StringData userCollName,
+                                                             std::string_view userCollName,
                                                              StageSpecs perPipelineStages);
 
 // Validates the user-provided combination.weights BSON against the input pipeline names and
 // returns the resulting weights map.
 StringMap<double> validateWeights(const BSONObj& inputWeights,
                                   const std::vector<std::string>& pipelineNames,
-                                  StringData stageName);
+                                  std::string_view stageName);
 
 // {$replaceWith: {<docsName>: "$$ROOT"}}
-BSONObj buildReplaceRootBson(StringData docsName);
+BSONObj buildReplaceRootBson(std::string_view docsName);
 
 // {$sort: {score: {$meta: "score"}, _id: 1}}
 BSONObj buildSortByScoreMetaBson();
 
 // {$project: {<internalFieldsName>: 0}}
-BSONObj buildProjectRemoveInternalFieldsBson(StringData internalFieldsName);
+BSONObj buildProjectRemoveInternalFieldsBson(std::string_view internalFieldsName);
 
 // {$group: {_id: "$<docsName>._id",
 //           <docsName>: {$first: "$<docsName>"},
@@ -87,9 +88,9 @@ BSONObj buildProjectRemoveInternalFieldsBson(StringData internalFieldsName);
 //   "_rank" for $rankFusion, "_rawScore" for $scoreFusion.
 BSONObj buildGroupBson(const std::vector<std::string>& pipelineNames,
                        bool includeScoreDetails,
-                       StringData internalFieldsName,
-                       StringData docsName,
-                       StringData detailsScalarSuffix);
+                       std::string_view internalFieldsName,
+                       std::string_view docsName,
+                       std::string_view detailsScalarSuffix);
 
 // {$replaceRoot: {newRoot: {$mergeObjects: ["$<docsName>",
 //                                            {<internalFieldsName>: {<p>_score: "$__hs_<p>_score",
@@ -98,8 +99,8 @@ BSONObj buildGroupBson(const std::vector<std::string>& pipelineNames,
 // `detailsScalarSuffix`: "_rank" for $rankFusion, "_rawScore" for $scoreFusion.
 BSONObj buildReplaceRootMergeBson(const std::vector<std::string>& pipelineNames,
                                   bool includeScoreDetails,
-                                  StringData internalFieldsName,
-                                  StringData docsName,
-                                  StringData detailsScalarSuffix);
+                                  std::string_view internalFieldsName,
+                                  std::string_view docsName,
+                                  std::string_view detailsScalarSuffix);
 
 }  // namespace mongo::lite_parsed_hybrid_search_desugarer::common_utils

@@ -36,7 +36,6 @@
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_tree.h"

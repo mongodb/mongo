@@ -62,6 +62,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #ifdef _WIN32
@@ -78,6 +79,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::unittest {
+using namespace std::literals::string_view_literals;
 
 static EnhancedReporter* gEnhancedReporter = nullptr;
 
@@ -123,7 +125,7 @@ class ThrowListener : public testing::EmptyTestEventListener {
         if (result.type() == testing::TestPartResult::kNonFatalFailure)
             return;
 
-        StringData msg = result.message();
+        std::string_view msg = result.message();
         // Try to avoid throwing an exception when reporting that an unexpected C++ exception
         // was thrown. That is because we are already in the top-level block, and if we throw
         // an exception here, it won't be able to be caught by the same block.
@@ -133,7 +135,7 @@ class ThrowListener : public testing::EmptyTestEventListener {
             (std::current_exception() &&
              (msg.starts_with("C++ exception with description") ||
               msg.starts_with("Unknown C++ exception")) &&
-             msg.find(" thrown in ") != StringData::npos);
+             msg.find(" thrown in ") != std::string_view::npos);
         if (!unexpectedException)
             throw testing::AssertionException(result);
     }
@@ -159,7 +161,7 @@ std::vector<const testing::TestSuite*> allSuites() {
 }
 
 /** The only special character is `*`. */
-bool matchesGooglePattern(StringData p, StringData s) {
+bool matchesGooglePattern(std::string_view p, std::string_view s) {
     if (p.empty())
         return s.empty();
     if (p.front() == '*') {
@@ -172,7 +174,7 @@ bool matchesGooglePattern(StringData p, StringData s) {
     return false;
 }
 
-bool matchesGoogleFilter(StringData filt, StringData suite, StringData test) {
+bool matchesGoogleFilter(std::string_view filt, std::string_view suite, std::string_view test) {
     std::string fullName = fmt::format("{}.{}", suite, test);
     while (!filt.empty()) {
         if (filt.front() == ':') {
@@ -180,7 +182,7 @@ bool matchesGoogleFilter(StringData filt, StringData suite, StringData test) {
             continue;
         }
         size_t pos = filt.find_first_of(':');
-        StringData elem = filt.substr(0, pos);
+        std::string_view elem = filt.substr(0, pos);
         filt = filt.substr(pos);
         if (matchesGooglePattern(elem, fullName))
             return true;
@@ -298,10 +300,10 @@ void callInitGoogleTest(std::vector<std::string>& argVec) {
 
 std::string gtestFilterForSelection(const std::vector<SelectedTest>& selection) {
     std::string filt;
-    StringData sep;
+    std::string_view sep;
     for (const auto& [s, t, k] : selection) {
         if (k)
-            filt += fmt::format("{}{}.{}", std::exchange(sep, ":"_sd), s, t);
+            filt += fmt::format("{}{}.{}", std::exchange(sep, ":"sv), s, t);
     }
     return filt;
 }

@@ -36,6 +36,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -49,10 +50,11 @@ struct MONGO_MOD_PUBLIC TimeseriesViewMetadata {
     boost::optional<bool> usesExtendedRange;
     boost::optional<bool> fixedBuckets;
 
-    static constexpr StringData kTimeseriesMayContainMixedData = "timeseriesMayContainMixedData"_sd;
-    static constexpr StringData kTimeseriesOptions = "timeseriesOptions"_sd;
-    static constexpr StringData kTimeseriesUsesExtendedRange = "timeseriesUsesExtendedRange"_sd;
-    static constexpr StringData kTimeseriesfixedBuckets = "timeseriesfixedBuckets"_sd;
+    static constexpr std::string_view kTimeseriesMayContainMixedData =
+        "timeseriesMayContainMixedData";
+    static constexpr std::string_view kTimeseriesOptions = "timeseriesOptions";
+    static constexpr std::string_view kTimeseriesUsesExtendedRange = "timeseriesUsesExtendedRange";
+    static constexpr std::string_view kTimeseriesfixedBuckets = "timeseriesfixedBuckets";
 
     void serialize(BSONObjBuilder* subObjBuilder) const;
 };
@@ -214,7 +216,7 @@ public:
      * These methods support IDL parsing of ResolvedNamespace.
      */
     static ResolvedNamespace parseFromBSON(const BSONElement& elem);
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
 
     // TODO SERVER-122119 Rename these variables to use the "_" prefix and make them private/add
     // getters.

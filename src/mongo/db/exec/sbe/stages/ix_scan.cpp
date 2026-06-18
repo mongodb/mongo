@@ -47,15 +47,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
-IndexScanStageBase::IndexScanStageBase(StringData stageType,
+using namespace std::literals::string_view_literals;
+IndexScanStageBase::IndexScanStageBase(std::string_view stageType,
                                        UUID collUuid,
                                        DatabaseName dbName,
-                                       StringData indexName,
+                                       std::string_view indexName,
                                        bool forward,
                                        boost::optional<value::SlotId> indexKeySlot,
                                        boost::optional<value::SlotId> recordIdSlot,
@@ -117,7 +119,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
 
     _ordering = _entry->ordering();
 
-    auto [identTag, identVal] = value::makeNewString(StringData(_entry->getIdent()));
+    auto [identTag, identVal] = value::makeNewString(std::string_view(_entry->getIdent()));
     _indexIdentAccessor.reset(identTag, identVal);
 
     if (_indexIdentSlot) {
@@ -440,10 +442,10 @@ std::string IndexScanStageBase::getIndexName() const {
 
 template <typename Derived>
 IndexScanStageBaseImpl<Derived>::IndexScanStageBaseImpl(
-    StringData stageType,
+    std::string_view stageType,
     UUID collUuid,
     DatabaseName dbName,
-    StringData indexName,
+    std::string_view indexName,
     bool forward,
     boost::optional<value::SlotId> indexKeySlot,
     boost::optional<value::SlotId> recordIdSlot,
@@ -471,7 +473,7 @@ IndexScanStageBaseImpl<Derived>::IndexScanStageBaseImpl(
 
 SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                                            DatabaseName dbName,
-                                           StringData indexName,
+                                           std::string_view indexName,
                                            bool forward,
                                            boost::optional<value::SlotId> indexKeySlot,
                                            boost::optional<value::SlotId> recordIdSlot,
@@ -484,7 +486,7 @@ SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                                            PlanYieldPolicySBE* yieldPolicy,
                                            PlanNodeId nodeId,
                                            bool participateInTrialRunTracking)
-    : IndexScanStageBaseImpl(seekKeyLow ? "ixseek"_sd : "ixscan"_sd,
+    : IndexScanStageBaseImpl(seekKeyLow ? "ixseek"sv : "ixscan"sv,
                              collUuid,
                              dbName,
                              indexName,
@@ -642,7 +644,7 @@ size_t SimpleIndexScanStage::estimateCompileTimeSize() const {
 
 GenericIndexScanStage::GenericIndexScanStage(UUID collUuid,
                                              DatabaseName dbName,
-                                             StringData indexName,
+                                             std::string_view indexName,
                                              GenericIndexScanStageParams params,
                                              boost::optional<value::SlotId> indexKeySlot,
                                              boost::optional<value::SlotId> recordIdSlot,
@@ -653,7 +655,7 @@ GenericIndexScanStage::GenericIndexScanStage(UUID collUuid,
                                              PlanYieldPolicySBE* yieldPolicy,
                                              PlanNodeId planNodeId,
                                              bool participateInTrialRunTracking)
-    : IndexScanStageBaseImpl("ixscan_generic"_sd,
+    : IndexScanStageBaseImpl("ixscan_generic"sv,
                              collUuid,
                              dbName,
                              indexName,

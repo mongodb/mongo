@@ -40,6 +40,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -111,7 +112,7 @@ public:
 
     bool isHashedPattern() const;
 
-    bool isHashedOnField(StringData fieldName) const;
+    bool isHashedOnField(std::string_view fieldName) const;
 
     bool hasHashedPrefix() const;
 

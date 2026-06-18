@@ -29,7 +29,6 @@
 
 #include "mongo/db/versioning_protocol/stale_exception.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 

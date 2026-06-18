@@ -52,6 +52,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <span>
+#include <string_view>
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -173,7 +174,7 @@ public:
     /**
      * Adds the usage stats (time, count) for "name" to builder object "b".
      */
-    void appendStatsEntry(BSONObjBuilder& b, StringData name, const UsageData& data);
+    void appendStatsEntry(BSONObjBuilder& b, std::string_view name, const UsageData& data);
 
     /**
      * Adds usage stats for "coll" onto builder object "result".

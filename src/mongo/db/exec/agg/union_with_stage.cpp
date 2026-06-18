@@ -41,6 +41,8 @@
 #include "mongo/db/views/resolved_view.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 
@@ -58,6 +60,7 @@ exec::agg::StagePtr documentSourceUnionWithToStageFn(
 }
 
 namespace exec::agg {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -95,7 +98,7 @@ MONGO_COMPILER_NOINLINE void logPipeline(int32_t id,
 
 }  // namespace
 
-UnionWithStage::UnionWithStage(const StringData stageName,
+UnionWithStage::UnionWithStage(const std::string_view stageName,
                                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                const std::shared_ptr<UnionWithSharedState>& sharedState,
                                const NamespaceString& userNss)
@@ -204,7 +207,7 @@ void UnionWithStage::prepareSubPipeline(const std::vector<BSONObj>& serializedPi
         OperationShardingState::isShardingAware(opCtx)) {
         const auto& resultSources = _sharedState->_pipeline->getSources();
         const bool isMergePipeline =
-            !resultSources.empty() && resultSources.front()->getSourceName() == "$mergeCursors"_sd;
+            !resultSources.empty() && resultSources.front()->getSourceName() == "$mergeCursors"sv;
         if (!isMergePipeline) {
             const bool isCursorlessAtFront = resultSources.empty() ||
                 resultSources.front()->getSourceName() != DocumentSourceCursor::kStageName;

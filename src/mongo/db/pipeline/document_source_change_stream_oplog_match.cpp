@@ -46,10 +46,12 @@
 
 #include <algorithm>
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamOplogMatch,
                                               ChangeStreamOplogMatchLiteParsed::parse);
@@ -163,7 +165,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceChangeStreamOplogMatch::creat
     return new DocumentSourceChangeStreamOplogMatch(parsedSpec.getFilter(), pExpCtx);
 }
 
-StringData DocumentSourceChangeStreamOplogMatch::getSourceName() const {
+std::string_view DocumentSourceChangeStreamOplogMatch::getSourceName() const {
     // This is used in error reporting, particularly if we find this stage in a position other
     // than first, so report the name as $changeStream.
     return kStageName;
@@ -255,7 +257,7 @@ Value DocumentSourceChangeStreamOplogMatch::doSerialize(
     BSONObjBuilder builder;
     if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
-        sub.append("stage"_sd, kStageName);
+        sub.append("stage"sv, kStageName);
         sub.append(DocumentSourceChangeStreamOplogMatchSpec::kFilterFieldName,
                    getMatchExpression()->serialize(opts));
         sub.done();

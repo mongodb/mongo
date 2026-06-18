@@ -57,6 +57,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -430,7 +431,7 @@ public:
     /**
      * Appends the raw bytes of str with no NUL terminator.
      */
-    void appendStrBytes(StringData str) {
+    void appendStrBytes(std::string_view str) {
         str.copy(grow(str.size()), str.size());
     }
 
@@ -442,7 +443,7 @@ public:
      * trick a parser into thinking the string has ended. Use appendCStr() instead for that use
      * case.
      */
-    void appendStrBytesAndNul(StringData str) {
+    void appendStrBytesAndNul(std::string_view str) {
         auto dest = grow(str.size() + 1);
         dest += str.copy(dest, str.size());
         *dest = '\0';
@@ -454,7 +455,7 @@ public:
      *
      * This method is intended to pair with BufReader::readCStr() on the parse side.
      */
-    void appendCStr(StringData str) {
+    void appendCStr(std::string_view str) {
         str::uassertNoEmbeddedNulBytes(str);
         appendStrBytesAndNul(str);
     }
@@ -781,9 +782,9 @@ public:
         return *this;
     }
     StringBuilderImpl& operator<<(const char* str) {
-        return *this << StringData(str);
+        return *this << std::string_view(str);
     }
-    StringBuilderImpl& operator<<(StringData str) {
+    StringBuilderImpl& operator<<(std::string_view str) {
         append(str);
         return *this;
     }
@@ -810,10 +811,11 @@ public:
     StringBuilderImpl& operator<<(R (*val)(Args...)) = delete;
 
     void appendDoubleNice(double x) {
+        using namespace std::literals::string_view_literals;
         const int prev = _buf.len();
         const int maxSize = 32;
         char* start = _buf.grow(maxSize);
-        int z = std::isnan(x) ? "nan\0"_sd.copy(start, maxSize) - 1
+        int z = std::isnan(x) ? "nan\0"sv.copy(start, maxSize) - 1
                               : snprintf(start, maxSize, "%.16g", x);
         MONGO_verify(z >= 0);
         MONGO_verify(z < maxSize);
@@ -827,7 +829,7 @@ public:
         memcpy(_buf.grow(len), buf, len);
     }
 
-    void append(StringData str) {
+    void append(std::string_view str) {
         _buf.appendStrBytes(str);
     }
 
@@ -844,8 +846,8 @@ public:
      *
      * WARNING: The view is invalidated when this StringBuilder is modified or destroyed.
      */
-    StringData stringData() const {
-        return StringData(_buf.buf(), _buf.len());
+    std::string_view stringData() const {
+        return std::string_view(_buf.buf(), _buf.len());
     }
 
     /** size of current std::string */
@@ -867,9 +869,9 @@ private:
 
         if (val < T(0)) {
             *this << '-';
-            append(StringData(ItoA(-uint64_t(val))));  // Send the magnitude to ItoA.
+            append(std::string_view(ItoA(-uint64_t(val))));  // Send the magnitude to ItoA.
         } else {
-            append(StringData(ItoA(uint64_t(val))));
+            append(std::string_view(ItoA(uint64_t(val))));
         }
 
         return *this;

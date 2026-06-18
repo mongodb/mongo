@@ -29,7 +29,6 @@
 
 #include "mongo/db/matcher/doc_validation/constraint_validation_level_upgrade.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -42,6 +41,7 @@
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -49,7 +49,7 @@
 namespace mongo {
 namespace {
 
-Status makeViolatingValidatorStatus(const BSONObj& validator, StringData collName) {
+Status makeViolatingValidatorStatus(const BSONObj& validator, std::string_view collName) {
     str::stream msg;
     msg << "Cannot upgrade validationLevel to 'constraint': the collection contains documents "
            "that do not satisfy the validator.";

@@ -49,6 +49,7 @@
 #include <initializer_list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/filesystem.hpp>
@@ -134,7 +135,7 @@ public:
          * Implementations that change the value of the returned string can cause
          * data file incompatibilities.
          */
-        virtual StringData getCanonicalName() const = 0;
+        virtual std::string_view getCanonicalName() const = 0;
 
         /**
          * Validates creation options for a collection in the StorageEngine.
@@ -470,7 +471,7 @@ public:
      * belong to the same SpillTable. To call this method, the StorageEngine must be initialized
      * with a spill engine.
      */
-    virtual void dropSpillTable(RecoveryUnit& ru, StringData ident) = 0;
+    virtual void dropSpillTable(RecoveryUnit& ru, std::string_view ident) = 0;
 
     /**
      * Creates an internal RecordStore on the storage engine. On startup after an unclean shutdown,
@@ -478,7 +479,7 @@ public:
      * responsibility to drop the table when done.
      */
     virtual std::unique_ptr<RecordStore> makeInternalRecordStore(OperationContext* opCtx,
-                                                                 StringData ident,
+                                                                 std::string_view ident,
                                                                  KeyFormat keyFormat) = 0;
 
     /**
@@ -549,13 +550,14 @@ public:
      * tracked as the reaper cannot distinguish "ident has already been dropped" from "ident was
      * never drop pending".
      */
-    virtual Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident) = 0;
+    virtual Status immediatelyCompletePendingDrop(OperationContext* opCtx,
+                                                  std::string_view ident) = 0;
 
     /**
      * Attempts to immediately drop the given ident. If the ident is still in use and cannot be
      * dropped now, adds it to the reaper to be dropped later.
      */
-    virtual void dropIdent(RecoveryUnit& ru, StringData ident) = 0;
+    virtual void dropIdent(RecoveryUnit& ru, std::string_view ident) = 0;
 
     /**
      * Performs a timestamped ident drop.
@@ -564,7 +566,7 @@ public:
      * dropped in checkpoints taken at or after 'timestamp'.
      */
     virtual void dropIdentTimestamped(OperationContext* opCtx,
-                                      StringData ident,
+                                      std::string_view ident,
                                       Timestamp timestamp) = 0;
 
     BOOST_STRONG_TYPEDEF(uint64_t, CheckpointIteration);
@@ -617,7 +619,7 @@ public:
      */
     virtual void dropUnknownIdent(RecoveryUnit& ru,
                                   const Timestamp& stableTimestamp,
-                                  StringData ident) = 0;
+                                  std::string_view ident) = 0;
 
     /**
      * Marks the ident as in use and prevents the reaper from dropping the ident.
@@ -625,7 +627,7 @@ public:
      * Returns nullptr if the ident is not known to the reaper, is already being dropped, or is
      * already dropped.
      */
-    virtual std::shared_ptr<Ident> markIdentInUse(StringData ident) = 0;
+    virtual std::shared_ptr<Ident> markIdentInUse(std::string_view ident) = 0;
 
     /**
      * Accessor for this storage engine's timestamp monitor.
@@ -716,7 +718,7 @@ public:
     /**
      * Configures the specified checkpoint as the starting point for recovery.
      */
-    virtual void setRecoveryCheckpointMetadata(StringData checkpointMetadata) = 0;
+    virtual void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) = 0;
 
     /**
      * Configures the storage engine as the leader, allowing it to flush checkpoints to remote
@@ -836,15 +838,15 @@ public:
 
     virtual std::string generateNewCollectionIdent(
         const DatabaseName& dbName,
-        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const = 0;
+        const boost::optional<std::string_view>& optIdentUniqueTag = boost::none) const = 0;
     virtual std::string generateNewIndexIdent(
         const DatabaseName& dbName,
-        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const = 0;
+        const boost::optional<std::string_view>& optIdentUniqueTag = boost::none) const = 0;
 
-    virtual StringData getCollectionIdentUniqueTag(StringData ident,
-                                                   const DatabaseName& dbName) const = 0;
-    virtual StringData getIndexIdentUniqueTag(StringData ident,
-                                              const DatabaseName& dbName) const = 0;
+    virtual std::string_view getCollectionIdentUniqueTag(std::string_view ident,
+                                                         const DatabaseName& dbName) const = 0;
+    virtual std::string_view getIndexIdentUniqueTag(std::string_view ident,
+                                                    const DatabaseName& dbName) const = 0;
 
     /**
      * Generates a unique ident for an internal table that can be used to create a RecordStore
@@ -854,8 +856,8 @@ public:
         return ident::generateNewInternalIdent();
     }
 
-    std::string generateNewInternalIndexBuildIdent(StringData identStem,
-                                                   StringData indexIdent) const {
+    std::string generateNewInternalIndexBuildIdent(std::string_view identStem,
+                                                   std::string_view indexIdent) const {
         return ident::generateNewInternalIndexBuildIdent(identStem, indexIdent);
     }
 
@@ -875,7 +877,7 @@ public:
      */
     virtual bool storesFilesInDbPath() const = 0;
 
-    virtual int64_t getIdentSize(RecoveryUnit&, StringData ident) const = 0;
+    virtual int64_t getIdentSize(RecoveryUnit&, std::string_view ident) const = 0;
 
     virtual KVEngine* getEngine() = 0;
     virtual const KVEngine* getEngine() const = 0;
@@ -975,7 +977,7 @@ public:
      * TODO SERVER-92265 evaluate getting rid of this method.
      */
     virtual BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
-                                            StringData flagName,
+                                            std::string_view flagName,
                                             boost::optional<bool> flagValue) const = 0;
 
     /**
@@ -987,7 +989,7 @@ public:
      * TODO SERVER-92265 evaluate getting rid of this method.
      */
     virtual boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
-                                                            StringData flagName) const = 0;
+                                                            std::string_view flagName) const = 0;
 
     /**
      * Append `disaggregated.storage_tier` in the storage engine BSON object of a collection /

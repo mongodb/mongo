@@ -31,7 +31,6 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
@@ -72,6 +71,7 @@
 #include "mongo/util/time_support.h"
 
 #include <iterator>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <vector>
@@ -91,7 +91,7 @@ const auto rangeDeleterServiceDecorator = ServiceContext::declareDecoration<Rang
 
 void resetTermScopedPromise(WithLock,
                             boost::optional<SharedPromise<void>>& promise,
-                            StringData message) {
+                            std::string_view message) {
     if (promise.has_value() && !promise->getFuture().isReady()) {
         promise->setError({ErrorCodes::PrimarySteppedDown, message});
     }

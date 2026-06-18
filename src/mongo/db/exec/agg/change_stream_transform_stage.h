@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/change_stream_event_transform.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -47,7 +47,7 @@ namespace mongo::exec::agg {
  */
 class ChangeStreamTransformStage final : public Stage {
 public:
-    ChangeStreamTransformStage(StringData stageName,
+    ChangeStreamTransformStage(std::string_view stageName,
                                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                std::shared_ptr<ChangeStreamEventTransformer> transformer);
 

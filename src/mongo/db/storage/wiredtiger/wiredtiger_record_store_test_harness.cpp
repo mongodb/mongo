@@ -41,6 +41,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
 #include <utility>
 
 #include <wiredtiger.h>
@@ -57,7 +58,7 @@ std::string _testLoggingSettings(std::string extraStrings) {
 }
 }  // namespace
 
-WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData extraStrings)
+WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, std::string_view extraStrings)
     : _dbpath("wt_test") {
     auto& provider =
         rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
@@ -83,7 +84,7 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     const NamespaceString& nss,
-    StringData ident,
+    std::string_view ident,
     const RecordStore::Options& recordStoreOptions,
     boost::optional<UUID> uuid) {
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());

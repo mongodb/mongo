@@ -34,6 +34,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <system_error>
 
 #include <boost/filesystem/operations.hpp>
@@ -53,7 +54,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -92,7 +92,7 @@
 namespace mongo::initialize_server_global_state {
 
 #ifndef _WIN32
-static void croak(StringData prefix, int savedErr = errno) {
+static void croak(std::string_view prefix, int savedErr = errno) {
     std::cout << prefix << ": " << errorMessage(posixError(savedErr)) << std::endl;
     quickExit(ExitCode::abrupt);
 }
@@ -289,7 +289,7 @@ static bool forkServer() {
 
     std::cout << fmt::format("forked process: {}", getpid()) << std::endl;
 
-    auto stdioDetach = [](FILE* fp, const char* mode, StringData name) {
+    auto stdioDetach = [](FILE* fp, const char* mode, std::string_view name) {
         if (!freopen("/dev/null", mode, fp)) {
             int saved = errno;
             std::cout << fmt::format("Cannot reassign {} while forking server process: {}",
@@ -498,7 +498,7 @@ MONGO_INITIALIZER_GENERAL(MungeUmask, ("EndStartupOptionHandling"), ("ServerLogR
 #endif
 
 // --setParameter honorSystemUmask
-Status HonorSystemUMaskServerParameter::setFromString(StringData value,
+Status HonorSystemUMaskServerParameter::setFromString(std::string_view value,
                                                       const boost::optional<TenantId>&) {
 #ifndef _WIN32
     if ((value == "0") || (value == "false")) {
@@ -526,7 +526,7 @@ Status HonorSystemUMaskServerParameter::setFromString(StringData value,
 
 void HonorSystemUMaskServerParameter::append(OperationContext*,
                                              BSONObjBuilder* b,
-                                             StringData name,
+                                             std::string_view name,
                                              const boost::optional<TenantId>&) {
 #ifndef _WIN32
     *b << name << honorSystemUmask;
@@ -534,7 +534,7 @@ void HonorSystemUMaskServerParameter::append(OperationContext*,
 }
 
 // --setParameter processUmask
-Status ProcessUMaskServerParameter::setFromString(StringData value,
+Status ProcessUMaskServerParameter::setFromString(std::string_view value,
                                                   const boost::optional<TenantId>&) {
 #ifndef _WIN32
     if (honorSystemUmask) {
@@ -567,7 +567,7 @@ Status ProcessUMaskServerParameter::setFromString(StringData value,
 
 void ProcessUMaskServerParameter::append(OperationContext*,
                                          BSONObjBuilder* b,
-                                         StringData name,
+                                         std::string_view name,
                                          const boost::optional<TenantId>&) {
 #ifndef _WIN32
     *b << name << static_cast<int>(getUmaskOverride());

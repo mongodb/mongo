@@ -40,18 +40,19 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(InternalSchemaFmodMatchExpression, ZeroDivisor) {
-    ASSERT_THROWS_CODE(InternalSchemaFmodMatchExpression(""_sd, Decimal128(0), Decimal128(1)),
+    ASSERT_THROWS_CODE(InternalSchemaFmodMatchExpression(""sv, Decimal128(0), Decimal128(1)),
                        AssertionException,
                        ErrorCodes::BadValue);
 }
 
 TEST(InternalSchemaFmodMatchExpression, Equality) {
-    InternalSchemaFmodMatchExpression m1("a"_sd, Decimal128(1.7), Decimal128(2));
-    InternalSchemaFmodMatchExpression m2("a"_sd, Decimal128(2), Decimal128(2));
-    InternalSchemaFmodMatchExpression m3("a"_sd, Decimal128(1.7), Decimal128(1));
-    InternalSchemaFmodMatchExpression m4("b"_sd, Decimal128(1.7), Decimal128(2));
+    InternalSchemaFmodMatchExpression m1("a"sv, Decimal128(1.7), Decimal128(2));
+    InternalSchemaFmodMatchExpression m2("a"sv, Decimal128(2), Decimal128(2));
+    InternalSchemaFmodMatchExpression m3("a"sv, Decimal128(1.7), Decimal128(1));
+    InternalSchemaFmodMatchExpression m4("b"sv, Decimal128(1.7), Decimal128(2));
 
     ASSERT_TRUE(m1.equivalent(&m1));
     ASSERT_FALSE(m1.equivalent(&m2));

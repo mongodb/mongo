@@ -34,13 +34,15 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 
 #include <deque>
+#include <string_view>
 
 namespace mongo::sharded_agg_helpers {
 namespace {
 
 class SplitPipelineTest : public AggregationContextFixture {
 public:
-    void checkPipelineContents(const Pipeline* pipeline, std::deque<StringData> expectedStages) {
+    void checkPipelineContents(const Pipeline* pipeline,
+                               std::deque<std::string_view> expectedStages) {
         ASSERT_EQ(pipeline->size(), expectedStages.size());
         for (auto stage : pipeline->getSources()) {
             ASSERT_EQ(stage->getSourceName(), expectedStages.front());
@@ -57,8 +59,8 @@ public:
     }
 
     struct ExpectedSplitPipeline {
-        std::deque<StringData> shardsStages;
-        std::deque<StringData> mergeStages;
+        std::deque<std::string_view> shardsStages;
+        std::deque<std::string_view> mergeStages;
         boost::optional<BSONObj> sortSpec;
     };
     SplitPipeline testPipelineSplit(const std::vector<BSONObj>& inputPipeline,

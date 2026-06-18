@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -64,6 +63,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -78,7 +78,7 @@ namespace JSTests {
 /** Gives a formattable name to a Scope factory. */
 class NamedScopeFactory {
 public:
-    NamedScopeFactory(StringData name, std::function<std::unique_ptr<Scope>(ScriptEngine*)> f)
+    NamedScopeFactory(std::string_view name, std::function<std::unique_ptr<Scope>(ScriptEngine*)> f)
         : _name{name}, _f{std::move(f)} {}
 
     std::unique_ptr<Scope> operator()(ScriptEngine* eng) const {

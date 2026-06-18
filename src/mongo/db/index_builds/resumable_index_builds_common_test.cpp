@@ -40,6 +40,8 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
@@ -139,7 +141,7 @@ protected:
         return metadata.toBSON();
     }
 
-    static IndexStateInfo makeIndexState(StringData sideWritesTable,
+    static IndexStateInfo makeIndexState(std::string_view sideWritesTable,
                                          boost::optional<RecordId> lastSpilled) {
         IndexStateInfo info;
         info.setSpec(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"));

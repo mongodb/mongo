@@ -30,7 +30,6 @@
 #include "mongo/db/repl/apply_ops.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"

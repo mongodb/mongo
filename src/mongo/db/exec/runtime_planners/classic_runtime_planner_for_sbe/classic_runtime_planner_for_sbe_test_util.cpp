@@ -32,11 +32,12 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 BaseMockStage::BaseMockStage(PlanNodeId planNodeId,
                              PlanYieldPolicySBE* yieldPolicy,
                              bool participateInTrialRunTracking)
-    : PlanStage("mock"_sd,
+    : PlanStage("mock"sv,
                 yieldPolicy,
                 planNodeId,
                 participateInTrialRunTracking,

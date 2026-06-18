@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 /**
@@ -46,7 +47,7 @@ public:
     /**
      * Construct metrics for a command identified by commandName.
      */
-    UpdateMetrics(StringData commandName, ClusterRole role);
+    UpdateMetrics(std::string_view commandName, ClusterRole role);
 
     /**
      * Increment counter for how many times this command has executed with an aggregation

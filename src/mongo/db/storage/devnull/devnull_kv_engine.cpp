@@ -55,6 +55,7 @@
 #include <cstddef>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <variant>
 
 #include <boost/move/utility_core.hpp>
@@ -87,7 +88,7 @@ public:
     class Capped;
     class Oplog;
 
-    DevNullRecordStore(boost::optional<UUID> uuid, StringData ident, KeyFormat keyFormat)
+    DevNullRecordStore(boost::optional<UUID> uuid, std::string_view ident, KeyFormat keyFormat)
         : RecordStoreBase(uuid, ident), _container(_makeContainer(keyFormat)) {
         _numInserts = 0;
         _dummy = BSON("_id" << 1);
@@ -290,7 +291,7 @@ private:
 
 class DevNullRecordStore::Capped : public DevNullRecordStore, public RecordStoreBase::Capped {
 public:
-    Capped(boost::optional<UUID> uuid, StringData ident, KeyFormat keyFormat)
+    Capped(boost::optional<UUID> uuid, std::string_view ident, KeyFormat keyFormat)
         : DevNullRecordStore(uuid, ident, keyFormat) {}
 
     bool isCapped() const final {
@@ -313,7 +314,7 @@ private:
 class DevNullRecordStore::Oplog final : public DevNullRecordStore::Capped,
                                         public RecordStoreBase::Oplog {
 public:
-    Oplog(UUID uuid, StringData ident, int64_t maxSize)
+    Oplog(UUID uuid, std::string_view ident, int64_t maxSize)
         : DevNullRecordStore::Capped(uuid, ident, KeyFormat::Long), _maxSize(maxSize) {}
 
     RecordStore::Capped* capped() override {
@@ -363,7 +364,7 @@ public:
 
 class DevNullSortedDataInterface : public SortedDataInterface {
 public:
-    DevNullSortedDataInterface(StringData identName)
+    DevNullSortedDataInterface(std::string_view identName)
         : SortedDataInterface(
               kDataFormatV2KeyStringV1IndexVersionV2, Ordering::make(BSONObj()), KeyFormat::Long) {}
 
@@ -481,7 +482,7 @@ std::unique_ptr<RecoveryUnit> DevNullKVEngine::newRecoveryUnit() {
 
 std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* opCtx,
                                                              const NamespaceString& nss,
-                                                             StringData ident,
+                                                             std::string_view ident,
                                                              const RecordStore::Options& options,
                                                              boost::optional<UUID> uuid) {
     if (ident == ident::kMdbCatalog) {
@@ -495,13 +496,13 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::getInternalRecordStore(RecoveryUnit& ru,
-                                                                     StringData ident,
+                                                                     std::string_view ident,
                                                                      KeyFormat keyFormat) {
     return makeInternalRecordStore(ru, ident, keyFormat);
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::makeInternalRecordStore(RecoveryUnit& ru,
-                                                                      StringData ident,
+                                                                      std::string_view ident,
                                                                       KeyFormat keyFormat) {
     return std::make_unique<DevNullRecordStore>(boost::none /* uuid */, ident, keyFormat);
 }
@@ -511,7 +512,7 @@ std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(
     RecoveryUnit& ru,
     const NamespaceString& nss,
     const UUID& uuid,
-    StringData ident,
+    std::string_view ident,
     const IndexConfig& config,
     KeyFormat keyFormat) {
     return std::make_unique<DevNullSortedDataInterface>(ident);

@@ -32,7 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/read_preference.h"
@@ -161,6 +160,7 @@
 #include <algorithm>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -202,6 +202,7 @@ auto& notPrimaryUnackWrites =
     *MetricBuilder<Counter64>{"repl.network.notPrimaryUnacknowledgedWrites"};
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 
 void runCommandInvocation(const RequestExecutionContext& rec, CommandInvocation* invocation) {
@@ -1308,11 +1309,11 @@ void RunCommandAndWaitForWriteConcern::_waitForWriteConcern(BSONObjBuilder& bb) 
     if (auto scoped = failCommand.scopedIf([&](const BSONObj& obj) {
             return CommandHelpers::shouldActivateFailCommandFailPoint(
                        obj, invocation, opCtx->getClient()) &&
-                obj.hasField("writeConcernError"_sd) && !bb.hasField("writeConcernError"_sd);
+                obj.hasField("writeConcernError"sv) && !bb.hasField("writeConcernError"sv);
         });
         MONGO_unlikely(scoped.isActive())) {
         const BSONObj& data = scoped.getData();
-        bb.append(data["writeConcernError"_sd]);
+        bb.append(data["writeConcernError"sv]);
         if (data.hasField(kErrorLabelsFieldName) &&
             data[kErrorLabelsFieldName].type() == BSONType::array) {
             // Propagate error labels specified in the failCommand failpoint to the
@@ -1635,7 +1636,7 @@ void ExecCommandDatabase::_initiateCommand() {
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
         auto metaElem = request.body[kMetadataDocumentName];
-        auto isInternalClient = request.body["internalClient"_sd].ok();
+        auto isInternalClient = request.body["internalClient"sv].ok();
         ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem, isInternalClient);
     }
 
@@ -1745,15 +1746,15 @@ void ExecCommandDatabase::_initiateCommand() {
         bool optedIn = couldHaveOptedIn && ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
         bool canRunHere = commandCanRunHere(opCtx, dbName, command, inMultiDocumentTransaction);
         if (!canRunHere && couldHaveOptedIn) {
-            const auto msg = client->supportsHello() ? "not primary and secondaryOk=false"_sd
-                                                     : "not master and slaveOk=false"_sd;
+            const auto msg = client->supportsHello() ? "not primary and secondaryOk=false"sv
+                                                     : "not master and slaveOk=false"sv;
             uasserted(ErrorCodes::NotPrimaryNoSecondaryOk, msg);
         }
 
         if (MONGO_unlikely(respondWithNotPrimaryInCommandDispatch.shouldFail())) {
             uassert(ErrorCodes::NotWritablePrimary, "not primary", canRunHere);
         } else {
-            const auto msg = client->supportsHello() ? "not primary"_sd : "not master"_sd;
+            const auto msg = client->supportsHello() ? "not primary"sv : "not master"sv;
             uassert(ErrorCodes::NotWritablePrimary, msg, canRunHere);
         }
 

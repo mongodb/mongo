@@ -31,6 +31,7 @@
 #include <cerrno>
 #include <exception>
 #include <fstream>  // IWYU pragma: keep
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -325,7 +326,7 @@ Status StorageEngineMetadata::write() const {
 
 template <>
 Status StorageEngineMetadata::validateStorageEngineOption<bool>(
-    StringData fieldName, bool expectedValue, boost::optional<bool> defaultValue) const {
+    std::string_view fieldName, bool expectedValue, boost::optional<bool> defaultValue) const {
     BSONElement element = _storageEngineOptions.getField(fieldName);
     if (element.eoo()) {
         if (defaultValue && *defaultValue != expectedValue) {

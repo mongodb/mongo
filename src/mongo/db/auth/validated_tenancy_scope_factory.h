@@ -31,6 +31,8 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace MONGO_MOD_PUBLIC mongo {
 
 class Client;
@@ -47,7 +49,8 @@ public:
      *
      * If neither is provided, this method returns `boost::none`.
      */
-    static boost::optional<ValidatedTenancyScope> parse(Client* client, StringData securityToken);
+    static boost::optional<ValidatedTenancyScope> parse(Client* client,
+                                                        std::string_view securityToken);
 
     /**
      * Creates an HS256 signed token based on a pre-shared symmetric key.
@@ -58,7 +61,7 @@ public:
     struct TokenForTestingTag {};
     static constexpr Minutes kDefaultExpiration{15};
     static ValidatedTenancyScope create(const UserName& username,
-                                        StringData secret,
+                                        std::string_view secret,
                                         ValidatedTenancyScope::TenantProtocol protocol,
                                         TokenForTestingTag);
 
@@ -91,13 +94,13 @@ private:
      * when provided by clients who are already authenticated and posess
      * cluster{useTenant} privilege.
      */
-    static ValidatedTenancyScope parseUnsignedToken(Client* client, StringData securityToken);
+    static ValidatedTenancyScope parseUnsignedToken(Client* client, std::string_view securityToken);
 
     /**
      * Validates a JWS signature on the provided JWT header and token,
      * then extracts authenticatedUser, TenantId, and/or TenantProtocol.
      */
-    static ValidatedTenancyScope parseToken(Client* client, StringData securityToken);
+    static ValidatedTenancyScope parseToken(Client* client, std::string_view securityToken);
 };
 
 /**

@@ -43,6 +43,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -52,10 +53,10 @@ namespace mongo {
 
 class InternalSchemaObjectMatchExpression final : public PathMatchExpression {
 public:
-    static constexpr StringData kName = "$_internalSchemaObjectMatch"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaObjectMatch"_sd;
     static constexpr int kNumChildren = 1;
 
-    InternalSchemaObjectMatchExpression(boost::optional<StringData> path,
+    InternalSchemaObjectMatchExpression(boost::optional<std::string_view> path,
                                         std::unique_ptr<MatchExpression> expr,
                                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 

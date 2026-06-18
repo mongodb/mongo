@@ -33,6 +33,7 @@
 #include "mongo/util/str.h"
 
 #include <sstream>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 
@@ -74,7 +75,7 @@ std::array<uint8_t, 128> StringListSet::buildFastHash() {
             }
         }
 
-        auto [_, inserted] = _stringToIndexMap.emplace(StringData(p), idx);
+        auto [_, inserted] = _stringToIndexMap.emplace(std::string_view(p), idx);
         tassert(7582300,
                 str::stream()
                     << "Input vector to StringListSet contained multiple occurrences of string: "
@@ -85,7 +86,7 @@ std::array<uint8_t, 128> StringListSet::buildFastHash() {
     return fastHt;
 }
 
-size_t StringListSet::findInMapImpl(StringData str) const {
+size_t StringListSet::findInMapImpl(std::string_view str) const {
     auto it = _stringToIndexMap.find(str);
     return it != _stringToIndexMap.end() ? it->second : npos;
 }

@@ -34,6 +34,7 @@
 #include "mongo/util/net/ssl_parameters_gen.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -111,7 +112,7 @@ void OCSPManager::startThreadPool() {
  * Returns a vector of bytes to be constructed into a OCSP response.
  */
 Future<std::vector<uint8_t>> OCSPManager::requestStatus(std::vector<uint8_t> data,
-                                                        StringData responderURI,
+                                                        std::string_view responderURI,
                                                         OCSPPurpose purpose) {
     if (!this->_tlsClientHttp || !this->_tlsServerHttp) {
         return Future<std::vector<uint8_t>>::makeReady(

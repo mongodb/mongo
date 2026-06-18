@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -75,6 +74,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -100,7 +100,7 @@ public:
 
     std::vector<Document> getIndexStats(OperationContext* opCtx,
                                         const NamespaceString& ns,
-                                        StringData host,
+                                        std::string_view host,
                                         bool addShardName) final;
 
     std::deque<BSONObj> listCatalog(OperationContext* opCtx) const final;

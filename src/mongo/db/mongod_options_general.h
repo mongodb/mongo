@@ -33,12 +33,14 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
 inline Status validateSecurityAuthorizationSetting(const std::string& value) {
-    if (!(str::equalCaseInsensitive(value, "enabled"_sd) ||
-          str::equalCaseInsensitive(value, "disabled"_sd))) {
+    using namespace std::literals::string_view_literals;
+    if (!(str::equalCaseInsensitive(value, "enabled"sv) ||
+          str::equalCaseInsensitive(value, "disabled"sv))) {
         return {ErrorCodes::BadValue,
                 "security.authorization expects either 'enabled' or 'disabled'"};
     }
@@ -47,9 +49,10 @@ inline Status validateSecurityAuthorizationSetting(const std::string& value) {
 }
 
 inline Status validateOperationProfilingModeSetting(const std::string& value) {
-    if (!(str::equalCaseInsensitive(value, "off"_sd) ||
-          str::equalCaseInsensitive(value, "slowOp"_sd) ||
-          str::equalCaseInsensitive(value, "all"_sd))) {
+    using namespace std::literals::string_view_literals;
+    if (!(str::equalCaseInsensitive(value, "off"sv) ||
+          str::equalCaseInsensitive(value, "slowOp"sv) ||
+          str::equalCaseInsensitive(value, "all"sv))) {
         return {ErrorCodes::BadValue, "operationProfiling.mode expects 'off', 'slowOp', or 'all'"};
     }
 

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/secure_allocator.h"
-#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 

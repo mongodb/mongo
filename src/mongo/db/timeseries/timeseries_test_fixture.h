@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/uuid.h"
 
 #include <functional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -209,7 +209,7 @@ protected:
 
     uint64_t _getStorageCacheSizeBytes() const;
 
-    long long _getExecutionStat(const UUID& uuid, StringData stat);
+    long long _getExecutionStat(const UUID& uuid, std::string_view stat);
 
     template <typename T>
     inline std::vector<T> _getFlattenedVector(const std::vector<std::vector<T>>& vectors) {
@@ -229,11 +229,11 @@ protected:
     OperationContext* _opCtx;
     bucket_catalog::BucketCatalog* _bucketCatalog;
 
-    static constexpr StringData _timeField = "time";
-    static constexpr StringData _metaField = "tag";
-    static constexpr StringData _metaValue = "a";
-    static constexpr StringData _metaValue2 = "b";
-    static constexpr StringData _metaValue3 = "c";
+    static constexpr std::string_view _timeField = "time";
+    static constexpr std::string_view _metaField = "tag";
+    static constexpr std::string_view _metaValue = "a";
+    static constexpr std::string_view _metaValue2 = "b";
+    static constexpr std::string_view _metaValue3 = "c";
     uint64_t _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
 
     const std::vector<BSONType> _nonStringComponentVariableBSONTypes = {BSONType::timestamp,

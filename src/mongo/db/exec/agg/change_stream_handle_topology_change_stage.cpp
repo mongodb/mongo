@@ -40,6 +40,8 @@
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/query/exec/shard_tag.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamHandleTopologyChangeToStageFn(
@@ -85,10 +87,11 @@ bool isShardConfigEvent(const Document& eventDoc) {
         return true;
     }
 
+    using namespace std::literals::string_view_literals;
     // Check whether this event occurred on the config.shards collection.
     auto nsObj = eventDoc[DocumentSourceChangeStream::kNamespaceField];
-    auto nsDB = nsObj["db"_sd];
-    auto nsColl = nsObj["coll"_sd];
+    auto nsDB = nsObj["db"sv];
+    auto nsColl = nsObj["coll"sv];
     const bool isConfigDotShardsEvent = nsDB.getType() == BSONType::string &&
         nsDB.getStringData() == NamespaceString::kConfigsvrShardsNamespace.db(omitTenant) &&
         nsColl.getType() == BSONType::string &&
@@ -107,7 +110,7 @@ bool isShardConfigEvent(const Document& eventDoc) {
     }
     // Check the fullDocument field, which should contain details of the new shard's name and hosts.
     auto fullDocument = eventDoc[DocumentSourceChangeStream::kFullDocumentField];
-    if (opType.getStringData() == "insert"_sd && fullDocument.getType() != BSONType::object) {
+    if (opType.getStringData() == "insert"sv && fullDocument.getType() != BSONType::object) {
         return false;
     }
 
@@ -118,7 +121,7 @@ bool isShardConfigEvent(const Document& eventDoc) {
 }  // namespace
 
 ChangeStreamHandleTopologyChangeStage::ChangeStreamHandleTopologyChangeStage(
-    StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
+    std::string_view stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
     : Stage(stageName, pExpCtx) {}
 
 GetNextResult ChangeStreamHandleTopologyChangeStage::doGetNext() {

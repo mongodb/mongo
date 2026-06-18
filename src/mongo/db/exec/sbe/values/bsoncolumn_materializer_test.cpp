@@ -34,6 +34,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::sbe::bsoncolumn {
 namespace {
 
@@ -243,10 +245,10 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializer) {
     uint64_t uts = ConstDataView{obj.firstElement().value()}.read<LittleEndian<uint64_t>>();
     assertMaterializedValue(ts, {value::TypeTags::Timestamp, uts});
 
-    StringData strSmall{"cramped"};
+    std::string_view strSmall{"cramped"};
     assertMaterializedValue(strSmall, value::makeSmallString(strSmall));
 
-    StringData strBig{"spacious"};
+    std::string_view strBig{"spacious"};
     obj = BSON("" << strBig);
     const char* strStorage = obj.firstElement().value();
     assertMaterializedValue(
@@ -259,7 +261,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializer) {
     assertMaterializedValue(
         bsonBinData, {value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(bdStorage)});
 
-    BSONCode code{StringData{"x = 0"}};
+    BSONCode code{std::string_view{"x = 0"}};
     obj = BSON("" << code);
     auto codeStorage = obj.firstElement().value();
     assertMaterializedValue(
@@ -275,7 +277,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializer) {
     std::string longStr;
     for (size_t strSize = 0; strSize < 4097; ++strSize) {
         {
-            StringData sd{longStr};
+            std::string_view sd{longStr};
             obj = BSON("" << sd);
             strStorage = obj.firstElement().value();
 
@@ -288,7 +290,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializer) {
         }
 
         {
-            BSONCode code{StringData{longStr}};
+            BSONCode code{std::string_view{longStr}};
             obj = BSON("" << code);
             auto codeStorage = obj.firstElement().value();
             assertMaterializedValue(
@@ -378,7 +380,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressIterativeSimpleWithSBEMaterializer)
     uint64_t uts = ConstDataView{obj.firstElement().value()}.read<LittleEndian<uint64_t>>();
     verifyDecompressionIterative(obj, {value::TypeTags::Timestamp, uts});
 
-    StringData strBig{"hello_world"};
+    std::string_view strBig{"hello_world"};
     obj = BSON("" << strBig);
     verifyDecompressionIterative(
         obj,
@@ -391,7 +393,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressIterativeSimpleWithSBEMaterializer)
                                  {value::TypeTags::bsonBinData,
                                   value::bitcastFrom<const char*>(obj.firstElement().value())});
 
-    BSONCode code{StringData{"x = 0"}};
+    BSONCode code{std::string_view{"x = 0"}};
     obj = BSON("" << code);
     verifyDecompressionIterative(obj,
                                  {value::TypeTags::bsonJavascript,
@@ -875,19 +877,19 @@ TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithBindata) {
 }
 
 TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithCode) {
-    std::vector<BSONCode> codes = {BSONCode(StringData{"x = 0"}),
-                                   BSONCode(StringData{"x = 1"}),
-                                   BSONCode(StringData{"x = 2"}),
-                                   BSONCode(StringData{"x = 3"})};
+    std::vector<BSONCode> codes = {BSONCode(std::string_view{"x = 0"}),
+                                   BSONCode(std::string_view{"x = 1"}),
+                                   BSONCode(std::string_view{"x = 2"}),
+                                   BSONCode(std::string_view{"x = 3"})};
 
     verifyDecompressWithDifferentTypes(codes);
 }
 
 TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithString) {
-    std::vector<StringData> strs = {StringData("hello_world0"),
-                                    StringData("hello_world1"),
-                                    StringData("hello_world2"),
-                                    StringData("hello_world3")};
+    std::vector<std::string_view> strs = {std::string_view("hello_world0"),
+                                          std::string_view("hello_world1"),
+                                          std::string_view("hello_world2"),
+                                          std::string_view("hello_world3")};
 
     verifyDecompressWithDifferentTypes(strs);
 }

@@ -61,16 +61,19 @@
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 
 namespace mongo {
 namespace {
-static constexpr StringData kRecordIdField = "recordId"_sd;
-}
+using namespace std::literals::string_view_literals;
+static constexpr std::string_view kRecordIdField = "recordId"sv;
+}  // namespace
 
 SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
-                                           StringData ident,
+                                           std::string_view ident,
                                            LazyRecordStore::CreateMode createMode)
     : _skippedRecordsTable(opCtx, ident, createMode) {}
 

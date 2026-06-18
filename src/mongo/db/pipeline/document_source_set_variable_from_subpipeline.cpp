@@ -42,6 +42,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -52,7 +53,7 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-constexpr StringData DocumentSourceSetVariableFromSubPipeline::kStageName;
+constexpr std::string_view DocumentSourceSetVariableFromSubPipeline::kStageName;
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(setVariableFromSubPipeline,
                                               SetVariableFromSubPipelineLiteParsed::parse);

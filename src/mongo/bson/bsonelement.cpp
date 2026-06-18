@@ -53,10 +53,12 @@
 #include "mongo/util/str.h"
 
 #include <cmath>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using std::string;
 
@@ -188,7 +190,7 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             ConstDataCursor reader(value());
             const int len = reader.readAndAdvance<LittleEndian<int>>();
             BinDataType type = static_cast<BinDataType>(reader.readAndAdvance<uint8_t>());
-            g.writeBinData(buffer, StringData(reader.view(), len), type);
+            g.writeBinData(buffer, std::string_view(reader.view(), len), type);
         }
 
         break;
@@ -196,8 +198,8 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             g.writeDate(buffer, date());
             break;
         case BSONType::regEx: {
-            StringData pattern(regex());
-            g.writeRegex(buffer, pattern, StringData(pattern.data() + pattern.size() + 1));
+            std::string_view pattern(regex());
+            g.writeRegex(buffer, pattern, std::string_view(pattern.data() + pattern.size() + 1));
         } break;
         case BSONType::codeWScope: {
             BSONObj scope = codeWScopeObject();
@@ -229,8 +231,8 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
 
         BSONObjBuilder builder;
         BSONObjBuilder truncationInfo = builder.subobjStart(fieldNameStringData());
-        truncationInfo.append("type"_sd, typeName(type()));
-        truncationInfo.append("size"_sd, valuesize());
+        truncationInfo.append("type"sv, typeName(type()));
+        truncationInfo.append("size"sv, valuesize());
         truncationInfo.done();
         return builder.obj();
     }
@@ -418,8 +420,8 @@ int BSONElement::compareElements(const BSONElement& l,
             return strcmp(l.regexFlags(), r.regexFlags());
         }
         case BSONType::codeWScope: {
-            int cmp = StringData(l.codeWScopeCode(), l.codeWScopeCodeLen() - 1)
-                          .compare(StringData(r.codeWScopeCode(), r.codeWScopeCodeLen() - 1));
+            int cmp = std::string_view(l.codeWScopeCode(), l.codeWScopeCodeLen() - 1)
+                          .compare(std::string_view(r.codeWScopeCode(), r.codeWScopeCodeLen() - 1));
             if (cmp)
                 return cmp;
 
@@ -446,7 +448,7 @@ std::vector<BSONElement> BSONElement::Array() const {
         uassert(ErrorCodes::BadValue,
                 fmt::format("Invalid array index field name: \"{}\", expected \"{}\"",
                             fieldName,
-                            static_cast<StringData>(counter)),
+                            static_cast<std::string_view>(counter)),
                 fieldName == counter);
         ++counter;
         v.push_back(element);
@@ -614,7 +616,7 @@ BSONObj BSONElement::wrap() const {
     return b.obj();
 }
 
-BSONObj BSONElement::wrap(StringData newName) const {
+BSONObj BSONElement::wrap(std::string_view newName) const {
     BSONObjBuilder b(size() + 6 + newName.size());
     b.appendAs(*this, newName);
     return b.obj();
@@ -628,7 +630,7 @@ BSONObj BSONElement::Obj() const {
     return embeddedObjectUserCheck();
 }
 
-BSONElement BSONElement::operator[](StringData field) const {
+BSONElement BSONElement::operator[](std::string_view field) const {
     BSONObj o = Obj();
     return o[field];
 }
@@ -766,7 +768,7 @@ void BSONElement::toString(
             const char* data = binDataClean(len);
             // If the BinData is a correctly sized newUUID, display it as such.
             if (binDataType() == newUUID && len == 16) {
-                StringData sd(data, len);
+                std::string_view sd(data, len);
                 // 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
                 s << fmt::format("UUID(\"{}-{}-{}-{}-{}\")",
                                  hexblob::encodeLower(sd.substr(0, 4)),

@@ -35,6 +35,7 @@
 
 namespace mongo {
 namespace test {
+using namespace std::literals::string_view_literals;
 
 const ChangeStreamShardTargeterMock::ReaderContextCallback
     V2StageTestHelpers::kEmptyShardTargeterCallback =
@@ -45,7 +46,7 @@ const ChangeStreamShardTargeterMock::ReaderContextCallback
 
 MockWithUndoStage::MockWithUndoStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      std::deque<exec::agg::GetNextResult> results)
-    : Stage("DocumentSourceWithUndoMock"_sd, expCtx), _queue(std::move(results)) {}
+    : Stage("DocumentSourceWithUndoMock"sv, expCtx), _queue(std::move(results)) {}
 
 boost::intrusive_ptr<MockWithUndoStage> MockWithUndoStage::createForTest(
     std::deque<exec::agg::GetNextResult> results,

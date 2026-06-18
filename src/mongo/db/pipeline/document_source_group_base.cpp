@@ -60,6 +60,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -230,7 +231,7 @@ std::vector<AccumulationStatement>& DocumentSourceGroupBase::getMutableAccumulat
 }
 
 DocumentSourceGroupBase::DocumentSourceGroupBase(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<int64_t> maxMemoryUsageBytes)
     : DocumentSource(stageName, expCtx),
@@ -292,7 +293,7 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
 
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
-        StringData pFieldName = groupField.fieldNameStringData();
+        std::string_view pFieldName = groupField.fieldNameStringData();
         if (pFieldName == "_id") {
             uassert(15948, "a group's _id may only be specified once", idExpressions.empty());
             _groupProcessor->setIdExpression(parseIdExpression(getExpCtx(), groupField, vps));

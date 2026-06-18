@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_count.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -45,12 +44,14 @@
 #include "mongo/util/intrusive_counter.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 using boost::intrusive_ptr;
 using std::list;
 using std::vector;
@@ -81,7 +82,7 @@ public:
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
         ASSERT_EQUALS(explainedStages.size(), 2UL);
 
-        StringData countName = countSpec.firstElement().valueStringData();
+        std::string_view countName = countSpec.firstElement().valueStringData();
         Value expectedGroupExplain =
             Value{Document{{"_id", Document{{"$const", BSONNULL}}},
                            {countName, Document{{"$sum", Document{{"$const", 1}}}}},
@@ -130,7 +131,7 @@ TEST_F(InvalidCountSpec, FieldPathSpec) {
 }
 
 TEST_F(InvalidCountSpec, EmbeddedNullByteSpec) {
-    BSONObj spec = BSON("$count" << "te\0st"_sd);
+    BSONObj spec = BSON("$count" << "te\0st"sv);
     ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40159);
 }
 

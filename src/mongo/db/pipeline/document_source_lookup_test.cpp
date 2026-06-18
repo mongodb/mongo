@@ -69,6 +69,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace test;
 
@@ -1080,7 +1081,7 @@ TEST_F(DocumentSourceLookUpTest,
     const auto* subPipeline = lookup->getSubPipeline();
     ASSERT_TRUE(subPipeline != nullptr);
     ASSERT_EQ(subPipeline->size(), 1U);
-    ASSERT_EQ(subPipeline->front()->getSourceName(), "$addFields"_sd);
+    ASSERT_EQ(subPipeline->front()->getSourceName(), "$addFields"sv);
 
     // The BSON resolved pipeline must also carry the view stage (set by the base constructor).
     ASSERT_EQ(lookup->getResolvedPipelineForTest().size(), 2U);  // view stage + $match placeholder
@@ -1244,9 +1245,9 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
                                 Document{{"from", fromNs.coll()},
-                                         {"localField", "foreignId"_sd},
-                                         {"foreignField", "_id"_sd},
-                                         {"as", "foreignDocs"_sd}}}}
+                                         {"localField", "foreignId"sv},
+                                         {"foreignField", "_id"sv},
+                                         {"as", "foreignDocs"sv}}}}
                           .toBson();
     auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
 
@@ -1265,9 +1266,9 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
                                 Document{{"from", fromNs.coll()},
-                                         {"localField", "foreignId"_sd},
-                                         {"foreignField", "_id"_sd},
-                                         {"as", "foreignDoc"_sd}}}}
+                                         {"localField", "foreignId"sv},
+                                         {"foreignField", "_id"sv},
+                                         {"as", "foreignDoc"sv}}}}
                           .toBson();
     auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
 

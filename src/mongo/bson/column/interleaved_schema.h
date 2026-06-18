@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -80,7 +80,7 @@ public:
 
 private:
     void _discover(const BSONObj& obj,
-                   StringData fieldName,
+                   std::string_view fieldName,
                    BSONType type,
                    bool allowEmpty,
                    index_t& scalarIdx);

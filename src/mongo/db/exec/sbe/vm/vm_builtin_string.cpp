@@ -31,6 +31,8 @@
 #include "mongo/db/exec/str_trim_utils.h"
 #include "mongo/db/exec/substr_utils.h"
 
+#include <string_view>
+
 #include <boost/algorithm/string/case_conv.hpp>
 
 namespace mongo {
@@ -116,7 +118,7 @@ value::TagValueMaybeOwned ByteCode::builtinStrLenBytes(ArityType arity) {
     auto operand = viewFromStack(0);
 
     if (value::isString(operand.tag)) {
-        StringData str = value::getStringView(operand.tag, operand.value);
+        std::string_view str = value::getStringView(operand.tag, operand.value);
         size_t strLenBytes = str.size();
         uassert(5155801,
                 "string length could not be represented as an int.",
@@ -132,7 +134,7 @@ value::TagValueMaybeOwned ByteCode::builtinStrLenCP(ArityType arity) {
     auto operand = viewFromStack(0);
 
     if (value::isString(operand.tag)) {
-        StringData str = value::getStringView(operand.tag, operand.value);
+        std::string_view str = value::getStringView(operand.tag, operand.value);
         size_t strLenCP = str::lengthInUTF8CodePoints(str);
         uassert(5155901,
                 "string length could not be represented as an int.",
@@ -154,7 +156,7 @@ value::TagValueMaybeOwned ByteCode::builtinSubstrBytes(ArityType arity) {
         return value::TagValueMaybeOwned::nothing();
     }
 
-    StringData str = value::getStringView(strView.tag, strView.value);
+    std::string_view str = value::getStringView(strView.tag, strView.value);
     int64_t startIndexBytes = value::bitcastTo<int64_t>(startIndexView.value);
     int64_t lenBytes = value::bitcastTo<int64_t>(lenView.value);
 
@@ -164,8 +166,8 @@ value::TagValueMaybeOwned ByteCode::builtinSubstrBytes(ArityType arity) {
     }
 
     // If passed length is negative, we should return rest of string.
-    const StringData::size_type length =
-        lenBytes < 0 ? str.length() : static_cast<StringData::size_type>(lenBytes);
+    const std::string_view::size_type length =
+        lenBytes < 0 ? str.length() : static_cast<std::string_view::size_type>(lenBytes);
 
     // Check 'startIndexBytes' and byte after last char is not continuation byte.
     uassert(5155604,
@@ -205,7 +207,7 @@ value::TagValueMaybeOwned ByteCode::builtinSubstrCP(ArityType arity) {
         return value::TagValueMaybeOwned::nothing();
     }
 
-    StringData str = value::getStringView(strView.tag, strView.value);
+    std::string_view str = value::getStringView(strView.tag, strView.value);
     auto [outTag, outVal] =
         value::makeNewString(substr_utils::getSubstringCP(str, startIndex, len));
     return {true, outTag, outVal};
@@ -256,19 +258,19 @@ value::TagValueMaybeOwned ByteCode::builtinCoerceToString(ArityType arity) {
         case value::TypeTags::NumberInt32: {
             str::stream str;
             str << value::bitcastTo<int32_t>(operand.value());
-            auto [strTag, strVal] = value::makeNewString(StringData(str));
+            auto [strTag, strVal] = value::makeNewString(std::string_view(str));
             return {true, strTag, strVal};
         }
         case value::TypeTags::NumberInt64: {
             str::stream str;
             str << value::bitcastTo<int64_t>(operand.value());
-            auto [strTag, strVal] = value::makeNewString(StringData(str));
+            auto [strTag, strVal] = value::makeNewString(std::string_view(str));
             return {true, strTag, strVal};
         }
         case value::TypeTags::NumberDouble: {
             str::stream str;
             str << value::bitcastTo<double>(operand.value());
-            auto [strTag, strVal] = value::makeNewString(StringData(str));
+            auto [strTag, strVal] = value::makeNewString(std::string_view(str));
             return {true, strTag, strVal};
         }
         case value::TypeTags::NumberDecimal: {
@@ -288,7 +290,7 @@ value::TagValueMaybeOwned ByteCode::builtinCoerceToString(ArityType arity) {
                 // Date formatting failed. Return stringified status.
                 str::stream str;
                 str << formatted.getStatus();
-                auto [strTag, strVal] = value::makeNewString(StringData(str));
+                auto [strTag, strVal] = value::makeNewString(std::string_view(str));
                 return {true, strTag, strVal};
             }
         }
@@ -329,11 +331,11 @@ value::TagValueMaybeOwned ByteCode::builtinTrim(ArityType arity, bool trimLeft, 
         return value::TagValueMaybeOwned::nothing();
     }
 
-    std::vector<StringData> replacementChars;
+    std::vector<std::string_view> replacementChars;
     // Nullish 'chars' indicates that it was not provided and the default whitespace characters will
     // be used.
     if (value::isNullish(charsView.tag)) {
-        replacementChars = str_trim_utils::kDefaultTrimWhitespaceChars;
+        replacementChars = str_trim_utils::defaultTrimWhitespaceChars();
     } else {
         auto charsStringData = value::getStringView(charsView.tag, charsView.value);
         uassert(12066801,

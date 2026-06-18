@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -107,6 +106,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -116,6 +116,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 constexpr std::size_t kOplogBufferSize = 256 * 1024 * 1024;
 constexpr std::size_t kOplogBufferCount = std::numeric_limits<std::size_t>::max();
@@ -560,7 +561,7 @@ private:
 
     std::vector<BSONObj> _oplogEntries;
     UUID _foobarUUID;
-    NamespaceString _foobarNs = NamespaceString::createNamespaceString_forTest("foo.bar"_sd);
+    NamespaceString _foobarNs = NamespaceString::createNamespaceString_forTest("foo.bar"sv);
     repl::OplogApplierBatcher::BatchLimits _batchLimits{std::numeric_limits<std::size_t>::max(),
                                                         std::numeric_limits<std::size_t>::max()};
 };

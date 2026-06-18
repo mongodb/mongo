@@ -48,6 +48,7 @@
 #include "mongo/util/pcre_util.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -56,6 +57,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 
@@ -77,7 +79,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamStage, DocumentSourceInternalCh
 
 
 void DocumentSourceChangeStream::checkValueType(const Value v,
-                                                const StringData fieldName,
+                                                const std::string_view fieldName,
                                                 BSONType expectedType) {
     uassert(40532,
             str::stream() << "Entry field \"" << fieldName << "\" should be "
@@ -86,14 +88,14 @@ void DocumentSourceChangeStream::checkValueType(const Value v,
 }
 
 void DocumentSourceChangeStream::checkValueTypeOrMissing(const Value v,
-                                                         const StringData fieldName,
+                                                         const std::string_view fieldName,
                                                          BSONType expectedType) {
     if (!v.missing()) {
         checkValueType(v, fieldName, expectedType);
     }
 }
 
-StringData DocumentSourceChangeStream::resolveAllCollectionsRegex(
+std::string_view DocumentSourceChangeStream::resolveAllCollectionsRegex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // We never expect this method to be called except when building a change stream pipeline.
     tassert(6189300,
@@ -453,7 +455,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             !resumeToken || resumeToken->uuid || !expCtx->isSingleNamespaceAggregation() ||
                 ResumeToken::isHighWaterMarkToken(*resumeToken) ||
                 Value::compare(resumeToken->eventIdentifier["operationType"],
-                               Value("endOfTransaction"_sd),
+                               Value("endOfTransaction"sv),
                                nullptr) == 0);
 }
 

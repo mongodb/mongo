@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
@@ -37,6 +36,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -47,7 +47,7 @@ namespace {
 struct ClusterCountCmdS {
     using Request = CountCommandRequest;
     using Reply = CountCommandRequest::Reply;
-    static constexpr StringData kCommandName = Request::kCommandName;
+    static constexpr std::string_view kCommandName = Request::kCommandName;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;

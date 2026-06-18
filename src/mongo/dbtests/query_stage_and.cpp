@@ -34,7 +34,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -71,6 +70,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -168,7 +168,7 @@ public:
         return BSONObj();
     }
 
-    StringData ns() {
+    std::string_view ns() {
         return _nss.ns_forTest();
     }
     const NamespaceString& nss() {

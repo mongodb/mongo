@@ -29,12 +29,14 @@
 
 #include "mongo/db/exec/agg/stage.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace exec {
 namespace agg {
 
 
-Stage::Stage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pCtx)
+Stage::Stage(std::string_view stageName, const boost::intrusive_ptr<ExpressionContext>& pCtx)
     : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName) {
     if (pExpCtx->shouldCollectDocumentSourceExecStats()) {
         if (pExpCtx->getQueryKnobConfiguration().getMeasureQueryExecutionTimeInNanoseconds()) {

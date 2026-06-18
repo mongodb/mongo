@@ -47,6 +47,7 @@
 #include <algorithm>
 #include <iterator>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <boost/cstdint.hpp>
@@ -66,6 +67,7 @@ exec::agg::StagePtr documentSourceExchangeToStageFn(
         ds->kStageName, ds->getExpCtx(), ds->_exchange, ds->_consumerId, ds->_resourceYielder);
 }
 namespace exec::agg {
+using namespace std::literals::string_view_literals;
 REGISTER_AGG_STAGE_MAPPING(exchange, DocumentSourceExchange::id, documentSourceExchangeToStageFn)
 
 MONGO_FAIL_POINT_DEFINE(exchangeFailLoadNextBatch);
@@ -238,7 +240,7 @@ Ordering Exchange::extractOrdering(const BSONObj& keyPattern) {
         if (element.type() == BSONType::string) {
             uassert(50895,
                     str::stream() << "Exchange key description is invalid: " << element,
-                    element.valueStringData() == "hashed"_sd);
+                    element.valueStringData() == "hashed"sv);
             hasHashKey = true;
         } else if (element.isNumber()) {
             auto num = element.number();
@@ -452,7 +454,7 @@ size_t Exchange::getTargetConsumer(const Document& input) {
     }
 
     key_string::Builder key{key_string::Version::V1, kb.obj(), _ordering};
-    StringData keyStr{key.getView().data(), key.getView().size()};
+    std::string_view keyStr{key.getView().data(), key.getView().size()};
 
     // Binary search for the consumer id.
     auto it = std::upper_bound(_boundaries.begin(), _boundaries.end(), keyStr);
@@ -547,7 +549,7 @@ bool Exchange::ExchangeBuffer::appendDocument(DocumentSource::GetNextResult inpu
     return _bytesInBuffer >= limit;
 }
 
-ExchangeStage::ExchangeStage(StringData stageName,
+ExchangeStage::ExchangeStage(std::string_view stageName,
                              const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                              boost::intrusive_ptr<Exchange> exchange,
                              size_t consumerId,

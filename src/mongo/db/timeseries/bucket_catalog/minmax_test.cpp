@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -38,6 +37,7 @@
 #include <iterator>
 #include <numeric>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -45,6 +45,7 @@
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
+using namespace std::literals::string_view_literals;
 using Entry = FlatBSONStore<MinMaxElement, BSONElementValueBuffer>::Entry;
 
 std::string concatFieldNames(const MinMaxStore::Obj& obj) {
@@ -149,11 +150,11 @@ TEST(MinMax, MinMaxNoUpdatesAfterFullMinMax) {
     tracking::Context trackingContext;
     MinMax minMaxObj{trackingContext};
     const auto* strCmp = &simpleStringDataComparator;
-    minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
+    minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"sv, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.min(), BSON("a" << 2 << "b" << 3));
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSONObj());
 
-    minMaxObj.update(BSON("a" << 1 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
+    minMaxObj.update(BSON("a" << 1 << "b" << 3 << "meta" << 4), "meta"sv, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.max(), BSON("a" << 2 << "b" << 3));
     ASSERT_BSONOBJ_EQ(minMaxObj.maxUpdates(), BSONObj());
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSON("u" << BSON("a" << 1)));
@@ -165,7 +166,7 @@ TEST(MinMax, MinMaxNoUpdatesAfterFullMinMaxNested) {
     const auto* strCmp = &simpleStringDataComparator;
 
     auto obj = BSON("a" << BSON("z" << 1) << "b" << BSON_ARRAY(BSON("z" << 1) << BSON("z" << 2)));
-    minMaxObj.update(obj, "_meta"_sd, strCmp);
+    minMaxObj.update(obj, "_meta"sv, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.min(), obj);
     ASSERT_BSONOBJ_EQ(minMaxObj.max(), obj);
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSONObj{});
@@ -173,7 +174,7 @@ TEST(MinMax, MinMaxNoUpdatesAfterFullMinMaxNested) {
 
     minMaxObj.update(
         BSON("a" << BSON_ARRAY(BSON("z" << 1) << BSON("z" << 2)) << "b" << BSON("z" << 1)),
-        "_meta"_sd,
+        "_meta"sv,
         strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSON("u" << BSON("b" << BSON("z" << 1))));
     ASSERT_BSONOBJ_EQ(minMaxObj.maxUpdates(),
@@ -186,10 +187,10 @@ TEST(MinMax, MinMaxInitialUpdates) {
     tracking::Context trackingContext;
     MinMax minMaxObj{trackingContext};
     const auto* strCmp = &simpleStringDataComparator;
-    minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
+    minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"sv, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSON("u" << BSON("a" << 2 << "b" << 3)));
 
-    minMaxObj.update(BSON("a" << 1 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
+    minMaxObj.update(BSON("a" << 1 << "b" << 3 << "meta" << 4), "meta"sv, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSON("u" << BSON("a" << 1)));
 }
 
@@ -197,13 +198,13 @@ TEST(MinMax, MinMaxMixedUpdates) {
     tracking::Context trackingContext;
     MinMax minMaxObj{trackingContext};
     const auto* strCmp = &simpleStringDataComparator;
-    minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
+    minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"sv, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.min(), BSON("a" << 2 << "b" << 3));
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSONObj());
     ASSERT_BSONOBJ_EQ(minMaxObj.maxUpdates(), BSON("u" << BSON("a" << 2 << "b" << 3)));
     ASSERT_BSONOBJ_EQ(minMaxObj.max(), BSON("a" << 2 << "b" << 3));
 
-    minMaxObj.update(BSON("a" << 5 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
+    minMaxObj.update(BSON("a" << 5 << "b" << 3 << "meta" << 4), "meta"sv, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSONObj());
     ASSERT_BSONOBJ_EQ(minMaxObj.maxUpdates(), BSON("u" << BSON("a" << 5)));
 }

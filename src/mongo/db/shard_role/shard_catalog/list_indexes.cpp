@@ -31,7 +31,6 @@
 #include "mongo/db/shard_role/shard_catalog/list_indexes.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,6 +55,7 @@
 #include <cstddef>
 #include <list>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -69,6 +69,7 @@
 MONGO_FAIL_POINT_DEFINE(hangBeforeListIndexes);
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                        const CollectionAcquisition& collectionAcquisition,
@@ -106,7 +107,7 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
             collection->getCollectionOptions().expireAfterSeconds,
             expandSimpleCollation);
         if (additionalInclude == ListIndexesInclude::kIndexBuildInfo) {
-            indexSpecs.push_back(BSON("spec"_sd << clusteredSpec));
+            indexSpecs.push_back(BSON("spec"sv << clusteredSpec));
         } else {
             indexSpecs.push_back(clusteredSpec);
         }
@@ -135,7 +136,7 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
             case ListIndexesInclude::kBuildUUID:
                 if (inProgressInformationExists) {
                     indexSpecs.push_back(
-                        BSON("spec"_sd << spec << "buildUUID"_sd << *durableBuildUUID));
+                        BSON("spec"sv << spec << "buildUUID"sv << *durableBuildUUID));
                 } else {
                     indexSpecs.push_back(spec);
                 }
@@ -163,13 +164,13 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
                     // gathered for an in-progress index build and is subject to change.
 
                     BSONObjBuilder builder;
-                    durableBuildUUID->appendToBuilder(&builder, "buildUUID"_sd);
+                    durableBuildUUID->appendToBuilder(&builder, "buildUUID"sv);
                     IndexBuildsCoordinator::get(opCtx)->appendBuildInfo(*durableBuildUUID,
                                                                         &builder);
                     indexSpecs.push_back(
-                        BSON("spec"_sd << spec << "indexBuildInfo"_sd << builder.obj()));
+                        BSON("spec"sv << spec << "indexBuildInfo"sv << builder.obj()));
                 } else {
-                    indexSpecs.push_back(BSON("spec"_sd << spec));
+                    indexSpecs.push_back(BSON("spec"sv << spec));
                 }
                 break;
             default:

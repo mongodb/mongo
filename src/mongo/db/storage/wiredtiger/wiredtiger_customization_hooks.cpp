@@ -30,13 +30,13 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -69,7 +69,8 @@ void WiredTigerCustomizationHooksRegistry::addHook(
     _hooks.push_back(std::move(custHook));
 }
 
-std::string WiredTigerCustomizationHooksRegistry::getTableCreateConfig(StringData tableName) const {
+std::string WiredTigerCustomizationHooksRegistry::getTableCreateConfig(
+    std::string_view tableName) const {
     str::stream config;
     for (const auto& h : _hooks) {
         config << h->getTableCreateConfig(tableName);
@@ -94,7 +95,7 @@ bool WiredTigerCustomizationHooks::enabled() const {
     return false;
 }
 
-std::string WiredTigerCustomizationHooks::getTableCreateConfig(StringData tableName) {
+std::string WiredTigerCustomizationHooks::getTableCreateConfig(std::string_view tableName) {
     return "";
 }
 

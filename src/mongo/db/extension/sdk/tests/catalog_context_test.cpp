@@ -40,15 +40,17 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo::extension {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(CatalogContextTest, CatalogContextWithValidFields) {
     QueryTestServiceContext testCtx;
     auto opCtx = testCtx.makeOperationContext();
-    const auto dbNameSd = "test"_sd;
-    const auto collNameSd = "namespace"_sd;
+    const auto dbNameSd = "test"sv;
+    const auto collNameSd = "namespace"sv;
     const auto expectedUUID = UUID::gen();
 
     auto expCtx = make_intrusive<ExpressionContextForTest>(
@@ -83,8 +85,8 @@ TEST(CatalogContextTest, CatalogContextWithValidFields) {
 TEST(CatalogContextTest, CatalogContextWithEmptyFields) {
     QueryTestServiceContext testCtx;
     auto opCtx = testCtx.makeOperationContext();
-    const auto dbNameSd = ""_sd;
-    const auto collNameSd = ""_sd;
+    const auto dbNameSd = ""sv;
+    const auto collNameSd = ""sv;
 
     auto expCtx = make_intrusive<ExpressionContextForTest>(
         opCtx.get(),
@@ -116,8 +118,8 @@ TEST(CatalogContextTest, CatalogContextWithShardId) {
                                 expectedShardHandle.name()},
                                expectedShardHandle.uuid().value());
 
-    const auto dbNameSd = "test"_sd;
-    const auto collNameSd = "namespace"_sd;
+    const auto dbNameSd = "test"sv;
+    const auto collNameSd = "namespace"sv;
 
     auto expCtx = make_intrusive<ExpressionContextForTest>(
         opCtx.get(),

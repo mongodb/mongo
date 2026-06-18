@@ -40,6 +40,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/buildinfo.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
 namespace mongo {
@@ -75,7 +77,7 @@ auto& queryStatsHmacApplicationErrors =
     *MetricBuilder<Counter64>{"queryStats.numHmacApplicationErrors"};
 }
 
-QueryStatsStage::QueryStatsStage(StringData stageName,
+QueryStatsStage::QueryStatsStage(std::string_view stageName,
                                  const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  TransformAlgorithmEnum algorithm,
                                  std::string hmacKey,
@@ -88,7 +90,7 @@ QueryStatsStage::QueryStatsStage(StringData stageName,
 
 BSONObj QueryStatsStage::computeQueryStatsKey(
     std::shared_ptr<const Key> key, const SerializationContext& serializationContext) const {
-    static const auto sha256HmacStringDataHasher = [](const std::string& key, StringData sd) {
+    static const auto sha256HmacStringDataHasher = [](const std::string& key, std::string_view sd) {
         auto hashed = SHA256Block::computeHmac(
             (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.data(), sd.size());
         return hashed.toString();
@@ -98,7 +100,7 @@ BSONObj QueryStatsStage::computeQueryStatsKey(
     opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
     if (_algorithm == TransformAlgorithmEnum::kHmacSha256) {
         opts.transformIdentifiers = true;
-        opts.transformIdentifiersCallback = [&](StringData sd) {
+        opts.transformIdentifiersCallback = [&](std::string_view sd) {
             return sha256HmacStringDataHasher(_hmacKey, sd);
         };
     }

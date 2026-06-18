@@ -29,7 +29,6 @@
 
 #include "mongo/db/op_observer/fallback_op_observer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/keys_collection_document_gen.h"

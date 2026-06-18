@@ -42,6 +42,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
+#include <string_view>
 
 namespace mongo {
 
@@ -527,15 +528,15 @@ protected:
         _expCtx.setPathArraynessForNss(_expCtx.getNamespaceString(), _oldPathArrayness);
     }
 
-    void addOldPath(StringData path, MultikeyComponents mk = {}) {
+    void addOldPath(std::string_view path, MultikeyComponents mk = {}) {
         _oldPathArrayness->addPath(FieldPath(path), mk, true);
     }
 
-    bool canPathBeArray(StringData path) {
+    bool canPathBeArray(std::string_view path) {
         return _expCtx.canPathBeArrayForNss(FieldPath(path), _expCtx.getNamespaceString());
     }
 
-    void addCurrentPath(StringData path, MultikeyComponents mk = {}) {
+    void addCurrentPath(std::string_view path, MultikeyComponents mk = {}) {
         _current.addPath(FieldPath(path), mk, true);
     }
 

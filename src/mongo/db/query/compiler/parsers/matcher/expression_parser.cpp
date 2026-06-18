@@ -34,7 +34,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -96,6 +95,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -158,11 +158,11 @@ void addExpressionToRoot(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 using ErrorAnnotation = MatchExpression::ErrorAnnotation;
 using AnnotationMode = ErrorAnnotation::Mode;
 
-constexpr StringData AlwaysFalseMatchExpression::kName;
-constexpr StringData AlwaysTrueMatchExpression::kName;
-constexpr StringData OrMatchExpression::kName;
-constexpr StringData AndMatchExpression::kName;
-constexpr StringData NorMatchExpression::kName;
+constexpr std::string_view AlwaysFalseMatchExpression::kName;
+constexpr std::string_view AlwaysTrueMatchExpression::kName;
+constexpr std::string_view OrMatchExpression::kName;
+constexpr std::string_view AndMatchExpression::kName;
+constexpr std::string_view NorMatchExpression::kName;
 
 /**
  * 'DocumentParseLevel' refers to the current position of the parser as it descends a
@@ -182,9 +182,10 @@ enum class DocumentParseLevel {
 };
 
 namespace {
+using namespace std::literals::string_view_literals;
 // Forward declarations.
 
-Status parseSub(boost::optional<StringData> name,
+Status parseSub(boost::optional<std::string_view> name,
                 const BSONObj& sub,
                 AndMatchExpression* root,
                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -192,13 +193,13 @@ Status parseSub(boost::optional<StringData> name,
                 MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                 DocumentParseLevel currentLevel);
 
-std::function<StatusWithMatchExpression(StringData,
+std::function<StatusWithMatchExpression(std::string_view,
                                         BSONElement,
                                         const boost::intrusive_ptr<ExpressionContext>&,
                                         const ExtensionsCallback*,
                                         MatchExpressionParser::AllowedFeatureSet,
                                         DocumentParseLevel)>
-retrievePathlessParser(StringData name);
+retrievePathlessParser(std::string_view name);
 
 // createAnnotation() helper functions. If the expCtx indicates we're parsing a collection
 // validator then these functions return an annotation, otherwise these functions are a no-op
@@ -206,7 +207,7 @@ retrievePathlessParser(StringData name);
 
 inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    StringData tag,
+    std::string_view tag,
     BSONObj annotation,
     const BSONObj& jsonSchemaElement = BSONObj()) {
     if (expCtx->getIsParsingCollectionValidator()) {
@@ -229,7 +230,7 @@ inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
 
 inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    StringData tag,
+    std::string_view tag,
     BSONElement e,
     const BSONObj& jsonSchemaElement = BSONObj()) {
     if (expCtx->getIsParsingCollectionValidator()) {
@@ -242,13 +243,13 @@ inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
 
 inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    StringData tag,
-    boost::optional<StringData> name,
+    std::string_view tag,
+    boost::optional<std::string_view> name,
     BSONElement e,
     const BSONObj& jsonSchemaElement = BSONObj()) {
     if (expCtx->getIsParsingCollectionValidator()) {
         return doc_validation_error::createAnnotation(
-            expCtx, std::string{tag}, BSON((name ? *name : ""_sd) << e.wrap()), jsonSchemaElement);
+            expCtx, std::string{tag}, BSON((name ? *name : ""sv) << e.wrap()), jsonSchemaElement);
     } else {
         return nullptr;
     }
@@ -256,13 +257,13 @@ inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
 
 inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    StringData tag,
-    boost::optional<StringData> name,
+    std::string_view tag,
+    boost::optional<std::string_view> name,
     const BSONObj& obj,
     const BSONObj& jsonSchemaElement = BSONObj()) {
     if (expCtx->getIsParsingCollectionValidator()) {
         return doc_validation_error::createAnnotation(
-            expCtx, std::string{tag}, BSON((name ? *name : ""_sd) << obj), jsonSchemaElement);
+            expCtx, std::string{tag}, BSON((name ? *name : ""sv) << obj), jsonSchemaElement);
     } else {
         return nullptr;
     }
@@ -270,7 +271,7 @@ inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
 
 // Parse functions.
 
-StatusWithMatchExpression parseRegexElement(boost::optional<StringData> name,
+StatusWithMatchExpression parseRegexElement(boost::optional<std::string_view> name,
                                             BSONElement e,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (e.type() != BSONType::regEx)
@@ -285,7 +286,7 @@ StatusWithMatchExpression parseRegexElement(boost::optional<StringData> name,
 }
 
 StatusWithMatchExpression parseComparison(
-    boost::optional<StringData> name,
+    boost::optional<std::string_view> name,
     std::unique_ptr<ComparisonMatchExpression> cmp,
     BSONElement e,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -473,7 +474,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
     return {std::move(root)};
 }
 
-StatusWithMatchExpression parseComment(StringData name,
+StatusWithMatchExpression parseComment(std::string_view name,
                                        BSONElement elem,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        const ExtensionsCallback* extensionsCallback,
@@ -482,7 +483,7 @@ StatusWithMatchExpression parseComment(StringData name,
     return {nullptr};
 }
 
-StatusWithMatchExpression parseWhere(StringData name,
+StatusWithMatchExpression parseWhere(std::string_view name,
                                      BSONElement elem,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      const ExtensionsCallback* extensionsCallback,
@@ -500,7 +501,7 @@ StatusWithMatchExpression parseWhere(StringData name,
     return extensionsCallback->parseWhere(expCtx, elem);
 }
 
-StatusWithMatchExpression parseSampleRate(StringData name,
+StatusWithMatchExpression parseSampleRate(std::string_view name,
                                           BSONElement elem,
                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           const ExtensionsCallback* extensionsCallback,
@@ -547,7 +548,7 @@ StatusWithMatchExpression parseSampleRate(StringData name,
     }
 }
 
-StatusWithMatchExpression parseText(StringData name,
+StatusWithMatchExpression parseText(std::string_view name,
                                     BSONElement elem,
                                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const ExtensionsCallback* extensionsCallback,
@@ -565,16 +566,16 @@ StatusWithMatchExpression parseText(StringData name,
     return extensionsCallback->parseText(elem);
 }
 
-StatusWithMatchExpression parseDBRef(StringData name,
+StatusWithMatchExpression parseDBRef(std::string_view name,
                                      BSONElement elem,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      const ExtensionsCallback* extensionsCallback,
                                      MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                      DocumentParseLevel currentLevel) {
-    auto eq = std::make_unique<EqualityMatchExpression>(StringData(elem.fieldName()), elem);
+    auto eq = std::make_unique<EqualityMatchExpression>(std::string_view(elem.fieldName()), elem);
 
     // 'id' is collation-aware. 'ref' and 'db' are compared using binary comparison.
-    eq->setCollator("id"_sd == name ? expCtx->getCollator() : nullptr);
+    eq->setCollator("id"sv == name ? expCtx->getCollator() : nullptr);
 
     return {std::move(eq)};
 }
@@ -589,7 +590,7 @@ StatusWithMatchExpression parseDBRef(StringData name,
  * Parse: {<path>: <right-hand side>}
  */
 StatusWithMatchExpression parseInternalPath(
-    StringData name,
+    std::string_view name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
@@ -614,7 +615,7 @@ StatusWithMatchExpression parseInternalPath(
     return {std::move((*root->getChildVector())[0])};
 }
 
-StatusWithMatchExpression parseJSONSchema(StringData name,
+StatusWithMatchExpression parseJSONSchema(std::string_view name,
                                           BSONElement elem,
                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           const ExtensionsCallback* extensionsCallback,
@@ -635,7 +636,7 @@ StatusWithMatchExpression parseJSONSchema(StringData name,
 
 template <class T>
 StatusWithMatchExpression parseAlwaysBoolean(
-    StringData name,
+    std::string_view name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
@@ -654,7 +655,7 @@ StatusWithMatchExpression parseAlwaysBoolean(
     return {std::make_unique<T>()};
 }
 
-StatusWithMatchExpression parseExpr(StringData name,
+StatusWithMatchExpression parseExpr(std::string_view name,
                                     BSONElement elem,
                                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const ExtensionsCallback* extensionsCallback,
@@ -673,7 +674,7 @@ StatusWithMatchExpression parseExpr(StringData name,
     return {std::make_unique<ExprMatchExpression>(std::move(elem), expCtx, std::move(annotation))};
 }
 
-StatusWithMatchExpression parseMOD(boost::optional<StringData> name,
+StatusWithMatchExpression parseMOD(boost::optional<std::string_view> name,
                                    BSONElement elem,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (elem.type() != BSONType::array)
@@ -698,12 +699,12 @@ StatusWithMatchExpression parseMOD(boost::optional<StringData> name,
 
     long long divisor;
     if (auto status = divisorElement.tryCoerce(&divisor); !status.isOK()) {
-        return status.withContext("malformed mod, divisor value is invalid"_sd);
+        return status.withContext("malformed mod, divisor value is invalid"sv);
     }
 
     long long remainder;
     if (auto status = remainderElement.tryCoerce(&remainder); !status.isOK()) {
-        return status.withContext("malformed mod, remainder value is invalid"_sd);
+        return status.withContext("malformed mod, remainder value is invalid"sv);
     }
     return {std::make_unique<ModMatchExpression>(
         name,
@@ -713,11 +714,11 @@ StatusWithMatchExpression parseMOD(boost::optional<StringData> name,
 }
 
 StatusWithMatchExpression parseRegexDocument(
-    boost::optional<StringData> name,
+    boost::optional<std::string_view> name,
     const BSONObj& doc,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    StringData regex;
-    StringData regexOptions;
+    std::string_view regex;
+    std::string_view regexOptions;
 
     for (auto e : doc) {
         auto matchType = MatchExpressionParser::parsePathAcceptingKeyword(e);
@@ -731,7 +732,7 @@ StatusWithMatchExpression parseRegexDocument(
                     regex = e.valueStringData();
                 } else if (e.type() == BSONType::regEx) {
                     regex = e.regex();
-                    if (!StringData{e.regexFlags()}.empty()) {
+                    if (!std::string_view{e.regexFlags()}.empty()) {
                         if (!regexOptions.empty()) {
                             return {Status(ErrorCodes::Error(51074),
                                            "options set in both $regex and $options")};
@@ -776,7 +777,7 @@ Status parseInExpression(InMatchExpression* inExpression,
         }
 
         if (e.type() == BSONType::regEx) {
-            auto status = inExpression->addRegex(std::make_unique<RegexMatchExpression>(""_sd, e));
+            auto status = inExpression->addRegex(std::make_unique<RegexMatchExpression>(""sv, e));
             if (!status.isOK()) {
                 return status;
             }
@@ -787,7 +788,7 @@ Status parseInExpression(InMatchExpression* inExpression,
 }
 
 template <class T>
-StatusWithMatchExpression parseType(boost::optional<StringData> name,
+StatusWithMatchExpression parseType(boost::optional<std::string_view> name,
                                     BSONElement elt,
                                     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto typeSet = parsers::matcher::parseMatcherTypeSet(elt);
@@ -833,7 +834,7 @@ StatusWith<std::vector<uint32_t>> parseBitPositionsArray(const BSONObj& theArray
  * Parses 'e' into a BitTestMatchExpression.
  */
 template <class T>
-StatusWithMatchExpression parseBitTest(boost::optional<StringData> name,
+StatusWithMatchExpression parseBitTest(boost::optional<std::string_view> name,
                                        BSONElement e,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression;
@@ -871,10 +872,10 @@ StatusWithMatchExpression parseBitTest(boost::optional<StringData> name,
 }
 
 StatusWithMatchExpression parseInternalSchemaFmod(
-    boost::optional<StringData> name,
+    boost::optional<std::string_view> name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    StringData path(name ? *name : "");
+    std::string_view path(name ? *name : "");
     if (elem.type() != BSONType::array)
         return {ErrorCodes::BadValue,
                 str::stream() << path << " must be an array, but got type " << elem.type()};
@@ -908,7 +909,7 @@ StatusWithMatchExpression parseInternalSchemaFmod(
 }
 
 StatusWithMatchExpression parseInternalSchemaRootDocEq(
-    StringData name,
+    std::string_view name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
@@ -937,7 +938,7 @@ StatusWithMatchExpression parseInternalSchemaRootDocEq(
  */
 template <class T>
 StatusWithMatchExpression parseInternalSchemaSingleIntegerArgument(
-    boost::optional<StringData> name,
+    boost::optional<std::string_view> name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto parsedInt = elem.parseIntegerElementToNonNegativeLong();
@@ -955,7 +956,7 @@ StatusWithMatchExpression parseInternalSchemaSingleIntegerArgument(
  */
 template <class T>
 StatusWithMatchExpression parseTopLevelInternalSchemaSingleIntegerArgument(
-    StringData name,
+    std::string_view name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
@@ -974,9 +975,9 @@ StatusWithMatchExpression parseTopLevelInternalSchemaSingleIntegerArgument(
  * placeholder from that element. 'expressionName' is the name of the expression that requires the
  * name placeholder and is used to generate helpful error messages.
  */
-StatusWith<StringData> parseNamePlaceholder(const BSONObj& containingObject,
-                                            StringData namePlaceholderFieldName,
-                                            StringData expressionName) {
+StatusWith<std::string_view> parseNamePlaceholder(const BSONObj& containingObject,
+                                                  std::string_view namePlaceholderFieldName,
+                                                  std::string_view expressionName) {
     auto namePlaceholderElem = containingObject[namePlaceholderFieldName];
     if (!namePlaceholderElem) {
         return {ErrorCodes::FailedToParse,
@@ -999,9 +1000,9 @@ StatusWith<StringData> parseNamePlaceholder(const BSONObj& containingObject,
  */
 StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parseExprWithPlaceholder(
     const BSONObj& containingObject,
-    StringData exprWithPlaceholderFieldName,
-    StringData expressionName,
-    StringData expectedPlaceholder,
+    std::string_view exprWithPlaceholderFieldName,
+    std::string_view expressionName,
+    std::string_view expectedPlaceholder,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
@@ -1046,7 +1047,7 @@ StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parseExprWithPlaceholder(
 
 StatusWith<std::vector<InternalSchemaAllowedPropertiesMatchExpression::PatternSchema>>
 parsePatternProperties(BSONElement patternPropertiesElem,
-                       StringData expectedPlaceholder,
+                       std::string_view expectedPlaceholder,
                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        const ExtensionsCallback* extensionsCallback,
                        MatchExpressionParser::AllowedFeatureSet allowedFeatures,
@@ -1080,7 +1081,7 @@ parsePatternProperties(BSONElement patternPropertiesElem,
 
         auto expressionWithPlaceholder =
             parseExprWithPlaceholder(constraint,
-                                     "expression"_sd,
+                                     "expression"sv,
                                      InternalSchemaAllowedPropertiesMatchExpression::kName,
                                      expectedPlaceholder,
                                      expCtx,
@@ -1147,7 +1148,7 @@ StatusWith<StringDataSet> parseProperties(BSONElement propertiesElem) {
 }
 
 StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
-    StringData name,
+    std::string_view name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
@@ -1228,7 +1229,7 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
 }
 
 StatusWithMatchExpression parseInternalSchemaAllowedProperties(
-    StringData name,
+    std::string_view name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
@@ -1249,7 +1250,7 @@ StatusWithMatchExpression parseInternalSchemaAllowedProperties(
     }
 
     auto namePlaceholder = parseNamePlaceholder(
-        subobj, "namePlaceholder"_sd, InternalSchemaAllowedPropertiesMatchExpression::kName);
+        subobj, "namePlaceholder"sv, InternalSchemaAllowedPropertiesMatchExpression::kName);
     if (!namePlaceholder.isOK()) {
         return namePlaceholder.getStatus();
     }
@@ -1265,7 +1266,7 @@ StatusWithMatchExpression parseInternalSchemaAllowedProperties(
     }
 
     auto otherwise = parseExprWithPlaceholder(subobj,
-                                              "otherwise"_sd,
+                                              "otherwise"sv,
                                               InternalSchemaAllowedPropertiesMatchExpression::kName,
                                               namePlaceholder.getValue(),
                                               expCtx,
@@ -1293,7 +1294,7 @@ StatusWithMatchExpression parseInternalSchemaAllowedProperties(
  * Parses 'elem' into an InternalSchemaMatchArrayIndexMatchExpression.
  */
 StatusWithMatchExpression parseInternalSchemaMatchArrayIndex(
-    boost::optional<StringData> path,
+    boost::optional<std::string_view> path,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
@@ -1319,14 +1320,14 @@ StatusWithMatchExpression parseInternalSchemaMatchArrayIndex(
     }
 
     auto namePlaceholder = parseNamePlaceholder(
-        subobj, "namePlaceholder"_sd, InternalSchemaMatchArrayIndexMatchExpression::kName);
+        subobj, "namePlaceholder"sv, InternalSchemaMatchArrayIndexMatchExpression::kName);
     if (!namePlaceholder.isOK()) {
         return namePlaceholder.getStatus();
     }
 
     auto expressionWithPlaceholder =
         parseExprWithPlaceholder(subobj,
-                                 "expression"_sd,
+                                 "expression"sv,
                                  InternalSchemaMatchArrayIndexMatchExpression::kName,
                                  namePlaceholder.getValue(),
                                  expCtx,
@@ -1342,7 +1343,7 @@ StatusWithMatchExpression parseInternalSchemaMatchArrayIndex(
         path, index.getValue(), std::move(expressionWithPlaceholder.getValue()))};
 }
 
-StatusWithMatchExpression parseGeo(boost::optional<StringData> name,
+StatusWithMatchExpression parseGeo(boost::optional<std::string_view> name,
                                    PathAcceptingKeyword type,
                                    const BSONObj& section,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1353,7 +1354,7 @@ StatusWithMatchExpression parseGeo(boost::optional<StringData> name,
         if (!parseStatus.isOK()) {
             return parseStatus;
         }
-        StringData operatorName = section.firstElementFieldNameStringData();
+        std::string_view operatorName = section.firstElementFieldNameStringData();
         expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
         return {std::make_unique<GeoMatchExpression>(
             name, gq.release(), section, createAnnotation(expCtx, operatorName, name, section))};
@@ -1385,7 +1386,7 @@ StatusWithMatchExpression parseGeo(boost::optional<StringData> name,
 
 template <class T>
 StatusWithMatchExpression parseTreeTopLevel(
-    StringData name,
+    std::string_view name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
@@ -1421,7 +1422,7 @@ StatusWithMatchExpression parseTreeTopLevel(
     return {std::move(temp)};
 }
 
-StatusWithMatchExpression parseElemMatch(boost::optional<StringData> name,
+StatusWithMatchExpression parseElemMatch(boost::optional<std::string_view> name,
                                          BSONElement e,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          const ExtensionsCallback* extensionsCallback,
@@ -1501,7 +1502,7 @@ StatusWithMatchExpression parseElemMatch(boost::optional<StringData> name,
 }
 
 StatusWithMatchExpression parseBetweenWithArray(
-    boost::optional<StringData> name,
+    boost::optional<std::string_view> name,
     BSONElement e,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
@@ -1533,7 +1534,7 @@ StatusWithMatchExpression parseBetweenWithArray(
     return theAnd;
 }
 
-StatusWithMatchExpression parseAll(boost::optional<StringData> name,
+StatusWithMatchExpression parseAll(boost::optional<std::string_view> name,
                                    BSONElement e,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    const ExtensionsCallback* extensionsCallback,
@@ -1547,7 +1548,7 @@ StatusWithMatchExpression parseAll(boost::optional<StringData> name,
     BSONObjIterator i(arr);
 
     if (arr.firstElement().type() == BSONType::object &&
-        "$elemMatch"_sd == arr.firstElement().Obj().firstElement().fieldNameStringData()) {
+        "$elemMatch"sv == arr.firstElement().Obj().firstElement().fieldNameStringData()) {
         // $all : [ { $elemMatch : {} } ... ]
 
         while (i.more()) {
@@ -1559,7 +1560,7 @@ StatusWithMatchExpression parseAll(boost::optional<StringData> name,
             }
 
             auto hopefullyElemMatchObj = hopefullyElemMatchElement.Obj();
-            if ("$elemMatch"_sd != hopefullyElemMatchObj.firstElement().fieldNameStringData()) {
+            if ("$elemMatch"sv != hopefullyElemMatchObj.firstElement().fieldNameStringData()) {
                 // $all : [ { $elemMatch : ... }, { x : 5 } ]
                 return {Status(ErrorCodes::BadValue, "$all/$elemMatch has to be consistent")};
             }
@@ -1611,7 +1612,7 @@ StatusWithMatchExpression parseAll(boost::optional<StringData> name,
  */
 template <class T>
 StatusWithMatchExpression parseInternalSchemaFixedArityArgument(
-    StringData name,
+    std::string_view name,
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback* extensionsCallback,
@@ -1657,7 +1658,7 @@ StatusWithMatchExpression parseInternalSchemaFixedArityArgument(
     return {std::make_unique<T>(std::move(expressions))};
 }
 
-StatusWithMatchExpression parseNot(boost::optional<StringData> name,
+StatusWithMatchExpression parseNot(boost::optional<std::string_view> name,
                                    BSONElement elem,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    const ExtensionsCallback* extensionsCallback,
@@ -1698,7 +1699,7 @@ StatusWithMatchExpression parseNot(boost::optional<StringData> name,
 }
 
 StatusWithMatchExpression parseInternalSchemaBinDataSubType(
-    boost::optional<StringData> name,
+    boost::optional<std::string_view> name,
     BSONElement e,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (!e.isNumber()) {
@@ -1734,7 +1735,7 @@ StatusWithMatchExpression parseInternalSchemaBinDataSubType(
  */
 StatusWithMatchExpression parseSubField(const BSONObj& context,
                                         const AndMatchExpression* andSoFar,
-                                        boost::optional<StringData> name,
+                                        boost::optional<std::string_view> name,
                                         BSONElement e,
                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         const ExtensionsCallback* extensionsCallback,
@@ -1742,14 +1743,14 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                         DocumentParseLevel currentLevel) {
     tassert(11051917, "Missing match expression parameter", e);
 
-    if ("$not"_sd == e.fieldNameStringData()) {
+    if ("$not"sv == e.fieldNameStringData()) {
         return parseNot(name, e, expCtx, extensionsCallback, allowedFeatures, currentLevel);
     }
 
     auto parseExpMatchType = MatchExpressionParser::parsePathAcceptingKeyword(e);
     if (!parseExpMatchType) {
         // $where cannot be a sub-expression because it works on top-level documents only.
-        if ("$where"_sd == e.fieldNameStringData()) {
+        if ("$where"sv == e.fieldNameStringData()) {
             return {Status(ErrorCodes::BadValue, "$where cannot be applied to a field")};
         }
 
@@ -2155,7 +2156,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
  * If the query is { x : { $gt : 5, $lt : 8 } },
  * 'e' is { $gt : 5, $lt : 8 }
  */
-Status parseSub(boost::optional<StringData> name,
+Status parseSub(boost::optional<std::string_view> name,
                 const BSONObj& sub,
                 AndMatchExpression* root,
                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -2235,7 +2236,7 @@ std::unique_ptr<MatchExpression> MatchExpressionParser::parseAndNormalize(
 namespace {
 // Maps from query operator string name to function.
 std::unique_ptr<StringMap<
-    std::function<StatusWithMatchExpression(StringData,
+    std::function<StatusWithMatchExpression(std::string_view,
                                             BSONElement,
                                             const boost::intrusive_ptr<ExpressionContext>&,
                                             const ExtensionsCallback*,
@@ -2245,14 +2246,14 @@ std::unique_ptr<StringMap<
 
 MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
     pathlessOperatorMap = std::make_unique<StringMap<
-        std::function<StatusWithMatchExpression(StringData,
+        std::function<StatusWithMatchExpression(std::string_view,
                                                 BSONElement,
                                                 const boost::intrusive_ptr<ExpressionContext>&,
                                                 const ExtensionsCallback*,
                                                 MatchExpressionParser::AllowedFeatureSet,
                                                 DocumentParseLevel)>>>(
         StringMap<
-            std::function<StatusWithMatchExpression(StringData,
+            std::function<StatusWithMatchExpression(std::string_view,
                                                     BSONElement,
                                                     const boost::intrusive_ptr<ExpressionContext>&,
                                                     const ExtensionsCallback*,
@@ -2351,13 +2352,13 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
  * Returns the proper parser for the indicated pathless operator. Returns 'null' if 'name'
  * doesn't represent a known type.
  */
-std::function<StatusWithMatchExpression(StringData,
+std::function<StatusWithMatchExpression(std::string_view,
                                         BSONElement,
                                         const boost::intrusive_ptr<ExpressionContext>&,
                                         const ExtensionsCallback*,
                                         MatchExpressionParser::AllowedFeatureSet,
                                         DocumentParseLevel)>
-retrievePathlessParser(StringData name) {
+retrievePathlessParser(std::string_view name) {
     auto func = pathlessOperatorMap->find(name);
     if (func == pathlessOperatorMap->end()) {
         return nullptr;

@@ -98,6 +98,7 @@
 #include <cstdint>
 #include <limits>
 #include <set>
+#include <string_view>
 #include <tuple>
 
 #include <absl/container/flat_hash_map.h>
@@ -110,6 +111,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::stage_builder {
+using namespace std::literals::string_view_literals;
 namespace {
 /**
  * Generates an EOF plan. Note that even though this plan will return nothing, it will still define
@@ -147,7 +149,7 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
 
     // Set values for QSN slots.
     if (sn->limit) {
-        env->resetSlot(env->getSlot("searchLimit"_sd),
+        env->resetSlot(env->getSlot("searchLimit"sv),
                        sbe::value::TypeTags::NumberInt64,
                        *sn->limit,
                        true /* owned */);
@@ -155,7 +157,7 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
 
     if (sn->sortSpec) {
         auto sortSpec = std::make_unique<sbe::SortSpec>(*sn->sortSpec, cq.getExpCtx());
-        env->resetSlot(env->getSlot("searchSortSpec"_sd),
+        env->resetSlot(env->getSlot("searchSortSpec"sv),
                        sbe::value::TypeTags::sortSpec,
                        sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release()),
                        true /* owned */);
@@ -283,7 +285,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
     // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value should
     // be set to Nothing in the plan cache to avoid extending the lifetime of the ownership filter.
-    if (auto shardFiltererSlot = env->getSlotIfExists("shardFilterer"_sd)) {
+    if (auto shardFiltererSlot = env->getSlotIfExists("shardFilterer"sv)) {
         populateShardFiltererSlot(opCtx, *env, *shardFiltererSlot, collections);
     }
 
@@ -495,7 +497,7 @@ void PlanStageSlots::addEffectsToResultInfo(StageBuilderState& state,
 
 namespace {
 template <typename SetT>
-bool prefixIsInSet(StringData str, const SetT& s) {
+bool prefixIsInSet(std::string_view str, const SetT& s) {
     for (;;) {
         if (s.count(str)) {
             return true;
@@ -512,7 +514,7 @@ bool prefixIsInSet(StringData str, const SetT& s) {
     return false;
 };
 
-void addPrefixesToSet(StringData str, StringDataSet& s) {
+void addPrefixesToSet(std::string_view str, StringDataSet& s) {
     for (;;) {
         auto [_, inserted] = s.insert(str);
         if (!inserted) {
@@ -528,7 +530,7 @@ void addPrefixesToSet(StringData str, StringDataSet& s) {
     }
 };
 
-void addPrefixesToSet(StringData str, StringSet& s) {
+void addPrefixesToSet(std::string_view str, StringSet& s) {
     for (;;) {
         auto [_, inserted] = s.insert(std::string{str});
         if (!inserted) {
@@ -550,7 +552,8 @@ std::vector<ProjectNode> getTransformedNodesForCoveredProjection(
     std::vector<ProjectNode> newNodes;
     newNodes.reserve(paths.size());
     for (const auto& path : paths) {
-        newNodes.emplace_back(outputs.get(std::pair(PlanStageSlots::kField, StringData{path})));
+        newNodes.emplace_back(
+            outputs.get(std::pair(PlanStageSlots::kField, std::string_view{path})));
     }
 
     return newNodes;
@@ -1253,7 +1256,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
                 return true;
             }
             for (auto&& part : child->providedSorts().getBaseSortPattern()) {
-                if (StringData(s) == part.fieldNameStringData()) {
+                if (std::string_view(s) == part.fieldNameStringData()) {
                     return true;
                 }
             }
@@ -2193,11 +2196,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildReplaceRoot(
     auto validatedNewRootExpr = b.makeLet(
         frameId,
         SbExpr::makeSeq(b.makeFillEmptyNull(std::move(newRootABT))),
-        b.makeIf(
-            b.generateNonObjectCheck(newRootVar),
-            b.makeFail(ErrorCodes::Error{8105800},
-                       "Expression in $replaceRoot/$replaceWith must evaluate to an object"_sd),
-            newRootVar));
+        b.makeIf(b.generateNonObjectCheck(newRootVar),
+                 b.makeFail(ErrorCodes::Error{8105800},
+                            "Expression in $replaceRoot/$replaceWith must evaluate to an object"sv),
+                 newRootVar));
 
     auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(validatedNewRootExpr));
     stage = std::move(outStage);
@@ -3479,7 +3481,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildShardFilterCovere
     // once constructed the ShardFilterer will prevent orphaned documents from being deleted. We
     // will construct the ShardFilterer later while preparing the SBE tree for execution.
     auto shardFiltererSlot = SbSlot{_env->registerSlot(
-        "shardFilterer"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator)};
+        "shardFilterer"sv, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator)};
 
     for (auto&& shardKeyElt : shardKeyPattern) {
         childReqs.set(std::make_pair(PlanStageSlots::kField, shardKeyElt.fieldNameStringData()));
@@ -3566,7 +3568,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildShardFilter(
     // once constructed the ShardFilterer will prevent orphaned documents from being deleted. We
     // will construct the ShardFilterer later while preparing the SBE tree for execution.
     auto shardFiltererSlot = SbSlot{_env->registerSlot(
-        "shardFilterer"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator)};
+        "shardFilterer"sv, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator)};
 
     // Request slots for top level shard key fields and cache parsed key path.
     std::vector<sbe::MatchPath> shardKeyPaths;
@@ -4387,7 +4389,7 @@ public:
 
         // Deal with empty window for finalize expressions.
         auto emptyWindowExpr = [&] {
-            StringData opName = outputField.expr->getOpName();
+            std::string_view opName = outputField.expr->getOpName();
 
             if (opName == "$sum") {
                 return b.makeInt32Constant(0);
@@ -4742,14 +4744,14 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSearch(const Quer
     auto expCtx = _cq.getExpCtxRaw();
 
     // Register search query parameter slots.
-    auto limitSlot = _env->registerSlot("searchLimit"_sd,
+    auto limitSlot = _env->registerSlot("searchLimit"sv,
                                         sbe::value::TypeTags::Nothing,
                                         0 /* val */,
                                         false /* owned */,
                                         &_slotIdGenerator);
 
     auto sortSpecSlot = _env->registerSlot(
-        "searchSortSpec"_sd, sbe::value::TypeTags::Nothing, 0 /* val */, false, &_slotIdGenerator);
+        "searchSortSpec"sv, sbe::value::TypeTags::Nothing, 0 /* val */, false, &_slotIdGenerator);
 
     bool isStoredSource = sn->searchQuery.getBoolField(mongot_cursor::kReturnStoredSourceArg);
 

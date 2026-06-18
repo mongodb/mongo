@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -47,6 +46,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -604,7 +604,7 @@ public:
     /**
      * @return a registered FailPoint, or nullptr if it was not registered.
      */
-    MONGO_MOD_PUBLIC FailPoint* find(StringData name) const;
+    MONGO_MOD_PUBLIC FailPoint* find(std::string_view name) const;
 
     /**
      * Freezes this registry from being modified.
@@ -635,9 +635,9 @@ private:
  */
 class FailPointEnableBlock {
 public:
-    explicit FailPointEnableBlock(StringData failPointName);
-    FailPointEnableBlock(StringData failPointName, BSONObj data);
-    FailPointEnableBlock(StringData failPointName, FailPoint::ModeOptions mode);
+    explicit FailPointEnableBlock(std::string_view failPointName);
+    FailPointEnableBlock(std::string_view failPointName, BSONObj data);
+    FailPointEnableBlock(std::string_view failPointName, FailPoint::ModeOptions mode);
     explicit FailPointEnableBlock(FailPoint* failPoint);
     FailPointEnableBlock(FailPoint* failPoint, BSONObj data);
     FailPointEnableBlock(FailPoint* failPoint, FailPoint::ModeOptions mode);

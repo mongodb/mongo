@@ -34,7 +34,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -70,6 +69,7 @@
 
 #include <functional>
 #include <mutex>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <vector>
@@ -359,12 +359,12 @@ public:
 
     ~TransientInternalAuthParametersProvider() override = default;
 
-    boost::optional<auth::Credential> get(size_t index, StringData mechanism) final {
+    boost::optional<auth::Credential> get(size_t index, std::string_view mechanism) final {
         if (_transientSSLContext) {
             if (index == 0) {
-                return auth::createInternalX509AuthCredential(
-                    boost::optional<StringData>{_transientSSLContext->manager->getSSLConfiguration()
-                                                    .clientSubjectName.toString()});
+                return auth::createInternalX509AuthCredential(boost::optional<std::string_view>{
+                    _transientSSLContext->manager->getSSLConfiguration()
+                        .clientSubjectName.toString()});
             } else {
                 return boost::none;
             }

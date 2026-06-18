@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -55,6 +54,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -116,8 +116,8 @@ public:
                 "'toCollection' must be of type String",
                 toElt.type() == BSONType::string);
 
-        const StringData from(fromElt.valueStringData());
-        const StringData to(toElt.valueStringData());
+        const std::string_view from(fromElt.valueStringData());
+        const std::string_view to(toElt.valueStringData());
 
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid source collection name: " << from,

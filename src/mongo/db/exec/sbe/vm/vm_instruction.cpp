@@ -37,6 +37,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 
 #include <algorithm>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -69,7 +70,7 @@ std::pair<value::TypeTags, value::Value> collComparisonKey(value::TypeTags tag,
     // For collatable types other than strings (such as arrays and objects), we take the slow
     // path and round-trip the value through BSON.
     BSONObjBuilder input;
-    bson::appendValueToBsonObj<BSONObjBuilder>(input, ""_sd, tag, val);
+    bson::appendValueToBsonObj<BSONObjBuilder>(input, ""sv, tag, val);
 
     BSONObjBuilder output;
     CollationIndexKey::collationAwareIndexKeyAppend(input.obj().firstElement(), collator, &output);
@@ -972,7 +973,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
         auto size = readFromMemory<uint8_t>(pcPointer);
         pcPointer += sizeof(size);
-        StringData fieldName(reinterpret_cast<const char*>(pcPointer), size);
+        std::string_view fieldName(reinterpret_cast<const char*>(pcPointer), size);
         pcPointer += size;
 
         auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);

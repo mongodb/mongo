@@ -31,13 +31,13 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -54,7 +54,7 @@ public:
      */
     MONGO_MOD_PRIVATE StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
-        StringData purpose,
+        std::string_view purpose,
         const LogicalTime& newerThanThis,
         bool tryUseMajority) override;
 
@@ -62,7 +62,7 @@ public:
      * Returns all external (i.e. validation-only) keys for the given purpose on the config server.
      */
     MONGO_MOD_PRIVATE StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
-        OperationContext* opCtx, StringData purpose) override;
+        OperationContext* opCtx, std::string_view purpose) override;
 
     /**
      * Directly inserts a key document to the storage

@@ -31,11 +31,14 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/commands/query_cmd/cluster_bulk_write_cmd.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 struct ClusterBulkWriteCmdS {
-    static constexpr StringData kName = "bulkWrite"_sd;
+    static constexpr std::string_view kName = "bulkWrite"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;

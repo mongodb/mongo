@@ -28,7 +28,6 @@
  */
 #include "mongo/db/query/util/field_set.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>

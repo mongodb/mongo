@@ -32,7 +32,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
@@ -40,6 +39,7 @@
 #include "mongo/logv2/log_util.h"
 
 #include <functional>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -79,7 +79,7 @@ LogComponentSettings& LogManager::getGlobalSettings() {
 MONGO_INITIALIZER(GlobalLogRotator)(InitializerContext*) {
     addLogRotator(
         logv2::kServerLogTag,
-        [](bool renameFiles, StringData suffix, std::function<void(Status)> onMinorError) {
+        [](bool renameFiles, std::string_view suffix, std::function<void(Status)> onMinorError) {
             return LogManager::global().getGlobalDomainInternal().rotate(
                 renameFiles, suffix, onMinorError);
         });

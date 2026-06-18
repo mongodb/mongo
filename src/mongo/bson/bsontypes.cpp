@@ -34,6 +34,7 @@
 #include "mongo/util/string_map.h"
 
 #include <ostream>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -105,7 +106,7 @@ const char* typeName(BSONType type) {
     }
 }
 
-boost::optional<BSONType> findBSONTypeAlias(StringData key) {
+boost::optional<BSONType> findBSONTypeAlias(std::string_view key) {
     // intentionally leaked
     static const auto& typeAliasMap =
         *new StringMap<BSONType>{{typeName(BSONType::numberDouble), BSONType::numberDouble},
@@ -136,13 +137,13 @@ boost::optional<BSONType> findBSONTypeAlias(StringData key) {
     return it->second;
 }
 
-BSONType typeFromName(StringData name) {
+BSONType typeFromName(std::string_view name) {
     auto typeAlias = findBSONTypeAlias(name);
     uassert(ErrorCodes::BadValue, fmt::format("Unknown type name: {}", name), typeAlias);
     return *typeAlias;
 }
 
-Status isValidBSONTypeName(StringData typeName) {
+Status isValidBSONTypeName(std::string_view typeName) {
     try {
         typeFromName(typeName);
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {

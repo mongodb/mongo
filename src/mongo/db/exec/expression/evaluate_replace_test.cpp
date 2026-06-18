@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -41,12 +40,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace expression_evaluation_test {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -90,186 +91,181 @@ TEST(ExpressionEvaluateReplaceTest, ExpectsStringsOrNullish) {
     ASSERT_THROWS(replaceAll(BSONNULL, 1, BSONNULL).second, AssertionException);
     ASSERT_THROWS(replaceAll(BSONNULL, BSONNULL, 1).second, AssertionException);
 
-    ASSERT_THROWS(replaceOne(1, ""_sd, ""_sd).second, AssertionException);
-    ASSERT_THROWS(replaceOne(""_sd, 1, ""_sd).second, AssertionException);
-    ASSERT_THROWS(replaceOne(""_sd, ""_sd, 1).second, AssertionException);
+    ASSERT_THROWS(replaceOne(1, ""sv, ""sv).second, AssertionException);
+    ASSERT_THROWS(replaceOne(""sv, 1, ""sv).second, AssertionException);
+    ASSERT_THROWS(replaceOne(""sv, ""sv, 1).second, AssertionException);
 
-    ASSERT_THROWS(replaceAll(1, ""_sd, ""_sd).second, AssertionException);
-    ASSERT_THROWS(replaceAll(""_sd, 1, ""_sd).second, AssertionException);
-    ASSERT_THROWS(replaceAll(""_sd, ""_sd, 1).second, AssertionException);
+    ASSERT_THROWS(replaceAll(1, ""sv, ""sv).second, AssertionException);
+    ASSERT_THROWS(replaceAll(""sv, 1, ""sv).second, AssertionException);
+    ASSERT_THROWS(replaceAll(""sv, ""sv, 1).second, AssertionException);
 
-    ASSERT_THROWS(replaceOne(1, BSONRegEx(), ""_sd).second, AssertionException);
-    ASSERT_THROWS(replaceOne(""_sd, BSONRegEx(), 1).second, AssertionException);
+    ASSERT_THROWS(replaceOne(1, BSONRegEx(), ""sv).second, AssertionException);
+    ASSERT_THROWS(replaceOne(""sv, BSONRegEx(), 1).second, AssertionException);
 
-    ASSERT_THROWS(replaceAll(1, BSONRegEx(), ""_sd).second, AssertionException);
-    ASSERT_THROWS(replaceAll(""_sd, BSONRegEx(), 1).second, AssertionException);
+    ASSERT_THROWS(replaceAll(1, BSONRegEx(), ""sv).second, AssertionException);
+    ASSERT_THROWS(replaceAll(""sv, BSONRegEx(), 1).second, AssertionException);
 }
 
 TEST(ExpressionEvaluateReplaceTest, HandlesNullish) {
     // If any argument is nullish, the result is null.
-    ASSERT_VALUE_EQ(replaceOne(BSONNULL, ""_sd, ""_sd).second, Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceOne(""_sd, BSONNULL, ""_sd).second, Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceOne(""_sd, ""_sd, BSONNULL).second, Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceOne(BSONNULL, BSONRegEx(), ""_sd).second, Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceOne(""_sd, BSONRegEx(), BSONNULL).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(BSONNULL, ""sv, ""sv).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(""sv, BSONNULL, ""sv).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(""sv, ""sv, BSONNULL).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(BSONNULL, BSONRegEx(), ""sv).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(""sv, BSONRegEx(), BSONNULL).second, Value(BSONNULL));
 
-    ASSERT_VALUE_EQ(replaceAll(BSONNULL, ""_sd, ""_sd).second, Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceAll(""_sd, BSONNULL, ""_sd).second, Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceAll(""_sd, ""_sd, BSONNULL).second, Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceAll(BSONNULL, BSONRegEx(), ""_sd).second, Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceAll(""_sd, BSONRegEx(), BSONNULL).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceAll(BSONNULL, ""sv, ""sv).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceAll(""sv, BSONNULL, ""sv).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceAll(""sv, ""sv, BSONNULL).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceAll(BSONNULL, BSONRegEx(), ""sv).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceAll(""sv, BSONRegEx(), BSONNULL).second, Value(BSONNULL));
 }
 
 TEST(ExpressionEvaluateReplaceTest, ReplacesNothingWhenNoMatches) {
     // When there are no matches, the result is the input, unchanged.
-    ASSERT_VALUE_EQ(replaceOne(""_sd, "x"_sd, "y"_sd).second, Value(""_sd));
-    ASSERT_VALUE_EQ(replaceOne("a"_sd, "x"_sd, "y"_sd).second, Value("a"_sd));
-    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, "x"_sd, "y"_sd).second, Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, "xyz"_sd, "y"_sd).second, Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyyz"_sd, "xyz"_sd, "y"_sd).second, Value("xyyz"_sd));
+    ASSERT_VALUE_EQ(replaceOne(""sv, "x"sv, "y"sv).second, Value(""sv));
+    ASSERT_VALUE_EQ(replaceOne("a"sv, "x"sv, "y"sv).second, Value("a"sv));
+    ASSERT_VALUE_EQ(replaceOne("abcd"sv, "x"sv, "y"sv).second, Value("abcd"sv));
+    ASSERT_VALUE_EQ(replaceOne("abcd"sv, "xyz"sv, "y"sv).second, Value("abcd"sv));
+    ASSERT_VALUE_EQ(replaceOne("xyyz"sv, "xyz"sv, "y"sv).second, Value("xyyz"sv));
 
-    ASSERT_VALUE_EQ(replaceOne(""_sd, BSONRegEx("x"), "y"_sd).second, Value(""_sd));
-    ASSERT_VALUE_EQ(replaceOne("a"_sd, BSONRegEx("x"), "y"_sd).second, Value("a"_sd));
-    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, BSONRegEx("xyz"), "y"_sd).second, Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, BSONRegEx("xyz"), "y"_sd).second, Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyyz"_sd, BSONRegEx("xyz"), "y"_sd).second, Value("xyyz"_sd));
+    ASSERT_VALUE_EQ(replaceOne(""sv, BSONRegEx("x"), "y"sv).second, Value(""sv));
+    ASSERT_VALUE_EQ(replaceOne("a"sv, BSONRegEx("x"), "y"sv).second, Value("a"sv));
+    ASSERT_VALUE_EQ(replaceOne("abcd"sv, BSONRegEx("xyz"), "y"sv).second, Value("abcd"sv));
+    ASSERT_VALUE_EQ(replaceOne("abcd"sv, BSONRegEx("xyz"), "y"sv).second, Value("abcd"sv));
+    ASSERT_VALUE_EQ(replaceOne("xyyz"sv, BSONRegEx("xyz"), "y"sv).second, Value("xyyz"sv));
 
-    ASSERT_VALUE_EQ(replaceAll(""_sd, "x"_sd, "y"_sd).second, Value(""_sd));
-    ASSERT_VALUE_EQ(replaceAll("a"_sd, "x"_sd, "y"_sd).second, Value("a"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abcd"_sd, "x"_sd, "y"_sd).second, Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abcd"_sd, "xyz"_sd, "y"_sd).second, Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyyz"_sd, "xyz"_sd, "y"_sd).second, Value("xyyz"_sd));
+    ASSERT_VALUE_EQ(replaceAll(""sv, "x"sv, "y"sv).second, Value(""sv));
+    ASSERT_VALUE_EQ(replaceAll("a"sv, "x"sv, "y"sv).second, Value("a"sv));
+    ASSERT_VALUE_EQ(replaceAll("abcd"sv, "x"sv, "y"sv).second, Value("abcd"sv));
+    ASSERT_VALUE_EQ(replaceAll("abcd"sv, "xyz"sv, "y"sv).second, Value("abcd"sv));
+    ASSERT_VALUE_EQ(replaceAll("xyyz"sv, "xyz"sv, "y"sv).second, Value("xyyz"sv));
 
-    ASSERT_VALUE_EQ(replaceAll(""_sd, BSONRegEx("x"), "y"_sd).second, Value(""_sd));
-    ASSERT_VALUE_EQ(replaceAll("a"_sd, BSONRegEx("x"), "y"_sd).second, Value("a"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abcd"_sd, BSONRegEx("xyz"), "y"_sd).second, Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abcd"_sd, BSONRegEx("xyz"), "y"_sd).second, Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyyz"_sd, BSONRegEx("xyz"), "y"_sd).second, Value("xyyz"_sd));
+    ASSERT_VALUE_EQ(replaceAll(""sv, BSONRegEx("x"), "y"sv).second, Value(""sv));
+    ASSERT_VALUE_EQ(replaceAll("a"sv, BSONRegEx("x"), "y"sv).second, Value("a"sv));
+    ASSERT_VALUE_EQ(replaceAll("abcd"sv, BSONRegEx("xyz"), "y"sv).second, Value("abcd"sv));
+    ASSERT_VALUE_EQ(replaceAll("abcd"sv, BSONRegEx("xyz"), "y"sv).second, Value("abcd"sv));
+    ASSERT_VALUE_EQ(replaceAll("xyyz"sv, BSONRegEx("xyz"), "y"sv).second, Value("xyyz"sv));
 }
 
 TEST(ExpressionEvaluateReplaceTest, ReplacesOnlyMatch) {
-    ASSERT_VALUE_EQ(replaceOne(""_sd, ""_sd, "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("x"_sd, "x"_sd, "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("..xyz.."_sd, "xyz"_sd, "abc"_sd).second, Value("..abc.."_sd));
-    ASSERT_VALUE_EQ(replaceOne("..xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("..abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyz.."_sd, "xyz"_sd, "abc"_sd).second, Value("abc.."_sd));
+    ASSERT_VALUE_EQ(replaceOne(""sv, ""sv, "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceOne("x"sv, "x"sv, "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceOne("xyz"sv, "xyz"sv, "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceOne("..xyz.."sv, "xyz"sv, "abc"sv).second, Value("..abc.."sv));
+    ASSERT_VALUE_EQ(replaceOne("..xyz"sv, "xyz"sv, "abc"sv).second, Value("..abc"sv));
+    ASSERT_VALUE_EQ(replaceOne("xyz.."sv, "xyz"sv, "abc"sv).second, Value("abc.."sv));
 
-    ASSERT_VALUE_EQ(replaceOne(""_sd, BSONRegEx(""), "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("x"_sd, BSONRegEx("x"), "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyz"_sd, BSONRegEx("xyz"), "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("..xyz.."_sd, BSONRegEx("xyz"), "abc"_sd).second,
-                    Value("..abc.."_sd));
-    ASSERT_VALUE_EQ(replaceOne("..xyz"_sd, BSONRegEx("xyz"), "abc"_sd).second, Value("..abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyz.."_sd, BSONRegEx("xyz"), "abc"_sd).second, Value("abc.."_sd));
+    ASSERT_VALUE_EQ(replaceOne(""sv, BSONRegEx(""), "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceOne("x"sv, BSONRegEx("x"), "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceOne("xyz"sv, BSONRegEx("xyz"), "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceOne("..xyz.."sv, BSONRegEx("xyz"), "abc"sv).second, Value("..abc.."sv));
+    ASSERT_VALUE_EQ(replaceOne("..xyz"sv, BSONRegEx("xyz"), "abc"sv).second, Value("..abc"sv));
+    ASSERT_VALUE_EQ(replaceOne("xyz.."sv, BSONRegEx("xyz"), "abc"sv).second, Value("abc.."sv));
 
-    ASSERT_VALUE_EQ(replaceAll(""_sd, ""_sd, "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("x"_sd, "x"_sd, "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("..xyz.."_sd, "xyz"_sd, "abc"_sd).second, Value("..abc.."_sd));
-    ASSERT_VALUE_EQ(replaceAll("..xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("..abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyz.."_sd, "xyz"_sd, "abc"_sd).second, Value("abc.."_sd));
+    ASSERT_VALUE_EQ(replaceAll(""sv, ""sv, "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceAll("x"sv, "x"sv, "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceAll("xyz"sv, "xyz"sv, "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceAll("..xyz.."sv, "xyz"sv, "abc"sv).second, Value("..abc.."sv));
+    ASSERT_VALUE_EQ(replaceAll("..xyz"sv, "xyz"sv, "abc"sv).second, Value("..abc"sv));
+    ASSERT_VALUE_EQ(replaceAll("xyz.."sv, "xyz"sv, "abc"sv).second, Value("abc.."sv));
 
-    ASSERT_VALUE_EQ(replaceAll(""_sd, BSONRegEx(""), "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("x"_sd, BSONRegEx("x"), "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyz"_sd, BSONRegEx("xyz"), "abc"_sd).second, Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("..xyz.."_sd, BSONRegEx("xyz"), "abc"_sd).second,
-                    Value("..abc.."_sd));
-    ASSERT_VALUE_EQ(replaceAll("..xyz"_sd, BSONRegEx("xyz"), "abc"_sd).second, Value("..abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyz.."_sd, BSONRegEx("xyz"), "abc"_sd).second, Value("abc.."_sd));
+    ASSERT_VALUE_EQ(replaceAll(""sv, BSONRegEx(""), "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceAll("x"sv, BSONRegEx("x"), "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceAll("xyz"sv, BSONRegEx("xyz"), "abc"sv).second, Value("abc"sv));
+    ASSERT_VALUE_EQ(replaceAll("..xyz.."sv, BSONRegEx("xyz"), "abc"sv).second, Value("..abc.."sv));
+    ASSERT_VALUE_EQ(replaceAll("..xyz"sv, BSONRegEx("xyz"), "abc"sv).second, Value("..abc"sv));
+    ASSERT_VALUE_EQ(replaceAll("xyz.."sv, BSONRegEx("xyz"), "abc"sv).second, Value("abc.."sv));
 }
 
 TEST(ExpressionReplaceOneTest, ReplacesFirstMatchOnly) {
-    ASSERT_VALUE_EQ(replaceOne("."_sd, ""_sd, "abc"_sd).second, Value("abc."_sd));
-    ASSERT_VALUE_EQ(replaceOne(".."_sd, ""_sd, "abc"_sd).second, Value("abc.."_sd));
-    ASSERT_VALUE_EQ(replaceOne(".."_sd, "."_sd, "abc"_sd).second, Value("abc."_sd));
-    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"_sd, "->"_sd, "."_sd).second,
-                    Value("abc.defg->hij"_sd));
+    ASSERT_VALUE_EQ(replaceOne("."sv, ""sv, "abc"sv).second, Value("abc."sv));
+    ASSERT_VALUE_EQ(replaceOne(".."sv, ""sv, "abc"sv).second, Value("abc.."sv));
+    ASSERT_VALUE_EQ(replaceOne(".."sv, "."sv, "abc"sv).second, Value("abc."sv));
+    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"sv, "->"sv, "."sv).second, Value("abc.defg->hij"sv));
 
-    ASSERT_VALUE_EQ(replaceOne("."_sd, BSONRegEx(""), "abc"_sd).second, Value("abc."_sd));
-    ASSERT_VALUE_EQ(replaceOne(".."_sd, BSONRegEx(""), "abc"_sd).second, Value("abc.."_sd));
-    ASSERT_VALUE_EQ(replaceOne(".."_sd, BSONRegEx("[.]"), "abc"_sd).second, Value("abc."_sd));
-    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"_sd, BSONRegEx("->"), "."_sd).second,
-                    Value("abc.defg->hij"_sd));
+    ASSERT_VALUE_EQ(replaceOne("."sv, BSONRegEx(""), "abc"sv).second, Value("abc."sv));
+    ASSERT_VALUE_EQ(replaceOne(".."sv, BSONRegEx(""), "abc"sv).second, Value("abc.."sv));
+    ASSERT_VALUE_EQ(replaceOne(".."sv, BSONRegEx("[.]"), "abc"sv).second, Value("abc."sv));
+    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"sv, BSONRegEx("->"), "."sv).second,
+                    Value("abc.defg->hij"sv));
 }
 
 TEST(ExpressionReplaceAllTest, ReplacesAllMatches) {
-    ASSERT_VALUE_EQ(replaceAll("."_sd, ""_sd, "abc"_sd).second, Value("abc.abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll(".."_sd, ""_sd, "abc"_sd).second, Value("abc.abc.abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll(".."_sd, "."_sd, "abc"_sd).second, Value("abcabc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"_sd, "->"_sd, "."_sd).second,
-                    Value("abc.defg.hij"_sd));
+    ASSERT_VALUE_EQ(replaceAll("."sv, ""sv, "abc"sv).second, Value("abc.abc"sv));
+    ASSERT_VALUE_EQ(replaceAll(".."sv, ""sv, "abc"sv).second, Value("abc.abc.abc"sv));
+    ASSERT_VALUE_EQ(replaceAll(".."sv, "."sv, "abc"sv).second, Value("abcabc"sv));
+    ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"sv, "->"sv, "."sv).second, Value("abc.defg.hij"sv));
 
-    ASSERT_VALUE_EQ(replaceAll("."_sd, BSONRegEx(""), "abc"_sd).second, Value("abc.abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll(".."_sd, BSONRegEx(""), "abc"_sd).second, Value("abc.abc.abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll(".."_sd, BSONRegEx("[.]"), "abc"_sd).second, Value("abcabc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"_sd, BSONRegEx("->"), "."_sd).second,
-                    Value("abc.defg.hij"_sd));
+    ASSERT_VALUE_EQ(replaceAll("."sv, BSONRegEx(""), "abc"sv).second, Value("abc.abc"sv));
+    ASSERT_VALUE_EQ(replaceAll(".."sv, BSONRegEx(""), "abc"sv).second, Value("abc.abc.abc"sv));
+    ASSERT_VALUE_EQ(replaceAll(".."sv, BSONRegEx("[.]"), "abc"sv).second, Value("abcabc"sv));
+    ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"sv, BSONRegEx("->"), "."sv).second,
+                    Value("abc.defg.hij"sv));
 }
 
 TEST(ExpressionEvaluateReplaceTest, DoesNotReplaceInTheReplacement) {
-    ASSERT_VALUE_EQ(replaceOne("a.b.c"_sd, "."_sd, ".."_sd).second, Value("a..b.c"_sd));
-    ASSERT_VALUE_EQ(replaceAll("a.b.c"_sd, "."_sd, ".."_sd).second, Value("a..b..c"_sd));
+    ASSERT_VALUE_EQ(replaceOne("a.b.c"sv, "."sv, ".."sv).second, Value("a..b.c"sv));
+    ASSERT_VALUE_EQ(replaceAll("a.b.c"sv, "."sv, ".."sv).second, Value("a..b..c"sv));
 
-    ASSERT_VALUE_EQ(replaceOne("a.b.c"_sd, BSONRegEx("[.]"), ".."_sd).second, Value("a..b.c"_sd));
-    ASSERT_VALUE_EQ(replaceAll("a.b.c"_sd, BSONRegEx("[.]"), ".."_sd).second, Value("a..b..c"_sd));
+    ASSERT_VALUE_EQ(replaceOne("a.b.c"sv, BSONRegEx("[.]"), ".."sv).second, Value("a..b.c"sv));
+    ASSERT_VALUE_EQ(replaceAll("a.b.c"sv, BSONRegEx("[.]"), ".."sv).second, Value("a..b..c"sv));
 }
 
 TEST(ExpressionEvaluateReplaceTest, DoesNotNormalizeUnicode) {
-    StringData combiningAcute = "́"_sd;
-    StringData combinedAcuteE = "é"_sd;
+    std::string_view combiningAcute = "́"sv;
+    std::string_view combinedAcuteE = "é"sv;
     ASSERT_EQ(combinedAcuteE[0], 'e');
     ASSERT_EQ(combinedAcuteE.substr(1), combiningAcute);
 
-    StringData precomposedAcuteE = "é";
+    std::string_view precomposedAcuteE = "é";
     ASSERT_NOT_EQUALS(precomposedAcuteE[0], 'e');
 
     // If the input has combining characters, you can match and replace the base letter.
-    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, "e"_sd, "a"_sd).second, Value("á"_sd));
-    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, "e"_sd, "a"_sd).second, Value("á"_sd));
-    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, BSONRegEx("e"), "a"_sd).second, Value("á"_sd));
-    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, BSONRegEx("e"), "a"_sd).second, Value("á"_sd));
+    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, "e"sv, "a"sv).second, Value("á"sv));
+    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, "e"sv, "a"sv).second, Value("á"sv));
+    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, BSONRegEx("e"), "a"sv).second, Value("á"sv));
+    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, BSONRegEx("e"), "a"sv).second, Value("á"sv));
 
     // If the input has precomposed characters, you can't replace the base letter.
-    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, "e"_sd, "x"_sd).second, Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, "e"_sd, "x"_sd).second, Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, BSONRegEx("e"), "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, "e"sv, "x"sv).second, Value(precomposedAcuteE));
+    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, "e"sv, "x"sv).second, Value(precomposedAcuteE));
+    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, BSONRegEx("e"), "x"sv).second,
                     Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, BSONRegEx("e"), "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, BSONRegEx("e"), "x"sv).second,
                     Value(precomposedAcuteE));
 
     // Precomposed characters and combined forms can't match each other.
-    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, combinedAcuteE, "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, combinedAcuteE, "x"sv).second,
                     Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, combinedAcuteE, "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, combinedAcuteE, "x"sv).second,
                     Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, precomposedAcuteE, "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, precomposedAcuteE, "x"sv).second,
                     Value(combinedAcuteE));
-    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, precomposedAcuteE, "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, precomposedAcuteE, "x"sv).second,
                     Value(combinedAcuteE));
-    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, BSONRegEx(combinedAcuteE), "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, BSONRegEx(combinedAcuteE), "x"sv).second,
                     Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, BSONRegEx(combinedAcuteE), "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, BSONRegEx(combinedAcuteE), "x"sv).second,
                     Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, BSONRegEx(precomposedAcuteE), "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, BSONRegEx(precomposedAcuteE), "x"sv).second,
                     Value(combinedAcuteE));
-    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, BSONRegEx(precomposedAcuteE), "x"_sd).second,
+    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, BSONRegEx(precomposedAcuteE), "x"sv).second,
                     Value(combinedAcuteE));
 }
 
 TEST(ExpressionEvaluateReplaceTest, ReplacesWithVariableRegExPattern) {
-    ASSERT_VALUE_EQ(replaceOne("xyz"_sd, BSONRegEx("x*"), "a"_sd).second, Value("ayz"_sd));
-    ASSERT_VALUE_EQ(replaceOne("abcdefghij"_sd, BSONRegEx("...."), "<-->"_sd).second,
-                    Value("<-->efghij"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyzxx"_sd, BSONRegEx("x+"), "abc"_sd).second, Value("abcyzxx"_sd));
-    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"_sd, BSONRegEx(".*"), "a"_sd).second, Value("a"_sd));
+    ASSERT_VALUE_EQ(replaceOne("xyz"sv, BSONRegEx("x*"), "a"sv).second, Value("ayz"sv));
+    ASSERT_VALUE_EQ(replaceOne("abcdefghij"sv, BSONRegEx("...."), "<-->"sv).second,
+                    Value("<-->efghij"sv));
+    ASSERT_VALUE_EQ(replaceOne("xyzxx"sv, BSONRegEx("x+"), "abc"sv).second, Value("abcyzxx"sv));
+    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"sv, BSONRegEx(".*"), "a"sv).second, Value("a"sv));
 
-    ASSERT_VALUE_EQ(replaceAll("xyz"_sd, BSONRegEx("x*"), "a"_sd).second, Value("aayaza"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abcdefghij"_sd, BSONRegEx("...."), "<-->"_sd).second,
-                    Value("<--><-->ij"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyzxx"_sd, BSONRegEx("x+"), "abc"_sd).second, Value("abcyzabc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"_sd, BSONRegEx(".*"), "a"_sd).second,
-                    Value("aa"_sd));
+    ASSERT_VALUE_EQ(replaceAll("xyz"sv, BSONRegEx("x*"), "a"sv).second, Value("aayaza"sv));
+    ASSERT_VALUE_EQ(replaceAll("abcdefghij"sv, BSONRegEx("...."), "<-->"sv).second,
+                    Value("<--><-->ij"sv));
+    ASSERT_VALUE_EQ(replaceAll("xyzxx"sv, BSONRegEx("x+"), "abc"sv).second, Value("abcyzabc"sv));
+    ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"sv, BSONRegEx(".*"), "a"sv).second, Value("aa"sv));
 }
 
 }  // namespace expression_evaluation_test

@@ -41,6 +41,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -122,10 +123,10 @@ public:
     }
 
     /// reads a NUL terminated string
-    StringData readCStr() {
+    std::string_view readCStr() {
         auto range = read<Terminated<'\0', ConstDataRange>>().value;
 
-        return StringData(range.data(), range.length());
+        return std::string_view(range.data(), range.length());
     }
 
     void readStr(std::string& s) {
@@ -135,9 +136,9 @@ public:
     /**
      * Return a view of the next len bytes and advance by len.
      */
-    StringData readBytes(size_t len) {
+    std::string_view readBytes(size_t len) {
         // Note: the call to skip() includes a check that at least 'len' bytes remain in the buffer.
-        return StringData(reinterpret_cast<const char*>(skip(len)), len);
+        return std::string_view(reinterpret_cast<const char*>(skip(len)), len);
     }
 
     const void* pos() {

@@ -33,22 +33,25 @@
 #include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"
 
+#include <string_view>
+
 #include <benchmark/benchmark.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
-constexpr StringData kMapCollName = "CollName"_sd;
+constexpr std::string_view kMapCollName = "CollName"sv;
 
 constexpr size_t kSmallSize = 8;  // Under the small-string optimization limit
 constexpr size_t kLongSize = 32;  // Over the small string optimization limit
 
-DatabaseName makeDB(StringData db) {
+DatabaseName makeDB(std::string_view db) {
     return DatabaseName::createDatabaseName_forTest(boost::none, db);
 }
 
-NamespaceString makeNS(StringData db, StringData coll) {
+NamespaceString makeNS(std::string_view db, std::string_view coll) {
     return NamespaceString::createNamespaceString_forTest(db, coll);
 }
 
@@ -76,10 +79,10 @@ std::vector<std::pair<DatabaseName, std::shared_ptr<int>>> createDataVectorForMa
 }  // namespace
 
 void BM_NamespaceStringCreation(benchmark::State& state) {
-    const StringData dbName =
-        "ThisIsAVeryLongDatabaseNameThatIDontCareAboutAndPerhapsTheGetty"_sd.substr(0,
-                                                                                    state.range(0));
-    const StringData collName = "COL"_sd;
+    const std::string_view dbName =
+        "ThisIsAVeryLongDatabaseNameThatIDontCareAboutAndPerhapsTheGetty"sv.substr(0,
+                                                                                   state.range(0));
+    const std::string_view collName = "COL"sv;
     for (auto _ : state) {
         benchmark::DoNotOptimize(makeNS(dbName, collName));
     }
@@ -99,7 +102,7 @@ void BM_CreateLongNsFromConstexpr(benchmark::State& state) {
 }
 
 void BM_NamespaceStringShortDbName(benchmark::State& state) {
-    const auto dbName = "short"_sd;
+    const auto dbName = "short"sv;
     NamespaceString ns = makeNS(dbName, kMapCollName);
 
     for (auto _ : state) {

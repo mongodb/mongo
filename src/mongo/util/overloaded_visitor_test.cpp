@@ -29,7 +29,6 @@
 
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>

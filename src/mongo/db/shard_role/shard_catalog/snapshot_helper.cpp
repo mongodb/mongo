@@ -42,6 +42,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -145,25 +147,26 @@ ReadAtLastAppliedDecision shouldReadAtLastApplied(OperationContext* opCtx,
 }  // namespace
 
 namespace SnapshotHelper {
+using namespace std::literals::string_view_literals;
 
-StringData toString(ReadSourceReason reason) {
+std::string_view toString(ReadSourceReason reason) {
     switch (reason) {
         case ReadSourceReason::kUnspecified:
-            return "unspecified"_sd;
+            return "unspecified"sv;
         case ReadSourceReason::kSecondaryReadingReplicatedCollection:
-            return "secondary reading replicated collection"_sd;
+            return "secondary reading replicated collection"sv;
         case ReadSourceReason::kUnreplicatedCollection:
-            return "unreplicated collection"_sd;
+            return "unreplicated collection"sv;
         case ReadSourceReason::kPrimary:
-            return "primary"_sd;
+            return "primary"sv;
         case ReadSourceReason::kNotPrimaryOrSecondary:
-            return "not primary or secondary"_sd;
+            return "not primary or secondary"sv;
         case ReadSourceReason::kPinned:
-            return "pinned read source"_sd;
+            return "pinned read source"sv;
         case ReadSourceReason::kSecondaryReadChangeNotNeeded:
-            return "secondary read source change not needed"_sd;
+            return "secondary read source change not needed"sv;
         case ReadSourceReason::kAllowReadFromLatest:
-            return "allow read from latest on secondary block"_sd;
+            return "allow read from latest on secondary block"sv;
     }
     MONGO_UNREACHABLE;
 }

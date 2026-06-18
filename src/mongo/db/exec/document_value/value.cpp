@@ -50,6 +50,7 @@
 #include <limits>
 #include <memory>
 #include <ostream>
+#include <string_view>
 #include <typeinfo>
 
 #include <absl/hash/hash.h>
@@ -68,7 +69,7 @@ using std::stringstream;
 using std::vector;
 using namespace std::string_literals;
 
-void ValueStorage::putString(StringData s) {
+void ValueStorage::putString(std::string_view s) {
     // Note: this also stores data portion of BinData
     const size_t sizeNoNUL = s.size();
     if (sizeNoNUL <= sizeof(shortStrStorage)) {
@@ -108,7 +109,7 @@ void ValueStorage::putRegEx(const BSONRegEx& re) {
     auto dest = buf.get();
     dest = str::copyAsCString(dest, re.pattern);
     re.flags.copy(dest, re.flags.size());  // NUL added automatically by putString()
-    putString(StringData(buf.get(), totalLen));
+    putString(std::string_view(buf.get(), totalLen));
 }
 
 Document ValueStorage::getDocument() const {
@@ -201,7 +202,7 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
             break;
 
         case BSONType::codeWScope: {
-            StringData code(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1);
+            std::string_view code(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1);
             _storage.putCodeWScope(BSONCodeWScope(code, elem.codeWScopeObject()));
             break;
         }
@@ -314,14 +315,14 @@ Value Value::operator[](size_t index) const {
     return getArray()[index];
 }
 
-Value Value::operator[](StringData name) const {
+Value Value::operator[](std::string_view name) const {
     if (getType() != BSONType::object)
         return Value();
 
     return _storage.getDocument()[name];
 }
 
-void Value::_appendToBson(BSONObjBuilder& builder, StringData fieldName) const {
+void Value::_appendToBson(BSONObjBuilder& builder, std::string_view fieldName) const {
     switch (getType()) {
         case BSONType::eoo:
             return;  // nothing appended
@@ -410,7 +411,7 @@ void Value::_appendToBson(BSONObjBuilder& builder, StringData fieldName) const {
 }
 
 void Value::addToBsonObj(BSONObjBuilder* builder,
-                         StringData fieldName,
+                         std::string_view fieldName,
                          size_t recursionLevel) const {
     uassert(ErrorCodes::Overflow,
             str::stream() << "cannot convert document to BSON because it exceeds the limit of "
@@ -871,9 +872,10 @@ int Value::compare(const Value& rL, const Value& rR, const StringDataComparator*
 
 namespace {
 /**
- * Hashes the given 'StringData', combines the resulting hash with 'seed', and returns the result.
+ * Hashes the given 'std::string_view', combines the resulting hash with 'seed', and returns the
+ * result.
  */
-size_t hashStringData(StringData sd, size_t seed) {
+size_t hashStringData(std::string_view sd, size_t seed) {
     size_t strHash = absl::Hash<absl::string_view>{}(absl::string_view(sd.data(), sd.size()));
     boost::hash_combine(seed, strHash);
     return seed;
@@ -949,13 +951,13 @@ void Value::hash_combine(size_t& seed, const StringDataComparator* stringCompara
 
         case BSONType::code:
         case BSONType::symbol: {
-            StringData sd = getRawData();
+            std::string_view sd = getRawData();
             seed = hashStringData(sd, seed);
             break;
         }
 
         case BSONType::string: {
-            StringData sd = getStringData();
+            std::string_view sd = getStringData();
             if (stringComparator) {
                 stringComparator->hash_combine(seed, sd);
             } else {
@@ -982,14 +984,14 @@ void Value::hash_combine(size_t& seed, const StringDataComparator* stringCompara
 
 
         case BSONType::binData: {
-            StringData sd = getRawData();
+            std::string_view sd = getRawData();
             seed = hashStringData(sd, seed);
             boost::hash_combine(seed, _storage.binDataType());
             break;
         }
 
         case BSONType::regEx: {
-            StringData sd = getRawData();
+            std::string_view sd = getRawData();
             seed = hashStringData(sd, seed);
             break;
         }
@@ -1358,14 +1360,14 @@ void Value::serializeForSorter(BufBuilder& buf) const {
         case BSONType::string:
         case BSONType::symbol:
         case BSONType::code: {
-            StringData str = getRawData();
+            std::string_view str = getRawData();
             buf.appendNum(int(str.size()));
             buf.appendStrBytes(str);
             break;
         }
 
         case BSONType::binData: {
-            StringData str = getRawData();
+            std::string_view str = getRawData();
             buf.appendChar(_storage.binDataType());
             buf.appendNum(int(str.size()));
             buf.appendStrBytes(str);
@@ -1443,7 +1445,7 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
         case BSONType::code: {
             int size = buf.read<LittleEndian<int>>();
             const char* str = static_cast<const char*>(buf.skip(size));
-            return Value(ValueStorage(type, StringData(str, size)));
+            return Value(ValueStorage(type, std::string_view(str, size)));
         }
 
         case BSONType::binData: {
@@ -1454,8 +1456,8 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
         }
 
         case BSONType::regEx: {
-            StringData regex = buf.readCStr();
-            StringData flags = buf.readCStr();
+            std::string_view regex = buf.readCStr();
+            std::string_view flags = buf.readCStr();
             return Value(BSONRegEx(regex, flags));
         }
 
@@ -1465,7 +1467,7 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
 
         case BSONType::dbRef: {
             OID oid = OID::from(buf.skip(OID::kOIDSize));
-            StringData ns = buf.readCStr();
+            std::string_view ns = buf.readCStr();
             return Value(BSONDBRef(ns, oid));
         }
 
@@ -1473,7 +1475,7 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
             int size = buf.read<LittleEndian<int>>();
             const char* str = static_cast<const char*>(buf.skip(size));
             BSONObj bson = BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings());
-            return Value(BSONCodeWScope(StringData(str, size), bson));
+            return Value(BSONCodeWScope(std::string_view(str, size), bson));
         }
 
         case BSONType::array: {
@@ -1488,7 +1490,7 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
     MONGO_verify(false);
 }
 
-void Value::serializeForIDL(StringData fieldName, BSONObjBuilder* builder) const {
+void Value::serializeForIDL(std::string_view fieldName, BSONObjBuilder* builder) const {
     addToBsonObj(builder, fieldName);
 }
 
@@ -1500,7 +1502,7 @@ Value Value::deserializeForIDL(const BSONElement& element) {
     return Value(element);
 }
 
-BSONObj Value::wrap(StringData newName) const {
+BSONObj Value::wrap(std::string_view newName) const {
     BSONObjBuilder b(getApproximateSize() + 6 + newName.size());
     addToBsonObj(&b, newName);
     return b.obj();

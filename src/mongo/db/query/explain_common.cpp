@@ -44,6 +44,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
+#include <string_view>
+
 namespace mongo::explain_common {
 namespace append_if_room {
 /*
@@ -55,7 +57,7 @@ namespace append_if_room {
  */
 constexpr int OutputObjectMaxSize = BSONObjMaxUserSize - 10 * 1024;
 
-void appendWarningMessage(StringData fieldName, BSONObjBuilder* out) {
+void appendWarningMessage(std::string_view fieldName, BSONObjBuilder* out) {
     constexpr int kWarningMsgOverhead = 60;
     // The reserved buffer size for the warning message if 'out' exceeds the max BSON user size.
     const int warningMsgSize = fieldName.size() + kWarningMsgOverhead;
@@ -124,7 +126,7 @@ void generatePeakTrackedMemBytes(const OperationContext* opCtx, BSONObjBuilder* 
     }
 }
 
-bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {
+bool appendIfRoom(const BSONObj& toAppend, std::string_view fieldName, BSONObjBuilder* out) {
     if ((out->len() + toAppend.objsize()) < append_if_room::OutputObjectMaxSize) {
         out->append(fieldName, toAppend);
         return true;
@@ -135,7 +137,7 @@ bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder*
     return false;
 }
 
-bool appendIfRoom(const BSONArray& toAppend, StringData fieldName, BSONObjBuilder* out) {
+bool appendIfRoom(const BSONArray& toAppend, std::string_view fieldName, BSONObjBuilder* out) {
     if ((out->len() + toAppend.objsize()) < append_if_room::OutputObjectMaxSize) {
         out->appendArray(fieldName, toAppend);
         return true;

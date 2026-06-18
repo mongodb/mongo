@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -51,10 +50,12 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using std::vector;
 
@@ -71,7 +72,7 @@ namespace {
 // maximum user size for a BSON object will be exceeded.
 //
 
-bool appendIfRoom(BSONObjBuilder* bob, const BSONObj& toAppend, StringData fieldName) {
+bool appendIfRoom(BSONObjBuilder* bob, const BSONObj& toAppend, std::string_view fieldName) {
     if ((bob->len() + toAppend.objsize()) < BSONObjMaxUserSize) {
         bob->append(fieldName, toAppend);
         return true;
@@ -149,14 +150,14 @@ BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
         const auto& fieldName = elem.fieldNameStringData();
         // Skip 'querySettings' from the original command as we're going to append it separately
         // to avoid duplicate fields.
-        if (fieldName == "querySettings"_sd) {
+        if (fieldName == "querySettings"sv) {
             continue;
         }
         if (!isGenericArgument(fieldName) || fieldName == kRawDataFieldName) {
             explainBuilder.append(elem);
-        } else if (fieldName == "comment"_sd) {
+        } else if (fieldName == "comment"sv) {
             commentField = elem;
-        } else if (fieldName == "readConcern"_sd) {
+        } else if (fieldName == "readConcern"sv) {
             readConcernField = elem;
         }
     }

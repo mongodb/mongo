@@ -29,7 +29,6 @@
 
 #include "mongo/db/matcher/expression_text_noop.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_util.h"
 
 #include <memory>

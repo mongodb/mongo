@@ -29,10 +29,10 @@
 
 #include "mongo/db/storage/backup_block.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/storage/storage_options.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
@@ -63,7 +63,7 @@ bool BackupBlock::isRequired() const {
     }
 
     // Check if this is a journal file.
-    if (StringData(filename).starts_with("WiredTigerLog.")) {
+    if (std::string_view(filename).starts_with("WiredTigerLog.")) {
         return true;
     }
 
@@ -75,7 +75,7 @@ bool BackupBlock::isRequired() const {
     // All files for the encrypted storage engine are required.
     boost::filesystem::path basePath(storageGlobalParams.dbpath);
     boost::filesystem::path keystoreBasePath(basePath / "key.store");
-    if (StringData(_kvBackupBlock.filePath()).starts_with(keystoreBasePath.string())) {
+    if (std::string_view(_kvBackupBlock.filePath()).starts_with(keystoreBasePath.string())) {
         return true;
     }
 

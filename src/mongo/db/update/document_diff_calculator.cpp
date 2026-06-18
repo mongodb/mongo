@@ -30,7 +30,6 @@
 #include "mongo/db/update/document_diff_calculator.h"
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -43,6 +42,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -129,7 +129,7 @@ std::unique_ptr<diff_tree::DocumentSubDiffNode> computeDocDiff(const BSONObj& pr
     BSONObjIterator preItr(pre);
     BSONObjIterator postItr(post);
     const size_t postObjSize = static_cast<size_t>(post.objsize());
-    std::set<StringData> deletes;
+    std::set<std::string_view> deletes;
     while (preItr.more() && postItr.more()) {
         // Bailout if the generated diff so far is larger than the 'post' object.
         if (!ignoreSizeLimit && (postObjSize < diffNode->getObjSize())) {
@@ -218,15 +218,15 @@ void calculateSubDiffHelper(const BSONElement& preVal,
 class StringWrapper {
 public:
     StringWrapper(size_t s) : storage(std::to_string(s)), str(storage) {}
-    StringWrapper(StringData s) : str(s) {}
+    StringWrapper(std::string_view s) : str(s) {}
 
-    StringData getStr() {
+    std::string_view getStr() {
         return str;
     }
 
 private:
     std::string storage;
-    StringData str;
+    std::string_view str;
 };
 
 /**
@@ -235,8 +235,8 @@ private:
  * 'outerValue'.
  */
 void appendFieldNested(std::variant<mutablebson::Element, BSONElement> elt,
-                       StringData outerValue,
-                       StringData innerValue,
+                       std::string_view outerValue,
+                       std::string_view innerValue,
                        BSONObjBuilder* bob) {
     visit(OverloadedVisitor{
               [&](const mutablebson::Element& element) {
@@ -291,17 +291,17 @@ void serializeInlineDiff(diff_tree::DocumentSubDiffNode const* node, BSONObjBuil
                 MONGO_UNIMPLEMENTED;
             }
             case diff_tree::NodeType::kDelete: {
-                bob->append(StringData{field}, doc_diff::kDeleteSectionFieldName);
+                bob->append(std::string_view{field}, doc_diff::kDeleteSectionFieldName);
                 break;
             }
             case diff_tree::NodeType::kDocumentSubDiff: {
-                BSONObjBuilder subBob(bob->subobjStart(StringData{field}));
+                BSONObjBuilder subBob(bob->subobjStart(std::string_view{field}));
                 serializeInlineDiff(
                     checked_cast<const diff_tree::DocumentSubDiffNode*>(child.get()), &subBob);
                 break;
             }
             case diff_tree::NodeType::kArray: {
-                bob->append(StringData{field}, doc_diff::kUpdateSectionFieldName);
+                bob->append(std::string_view{field}, doc_diff::kUpdateSectionFieldName);
                 break;
             }
             case diff_tree::NodeType::kDocumentInsert: {
@@ -392,7 +392,7 @@ void IndexUpdateIdentifier::determineAffectedIndexes(const FieldRef& path,
     if (!_pathComponentsToIndexSets.empty()) {
         for (size_t partIdx = 0; partIdx < path.numParts(); ++partIdx) {
             // Look up path component in hash table.
-            StringData part = path.getPart(partIdx);
+            std::string_view part = path.getPart(partIdx);
 
             // Converting to std::string_view here to avoid heap allocations for temporary
             // std::string lookup values.
@@ -421,26 +421,26 @@ void IndexUpdateIdentifier::determineAffectedIndexes(DocumentDiffReader* reader,
               subItem.second);
     };
     while ((item = reader->next()).has_value()) {
-        visit(OverloadedVisitor{
-                  [this, &done, &fieldRef, &indexesToUpdate](StringData& sdItem) -> void {
-                      FieldRef::FieldRefTempAppend tempAppend(fieldRef, sdItem);
-                      determineAffectedIndexes(fieldRef, indexesToUpdate);
-                      done = done || (indexesToUpdate.count() == _numIndexes);
-                  },
-                  [this, &done, &fieldRef, &indexesToUpdate](BSONElement& beItem) -> void {
-                      FieldRef::FieldRefTempAppend tempAppend(fieldRef,
-                                                              beItem.fieldNameStringData());
-                      determineAffectedIndexes(fieldRef, indexesToUpdate);
-                      done = done || (indexesToUpdate.count() == _numIndexes);
-                  },
-                  [this, &done, &fieldRef, &indexesToUpdate, &innerVisit](
-                      std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>&
-                          subItem) -> void {
-                      FieldRef::FieldRefTempAppend tempAppend(fieldRef, subItem.first);
-                      innerVisit(subItem);
-                      done = done || (indexesToUpdate.count() == _numIndexes);
-                  }},
-              *item);
+        visit(
+            OverloadedVisitor{
+                [this, &done, &fieldRef, &indexesToUpdate](std::string_view& sdItem) -> void {
+                    FieldRef::FieldRefTempAppend tempAppend(fieldRef, sdItem);
+                    determineAffectedIndexes(fieldRef, indexesToUpdate);
+                    done = done || (indexesToUpdate.count() == _numIndexes);
+                },
+                [this, &done, &fieldRef, &indexesToUpdate](BSONElement& beItem) -> void {
+                    FieldRef::FieldRefTempAppend tempAppend(fieldRef, beItem.fieldNameStringData());
+                    determineAffectedIndexes(fieldRef, indexesToUpdate);
+                    done = done || (indexesToUpdate.count() == _numIndexes);
+                },
+                [this, &done, &fieldRef, &indexesToUpdate, &innerVisit](
+                    std::pair<std::string_view, std::variant<DocumentDiffReader, ArrayDiffReader>>&
+                        subItem) -> void {
+                    FieldRef::FieldRefTempAppend tempAppend(fieldRef, subItem.first);
+                    innerVisit(subItem);
+                    done = done || (indexesToUpdate.count() == _numIndexes);
+                }},
+            *item);
 
         // Early exit if possible.
         if (done) {

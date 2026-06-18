@@ -41,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -58,7 +59,7 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingAddResumeId);
  */
 class MONGO_MOD_PUBLIC DocumentSourceReshardingAddResumeId : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_addReshardingResumeId"_sd;
+    static constexpr std::string_view kStageName = "$_addReshardingResumeId"_sd;
 
     static boost::intrusive_ptr<DocumentSourceReshardingAddResumeId> create(
         const boost::intrusive_ptr<ExpressionContext>&);
@@ -82,7 +83,7 @@ public:
         return boost::none;
     }
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return DocumentSourceReshardingAddResumeId::kStageName;
     }
 

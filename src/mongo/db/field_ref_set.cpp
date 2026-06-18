@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
@@ -50,9 +51,9 @@ namespace {
 // prohibits. It is preferrable to have FieldRef keep that constraint and relax it here
 // -- stricly in update code. The rationale is that, if we want to ban data with no
 // field names, we must allow that data to be updated.
-StringData safeFirstPart(const FieldRef* fieldRef) {
+std::string_view safeFirstPart(const FieldRef* fieldRef) {
     if (fieldRef->numParts() == 0) {
-        return StringData();
+        return std::string_view();
     } else {
         return fieldRef->getPart(0);
     }
@@ -101,7 +102,7 @@ StatusWith<bool> FieldRefSet::checkForConflictsAndPrefix(const FieldRef* toCheck
     if (_fieldSet.empty())
         return foundConflict;
 
-    StringData prefixStr = safeFirstPart(toCheck);
+    std::string_view prefixStr = safeFirstPart(toCheck);
     FieldRef prefixField(prefixStr);
 
     iterator it = _fieldSet.lower_bound(&prefixField);
@@ -166,7 +167,7 @@ bool FieldRefSet::insert(const FieldRef* toInsert, const FieldRef** conflict) {
 
     // At each insertion, we only need to bother checking the fields in the set that have
     // at least some common prefix with the 'toInsert' field.
-    StringData prefixStr = safeFirstPart(toInsert);
+    std::string_view prefixStr = safeFirstPart(toInsert);
     FieldRef prefixField(prefixStr);
     iterator it = _fieldSet.lower_bound(&prefixField);
 

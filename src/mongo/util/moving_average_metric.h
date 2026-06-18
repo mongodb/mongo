@@ -33,6 +33,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/moving_average.h"
 
+#include <string_view>
+
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
@@ -96,7 +98,7 @@ public:
         return _v;
     }
 
-    void appendTo(BSONObjBuilder& b, StringData leafName) const {
+    void appendTo(BSONObjBuilder& b, std::string_view leafName) const {
         if (const boost::optional<double> snapshot = _v.avg().get()) {
             b.append(leafName, *snapshot);
         }

@@ -34,6 +34,8 @@
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/platform/decimal128.h"
 
+#include <string_view>
+
 namespace mongo::abt {
 
 using namespace sbe::value;
@@ -59,7 +61,7 @@ ABT Constant::createFromCopy(const sbe::value::TypeTags tag, const sbe::value::V
     return make<Constant>(copy.first, copy.second);
 }
 
-ABT Constant::str(StringData str) {
+ABT Constant::str(std::string_view str) {
     // Views are non-owning so we have to make a copy.
     auto [tag, val] = makeNewString(str);
     return make<Constant>(tag, val);
@@ -162,7 +164,7 @@ bool Constant::isString() const {
     return sbe::value::isString(_tag);
 }
 
-StringData Constant::getString() const {
+std::string_view Constant::getString() const {
     return getStringView(_tag, _val);
 }
 

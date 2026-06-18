@@ -73,6 +73,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -392,7 +393,7 @@ public:
     /**
      * Return whether 'name' refers to an expression in the language.
      */
-    static bool isExpressionName(StringData name);
+    static bool isExpressionName(std::string_view name);
 
     /*
       Produce a field path std::string with the field prefix removed.
@@ -438,7 +439,7 @@ public:
      * Return an error message for an unknown expression. Adds a hint in case the expression is
      * switched off by a feature flag or is only available in testing mode.
      */
-    static std::string getErrorMessage(StringData key);
+    static std::string getErrorMessage(std::string_view key);
 
     const ExpressionVector& getChildren() const {
         return _children;
@@ -914,7 +915,7 @@ public:
     const Expression* getTimeZone() const {
         return _children[_kTimeZone].get();
     }
-    StringData getOpName() const {
+    std::string_view getOpName() const {
         return _opName;
     }
     const boost::optional<TimeZone>& getParsedTimeZone() const {
@@ -923,7 +924,7 @@ public:
 
 protected:
     explicit DateExpressionAcceptingTimeZone(ExpressionContext* const expCtx,
-                                             const StringData opName,
+                                             const std::string_view opName,
                                              boost::intrusive_ptr<Expression> date,
                                              boost::intrusive_ptr<Expression> timeZone)
         : Expression(expCtx, {date, timeZone}), _opName(opName) {}
@@ -936,7 +937,7 @@ protected:
 
 private:
     // The name of this expression, e.g. $week or $month.
-    StringData _opName;
+    std::string_view _opName;
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
@@ -2851,9 +2852,9 @@ private:
         // The meta enum type.
         DocumentMetadataFields::MetaType metaType;
         // The string name used for the meta type.
-        StringData typeName;
+        std::string_view typeName;
         // An optional path, for use cases like $meta: "stream.window".
-        boost::optional<StringData> path;
+        boost::optional<std::string_view> path;
     };
 
     /**
@@ -2876,8 +2877,8 @@ private:
     static void _assertMetaFieldCompatibleWithStreamsFeatureFlag(
         ExpressionContext* expCtx,
         DocumentMetadataFields::MetaType type,
-        StringData typeName,
-        boost::optional<StringData> optionalPath);
+        std::string_view typeName,
+        boost::optional<std::string_view> optionalPath);
 
     /**
      * Rewrites { $meta: "stream.path" } as
@@ -2885,14 +2886,14 @@ private:
      */
     static boost::intrusive_ptr<Expression> _rewriteAsLet(ExpressionContext* expCtx,
                                                           DocumentMetadataFields::MetaType type,
-                                                          StringData typeName,
-                                                          StringData path,
+                                                          std::string_view typeName,
+                                                          std::string_view path,
                                                           const VariablesParseState& vpsIn);
 
     /**
      * Helper utility to parse a meta type and optional path from the user supplied typeName.
      */
-    static ParseMetaTypeResult _parseMetaType(ExpressionContext* expCtx, StringData typeName);
+    static ParseMetaTypeResult _parseMetaType(ExpressionContext* expCtx, std::string_view typeName);
 
     DocumentMetadataFields::MetaType _metaType;
 };
@@ -2905,7 +2906,7 @@ private:
  */
 class ExpressionInternalRawSortKey final : public Expression {
 public:
-    static constexpr StringData kName = "$_internalSortKey"_sd;
+    static constexpr std::string_view kName = "$_internalSortKey"_sd;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext*,
                                                   BSONElement,
@@ -3711,7 +3712,7 @@ protected:
     static auto _parseInternal(ExpressionContext* expCtx,
                                BSONElement expr,
                                const VariablesParseState& vps,
-                               StringData similarityName);
+                               std::string_view similarityName);
 
     bool _score;
 };
@@ -4669,7 +4670,7 @@ public:
     };
     ExpressionTrim(ExpressionContext* const expCtx,
                    TrimType trimType,
-                   StringData name,
+                   std::string_view name,
                    boost::intrusive_ptr<Expression> input,
                    boost::intrusive_ptr<Expression> charactersToTrim)
         : Expression(expCtx, {std::move(input), std::move(charactersToTrim)}),
@@ -5093,7 +5094,7 @@ enum class BinDataFormat {
     kUuid,
 };
 
-static StringData toStringData(BinDataFormat type) {
+static std::string_view toStringData(BinDataFormat type) {
     switch (type) {
         case BinDataFormat::kAuto:
             return "auto"_sd;
@@ -5294,7 +5295,7 @@ public:
                     boost::intrusive_ptr<Expression> input,
                     boost::intrusive_ptr<Expression> regex,
                     boost::intrusive_ptr<Expression> options,
-                    const StringData opName)
+                    const std::string_view opName)
         : Expression(expCtx, {std::move(input), std::move(regex), std::move(options)}),
           _opName(opName) {}
 
@@ -5512,7 +5513,7 @@ public:
                               boost::intrusive_ptr<Expression> unit,
                               boost::intrusive_ptr<Expression> amount,
                               boost::intrusive_ptr<Expression> timezone,
-                              const StringData opName)
+                              const std::string_view opName)
         : Expression(
               expCtx,
               {std::move(startDate), std::move(unit), std::move(amount), std::move(timezone)}),
@@ -5539,7 +5540,7 @@ public:
     const boost::optional<TimeZone>& getParsedTimeZone() const {
         return _parsedTimeZone;
     }
-    StringData getOpName() const {
+    std::string_view getOpName() const {
         return _opName;
     }
 
@@ -5568,7 +5569,7 @@ private:
     boost::optional<TimeZone> _parsedTimeZone;
 
     // The name of this expression, e.g. $dateAdd or $dateSubtract.
-    StringData _opName;
+    std::string_view _opName;
 };
 
 class ExpressionDateAdd final : public ExpressionDateArithmetics {
@@ -6380,13 +6381,13 @@ public:
     const Expression* getOnError() const;
 
 private:
-    static constexpr StringData _kInput = "input"_sd;
+    static constexpr std::string_view _kInput = "input"_sd;
     static constexpr int _kInputIdx = 0;
 
-    static constexpr StringData _kRelaxed = "relaxed"_sd;
+    static constexpr std::string_view _kRelaxed = "relaxed"_sd;
     static constexpr int _kRelaxedIdx = 1;
 
-    static constexpr StringData _kOnError = "onError"_sd;
+    static constexpr std::string_view _kOnError = "onError"_sd;
     static constexpr int _kOnErrorIdx = 2;
 };
 
@@ -6424,10 +6425,10 @@ public:
     const Expression* getOnError() const;
 
 private:
-    static constexpr StringData _kInput = "input"_sd;
+    static constexpr std::string_view _kInput = "input"_sd;
     static constexpr int _kInputIdx = 0;
 
-    static constexpr StringData _kOnError = "onError"_sd;
+    static constexpr std::string_view _kOnError = "onError"_sd;
     static constexpr int _kOnErrorIdx = 1;
 };
 
@@ -6441,8 +6442,8 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(HashAlgorithm, HASH_ALGORITHM);
 
 class ExpressionHash final : public Expression {
 public:
-    static constexpr StringData kInput = "input"_sd;
-    static constexpr StringData kAlgorithm = "algorithm"_sd;
+    static constexpr std::string_view kInput = "input"_sd;
+    static constexpr std::string_view kAlgorithm = "algorithm"_sd;
 
     explicit ExpressionHash(ExpressionContext* expCtx,
                             boost::intrusive_ptr<Expression> input,

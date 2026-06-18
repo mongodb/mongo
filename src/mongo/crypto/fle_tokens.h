@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/base/data_range.h"
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/fle_key_types.h"
 #include "mongo/util/modules.h"
 
 #include <array>
+#include <string_view>
 #include <vector>
 
 #include <fmt/format.h>
@@ -135,7 +135,7 @@ class FLEToken {
 public:
     virtual ~FLEToken() {}
 
-    virtual StringData name() const = 0;
+    virtual std::string_view name() const = 0;
 
     virtual PrfBlock asPrfBlock() const = 0;
     virtual MongoCryptBuffer asMongoCryptBuffer() const = 0;
@@ -196,8 +196,8 @@ public:
             return H::combine(std::move(h), token.name(), token.asPrfBlock()); \
         }                                                                      \
                                                                                \
-        StringData name() const override {                                     \
-            return StringData(#TokenType);                                     \
+        std::string_view name() const override {                               \
+            return std::string_view(#TokenType);                               \
         }                                                                      \
                                                                                \
     private:                                                                   \
@@ -445,7 +445,7 @@ public:
          *   "value": {encryptedTokens},
          * }
          */
-        BSONObj generateDocument(StringData fieldName) const;
+        BSONObj generateDocument(std::string_view fieldName) const;
 
         /**
          * Decrypt _encryptedTokens back to esc/isLeaf using ECOCToken.

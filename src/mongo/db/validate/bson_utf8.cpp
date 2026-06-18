@@ -29,7 +29,6 @@
 
 #include "mongo/db/validate/bson_utf8.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -37,6 +36,7 @@
 #include "mongo/util/str_escape.h"
 
 #include <algorithm>
+#include <string_view>
 
 namespace mongo {
 bool isValidUTF8(const BSONObj& obj) {
@@ -74,8 +74,8 @@ bool isValidUTF8(const BSONObj& obj) {
     });
 }
 
-void scrubInvalidUTF8(BSONElement elem, StringData fieldName, BSONObjBuilder& subObjBuilder) {
-    auto scrub = [](StringData sd) {
+void scrubInvalidUTF8(BSONElement elem, std::string_view fieldName, BSONObjBuilder& subObjBuilder) {
+    auto scrub = [](std::string_view sd) {
         return str::validUTF8(sd) ? std::string{sd} : str::scrubInvalidUTF8(sd);
     };
 

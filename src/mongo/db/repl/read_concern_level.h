@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace MONGO_MOD_PUB mongo {
 namespace repl {
@@ -40,7 +41,7 @@ using ReadConcernLevel = ReadConcernLevelEnum;
 
 namespace readConcernLevels {
 
-StringData toString(ReadConcernLevel level);
+std::string_view toString(ReadConcernLevel level);
 
 }  // namespace readConcernLevels
 

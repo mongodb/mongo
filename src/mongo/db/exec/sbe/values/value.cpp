@@ -49,6 +49,7 @@
 #include "mongo/util/duration.h"
 
 #include <cmath>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/hash/hash.h>
@@ -62,7 +63,7 @@ namespace value {
 namespace {
 template <typename T>
 auto abslHash(const T& val) {
-    if constexpr (std::is_same_v<T, StringData>) {
+    if constexpr (std::is_same_v<T, std::string_view>) {
         return absl::Hash<absl::string_view>{}(absl::string_view{val.data(), val.size()});
     } else if constexpr (IsEndian<T>::value) {
         return abslHash(val.value);
@@ -93,7 +94,7 @@ void registerExtendedTypeOps(TypeTags tag, const ExtendedTypeOps* typeOps) {
     gTypeOps[typeOpsIdx] = typeOps;
 }
 
-std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags) {
+std::pair<TypeTags, Value> makeNewBsonRegex(std::string_view pattern, std::string_view flags) {
     // Add 2 to account NULL bytes after pattern and flags.
     auto totalSize = pattern.size() + flags.size() + 2;
     auto buffer = std::make_unique<char[]>(totalSize);
@@ -109,12 +110,12 @@ std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags
     return {TypeTags::bsonRegex, bitcastFrom<char*>(buffer.release())};
 }
 
-std::pair<TypeTags, Value> makeCopyBsonJavascript(StringData code) {
+std::pair<TypeTags, Value> makeCopyBsonJavascript(std::string_view code) {
     auto [_, strVal] = makeBigString(code);
     return {TypeTags::bsonJavascript, strVal};
 }
 
-std::pair<TypeTags, Value> makeNewBsonDBPointer(StringData ns, const uint8_t* id) {
+std::pair<TypeTags, Value> makeNewBsonDBPointer(std::string_view ns, const uint8_t* id) {
     const auto nsLen = ns.size();
     const auto nsLenWithNull = nsLen + sizeof(char);
     auto buffer = std::make_unique<char[]>(sizeof(uint32_t) + nsLenWithNull + sizeof(ObjectIdType));
@@ -135,7 +136,7 @@ std::pair<TypeTags, Value> makeNewBsonDBPointer(StringData ns, const uint8_t* id
     return {TypeTags::bsonDBPointer, bitcastFrom<char*>(buffer.release())};
 }
 
-std::pair<TypeTags, Value> makeNewBsonCodeWScope(StringData code, const char* scope) {
+std::pair<TypeTags, Value> makeNewBsonCodeWScope(std::string_view code, const char* scope) {
     const auto codeLen = code.size();
     const auto codeLenWithNull = codeLen + sizeof(char);
     const auto scopeLen = ConstDataView(scope).read<LittleEndian<uint32_t>>();
@@ -860,19 +861,19 @@ bool ObjectEnumerator::advance() {
     }
 }
 
-StringData ObjectEnumerator::getFieldName() const {
+std::string_view ObjectEnumerator::getFieldName() const {
     using namespace std::literals;
     if (_object) {
         if (_index < _object->size()) {
             return _object->field(_index);
         } else {
-            return ""_sd;
+            return ""sv;
         }
     } else {
         if (*_objectCurrent != 0) {
             return bson::fieldNameAndLength(_objectCurrent);
         } else {
-            return ""_sd;
+            return ""sv;
         }
     }
 }

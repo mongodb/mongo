@@ -29,7 +29,6 @@
 
 #include "mongo/scripting/bson_template_evaluator.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/unittest/unittest.h"
 

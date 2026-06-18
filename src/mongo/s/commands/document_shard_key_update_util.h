@@ -44,6 +44,7 @@
 #include "mongo/util/out_of_line_executor.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -64,12 +65,12 @@ class TaskExecutor;
  */
 namespace documentShardKeyUpdateUtil {
 
-static constexpr StringData kDuplicateKeyErrorContext =
+static constexpr std::string_view kDuplicateKeyErrorContext =
     "Failed to update document's shard key "
     "field. There is either an orphan for this document or _id for this collection is not "
     "globally unique."_sd;
 
-static constexpr StringData kNonDuplicateKeyErrorContext =
+static constexpr std::string_view kNonDuplicateKeyErrorContext =
     "Update operation was converted into a "
     "distributed transaction because the document being updated would move shards and that "
     "transaction failed."_sd;

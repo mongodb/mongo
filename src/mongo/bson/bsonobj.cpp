@@ -32,7 +32,6 @@
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -59,6 +58,7 @@
 #include <ostream>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -70,6 +70,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -178,10 +179,10 @@ BSONObj BSONObj::redact(RedactLevel level,
     // Helper to get an "internal function" to be able to do recursion
     struct redactor {
         void appendRedactedElem(BSONObjBuilder& builder,
-                                StringData fieldNameString,
+                                std::string_view fieldNameString,
                                 bool appendMask) {
             if (appendMask) {
-                builder.append(fieldNameString, "###"_sd);
+                builder.append(fieldNameString, "###"sv);
             } else {
                 builder.appendNull(fieldNameString);
             }
@@ -193,7 +194,7 @@ BSONObj BSONObj::redact(RedactLevel level,
                         RedactLevel level,
                         std::function<std::string(const BSONElement&)> fieldNameRedactor) {
             for (BSONElement e : obj) {
-                StringData fieldNameString;
+                std::string_view fieldNameString;
                 // Temporarily allocated string that must live long enough to be copied by builder.
                 std::string tempString;
                 if (!fieldNameRedactor) {
@@ -280,7 +281,7 @@ BSONObj BSONObj::_jsonStringGenerator(const Generator& g,
                                       fmt::memory_buffer& buffer,
                                       size_t writeLimit) const {
     if (isEmpty()) {
-        const auto empty = isArray ? "[]"_sd : "{}"_sd;
+        const auto empty = isArray ? "[]"sv : "{}"sv;
         buffer.append(empty.data(), empty.data() + empty.size());
         return BSONObj();
     }
@@ -522,7 +523,7 @@ BSONObj BSONObj::stripFieldNames(const BSONObj& obj) {
 
     BSONObjBuilder bb;
     for (auto e : obj) {
-        bb.appendAs(e, StringData());
+        bb.appendAs(e, std::string_view());
     }
     return bb.obj();
 }
@@ -542,7 +543,7 @@ Status BSONObj::storageValidEmbedded() const {
     bool first = true;
     while (i.more()) {
         BSONElement e = i.next();
-        StringData name = e.fieldNameStringData();
+        std::string_view name = e.fieldNameStringData();
 
         // Cannot start with "$", unless dbref which must start with ($ref, $id)
         if (name.starts_with("$")) {
@@ -598,7 +599,7 @@ Status BSONObj::storageValidEmbedded() const {
     return Status::OK();
 }
 
-BSONElement BSONObj::getField(StringData name) const {
+BSONElement BSONObj::getField(std::string_view name) const {
     const char* elem = objdata() + sizeof(int);
     while (*elem) {
         auto ptr = elem;
@@ -624,17 +625,17 @@ next:
     return BSONElement();
 }
 
-int BSONObj::getIntField(StringData name) const {
+int BSONObj::getIntField(std::string_view name) const {
     BSONElement e = getField(name);
     return e.isNumber() ? (int)e.number() : std::numeric_limits<int>::min();
 }
 
-bool BSONObj::getBoolField(StringData name) const {
+bool BSONObj::getBoolField(std::string_view name) const {
     BSONElement e = getField(name);
     return e.type() == BSONType::boolean ? e.boolean() : false;
 }
 
-StringData BSONObj::getStringField(StringData name) const {
+std::string_view BSONObj::getStringField(std::string_view name) const {
     BSONElement e = getField(name);
     return e.valueStringDataSafe();
 }
@@ -643,7 +644,7 @@ BSONObj BSONObj::addField(const BSONElement& field) const {
     if (!field.ok())
         return copy();
     BSONObjBuilder b;
-    StringData name = field.fieldNameStringData();
+    std::string_view name = field.fieldNameStringData();
     bool added = false;
     for (auto e : *this) {
         if (e.fieldNameStringData() == name) {
@@ -682,7 +683,7 @@ BSONObj BSONObj::addFields(const BSONObj& from,
     return bob.obj();
 }
 
-BSONObj BSONObj::removeField(StringData name) const {
+BSONObj BSONObj::removeField(std::string_view name) const {
     BSONObjBuilder b;
     BSONObjIterator i(*this);
     while (i.more()) {
@@ -734,7 +735,7 @@ void BSONObj::elems(std::list<BSONElement>& v) const {
         v.push_back(i.next());
 }
 
-BSONObj BSONObj::getObjectField(StringData name) const {
+BSONObj BSONObj::getObjectField(std::string_view name) const {
     BSONElement e = getField(name);
     BSONType t = e.type();
     return t == BSONType::object || t == BSONType::array ? e.embeddedObject() : BSONObj();
@@ -822,7 +823,7 @@ StringBuilder& operator<<(StringBuilder& s, const BSONObj& o) {
 class BSONIteratorSorted::FieldNameCmp {
 public:
     FieldNameCmp(bool isArray);
-    bool operator()(StringData lhs, StringData rhs) const;
+    bool operator()(std::string_view lhs, std::string_view rhs) const;
 
 private:
     str::LexNumCmp _cmp;
@@ -830,7 +831,8 @@ private:
 
 BSONIteratorSorted::FieldNameCmp::FieldNameCmp(bool isArray) : _cmp(!isArray) {}
 
-bool BSONIteratorSorted::FieldNameCmp::operator()(StringData lhs, StringData rhs) const {
+bool BSONIteratorSorted::FieldNameCmp::operator()(std::string_view lhs,
+                                                  std::string_view rhs) const {
     // Just compare field names.
     return _cmp(lhs, rhs);
 }

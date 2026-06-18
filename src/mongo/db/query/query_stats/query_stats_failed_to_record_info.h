@@ -38,6 +38,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -53,7 +54,7 @@ public:
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-    QueryStatsFailedToRecordInfo(BSONObj cmdObj, Status status, StringData versionString);
+    QueryStatsFailedToRecordInfo(BSONObj cmdObj, Status status, std::string_view versionString);
 
     void serialize(BSONObjBuilder* bob) const override;
 

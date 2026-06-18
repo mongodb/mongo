@@ -47,6 +47,7 @@
 
 namespace mongo::extension {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Helper to build a HostLogicalAggStageAdapter backed by a DocumentSourceMock.
 // The returned mock must outlive the adapter.
@@ -113,7 +114,7 @@ DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
            "12303707") {
     auto [mock, adapter] = makeAdapterWithMock();
     LogicalAggStageAPI api(adapter.get());
-    [[maybe_unused]] auto result = api.evaluatePipelineRewriteRulePrecondition("rule"_sd, nullptr);
+    [[maybe_unused]] auto result = api.evaluatePipelineRewriteRulePrecondition("rule"sv, nullptr);
 }
 
 DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
@@ -121,7 +122,7 @@ DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
            "12303708") {
     auto [mock, adapter] = makeAdapterWithMock();
     LogicalAggStageAPI api(adapter.get());
-    [[maybe_unused]] auto result = api.evaluatePipelineRewriteRuleTransform("rule"_sd, nullptr);
+    [[maybe_unused]] auto result = api.evaluatePipelineRewriteRuleTransform("rule"sv, nullptr);
 }
 
 // ---- PipelineRewriteContextAPI vtable constraint death tests ----

@@ -30,7 +30,6 @@
 
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"

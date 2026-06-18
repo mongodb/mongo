@@ -29,7 +29,6 @@
 
 #include "mongo/db/op_debug.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/ticketing/ticketholder_queue_stats.h"
@@ -50,10 +49,11 @@
 #include "mongo/util/duration.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace {
-StringData getProtoString(int op) {
+std::string_view getProtoString(int op) {
     if (op == dbMsg) {
         return "op_msg";
     } else if (op == dbQuery) {
@@ -226,7 +226,7 @@ void OpDebug::report(OperationContext* opCtx,
 
     if (client) {
         if (auto clientMetadata = ClientMetadata::get(client)) {
-            StringData appName = clientMetadata->getApplicationName();
+            std::string_view appName = clientMetadata->getApplicationName();
             if (!appName.empty()) {
                 pAttrs->add("appName", appName);
             }

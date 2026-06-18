@@ -30,7 +30,6 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 
 #include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -49,6 +48,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -135,7 +135,7 @@ bool collectionHasTimeIndex(OperationContext* opCtx, const Collection& collectio
         auto desc = index->descriptor();
         auto pattern = desc->keyPattern();
         auto keyIt = pattern.begin();
-        StringData field = keyIt->fieldNameStringData();
+        std::string_view field = keyIt->fieldNameStringData();
         if (field == controlMinTimeField || field == controlMaxTimeField) {
             return true;
         }

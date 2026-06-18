@@ -31,7 +31,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -66,6 +65,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/algorithm/string/join.hpp>
@@ -225,7 +225,7 @@ Status checkHashedShardKeyRange(const ChunkRange& range, const KeyPattern& shard
  * sharded on the min time of the bucket, which means the bucket might contain time point outside
  * any designated time range.
  */
-Status checkForTimeseriesTimeFieldKeyRange(const ChunkRange& range, StringData timeField) {
+Status checkForTimeseriesTimeFieldKeyRange(const ChunkRange& range, std::string_view timeField) {
     const std::string controlTimeField =
         std::string{timeseries::kControlMinFieldNamePrefix} + std::string{timeField};
     const BSONElement minRangeControlTimeField = range.getMin().getField(controlTimeField);

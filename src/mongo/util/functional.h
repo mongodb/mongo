@@ -36,6 +36,7 @@
 #include <functional>
 #include <iosfwd>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -46,9 +47,9 @@ class function_ref;
 
 /**
  * A function_ref is a type-erased callable similar to std::function, however it does not own the
- * underlying object, similar to StringData vs std::string. It should generally only be used as a
- * parameter to functions that invoke their callback while running. It should generally not be put
- * in a variable or stashed for calling later.
+ * underlying object, similar to std::string_view vs std::string. It should generally only be used
+ * as a parameter to functions that invoke their callback while running. It should generally not be
+ * put in a variable or stashed for calling later.
  *
  * In the specific case of a function_ref constructed from a function or function pointer it will
  * store the function pointer directly rather than a pointer to the function pointer, so you do not
@@ -139,10 +140,10 @@ private:
     // the data pointer with the stored this pointer, since in most ABIs the implicit argument
     // parameter is treated as if it were the first argument.
     // There is also a trade-off of Args vs Args&&. The former is more efficient for trivially
-    // copiable types like int and StringData, but the latter is better for expensive-to-move types
-    // like std::string. I opted for the former so that this is cheap when doing cheap things and
-    // because you can always pass expensive-to-move types by reference if you want to, but if we
-    // added a reference here, you couldn't remove it.
+    // copiable types like int and std::string_view, but the latter is better for expensive-to-move
+    // types like std::string. I opted for the former so that this is cheap when doing cheap things
+    // and because you can always pass expensive-to-move types by reference if you want to, but if
+    // we added a reference here, you couldn't remove it.
     using Erased = RetType(const void*, Args...);
 
     const void* _target;

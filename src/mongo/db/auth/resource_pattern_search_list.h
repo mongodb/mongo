@@ -38,6 +38,7 @@
 
 #include <array>
 #include <cstddef>
+#include <string_view>
 
 namespace mongo::auth {
 /**
@@ -86,7 +87,7 @@ namespace mongo::auth {
  */
 class ResourcePatternSearchList {
 private:
-    static constexpr StringData kSystemBucketsPrefix = "system.buckets."_sd;
+    static constexpr std::string_view kSystemBucketsPrefix = "system.buckets."_sd;
     static constexpr std::size_t kMaxResourcePatternLookups = 10;
     using ListType = std::array<ResourcePattern, kMaxResourcePatternLookups>;
 
@@ -111,7 +112,7 @@ public:
                        nss.coll().starts_with(kSystemBucketsPrefix)) {
                 // System bucket patterns behave similar to any/db/coll/exact patterns,
                 // But with a fixed "system.buckets." prefix to the collection name.
-                StringData coll = nss.coll().substr(kSystemBucketsPrefix.size());
+                std::string_view coll = nss.coll().substr(kSystemBucketsPrefix.size());
                 _list[_size++] = ResourcePattern::forExactSystemBucketsCollection(
                     NamespaceStringUtil::deserialize(nss.dbName(), coll));
                 _list[_size++] = ResourcePattern::forAnySystemBuckets(target.tenantId());

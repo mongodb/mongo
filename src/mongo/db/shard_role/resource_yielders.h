@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -48,13 +49,13 @@ public:
     static void initialize(ServiceContext* svcCtx);
 
     virtual std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
-                                                  StringData cmdName) const = 0;
+                                                  std::string_view cmdName) const = 0;
 };
 
 class MONGO_MOD_FILE_PRIVATE ShardResourceYielderFactory : public ResourceYielderFactory {
 public:
     std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
-                                          StringData cmdName) const override {
+                                          std::string_view cmdName) const override {
         if (opCtx->isActiveTransactionParticipant() && opCtx->inMultiDocumentTransaction()) {
             return TransactionParticipantResourceYielder::make(cmdName);
         } else {
@@ -66,7 +67,7 @@ public:
 class MONGO_MOD_PUBLIC RouterResourceYielderFactory : public ResourceYielderFactory {
 public:
     std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
-                                          StringData cmdName) const override {
+                                          std::string_view cmdName) const override {
         return TransactionRouterResourceYielder::makeForRemoteCommand();
     }
 };

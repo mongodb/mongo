@@ -32,6 +32,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -49,7 +51,7 @@ boost::optional<std::string> stringOrNullParseFromBSON(const BSONElement& elem) 
 }
 
 void stringOrNullSerializeToBSON(const boost::optional<std::string>& stringOrNull,
-                                 StringData fieldName,
+                                 std::string_view fieldName,
                                  BSONObjBuilder* bob) {
     if (stringOrNull) {
         bob->append(fieldName, *stringOrNull);

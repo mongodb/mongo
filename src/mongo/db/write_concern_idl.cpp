@@ -36,6 +36,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo {
@@ -83,7 +85,9 @@ WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
         fmt::format("w has to be a number, string, or object; found: {}", typeName(wEl.type())));
 }
 
-void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONObjBuilder* builder) {
+void serializeWriteConcernW(const WriteConcernW& w,
+                            std::string_view fieldName,
+                            BSONObjBuilder* builder) {
     visit(OverloadedVisitor{[&](int64_t wNumNodes) {
                                 builder->appendNumber(fieldName, static_cast<long long>(wNumNodes));
                             },
@@ -109,7 +113,7 @@ std::int64_t parseWTimeoutFromBSON(BSONElement element) {
     return value;
 }
 
-void serializeWTimeout(std::int64_t wTimeout, StringData fieldName, BSONObjBuilder* builder) {
+void serializeWTimeout(std::int64_t wTimeout, std::string_view fieldName, BSONObjBuilder* builder) {
     // Historically we have serialized this as a int32_t, even though it is defined as an
     // int64_t in our IDL format.
     builder->append(fieldName, static_cast<int32_t>(wTimeout));

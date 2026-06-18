@@ -41,6 +41,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <string_view>
 
 #include <absl/strings/str_split.h>
 #include <boost/algorithm/string/replace.hpp>
@@ -51,7 +52,8 @@ namespace mongo {
 
 using std::string;
 
-StatusWith<bool> SaslSCRAMClientConversation::step(StringData inputData, std::string* outputData) {
+StatusWith<bool> SaslSCRAMClientConversation::step(std::string_view inputData,
+                                                   std::string* outputData) {
     _step++;
 
     switch (_step) {
@@ -97,7 +99,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
 
     encodeSCRAMUsername(user);
     _clientNonce =
-        base64::encode(StringData(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce)));
+        base64::encode(std::string_view(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce)));
 
     // Append client-first-message-bare to authMessage
     _authMessage = "n=" + user + ",r=" + _clientNonce;
@@ -117,7 +119,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
  * c=channel-binding(base64),r=client-nonce|server-nonce,p=ClientProof
  *
  **/
-StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
+StatusWith<bool> SaslSCRAMClientConversation::_secondStep(std::string_view inputData,
                                                           std::string* outputData) {
     if (inputData.starts_with("m=")) {
         return Status(ErrorCodes::BadValue, "SCRAM required extensions not supported");
@@ -184,7 +186,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
  * or failed authentication server-final-message on the form:
  * e=message
  **/
-StatusWith<bool> SaslSCRAMClientConversation::_thirdStep(StringData inputData,
+StatusWith<bool> SaslSCRAMClientConversation::_thirdStep(std::string_view inputData,
                                                          std::string* outputData) {
     const std::vector<std::string> input = absl::StrSplit(inputData, ",", absl::SkipEmpty());
 

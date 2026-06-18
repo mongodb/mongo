@@ -32,6 +32,8 @@
 #include "mongo/bson/generator_extended_canonical_2_0_0.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 class ExtendedRelaxedV200Generator : private ExtendedCanonicalV200Generator {
 public:
@@ -81,7 +83,7 @@ public:
         if (val.isFormattable()) {
             fmt::format_to(std::back_inserter(buffer),
                            FMT_COMPILE(R"({{"$date":"{}"}})"),
-                           StringData{DateStringBuffer{}.iso8601(val, _localDate)});
+                           std::string_view{DateStringBuffer{}.iso8601(val, _localDate)});
         } else {
             ExtendedCanonicalV200Generator::writeDate(buffer, val);
         }

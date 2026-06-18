@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -54,6 +55,7 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 NoopOplogApplierObserver noopOplogApplierObserver;
 
@@ -161,7 +163,7 @@ void OplogApplier::setMinValid(const OpTime& minValid) {
 namespace {
 
 std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount,
-                                               StringData name,
+                                               std::string_view name,
                                                bool isKillableByStepdown) {
     auto pool = ThreadPool::make({
         .poolName = fmt::format("{}ThreadPool", name),
@@ -189,7 +191,7 @@ std::unique_ptr<ThreadPool> makeReplWorkerPool() {
 }
 
 std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount) {
-    return makeReplWorkerPool(threadCount, "ReplWriterWorker"_sd, false);
+    return makeReplWorkerPool(threadCount, "ReplWriterWorker"sv, false);
 }
 
 }  // namespace repl

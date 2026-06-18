@@ -44,6 +44,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
@@ -64,9 +65,9 @@ namespace mongo {
 class DocumentSourceSequentialDocumentCache final : public DocumentSource {
 public:
     using SequentialDocumentCachePtr = std::shared_ptr<SequentialDocumentCache>;
-    static constexpr StringData kStageName = "$sequentialCache"_sd;
+    static constexpr std::string_view kStageName = "$sequentialCache"_sd;
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return DocumentSourceSequentialDocumentCache::kStageName;
     }
 

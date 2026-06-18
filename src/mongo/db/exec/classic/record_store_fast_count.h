@@ -40,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 
@@ -50,7 +51,7 @@ namespace mongo {
  */
 class RecordStoreFastCountStage final : public RequiresCollectionStage {
 public:
-    static constexpr StringData kStageType = "RECORD_STORE_FAST_COUNT"_sd;
+    static constexpr std::string_view kStageType = "RECORD_STORE_FAST_COUNT"_sd;
 
     RecordStoreFastCountStage(ExpressionContext* expCtx,
                               CollectionAcquisition collection,

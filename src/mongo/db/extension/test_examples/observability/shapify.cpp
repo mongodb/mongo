@@ -34,6 +34,8 @@
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
+#include <string_view>
+
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 

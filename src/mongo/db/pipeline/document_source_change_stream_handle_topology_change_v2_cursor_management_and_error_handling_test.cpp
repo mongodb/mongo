@@ -44,6 +44,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace test;
 
@@ -585,7 +586,7 @@ TEST_F(DSV2StageCursorManagementAndErrorHandlingTest, BuildPipelineForConfigServ
     // o.applyOps: { $type: [ 4 ] } } ] }, { $and: [ { o.commitTransaction: { $eq: 1 } }, { op: {
     // $eq: "c" } } ] } ] } ] } } }
     auto elem = pipeline[0].firstElement();
-    ASSERT_EQ("$_internalChangeStreamOplogMatch"_sd, elem.fieldNameStringData());
+    ASSERT_EQ("$_internalChangeStreamOplogMatch"sv, elem.fieldNameStringData());
     ASSERT_EQ(BSONType::object, elem.type());
     ASSERT_BSONOBJ_EQ(
         BSON(
@@ -627,7 +628,7 @@ TEST_F(DSV2StageCursorManagementAndErrorHandlingTest, BuildPipelineForConfigServ
     // true } } }, { $or: [ { o2.eventType1: { $exists: true } }, { o2.eventType2: { $exists: true }
     // } ] } ] } } }
     elem = pipeline[1].firstElement();
-    ASSERT_EQ("$_internalChangeStreamUnwindTransaction"_sd, elem.fieldNameStringData());
+    ASSERT_EQ("$_internalChangeStreamUnwindTransaction"sv, elem.fieldNameStringData());
     ASSERT_EQ(BSONType::object, elem.type());
     ASSERT_BSONOBJ_EQ(
         BSON("filter" << BSON(
@@ -642,7 +643,7 @@ TEST_F(DSV2StageCursorManagementAndErrorHandlingTest, BuildPipelineForConfigServ
     // "default", fullDocumentBeforeChange: "off", allowToRunOnConfigDB: true, ignoreRemovedShards:
     // false, supportedEvents: [ "eventType1", "eventType2" ] } }
     elem = pipeline[2].firstElement();
-    ASSERT_EQ("$_internalChangeStreamTransform"_sd, elem.fieldNameStringData());
+    ASSERT_EQ("$_internalChangeStreamTransform"sv, elem.fieldNameStringData());
     ASSERT_EQ(BSONType::object, elem.type());
     ASSERT_BSONOBJ_EQ(BSON("startAtOperationTime"
                            << ts << "fullDocument" << "default" << "fullDocumentBeforeChange"
@@ -652,13 +653,13 @@ TEST_F(DSV2StageCursorManagementAndErrorHandlingTest, BuildPipelineForConfigServ
 
     // { $_internalChangeStreamCheckResumability: {}}
     elem = pipeline[3].firstElement();
-    ASSERT_EQ("$_internalChangeStreamCheckResumability"_sd, elem.fieldNameStringData());
+    ASSERT_EQ("$_internalChangeStreamCheckResumability"sv, elem.fieldNameStringData());
     ASSERT_EQ(BSONType::object, elem.type());
 
     // { $_internalChangeStreamInjectControlEvents: { actions: { eventType1:
     // "transformToControlEvent", eventType2: "transformToControlEvent" } } }
     elem = pipeline[4].firstElement();
-    ASSERT_EQ("$_internalChangeStreamInjectControlEvents"_sd, elem.fieldNameStringData());
+    ASSERT_EQ("$_internalChangeStreamInjectControlEvents"sv, elem.fieldNameStringData());
     ASSERT_EQ(BSONType::object, elem.type());
     ASSERT_BSONOBJ_EQ(
         BSON("actions" << BSON("eventType1" << "transformToControlEvent" << "eventType2"

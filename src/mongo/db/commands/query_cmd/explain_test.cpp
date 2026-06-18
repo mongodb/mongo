@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -40,16 +39,18 @@
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using Verbosity = explain::VerbosityEnum;
 
 TEST(ExplainTest, VerbosityEnumToStringReturnsCorrectValues) {
-    ASSERT_EQ(idl::serialize(Verbosity::kQueryPlanner), "queryPlanner"_sd);
-    ASSERT_EQ(idl::serialize(Verbosity::kExecStats), "executionStats"_sd);
-    ASSERT_EQ(idl::serialize(Verbosity::kExecAllPlans), "allPlansExecution"_sd);
+    ASSERT_EQ(idl::serialize(Verbosity::kQueryPlanner), "queryPlanner"sv);
+    ASSERT_EQ(idl::serialize(Verbosity::kExecStats), "executionStats"sv);
+    ASSERT_EQ(idl::serialize(Verbosity::kExecAllPlans), "allPlansExecution"sv);
 }
 
 TEST(ExplainTest, ExplainSerializeToBSONCorrectly) {

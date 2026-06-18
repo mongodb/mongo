@@ -33,6 +33,7 @@
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 
 #include <cstring>
+#include <string_view>
 
 #include <jsapi.h>
 
@@ -146,7 +147,7 @@ bool installParseJSFunctionHelper(JSContext* cx, JS::HandleObject global) {
 
 bool parseJSFunctionOrExpression(JSContext* cx,
                                  JS::HandleObject global,
-                                 StringData input,
+                                 std::string_view input,
                                  std::string* out) {
     JS::RootedValue helperVal(cx);
     if (!JS_GetProperty(cx, global, "__parseJSFunctionOrExpression", &helperVal))

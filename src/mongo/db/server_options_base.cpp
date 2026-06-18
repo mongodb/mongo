@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base_gen.h"
@@ -44,10 +43,12 @@
 #include "mongo/util/str.h"
 
 #include <ostream>
+#include <string_view>
 
 namespace moe = mongo::optionenvironment;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 // Primarily dispatches to IDL defined addBaseServerOptionDefinitions,
 // then adds some complex options inexpressible in IDL.
@@ -97,8 +98,8 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
 }
 
 Status validateSystemLogDestinationSetting(const std::string& value) {
-    if (!(str::equalCaseInsensitive(value, "syslog"_sd) ||
-          str::equalCaseInsensitive(value, "file"_sd))) {
+    if (!(str::equalCaseInsensitive(value, "syslog"sv) ||
+          str::equalCaseInsensitive(value, "file"sv))) {
         return {ErrorCodes::BadValue, "systemLog.destination expects one of 'syslog' or 'file'"};
     }
 

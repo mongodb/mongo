@@ -44,6 +44,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -56,11 +57,11 @@ namespace mongo {
  */
 class InternalSchemaMatchArrayIndexMatchExpression final : public ArrayMatchingMatchExpression {
 public:
-    static constexpr StringData kName = "$_internalSchemaMatchArrayIndex"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaMatchArrayIndex"_sd;
     static constexpr int kNumChildren = 1;
 
     InternalSchemaMatchArrayIndexMatchExpression(
-        boost::optional<StringData> path,
+        boost::optional<std::string_view> path,
         long long index,
         std::unique_ptr<ExpressionWithPlaceholder> expression,
         clonable_ptr<ErrorAnnotation> annotation = nullptr);

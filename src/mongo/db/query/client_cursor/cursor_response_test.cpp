@@ -41,6 +41,8 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/none.hpp>
 
 
@@ -391,12 +393,12 @@ TEST(CursorResponseTest, parseFromBSONCursorMetricsIncomplete) {
     // Remove each mandatory field and then check that the result is invalid.
     // Only the original metric fields are mandatory. Newer fields that are added should not be
     // mandatory for multiversion clusters.
-    std::vector<StringData> fields{CursorMetrics::kKeysExaminedFieldName,
-                                   CursorMetrics::kDocsExaminedFieldName,
-                                   CursorMetrics::kWorkingTimeMillisFieldName,
-                                   CursorMetrics::kHasSortStageFieldName,
-                                   CursorMetrics::kUsedDiskFieldName,
-                                   CursorMetrics::kFromMultiPlannerFieldName};
+    std::vector<std::string_view> fields{CursorMetrics::kKeysExaminedFieldName,
+                                         CursorMetrics::kDocsExaminedFieldName,
+                                         CursorMetrics::kWorkingTimeMillisFieldName,
+                                         CursorMetrics::kHasSortStageFieldName,
+                                         CursorMetrics::kUsedDiskFieldName,
+                                         CursorMetrics::kFromMultiPlannerFieldName};
     for (auto fieldName : fields) {
         auto badMetrics = metrics.copy().removeField(fieldName);
         auto badCursor = makeCursorBSON(badMetrics);

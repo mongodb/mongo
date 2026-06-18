@@ -54,6 +54,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -74,7 +75,7 @@ public:
     using UserMode = MongoProcessInterface::CurrentOpUserMode;
     using CursorMode = MongoProcessInterface::CurrentOpCursorMode;
 
-    static constexpr StringData kStageName = "$currentOp"_sd;
+    static constexpr std::string_view kStageName = "$currentOp"_sd;
 
     static constexpr ConnMode kDefaultConnMode = ConnMode::kExcludeIdle;
     static constexpr SessionMode kDefaultSessionMode = SessionMode::kIncludeIdle;
@@ -157,7 +158,7 @@ public:
         boost::optional<CursorMode> idleCursors = boost::none,
         boost::optional<bool> targetAllNodes = boost::none);
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

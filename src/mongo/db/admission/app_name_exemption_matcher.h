@@ -32,6 +32,7 @@
 #include "mongo/util/versioned_value.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -75,7 +76,7 @@ std::shared_ptr<std::vector<std::string>> parseAppNameExemptionList(const BSONOb
 
 void appendAppNameExemptionList(const VersionedValue<std::vector<std::string>>::Snapshot& snapshot,
                                 BSONObjBuilder* bob,
-                                StringData name);
+                                std::string_view name);
 
 }  // namespace admission
 

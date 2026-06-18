@@ -42,6 +42,7 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -86,28 +87,32 @@ OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
                                         const BSONObj& updatedDocument);
 
 OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
-                                         StringData containerIdent,
+                                         std::string_view containerIdent,
                                          int64_t key,
                                          BSONBinData value);
 
 OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
-                                         StringData containerIdent,
+                                         std::string_view containerIdent,
                                          BSONBinData key,
                                          BSONBinData value);
 
 OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
-                                         StringData containerIdent,
+                                         std::string_view containerIdent,
                                          int64_t key,
                                          BSONBinData value);
 
 OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
-                                         StringData containerIdent,
+                                         std::string_view containerIdent,
                                          BSONBinData key,
                                          BSONBinData value);
 
-OplogEntry makeContainerDeleteOplogEntry(OpTime opTime, StringData containerIdent, int64_t key);
+OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
+                                         std::string_view containerIdent,
+                                         int64_t key);
 
-OplogEntry makeContainerDeleteOplogEntry(OpTime opTime, StringData containerIdent, BSONBinData key);
+OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
+                                         std::string_view containerIdent,
+                                         BSONBinData key);
 
 /**
  * Creates an index creation entry with given optime and namespace.
@@ -127,7 +132,7 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const UUID& uuid,
                                          const UUID& indexBuildUUID,
                                          const IndexBuildInfo& indexBuildInfo,
-                                         StringData indexIdent);
+                                         std::string_view indexIdent);
 
 /**
  * Creates a two-phase index build commit oplog entry with a given optime, namespace, and index

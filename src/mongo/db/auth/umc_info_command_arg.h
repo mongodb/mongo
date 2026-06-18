@@ -39,6 +39,7 @@
 #include "mongo/util/serialization_context.h"
 
 #include <string>
+#include <string_view>
 #include <variant>
 
 namespace mongo {
@@ -93,7 +94,7 @@ public:
         return UMCInfoCommandArg(parseNamedElement(elem, tenantId));
     }
 
-    void serializeToBSON(StringData fieldName,
+    void serializeToBSON(std::string_view fieldName,
                          BSONObjBuilder* bob,
                          const SerializationContext&) const {
         if (holds_alternative<AllOnCurrentDB>(_value)) {
@@ -168,7 +169,7 @@ public:
     }
 
 private:
-    static constexpr StringData kForAllDBs = "forAllDBs"_sd;
+    static constexpr std::string_view kForAllDBs = "forAllDBs"_sd;
 
     struct AllOnCurrentDB {};
     struct AllForAllDBs {};
@@ -184,7 +185,7 @@ private:
         return T::parseFromBSON(elem, tenantId);
     }
 
-    static void serializeSingle(StringData fieldName, BSONObjBuilder* builder, Single elem) {
+    static void serializeSingle(std::string_view fieldName, BSONObjBuilder* builder, Single elem) {
         if (holds_alternative<T>(elem)) {
             builder->append(fieldName, get<T>(elem).toBSON());
         } else {

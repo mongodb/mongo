@@ -59,6 +59,7 @@
 #include "mongo/util/scopeguard.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <fcntl.h>
@@ -70,6 +71,7 @@
 
 namespace mongo::transport::grpc {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class GRPCTransportLayerTest : public ServiceContextTest {
 public:
@@ -203,9 +205,9 @@ public:
      * message from the client to the server, which responds back to the client with the same
      * message.
      */
-    void runCommandThroughServiceEntryPoint(StringData message) {
-        constexpr auto kCommandName = "mockCommand"_sd;
-        constexpr auto kReplyField = "mockReply"_sd;
+    void runCommandThroughServiceEntryPoint(std::string_view message) {
+        constexpr auto kCommandName = "mockCommand"sv;
+        constexpr auto kReplyField = "mockReply"sv;
         serviceEntryPoint->handleRequestCb = [&](OperationContext*,
                                                  const Message& request) -> Future<DbResponse> {
             ASSERT_EQ(OpMsg::parse(request).body.firstElement().fieldName(), kCommandName);

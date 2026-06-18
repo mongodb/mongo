@@ -35,13 +35,13 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -143,7 +143,7 @@ private:
 void assertOneOfNodesSelected(MockReplicaSet* replSet,
                               ReadPreference rp,
                               const std::vector<std::string> hostNames) {
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
     bool secondaryOk = (rp != ReadPreference::PrimaryOnly);
     auto tagSet = secondaryOk ? TagSet() : TagSet::primaryOnly();
     // We need the command to be a "SecOk command"
@@ -159,13 +159,13 @@ void assertOneOfNodesSelected(MockReplicaSet* replSet,
     ASSERT_EQ(hostSet.count(HostAndPort{res->getCommandReply()["host"].str()}), 1u);
 }
 
-void assertNodeSelected(MockReplicaSet* replSet, ReadPreference rp, StringData host) {
+void assertNodeSelected(MockReplicaSet* replSet, ReadPreference rp, std::string_view host) {
     assertOneOfNodesSelected(replSet, rp, std::vector<std::string>{std::string{host}});
 }
 
 TEST_F(BasicRS, QueryPrimary) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     // Note: IdentityNS contains the name of the server.
     FindCommandRequest findCmd{IdentityNS};
@@ -181,7 +181,7 @@ TEST_F(BasicRS, CommandPrimary) {
 
 TEST_F(BasicRS, QuerySecondaryOnly) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     // Note: IdentityNS contains the name of the server.
     FindCommandRequest findCmd{IdentityNS};
@@ -198,7 +198,7 @@ TEST_F(BasicRS, CommandSecondaryOnly) {
 
 TEST_F(BasicRS, QueryPrimaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     // Note: IdentityNS contains the name of the server.
     FindCommandRequest findCmd{IdentityNS};
@@ -214,7 +214,7 @@ TEST_F(BasicRS, CommandPrimaryPreferred) {
 
 TEST_F(BasicRS, QuerySecondaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     // Note: IdentityNS contains the name of the server.
     FindCommandRequest findCmd{IdentityNS};
@@ -271,7 +271,7 @@ void assertRunCommandWithReadPrefThrows(MockReplicaSet* replSet, ReadPreference 
     bool isPrimaryOnly = (rp == ReadPreference::PrimaryOnly);
     TagSet ts = isPrimaryOnly ? TagSet::primaryOnly() : TagSet();
 
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
     ASSERT_THROWS(replConn.runCommand(OpMsgRequestBuilder::create(
                       auth::ValidatedTenancyScope::kNotRequired,
                       DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
@@ -282,7 +282,7 @@ void assertRunCommandWithReadPrefThrows(MockReplicaSet* replSet, ReadPreference 
 
 TEST_F(AllNodesDown, QueryPrimary) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     ASSERT_THROWS(
@@ -296,7 +296,7 @@ TEST_F(AllNodesDown, CommandPrimary) {
 
 TEST_F(AllNodesDown, QuerySecondaryOnly) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     ASSERT_THROWS(
@@ -310,7 +310,7 @@ TEST_F(AllNodesDown, CommandSecondaryOnly) {
 
 TEST_F(AllNodesDown, QueryPrimaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     ASSERT_THROWS(
@@ -324,7 +324,7 @@ TEST_F(AllNodesDown, CommandPrimaryPreferred) {
 
 TEST_F(AllNodesDown, QuerySecondaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     ASSERT_THROWS(replConn.find(std::move(findCmd),
@@ -338,7 +338,7 @@ TEST_F(AllNodesDown, CommandSecondaryPreferred) {
 
 TEST_F(AllNodesDown, QueryNearest) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     ASSERT_THROWS(replConn.find(std::move(findCmd), ReadPreferenceSetting{ReadPreference::Nearest}),
@@ -384,7 +384,7 @@ private:
 
 TEST_F(PrimaryDown, QueryPrimary) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     ASSERT_THROWS(
@@ -398,7 +398,7 @@ TEST_F(PrimaryDown, CommandPrimary) {
 
 TEST_F(PrimaryDown, QuerySecondaryOnly) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     // Note: IdentityNS contains the name of the server.
     FindCommandRequest findCmd{IdentityNS};
@@ -415,7 +415,7 @@ TEST_F(PrimaryDown, CommandSecondaryOnly) {
 
 TEST_F(PrimaryDown, QueryPrimaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     // Note: IdentityNS contains the name of the server.
     FindCommandRequest findCmd{IdentityNS};
@@ -432,7 +432,7 @@ TEST_F(PrimaryDown, CommandPrimaryPreferred) {
 
 TEST_F(PrimaryDown, QuerySecondaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     // Note: IdentityNS contains the name of the server.
     FindCommandRequest findCmd{IdentityNS};
@@ -449,7 +449,7 @@ TEST_F(PrimaryDown, CommandSecondaryPreferred) {
 
 TEST_F(PrimaryDown, Nearest) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     auto cursor = replConn.find(std::move(findCmd), ReadPreferenceSetting{ReadPreference::Nearest});
@@ -493,7 +493,7 @@ private:
 
 TEST_F(SecondaryDown, QueryPrimary) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     // Note: IdentityNS contains the name of the server.
     FindCommandRequest findCmd{IdentityNS};
@@ -509,7 +509,7 @@ TEST_F(SecondaryDown, CommandPrimary) {
 
 TEST_F(SecondaryDown, QuerySecondaryOnly) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     ASSERT_THROWS(
@@ -523,7 +523,7 @@ TEST_F(SecondaryDown, CommandSecondaryOnly) {
 
 TEST_F(SecondaryDown, QueryPrimaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     // Note: IdentityNS contains the name of the server.
     FindCommandRequest findCmd{IdentityNS};
@@ -539,7 +539,7 @@ TEST_F(SecondaryDown, CommandPrimaryPreferred) {
 
 TEST_F(SecondaryDown, QuerySecondaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     auto cursor = replConn.find(std::move(findCmd),
@@ -554,7 +554,7 @@ TEST_F(SecondaryDown, CommandSecondaryPreferred) {
 
 TEST_F(SecondaryDown, QueryNearest) {
     MockReplicaSet* replSet = getReplSet();
-    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), std::string_view());
 
     FindCommandRequest findCmd{IdentityNS};
     auto cursor = replConn.find(std::move(findCmd), ReadPreferenceSetting{ReadPreference::Nearest});
@@ -695,7 +695,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldPinIfSameSettings) {
     vector<HostAndPort> seedList;
     seedList.push_back(HostAndPort(replSet->getPrimary()));
 
-    DBClientReplicaSet replConn(replSet->getSetName(), seedList, StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), seedList, std::string_view());
 
     string dest;
     {
@@ -722,7 +722,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfHostMarkedAsFailed) {
     vector<HostAndPort> seedList;
     seedList.push_back(HostAndPort(replSet->getPrimary()));
 
-    DBClientReplicaSet replConn(replSet->getSetName(), seedList, StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), seedList, std::string_view());
 
     string dest;
     {
@@ -756,7 +756,7 @@ TEST_F(TaggedFiveMemberRS, SecondaryConnReturnsSecConn) {
     vector<HostAndPort> seedList;
     seedList.push_back(HostAndPort(replSet->getPrimary()));
 
-    DBClientReplicaSet replConn(replSet->getSetName(), seedList, StringData());
+    DBClientReplicaSet replConn(replSet->getSetName(), seedList, std::string_view());
 
     mongo::DBClientConnection& secConn = replConn.secondaryConn();
 

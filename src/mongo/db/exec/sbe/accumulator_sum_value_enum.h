@@ -32,6 +32,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -57,8 +59,8 @@ enum AggSumValueElems {
 
 namespace stage_builder {
 
-constexpr StringData partialSumName = "ps"_sd;  // Used for the full state of partial sum
-constexpr StringData countName = "count"_sd;    // Used for number of elements in average
+constexpr std::string_view partialSumName = "ps"_sd;  // Used for the full state of partial sum
+constexpr std::string_view countName = "count"_sd;    // Used for number of elements in average
 
 }  // namespace stage_builder
 

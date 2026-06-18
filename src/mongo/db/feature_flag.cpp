@@ -39,6 +39,8 @@
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/version/releases.h"
 
+#include <string_view>
+
 namespace mongo {
 void BinaryCompatibleFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const {
     flagBuilder.append("value", _enabled);
@@ -57,7 +59,7 @@ void BinaryCompatibleFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& fla
 
 // (Generic FCV reference): Feature flag support.
 FCVGatedFeatureFlagBase::FCVGatedFeatureFlagBase(bool enabled,
-                                                 StringData versionString,
+                                                 std::string_view versionString,
                                                  bool enableOnTransitionalFCV)
     : _enabled(enabled),
       _enableOnTransitionalFCV(enableOnTransitionalFCV),
@@ -257,7 +259,8 @@ std::vector<IncrementalRolloutFeatureFlag*>& getMutableAllIncrementalRolloutFeat
 }
 }  // namespace
 
-IncrementalRolloutFeatureFlag* IncrementalRolloutFeatureFlag::findByName(StringData flagName) {
+IncrementalRolloutFeatureFlag* IncrementalRolloutFeatureFlag::findByName(
+    std::string_view flagName) {
     for (auto* flag : getMutableAllIncrementalRolloutFeatureFlags()) {
         if (flag->getName() == flagName) {
             return flag;
@@ -267,10 +270,10 @@ IncrementalRolloutFeatureFlag* IncrementalRolloutFeatureFlag::findByName(StringD
 }
 
 IncrementalRolloutFeatureFlag::IncrementalRolloutFeatureFlag(
-    StringData flagName,
+    std::string_view flagName,
     RolloutPhase phase,
     bool value,
-    StringData serializeOnOutgoingRequestsVersion)
+    std::string_view serializeOnOutgoingRequestsVersion)
     : _flagName(std::string{flagName}), _phase(phase), _value(value) {
     if (!serializeOnOutgoingRequestsVersion.empty()) {
         _serializeOnOutgoingRequestsVersion =

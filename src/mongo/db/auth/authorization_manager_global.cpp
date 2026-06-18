@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -49,6 +48,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -104,10 +104,10 @@ Service::ConstructorActionRegisterer createAuthorizationManager(
         // Send x509 authentication if we can.
 #ifdef MONGO_CONFIG_SSL
             auth::setInternalUserAuthParams(auth::createInternalX509AuthCredential(
-                boost::optional<StringData>{SSLManagerCoordinator::get()
-                                                ->getSSLManager()
-                                                ->getSSLConfiguration()
-                                                .clientSubjectName.toString()}));
+                boost::optional<std::string_view>{SSLManagerCoordinator::get()
+                                                      ->getSSLManager()
+                                                      ->getSSLConfiguration()
+                                                      .clientSubjectName.toString()}));
 #endif
         }
     },
@@ -117,12 +117,12 @@ Service::ConstructorActionRegisterer createAuthorizationManager(
 
 void AuthzVersionParameter::append(OperationContext* opCtx,
                                    BSONObjBuilder* b,
-                                   StringData name,
+                                   std::string_view name,
                                    const boost::optional<TenantId>&) {
     b->append(name, AuthorizationManager::schemaVersion28SCRAM);
 }
 
-Status AuthzVersionParameter::setFromString(StringData newValueString,
+Status AuthzVersionParameter::setFromString(std::string_view newValueString,
                                             const boost::optional<TenantId>&) {
     return {ErrorCodes::InternalError, "set called on unsettable server parameter"};
 }

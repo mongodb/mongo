@@ -121,6 +121,7 @@
 #include <exception>
 #include <fstream>  // IWYU pragma: keep
 #include <future>
+#include <string_view>
 #include <type_traits>
 
 #include <absl/container/node_hash_set.h>
@@ -137,6 +138,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 // Failpoint which will pause an operation just after allocating a point-in-time storage engine
@@ -523,8 +525,8 @@ void updateSessionEntry(OperationContext* opCtx,
 
         if (status == ErrorCodes::DuplicateKey) {
             throwWriteConflictException(
-                str::stream() << "Updating session entry failed with duplicate key, session "_sd
-                              << sessionId << ", transaction "_sd << txnNum);
+                str::stream() << "Updating session entry failed with duplicate key, session "sv
+                              << sessionId << ", transaction "sv << txnNum);
         }
 
         uassertStatusOK(status);
@@ -622,7 +624,7 @@ TransactionParticipant::Participant::Participant(OperationContext* opCtx, Sessio
 TransactionParticipant::Participant::Participant(const SessionToKill& session)
     : Observer(&getTransactionParticipant(session.get())) {}
 
-void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringData msg) {
+void TransactionParticipant::performNoopWrite(OperationContext* opCtx, std::string_view msg) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     // The locker must not have a max lock timeout when this noop write is performed, since if it
@@ -1492,7 +1494,7 @@ TransactionParticipant::TxnResources::TxnResources(ClientLock& clientLock,
     if (opCtx->getLogicalSessionId()) {
         auto& lsid = opCtx->getLogicalSessionId();
         std::string debugInfo = str::stream()
-            << "lsid: "_sd << lsid->getId() << ", " << lsid->getUid().toString() << ", "
+            << "lsid: "sv << lsid->getId() << ", " << lsid->getUid().toString() << ", "
             << lsid->getTxnNumber() << ", " << lsid->getTxnUUID();
         _locker->setDebugInfo(std::move(debugInfo));
     }
@@ -3251,7 +3253,7 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
 
     attrs.add("prepareReadConflicts", singleTransactionStats.getPrepareReadConflicts());
 
-    StringData terminationCauseString =
+    std::string_view terminationCauseString =
         terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
     attrs.add("terminationCause", terminationCauseString);
 
@@ -3987,7 +3989,7 @@ void mapLogv2ToBSON(BSONObjBuilder& builder,
     } else if (value.stringSerialize) {
         fmt::memory_buffer out;
         value.stringSerialize(out);
-        builder.append(name, StringData{out.data(), out.size()});
+        builder.append(name, std::string_view{out.data(), out.size()});
     } else if (value.toString) {
         builder.append(name, value.toString());
     } else {

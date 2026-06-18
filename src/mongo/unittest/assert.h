@@ -37,7 +37,6 @@
 // IWYU pragma: friend "mongo/unittest/.*"
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_matcher.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -50,6 +49,7 @@
 
 #include <cmath>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -240,7 +240,7 @@ namespace assert_details {
 template <typename Exception>
 MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS inline boost::optional<std::string> evaluateExceptionMatcher(
     std::invocable auto expression,
-    StringData expressionText,
+    std::string_view expressionText,
     testing::Matcher<Exception> matcher) {
     if (testing::StringMatchResultListener listener;
         !testing::ExplainMatchResult(match::Throws<Exception>(matcher), expression, &listener)) {

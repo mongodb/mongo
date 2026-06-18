@@ -58,8 +58,11 @@
 #include <boost/date_time/posix_time/time_parsers.hpp>
 #include <boost/optional/optional.hpp>
 
+using namespace std::literals::string_view_literals;
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
+using namespace std::literals::string_view_literals;
 namespace mongo::timeseries {
 namespace {
 
@@ -67,7 +70,7 @@ class TimeseriesWriteUtilTest : public TimeseriesTestFixture {
 protected:
     std::shared_ptr<bucket_catalog::WriteBatch> generateBatch(
         const UUID& uuid, bucket_catalog::BucketMetadata bucketMetadata) {
-        OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
+        OID oid = OID::createFromString("629e1e680958e279dc29a517"sv);
         std::uint8_t stripe = 0;
         bucket_catalog::BucketId bucketId(uuid, oid, stripe);
         auto opId = 0;
@@ -244,7 +247,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurements) {
     UUID uuid = UUID::gen();
-    OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
+    OID oid = OID::createFromString("629e1e680958e279dc29a517"sv);
     TimeseriesOptions options("time");
     options.setGranularity(BucketGranularityEnum::Seconds);
     const std::vector<BSONObj> measurements = {
@@ -280,7 +283,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurements) {
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
     UUID uuid = UUID::gen();
-    OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
+    OID oid = OID::createFromString("629e1e680958e279dc29a517"sv);
     TimeseriesOptions options("time");
     options.setGranularity(BucketGranularityEnum::Seconds);
     const std::vector<BSONObj> measurements = {
@@ -450,7 +453,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-    OID bucketId = OID::createFromString("629e1e680958e279dc29a517"_sd);
+    OID bucketId = OID::createFromString("629e1e680958e279dc29a517"sv);
     auto recordId = record_id_helpers::keyForOID(bucketId);
 
     AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);
@@ -502,7 +505,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-    OID bucketId = OID::createFromString("629e1e680958e279dc29a517"_sd);
+    OID bucketId = OID::createFromString("629e1e680958e279dc29a517"sv);
     auto recordId = record_id_helpers::keyForOID(bucketId);
 
     AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);

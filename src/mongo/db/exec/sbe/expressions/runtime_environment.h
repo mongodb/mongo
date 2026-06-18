@@ -31,7 +31,6 @@
 
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/sbe/slots_provider.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -44,6 +43,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo::sbe {
@@ -114,7 +114,7 @@ public:
      *
      * A user exception is raised if this slot 'name' has been already registered.
      */
-    value::SlotId registerSlot(StringData name,
+    value::SlotId registerSlot(std::string_view name,
                                value::TypeTags tag,
                                value::Value val,
                                bool owned,
@@ -132,13 +132,13 @@ public:
      * Returns a SlotId registered for the given slot 'name'. If the slot with the specified name
      * hasn't been registered, a user exception is raised.
      */
-    value::SlotId getSlot(StringData name) const final;
+    value::SlotId getSlot(std::string_view name) const final;
 
     /**
      * Returns a SlotId registered for the given slot 'name'. If the slot with the specified name
      * hasn't been registered, boost::none is returned.
      */
-    boost::optional<value::SlotId> getSlotIfExists(StringData name) const final;
+    boost::optional<value::SlotId> getSlotIfExists(std::string_view name) const final;
 
     /**
      * Store the given value in the specified slot within this runtime environment instance.
@@ -198,7 +198,7 @@ private:
             return index;
         }
 
-        void nameSlot(StringData name, value::SlotId slot) {
+        void nameSlot(std::string_view name, value::SlotId slot) {
             uassert(5645901, str::stream() << "undefined slot: " << slot, slots.count(slot));
             auto [_, inserted] = namedSlots.emplace(name, slot);
             uassert(5645902, str::stream() << "duplicate named slot: " << name, inserted);

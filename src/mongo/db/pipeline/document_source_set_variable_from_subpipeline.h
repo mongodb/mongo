@@ -50,6 +50,7 @@
 #include <list>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -65,7 +66,7 @@ struct SetVariableFromSubPipelineSharedState {
 };
 class DocumentSourceSetVariableFromSubPipeline final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$setVariableFromSubPipeline"_sd;
+    static constexpr std::string_view kStageName = "$setVariableFromSubPipeline"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -82,7 +83,7 @@ public:
         // {shardsStage, mergingStage, sortPattern}
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

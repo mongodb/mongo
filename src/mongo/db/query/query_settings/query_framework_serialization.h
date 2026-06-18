@@ -36,11 +36,12 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo::query_settings::query_framework {
 
-constexpr StringData kClassic = "classic"_sd;
-constexpr StringData kSbe = "sbe"_sd;
+constexpr std::string_view kClassic = "classic"_sd;
+constexpr std::string_view kSbe = "sbe"_sd;
 
 /**
  * Serializes the internal `QueryFrameworkControlEnum` values to the appropiate
@@ -52,5 +53,5 @@ std::string serialize(QueryFrameworkControlEnum queryFramework);
  * Parses the 'querySettings.queryFramework' user-facing strings as 'QueryFrameworkControlEnum'
  * values.
  */
-QueryFrameworkControlEnum parse(StringData queryFrameworkString);
+QueryFrameworkControlEnum parse(std::string_view queryFrameworkString);
 }  // namespace mongo::query_settings::query_framework

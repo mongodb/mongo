@@ -40,10 +40,12 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 // Tests for Decimal128 constructors
 TEST(Decimal128Test, TestDefaultConstructor) {
@@ -1213,19 +1215,19 @@ TEST(Decimal128Test, TestDecimal128Quantize) {
 
 struct RoundingModeInfo {
     Decimal128::RoundingMode mode;
-    StringData name;
+    std::string_view name;
 };
 
 static constexpr std::array<RoundingModeInfo, 5> roundingModes{
-    {{Decimal128::kRoundTiesToEven, "kRoundTiesToEven"_sd},
-     {Decimal128::kRoundTowardNegative, "kRoundTowardNegative"_sd},
-     {Decimal128::kRoundTowardPositive, "kRoundTowardPositive"_sd},
-     {Decimal128::kRoundTowardZero, "kRoundTowardZero"_sd},
-     {Decimal128::kRoundTiesToAway, "kRoundTiesToAway"_sd}}};
+    {{Decimal128::kRoundTiesToEven, "kRoundTiesToEven"sv},
+     {Decimal128::kRoundTowardNegative, "kRoundTowardNegative"sv},
+     {Decimal128::kRoundTowardPositive, "kRoundTowardPositive"sv},
+     {Decimal128::kRoundTowardZero, "kRoundTowardZero"sv},
+     {Decimal128::kRoundTiesToAway, "kRoundTiesToAway"sv}}};
 
 void assertRoundingTestCase(const Decimal128& actual,
                             const Decimal128& expected,
-                            StringData roundingModeName,
+                            std::string_view roundingModeName,
                             int testCaseLineNumber) {
     auto const& actualVal = actual.getValue();
     auto const& expectedVal = expected.getValue();

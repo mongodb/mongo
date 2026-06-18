@@ -52,6 +52,7 @@
 #include <array>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <tuple>
 
 #include <boost/optional/optional.hpp>
@@ -441,7 +442,7 @@ static void serializeValueIntoKeyString(key_string::Builder& buf,
                                         Value val,
                                         const CollatorInterface* collator) {
 
-    const auto stringTransformFn = [&](StringData stringData) {
+    const auto stringTransformFn = [&](std::string_view stringData) {
         return collator->getComparisonString(stringData);
     };
 

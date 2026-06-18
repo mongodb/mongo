@@ -36,11 +36,13 @@
 #include "mongo/util/uuid.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::change_stream_test_helper {
+using namespace std::literals::string_view_literals;
 
 const UUID& testUuid() {
     static const UUID* uuid_gen = new UUID(UUID::gen());
@@ -59,11 +61,11 @@ LogicalSessionFromClient testLsid() {
 Document makeResumeToken(Timestamp ts,
                          ImplicitValue uuid,
                          ImplicitValue docKeyOrOpDesc,
-                         StringData operationType,
+                         std::string_view operationType,
                          ResumeTokenData::FromInvalidate fromInvalidate,
                          size_t txnOpIndex) {
-    static const std::set<StringData> kCrudOps = {
-        "insert"_sd, "update"_sd, "replace"_sd, "delete"_sd};
+    static const std::set<std::string_view> kCrudOps = {
+        "insert"sv, "update"sv, "replace"sv, "delete"sv};
     auto eventId = Value(Document{
         {"operationType", operationType},
         {kCrudOps.count(operationType) ? "documentKey" : "operationDescription", docKeyOrOpDesc}});

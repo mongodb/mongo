@@ -70,6 +70,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 #ifdef _WIN32
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -179,7 +180,7 @@ ExitCode initAndListen() {
         }
 #endif
         const bool is32bit = sizeof(int*) == 4;
-        attrs.add("architecture", is32bit ? "32-bit"_sd : "64-bit"_sd);
+        attrs.add("architecture", is32bit ? "32-bit"sv : "64-bit"sv);
         std::string hostName = getHostNameCached();
         attrs.add("host", hostName);
         LOGV2(4615669, "MongoCryptD starting", attrs);

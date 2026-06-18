@@ -49,11 +49,13 @@
 
 #include <climits>
 #include <cmath>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace ExpressionTests {
+using namespace std::literals::string_view_literals;
 
 class ExpressionMapReduceFilterTest : public mongo::unittest::Test {
 public:
@@ -63,7 +65,7 @@ public:
 
     // Parse 'json' into an expression of type T.
     template <class T>
-    boost::intrusive_ptr<T> parse(StringData json) {
+    boost::intrusive_ptr<T> parse(std::string_view json) {
         return parse<T>(fromjson(json));
     }
 
@@ -138,7 +140,7 @@ TEST_F(ExpressionMapReduceFilterTest, MapParseConstraints) {
                 ErrorCodes::FailedToParse);
 
     // Identifier with embedded null.
-    StringData str("fo\0o", 4);
+    std::string_view str("fo\0o", 4);
     BSONObj query = BSONObjBuilder()
                         .append("$map",
                                 BSONObjBuilder()
@@ -393,7 +395,7 @@ TEST_F(ExpressionMapReduceFilterTest, ReduceParseConstraints) {
                 ErrorCodes::FailedToParse);
 
     // Identifier with embedded null.
-    StringData str("fo\0o", 4);
+    std::string_view str("fo\0o", 4);
     BSONObj query =
         BSONObjBuilder()
             .append(
@@ -444,7 +446,7 @@ TEST(ExpressionReduceTest, ReduceStringConcat) {
         ExpressionReduce::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
     Value val = expressionReduce->evaluate(MutableDocument().freeze(), &expCtx.variables);
 
-    ASSERT_VALUE_EQ(val, Value(("abc"_sd)));
+    ASSERT_VALUE_EQ(val, Value(("abc"sv)));
 }
 
 TEST(ExpressionReduceTest, ReduceSumProduct) {
@@ -669,7 +671,7 @@ TEST_F(ExpressionMapReduceFilterTest, FilterParseConstraints) {
         ErrorCodes::FailedToParse);
 
     // Identifier with embedded null.
-    StringData str("fo\0o", 4);
+    std::string_view str("fo\0o", 4);
     BSONObj query =
         BSONObjBuilder()
             .append("$filter",

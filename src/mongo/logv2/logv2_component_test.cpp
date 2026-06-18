@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 
 
 namespace mongo::logv2 {
@@ -202,7 +202,7 @@ TEST(LogV2ComponentTest, DottedNameOldTest) {
 TEST(LogV2ComponentTest, DottedName) {
     struct {
         LogComponent lc;
-        StringData expect;
+        std::string_view expect;
     } const kSpecs[] = {
         {LogComponent::kDefault, "default"},
         {LogComponent::kAccessControl, "accessControl"},

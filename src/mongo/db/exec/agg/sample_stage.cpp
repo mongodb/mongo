@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/agg/sample_stage.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -48,6 +47,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -68,7 +68,7 @@ const BSONObj randSortSpec = BSON("$rand" << BSON("$meta" << "randVal"));
 namespace exec::agg {
 REGISTER_AGG_STAGE_MAPPING(sampleStage, DocumentSourceSample::id, sampleStageToStageFn);
 
-SampleStage::SampleStage(StringData stageName,
+SampleStage::SampleStage(std::string_view stageName,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          long long size)
     : Stage(stageName, pExpCtx), _size(size) {

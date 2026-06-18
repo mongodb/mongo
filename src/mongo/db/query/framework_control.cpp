@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
@@ -40,18 +39,21 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/synchronized_value.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 void QueryFrameworkControl::append(OperationContext*,
                                    BSONObjBuilder* b,
-                                   StringData name,
+                                   std::string_view name,
                                    const boost::optional<TenantId>&) {
     *b << name << idl::serialize(_data.get());
 }
 
-Status QueryFrameworkControl::setFromString(StringData value, const boost::optional<TenantId>&) {
+Status QueryFrameworkControl::setFromString(std::string_view value,
+                                            const boost::optional<TenantId>&) {
     _data = idl::deserialize<QueryFrameworkControlEnum>(
         value, IDLParserContext("internalQueryFrameworkControl"));
     return Status::OK();

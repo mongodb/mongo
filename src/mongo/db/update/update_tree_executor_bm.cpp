@@ -36,6 +36,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain_global.h"
 
+#include <string_view>
+
 #include <benchmark/benchmark.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -44,7 +46,8 @@ namespace mongo {
 namespace {
 
 static const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.bm");
-static const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> kArrayFilters = {};
+static const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>> kArrayFilters =
+    {};
 
 
 void configureLogging(bool disable) {

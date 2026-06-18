@@ -52,6 +52,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -66,7 +67,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(QueryStats);
 
 class DocumentSourceQueryStats final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$queryStats"_sd;
+    static constexpr std::string_view kStageName = "$queryStats"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
@@ -143,7 +144,7 @@ public:
         return boost::none;
     }
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     }
 

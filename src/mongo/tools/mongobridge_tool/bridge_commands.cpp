@@ -45,6 +45,7 @@
 #include <limits>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -181,7 +182,7 @@ MONGO_INITIALIZER(RegisterBridgeCommands)(InitializerContext* context) {
 
 }  // namespace
 
-StatusWith<BridgeCommand*> BridgeCommand::findCommand(StringData cmdName) {
+StatusWith<BridgeCommand*> BridgeCommand::findCommand(std::string_view cmdName) {
     auto it = bridgeCommandMap.find(cmdName);
     if (it != bridgeCommandMap.end()) {
         invariant(it->second);

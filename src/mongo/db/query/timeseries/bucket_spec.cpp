@@ -52,6 +52,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <string_view>
 
 #include <s2cellid.h>
 
@@ -66,7 +67,7 @@ namespace mongo::timeseries {
 
 using IneligiblePredicatePolicy = BucketSpec::IneligiblePredicatePolicy;
 
-bool BucketSpec::fieldIsComputed(StringData field) const {
+bool BucketSpec::fieldIsComputed(std::string_view field) const {
     return std::any_of(
         _computedMetaProjFields.begin(), _computedMetaProjFields.end(), [&](auto& s) {
             return s == field || expression::isPathPrefixOf(field, s) ||
@@ -111,7 +112,7 @@ std::unique_ptr<MatchExpression> createTightExprTimeFieldPredicate(
 
 BucketSpec::BucketPredicate BucketSpec::handleIneligible(IneligiblePredicatePolicy policy,
                                                          const MatchExpression* matchExpr,
-                                                         StringData message) {
+                                                         std::string_view message) {
     switch (policy) {
         case IneligiblePredicatePolicy::kError:
             uasserted(
@@ -324,10 +325,10 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         if (assumeNoMixedSchemaData) {
             // We know that every field that appears in an event will also appear in the min/max.
             auto result = std::make_unique<AndMatchExpression>();
-            result->add(std::make_unique<ExistsMatchExpression>(StringData(
-                std::string{kControlMinFieldNamePrefix} + std::string{matchExpr->path()})));
-            result->add(std::make_unique<ExistsMatchExpression>(StringData(
-                std::string{kControlMaxFieldNamePrefix} + std::string{matchExpr->path()})));
+            result->add(std::make_unique<ExistsMatchExpression>(std::string_view(
+                fmt::format("{}{}", kControlMinFieldNamePrefix, matchExpr->path()))));
+            result->add(std::make_unique<ExistsMatchExpression>(std::string_view(
+                fmt::format("{}{}", kControlMaxFieldNamePrefix, matchExpr->path()))));
             return {std::move(result), nullptr};
         } else {
             // At time of writing, we only pass 'kError' when creating a partial index, and
@@ -424,7 +425,7 @@ std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
 
 std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
 BucketSpec::splitOutMetaOnlyPredicate(std::unique_ptr<MatchExpression> expr,
-                                      boost::optional<StringData> metaField) {
+                                      boost::optional<std::string_view> metaField) {
     if (!metaField) {
         // If there's no metadata field, then none of the predicates are metadata-only
         // predicates.
@@ -461,7 +462,7 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
     if (residualPred) {
         BucketSpec bucketSpec{
             std::string{tsOptions.getTimeField()},
-            metaField.map([](StringData s) { return std::string{s}; }),
+            metaField.map([](std::string_view s) { return std::string{s}; }),
             // Since we are operating on a collection, not a query-result,
             // there are no inclusion/exclusion projections we need to apply
             // to the buckets before unpacking. So we can use default values

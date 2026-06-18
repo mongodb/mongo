@@ -34,14 +34,15 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
 namespace {
-std::set<StringData> sequenceFields{"documents", "updates", "deletes", "GARBAGE"};
+std::set<std::string_view> sequenceFields{"documents", "updates", "deletes", "GARBAGE"};
 }
 
-OpMsgRequest toOpMsg(StringData db, const BSONObj& cmd, bool useDocSequence) {
+OpMsgRequest toOpMsg(std::string_view db, const BSONObj& cmd, bool useDocSequence) {
     OpMsgRequest request;
     BSONObjBuilder body;
     for (auto field : cmd) {

@@ -30,7 +30,6 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/service_context.h"
@@ -43,6 +42,7 @@
 #include <deque>
 #include <memory>
 #include <new>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -66,7 +66,7 @@ class AppendMergedTreesInvocation {
         }
 
         /** The name of the child element to which this refers. Requires `!done()`. */
-        StringData key() const {
+        std::string_view key() const {
             return _iter->first;
         }
 
@@ -134,7 +134,7 @@ class AppendMergedTreesInvocation {
         BSONObjBuilder* bob;
         std::unique_ptr<BSONObjBuilder> bobStorage;
         bool inSubtreePhase;
-        StringData key;
+        std::string_view key;
         BSONObj excludePaths;
     };
 
@@ -191,7 +191,7 @@ private:
      * excluded, then this returns false and the embedded subtree under that key
      * for use in recursive descent, hence the `std::pair` return type.
      */
-    std::pair<bool, BSONObj> _applyExclusion(StringData key) {
+    std::pair<bool, BSONObj> _applyExclusion(std::string_view key) {
         Frame& frame = _stack.back();
         auto el = frame.excludePaths.getField(key);
         if (!el)
@@ -266,8 +266,8 @@ private:
     }
 
     /** Returns current path built from the `_stack` keys. */
-    std::vector<StringData> _pathDiag() const {
-        std::vector<StringData> parts;
+    std::vector<std::string_view> _pathDiag() const {
+        std::vector<std::string_view> parts;
         parts.reserve(_stack.size());
         for (auto&& fr : _stack)
             parts.push_back(fr.key);
@@ -277,7 +277,7 @@ private:
     /** The `_pathDiag` vector, joined by dots. */
     std::string _pathDiagJoin() const {
         std::string r;
-        StringData sep;
+        std::string_view sep;
         for (auto s : _pathDiag()) {
             (r += sep) += s;
             sep = ".";
@@ -305,7 +305,7 @@ bool isMainThread() {
 
 }  // namespace
 
-void MetricTree::add(StringData path, std::unique_ptr<ServerStatusMetric> metric) {
+void MetricTree::add(std::string_view path, std::unique_ptr<ServerStatusMetric> metric) {
     invariant(!_frozen,
               fmt::format("Cannot add metric '{}' after the MetricTreeSet has been frozen", path));
     invariant(isMainThread(), fmt::format("Cannot add metric '{}' from a non-main thread", path));
@@ -323,8 +323,8 @@ void MetricTree::add(StringData path, std::unique_ptr<ServerStatusMetric> metric
     }
 }
 
-void MetricTree::_add(StringData path, std::unique_ptr<ServerStatusMetric> metric) {
-    StringData tail = path;
+void MetricTree::_add(std::string_view path, std::unique_ptr<ServerStatusMetric> metric) {
+    std::string_view tail = path;
     MetricTree* sub = this;
     while (true) {
         // Walk the tree popping heads and creating interior nodes until there's no more tail.
@@ -337,7 +337,7 @@ void MetricTree::_add(StringData path, std::unique_ptr<ServerStatusMetric> metri
             return;
         }
         // Found a dot, so hop to an interior node, creating it if necessary.
-        StringData part = tail.substr(0, dot);
+        std::string_view part = tail.substr(0, dot);
         tail = tail.substr(dot + 1);
         auto iter = sub->_children.find(part);
         if (iter != sub->_children.end()) {
@@ -352,7 +352,7 @@ void MetricTree::_add(StringData path, std::unique_ptr<ServerStatusMetric> metri
     }
 }
 
-void MetricTree::removeForTests(StringData path) {
+void MetricTree::removeForTests(std::string_view path) {
     if (path.empty()) {
         return;
     }
@@ -367,14 +367,14 @@ void MetricTree::removeForTests(StringData path) {
     _frozen = false;
 }
 
-void MetricTree::_removeForTests(StringData path) {
+void MetricTree::_removeForTests(std::string_view path) {
     // Walk the path, recording (parent, key) pairs so we can prune empty subtrees afterward.
     struct Node {
         MetricTree* parent;
         std::string key;
     };
     std::vector<Node> stack;
-    StringData tail = path;
+    std::string_view tail = path;
     MetricTree* subTree = this;
 
     while (true) {
@@ -385,7 +385,7 @@ void MetricTree::_removeForTests(StringData path) {
             break;
         }
 
-        StringData part = tail.substr(0, dot);
+        std::string_view part = tail.substr(0, dot);
         tail = tail.substr(dot + 1);
         auto iter = subTree->_children.find(part);
 

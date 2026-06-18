@@ -39,6 +39,8 @@
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 
+#include <string_view>
+
 #include <absl/strings/str_split.h>
 #include <boost/filesystem/operations.hpp>
 
@@ -311,7 +313,7 @@ Status canonicalizeSSLServerOptions(moe::Environment* params) {
             return ret;
         }
 
-        if (StringData(mode).ends_with("SSL")) {
+        if (std::string_view(mode).ends_with("SSL")) {
             mode.replace(mode.size() - 3, 3, "TLS");
         }
 

@@ -30,7 +30,6 @@
 #pragma once
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -38,6 +37,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -48,18 +48,18 @@ namespace mongo::pipeline::dependency_graph {
  * A dot-separated field path. Every component is interpreted as a field name and never as an
  * array index.
  */
-using PathRef = StringData;
+using PathRef = std::string_view;
 
 /**
  * Callback used to query whether a path from the input of the pipeline (i.e. the base collection)
  * may resolve to an array.
  */
-using CanPathBeArray = std::function<bool(StringData)>;
+using CanPathBeArray = std::function<bool(std::string_view)>;
 
 /**
  * Always returns true (any path may be an array).
  */
-bool defaultCanPathBeArray(StringData path);
+bool defaultCanPathBeArray(std::string_view path);
 
 /**
  * Result of looking up which stage last declared or modified a field path.

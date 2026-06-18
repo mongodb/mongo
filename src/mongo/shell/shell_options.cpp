@@ -66,6 +66,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -94,7 +95,7 @@ const std::set<std::string> kSetShellParameterAllowlist = {
     "defaultFindReplicaSetHostTimeoutMS",
     "multitenancySupport"};
 
-std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {
+std::string getMongoShellHelp(std::string_view name, const moe::OptionSection& options) {
     StringBuilder sb;
     sb << "usage: " << name << " [options] [db address] [file names (ending in .js)]\n"
        << "db address can be:\n"

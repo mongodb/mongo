@@ -33,7 +33,6 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -96,6 +95,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <variant>
@@ -127,6 +127,7 @@ MONGO_FAIL_POINT_DEFINE(fleCrudPauseNonTxnGetTags);
 MONGO_FAIL_POINT_DEFINE(fleCrudThrowTransientTxnError);
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 std::vector<write_ops::WriteError> singleStatusToWriteErrors(const Status& status) {
     std::vector<write_ops::WriteError> errors;
@@ -388,7 +389,7 @@ using VTS = auth::ValidatedTenancyScope;
 void validateInsertUpdatePayloads(OperationContext* opCtx,
                                   const std::vector<EncryptedField>& fields,
                                   const std::vector<EDCServerPayloadInfo>& payload) {
-    std::map<StringData, const EncryptedField*> pathToFieldMap;
+    std::map<std::string_view, const EncryptedField*> pathToFieldMap;
     for (const auto& field : fields) {
         pathToFieldMap.insert({field.getPath(), &field});
     }
@@ -1062,7 +1063,7 @@ void validateFindAndModifyRequest(OperationContext* opCtx,
         update = updateMod.getUpdateReplacement();
     } else {
         invariant(updateMod.type() == write_ops::UpdateModification::Type::kModifier);
-        update = updateMod.getUpdateModifier().getObjectField("$set"_sd);
+        update = updateMod.getUpdateModifier().getObjectField("$set"sv);
     }
 
     if (!update.firstElement().eoo()) {
@@ -1351,7 +1352,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     auto idElement = originalDocument.firstElement();
     uassert(6371504,
             "Missing _id field in pre-image document",
-            idElement.fieldNameStringData() == "_id"_sd);
+            idElement.fieldNameStringData() == "_id"sv);
     BSONObj newDocument = queryImpl->getById(edcNss, idElement);
 
     // Fail if we could not find the new document
@@ -1379,7 +1380,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         auto pullUpdateOpEntry = write_ops::UpdateOpEntry();
         pullUpdateOpEntry.setUpsert(false);
         pullUpdateOpEntry.setMulti(false);
-        pullUpdateOpEntry.setQ(BSON("_id"_sd << idElement));
+        pullUpdateOpEntry.setQ(BSON("_id"sv << idElement));
         pullUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
             pullUpdate, write_ops::UpdateModification::ModifierUpdateTag{}));
         newUpdateRequest.setUpdates({pullUpdateOpEntry});
@@ -1624,7 +1625,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     auto idElement = originalDocument.firstElement();
     uassert(6371403,
             "Missing _id field in pre-image document, the fields document must contain _id",
-            idElement.fieldNameStringData() == "_id"_sd);
+            idElement.fieldNameStringData() == "_id"sv);
 
     // Is this a delete? If so, there's no need to GarbageCollect.
     if (findAndModifyRequest.getRemove().value_or(false)) {
@@ -1664,7 +1665,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
         auto pullUpdateOpEntry = write_ops::UpdateOpEntry();
         pullUpdateOpEntry.setUpsert(false);
         pullUpdateOpEntry.setMulti(false);
-        pullUpdateOpEntry.setQ(BSON("_id"_sd << idElement));
+        pullUpdateOpEntry.setQ(BSON("_id"sv << idElement));
         pullUpdateOpEntry.setU(mongo::write_ops::UpdateModification(
             pullUpdate, write_ops::UpdateModification::ModifierUpdateTag{}));
         newUpdateRequest.setUpdates({pullUpdateOpEntry});

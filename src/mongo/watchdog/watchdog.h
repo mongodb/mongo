@@ -42,6 +42,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/filesystem/path.hpp>
@@ -95,8 +96,8 @@ public:
  */
 class DirectoryCheck : public WatchdogCheck {
 public:
-    static constexpr StringData kProbeFileName = "watchdog_probe_"_sd;
-    static constexpr StringData kProbeFileNameExt = ".txt"_sd;
+    static constexpr std::string_view kProbeFileName = "watchdog_probe_"_sd;
+    static constexpr std::string_view kProbeFileNameExt = ".txt"_sd;
 
 public:
     DirectoryCheck(const boost::filesystem::path& directory) : _directory(directory) {}
@@ -120,7 +121,7 @@ private:
  */
 class MONGO_MOD_OPEN WatchdogPeriodicThread {
 public:
-    WatchdogPeriodicThread(Milliseconds period, StringData threadName);
+    WatchdogPeriodicThread(Milliseconds period, std::string_view threadName);
     virtual ~WatchdogPeriodicThread() = default;
 
     /**

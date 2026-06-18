@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/server_feature_flags_gen.h"

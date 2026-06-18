@@ -36,6 +36,7 @@
 #include <cstddef>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
@@ -56,24 +57,24 @@ public:
     /**
      * Encode a payload to base64.
      */
-    static std::string encode(StringData in);
+    static std::string encode(std::string_view in);
     static std::string encode(const void* data, size_t len) {
-        return encode(StringData(reinterpret_cast<const char*>(data), len));
+        return encode(std::string_view(reinterpret_cast<const char*>(data), len));
     }
-    static void encode(std::stringstream& ss, StringData in);
-    static void encode(fmt::memory_buffer& buffer, StringData in);
+    static void encode(std::stringstream& ss, std::string_view in);
+    static void encode(fmt::memory_buffer& buffer, std::string_view in);
 
     /**
      * Decode a base64 string to its original payload.
      */
-    static std::string decode(StringData in);
-    static void decode(std::stringstream& ss, StringData in);
-    static void decode(fmt::memory_buffer& buffer, StringData in);
+    static std::string decode(std::string_view in);
+    static void decode(std::stringstream& ss, std::string_view in);
+    static void decode(fmt::memory_buffer& buffer, std::string_view in);
 
     /**
      * Determines if a given string appears to be valid base64.
      */
-    static bool validate(StringData s);
+    static bool validate(std::string_view s);
 
     /**
      * Calculate how large a given input would expand to.
@@ -86,7 +87,7 @@ public:
 
 constexpr unsigned char kInvalid = ~0;
 
-constexpr std::size_t search(StringData table, int c) {
+constexpr std::size_t search(std::string_view table, int c) {
     for (std::size_t i = 0; i < table.size(); ++i) {
         if (table[i] == c) {
             return i;
@@ -97,7 +98,7 @@ constexpr std::size_t search(StringData table, int c) {
 }
 
 template <std::size_t... Cs>
-constexpr auto invertTable(StringData table, std::index_sequence<Cs...>) {
+constexpr auto invertTable(std::string_view table, std::index_sequence<Cs...>) {
     return std::array<unsigned char, sizeof...(Cs)>{
         {static_cast<unsigned char>(search(table, Cs))...}};
 }

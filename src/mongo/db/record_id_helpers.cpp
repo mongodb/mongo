@@ -46,6 +46,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -155,7 +156,7 @@ RecordId keyForDate(Date_t date) {
     return RecordId(keyBuilder.getView());
 }
 
-void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, StringData fieldName) {
+void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, std::string_view fieldName) {
     rid.withFormat([&](RecordId::Null) { builder->appendNull(fieldName); },
                    [&](int64_t val) { builder->append(fieldName, val); },
                    [&](const char* str, int len) {
@@ -163,7 +164,7 @@ void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, StringData fie
                    });
 }
 
-BSONObj toBSONAs(const RecordId& rid, StringData fieldName) {
+BSONObj toBSONAs(const RecordId& rid, std::string_view fieldName) {
     BSONObjBuilder builder;
     appendToBSONAs(rid, &builder, fieldName);
     return builder.obj();

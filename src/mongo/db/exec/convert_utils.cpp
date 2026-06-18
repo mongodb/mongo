@@ -35,12 +35,14 @@
 
 #include <cstdint>
 #include <stack>
+#include <string_view>
 
 #include <nlohmann/json.hpp>
 
 namespace mongo::exec::expression::convert_utils {
 
 namespace {
+using namespace std::literals::string_view_literals;
 using json = nlohmann::json;
 
 class BsonSaxConsumer : public json::json_sax_t {
@@ -123,7 +125,7 @@ public:
     bool parse_error(std::size_t position,
                      const std::string& last_token,
                      const json::exception& ex) override {
-        uassertInvalidJson(""_sd, false);
+        uassertInvalidJson(""sv, false);
         return false;
     }
 
@@ -206,7 +208,7 @@ private:
         }
     }
 
-    void uassertInvalidJson(StringData reason, bool cond) const {
+    void uassertInvalidJson(std::string_view reason, bool cond) const {
         uassert(ErrorCodes::ConversionFailure,
                 str::stream() << "Input doesn't represent valid JSON"
                               << (reason.empty() ? "" : ": ") << reason,
@@ -222,7 +224,7 @@ private:
 };
 }  // namespace
 
-Value parseJson(StringData data, boost::optional<BSONType> expectedType) {
+Value parseJson(std::string_view data, boost::optional<BSONType> expectedType) {
     // The sax consumer handles errors by uasserting. It should never return false.
     BsonSaxConsumer sax{BSONObjMaxUserSize};
     tassert(10508706, "Unexpected parsing error", json::sax_parse(data, &sax));

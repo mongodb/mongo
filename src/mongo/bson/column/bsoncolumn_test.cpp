@@ -54,6 +54,7 @@
 #include <forward_list>
 #include <limits>
 #include <string>
+#include <string_view>
 
 #include <absl/numeric/int128.h>
 #include <boost/cstdint.hpp>
@@ -61,6 +62,7 @@
 
 namespace mongo::bsoncolumn {
 namespace {
+using namespace std::literals::string_view_literals;
 using namespace mongo::bsoncolumn::internal;
 using namespace sbe::bsoncolumn;
 
@@ -89,7 +91,7 @@ public:
 
     BSONElement createBSONColumn(const char* buffer, int size) {
         BSONObjBuilder ob;
-        ob.appendBinData(""_sd, size, BinDataType::Column, buffer);
+        ob.appendBinData(""sv, size, BinDataType::Column, buffer);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
@@ -97,14 +99,14 @@ public:
     template <typename T>
     BSONElement _createElement(T val) {
         BSONObjBuilder ob;
-        ob.append("0"_sd, val);
+        ob.append("0"sv, val);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
 
     BSONElement createElementDouble(double val) {
         BSONObjBuilder ob;
-        ob.append("0"_sd, val);
+        ob.append("0"sv, val);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
@@ -139,63 +141,63 @@ public:
 
     BSONElement createElementMinKey() {
         BSONObjBuilder ob;
-        ob.appendMinKey("0"_sd);
+        ob.appendMinKey("0"sv);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
 
     BSONElement createElementMaxKey() {
         BSONObjBuilder ob;
-        ob.appendMaxKey("0"_sd);
+        ob.appendMaxKey("0"sv);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
 
     BSONElement createNull() {
         BSONObjBuilder ob;
-        ob.appendNull("0"_sd);
+        ob.appendNull("0"sv);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
 
     BSONElement createUndefined() {
         BSONObjBuilder ob;
-        ob.appendUndefined("0"_sd);
+        ob.appendUndefined("0"sv);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
 
-    BSONElement createRegex(StringData pattern = "", StringData options = "") {
+    BSONElement createRegex(std::string_view pattern = "", std::string_view options = "") {
         BSONObjBuilder ob;
-        ob.appendRegex("0"_sd, pattern, options);
+        ob.appendRegex("0"sv, pattern, options);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
 
-    BSONElement createDBRef(StringData ns, const OID& oid) {
+    BSONElement createDBRef(std::string_view ns, const OID& oid) {
         BSONObjBuilder ob;
-        ob.appendDBRef("0"_sd, ns, oid);
+        ob.appendDBRef("0"sv, ns, oid);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
 
-    BSONElement createElementCode(StringData code) {
+    BSONElement createElementCode(std::string_view code) {
         BSONObjBuilder ob;
-        ob.appendCode("0"_sd, code);
+        ob.appendCode("0"sv, code);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
 
-    BSONElement createCodeWScope(StringData code, const BSONObj& scope) {
+    BSONElement createCodeWScope(std::string_view code, const BSONObj& scope) {
         BSONObjBuilder ob;
-        ob.appendCodeWScope("0"_sd, code, scope);
+        ob.appendCodeWScope("0"sv, code, scope);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
 
-    BSONElement createSymbol(StringData symbol) {
+    BSONElement createSymbol(std::string_view symbol) {
         BSONObjBuilder ob;
-        ob.appendSymbol("0"_sd, symbol);
+        ob.appendSymbol("0"sv, symbol);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
@@ -207,7 +209,7 @@ public:
         return _elementMemory.front().firstElement();
     }
 
-    BSONElement createElementString(StringData val) {
+    BSONElement createElementString(std::string_view val) {
         return _createElement(val);
     }
 
@@ -767,7 +769,7 @@ public:
         // Wrap each input in a BSONObj.
         for (auto&& elem : input) {
             BSONObjBuilder ob;
-            ob.append("0"_sd, (elem.eoo() ? BSONObj{} : BSON("fp" << elem)));
+            ob.append("0"sv, (elem.eoo() ? BSONObj{} : BSON("fp" << elem)));
             expected.push_back(ob.obj());
             interleavedCb.append(expected.back().firstElement());
         }
@@ -934,7 +936,7 @@ public:
                                     const std::vector<BSONElement>& expected,
                                     bool testPathDecompression = true) {
         BSONObjBuilder obj;
-        obj.append(""_sd, columnBinary);
+        obj.append(""sv, columnBinary);
         BSONElement columnElement = obj.done().firstElement();
 
         // Verify that we can traverse BSONColumn twice and extract values on the second pass
@@ -1136,7 +1138,7 @@ public:
         using namespace mongo;
         StringDataSet fields;
         for (auto&& elem : obj) {
-            StringData fieldName = elem.fieldNameStringData();
+            std::string_view fieldName = elem.fieldNameStringData();
             if (fields.contains(fieldName)) {
                 return true;
             }
@@ -1277,26 +1279,26 @@ private:
 TEST_F(BSONColumnTest, FuzzerDiscoveredEdgeCases) {
     // This test is a collection of binaries produced by the fuzzer that exposed bugs at some point
     // and contains coverage missing from the tests defined above.
-    std::vector<StringData> binariesBase64 = {
+    std::vector<std::string_view> binariesBase64 = {
         // Ends with uncompressed literal. Last value in previous block needs to be set correctly
         // for doubles.
-        "AQAACQgAAHMA7wkAQP/Q0CfU0NCACvX//////9AA"_sd,
+        "AQAACQgAAHMA7wkAQP/Q0CfU0NCACvX//////9AA"sv,
         // Contains zero deltas after uncompressed string starting with '\0' (unencodable). Ensures
         // we have special handling for zero deltas that by-pass materialization.
-        "CAAAAgACAAAAAACAAgAAAAAAAAAA"_sd,
+        "CAAAAgACAAAAAACAAgAAAAAAAAAA"sv,
         // Re-scaling double is not possible. Offset to last control byte needs to be cleared so a
         // new control byte is written by the compressor.
-        "AQAAAAAAAAAAAJHCgLGRkf//DZGRCJEACAAAgDqRsZGRkZGRAA=="_sd,
+        "AQAAAAAAAAAAAJHCgLGRkf//DZGRCJEACAAAgDqRsZGRkZGRAA=="sv,
         // Re-scaling double is not possible. Offset to last control byte needs to be cleared so a
         // new control byte is written by the compressor.
-        "CgABAP//////////gAIBAAD7///4AA=="_sd,
+        "CgABAP//////////gAIBAAD7///4AA=="sv,
         // Ends with value too large to be encodable in Simple8b block
-        "AQAAAAAjAAAAHAkALV3DRTINAACAd/ce/////xwJAC33Hv////+/AA=="_sd,
+        "AQAAAAAjAAAAHAkALV3DRTINAACAd/ce/////xwJAC33Hv////+/AA=="sv,
         // Unencodable literal for 128bit types, prevEncoded128 needs to be set to none by
         // compressor.
-        "DQAUAAAAAAgAAIDx///++AAAAAMAAAAIAACA8f///vj/AAAA"_sd,
+        "DQAUAAAAAAgAAIDx///++AAAAAMAAAAIAACA8f///vj/AAAA"sv,
         // Merge of interleaved objects that results in repeated fieldname
-        "fwB/APEPAAAA/wD/////KwAGAAALAJ0qnZ0AAICx87tAc/+/fgQABwAAAP8AAICx88BEjAi/AICxAAIAACQAFgAA"_sd};
+        "fwB/APEPAAAA/wD/////KwAGAAALAJ0qnZ0AAICx87tAc/+/fgQABwAAAP8AAICx88BEjAi/AICxAAIAACQAFgAA"sv};
 
     for (auto&& binaryBase64 : binariesBase64) {
         auto binary = base64::decode(binaryBase64);
@@ -1328,9 +1330,9 @@ TEST_F(BSONColumnTest, PathFuzzerDiscoveredEdgeCases) {
     // bugs in the block-based or iterator API, and contains coverage missing from the tests defined
     // above. This test validates that the iterator API and the block-based API must produce the
     // same results.
-    std::vector<StringData> binariesBase64 = {
+    std::vector<std::string_view> binariesBase64 = {
         // Legacy interleaved encoding with array with single null value.
-        "8BAAAAAExgAIAAAACggAAAB/AP8AfwD/AAAA"_sd,
+        "8BAAAAAExgAIAAAACggAAAB/AP8AfwD/AAAA"sv,
     };
 
     for (auto&& binaryBase64 : binariesBase64) {
@@ -1466,42 +1468,42 @@ TEST_F(BSONColumnTest, BlockFuzzerDiscoveredEdgeCases) {
     // in the block-based or iterator API, and contains coverage missing from the tests defined
     // above. This test validates that the iterator API and the block-based API must produce the
     // same results.
-    std::vector<StringData> binariesBase64 = {
+    std::vector<std::string_view> binariesBase64 = {
         // Iterator API did not cast values to booleans before materializing (SERVER-87779).
-        "CAAAoJb//wD/3ylEAA=="_sd,
+        "CAAAoJb//wD/3ylEAA=="sv,
         // Block-based API updated the 'lastValue' when appending EOO elements (SERVER-85860).
-        "CgAKAAoAEwAHAAoACgEAAABQUFBQUFBQUFAAAAAAAACoqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioUFBQUAAAAAAACgAKAAsAEwAKAAoACgAKAAoACgAKAAoACgAKAAoACgAA"_sd,
+        "CgAKAAoAEwAHAAoACgEAAABQUFBQUFBQUFAAAAAAAACoqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioUFBQUAAAAAAACgAKAAsAEwAKAAoACgAKAAoACgAKAAoACgAKAAoACgAA"sv,
         // Block-based API didn't validate the scale index for simple8b blocks (SERVER-87628 and
         // SERVER-88738).
-        "QAEADP////+SAA=="_sd,
-        "fwBAAwAAAAAAAAAA"_sd,
-        "CgBh/wABemEUAAAAAAAAAAIBAAA="_sd,
-        "BQAvAAAAAABQslBQUFBQUFBQUFAAUFBQUFB5UP7///9QUFBQUFBQUFCBgYGBgYGBgYGBgYGBgYFQbFCpUFBQgVBQUFBQUFBQP1BQUFBQUAAA"_sd,
+        "QAEADP////+SAA=="sv,
+        "fwBAAwAAAAAAAAAA"sv,
+        "CgBh/wABemEUAAAAAAAAAAIBAAA="sv,
+        "BQAvAAAAAABQslBQUFBQUFBQUFAAUFBQUFB5UP7///9QUFBQUFBQUFCBgYGBgYGBgYGBgYGBgYFQbFCpUFBQgVBQUFBQUFBQP1BQUFBQUAAA"sv,
         // Block-based Path API doesn't validate the scale index for non-double values
         // (SERVER-89155).
-        "8AgAAAAIAAAA0Cz/AAAAAAdSAAA="_sd,
+        "8AgAAAAIAAAA0Cz/AAAAAAdSAAA="sv,
         // The two APIs had different delta values, but both should fail (SERVER-85860 and
         // SERVER-87873).
-        "BQADAAAAkP8AkJCR///+/4jIfdAmAAAAAAAAAJACAAAAAP8AAAA="_sd,
-        "fwDQYG9tfwAAAAAA"_sd,
-        "CAABwMABwMDAwMDAwH9DwMDAwMDAwMDAwMDAwMDAwMjAwMDAAAAAAA=="_sd,
-        "EwAAAGCvYK+vUgBSUlBQc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3NzFBQUFBQUc3PQ0NDQ0NDQ0NDQr1JSUlBQ0NDQ0NDQ0NDQ0NIYAAAA0NAXlaJ9//8AAA=="_sd,
+        "BQADAAAAkP8AkJCR///+/4jIfdAmAAAAAAAAAJACAAAAAP8AAAA="sv,
+        "fwDQYG9tfwAAAAAA"sv,
+        "CAABwMABwMDAwMDAwH9DwMDAwMDAwMDAwMDAwMDAwMjAwMDAAAAAAA=="sv,
+        "EwAAAGCvYK+vUgBSUlBQc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3NzFBQUFBQUc3PQ0NDQ0NDQ0NDQr1JSUlBQ0NDQ0NDQ0NDQ0NIYAAAA0NAXlaJ9//8AAA=="sv,
         // Block-based API using the table decoders should fail on bad selectors (SERVER-88062).
-        "CwBPpFpaWloAAKD3Af9dXQD/AAA="_sd,
+        "CwBPpFpaWloAAKD3Af9dXQD/AAA="sv,
         // Block-based API had a stack overflow for BinData values (SERVER-88207).
-        "BQAXAAAAMcLCPso9PcJhJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmsMIYAAECAAIAAA=="_sd,
-        "BQAwAAAAAAcAAAAAAAEAAAAAAABAAAAAAAA7Ozs7Ozs7Ozs6Ozs7Ozs7Ozs7Ozs7Ozs7OwD+/4A7OzsA/v+A/wA="_sd,
+        "BQAXAAAAMcLCPso9PcJhJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmsMIYAAECAAIAAA=="sv,
+        "BQAwAAAAAAcAAAAAAAEAAAAAAABAAAAAAAA7Ozs7Ozs7Ozs6Ozs7Ozs7Ozs7Ozs7Ozs7OwD+/4A7OzsA/v+A/wA="sv,
         // Block-based API didn't allow non-zero/missing deltas after EOO (SERVER-89150).
-        "8h4AAAD/p/+zSENBMoAB/0hDQzKAAP9IOjCAAP8AAACCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCggA="_sd,
+        "8h4AAAD/p/+zSENBMoAB/0hDQzKAAP9IOjCAAP8AAACCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCggA="sv,
         // Blockbased API didn't update last to EOO when Iterative API did for interleaved data
         // (SERVER-89612).
-        "8hQAAAAF+P//////FCgAAAAAAAAABgAIAACBKg7/+///////MP8V/3EAAACBeHFYDAAA/3RhZ3P//wEAAAA="_sd,
+        "8hQAAAAF+P//////FCgAAAAAAAAABgAIAACBKg7/+///////MP8V/3EAAACBeHFYDAAA/3RhZ3P//wEAAAA="sv,
         // Blockbased API doesn't fail an interleaved mode that has leftover data in some decoders
         // while the iterative version does (SERVER-92150)
-        "8jIAAAAHVvkCAAEAAAAAAgABAAAAAAxTdGNydHVfaWQAAQAAAAABMg5faWQAAQAAAAAA/wD/AP8Aj4+Pj4+Pj4+Pj4+Pj4+Pj4//AP8A/wD/AP8A/wD/AP8A/wCPj4+Pj4+Pj4+PAAD/AP8A/wD/AP8A/wCPj4+Pj4+Pj49vj4+Pj4+Pj/8A/041j4+Pj4+Pj4+Pj48BAFXeV6t2AI+Pj4+Pj4+Pj4+Pj8SPj4+Pj4+Pj4//AP8A/wD/AP8A/wAA"_sd,
+        "8jIAAAAHVvkCAAEAAAAAAgABAAAAAAxTdGNydHVfaWQAAQAAAAABMg5faWQAAQAAAAAA/wD/AP8Aj4+Pj4+Pj4+Pj4+Pj4+Pj4//AP8A/wD/AP8A/wD/AP8A/wCPj4+Pj4+Pj4+PAAD/AP8A/wD/AP8A/wCPj4+Pj4+Pj49vj4+Pj4+Pj/8A/041j4+Pj4+Pj4+Pj48BAFXeV6t2AI+Pj4+Pj4+Pj4+Pj8SPj4+Pj4+Pj4//AP8A/wD/AP8A/wAA"sv,
         // Empty interleaved mode produces an assert in block-based API but not iterative
         // (SERVER-92327)
-        "EAAAYTsB8gcAAAD/AAAAgsj//////////wEH//hB/7KyAP+AAP//AAA="_sd,
+        "EAAAYTsB8gcAAAD/AAAAgsj//////////wEH//hB/7KyAP+AAP//AAA="sv,
     };
 
     for (auto&& binaryBase64 : binariesBase64) {
@@ -1559,7 +1561,7 @@ TEST_F(BSONColumnTest, BuilderFuzzerGenerationDiscoveredEdgeCases) {
     // Base64:
     // <base64 string>
     //
-    std::vector<StringData> binariesBase64 = {};
+    std::vector<std::string_view> binariesBase64 = {};
 
     for (auto&& binaryBase64 : binariesBase64) {
         auto binary = base64::decode(binaryBase64);
@@ -1617,9 +1619,9 @@ TEST_F(BSONColumnTest, BuilderFuzzerReopenDiscoveredEdgeCases) {
     //
     // Column: <base64 string>
     //
-    std::vector<StringData> binariesBase64 = {
+    std::vector<std::string_view> binariesBase64 = {
         // Pending fix of SERVER-100659
-        "gPz/////////CAAAgP7/////////AQAAAAAAAAAAYI/OxcXFxcXFAQ4AAAAAAAAB7uLi4uLi4gAuHR0dHR2dAI5xcXFxcXEAjnFxcXFxcQCOcXFxcXFxAK6rq6urq2sAzri4uLi4OADOuLi4uLg4AM64uLi4uDgAzri4uLi4OADOuLi4uLg4AM64uLi4uDgAzri4uLi4OADOuLi4uLg4AI9ulpaWlpY2AG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAI9uXFxcXFwcAG5cXFxcXBwA7gsMDAwMHAAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAI8uLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAI8uLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAK6wr6+vrwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAI8uFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAIYuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAAA="_sd,
+        "gPz/////////CAAAgP7/////////AQAAAAAAAAAAYI/OxcXFxcXFAQ4AAAAAAAAB7uLi4uLi4gAuHR0dHR2dAI5xcXFxcXEAjnFxcXFxcQCOcXFxcXFxAK6rq6urq2sAzri4uLi4OADOuLi4uLg4AM64uLi4uDgAzri4uLi4OADOuLi4uLg4AM64uLi4uDgAzri4uLi4OADOuLi4uLg4AI9ulpaWlpY2AG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAG5cXFxcXBwAblxcXFxcHABuXFxcXFwcAI9uXFxcXFwcAG5cXFxcXBwA7gsMDAwMHAAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAI8uLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAI8uLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAC4uLi4uLg4ALi4uLi4uDgAuLi4uLi4OAK6wr6+vrwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAI8uFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAIYuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAC4XFxcXFwcALhcXFxcXBwAuFxcXFxcHAAA="sv,
     };
 
     for (auto&& binaryBase64 : binariesBase64) {
@@ -2008,7 +2010,7 @@ TEST_F(BSONColumnTest, MultipleSimple8bBlocksAfterControl128) {
     for (int i = 0; i < 100; ++i) {
         // Generate strings from integer to make it easier to control the delta values
         auto str = Simple8bTypeUtil::decodeString(i % 2);
-        elems.push_back(createElementString(StringData(str.str.data(), str.size)));
+        elems.push_back(createElementString(std::string_view(str.str.data(), str.size)));
     }
 
     for (auto&& elem : elems) {
@@ -4118,7 +4120,7 @@ TEST_F(BSONColumnTest, StringAfterInvalid) {
     auto elem = createElementString("mongo");
     cb.append(elem);
 
-    auto elemInvalid = createElementString("\0mongo"_sd);
+    auto elemInvalid = createElementString("\0mongo"sv);
     cb.append(elemInvalid);
 
     auto elem2 = createElementString("test");
@@ -4161,7 +4163,7 @@ TEST_F(BSONColumnTest, RepeatInvalidString) {
     auto elem = createElementString("mongo");
     cb.append(elem);
 
-    auto elemInvalid = createElementString("\0mongo"_sd);
+    auto elemInvalid = createElementString("\0mongo"sv);
     cb.append(elemInvalid);
     cb.append(elemInvalid);
 
@@ -4186,8 +4188,8 @@ TEST_F(BSONColumnTest, BinDataLargerThan16WithNonZeroDelta) {
     // than 16 bytes. This specific binary produces incorrect results when decompressed with a
     // in64_t simple8b decoder, and must use a int128_t simple8b decoder. We will verify that both
     // the block-based and iterative implementation throw an error.
-    StringData b64Encoded =
-        "8SwAAAAFACAAAAAAf/4BCLHOzwAG/////////2l/AAsACgBbAAEAegATaX8Ahn8A//gj/wD///8h/wH+AADf+CP/AP///yH/Af4A/6mX/2Z/AH/4AH9/Mn9gZXQAgGj/////AH8AAAA="_sd;
+    std::string_view b64Encoded =
+        "8SwAAAAFACAAAAAAf/4BCLHOzwAG/////////2l/AAsACgBbAAEAegATaX8Ahn8A//gj/wD///8h/wH+AADf+CP/AP///yH/Af4A/6mX/2Z/AH/4AH9/Mn9gZXQAgGj/////AH8AAAA="sv;
     std::string interleavedBinary = base64::decode(b64Encoded);
 
     // Verify block-based interleaved decompression throws an error.
@@ -4275,7 +4277,7 @@ TEST_F(BSONColumnTest, BinDataColumnSubtypeNestedInArrayRejectedByBuilder) {
 }
 
 TEST_F(BSONColumnTest, EmptyStringAfterUnencodable) {
-    std::vector<BSONElement> elems = {createElementString("\0"_sd), createElementString(""_sd)};
+    std::vector<BSONElement> elems = {createElementString("\0"sv), createElementString(""sv)};
 
     for (auto&& elem : elems) {
         cb.append(elem);
@@ -4292,7 +4294,7 @@ TEST_F(BSONColumnTest, EmptyStringAfterUnencodable) {
 }
 
 TEST_F(BSONColumnTest, UnencodableStringWithZeroDelta) {
-    std::vector<BSONElement> elems = {createElementString("\0"_sd), createElementString("\0"_sd)};
+    std::vector<BSONElement> elems = {createElementString("\0"sv), createElementString("\0"sv)};
 
     for (auto&& elem : elems) {
         cb.append(elem);
@@ -4311,7 +4313,7 @@ TEST_F(BSONColumnTest, UnencodableStringWithZeroDelta) {
 
 TEST_F(BSONColumnTest, EmptyStringAfterUnencodableDelta) {
     std::vector<BSONElement> elems = {
-        createElementString("\0"_sd), createElementString("\0"_sd), createElementString(""_sd)};
+        createElementString("\0"sv), createElementString("\0"sv), createElementString(""sv)};
 
     for (auto&& elem : elems) {
         cb.append(elem);
@@ -4330,10 +4332,10 @@ TEST_F(BSONColumnTest, EmptyStringAfterUnencodableDelta) {
 }
 
 TEST_F(BSONColumnTest, EmptyStringAfterUnencodableLiteralAndDelta) {
-    std::vector<BSONElement> elems = {createElementString("\0"_sd),
-                                      createElementString("a"_sd),
-                                      createElementString(""_sd),
-                                      createElementString(""_sd)};
+    std::vector<BSONElement> elems = {createElementString("\0"sv),
+                                      createElementString("a"sv),
+                                      createElementString(""sv),
+                                      createElementString(""sv)};
 
     for (auto&& elem : elems) {
         cb.append(elem);
@@ -4354,12 +4356,12 @@ TEST_F(BSONColumnTest, EmptyStringAfterUnencodableLiteralAndDelta) {
 
 TEST_F(BSONColumnTest, UnencodableStringBetweenZeroDelta) {
     std::vector<BSONElement> elems = {
-        createElementString("a"_sd),
-        createElementString("\0"_sd),
-        createElementString("s"_sd),
-        createElementString("s"_sd),
-        createElementString("\0"_sd),
-        createElementString("\0"_sd),
+        createElementString("a"sv),
+        createElementString("\0"sv),
+        createElementString("s"sv),
+        createElementString("s"sv),
+        createElementString("\0"sv),
+        createElementString("\0"sv),
     };
 
     for (auto&& elem : elems) {
@@ -4476,18 +4478,18 @@ TEST_F(BSONColumnTest, StringFullControlWithPendingAtFinalize) {
     // end result should be identical to as-if we just looked at the current control and never
     // overflowed.
     std::vector<BSONElement> elems = {
-        createElementString("20719"_sd),  createElementString("22719"_sd),
-        createElementString("21719"_sd),  createElementString("22819"_sd),
-        createElementString("20819"_sd),  createElementString("21819"_sd),
-        createElementString("21919"_sd),  createElementString("20919"_sd),
-        createElementString("22919"_sd),  createElementString("201019"_sd),
-        createElementString("221019"_sd), createElementString("211019"_sd),
-        createElementString("211119"_sd), createElementString("201119"_sd),
-        createElementString("221119"_sd), createElementString("201219"_sd),
-        createElementString("221219"_sd), createElementString("211219"_sd),
-        createElementString("201319"_sd), createElementString("211319"_sd),
-        createElementString("221319"_sd), createElementString("221419"_sd),
-        createElementString("211419"_sd), createElementString("201419"_sd)};
+        createElementString("20719"sv),  createElementString("22719"sv),
+        createElementString("21719"sv),  createElementString("22819"sv),
+        createElementString("20819"sv),  createElementString("21819"sv),
+        createElementString("21919"sv),  createElementString("20919"sv),
+        createElementString("22919"sv),  createElementString("201019"sv),
+        createElementString("221019"sv), createElementString("211019"sv),
+        createElementString("211119"sv), createElementString("201119"sv),
+        createElementString("221119"sv), createElementString("201219"sv),
+        createElementString("221219"sv), createElementString("211219"sv),
+        createElementString("201319"sv), createElementString("211319"sv),
+        createElementString("221319"sv), createElementString("221419"sv),
+        createElementString("211419"sv), createElementString("201419"sv)};
 
     for (auto&& elem : elems) {
         cb.append(elem);
@@ -4881,7 +4883,7 @@ TEST_F(BSONColumnTest, RLEAfterMixedValueBlock128) {
     // Generate strings from integer to make it easier to control the delta values
     auto createStringFromInt = [&](int64_t val) {
         auto str = Simple8bTypeUtil::decodeString(val);
-        return createElementString(StringData(str.str.data(), str.size));
+        return createElementString(std::string_view(str.str.data(), str.size));
     };
 
     std::vector<BSONElement> elems = {createStringFromInt(64), createStringFromInt(128)};
@@ -4967,7 +4969,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock128) {
     // Generate strings from integer to make it easier to control the delta values
     auto createStringFromInt = [&](int64_t val) {
         auto str = Simple8bTypeUtil::decodeString(val);
-        return createElementString(StringData(str.str.data(), str.size));
+        return createElementString(std::string_view(str.str.data(), str.size));
     };
 
     std::vector<BSONElement> elems = {createStringFromInt(0),
@@ -5075,7 +5077,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreIdentical128
     // Generate strings from integer to make it easier to control the delta values
     auto createStringFromInt = [&](int64_t val) {
         auto str = Simple8bTypeUtil::decodeString(val);
-        return createElementString(StringData(str.str.data(), str.size));
+        return createElementString(std::string_view(str.str.data(), str.size));
     };
 
     std::vector<BSONElement> elems = {createStringFromInt(0),
@@ -5186,7 +5188,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreDifferent128
     // Generate strings from integer to make it easier to control the delta values
     auto createStringFromInt = [&](int64_t val) {
         auto str = Simple8bTypeUtil::decodeString(val);
-        return createElementString(StringData(str.str.data(), str.size));
+        return createElementString(std::string_view(str.str.data(), str.size));
     };
 
     std::vector<BSONElement> elems = {createStringFromInt(0),
@@ -5361,7 +5363,7 @@ TEST_F(BSONColumnTest, DefaultSelectorAfterExtended) {
     // This test is having a large delta that must be stored in the extended selectors, after comes
     // a small value. We need to properly adjust selector state when reopening.
     std::vector<BSONElement> elems = {
-        createElementString("core"_sd), createElementString("Singapore"_sd), BSONElement()};
+        createElementString("core"sv), createElementString("Singapore"sv), BSONElement()};
 
     for (auto&& elem : elems) {
         cb.append(elem);
@@ -5396,20 +5398,20 @@ TEST_F(BSONColumnTest, Interleaved) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
                             boost::none,
                             boost::none,
-                            deltaInt32(elems[5].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                            deltaInt32(elems[5].Obj()["x"sv], elems[2].Obj()["x"sv])},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
-                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                            deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv]),
+                            deltaInt32(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv]),
                             boost::none,
-                            deltaInt32(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd]),
-                            deltaInt32(elems[5].Obj()["y"_sd], elems[4].Obj()["y"_sd])},
+                            deltaInt32(elems[4].Obj()["y"sv], elems[2].Obj()["y"sv]),
+                            deltaInt32(elems[5].Obj()["y"sv], elems[4].Obj()["y"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5432,20 +5434,20 @@ TEST_F(BSONColumnTest, InterleavedLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
                             boost::none,
                             boost::none,
-                            deltaInt32(elems[5].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                            deltaInt32(elems[5].Obj()["x"sv], elems[2].Obj()["x"sv])},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
-                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                            deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv]),
+                            deltaInt32(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv]),
                             boost::none,
-                            deltaInt32(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd]),
-                            deltaInt32(elems[5].Obj()["y"_sd], elems[4].Obj()["y"_sd])},
+                            deltaInt32(elems[4].Obj()["y"sv], elems[2].Obj()["y"sv]),
+                            deltaInt32(elems[5].Obj()["y"sv], elems[4].Obj()["y"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5467,13 +5469,13 @@ TEST_F(BSONColumnTest, InterleavedArray) {
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["x"_sd].Array()[0], elems[0].Obj()["x"_sd].Array()[0])},
+         deltaInt32(elems[1].Obj()["x"sv].Array()[0], elems[0].Obj()["x"sv].Array()[0])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["x"_sd].Array()[1], elems[0].Obj()["x"_sd].Array()[1])},
+         deltaInt32(elems[1].Obj()["x"sv].Array()[1], elems[0].Obj()["x"sv].Array()[1])},
         1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5557,14 +5559,14 @@ TEST_F(BSONColumnTest, InterleavedAfterNonInterleaved) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv])},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
-                            deltaInt32(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
+                            deltaInt32(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv]),
+                            deltaInt32(elems[3].Obj()["y"sv], elems[2].Obj()["y"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5586,14 +5588,14 @@ TEST_F(BSONColumnTest, InterleavedAfterNonInterleavedLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv])},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
-                            deltaInt32(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
+                            deltaInt32(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv]),
+                            deltaInt32(elems[3].Obj()["y"sv], elems[2].Obj()["y"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5613,18 +5615,17 @@ TEST_F(BSONColumnTest, InterleavedLevels) {
     BufBuilder expected;
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["root"_sd].Obj()["x"_sd],
-                                       elems[0].Obj()["root"_sd].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["root"_sd].Obj()["x"_sd],
-                                       elems[1].Obj()["root"_sd].Obj()["x"_sd])},
-                           1);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues,
+         deltaInt32(elems[1].Obj()["root"sv].Obj()["x"sv], elems[0].Obj()["root"sv].Obj()["x"sv]),
+         deltaInt32(elems[2].Obj()["root"sv].Obj()["x"sv], elems[1].Obj()["root"sv].Obj()["x"sv])},
+        1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
-                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd])},
+                            deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv]),
+                            deltaInt32(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5642,18 +5643,17 @@ TEST_F(BSONColumnTest, InterleavedLevelsLegacyDecompress) {
     BufBuilder expected;
     appendInterleavedStartLegacy(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlocks64(expected,
-                           {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["root"_sd].Obj()["x"_sd],
-                                       elems[0].Obj()["root"_sd].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["root"_sd].Obj()["x"_sd],
-                                       elems[1].Obj()["root"_sd].Obj()["x"_sd])},
-                           1);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues,
+         deltaInt32(elems[1].Obj()["root"sv].Obj()["x"sv], elems[0].Obj()["root"sv].Obj()["x"sv]),
+         deltaInt32(elems[2].Obj()["root"sv].Obj()["x"sv], elems[1].Obj()["root"sv].Obj()["x"sv])},
+        1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
-                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd])},
+                            deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv]),
+                            deltaInt32(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5677,18 +5677,18 @@ TEST_F(BSONColumnTest, InterleavedDoubleDifferentScale) {
     appendSimple8bControl(expected, 0b1010, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
-                            deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
-                            deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10),
-                            deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 10)},
+                            deltaDouble(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv], 10),
+                            deltaDouble(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv], 10),
+                            deltaDouble(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv], 10),
+                            deltaDouble(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv], 10)},
                            1);
     appendSimple8bControl(expected, 0b1001, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaDouble(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd], 1),
-                            deltaDouble(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd], 1),
+                            deltaDouble(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv], 1),
+                            deltaDouble(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv], 1),
                             boost::none,
-                            deltaDouble(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)},
+                            deltaDouble(elems[4].Obj()["y"sv], elems[2].Obj()["y"sv], 1)},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5716,18 +5716,18 @@ TEST_F(BSONColumnTest, InterleavedDoubleDifferentScaleLegacyDecompress) {
     appendSimple8bControl(expected, 0b1010, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
-                            deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
-                            deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10),
-                            deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 10)},
+                            deltaDouble(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv], 10),
+                            deltaDouble(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv], 10),
+                            deltaDouble(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv], 10),
+                            deltaDouble(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv], 10)},
                            1);
     appendSimple8bControl(expected, 0b1001, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaDouble(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd], 1),
-                            deltaDouble(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd], 1),
+                            deltaDouble(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv], 1),
+                            deltaDouble(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv], 1),
                             boost::none,
-                            deltaDouble(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)},
+                            deltaDouble(elems[4].Obj()["y"sv], elems[2].Obj()["y"sv], 1)},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5753,13 +5753,13 @@ TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescale) {
     appendSimple8bControl(expected, 0b1010, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
-                            deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
-                            deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10)},
+                            deltaDouble(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv], 10),
+                            deltaDouble(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv], 10),
+                            deltaDouble(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv], 10)},
                            1);
     appendSimple8bControl(expected, 0b1101, 0b0000);
     appendSimple8bBlocks64(
-        expected, {deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 100000000)}, 1);
+        expected, {deltaDouble(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv], 100000000)}, 1);
     appendEOO(expected);
     appendEOO(expected);
 
@@ -5783,13 +5783,13 @@ TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescaleLegacyDec
     appendSimple8bControl(expected, 0b1010, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
-                            deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
-                            deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10)},
+                            deltaDouble(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv], 10),
+                            deltaDouble(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv], 10),
+                            deltaDouble(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv], 10)},
                            1);
     appendSimple8bControl(expected, 0b1101, 0b0000);
     appendSimple8bBlocks64(
-        expected, {deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 100000000)}, 1);
+        expected, {deltaDouble(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv], 100000000)}, 1);
     appendEOO(expected);
     appendEOO(expected);
 
@@ -5813,7 +5813,7 @@ TEST_F(BSONColumnTest, InterleavedScalarToObject) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendEOO(expected);
 
@@ -5822,13 +5822,13 @@ TEST_F(BSONColumnTest, InterleavedScalarToObject) {
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[3].Obj()["x"_sd].Obj()["y"_sd], elems[2].Obj()["x"_sd].Obj()["y"_sd])},
+         deltaInt32(elems[3].Obj()["x"sv].Obj()["y"sv], elems[2].Obj()["x"sv].Obj()["y"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[3].Obj()["x"_sd].Obj()["z"_sd], elems[2].Obj()["x"_sd].Obj()["z"_sd])},
+         deltaInt32(elems[3].Obj()["x"sv].Obj()["z"sv], elems[2].Obj()["x"sv].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -5872,7 +5872,7 @@ TEST_F(BSONColumnTest, InterleavedScalarToObjectLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendEOO(expected);
 
@@ -5881,13 +5881,13 @@ TEST_F(BSONColumnTest, InterleavedScalarToObjectLegacyDecompress) {
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[3].Obj()["x"_sd].Obj()["y"_sd], elems[2].Obj()["x"_sd].Obj()["y"_sd])},
+         deltaInt32(elems[3].Obj()["x"sv].Obj()["y"sv], elems[2].Obj()["x"sv].Obj()["y"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[3].Obj()["x"_sd].Obj()["z"_sd], elems[2].Obj()["x"_sd].Obj()["z"_sd])},
+         deltaInt32(elems[3].Obj()["x"sv].Obj()["z"sv], elems[2].Obj()["x"sv].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -5910,12 +5910,12 @@ TEST_F(BSONColumnTest, DecodeInterleavedObjectAsScalar) {
         BufBuilder expected;
         appendInterleavedStartFunc(expected, elems.front().Obj());
         appendSimple8bControl(expected, 0b1000, 0b0000);
-        appendSimple8bBlocks64(expected,
-                               {kDeltaForBinaryEqualValues,
-                                deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
-                               1);
-        appendLiteral(expected, elems[2].Obj()["x"_sd]);
-        appendLiteral(expected, elems[3].Obj()["x"_sd]);
+        appendSimple8bBlocks64(
+            expected,
+            {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
+            1);
+        appendLiteral(expected, elems[2].Obj()["x"sv]);
+        appendLiteral(expected, elems[3].Obj()["x"sv]);
         appendSimple8bControl(expected, 0b1000, 0b0000);
         appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
         appendEOO(expected);
@@ -5952,18 +5952,18 @@ TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd]),
-                            deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv]),
+                            deltaInt32(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv])},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks128(expected,
                             {kDeltaForBinaryEqualValues128,
-                             deltaString(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
-                             deltaString(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                             deltaString(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv]),
+                             deltaString(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv]),
                              boost::none,
-                             deltaString(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
+                             deltaString(elems[4].Obj()["y"sv], elems[2].Obj()["y"sv])},
                             1);
     appendEOO(expected);
     appendEOO(expected);
@@ -5989,18 +5989,18 @@ TEST_F(BSONColumnTest, InterleavedMix64And128BitLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd]),
-                            deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv]),
+                            deltaInt32(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv])},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks128(expected,
                             {kDeltaForBinaryEqualValues128,
-                             deltaString(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
-                             deltaString(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                             deltaString(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv]),
+                             deltaString(elems[2].Obj()["y"sv], elems[1].Obj()["y"sv]),
                              boost::none,
-                             deltaString(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
+                             deltaString(elems[4].Obj()["y"sv], elems[2].Obj()["y"sv])},
                             1);
     appendEOO(expected);
     appendEOO(expected);
@@ -6023,8 +6023,8 @@ TEST_F(BSONColumnTest, InterleavedWithEmptySubObj) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd])},
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -6047,8 +6047,8 @@ TEST_F(BSONColumnTest, InterleavedWithEmptySubObjLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd])},
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -6094,7 +6094,7 @@ TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendEOO(expected);
 
@@ -6123,7 +6123,7 @@ TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObjLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendEOO(expected);
 
@@ -6236,19 +6236,19 @@ TEST_F(BSONColumnTest, InterleavedSchemaChange) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv])},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
-    appendLiteral(expected, elems[2].Obj()["y"_sd]);
+    appendLiteral(expected, elems[2].Obj()["y"sv]);
     appendSimple8bControl(expected, 0b1001, 0b0000);
     appendSimple8bBlocks64(
-        expected, {deltaDouble(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)}, 1);
+        expected, {deltaDouble(elems[3].Obj()["y"sv], elems[2].Obj()["y"sv], 1)}, 1);
     appendEOO(expected);
     appendEOO(expected);
 
@@ -6268,19 +6268,19 @@ TEST_F(BSONColumnTest, InterleavedSchemaChangeLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv])},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
-    appendLiteral(expected, elems[2].Obj()["y"_sd]);
+    appendLiteral(expected, elems[2].Obj()["y"sv]);
     appendSimple8bControl(expected, 0b1001, 0b0000);
     appendSimple8bBlocks64(
-        expected, {deltaDouble(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)}, 1);
+        expected, {deltaDouble(elems[3].Obj()["y"sv], elems[2].Obj()["y"sv], 1)}, 1);
     appendEOO(expected);
     appendEOO(expected);
 
@@ -6301,13 +6301,13 @@ TEST_F(BSONColumnTest, InterleavedObjectSchemaChange) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["y"_sd].Obj()["z"_sd], elems[0].Obj()["y"_sd].Obj()["z"_sd])},
+         deltaInt32(elems[1].Obj()["y"sv].Obj()["z"sv], elems[0].Obj()["y"sv].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6334,13 +6334,13 @@ TEST_F(BSONColumnTest, InterleavedObjectSchemaChangeLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["y"_sd].Obj()["z"_sd], elems[0].Obj()["y"_sd].Obj()["z"_sd])},
+         deltaInt32(elems[1].Obj()["y"sv].Obj()["z"sv], elems[0].Obj()["y"sv].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6369,7 +6369,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNameChange) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues, boost::none}, 1);
@@ -6394,7 +6394,7 @@ TEST_F(BSONColumnTest, InterleavedObjectNameChangeLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues, boost::none}, 1);
@@ -6422,13 +6422,13 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChange) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["y"_sd].Obj()["z"_sd], elems[0].Obj()["y"_sd].Obj()["z"_sd])},
+         deltaInt32(elems[1].Obj()["y"sv].Obj()["z"sv], elems[0].Obj()["y"sv].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6455,13 +6455,13 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChangeLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["y"_sd].Obj()["z"_sd], elems[0].Obj()["y"_sd].Obj()["z"_sd])},
+         deltaInt32(elems[1].Obj()["y"sv].Obj()["z"sv], elems[0].Obj()["y"sv].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6491,13 +6491,13 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyArrayChange) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["y"_sd].Obj()["z"_sd], elems[0].Obj()["y"_sd].Obj()["z"_sd])},
+         deltaInt32(elems[1].Obj()["y"sv].Obj()["z"sv], elems[0].Obj()["y"sv].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6528,12 +6528,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddle) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6563,12 +6563,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjMiddleLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6601,12 +6601,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayMiddle) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6641,12 +6641,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObj) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6676,12 +6676,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObjLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6713,12 +6713,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObj) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -6751,12 +6751,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjEnd) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -6785,12 +6785,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjEndLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -6821,12 +6821,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayEnd) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -6860,12 +6860,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObjEnd) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -6895,12 +6895,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyObjUnderObjEndLegacyDecompress) 
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -6932,12 +6932,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderObjEnd) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -6971,12 +6971,12 @@ TEST_F(BSONColumnTest, InterleavedObjectNewEmptyArrayUnderArrayEnd) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -7009,12 +7009,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjMiddle) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -7043,12 +7043,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjMiddleLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -7079,12 +7079,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayMiddle) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -7155,12 +7155,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObj) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -7189,12 +7189,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjLegacyDecompress)
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -7227,12 +7227,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObj) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -7265,12 +7265,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderArray) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv])},
         1);
     appendEOO(expected);
 
@@ -7303,12 +7303,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjEnd) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -7337,12 +7337,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjEndLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -7373,12 +7373,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayEnd) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -7449,12 +7449,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEnd) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -7484,12 +7484,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyObjUnderObjEndLegacyDecompre
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -7524,12 +7524,12 @@ TEST_F(BSONColumnTest, InterleavedObjectMissingEmptyArrayUnderObjEnd) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
 
@@ -7602,12 +7602,12 @@ TEST_F(BSONColumnTest, ReenterInterleaved) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
     appendLiteral(expected, elems[2]);
@@ -7615,17 +7615,17 @@ TEST_F(BSONColumnTest, ReenterInterleaved) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["y"_sd], elems[3].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["y"sv], elems[3].Obj()["y"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["z"_sd], elems[3].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["z"sv], elems[3].Obj()["z"sv])},
         1);
     appendEOO(expected);
     appendEOO(expected);
@@ -7647,12 +7647,12 @@ TEST_F(BSONColumnTest, ReenterInterleavedLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"sv], elems[0].Obj()["y"sv])},
         1);
     appendEOO(expected);
     appendLiteral(expected, elems[2]);
@@ -7660,17 +7660,17 @@ TEST_F(BSONColumnTest, ReenterInterleavedLegacyDecompress) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["y"_sd], elems[3].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["y"sv], elems[3].Obj()["y"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["z"_sd], elems[3].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["z"sv], elems[3].Obj()["z"sv])},
         1);
     appendEOO(expected);
     appendEOO(expected);
@@ -7707,17 +7707,17 @@ TEST_F(BSONColumnTest, ReenterInterleavedArrayRootToObj) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["y"_sd], elems[3].Obj()["y"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["y"sv], elems[3].Obj()["y"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["z"_sd], elems[3].Obj()["z"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["z"sv], elems[3].Obj()["z"sv])},
         1);
     appendEOO(expected);
     appendEOO(expected);
@@ -7749,7 +7749,7 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRight) {
                            {kDeltaForBinaryEqualValues,
                             boost::none,
                             boost::none,
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[0].Obj()["x"sv]),
                             boost::none,
                             boost::none},
                            1);
@@ -7759,7 +7759,7 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRight) {
                             kDeltaForBinaryEqualValues,
                             boost::none,
                             boost::none,
-                            deltaInt32(elems[4].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                            deltaInt32(elems[4].Obj()["y"sv], elems[1].Obj()["y"sv]),
                             boost::none},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -7769,7 +7769,7 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRight) {
                             kDeltaForBinaryEqualValues,
                             boost::none,
                             boost::none,
-                            deltaInt32(elems[5].Obj()["z"_sd], elems[2].Obj()["z"_sd])},
+                            deltaInt32(elems[5].Obj()["z"sv], elems[2].Obj()["z"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -7799,7 +7799,7 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRightLegacyDecompress) {
                            {kDeltaForBinaryEqualValues,
                             boost::none,
                             boost::none,
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[0].Obj()["x"sv]),
                             boost::none,
                             boost::none},
                            1);
@@ -7809,7 +7809,7 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRightLegacyDecompress) {
                             kDeltaForBinaryEqualValues,
                             boost::none,
                             boost::none,
-                            deltaInt32(elems[4].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                            deltaInt32(elems[4].Obj()["y"sv], elems[1].Obj()["y"sv]),
                             boost::none},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -7819,7 +7819,7 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRightLegacyDecompress) {
                             kDeltaForBinaryEqualValues,
                             boost::none,
                             boost::none,
-                            deltaInt32(elems[5].Obj()["z"_sd], elems[2].Obj()["z"_sd])},
+                            deltaInt32(elems[5].Obj()["z"sv], elems[2].Obj()["z"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -7850,8 +7850,8 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRight) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd]),
-                            deltaInt32(elems[2].Obj()["z"_sd], elems[1].Obj()["z"_sd])},
+                            deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv]),
+                            deltaInt32(elems[2].Obj()["z"sv], elems[1].Obj()["z"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -7880,8 +7880,8 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRightLegacyDecompress)
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd]),
-                            deltaInt32(elems[2].Obj()["z"_sd], elems[1].Obj()["z"_sd])},
+                            deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv]),
+                            deltaInt32(elems[2].Obj()["z"sv], elems[1].Obj()["z"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -7923,8 +7923,8 @@ TEST_F(BSONColumnTest, InterleavedMergeWithUnrelatedArray) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["z"_sd], elems[0].Obj()["z"_sd]),
-                            deltaInt32(elems[2].Obj()["z"_sd], elems[1].Obj()["z"_sd])},
+                            deltaInt32(elems[1].Obj()["z"sv], elems[0].Obj()["z"sv]),
+                            deltaInt32(elems[2].Obj()["z"sv], elems[1].Obj()["z"sv])},
                            1);
     appendEOO(expected);
     appendEOO(expected);
@@ -7948,14 +7948,14 @@ TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatch) {
 
     BufBuilder expected;
     appendInterleavedStart(
-        expected, BSON("y" << elems[1].Obj()["y"_sd].Int() << "z" << elems[0].Obj()["z"_sd].Obj()));
+        expected, BSON("y" << elems[1].Obj()["y"sv].Int() << "z" << elems[0].Obj()["z"sv].Obj()));
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues}, 1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["z"_sd].Obj()["x"_sd], elems[0].Obj()["z"_sd].Obj()["x"_sd])},
+         deltaInt32(elems[1].Obj()["z"sv].Obj()["x"sv], elems[0].Obj()["z"sv].Obj()["x"sv])},
         1);
     appendEOO(expected);
     appendEOO(expected);
@@ -7975,14 +7975,14 @@ TEST_F(BSONColumnTest, InterleavedMergeWithScalarObjectMismatchLegacyDecompress)
 
     BufBuilder expected;
     appendInterleavedStartLegacy(
-        expected, BSON("y" << elems[1].Obj()["y"_sd].Int() << "z" << elems[0].Obj()["z"_sd].Obj()));
+        expected, BSON("y" << elems[1].Obj()["y"sv].Int() << "z" << elems[0].Obj()["z"sv].Obj()));
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues}, 1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaInt32(elems[1].Obj()["z"_sd].Obj()["x"_sd], elems[0].Obj()["z"_sd].Obj()["x"_sd])},
+         deltaInt32(elems[1].Obj()["z"sv].Obj()["x"sv], elems[0].Obj()["z"sv].Obj()["x"sv])},
         1);
     appendEOO(expected);
     appendEOO(expected);
@@ -8050,11 +8050,11 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
     BufBuilder expected;
     appendInterleavedStart(
         expected,
-        BSON("x" << elems[0].Obj().firstElement().Int() << "y" << elems[1].Obj()["y"_sd].Int()));
+        BSON("x" << elems[0].Obj().firstElement().Int() << "y" << elems[1].Obj()["y"sv].Int()));
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues}, 1);
@@ -8081,11 +8081,11 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleMergeLegacyDecompress) {
     BufBuilder expected;
     appendInterleavedStartLegacy(
         expected,
-        BSON("x" << elems[0].Obj().firstElement().Int() << "y" << elems[1].Obj()["y"_sd].Int()));
+        BSON("x" << elems[0].Obj().firstElement().Int() << "y" << elems[1].Obj()["y"sv].Int()));
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv])},
         1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {boost::none, kDeltaForBinaryEqualValues}, 1);
@@ -8195,11 +8195,11 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd]),
-                            deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd]),
-                            deltaInt32(elems[5].Obj()["x"_sd], elems[4].Obj()["x"_sd])},
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv]),
+                            deltaInt32(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv]),
+                            deltaInt32(elems[5].Obj()["x"sv], elems[4].Obj()["x"sv])},
                            1);
     appendEOO(expected);
     appendInterleavedStart(expected, elems[6].Obj());
@@ -8230,11 +8230,11 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReferenceLegacyDeco
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
-                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
-                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd]),
-                            deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd]),
-                            deltaInt32(elems[5].Obj()["x"_sd], elems[4].Obj()["x"_sd])},
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
+                            deltaInt32(elems[2].Obj()["x"sv], elems[1].Obj()["x"sv]),
+                            deltaInt32(elems[3].Obj()["x"sv], elems[2].Obj()["x"sv]),
+                            deltaInt32(elems[4].Obj()["x"sv], elems[3].Obj()["x"sv]),
+                            deltaInt32(elems[5].Obj()["x"sv], elems[4].Obj()["x"sv])},
                            1);
     appendEOO(expected);
     appendInterleavedStartLegacy(expected, elems[6].Obj());
@@ -8535,7 +8535,7 @@ TEST_F(BSONColumnTest, InterleavedFullSkipAfterObjectSkip) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
                            {kDeltaForBinaryEqualValues,
-                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                            deltaInt32(elems[1].Obj()["x"sv], elems[0].Obj()["x"sv]),
                             boost::none},
                            1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -9462,14 +9462,14 @@ TEST_F(BSONColumnTest, DecompressPathFastInterleavedIntsAndDoubles) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
         expected,
-        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["a"_sd], elems[0].Obj()["a"_sd])},
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["a"sv], elems[0].Obj()["a"sv])},
         1);
 
     // Uncompressed literal since we are switching to doubles.
     appendLiteral(expected, values[2]);
     appendSimple8bControl(expected, 0b1001, 0b0000);
     appendSimple8bBlocks64(
-        expected, {deltaDouble(elems[3].Obj()["a"_sd], elems[2].Obj()["a"_sd], 1)}, 1);
+        expected, {deltaDouble(elems[3].Obj()["a"sv], elems[2].Obj()["a"sv], 1)}, 1);
 
     // Uncompressed literal since we are switching back to ints.
     appendLiteral(expected, values[4]);
@@ -9511,14 +9511,14 @@ TEST_F(BSONColumnTest, DecompressPathFastInterleavedDatesAndDecimals) {
     appendSimple8bBlocks64(
         expected,
         {kDeltaForBinaryEqualValues,
-         deltaOfDeltaDate(elems[1].Obj()["a"_sd], elems[0].Obj()["a"_sd], elems[0].Obj()["a"_sd])},
+         deltaOfDeltaDate(elems[1].Obj()["a"sv], elems[0].Obj()["a"sv], elems[0].Obj()["a"sv])},
         1);
 
     // Uncompressed literal since we are switching from dates to decimals.
     appendLiteral(expected, values[2]);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected,
-                           {deltaDecimal128(elems[3].Obj()["a"_sd], elems[2].Obj()["a"_sd])});
+                           {deltaDecimal128(elems[3].Obj()["a"sv], elems[2].Obj()["a"sv])});
 
     // Uncompressed literal when switching back from decimals to dates.
     appendLiteral(expected, values[4]);
@@ -9825,7 +9825,7 @@ TEST_F(BSONColumnTest, LegacyInterleavedPaths) {
 // 65535 bytes in length
 #if !defined(_MSC_VER) || _MSC_VER >= 1929
 TEST_F(BSONColumnTest, FTDCRoundTrip) {
-    StringData compressedBase64Encoded = {
+    std::string_view compressedBase64Encoded = {
 #include "mongo/bson/column/bson_column_compressed_data.inl"  // IWYU pragma: keep
     };
 
@@ -9833,7 +9833,7 @@ TEST_F(BSONColumnTest, FTDCRoundTrip) {
 
     auto roundtrip = [](const auto& compressed) {
         BSONObjBuilder builder;
-        builder.appendBinData("data"_sd, compressed.size(), BinDataType::Column, compressed.data());
+        builder.appendBinData("data"sv, compressed.size(), BinDataType::Column, compressed.data());
         BSONElement compressedFTDCElement = builder.done().firstElement();
 
         BSONColumnBuilder columnBuilder;
@@ -9853,8 +9853,15 @@ TEST_F(BSONColumnTest, FTDCRoundTrip) {
 
 class TestMaterializer {
 public:
-    using Element = std::
-        variant<std::monostate, bool, int32_t, int64_t, double, Timestamp, Date_t, OID, StringData>;
+    using Element = std::variant<std::monostate,
+                                 bool,
+                                 int32_t,
+                                 int64_t,
+                                 double,
+                                 Timestamp,
+                                 Date_t,
+                                 OID,
+                                 std::string_view>;
 
     template <typename T>
     static Element materialize(BSONElementStorage& a, const T& val) {
@@ -9894,7 +9901,7 @@ public:
 template <>
 TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(BSONElementStorage& a,
                                                                      const BSONBinData& val) {
-    return StringData((const char*)val.data, val.length);
+    return std::string_view((const char*)val.data, val.length);
 }
 
 template <>
@@ -9946,8 +9953,8 @@ TestMaterializer::Element TestMaterializer::materialize<OID>(BSONElementStorage&
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<StringData>(BSONElementStorage& a,
-                                                                    const BSONElement& val) {
+TestMaterializer::Element TestMaterializer::materialize<std::string_view>(BSONElementStorage& a,
+                                                                          const BSONElement& val) {
     return val.valueStringData();
 }
 
@@ -9955,7 +9962,7 @@ template <>
 TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(BSONElementStorage& a,
                                                                      const BSONElement& val) {
     int size = 0;
-    return StringData(val.binData(size), size);
+    return std::string_view(val.binData(size), size);
 }
 
 template <>
@@ -9985,7 +9992,7 @@ TEST_F(BSONColumnTest, TestCollector) {
     bsonBinData.type = BinDataGeneral;
     collector.append(bsonBinData);
     EXPECT_EQ(collection.size(), ++expectedSize);
-    StringData result = std::get<StringData>(collection.back());
+    std::string_view result = std::get<std::string_view>(collection.back());
     ASSERT_EQ(3, result.size());
     EXPECT_EQ(0, memcmp("foo", result.data(), 3));
 
@@ -9993,7 +10000,7 @@ TEST_F(BSONColumnTest, TestCollector) {
     bsonCode.code = "bar";
     collector.append(bsonCode);
     EXPECT_EQ(collection.size(), ++expectedSize);
-    result = std::get<StringData>(collection.back());
+    result = std::get<std::string_view>(collection.back());
     ASSERT_EQ(3, result.size());
     EXPECT_EQ(0, memcmp("bar", result.data(), 3));
 
@@ -10002,17 +10009,17 @@ TEST_F(BSONColumnTest, TestCollector) {
     EXPECT_EQ(collection.size(), ++expectedSize);
     EXPECT_EQ(2.0, std::get<double>(collection.back()));
 
-    BSONElement stringVal = createElementString(StringData("bam", 3));
-    collector.append<StringData>(stringVal);
+    BSONElement stringVal = createElementString(std::string_view("bam", 3));
+    collector.append<std::string_view>(stringVal);
     EXPECT_EQ(collection.size(), ++expectedSize);
-    result = std::get<StringData>(collection.back());
+    result = std::get<std::string_view>(collection.back());
     ASSERT_EQ(3, result.size());
     EXPECT_EQ(0, memcmp("bam", result.data(), 3));
 
-    BSONElement codeVal = createElementCode(StringData("baz", 3));
+    BSONElement codeVal = createElementCode(std::string_view("baz", 3));
     collector.append<BSONCode>(codeVal);
     EXPECT_EQ(collection.size(), ++expectedSize);
-    result = std::get<StringData>(collection.back());
+    result = std::get<std::string_view>(collection.back());
     ASSERT_EQ(3, result.size());
     EXPECT_EQ(0, memcmp("baz", result.data(), 3));
 

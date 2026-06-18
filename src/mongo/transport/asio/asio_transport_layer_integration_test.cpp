@@ -28,7 +28,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"

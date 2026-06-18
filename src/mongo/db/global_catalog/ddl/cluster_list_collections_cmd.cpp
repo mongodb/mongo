@@ -29,7 +29,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -72,6 +71,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -82,8 +82,9 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto systemBucketsDot = "system.buckets."_sd;
+constexpr auto systemBucketsDot = "system.buckets."sv;
 
 /**
  * Removes shard local fields from the 'info' sub-document of a single listCollections result entry.
@@ -98,10 +99,10 @@ static BSONObj scrubShardLocalFieldsFromCollectionEntry(BSONObj entry) {
     }
     BSONObjBuilder entryBuilder;
     for (auto&& field : entry) {
-        if (field.fieldNameStringData() == "info"_sd) {
-            entryBuilder.append("info"_sd,
-                                infoElem.Obj().removeFields(
-                                    StringDataSet{"recordIdsReplicated"_sd, "fastCount"_sd}));
+        if (field.fieldNameStringData() == "info"sv) {
+            entryBuilder.append(
+                "info"sv,
+                infoElem.Obj().removeFields(StringDataSet{"recordIdsReplicated"sv, "fastCount"sv}));
         } else {
             entryBuilder.append(field);
         }
@@ -181,7 +182,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     BSONArrayBuilder setBuilder(nameBuilder.subarrayStart("$in"));
 
     // Load the de-duplicated set into a BSON array
-    for (StringData collectionName : collectionNames) {
+    for (std::string_view collectionName : collectionNames) {
         setBuilder << collectionName;
     }
     setBuilder.done();

@@ -33,6 +33,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 /**
@@ -69,7 +71,7 @@ RoleNameOrString RoleNameOrString::parseFromBSON(const BSONElement& elem) {
     }
 }
 
-void RoleNameOrString::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+void RoleNameOrString::serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const {
     if (holds_alternative<RoleName>(_roleName)) {
         variant_get<RoleName>(&_roleName).serializeToBSON(fieldName, bob);
     } else {

@@ -41,6 +41,7 @@
 
 #include <ctime>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -515,7 +516,7 @@ void HelloResponse::setIsSecondary(bool secondary) {
     _secondary = secondary;
 }
 
-void HelloResponse::setReplSetName(StringData setName) {
+void HelloResponse::setReplSetName(std::string_view setName) {
     _setNameSet = true;
     _setName = std::string{setName};
 }

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/str.h"
 
@@ -36,21 +35,22 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include <benchmark/benchmark.h>
 
 // Verify the performance of our string processing algorithms.
-// This can include StringData, util/str utilities, etc.
+// This can include std::string_view, util/str utilities, etc.
 
 namespace mongo {
 namespace {
 
 std::string makeString(size_t size) {
-    StringData fill = "The quick brown fox jumped over the lazy dog. ";
+    std::string_view fill = "The quick brown fox jumped over the lazy dog. ";
     std::string s;
     while (s.size() < size) {
         size_t avail = size - s.size();
-        StringData fillSub = fill.substr(0, std::min(avail, fill.size()));
+        std::string_view fillSub = fill.substr(0, std::min(avail, fill.size()));
         s.append(fillSub.begin(), fillSub.end());
     }
     return s;
@@ -60,7 +60,7 @@ void BM_StringDataEqualCaseInsensitive(benchmark::State& state) {
     std::uint64_t items = 0;
     std::string s1 = makeString(1000);
     std::string s2 = s1;
-    StringData sd1 = s1;
+    std::string_view sd1 = s1;
     for (auto _ : state) {
         benchmark::DoNotOptimize(str::equalCaseInsensitive(sd1, s2));
         ++items;

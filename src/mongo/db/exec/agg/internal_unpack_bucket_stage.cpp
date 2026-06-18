@@ -34,6 +34,8 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalUnpackBucketToStageFn(
@@ -60,7 +62,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalUnpackBucket,
                            documentSourceInternalUnpackBucketToStageFn);
 
 InternalUnpackBucketStage::InternalUnpackBucketStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const std::shared_ptr<InternalUnpackBucketSharedState>& sharedState,
     DepsTracker depsTracker,

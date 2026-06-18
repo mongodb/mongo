@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document_internal.h"
 #include "mongo/db/index/geo/s2_common.h"
@@ -41,6 +40,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -53,7 +53,7 @@ namespace mongo::timeseries {
 // Optional callback to look up 2dsphere index version for a field.
 // When nullptr or not called, the most up to date version (currently v4) is used.
 using Get2dsphereIndexVersionFn = std::function<boost::optional<S2IndexVersion>(
-    OperationContext*, const NamespaceString&, StringData)>;
+    OperationContext*, const NamespaceString&, std::string_view)>;
 
 /**
  * Carries parameters for unpacking a bucket. The order of operations applied to determine which
@@ -104,7 +104,7 @@ public:
         _fieldSet = std::move(fieldSet);
     }
 
-    void addIncludeExcludeField(StringData field) {
+    void addIncludeExcludeField(std::string_view field) {
         _fieldSet.emplace(field);
     }
 
@@ -124,7 +124,7 @@ public:
         return _behavior;
     }
 
-    void addComputedMetaProjFields(StringData field) {
+    void addComputedMetaProjFields(std::string_view field) {
         _computedMetaProjFields.emplace(field);
     }
 
@@ -151,7 +151,7 @@ public:
     }
 
     // Returns whether 'field' depends on a pushed down $addFields or computed $project.
-    bool fieldIsComputed(StringData field) const;
+    bool fieldIsComputed(std::string_view field) const;
 
     // Says what to do when an event-level predicate cannot be mapped to a bucket-level predicate.
     enum class IneligiblePredicatePolicy {
@@ -181,7 +181,7 @@ public:
 
     static BucketPredicate handleIneligible(IneligiblePredicatePolicy policy,
                                             const MatchExpression* matchExpr,
-                                            StringData message);
+                                            std::string_view message);
 
     /**
      * Takes a predicate after $_internalUnpackBucket as an argument and attempts to rewrite it as
@@ -318,7 +318,7 @@ public:
      */
     static std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
     splitOutMetaOnlyPredicate(std::unique_ptr<MatchExpression> expr,
-                              boost::optional<StringData> metaField);
+                              boost::optional<std::string_view> metaField);
 
     // Used as the return value of getPushdownPredicates().
     struct SplitPredicates {
@@ -369,7 +369,7 @@ private:
 /**
  * Determines if an arbitrary field should be included in the materialized measurements.
  */
-inline bool determineIncludeField(StringData fieldName,
+inline bool determineIncludeField(std::string_view fieldName,
                                   BucketSpec::Behavior unpackerBehavior,
                                   const std::set<std::string>& unpackFieldsToIncludeExclude) {
     const bool isInclude = unpackerBehavior == BucketSpec::Behavior::kInclude;

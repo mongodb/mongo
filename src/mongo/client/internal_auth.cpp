@@ -41,6 +41,7 @@
 #include "mongo/util/read_through_cache.h"
 
 #include <mutex>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -76,7 +77,7 @@ bool isInternalAuthSet() {
     return internalAuthSet;
 }
 
-Credential createInternalX509AuthCredential(boost::optional<StringData> userName) {
+Credential createInternalX509AuthCredential(boost::optional<std::string_view> userName) {
     return Credential{
         .mechanism = AuthMechanism::kMongoX509,
         .db = std::string{"$external"},
@@ -84,7 +85,7 @@ Credential createInternalX509AuthCredential(boost::optional<StringData> userName
     };
 }
 
-boost::optional<Credential> getInternalAuthParams(size_t idx, StringData mechanism) {
+boost::optional<Credential> getInternalAuthParams(size_t idx, std::string_view mechanism) {
     std::lock_guard<std::mutex> lk(internalAuthKeysMutex);
     if (!internalAuthSet) {
         return boost::none;

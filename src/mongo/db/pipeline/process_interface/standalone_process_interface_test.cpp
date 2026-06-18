@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/intrusive_counter.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
@@ -75,7 +75,7 @@ public:
 class ProcessInterfaceStandaloneTest : public ShardServerTestFixture {
 protected:
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "testDB1");
-    const StringData coll = "testColl";
+    const std::string_view coll = "testColl";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, coll);
 
     OperationContext* opCtx() {

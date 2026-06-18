@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -58,6 +57,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -66,6 +66,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class IndexSignatureTest : public CatalogTestFixture {
 public:
@@ -240,7 +241,7 @@ TEST_F(IndexSignatureTest, CannotCreateMultipleIndexesOnSameKeyPatternIfNonSigna
     auto* basicIndex = unittest::assertGet(createIndex(indexSpec));
 
     std::vector<BSONObj> nonSigOptions = {
-        BSON(IndexDescriptor::kStorageEngineFieldName << BSON("wiredTiger"_sd << BSONObj())),
+        BSON(IndexDescriptor::kStorageEngineFieldName << BSON("wiredTiger"sv << BSONObj())),
         BSON(IndexDescriptor::kExpireAfterSecondsFieldName << 10)};
 
     // Verify that changing each of the non-signature fields does not distinguish this index from

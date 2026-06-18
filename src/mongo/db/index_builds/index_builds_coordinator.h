@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -66,6 +65,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -371,7 +371,7 @@ public:
     virtual Status voteAbortIndexBuild(OperationContext* opCtx,
                                        const UUID& buildUUID,
                                        const HostAndPort& hostAndPort,
-                                       StringData reason) = 0;
+                                       std::string_view reason) = 0;
 
     /**
      * Handles the 'VoteCommitIndexBuild' command request.
@@ -389,7 +389,7 @@ public:
      */
     virtual Status setCommitQuorum(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   const std::vector<StringData>& indexNames,
+                                   const std::vector<std::string_view>& indexNames,
                                    const CommitQuorumOptions& newCommitQuorum) = 0;
 
     /**

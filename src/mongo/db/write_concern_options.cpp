@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -44,6 +43,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -51,6 +51,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Controls how much a client cares about writes and serves as initializer for the pre-defined
@@ -60,13 +61,13 @@ namespace {
  */
 enum WriteConcern { W_NONE = 0, W_NORMAL = 1 };
 
-constexpr StringData kJFieldName = "j"_sd;
-constexpr StringData kFSyncFieldName = "fsync"_sd;
-constexpr StringData kWFieldName = "w"_sd;
-constexpr StringData kWTimeoutFieldName = "wtimeout"_sd;
-constexpr StringData kGetLastErrorFieldName = "getLastError"_sd;
-constexpr StringData kWOpTimeFieldName = "wOpTime"_sd;
-constexpr StringData kWElectionIdFieldName = "wElectionId"_sd;
+constexpr std::string_view kJFieldName = "j"sv;
+constexpr std::string_view kFSyncFieldName = "fsync"sv;
+constexpr std::string_view kWFieldName = "w"sv;
+constexpr std::string_view kWTimeoutFieldName = "wtimeout"sv;
+constexpr std::string_view kGetLastErrorFieldName = "getLastError"sv;
+constexpr std::string_view kWOpTimeFieldName = "wOpTime"sv;
+constexpr std::string_view kWElectionIdFieldName = "wElectionId"sv;
 
 }  // namespace
 
@@ -78,7 +79,7 @@ constexpr WriteConcernOptions::Timeout WriteConcernOptions::kNoTimeout(
 constexpr WriteConcernOptions::Timeout WriteConcernOptions::kNoWaiting(
     WriteConcernOptions::Timeout::kNoWaitingVal);
 
-constexpr StringData WriteConcernOptions::kWriteConcernField;
+constexpr std::string_view WriteConcernOptions::kWriteConcernField;
 const char WriteConcernOptions::kMajority[] = "majority";
 
 const BSONObj WriteConcernOptions::Default = BSONObj();

@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -57,7 +58,7 @@ struct CompressionResult {
     bool decompressionFailed = false;
 };
 CompressionResult compressBucket(const BSONObj& bucketDoc,
-                                 StringData timeFieldName,
+                                 std::string_view timeFieldName,
                                  const NamespaceString& nss,
                                  bool validateDecompression);
 

@@ -37,6 +37,7 @@
 
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -151,7 +152,7 @@ public:
     }
 
 private:
-    void logCacheEvent(StringData event) const {
+    void logCacheEvent(std::string_view event) const {
         LOGV2_DEBUG(9542300,
                     5,
                     "Cache stats updated",

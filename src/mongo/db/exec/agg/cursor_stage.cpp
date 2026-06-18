@@ -41,6 +41,8 @@
 #include "mongo/s/resharding/resume_token_gen.h"
 #include "mongo/util/fail_point.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -123,7 +125,7 @@ void CursorStage::Batch::clear() {
     _memUsageBytes = 0;
 }
 
-CursorStage::CursorStage(StringData stageName,
+CursorStage::CursorStage(std::string_view stageName,
                          const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          CursorType cursorType,

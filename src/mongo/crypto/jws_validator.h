@@ -32,10 +32,10 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo::crypto {
 
@@ -49,16 +49,16 @@ public:
      * In practice, this will be:
      * validate('RS256', 'headerb64url.bodyb64url', 'signatureoctets')
      */
-    virtual Status validate(StringData algorithm,
-                            StringData payload,
-                            StringData signature) const = 0;
+    virtual Status validate(std::string_view algorithm,
+                            std::string_view payload,
+                            std::string_view signature) const = 0;
 
     /**
      * Instantiate a new JWSValidator for the given
      * key type (e.g. 'RSA') and JWK key data.
      * Returns, for example, JWSValidatorOpenSSLRSA
      */
-    static StatusWith<std::unique_ptr<JWSValidator>> create(StringData algorithm,
+    static StatusWith<std::unique_ptr<JWSValidator>> create(std::string_view algorithm,
                                                             const BSONObj& key);
 };
 

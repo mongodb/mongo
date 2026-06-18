@@ -37,12 +37,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <utility>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer::common_utils {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -52,7 +54,7 @@ namespace {
     const std::vector<std::string>& pipelineNames,
     const StringSet& matchedPipelines,
     const std::vector<std::string>& invalidWeights,
-    StringData stageName) {
+    std::string_view stageName) {
     std::vector<std::string> unmatchedPipelines;
     for (const auto& name : pipelineNames) {
         if (!matchedPipelines.contains(name)) {
@@ -69,7 +71,7 @@ namespace {
 
 StringMap<double> validateWeights(const BSONObj& inputWeights,
                                   const std::vector<std::string>& pipelineNames,
-                                  StringData stageName) {
+                                  std::string_view stageName) {
     StringSet pipelineNameSet(pipelineNames.begin(), pipelineNames.end());
 
     StringMap<double> weights;
@@ -127,7 +129,7 @@ StringMap<double> validateWeights(const BSONObj& inputWeights,
     return weights;
 }
 
-BSONObj buildReplaceRootBson(StringData docsName) {
+BSONObj buildReplaceRootBson(std::string_view docsName) {
     return BSON("$replaceWith" << BSON(docsName << "$$ROOT"));
 }
 
@@ -135,10 +137,10 @@ BSONObj buildSortByScoreMetaBson() {
     return BSON("$sort" << BSON("score" << BSON("$meta" << "score") << "_id" << 1));
 }
 
-BSONObj buildProjectRemoveInternalFieldsBson(StringData internalFieldsName) {
+BSONObj buildProjectRemoveInternalFieldsBson(std::string_view internalFieldsName) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder projectBob(bob.subobjStart("$project"_sd));
+        BSONObjBuilder projectBob(bob.subobjStart("$project"sv));
         projectBob.append(internalFieldsName, 0);
     }
     return bob.obj();
@@ -146,16 +148,16 @@ BSONObj buildProjectRemoveInternalFieldsBson(StringData internalFieldsName) {
 
 BSONObj buildGroupBson(const std::vector<std::string>& pipelineNames,
                        bool includeScoreDetails,
-                       StringData internalFieldsName,
-                       StringData docsName,
-                       StringData detailsScalarSuffix) {
+                       std::string_view internalFieldsName,
+                       std::string_view docsName,
+                       std::string_view detailsScalarSuffix) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder gBob(bob.subobjStart("$group"_sd));
+        BSONObjBuilder gBob(bob.subobjStart("$group"sv));
         gBob.append("_id", fmt::format("${}._id", docsName));
         gBob.append(docsName, BSON("$first" << fmt::format("${}", docsName)));
 
-        auto accumulateScalar = [&](StringData field, const std::string& internalPath) {
+        auto accumulateScalar = [&](std::string_view field, const std::string& internalPath) {
             gBob.append(fmt::format("{}{}", kHsFlatFieldPrefix, field),
                         BSON("$max" << BSON("$ifNull"
                                             << BSON_ARRAY(fmt::format("${}", internalPath) << 0))));
@@ -188,19 +190,19 @@ BSONObj buildGroupBson(const std::vector<std::string>& pipelineNames,
 
 BSONObj buildReplaceRootMergeBson(const std::vector<std::string>& pipelineNames,
                                   bool includeScoreDetails,
-                                  StringData internalFieldsName,
-                                  StringData docsName,
-                                  StringData detailsScalarSuffix) {
+                                  std::string_view internalFieldsName,
+                                  std::string_view docsName,
+                                  std::string_view detailsScalarSuffix) {
     BSONObjBuilder bob;
     {
-        BSONObjBuilder rrBob(bob.subobjStart("$replaceRoot"_sd));
-        BSONObjBuilder newRootBob(rrBob.subobjStart("newRoot"_sd));
-        BSONArrayBuilder mergeArr(newRootBob.subarrayStart("$mergeObjects"_sd));
+        BSONObjBuilder rrBob(bob.subobjStart("$replaceRoot"sv));
+        BSONObjBuilder newRootBob(rrBob.subobjStart("newRoot"sv));
+        BSONArrayBuilder mergeArr(newRootBob.subarrayStart("$mergeObjects"sv));
         mergeArr.append(fmt::format("${}", docsName));
         BSONObjBuilder wrapperBob;
         {
             BSONObjBuilder internalFieldsBob(wrapperBob.subobjStart(internalFieldsName));
-            auto appendFlat = [&](StringData field) {
+            auto appendFlat = [&](std::string_view field) {
                 internalFieldsBob.append(field, fmt::format("${}{}", kHsFlatFieldPrefix, field));
             };
             for (const auto& pipelineName : pipelineNames) {
@@ -235,7 +237,7 @@ void mutateRightmostSortToOutputSortKey(const NamespaceString& nss, StageSpecs& 
 
             BSONObjBuilder mergedSortSpec;
             mergedSortSpec.appendElements(origSpec.embeddedObject());
-            if (!origSpec.embeddedObject().hasField("$_internalOutputSortKeyMetadata"_sd)) {
+            if (!origSpec.embeddedObject().hasField("$_internalOutputSortKeyMetadata"sv)) {
                 mergedSortSpec.append("$_internalOutputSortKeyMetadata", true);
             }
 
@@ -247,7 +249,7 @@ void mutateRightmostSortToOutputSortKey(const NamespaceString& nss, StageSpecs& 
 }
 
 std::unique_ptr<LiteParsedDocumentSource> buildUnionWithLPDS(const NamespaceString& nss,
-                                                             StringData userCollName,
+                                                             std::string_view userCollName,
                                                              StageSpecs perPipelineStages) {
     // Serialize the already-parsed (and sort-mutated) stages back to BSON. Each .wrap() call
     // produces a self-owning copy, so rawPipeline does not alias any stage's internal buffer.
@@ -265,9 +267,9 @@ std::unique_ptr<LiteParsedDocumentSource> buildUnionWithLPDS(const NamespaceStri
 
     BSONObjBuilder bob;
     {
-        BSONObjBuilder uwBob(bob.subobjStart("$unionWith"_sd));
+        BSONObjBuilder uwBob(bob.subobjStart("$unionWith"sv));
         uwBob.append("coll", userCollName);
-        BSONArrayBuilder pipeArr(uwBob.subarrayStart("pipeline"_sd));
+        BSONArrayBuilder pipeArr(uwBob.subarrayStart("pipeline"sv));
         for (const auto& obj : rawPipeline) {
             pipeArr.append(obj);
         }

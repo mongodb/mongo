@@ -75,6 +75,7 @@
 using std::string;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 // Helpers for option storage
@@ -397,9 +398,9 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
 #ifndef _WIN32
-    if (auto key = "net.proxyUnixDomainSocket.pathPrefix"_sd; params.count(key))
+    if (auto key = "net.proxyUnixDomainSocket.pathPrefix"sv; params.count(key))
         serverGlobalParams.proxySocketPrefix = params[key].as<string>();
-    if (auto key = "net.proxyUnixDomainSocket.fileGroupId"_sd; params.count(key))
+    if (auto key = "net.proxyUnixDomainSocket.fileGroupId"sv; params.count(key))
         serverGlobalParams.proxySocketGid = params[key].as<gid_t>();
     if (params.count("net.unixDomainSocket.pathPrefix")) {
         serverGlobalParams.socket = params["net.unixDomainSocket.pathPrefix"].as<string>();

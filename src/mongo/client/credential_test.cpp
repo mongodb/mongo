@@ -30,13 +30,13 @@
 #include "mongo/client/credential.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_matcher.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/auth_mechanism.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -46,18 +46,20 @@ namespace auth {
 namespace {
 
 struct ParseSuccessCase {
-    StringData name;
+    std::string_view name;
     BSONObj params;
     Credential expected;
 };
 
 struct ParseFailureCase {
-    StringData name;
+    std::string_view name;
     BSONObj params;
     boost::optional<ErrorCodes::Error> expectedCode;
 };
 
-void assertCredentialEq(StringData name, const Credential& actual, const Credential& expected) {
+void assertCredentialEq(std::string_view name,
+                        const Credential& actual,
+                        const Credential& expected) {
     ASSERT_EQ(actual.mechanism, expected.mechanism) << name;
     ASSERT_EQ(actual.db, expected.db) << name << ": db";
     ASSERT_EQ(actual.username, expected.username) << name << ": username";
@@ -295,8 +297,8 @@ TEST(CredentialTest, ParseFailureCases) {
 
 TEST(CredentialTest, ParseMechanismMappingCases) {
     struct TestCase {
-        StringData name;
-        StringData mechanism;
+        std::string_view name;
+        std::string_view mechanism;
         AuthMechanism expected;
     };
 

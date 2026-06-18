@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -42,12 +41,13 @@
 #include "mongo/util/time_support.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo::stats {
 TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {
     // Simplest example: empty strings map to 0.
-    const StringData collider("");
+    const std::string_view collider("");
     ASSERT_EQ(stringToDouble(collider), 0.0);
 
     // Note: this is contrived, and possibly an illegal value for an object id.

@@ -33,13 +33,16 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_current_op.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
-const StringData kOpIdFieldName = "opid"_sd;
-const StringData kClientFieldName = "client"_sd;
-const StringData kMongosClientFieldName = "client_s"_sd;
-const StringData kShardFieldName = "shard"_sd;
+using namespace std::literals::string_view_literals;
+const std::string_view kOpIdFieldName = "opid"sv;
+const std::string_view kClientFieldName = "client"sv;
+const std::string_view kMongosClientFieldName = "client_s"sv;
+const std::string_view kShardFieldName = "shard"sv;
 }  // namespace
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceCurrentOpToStageFn(
@@ -114,14 +117,14 @@ GetNextResult CurrentOpStage::doGetNext() {
         doc.addField(kShardFieldName, Value(_shardName));
 
         if (mongo::lockedForWriting()) {
-            doc.addField(StringData("fsyncLock"), Value(true));
+            doc.addField(std::string_view("fsyncLock"), Value(true));
         }
 
         // For operations on a shard, we change the opid from the raw numeric form to
         // 'shardname:opid'. We also change the fieldname 'client' to 'client_s' to indicate
         // that the IP is that of the mongos which initiated this request.
         for (auto&& elt : op) {
-            StringData fieldName = elt.fieldNameStringData();
+            std::string_view fieldName = elt.fieldNameStringData();
 
             if (fieldName == kOpIdFieldName) {
                 uassert(ErrorCodes::TypeMismatch,

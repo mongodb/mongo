@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/base/counter.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/commands/query_cmd/cmd_specific_metric_helpers.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -42,7 +43,7 @@ namespace mongo {
  * point to the same Counter64 metrics in serverStatus.
  */
 struct ExtensionMetricsAllocation {
-    ExtensionMetricsAllocation(StringData commandName, ClusterRole role)
+    ExtensionMetricsAllocation(std::string_view commandName, ClusterRole role)
         : successMetricCounter(
               getSingletonMetricPtrWithinCmd(commandName, "withExtension.succeeded", role)),
           failedMetricCounter(

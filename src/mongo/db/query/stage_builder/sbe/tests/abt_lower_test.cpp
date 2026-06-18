@@ -37,6 +37,7 @@
 
 namespace mongo::stage_builder::abt_lower {
 namespace {
+using namespace std::literals::string_view_literals;
 
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/stage_builder/sbe"};
 using GoldenTestContext = unittest::GoldenTestContext;
@@ -79,7 +80,7 @@ protected:
 TEST_F(ABTPlanGeneration, LowerConstantExpression) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
-    runExpressionVariation(ctx, "string", Constant::str("hello world"_sd));
+    runExpressionVariation(ctx, "string", Constant::str("hello world"sv));
 
     runExpressionVariation(ctx, "int64", Constant::int64(100));
     runExpressionVariation(ctx, "int32", Constant::int32(32));

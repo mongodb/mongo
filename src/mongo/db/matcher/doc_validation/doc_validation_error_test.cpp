@@ -29,7 +29,6 @@
 
 #include "mongo/db/matcher/doc_validation/doc_validation_error_test.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"

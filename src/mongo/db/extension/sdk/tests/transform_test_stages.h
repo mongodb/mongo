@@ -31,6 +31,8 @@
 #include "mongo/db/extension/sdk/test_extension_factory.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::extension::sdk::shared_test_stages {
 
 constexpr char kTransformName[] = "$transformStage";

@@ -35,6 +35,7 @@
 
 namespace mongo {
 namespace process_health {
+using namespace std::literals::string_view_literals;
 
 namespace {
 constexpr auto inline kDefaultObserverInterval = Milliseconds{10000};
@@ -64,13 +65,13 @@ Milliseconds FaultManagerConfig::_getDefaultObserverInterval(FaultFacetType type
 StringBuilder& operator<<(StringBuilder& s, const FaultState& state) {
     switch (state) {
         case FaultState::kOk:
-            return s << "Ok"_sd;
+            return s << "Ok"sv;
         case FaultState::kStartupCheck:
-            return s << "StartupCheck"_sd;
+            return s << "StartupCheck"sv;
         case FaultState::kTransientFault:
-            return s << "TransientFault"_sd;
+            return s << "TransientFault"sv;
         case FaultState::kActiveFault:
-            return s << "ActiveFault"_sd;
+            return s << "ActiveFault"sv;
         default:
             MONGO_UNREACHABLE;
     }

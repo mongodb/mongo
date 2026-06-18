@@ -29,14 +29,16 @@
 
 #include "mongo/db/sorter/sorter_checksum_calculator.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kData = "abacabadabacaba"_sd;
+constexpr std::string_view kData = "abacabadabacaba"sv;
 
 class SorterChecksumCalculatorTest : public testing::TestWithParam<SorterChecksumVersion> {};
 
@@ -136,8 +138,8 @@ TEST_P(SorterChecksumCalculatorTest, AbortThenReaddThenCommitMatchesSingleAdd) {
 }
 
 TEST_P(SorterChecksumCalculatorTest, MultipleUncommittedAddsAccumulate) {
-    constexpr StringData kPart1 = "abacaba"_sd;
-    constexpr StringData kPart2 = "dabacaba"_sd;
+    constexpr std::string_view kPart1 = "abacaba"sv;
+    constexpr std::string_view kPart2 = "dabacaba"sv;
 
     SorterChecksumCalculator expected{GetParam()};
     expected.addData(kPart1.data(), kPart1.size());

@@ -61,6 +61,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using MockMongoInterface = StubLookupSingleDocumentProcessInterface;
 
@@ -128,8 +129,8 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForE
         expCtx, getSpec(FullDocumentModeEnum::kUpdateLookup));
     const auto expectedOutput =
         Value(Document{{DocumentSourceChangeStream::kStageName,
-                        Document{{"stage"_sd, DocumentSourceChangeStreamAddPostImage::kStageName},
-                                 {"fullDocument"_sd, "updateLookup"_sd}}}});
+                        Document{{"stage"sv, DocumentSourceChangeStreamAddPostImage::kStageName},
+                                 {"fullDocument"sv, "updateLookup"sv}}}});
 
     ASSERT_VALUE_EQ(
         stage->serialize(query_shape::SerializationOptions{
@@ -142,7 +143,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForD
     const auto stage = DocumentSourceChangeStreamAddPostImage::create(
         expCtx, getSpec(FullDocumentModeEnum::kUpdateLookup));
     const auto expectedOutput = Value(Document{{DocumentSourceChangeStreamAddPostImage::kStageName,
-                                                Document{{"fullDocument"_sd, "updateLookup"_sd}}}});
+                                                Document{{"fullDocument"sv, "updateLookup"sv}}}});
 
     ASSERT_VALUE_EQ(stage->serialize(), expectedOutput);
 }
@@ -157,7 +158,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentK
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         {createDocumentWithIdAndResumeToken(
             0,
-            Document{{"operationType", "update"_sd},
+            Document{{"operationType", "update"sv},
                      {"fullDocument", Document{{"_id", 0}}},
                      {"ns",
                       Document{{"db", expCtx->getNamespaceString().db_forTest()},
@@ -216,7 +217,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace
         createDocumentWithIdAndResumeToken(0,
                                            Document{
                                                {"documentKey", Document{{"_id", 0}}},
-                                               {"operationType", "update"_sd},
+                                               {"operationType", "update"sv},
                                            }),
         expCtx);
 
@@ -245,7 +246,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldHasWrongT
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         createDocumentWithIdAndResumeToken(0,
                                            Document{{"documentKey", Document{{"_id", 0}}},
-                                                    {"operationType", "update"_sd},
+                                                    {"operationType", "update"sv},
                                                     {"ns", 4}}),
         expCtx);
 
@@ -276,9 +277,9 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMa
             0,
             Document{
                 {"documentKey", Document{{"_id", 0}}},
-                {"operationType", "update"_sd},
+                {"operationType", "update"sv},
                 {"ns",
-                 Document{{"db", "DIFFERENT"_sd}, {"coll", expCtx->getNamespaceString().coll()}}}}),
+                 Document{{"db", "DIFFERENT"sv}, {"coll", expCtx->getNamespaceString().coll()}}}}),
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -305,8 +306,8 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
         createDocumentWithIdAndResumeToken(
             0,
             Document{{"documentKey", Document{{"_id", 0}}},
-                     {"operationType", "update"_sd},
-                     {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", "irrelevant"_sd}}}}),
+                     {"operationType", "update"sv},
+                     {"ns", Document{{"db", "DIFFERENT"sv}, {"coll", "irrelevant"sv}}}}),
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -335,10 +336,10 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
         createDocumentWithIdAndResumeToken(
             0,
             Document{{"documentKey", Document{{"_id", 0}}},
-                     {"operationType", "update"_sd},
+                     {"operationType", "update"sv},
                      {"ns",
                       Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                               {"coll", "irrelevant"_sd}}}}),
+                               {"coll", "irrelevant"sv}}}}),
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -349,10 +350,10 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
                        createDocumentWithIdAndResumeToken(
                            0,
                            Document{{"documentKey", Document{{"_id", 0}}},
-                                    {"operationType", "update"_sd},
+                                    {"operationType", "update"sv},
                                     {"ns",
                                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                                              {"coll", "irrelevant"_sd}}},
+                                              {"coll", "irrelevant"sv}}},
                                     {"fullDocument", Document{{"_id", 0}}}}));
 }
 
@@ -367,7 +368,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
         createDocumentWithIdAndResumeToken(
             0,
             Document{{"documentKey", Document{{"_id", 0}}},
-                     {"operationType", "update"_sd},
+                     {"operationType", "update"sv},
                      {"ns",
                       Document{{"db", expCtx->getNamespaceString().db_forTest()},
                                {"coll", expCtx->getNamespaceString().coll()}}}}),
@@ -396,7 +397,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
         {createDocumentWithIdAndResumeToken(
              0,
              Document{{"documentKey", Document{{"_id", 0}}},
-                      {"operationType", "insert"_sd},
+                      {"operationType", "insert"sv},
                       {"ns",
                        Document{{"db", expCtx->getNamespaceString().db_forTest()},
                                 {"coll", expCtx->getNamespaceString().coll()}}},
@@ -405,7 +406,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
          createDocumentWithIdAndResumeToken(
              1,
              Document{{"documentKey", Document{{"_id", 1}}},
-                      {"operationType", "update"_sd},
+                      {"operationType", "update"sv},
                       {"ns",
                        Document{{"db", expCtx->getNamespaceString().db_forTest()},
                                 {"coll", expCtx->getNamespaceString().coll()}}}}),
@@ -426,7 +427,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
                        createDocumentWithIdAndResumeToken(
                            0,
                            Document{{"documentKey", Document{{"_id", 0}}},
-                                    {"operationType", "insert"_sd},
+                                    {"operationType", "insert"sv},
                                     {"ns",
                                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
                                               {"coll", expCtx->getNamespaceString().coll()}}},
@@ -440,7 +441,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
                        createDocumentWithIdAndResumeToken(
                            1,
                            Document{{"documentKey", Document{{"_id", 1}}},
-                                    {"operationType", "update"_sd},
+                                    {"operationType", "update"sv},
                                     {"ns",
                                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
                                               {"coll", expCtx->getNamespaceString().coll()}}},

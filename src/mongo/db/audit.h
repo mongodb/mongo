@@ -36,7 +36,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -59,6 +58,7 @@
 #include <functional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -96,9 +96,9 @@ extern std::function<void()> shutdownSynchronizeJob;
 class MONGO_MOD_OPEN CommandInterface {
 public:
     virtual ~CommandInterface() = default;
-    virtual std::set<StringData> sensitiveFieldNames() const = 0;
+    virtual std::set<std::string_view> sensitiveFieldNames() const = 0;
     virtual void snipForLogging(mutablebson::Document* cmdObj) const = 0;
-    virtual StringData getName() const = 0;
+    virtual std::string_view getName() const = 0;
     virtual NamespaceString ns() const = 0;
     virtual bool redactArgs() const = 0;
 };
@@ -117,13 +117,13 @@ class AuthenticateEvent {
 public:
     using Appender = unique_function<void(BSONObjBuilder*)>;
 
-    AuthenticateEvent(StringData mechanism,
+    AuthenticateEvent(std::string_view mechanism,
                       const UserName& user,
                       Appender appender,
                       ErrorCodes::Error result)
         : _mechanism(mechanism), _user(user), _appender(std::move(appender)), _result(result) {}
 
-    StringData getMechanism() const {
+    std::string_view getMechanism() const {
         return _mechanism;
     }
 
@@ -140,7 +140,7 @@ public:
     }
 
 private:
-    StringData _mechanism;
+    std::string_view _mechanism;
     UserName _user;
 
     Appender _appender;
@@ -287,7 +287,7 @@ void logReplSetReconfig(Client* client, const BSONObj* oldConfig, const BSONObj*
 /**
  * Logs the result of an ApplicationMessage command.
  */
-void logApplicationMessage(Client* client, StringData msg);
+void logApplicationMessage(Client* client, std::string_view msg);
 
 /**
  * Logs the options associated with a startup event.
@@ -303,7 +303,7 @@ void logShutdown(Client* client);
  * Logs the users authenticated to a session before and after a logout command.
  */
 void logLogout(Client* client,
-               StringData reason,
+               std::string_view reason,
                const BSONArray& initialUsers,
                const BSONArray& updatedUsers,
                const boost::optional<Date_t>& loginTime);
@@ -313,9 +313,9 @@ void logLogout(Client* client,
  */
 void logCreateIndex(Client* client,
                     const BSONObj* indexSpec,
-                    StringData indexname,
+                    std::string_view indexname,
                     const NamespaceString& nsname,
-                    StringData indexBuildState,
+                    std::string_view indexBuildState,
                     ErrorCodes::Error result);
 
 /**
@@ -346,7 +346,7 @@ void logCreateDatabase(Client* client, const DatabaseName& dbname);
 /**
  * Logs the result of a dropIndex command.
  */
-void logDropIndex(Client* client, StringData indexname, const NamespaceString& nsname);
+void logDropIndex(Client* client, std::string_view indexname, const NamespaceString& nsname);
 
 /**
  * Logs the result of a dropCollection command on a collection.
@@ -377,17 +377,17 @@ void logRenameCollection(Client* client,
 /**
  * Logs the result of a enableSharding command.
  */
-void logEnableSharding(Client* client, StringData dbname);
+void logEnableSharding(Client* client, std::string_view dbname);
 
 /**
  * Logs the result of a addShard command.
  */
-void logAddShard(Client* client, StringData name, const std::string& servers);
+void logAddShard(Client* client, std::string_view name, const std::string& servers);
 
 /**
  * Logs the result of a removeShard command.
  */
-void logRemoveShard(Client* client, StringData shardname);
+void logRemoveShard(Client* client, std::string_view shardname);
 
 /**
  * Logs the result of a shardCollection command.

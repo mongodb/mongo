@@ -29,7 +29,6 @@
 
 #include "mongo/db/auth/restriction.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/restriction_mock.h"

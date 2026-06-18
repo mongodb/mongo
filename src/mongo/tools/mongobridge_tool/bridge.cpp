@@ -32,7 +32,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -78,6 +77,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -96,7 +96,7 @@ namespace {
 boost::optional<HostAndPort> extractHostInfo(const OpMsgRequest& request) {
     // The initial hello/isMaster request made by mongod and mongos processes should contain a
     // hostInfo field that identifies the process by its host:port.
-    StringData cmdName = request.getCommandName();
+    std::string_view cmdName = request.getCommandName();
     if (cmdName != "isMaster" && cmdName != "ismaster" && cmdName != "hello") {
         return boost::none;
     }
@@ -127,7 +127,7 @@ private:
 
 class BridgeContext {
 public:
-    Status runBridgeCommand(StringData cmdName, BSONObj cmdObj) {
+    Status runBridgeCommand(std::string_view cmdName, BSONObj cmdObj) {
         auto status = BridgeCommand::findCommand(cmdName);
         if (!status.isOK()) {
             return status.getStatus();
@@ -217,7 +217,7 @@ public:
 
         // The initial hello/isMaster request made by mongod and mongos processes should contain a
         // hostInfo field that identifies the process by its host:port.
-        StringData cmdName = request.getCommandName();
+        std::string_view cmdName = request.getCommandName();
         if (cmdName != "isMaster" && cmdName != "ismaster" && cmdName != "hello") {
             return;
         }

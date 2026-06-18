@@ -33,11 +33,16 @@
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
-constexpr StringData kAdditionalResolvedNamespacesFieldName = "additionalResolvedNamespaces"_sd;
-constexpr StringData kIsSentinelPrimaryFieldName = "isSentinelPrimary"_sd;
+
+using namespace std::literals::string_view_literals;
+
+constexpr auto kAdditionalResolvedNamespacesFieldName = "additionalResolvedNamespaces"sv;
+constexpr auto kIsSentinelPrimaryFieldName = "isSentinelPrimary"sv;
 
 void appendAdditionalResolvedNamespaceEntry(BSONObjBuilder* entry, const ResolvedNamespace& rn) {
     entry->append("ns", rn.getResolvedNamespace().toStringForErrorMsg());
@@ -484,7 +489,7 @@ ResolvedNamespace ResolvedNamespace::parseFromBSON(const BSONElement& elem) {
     return fromBSON(localBuilder.done());
 }
 
-void ResolvedNamespace::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+void ResolvedNamespace::serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
     serialize(builder);
 }
 

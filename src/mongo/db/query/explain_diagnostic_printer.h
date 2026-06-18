@@ -34,6 +34,8 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
@@ -46,7 +48,7 @@ namespace mongo::diagnostic_printers {
  * of these diagnostics is done lazily during failure handling.
  */
 struct ExplainDiagnosticPrinter {
-    static constexpr StringData kNoExecOpMsg = "omitted: no executor"_sd;
+    static constexpr std::string_view kNoExecOpMsg = "omitted: no executor"_sd;
 
     auto format(auto& fc) const {
         auto out = fc.out();

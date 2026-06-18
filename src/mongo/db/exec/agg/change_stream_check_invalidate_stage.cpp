@@ -36,6 +36,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamCheckInvalidateToStageFn(
@@ -84,7 +86,7 @@ namespace {
 // Returns true if the given 'operationType' should invalidate the change stream based on the
 // namespace in 'pExpCtx'.
 bool isInvalidationCommand(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           StringData operationType) {
+                           std::string_view operationType) {
     if (expCtx->isSingleNamespaceAggregation()) {
         return operationType == DSCS::kDropCollectionOpType ||
             operationType == DSCS::kRenameCollectionOpType ||
@@ -98,7 +100,7 @@ bool isInvalidationCommand(const boost::intrusive_ptr<ExpressionContext>& expCtx
 }  // namespace
 
 ChangeStreamCheckInvalidateStage::ChangeStreamCheckInvalidateStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     boost::optional<ResumeTokenData> startAfterInvalidate)
     : Stage(stageName, pExpCtx), _startAfterInvalidate(std::move(startAfterInvalidate)) {}

@@ -31,7 +31,6 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
@@ -70,6 +69,7 @@
 
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -78,8 +78,9 @@
 namespace mongo {
 
 namespace {
-constexpr auto kTempDirStem = "op_msg_fuzzer_fixture"_sd;
-}
+using namespace std::literals::string_view_literals;
+constexpr auto kTempDirStem = "op_msg_fuzzer_fixture"sv;
+}  // namespace
 
 // This must be called before creating any new threads that may access `AuthorizationManager` to
 // avoid a data-race.

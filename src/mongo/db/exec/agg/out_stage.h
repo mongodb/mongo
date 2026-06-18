@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/writer_stage.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -57,7 +57,7 @@ namespace mongo::exec::agg {
  */
 class OutStage final : public WriterStage<BSONObj> {
 public:
-    OutStage(StringData stageName,
+    OutStage(std::string_view stageName,
              const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
              NamespaceString outputNs,
              const std::shared_ptr<TimeseriesOptions>& timeseries,

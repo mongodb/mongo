@@ -42,13 +42,13 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <cxxabi.h>
 // IWYU pragma: no_include "libunwind-x86_64.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -91,9 +91,10 @@
 namespace mongo {
 namespace stacktrace_details {
 namespace {
+using namespace std::literals::string_view_literals;
 
 constexpr size_t kSymbolMax = 512;
-constexpr StringData kUnknownFileName = "???"_sd;
+constexpr std::string_view kUnknownFileName = "???"sv;
 
 // Answer might be negative, but that should be a peculiar case.
 ptrdiff_t offsetFromBase(uintptr_t base, uintptr_t addr) {
@@ -113,7 +114,7 @@ struct Options {
 
 
 // E.g., for "/foo/bar/my.txt", returns "my.txt".
-StringData getBaseName(StringData path) {
+std::string_view getBaseName(std::string_view path) {
     size_t lastSlash = path.rfind('/');
     if (lastSlash == std::string::npos)
         return path;
@@ -183,8 +184,8 @@ void appendProcessInfoTrimmed(const BSONObj& bsonProcInfo,
                               const std::vector<uintptr_t>& bases,
                               BSONObjBuilder* bob) {
     for (const BSONElement& be : bsonProcInfo) {
-        StringData key = be.fieldNameStringData();
-        if (be.type() != BSONType::array || key != "somap"_sd) {
+        std::string_view key = be.fieldNameStringData();
+        if (be.type() != BSONType::array || key != "somap"sv) {
             bob->append(be);
             continue;
         }
@@ -216,9 +217,9 @@ void appendStackTraceObject(BSONObjBuilder* obj, IterationIface& iter, const Opt
 void printMetadata(StackTraceSink& sink, const StackTraceAddressMetadata& meta) {
     auto printOffset = [&sink](uintptr_t base, uintptr_t address) {
         ptrdiff_t offset = offsetFromBase(base, address);
-        StringData sign = "+"_sd;
+        std::string_view sign = "+"sv;
         if (offset < 0) {
-            sign = "-"_sd;
+            sign = "-"sv;
             offset = -offset;
         }
         sink << sign << Hex(static_cast<uint64_t>(offset), true);

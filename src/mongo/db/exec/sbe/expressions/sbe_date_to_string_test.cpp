@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
@@ -40,6 +39,7 @@
 #include <cstdint>
 #include <memory>
 #include <ostream>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -95,7 +95,7 @@ TEST_F(SBEDateToStringTest, BasicDateToString) {
         std::pair<value::TypeTags, value::Value> timezone;
         std::pair<value::TypeTags, value::Value> date;
         std::pair<value::TypeTags, value::Value> format;
-        StringData expectedValue;  // Output.
+        std::string_view expectedValue;  // Output.
     };
 
     const std::pair<value::TypeTags, value::Value> kNothing{value::TypeTags::Nothing, 0};
@@ -107,14 +107,14 @@ TEST_F(SBEDateToStringTest, BasicDateToString) {
             value::makeNewString("UTC"),
             kDate,
             value::makeNewString("%m/%d/%Y, %H:%M:%S"),
-            StringData("08/14/2023, 12:24:36"),
+            std::string_view("08/14/2023, 12:24:36"),
         },
         {
             // America/New York is 4 hours behind UTC.
             value::makeNewString("America/New_York"),
             kDate,
             value::makeNewString("%m/%d/%Y, %H:%M:%S"),
-            StringData("08/14/2023, 08:24:36"),
+            std::string_view("08/14/2023, 08:24:36"),
         },
         {
             // Try a weirder format string.
@@ -124,7 +124,7 @@ TEST_F(SBEDateToStringTest, BasicDateToString) {
                 "The %dth day of the %mth month of the year %Y, in the %Sth "
                 "second of the %Mth minute of the %Hth hour with timezone offset %z is the %wnd "
                 "day of the %Urd week of the year, and the %jth day of the year."),
-            StringData(
+            std::string_view(
                 "The 14th day of the 08th month of the year 2023, in the 36th "
                 "second of the 24th minute of the 12th hour with timezone offset +0000 is the 2nd "
                 "day of the 33rd week of the year, and the 226th day of the year."),
@@ -136,63 +136,63 @@ TEST_F(SBEDateToStringTest, BasicDateToString) {
             kNothing,
             kDate,
             value::makeNewString("%m/%d/%Y, %H:%M:%S"),
-            StringData(),
+            std::string_view(),
         },
         {
             //'timezone' is not a valid type.
             {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0)},
             kDate,
             value::makeNewString("%m/%d/%Y, %H:%M:%S"),
-            StringData(),
+            std::string_view(),
         },
         {
             //'timezone' is not a recognized value.
             value::makeNewString("Arctic/North_Pole"),
             kDate,
             value::makeNewString("%m/%d/%Y, %H:%M:%S"),
-            StringData(),
+            std::string_view(),
         },
         {
             //'date' is Nothing.
             value::makeNewString("UTC"),
             kNothing,
             value::makeNewString("%m/%d/%Y, %H:%M:%S"),
-            StringData(),
+            std::string_view(),
         },
         {
             //'date' is Null.
             value::makeNewString("UTC"),
             kNull,
             value::makeNewString("%m/%d/%Y, %H:%M:%S"),
-            StringData(),
+            std::string_view(),
         },
         {
             //'date' is not a valid type.
             value::makeNewString("UTC"),
             {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0)},
             value::makeNewString("%m/%d/%Y, %H:%M:%S"),
-            StringData(),
+            std::string_view(),
         },
         {
             //'format' is Nothing.
             value::makeNewString("UTC"),
             kDate,
             kNothing,
-            StringData(),
+            std::string_view(),
         },
         {
             //'format' is a valid string, but not a valid format.
             value::makeNewString("UTC"),
             kDate,
             value::makeNewString("Random String%"),
-            StringData(),
+            std::string_view(),
         },
         {
             //'format' is not a valid type.
             value::makeNewString("UTC"),
             kDate,
             {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0)},
-            StringData(),
+            std::string_view(),
         },
     };
 

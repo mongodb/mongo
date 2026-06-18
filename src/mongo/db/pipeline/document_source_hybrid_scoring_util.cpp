@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
@@ -48,6 +47,8 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/query/util/string_util.h"
 #include "mongo/util/string_map.h"
+
+#include <string_view>
 
 #include <fmt/ranges.h>
 
@@ -79,7 +80,7 @@ double getPipelineWeight(const StringMap<double>& weights, const std::string& pi
 StringMap<double> validateWeights(
     const mongo::BSONObj& inputWeights,
     const std::map<std::string, std::unique_ptr<Pipeline>>& inputPipelines,
-    const StringData stageName) {
+    const std::string_view stageName) {
     // Output map of pipeline name, to weight of pipeline.
     StringMap<double> weights;
     // Keeps track of the weights that do not reference a valid pipeline most often from a
@@ -159,7 +160,7 @@ void failWeightsValidationWithPipelineSuggestions(
     const std::map<std::string, std::unique_ptr<Pipeline>>& allPipelines,
     const stdx::unordered_set<std::string>& matchedPipelines,
     const std::vector<std::string>& invalidWeights,
-    const StringData stageName) {
+    const std::string_view stageName) {
     // The list of unmatchedPipelines is first computed to find
     // the valid set of possible suggestions.
     std::vector<std::string> unmatchedPipelines;
@@ -396,7 +397,7 @@ Status isScoredPipeline(const std::vector<BSONObj>& bsonPipeline,
 
 bool isHybridSearchPipeline(const std::vector<BSONObj>& bsonPipeline) {
     // Please keep the following in alphabetical order.
-    static const std::set<StringData> hybridScoringStages{
+    static const std::set<std::string_view> hybridScoringStages{
         DocumentSourceRankFusion::kStageName,
         DocumentSourceScoreFusion::kStageName,
     };

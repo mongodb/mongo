@@ -30,7 +30,6 @@
 #include "mongo/db/repl/apply_ops.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/crypto/oplog_key_entry_handler.h"
@@ -59,6 +58,7 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -70,7 +70,7 @@
 namespace mongo {
 namespace repl {
 
-constexpr StringData ApplyOps::kOplogApplicationModeFieldName;
+constexpr std::string_view ApplyOps::kOplogApplicationModeFieldName;
 
 namespace {
 

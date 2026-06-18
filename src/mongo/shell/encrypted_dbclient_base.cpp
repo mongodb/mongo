@@ -90,6 +90,7 @@
 #include <list>
 #include <new>
 #include <stack>
+#include <string_view>
 
 #include <jsapi.h>
 
@@ -108,11 +109,12 @@
 #include <js/ValueArray.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 constexpr Duration kCacheInvalidationTime = Minutes(1);
-constexpr StringData compactCmdName = "compact"_sd;
-constexpr StringData cleanupCmdName = "cleanup"_sd;
+constexpr std::string_view compactCmdName = "compact"sv;
+constexpr std::string_view cleanupCmdName = "cleanup"sv;
 
 ImplicitEncryptedDBClientCallback* implicitEncryptedDBClientCallback{nullptr};
 
@@ -220,13 +222,13 @@ BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
 
 void EncryptedDBClientBase::encryptMarking(const BSONObj& elem,
                                            BSONObjBuilder* builder,
-                                           StringData elemName) {
+                                           std::string_view elemName) {
     MONGO_UNREACHABLE;
 }
 
 void EncryptedDBClientBase::decryptPayload(ConstDataRange data,
                                            BSONObjBuilder* builder,
-                                           StringData elemName) {
+                                           std::string_view elemName) {
     invariant(builder);
     uassert(ErrorCodes::BadValue, "Invalid decryption blob", data.length() > kAssociatedDataLength);
 
@@ -284,8 +286,9 @@ EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::handleEncryptionR
     auto commandName = std::string{request.getCommandName()};
     const DatabaseName dbName = request.parseDbName();
 
-    if (std::find(kEncryptedCommands.begin(), kEncryptedCommands.end(), StringData(commandName)) ==
-        std::end(kEncryptedCommands)) {
+    if (std::find(kEncryptedCommands.begin(),
+                  kEncryptedCommands.end(),
+                  std::string_view(commandName)) == std::end(kEncryptedCommands)) {
         return doRunCommand(std::move(params));
     }
 
@@ -324,7 +327,7 @@ BSONObj EncryptedDBClientBase::validateBSONElement(ConstDataRange out, uint8_t b
         valueObj = cdc.readAndAdvance<Validated<BSONObj>>();
         return valueObj.getOwned();
     } else {
-        auto valueString = "value"_sd;
+        auto valueString = "value"sv;
 
         // The size here is to construct a new BSON document and validate the
         // total size of the object. The first four bytes is for the size of an
@@ -429,9 +432,9 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
     auto algorithmStr = mozjs::ValueWriter(cx, args.get(2)).toString();
     FleAlgorithmInt algorithm;
 
-    if (StringData(algorithmStr) == idl::serialize(FleAlgorithmEnum::kRandom)) {
+    if (std::string_view(algorithmStr) == idl::serialize(FleAlgorithmEnum::kRandom)) {
         algorithm = FleAlgorithmInt::kRandom;
-    } else if (StringData(algorithmStr) == idl::serialize(FleAlgorithmEnum::kDeterministic)) {
+    } else if (std::string_view(algorithmStr) == idl::serialize(FleAlgorithmEnum::kDeterministic)) {
         algorithm = FleAlgorithmInt::kDeterministic;
     } else {
         uasserted(ErrorCodes::BadValue, "Third parameter must be the FLE Algorithm type");
@@ -493,12 +496,12 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
             // that information from the object by building it and pulling out the first
             // element, which is the object we are trying to get.
             mozjs::ObjectWrapper::WriteFieldRecursionFrames frames;
-            frames.emplace(cx, rootedObj.get(), nullptr, StringData{});
+            frames.emplace(cx, rootedObj.get(), nullptr, std::string_view{});
             BSONObjBuilder builder;
-            mozjs::ValueWriter(cx, args.get(1)).writeThis(&builder, "value"_sd, &frames);
+            mozjs::ValueWriter(cx, args.get(1)).writeThis(&builder, "value"sv, &frames);
 
             BSONObj object = builder.obj();
-            auto elem = object.getField("value"_sd);
+            auto elem = object.getField("value"sv);
 
             plaintextBuilder.appendBuf(elem.value(), elem.valuesize());
             bsonType = elem.type();
@@ -546,7 +549,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
     // Prepare the return value
     ConstDataRange ciphertextBlob(encryptionFrame.get());
     std::string blobStr =
-        base64::encode(StringData(ciphertextBlob.data(), ciphertextBlob.length()));
+        base64::encode(std::string_view(ciphertextBlob.data(), ciphertextBlob.length()));
     JS::RootedValueArray<2> arr(cx);
 
     arr[0].setInt32(BinDataType::Encrypt);
@@ -612,7 +615,7 @@ boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldCo
 
 std::tuple<NamespaceString, BSONObj> validateStructuredEncryptionParams(JSContext* cx,
                                                                         JS::CallArgs args,
-                                                                        StringData cmdName) {
+                                                                        std::string_view cmdName) {
     if ((args.length() < 1) || (args.length() > 2)) {
         uasserted(ErrorCodes::BadValue, str::stream() << cmdName << " requires 1 or 2 args");
     }
@@ -645,18 +648,18 @@ void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
 
     builder.append("compactStructuredEncryptionData", nss.coll());
 
-    if (extra["compactionTokens"_sd].eoo()) {
+    if (extra["compactionTokens"sv].eoo()) {
         builder.append("compactionTokens",
                        efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
     }
 
-    if (efc && extra["encryptionInformation"_sd].eoo() &&
+    if (efc && extra["encryptionInformation"sv].eoo() &&
         hasQueryTypeMatching(*efc, [](QueryTypeEnum type) {
             return type == QueryTypeEnum::Range || isFLE2TextQueryType(type);
         })) {
         EncryptionInformation ei;
         ei.setSchema(BSON(nss.serializeWithoutTenantPrefix_UNSAFE() << efc->toBSON()));
-        builder.append("encryptionInformation"_sd, ei.toBSON());
+        builder.append("encryptionInformation"sv, ei.toBSON());
     }
 
     for (const auto& [fieldName, _] : extra) {
@@ -682,7 +685,7 @@ void EncryptedDBClientBase::cleanup(JSContext* cx, JS::CallArgs args) {
 
     builder.append("cleanupStructuredEncryptionData", nss.coll());
 
-    if (extra["cleanupTokens"_sd].eoo()) {
+    if (extra["cleanupTokens"sv].eoo()) {
         builder.append("cleanupTokens",
                        efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
     }
@@ -894,7 +897,7 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
 
     auto keyStoreRecord = KeyStoreRecord::parse(dataKeyObj, IDLParserContext("root"));
 
-    BSONElement elem = dataKeyObj.getField("keyMaterial"_sd);
+    BSONElement elem = dataKeyObj.getField("keyMaterial"sv);
     uassert(ErrorCodes::BadValue,
             fmt::format("Key ID {} is not a generic BinData type", uuid.toString()),
             elem.isBinData(BinDataType::BinDataGeneral));
@@ -969,7 +972,7 @@ namespace {
  */
 void createCollectionObject(JSContext* cx,
                             JS::HandleValue client,
-                            StringData nsString,
+                            std::string_view nsString,
                             JS::MutableHandleValue collection) {
     invariant(!client.isNull() && !client.isUndefined());
 

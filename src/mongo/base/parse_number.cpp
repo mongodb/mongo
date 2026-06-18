@@ -43,6 +43,7 @@
 #include <iterator>
 #include <limits>
 #include <string>
+#include <string_view>
 
 #include <absl/strings/charconv.h>
 #include <boost/cstdint.hpp>
@@ -50,6 +51,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Returns the value of the digit "c", with the same conversion behavior as strtol.
@@ -71,7 +73,7 @@ uint8_t _digitValue(char c) {
  * substring with any sign characters stripped away.  "*isNegative" is set to true if the
  * number is negative, and false otherwise.
  */
-inline StringData _extractSign(StringData stringValue, bool* isNegative) {
+inline std::string_view _extractSign(std::string_view stringValue, bool* isNegative) {
     if (stringValue.empty()) {
         *isNegative = false;
         return stringValue;
@@ -107,9 +109,9 @@ inline StringData _extractSign(StringData stringValue, bool* isNegative) {
  * Returns stringValue, unless it sets *outputBase to 16, in which case it will strip off the
  * "0x" or "0X" prefix, if present.
  */
-inline StringData _extractBase(StringData stringValue, int inputBase, int* outputBase) {
-    const auto hexPrefixLower = "0x"_sd;
-    const auto hexPrefixUpper = "0X"_sd;
+inline std::string_view _extractBase(std::string_view stringValue, int inputBase, int* outputBase) {
+    const auto hexPrefixLower = "0x"sv;
+    const auto hexPrefixUpper = "0X"sv;
     if (inputBase == 0) {
         if (stringValue.size() > 2 &&
             (stringValue.starts_with(hexPrefixLower) || stringValue.starts_with(hexPrefixUpper))) {
@@ -132,7 +134,7 @@ inline StringData _extractBase(StringData stringValue, int inputBase, int* outpu
     }
 }
 
-StatusWith<uint64_t> _parseMagnitude(StringData magnitudeStr,
+StatusWith<uint64_t> _parseMagnitude(std::string_view magnitudeStr,
                                      uint64_t base,
                                      const char** end,
                                      bool allowTrailingText) {
@@ -161,13 +163,13 @@ StatusWith<uint64_t> _parseMagnitude(StringData magnitudeStr,
     return n;
 }
 
-StringData removeLeadingWhitespace(StringData s) {
+std::string_view removeLeadingWhitespace(std::string_view s) {
     return s.substr(std::distance(
         s.begin(), std::find_if_not(s.begin(), s.end(), [](char c) { return ctype::isSpace(c); })));
 }
 
 template <std::integral NumberType>
-Status _parseNumber(StringData s,
+Status _parseNumber(std::string_view s,
                     NumberType* result,
                     const char** endptr,
                     const NumberParser& parser) {
@@ -222,7 +224,7 @@ Status _parseNumber(StringData s,
     return Status::OK();
 }
 
-Status _parseNumber(StringData stringValue,
+Status _parseNumber(std::string_view stringValue,
                     double* result,
                     const char** endptr,
                     const NumberParser& parser) {
@@ -268,7 +270,7 @@ Status _parseNumber(StringData stringValue,
     return Status::OK();
 }
 
-Status _parseNumber(StringData stringValue,
+Status _parseNumber(std::string_view stringValue,
                     Decimal128* result,
                     const char** endptr,
                     const NumberParser& parser) {
@@ -312,9 +314,9 @@ Status _parseNumber(StringData stringValue,
 }
 }  // namespace
 
-#define DEFINE_NUMBER_PARSER_OPERATOR(type)                                            \
-    Status NumberParser::operator()(StringData s, type* out, const char** end) const { \
-        return _parseNumber(s, out, end, *this);                                       \
+#define DEFINE_NUMBER_PARSER_OPERATOR(type)                                                  \
+    Status NumberParser::operator()(std::string_view s, type* out, const char** end) const { \
+        return _parseNumber(s, out, end, *this);                                             \
     }
 
 DEFINE_NUMBER_PARSER_OPERATOR(long)

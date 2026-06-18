@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace {
@@ -246,7 +248,8 @@ boost::intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* cons
     // "vpsSub" gets our variables, "vps" doesn't.
     VariablesParseState vpsSub(vps);
 
-    auto parseVariableDefinition = [&vpsSub](const BSONElement& elem, StringData defaultName) {
+    auto parseVariableDefinition = [&vpsSub](const BSONElement& elem,
+                                             std::string_view defaultName) {
         boost::optional<std::string> name;
         if (elem) {
             name = elem.str();

@@ -32,7 +32,6 @@
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -53,6 +52,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -347,10 +347,10 @@ public:
     virtual std::vector<std::unique_ptr<MatchExpression>>* getChildVector() = 0;
 
     /**
-     * Get the path of the leaf.  Returns StringData() if there is no path (node is logical).
+     * Get the path of the leaf.  Returns std::string_view() if there is no path (node is logical).
      */
-    virtual StringData path() const {
-        return StringData();
+    virtual std::string_view path() const {
+        return std::string_view();
     }
     /**
      * Similar to path(), but returns a FieldRef. Returns nullptr if there is no path.

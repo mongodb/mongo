@@ -35,7 +35,6 @@
 #include <s2cellid.h>
 #include <s2region.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/field_ref.h"
@@ -68,12 +67,14 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -1272,7 +1273,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
     } else if (MatchExpression::INTERNAL_BUCKET_GEO_WITHIN == expr->matchType()) {
         const InternalBucketGeoWithinMatchExpression* ibgwme =
             static_cast<const InternalBucketGeoWithinMatchExpression*>(expr);
-        if ("2dsphere_bucket"_sd == elt.valueStringDataSafe()) {
+        if ("2dsphere_bucket"sv == elt.valueStringDataSafe()) {
             tassert(5837101,
                     "A geo query on a sphere must have an S2 region",
                     ibgwme->getGeoContainer().hasS2Region());
@@ -1434,7 +1435,7 @@ Interval IndexBoundsBuilder::makePointInterval(const BSONObj& obj) {
 }
 
 // static
-Interval IndexBoundsBuilder::makePointInterval(StringData str) {
+Interval IndexBoundsBuilder::makePointInterval(std::string_view str) {
     BSONObjBuilder bob;
     bob.append("", str);
     return makePointInterval(bob.obj());

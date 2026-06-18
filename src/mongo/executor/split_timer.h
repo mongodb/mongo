@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
@@ -41,6 +40,7 @@
 #include <array>
 #include <cstddef>
 #include <functional>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -108,7 +108,7 @@ private:
  *  - static constexpr properties:
  *      - size_t numIntervalIds and numTimesplitIds for enum extents.
  *      - toIdx(e) to convert these enums to size_t.
- *      - getName(e) to convert these enums to StringData (intervals should end in "Millis").
+ *      - getName(e) to convert these enums to std::string_view (intervals should end in "Millis").
  *      - TimeSplitIdType getStartSplit(IntervalIdType).
  *      - TimeSplitIdType getEndSplit(IntervalIdType).
  *  - nonstatic onStart and onFinish member functions, taking a pointer to this SplitTimer.

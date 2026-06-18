@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -51,7 +53,7 @@ namespace exec::agg {
 
 REGISTER_AGG_STAGE_MAPPING(skipStage, DocumentSourceSkip::id, documentSourceSkipToStageFn)
 
-SkipStage::SkipStage(StringData stageName,
+SkipStage::SkipStage(std::string_view stageName,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      long long nToSkip)
     : Stage(stageName, expCtx), _nToSkip(nToSkip) {}

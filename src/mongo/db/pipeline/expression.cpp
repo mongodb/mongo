@@ -33,6 +33,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -72,6 +73,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 using Parser = Expression::Parser;
 
 using boost::intrusive_ptr;
@@ -107,7 +109,7 @@ Value ExpressionConstant::serializeConstant(const query_shape::SerializationOpti
                                             Value val,
                                             bool wrapRepresentativeValue) {
     if (val.missing()) {
-        return Value("$$REMOVE"_sd);
+        return Value("$$REMOVE"sv);
     }
     // It's safer to wrap constants in $const when generating representative shapes to avoid
     // ambiguity when re-parsing (SERVER-88296, SERVER-85376). However, we allow certain expressions
@@ -212,7 +214,7 @@ stdx::unordered_set<std::string> Expression::listDisabledExpressions() {
     return expressions;
 }
 
-std::string Expression::getErrorMessage(const StringData key) {
+std::string Expression::getErrorMessage(const std::string_view key) {
     if (const auto it = disabledExpressionNames.find(key); it != disabledExpressionNames.end()) {
         // the expression was disabled: return a more detail error message
         switch (it->second) {
@@ -298,7 +300,7 @@ intrusive_ptr<Expression> Expression::parseOperand(ExpressionContext* const expC
     }
 }
 
-bool Expression::isExpressionName(StringData name) {
+bool Expression::isExpressionName(std::string_view name) {
     return parserMap.find(name) != parserMap.end();
 }
 
@@ -326,9 +328,9 @@ boost::intrusive_ptr<Expression> parseDateExpressionAcceptingTimeZone(
             boost::intrusive_ptr<Expression> timeZone;
             for (const auto& subElem : operatorElem.embeddedObject()) {
                 auto argName = subElem.fieldNameStringData();
-                if (argName == "date"_sd) {
+                if (argName == "date"sv) {
                     date = Expression::parseOperand(expCtx, subElem, variablesParseState);
-                } else if (argName == "timezone"_sd) {
+                } else if (argName == "timezone"sv) {
                     timeZone = Expression::parseOperand(expCtx, subElem, variablesParseState);
                 } else {
                     uasserted(40535,
@@ -957,27 +959,27 @@ intrusive_ptr<Expression> ExpressionDateFromParts::parse(ExpressionContext* cons
     for (auto&& arg : args) {
         auto field = arg.fieldNameStringData();
 
-        if (field == "year"_sd) {
+        if (field == "year"sv) {
             yearElem = arg;
-        } else if (field == "month"_sd) {
+        } else if (field == "month"sv) {
             monthElem = arg;
-        } else if (field == "day"_sd) {
+        } else if (field == "day"sv) {
             dayElem = arg;
-        } else if (field == "hour"_sd) {
+        } else if (field == "hour"sv) {
             hourElem = arg;
-        } else if (field == "minute"_sd) {
+        } else if (field == "minute"sv) {
             minuteElem = arg;
-        } else if (field == "second"_sd) {
+        } else if (field == "second"sv) {
             secondElem = arg;
-        } else if (field == "millisecond"_sd) {
+        } else if (field == "millisecond"sv) {
             millisecondElem = arg;
-        } else if (field == "isoWeekYear"_sd) {
+        } else if (field == "isoWeekYear"sv) {
             isoWeekYearElem = arg;
-        } else if (field == "isoWeek"_sd) {
+        } else if (field == "isoWeek"sv) {
             isoWeekElem = arg;
-        } else if (field == "isoDayOfWeek"_sd) {
+        } else if (field == "isoDayOfWeek"sv) {
             isoDayOfWeekElem = arg;
-        } else if (field == "timezone"_sd) {
+        } else if (field == "timezone"sv) {
             timeZoneElem = arg;
         } else {
             uasserted(40518,
@@ -1149,15 +1151,15 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(ExpressionContext* con
     for (auto&& arg : args) {
         auto field = arg.fieldNameStringData();
 
-        if (field == "format"_sd) {
+        if (field == "format"sv) {
             formatElem = arg;
-        } else if (field == "dateString"_sd) {
+        } else if (field == "dateString"sv) {
             dateStringElem = arg;
-        } else if (field == "timezone"_sd) {
+        } else if (field == "timezone"sv) {
             timeZoneElem = arg;
-        } else if (field == "onNull"_sd) {
+        } else if (field == "onNull"sv) {
             onNullElem = arg;
-        } else if (field == "onError"_sd) {
+        } else if (field == "onError"sv) {
             onErrorElem = arg;
         } else {
             uasserted(40541,
@@ -1266,11 +1268,11 @@ intrusive_ptr<Expression> ExpressionDateToParts::parse(ExpressionContext* const 
     for (auto&& arg : args) {
         auto field = arg.fieldNameStringData();
 
-        if (field == "date"_sd) {
+        if (field == "date"sv) {
             dateElem = arg;
-        } else if (field == "timezone"_sd) {
+        } else if (field == "timezone"sv) {
             timeZoneElem = arg;
-        } else if (field == "iso8601"_sd) {
+        } else if (field == "iso8601"sv) {
             isoDateElem = arg;
         } else {
             uasserted(40520,
@@ -1356,13 +1358,13 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(ExpressionContext* const
     for (auto&& arg : expr.embeddedObject()) {
         auto field = arg.fieldNameStringData();
 
-        if (field == "format"_sd) {
+        if (field == "format"sv) {
             formatElem = arg;
-        } else if (field == "date"_sd) {
+        } else if (field == "date"sv) {
             dateElem = arg;
-        } else if (field == "timezone"_sd) {
+        } else if (field == "timezone"sv) {
             timeZoneElem = arg;
-        } else if (field == "onNull"_sd) {
+        } else if (field == "onNull"sv) {
             onNullElem = arg;
         } else {
             uasserted(18534,
@@ -1469,15 +1471,15 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* co
     BSONElement startDateElement, endDateElement, unitElement, timezoneElement, startOfWeekElement;
     for (auto&& element : expr.embeddedObject()) {
         auto field = element.fieldNameStringData();
-        if ("startDate"_sd == field) {
+        if ("startDate"sv == field) {
             startDateElement = element;
-        } else if ("endDate"_sd == field) {
+        } else if ("endDate"sv == field) {
             endDateElement = element;
-        } else if ("unit"_sd == field) {
+        } else if ("unit"sv == field) {
             unitElement = element;
-        } else if ("timezone"_sd == field) {
+        } else if ("timezone"sv == field) {
             timezoneElement = element;
-        } else if ("startOfWeek"_sd == field) {
+        } else if ("startOfWeek"sv == field) {
             startOfWeekElement = element;
         } else {
             uasserted(5166302,
@@ -1522,7 +1524,7 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
         if (unitValue.nullish()) {
             return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
         }
-        _parsedUnit = exec::expression::parseTimeUnit(unitValue, "$dateDiff"_sd);
+        _parsedUnit = exec::expression::parseTimeUnit(unitValue, "$dateDiff"sv);
     }
     if (ExpressionConstant::isConstant(_children[_kStartOfWeek])) {
         const Value startOfWeekValue =
@@ -1531,7 +1533,7 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
             return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
         }
         _parsedStartOfWeek =
-            exec::expression::parseDayOfWeek(startOfWeekValue, "$dateDiff"_sd, "startOfWeek"_sd);
+            exec::expression::parseDayOfWeek(startOfWeekValue, "$dateDiff"sv, "startOfWeek"sv);
     }
     if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
         _parsedTimeZone = exec::expression::addContextToAssertionException(
@@ -1542,7 +1544,7 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
                                                       &(getExpressionContext()->variables),
                                                       {});
             },
-            "$dateDiff parameter 'timezone' value parsing failed"_sd);
+            "$dateDiff parameter 'timezone' value parsing failed"sv);
         if (!_parsedTimeZone) {
             return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
         }
@@ -1552,13 +1554,13 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
 
 Value ExpressionDateDiff::serialize(const query_shape::SerializationOptions& options) const {
     return Value{Document{
-        {"$dateDiff"_sd,
-         Document{{"startDate"_sd, _children[_kStartDate]->serialize(options)},
-                  {"endDate"_sd, _children[_kEndDate]->serialize(options)},
-                  {"unit"_sd, _children[_kUnit]->serialize(options)},
-                  {"timezone"_sd,
+        {"$dateDiff"sv,
+         Document{{"startDate"sv, _children[_kStartDate]->serialize(options)},
+                  {"endDate"sv, _children[_kEndDate]->serialize(options)},
+                  {"unit"sv, _children[_kUnit]->serialize(options)},
+                  {"timezone"sv,
                    _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value{}},
-                  {"startOfWeek"_sd,
+                  {"startOfWeek"sv,
                    _children[_kStartOfWeek] ? _children[_kStartOfWeek]->serialize(options)
                                             : Value{}}}}}};
 };
@@ -1645,8 +1647,8 @@ intrusive_ptr<ExpressionObject> ExpressionObject::parse(ExpressionContext* const
     std::vector<boost::intrusive_ptr<Expression>> children;
     vector<pair<string, intrusive_ptr<Expression>&>> expressions;
     for (auto&& elem : obj) {
-        // Make sure this element has a valid field name. Use StringData here so that we can detect
-        // if the field name contains a null byte.
+        // Make sure this element has a valid field name. Use std::string_view here so that we can
+        // detect if the field name contains a null byte.
         uassertStatusOKWithContext(
             FieldPath::validateFieldName(elem.fieldNameStringData()),
             "Consider using $getField or $setField for a field path with '.' or '$'.");
@@ -1744,9 +1746,9 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext*
             raw.size() >= 2);  // need at least "$" and either "$" or a field name
 
     if (raw[1] == '$') {
-        const StringData rawSD = raw;
-        const StringData fieldPath = rawSD.substr(2);  // strip off $$
-        const StringData varName = fieldPath.substr(0, fieldPath.find('.'));
+        const std::string_view rawSD = raw;
+        const std::string_view fieldPath = rawSD.substr(2);  // strip off $$
+        const std::string_view varName = fieldPath.substr(0, fieldPath.find('.'));
         variableValidation::validateNameForUserRead(varName);
         auto varId = vps.getVariable(varName);
 
@@ -1769,8 +1771,8 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::createPathFromString(
 }
 intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::createVarFromString(
     ExpressionContext* const expCtx, const string& raw, const VariablesParseState& vps) {
-    const auto rawSD = StringData{raw};
-    const StringData varName = rawSD.substr(0, rawSD.find('.'));
+    const auto rawSD = std::string_view{raw};
+    const std::string_view varName = rawSD.substr(0, rawSD.find('.'));
     auto varId = vps.getVariable(varName);
     return new ExpressionFieldPath(expCtx, raw, varId);
 }
@@ -1999,8 +2001,8 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
 boost::intrusive_ptr<Expression> ExpressionMeta::_rewriteAsLet(
     ExpressionContext* const expCtx,
     DocumentMetadataFields::MetaType type,
-    StringData typeName,
-    StringData path,
+    std::string_view typeName,
+    std::string_view path,
     const VariablesParseState& vpsIn) {
     // Rewrite $meta: "stream.some.path" as
     // {$let: {in: "$$stream.some.path", vars: {"stream": {$meta: "stream"}}}}.
@@ -2017,8 +2019,8 @@ boost::intrusive_ptr<Expression> ExpressionMeta::_rewriteAsLet(
 void ExpressionMeta::_assertMetaFieldCompatibleWithStreamsFeatureFlag(
     ExpressionContext* const expCtx,
     DocumentMetadataFields::MetaType type,
-    StringData typeName,
-    boost::optional<StringData> optionalPath) {
+    std::string_view typeName,
+    boost::optional<std::string_view> optionalPath) {
     bool streamsEnabled = expCtx->shouldParserAllowStreams();
     // $meta: "stream" is only supported when the ff is enabled.
     uassert(9692105,
@@ -2037,10 +2039,10 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStreamsFeatureFlag(
 }
 
 ExpressionMeta::ParseMetaTypeResult ExpressionMeta::_parseMetaType(ExpressionContext* const expCtx,
-                                                                   StringData typeName) {
-    boost::optional<StringData> fieldPath;
+                                                                   std::string_view typeName) {
+    boost::optional<std::string_view> fieldPath;
     if (size_t idx = typeName.find_first_of('.');
-        idx != StringData::npos && expCtx->shouldParserAllowStreams()) {
+        idx != std::string_view::npos && expCtx->shouldParserAllowStreams()) {
         // An optional path is supported for { $meta: "stream.<path>" }
         uassert(9692107,
                 ExpressionMeta::kParseErrPrefix + std::string{typeName},
@@ -2330,7 +2332,7 @@ const char* ExpressionLog10::getOpName() const {
 }
 
 /* ----------------------- ExpressionInternalFLEEqual ---------------------------- */
-constexpr auto kInternalFleEq = "$_internalFleEq"_sd;
+constexpr auto kInternalFleEq = "$_internalFleEq"sv;
 
 ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const expCtx,
                                                        boost::intrusive_ptr<Expression> field,
@@ -2387,7 +2389,7 @@ const char* ExpressionInternalFLEEqual::getOpName() const {
 
 /* ----------------------- ExpressionInternalFLEBetween ---------------------------- */
 
-constexpr auto kInternalFleBetween = "$_internalFleBetween"_sd;
+constexpr auto kInternalFleBetween = "$_internalFleBetween"sv;
 
 ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(
     ExpressionContext* const expCtx,
@@ -2727,11 +2729,11 @@ parseExpressionReplaceBase(const char* opName,
     for (auto&& elem : expr.Obj()) {
         auto field = elem.fieldNameStringData();
 
-        if (field == "input"_sd) {
+        if (field == "input"sv) {
             input = Expression::parseOperand(expCtx, elem, vps);
-        } else if (field == "find"_sd) {
+        } else if (field == "find"sv) {
             find = Expression::parseOperand(expCtx, elem, vps);
-        } else if (field == "replacement"_sd) {
+        } else if (field == "replacement"sv) {
             replacement = Expression::parseOperand(expCtx, elem, vps);
         } else {
             uasserted(51750, str::stream() << opName << " found an unknown argument: " << field);
@@ -3692,12 +3694,12 @@ intrusive_ptr<Expression> ExpressionTrim::parse(ExpressionContext* const expCtx,
                                                 const VariablesParseState& vps) {
     const auto name = expr.fieldNameStringData();
     TrimType trimType = TrimType::kBoth;
-    if (name == "$ltrim"_sd) {
+    if (name == "$ltrim"sv) {
         trimType = TrimType::kLeft;
-    } else if (name == "$rtrim"_sd) {
+    } else if (name == "$rtrim"sv) {
         trimType = TrimType::kRight;
     } else {
-        invariant(name == "$trim"_sd);
+        invariant(name == "$trim"sv);
     }
     uassert(50696,
             str::stream() << name << " only supports an object as an argument, found "
@@ -3708,9 +3710,9 @@ intrusive_ptr<Expression> ExpressionTrim::parse(ExpressionContext* const expCtx,
     boost::intrusive_ptr<Expression> characters;
     for (auto&& elem : expr.Obj()) {
         const auto field = elem.fieldNameStringData();
-        if (field == "input"_sd) {
+        if (field == "input"sv) {
             input = parseOperand(expCtx, elem, vps);
-        } else if (field == "chars"_sd) {
+        } else if (field == "chars"sv) {
             characters = parseOperand(expCtx, elem, vps);
         } else {
             uasserted(50694,
@@ -3928,7 +3930,7 @@ Value ExpressionZip::serialize(const query_shape::SerializationOptions& options)
 namespace {
 
 Expression::Parser makeConversionAlias(
-    const StringData shortcutName,
+    const std::string_view shortcutName,
     BSONType toType,
     boost::optional<BinDataFormat> format = boost::none,
     boost::optional<BinDataType> toSubtype = boost::none,
@@ -3963,30 +3965,27 @@ REGISTER_STABLE_EXPRESSION(convert, ExpressionConvert::parse);
 // Also register shortcut expressions like $toInt, $toString, etc. which can be used as a shortcut
 // for $convert without an 'onNull' or 'onError'.
 REGISTER_STABLE_EXPRESSION(
-    toString, makeConversionAlias("$toString"_sd, BSONType::string, BinDataFormat::kAuto));
-REGISTER_STABLE_EXPRESSION(toObjectId, makeConversionAlias("$toObjectId"_sd, BSONType::oid));
-REGISTER_STABLE_EXPRESSION(toDate, makeConversionAlias("$toDate"_sd, BSONType::date));
-REGISTER_STABLE_EXPRESSION(toDouble, makeConversionAlias("$toDouble"_sd, BSONType::numberDouble));
-REGISTER_STABLE_EXPRESSION(toInt, makeConversionAlias("$toInt"_sd, BSONType::numberInt));
-REGISTER_STABLE_EXPRESSION(toLong, makeConversionAlias("$toLong"_sd, BSONType::numberLong));
-REGISTER_STABLE_EXPRESSION(toDecimal,
-                           makeConversionAlias("$toDecimal"_sd, BSONType::numberDecimal));
-REGISTER_STABLE_EXPRESSION(toBool, makeConversionAlias("$toBool"_sd, BSONType::boolean));
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(toUUID,
-                                      makeConversionAlias("$toUUID"_sd,
-                                                          BSONType::binData,
-                                                          BinDataFormat::kUuid,
-                                                          BinDataType::newUUID),
-                                      AllowedWithApiStrict::kAlways,
-                                      AllowedWithClientType::kAny,
-                                      &feature_flags::gFeatureFlagBinDataConvert);
+    toString, makeConversionAlias("$toString"sv, BSONType::string, BinDataFormat::kAuto));
+REGISTER_STABLE_EXPRESSION(toObjectId, makeConversionAlias("$toObjectId"sv, BSONType::oid));
+REGISTER_STABLE_EXPRESSION(toDate, makeConversionAlias("$toDate"sv, BSONType::date));
+REGISTER_STABLE_EXPRESSION(toDouble, makeConversionAlias("$toDouble"sv, BSONType::numberDouble));
+REGISTER_STABLE_EXPRESSION(toInt, makeConversionAlias("$toInt"sv, BSONType::numberInt));
+REGISTER_STABLE_EXPRESSION(toLong, makeConversionAlias("$toLong"sv, BSONType::numberLong));
+REGISTER_STABLE_EXPRESSION(toDecimal, makeConversionAlias("$toDecimal"sv, BSONType::numberDecimal));
+REGISTER_STABLE_EXPRESSION(toBool, makeConversionAlias("$toBool"sv, BSONType::boolean));
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(
+    toUUID,
+    makeConversionAlias("$toUUID"sv, BSONType::binData, BinDataFormat::kUuid, BinDataType::newUUID),
+    AllowedWithApiStrict::kAlways,
+    AllowedWithClientType::kAny,
+    &feature_flags::gFeatureFlagBinDataConvert);
 REGISTER_EXPRESSION_WITH_FEATURE_FLAG(toArray,
-                                      makeConversionAlias("$toArray"_sd, BSONType::array),
+                                      makeConversionAlias("$toArray"sv, BSONType::array),
                                       AllowedWithApiStrict::kAlways,
                                       AllowedWithClientType::kAny,
                                       &feature_flags::gFeatureFlagMqlJsEngineGap);
 REGISTER_EXPRESSION_WITH_FEATURE_FLAG(toObject,
-                                      makeConversionAlias("$toObject"_sd, BSONType::object),
+                                      makeConversionAlias("$toObject"sv, BSONType::object),
                                       AllowedWithApiStrict::kAlways,
                                       AllowedWithClientType::kAny,
                                       &feature_flags::gFeatureFlagMqlJsEngineGap);
@@ -3998,7 +3997,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::create(
     boost::optional<BinDataFormat> format,
     boost::optional<BinDataType> toSubtype,
     boost::optional<ConvertByteOrderType> byteOrder) {
-    auto targetType = StringData(typeName(toType));
+    auto targetType = std::string_view(typeName(toType));
     auto toValue = toSubtype
         ? Value(BSON("type" << targetType << "subtype" << static_cast<int>(*toSubtype)))
         : Value(targetType);
@@ -4059,11 +4058,11 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
     boost::intrusive_ptr<Expression> byteOrder;
     for (auto&& elem : expr.embeddedObject()) {
         const auto field = elem.fieldNameStringData();
-        if (field == "input"_sd) {
+        if (field == "input"sv) {
             input = parseOperand(expCtx, elem, vps);
-        } else if (field == "to"_sd) {
+        } else if (field == "to"sv) {
             to = parseOperand(expCtx, elem, vps);
-        } else if (field == "base"_sd) {
+        } else if (field == "base"sv) {
             uassert(
                 ErrorCodes::FailedToParse,
                 str::stream() << "The 'base' argument to $convert is not allowed in the "
@@ -4072,7 +4071,7 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
                               << ".",
                 expCtx->isFeatureFlagMqlJsEngineGapEnabled());
             base = parseOperand(expCtx, elem, vps);
-        } else if (field == "format"_sd) {
+        } else if (field == "format"sv) {
             uassert(
                 ErrorCodes::FailedToParse,
                 str::stream() << "The 'format' argument to $convert is not allowed in the "
@@ -4083,11 +4082,11 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
                 // supports the 'format' field.
                 expCtx->getFromRouter() || allowBinDataConvert);
             format = parseOperand(expCtx, elem, vps);
-        } else if (field == "onError"_sd) {
+        } else if (field == "onError"sv) {
             onError = parseOperand(expCtx, elem, vps);
-        } else if (field == "onNull"_sd) {
+        } else if (field == "onNull"sv) {
             onNull = parseOperand(expCtx, elem, vps);
-        } else if (field == "byteOrder"_sd) {
+        } else if (field == "byteOrder"sv) {
             uassert(
                 ErrorCodes::FailedToParse,
                 str::stream() << "The 'byteOrder' argument to $convert is not allowed in the "
@@ -4133,8 +4132,8 @@ ExpressionConvert::ConvertTargetTypeInfo::parse(Value value) {
     Value typeValue;
     Value subtypeValue;
     if (value.isObject()) {
-        typeValue = value["type"_sd];
-        subtypeValue = value["subtype"_sd];
+        typeValue = value["type"sv];
+        subtypeValue = value["subtype"sv];
     } else {
         typeValue = value;
     }
@@ -4227,7 +4226,7 @@ BSONType ExpressionConvert::computeTargetType(Value targetTypeName) {
     if (targetTypeName.getType() == BSONType::string) {
         // typeFromName() does not consider "missing" to be a valid type, but we want to accept it,
         // because it is a possible result of the $type aggregation operator.
-        if (targetTypeName.getStringData() == "missing"_sd) {
+        if (targetTypeName.getStringData() == "missing"sv) {
             return BSONType::eoo;
         }
 
@@ -4271,7 +4270,7 @@ namespace {
 auto CommonRegexParse(ExpressionContext* const expCtx,
                       BSONElement expr,
                       const VariablesParseState& vpsIn,
-                      StringData opName) {
+                      std::string_view opName) {
     uassert(51103,
             str::stream() << opName
                           << " expects an object of named arguments but found: " << expr.type(),
@@ -4284,11 +4283,11 @@ auto CommonRegexParse(ExpressionContext* const expCtx,
     } parsed;
     for (auto&& elem : expr.embeddedObject()) {
         const auto field = elem.fieldNameStringData();
-        if (field == "input"_sd) {
+        if (field == "input"sv) {
             parsed.input = Expression::parseOperand(expCtx, elem, vpsIn);
-        } else if (field == "regex"_sd) {
+        } else if (field == "regex"sv) {
             parsed.regex = Expression::parseOperand(expCtx, elem, vpsIn);
-        } else if (field == "options"_sd) {
+        } else if (field == "options"sv) {
             parsed.options = Expression::parseOperand(expCtx, elem, vpsIn);
         } else {
             uasserted(31024,
@@ -4346,7 +4345,7 @@ ExpressionRegex::getConstantPatternAndOptions() const {
                 patternValue.getType() == BSONType::string);
     auto patternStr = [&]() -> boost::optional<std::string> {
         if (patternValue.getType() == BSONType::regEx) {
-            StringData flags = patternValue.getRegexFlags();
+            std::string_view flags = patternValue.getRegexFlags();
             uassert(5073406,
                     str::stream()
                         << _opName
@@ -4372,7 +4371,7 @@ ExpressionRegex::getConstantPatternAndOptions() const {
             }
         }
         if (patternValue.getType() == BSONType::regEx) {
-            StringData flags = patternValue.getRegexFlags();
+            std::string_view flags = patternValue.getRegexFlags();
             if (!flags.empty()) {
                 return std::string{flags};
             }
@@ -4398,7 +4397,7 @@ REGISTER_STABLE_EXPRESSION(regexFind, ExpressionRegexFind::parse);
 boost::intrusive_ptr<Expression> ExpressionRegexFind::parse(ExpressionContext* const expCtx,
                                                             BSONElement expr,
                                                             const VariablesParseState& vpsIn) {
-    auto opName = "$regexFind"_sd;
+    auto opName = "$regexFind"sv;
     auto [input, regex, options] = CommonRegexParse(expCtx, expr, vpsIn, opName);
     return new ExpressionRegexFind(
         expCtx, std::move(input), std::move(regex), std::move(options), opName);
@@ -4416,7 +4415,7 @@ REGISTER_STABLE_EXPRESSION(regexFindAll, ExpressionRegexFindAll::parse);
 boost::intrusive_ptr<Expression> ExpressionRegexFindAll::parse(ExpressionContext* const expCtx,
                                                                BSONElement expr,
                                                                const VariablesParseState& vpsIn) {
-    auto opName = "$regexFindAll"_sd;
+    auto opName = "$regexFindAll"sv;
     auto [input, regex, options] = CommonRegexParse(expCtx, expr, vpsIn, opName);
     return new ExpressionRegexFindAll(
         expCtx, std::move(input), std::move(regex), std::move(options), opName);
@@ -4434,7 +4433,7 @@ REGISTER_STABLE_EXPRESSION(regexMatch, ExpressionRegexMatch::parse);
 boost::intrusive_ptr<Expression> ExpressionRegexMatch::parse(ExpressionContext* const expCtx,
                                                              BSONElement expr,
                                                              const VariablesParseState& vpsIn) {
-    auto opName = "$regexMatch"_sd;
+    auto opName = "$regexMatch"sv;
     auto [input, regex, options] = CommonRegexParse(expCtx, expr, vpsIn, opName);
     return new ExpressionRegexMatch(
         expCtx, std::move(input), std::move(regex), std::move(options), opName);
@@ -4547,7 +4546,7 @@ namespace {
 auto commonDateArithmeticsParse(ExpressionContext* const expCtx,
                                 BSONElement expr,
                                 const VariablesParseState& vps,
-                                StringData opName) {
+                                std::string_view opName) {
     uassert(5166400,
             str::stream() << opName << " expects an object as its argument",
             expr.type() == BSONType::object);
@@ -4563,13 +4562,13 @@ auto commonDateArithmeticsParse(ExpressionContext* const expCtx,
     for (auto&& arg : args) {
         auto field = arg.fieldNameStringData();
 
-        if (field == "startDate"_sd) {
+        if (field == "startDate"sv) {
             parsedArgs.startDate = Expression::parseOperand(expCtx, arg, vps);
-        } else if (field == "unit"_sd) {
+        } else if (field == "unit"sv) {
             parsedArgs.unit = Expression::parseOperand(expCtx, arg, vps);
-        } else if (field == "amount"_sd) {
+        } else if (field == "amount"sv) {
             parsedArgs.amount = Expression::parseOperand(expCtx, arg, vps);
-        } else if (field == "timezone"_sd) {
+        } else if (field == "timezone"sv) {
             parsedArgs.timezone = Expression::parseOperand(expCtx, arg, vps);
         } else {
             uasserted(5166401,
@@ -4650,7 +4649,7 @@ REGISTER_STABLE_EXPRESSION(dateAdd, ExpressionDateAdd::parse);
 boost::intrusive_ptr<Expression> ExpressionDateAdd::parse(ExpressionContext* const expCtx,
                                                           BSONElement expr,
                                                           const VariablesParseState& vps) {
-    constexpr auto opName = "$dateAdd"_sd;
+    constexpr auto opName = "$dateAdd"sv;
     auto [startDate, unit, amount, timezone] =
         commonDateArithmeticsParse(expCtx, expr, vps, opName);
     return make_intrusive<ExpressionDateAdd>(expCtx,
@@ -4679,7 +4678,7 @@ REGISTER_STABLE_EXPRESSION(dateSubtract, ExpressionDateSubtract::parse);
 boost::intrusive_ptr<Expression> ExpressionDateSubtract::parse(ExpressionContext* const expCtx,
                                                                BSONElement expr,
                                                                const VariablesParseState& vps) {
-    constexpr auto opName = "$dateSubtract"_sd;
+    constexpr auto opName = "$dateSubtract"sv;
     auto [startDate, unit, amount, timezone] =
         commonDateArithmeticsParse(expCtx, expr, vps, opName);
     return make_intrusive<ExpressionDateSubtract>(expCtx,
@@ -4728,15 +4727,15 @@ boost::intrusive_ptr<Expression> ExpressionDateTrunc::parse(ExpressionContext* c
     BSONElement dateElement, unitElement, binSizeElement, timezoneElement, startOfWeekElement;
     for (auto&& element : expr.embeddedObject()) {
         auto field = element.fieldNameStringData();
-        if ("date"_sd == field) {
+        if ("date"sv == field) {
             dateElement = element;
-        } else if ("binSize"_sd == field) {
+        } else if ("binSize"sv == field) {
             binSizeElement = element;
-        } else if ("unit"_sd == field) {
+        } else if ("unit"sv == field) {
             unitElement = element;
-        } else if ("timezone"_sd == field) {
+        } else if ("timezone"sv == field) {
             timezoneElement = element;
-        } else if ("startOfWeek"_sd == field) {
+        } else if ("startOfWeek"sv == field) {
             startOfWeekElement = element;
         } else {
             uasserted(5439008,
@@ -4784,7 +4783,7 @@ boost::intrusive_ptr<Expression> ExpressionDateTrunc::optimize() {
         if (unitValue.nullish()) {
             return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
         }
-        _parsedUnit = exec::expression::parseTimeUnit(unitValue, "$dateTrunc"_sd);
+        _parsedUnit = exec::expression::parseTimeUnit(unitValue, "$dateTrunc"sv);
     }
     if (ExpressionConstant::isConstant(_children[_kStartOfWeek])) {
         const Value startOfWeekValue =
@@ -4793,7 +4792,7 @@ boost::intrusive_ptr<Expression> ExpressionDateTrunc::optimize() {
             return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
         }
         _parsedStartOfWeek =
-            exec::expression::parseDayOfWeek(startOfWeekValue, "$dateTrunc"_sd, "startOfWeek"_sd);
+            exec::expression::parseDayOfWeek(startOfWeekValue, "$dateTrunc"sv, "startOfWeek"sv);
     }
     if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
         _parsedTimeZone = exec::expression::addContextToAssertionException(
@@ -4804,7 +4803,7 @@ boost::intrusive_ptr<Expression> ExpressionDateTrunc::optimize() {
                                                       &(getExpressionContext()->variables),
                                                       {});
             },
-            "$dateTrunc parameter 'timezone' value parsing failed"_sd);
+            "$dateTrunc parameter 'timezone' value parsing failed"sv);
         if (!_parsedTimeZone) {
             return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
         }
@@ -4822,14 +4821,14 @@ boost::intrusive_ptr<Expression> ExpressionDateTrunc::optimize() {
 
 Value ExpressionDateTrunc::serialize(const query_shape::SerializationOptions& options) const {
     return Value{Document{
-        {"$dateTrunc"_sd,
-         Document{{"date"_sd, _children[_kDate]->serialize(options)},
-                  {"unit"_sd, _children[_kUnit]->serialize(options)},
-                  {"binSize"_sd,
+        {"$dateTrunc"sv,
+         Document{{"date"sv, _children[_kDate]->serialize(options)},
+                  {"unit"sv, _children[_kUnit]->serialize(options)},
+                  {"binSize"sv,
                    _children[_kBinSize] ? _children[_kBinSize]->serialize(options) : Value{}},
-                  {"timezone"_sd,
+                  {"timezone"sv,
                    _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value{}},
-                  {"startOfWeek"_sd,
+                  {"startOfWeek"sv,
                    _children[_kStartOfWeek] ? _children[_kStartOfWeek]->serialize(options)
                                             : Value{}}}}}};
 };
@@ -4868,9 +4867,9 @@ intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const exp
                 fieldExpr = Expression::parseOperand(expCtx, expr, vps);
                 inputExpr = ExpressionFieldPath::parse(expCtx, "$$CURRENT", vps);
                 break;
-            } else if (fieldName == "field"_sd) {
+            } else if (fieldName == "field"sv) {
                 fieldExpr = Expression::parseOperand(expCtx, elem, vps);
-            } else if (fieldName == "input"_sd) {
+            } else if (fieldName == "input"sv) {
                 inputExpr = Expression::parseOperand(expCtx, elem, vps);
             } else {
                 uasserted(3041701,
@@ -4919,16 +4918,16 @@ Value ExpressionGetField::serialize(const query_shape::SerializationOptions& opt
         // reference, it should be wrapped in $const to make it unambiguous with actual field
         // references.
         if (!options.isSerializingLiteralsAsDebugTypes() || strPath[0] == '$') {
-            maybeRedactedPath = Value(Document{{"$const"_sd, maybeRedactedPath}});
+            maybeRedactedPath = Value(Document{{"$const"sv, maybeRedactedPath}});
         }
         fieldValue = maybeRedactedPath;
     } else {
         fieldValue = _children[_kField]->serialize(options);
     }
 
-    return Value(Document{{"$getField"_sd,
-                           Document{{"field"_sd, std::move(fieldValue)},
-                                    {"input"_sd, _children[_kInput]->serialize(options)}}}});
+    return Value(Document{{"$getField"sv,
+                           Document{{"field"sv, std::move(fieldValue)},
+                                    {"input"sv, _children[_kInput]->serialize(options)}}}});
 }
 
 /* -------------------------- ExpressionSetField ------------------------------ */
@@ -4954,11 +4953,11 @@ intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const exp
 
     for (auto&& elem : expr.embeddedObject()) {
         const auto fieldName = elem.fieldNameStringData();
-        if (fieldName == "field"_sd) {
+        if (fieldName == "field"sv) {
             fieldExpr = Expression::parseOperand(expCtx, elem, vps);
-        } else if (fieldName == "input"_sd) {
+        } else if (fieldName == "input"sv) {
             inputExpr = Expression::parseOperand(expCtx, elem, vps);
-        } else if (!isUnsetField && fieldName == "value"_sd) {
+        } else if (!isUnsetField && fieldName == "value"sv) {
             valueExpr = Expression::parseOperand(expCtx, elem, vps);
         } else {
             uasserted(4161101,
@@ -5002,13 +5001,13 @@ Value ExpressionSetField::serialize(const query_shape::SerializationOptions& opt
     //  - should be redacted (if that option is set).
     //  - should *not* be wrapped in $const iff we are serializing for a debug string
     if (!options.isSerializingLiteralsAsDebugTypes()) {
-        maybeRedactedPath = Value(Document{{"$const"_sd, maybeRedactedPath}});
+        maybeRedactedPath = Value(Document{{"$const"sv, maybeRedactedPath}});
     }
 
-    return Value(Document{{"$setField"_sd,
-                           Document{{"field"_sd, std::move(maybeRedactedPath)},
-                                    {"input"_sd, _children[_kInput]->serialize(options)},
-                                    {"value"_sd, _children[_kValue]->serialize(options)}}}});
+    return Value(Document{{"$setField"sv,
+                           Document{{"field"sv, std::move(maybeRedactedPath)},
+                                    {"input"sv, _children[_kInput]->serialize(options)},
+                                    {"value"sv, _children[_kValue]->serialize(options)}}}});
 }
 
 std::string ExpressionSetField::getValidFieldName(boost::intrusive_ptr<Expression> fieldExpr) {
@@ -5126,9 +5125,9 @@ boost::intrusive_ptr<Expression> ExpressionInternalKeyStringValue::parse(
 
     for (auto&& element : expr.embeddedObject()) {
         auto field = element.fieldNameStringData();
-        if ("input"_sd == field) {
+        if ("input"sv == field) {
             inputExpr = parseOperand(expCtx, element, vps);
-        } else if ("collation"_sd == field) {
+        } else if ("collation"sv == field) {
             collationExpr = parseOperand(expCtx, element, vps);
         } else {
             uasserted(8281501,
@@ -5436,7 +5435,7 @@ namespace {
 intrusive_ptr<Expression> parseHash(ExpressionContext* const expCtx,
                                     BSONElement expr,
                                     const VariablesParseState& vps,
-                                    const StringData opName) {
+                                    const std::string_view opName) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << opName << " expects an object of named arguments but found: "
                           << typeName(expr.type()),
@@ -5487,7 +5486,7 @@ ExpressionHash::ExpressionHash(ExpressionContext* const expCtx,
 intrusive_ptr<Expression> ExpressionHash::parse(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vps) {
-    return parseHash(expCtx, expr, vps, "$hash"_sd);
+    return parseHash(expCtx, expr, vps, "$hash"sv);
 }
 
 const char* ExpressionHash::getOpName() const {
@@ -5533,7 +5532,7 @@ namespace {
 intrusive_ptr<Expression> parseHexHash(ExpressionContext* const expCtx,
                                        BSONElement expr,
                                        const VariablesParseState& vps) {
-    auto hashExpr = parseHash(expCtx, expr, vps, "$hexHash"_sd);
+    auto hashExpr = parseHash(expCtx, expr, vps, "$hexHash"sv);
     return ExpressionConvert::create(expCtx, hashExpr, BSONType::string, BinDataFormat::kHex);
 }
 
@@ -5631,7 +5630,7 @@ ExpressionEncStrStartsWith::ExpressionEncStrStartsWith(ExpressionContext* const 
                                                        boost::intrusive_ptr<Expression> prefix)
     : ExpressionEncTextSearch(expCtx, std::move(input), std::move(prefix)) {}
 
-constexpr auto kEncStrStartsWith = "$encStrStartsWith"_sd;
+constexpr auto kEncStrStartsWith = "$encStrStartsWith"sv;
 boost::intrusive_ptr<Expression> ExpressionEncStrStartsWith::parse(ExpressionContext* const expCtx,
                                                                    BSONElement expr,
                                                                    const VariablesParseState& vps) {
@@ -5680,7 +5679,7 @@ ExpressionEncStrEndsWith::ExpressionEncStrEndsWith(ExpressionContext* const expC
                                                    boost::intrusive_ptr<Expression> suffix)
     : ExpressionEncTextSearch(expCtx, std::move(input), std::move(suffix)) {}
 
-constexpr auto kEncStrEndsWith = "$encStrEndsWith"_sd;
+constexpr auto kEncStrEndsWith = "$encStrEndsWith"sv;
 boost::intrusive_ptr<Expression> ExpressionEncStrEndsWith::parse(ExpressionContext* const expCtx,
                                                                  BSONElement expr,
                                                                  const VariablesParseState& vps) {
@@ -5728,7 +5727,7 @@ ExpressionEncStrContains::ExpressionEncStrContains(ExpressionContext* const expC
                                                    boost::intrusive_ptr<Expression> substring)
     : ExpressionEncTextSearch(expCtx, std::move(input), std::move(substring)) {}
 
-constexpr auto kEncStrContains = "$encStrContains"_sd;
+constexpr auto kEncStrContains = "$encStrContains"sv;
 boost::intrusive_ptr<Expression> ExpressionEncStrContains::parse(ExpressionContext* const expCtx,
                                                                  BSONElement expr,
                                                                  const VariablesParseState& vps) {
@@ -5778,7 +5777,7 @@ ExpressionEncStrNormalizedEq::ExpressionEncStrNormalizedEq(
     boost::intrusive_ptr<Expression> substring)
     : ExpressionEncTextSearch(expCtx, std::move(input), std::move(substring)) {}
 
-constexpr auto kEncStrNormalizedEq = "$encStrNormalizedEq"_sd;
+constexpr auto kEncStrNormalizedEq = "$encStrNormalizedEq"sv;
 boost::intrusive_ptr<Expression> ExpressionEncStrNormalizedEq::parse(
     ExpressionContext* const expCtx, BSONElement expr, const VariablesParseState& vps) {
     IDLParserContext ctx(kEncStrNormalizedEq);
@@ -5819,7 +5818,7 @@ Value ExpressionEncStrNormalizedEq::evaluate(const Document& root,
 auto ExpressionVectorSimilarity::_parseInternal(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vps,
-                                                StringData similarityName) {
+                                                std::string_view similarityName) {
 
     struct {
         bool score{false};

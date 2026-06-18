@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
@@ -43,6 +42,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/optional/optional.hpp>
@@ -83,7 +83,7 @@ public:
      * Returns a DocSeqBuilder for building a command reply in place. This should only be called
      * before the body as the body will have status types appended at the end.
      */
-    virtual OpMsgBuilder::DocSequenceBuilder getDocSequenceBuilder(StringData name) {
+    virtual OpMsgBuilder::DocSequenceBuilder getDocSequenceBuilder(std::string_view name) {
         uasserted(50875, "Only OpMsg may use document sequences");
     }
 

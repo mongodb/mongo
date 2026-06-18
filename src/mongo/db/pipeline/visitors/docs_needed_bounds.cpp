@@ -28,6 +28,8 @@
  */
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace docs_needed_bounds {
 DocsNeededConstraint parseDocsNeededConstraintFromBSON(const BSONElement& elem) {
@@ -52,7 +54,7 @@ DocsNeededConstraint parseDocsNeededConstraintFromBSON(const BSONElement& elem) 
 }
 
 void serializeDocsNeededConstraint(const DocsNeededConstraint& constraint,
-                                   StringData fieldName,
+                                   std::string_view fieldName,
                                    BSONObjBuilder* builder) {
     visit(OverloadedVisitor{
               [&](long long val) { builder->append(fieldName, val); },

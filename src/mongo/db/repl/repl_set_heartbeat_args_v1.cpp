@@ -36,6 +36,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace repl {
 
@@ -147,7 +149,7 @@ void ReplSetHeartbeatArgsV1::setSenderId(long long newVal) {
     _senderId = newVal;
 }
 
-void ReplSetHeartbeatArgsV1::setSetName(StringData newVal) {
+void ReplSetHeartbeatArgsV1::setSetName(std::string_view newVal) {
     _setName = std::string{newVal};
 }
 

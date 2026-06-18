@@ -31,12 +31,15 @@
 
 #include <fmt/format.h>
 extern "C" {
+#include <string_view>
+
 #include <mongocrypt.h>
 }
 
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MongoCryptStatus::MongoCryptStatus() {
     _status = mongocrypt_status_new();
@@ -66,21 +69,21 @@ std::string MongoCryptStatus::reason() const {
 }
 
 Status MongoCryptStatus::toStatus() const {
-    StringData errorPrefix;
+    std::string_view errorPrefix;
     switch (mongocrypt_status_type(_status)) {
         case MONGOCRYPT_STATUS_OK:
             return Status::OK();
         case MONGOCRYPT_STATUS_ERROR_CLIENT:
-            errorPrefix = "Client Error"_sd;
+            errorPrefix = "Client Error"sv;
             break;
         case MONGOCRYPT_STATUS_ERROR_KMS:
-            errorPrefix = "KMS Error"_sd;
+            errorPrefix = "KMS Error"sv;
             break;
         case MONGOCRYPT_STATUS_ERROR_CRYPT_SHARED:
-            errorPrefix = "Crypt Shared Error"_sd;
+            errorPrefix = "Crypt Shared Error"sv;
             break;
         default:
-            errorPrefix = "Unexpected Error"_sd;
+            errorPrefix = "Unexpected Error"sv;
             break;
     }
 

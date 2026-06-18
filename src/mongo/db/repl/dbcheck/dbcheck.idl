@@ -119,7 +119,7 @@ structs:
                 default: dataConsistency
             secondaryIndex:
                 type: string
-                default: StringData("")
+                default: std::string_view()
             skipLookupForExtraKeys:
                 type: safeBool
                 default: false

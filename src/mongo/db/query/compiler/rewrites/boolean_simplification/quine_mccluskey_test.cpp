@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/quine_mccluskey.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::boolean_simplification {

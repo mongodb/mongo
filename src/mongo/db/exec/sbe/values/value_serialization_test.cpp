@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,10 +45,12 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 /**
  * This file contains tests for sbe::value::writeValueToStream.
  */
@@ -78,25 +79,25 @@ TEST(ValueSerializeForSorter, Serialize) {
     testData->push_back_raw(value::TypeTags::MaxKey, 0);
     testData->push_back_raw(value::TypeTags::bsonUndefined, 0);
 
-    StringData smallString = "perfect"_sd;
+    std::string_view smallString = "perfect"sv;
     invariant(sbe::value::canUseSmallString(smallString));
-    StringData bigString = "too big string to fit into value"_sd;
+    std::string_view bigString = "too big string to fit into value"sv;
     invariant(!sbe::value::canUseSmallString(bigString));
-    StringData smallStringWithNull = "a\0b"_sd;
+    std::string_view smallStringWithNull = "a\0b"sv;
     invariant(smallStringWithNull.size() <= sbe::value::kSmallStringMaxLength);
-    StringData bigStringWithNull = "too big string \0 to fit into value"_sd;
+    std::string_view bigStringWithNull = "too big string \0 to fit into value"sv;
     invariant(bigStringWithNull.size() > sbe::value::kSmallStringMaxLength);
 
-    std::vector<StringData> stringCases = {
+    std::vector<std::string_view> stringCases = {
         smallString,
         smallStringWithNull,
         bigString,
         bigStringWithNull,
-        ""_sd,
-        "a"_sd,
-        "a\0"_sd,
-        "\0"_sd,
-        "\0\0\0"_sd,
+        ""sv,
+        "a"sv,
+        "a\0"sv,
+        "\0"sv,
+        "\0\0\0"sv,
     };
 
     for (const auto& stringCase : stringCases) {
@@ -177,11 +178,11 @@ TEST(ValueSerializeForSorter, Serialize) {
     testData->push_back_raw(keyStringTag, keyStringVal);
 
     auto [plainCodeTag, plainCodeVal] =
-        value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }"_sd);
+        value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }"sv);
     testData->push_back_raw(value::TypeTags::bsonJavascript, plainCodeVal);
 
     auto [codeWithNullTag, codeWithNullVal] =
-        value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }"_sd);
+        value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }"sv);
     testData->push_back_raw(value::TypeTags::bsonJavascript, codeWithNullVal);
 
     auto regexBson =
@@ -334,16 +335,16 @@ TEST_F(ValueSerializeForKeyString, DateTime) {
 }
 
 TEST_F(ValueSerializeForKeyString, SmallString) {
-    StringData smallString = "perfect"_sd;
+    std::string_view smallString = "perfect"sv;
     ASSERT(sbe::value::canUseSmallString(smallString));
-    StringData smallStringWithNull = "a\0b"_sd;
+    std::string_view smallStringWithNull = "a\0b"sv;
     ASSERT(smallStringWithNull.size() <= sbe::value::kSmallStringMaxLength);
 }
 
 TEST_F(ValueSerializeForKeyString, BigString) {
-    StringData bigString = "too big string to fit into value"_sd;
+    std::string_view bigString = "too big string to fit into value"sv;
     ASSERT(!sbe::value::canUseSmallString(bigString));
-    StringData bigStringWithNull = "too big string \0 to fit into value"_sd;
+    std::string_view bigStringWithNull = "too big string \0 to fit into value"sv;
     ASSERT(bigStringWithNull.size() > sbe::value::kSmallStringMaxLength);
 
     auto [bigStringTag, bigStringVal] = value::makeNewString(bigString);
@@ -367,10 +368,10 @@ TEST_F(ValueSerializeForKeyString, BigString) {
 
 TEST_F(ValueSerializeForKeyString, EmptyAndNullTerminatedStrings) {
 
-    auto aString = "a"_sd;
-    auto aStringNullTerm = "a\0"_sd;
-    auto nullTerm = "\0"_sd;
-    auto nullTerms = "\0\0\0"_sd;
+    auto aString = "a"sv;
+    auto aStringNullTerm = "a\0"sv;
+    auto nullTerm = "\0"sv;
+    auto nullTerms = "\0\0\0"sv;
 
     auto [aStringTag, aStringVal] = value::makeNewString(aString);
     sbe::value::ValueGuard testDataGuard{aStringTag, aStringVal};
@@ -450,27 +451,27 @@ TEST_F(ValueSerializeForKeyString, KeyString) {
 
 TEST_F(ValueSerializeForKeyString, BsonJavaScript) {
     auto [plainCodeTag, plainCodeVal] =
-        value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }"_sd);
+        value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }"sv);
     sbe::value::ValueGuard testDataGuard{plainCodeTag, plainCodeVal};
 
     auto [codeWithNullTag, codeWithNullVal] =
-        value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }"_sd);
+        value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }"sv);
     sbe::value::ValueGuard testDataGuard2{codeWithNullTag, codeWithNullVal};
 
     runTest({{plainCodeTag, plainCodeVal}, {codeWithNullTag, codeWithNullVal}});
 }
 
 TEST_F(ValueSerializeForKeyString, BsonRegex) {
-    auto [noFlagsTag, noFlagsVal] = value::makeNewBsonRegex("[a-z]+"_sd, ""_sd);
+    auto [noFlagsTag, noFlagsVal] = value::makeNewBsonRegex("[a-z]+"sv, ""sv);
     sbe::value::ValueGuard testDataGuard{noFlagsTag, noFlagsVal};
 
-    auto [withFlagsTag, withFlagsVal] = value::makeNewBsonRegex(".*"_sd, "i"_sd);
+    auto [withFlagsTag, withFlagsVal] = value::makeNewBsonRegex(".*"sv, "i"sv);
     sbe::value::ValueGuard testDataGuard2{withFlagsTag, withFlagsVal};
 
-    auto [empPatterNoFlagsTag, empPatterNoFlagsVal] = value::makeNewBsonRegex(""_sd, ""_sd);
+    auto [empPatterNoFlagsTag, empPatterNoFlagsVal] = value::makeNewBsonRegex(""sv, ""sv);
     sbe::value::ValueGuard testDataGuard3{empPatterNoFlagsTag, empPatterNoFlagsVal};
 
-    auto [empPatterWithFlagsTag, empPatterWithFlagsVal] = value::makeNewBsonRegex(""_sd, "s"_sd);
+    auto [empPatterWithFlagsTag, empPatterWithFlagsVal] = value::makeNewBsonRegex(""sv, "s"sv);
     sbe::value::ValueGuard testDataGuard4{empPatterWithFlagsTag, empPatterWithFlagsVal};
 
     runTest({{noFlagsTag, noFlagsVal},

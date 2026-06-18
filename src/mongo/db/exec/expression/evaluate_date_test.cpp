@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -47,10 +46,12 @@
 
 #include <initializer_list>
 #include <string>
+#include <string_view>
 #include <vector>
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace expression_evaluation_test {
 
@@ -91,17 +92,17 @@ TEST_F(ExpressionEvaluateDateFromPartsTest, TestThatOutOfRangeValuesRollOver) {
 
 namespace evaluate_date_expressions_test {
 
-std::vector<StringData> dateExpressions = {"$year"_sd,
-                                           "$isoWeekYear"_sd,
-                                           "$month"_sd,
-                                           "$dayOfMonth"_sd,
-                                           "$hour"_sd,
-                                           "$minute"_sd,
-                                           "$second"_sd,
-                                           "$millisecond"_sd,
-                                           "$week"_sd,
-                                           "$isoWeek"_sd,
-                                           "$dayOfYear"_sd};
+std::vector<std::string_view> dateExpressions = {"$year"sv,
+                                                 "$isoWeekYear"sv,
+                                                 "$month"sv,
+                                                 "$dayOfMonth"sv,
+                                                 "$hour"sv,
+                                                 "$minute"sv,
+                                                 "$second"sv,
+                                                 "$millisecond"sv,
+                                                 "$week"sv,
+                                                 "$isoWeek"sv,
+                                                 "$dayOfYear"sv};
 
 // This provides access to an ExpressionContext that has a valid ServiceContext with a
 // TimeZoneDatabase via getExpCtx(), but we'll use a different name for this test suite.
@@ -133,7 +134,7 @@ TEST_F(EvaluateDateExpressionsTest, RejectsTypesThatCannotCoerceToDate) {
     for (auto&& expName : dateExpressions) {
         BSONObj spec = BSON(expName << "$stringField");
         auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-        auto contextDoc = Document{{"stringField", "string"_sd}};
+        auto contextDoc = Document{{"stringField", "string"sv}};
         ASSERT_THROWS_CODE(
             dateExp->evaluate(contextDoc, &expCtx->variables), AssertionException, 16006);
     }
@@ -275,7 +276,7 @@ TEST_F(ExpressionEvaluateDateToStringTest, ReturnsOnNullValueWhenInputIsNullish)
                                                       << "date" << BSONNULL << "onNull"
                                                       << "null default"));
     auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(Value("null default"_sd), dateExp->evaluate({}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value("null default"sv), dateExp->evaluate({}, &expCtx->variables));
 
     spec = BSON("$dateToString" << BSON("format" << "%Y-%m-%d"
                                                  << "date" << BSONNULL << "onNull" << BSONNULL));
@@ -288,7 +289,7 @@ TEST_F(ExpressionEvaluateDateToStringTest, ReturnsOnNullValueWhenInputIsNullish)
                                                  << "onNull"
                                                  << "null default"));
     dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(Value("null default"_sd), dateExp->evaluate({}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value("null default"sv), dateExp->evaluate({}, &expCtx->variables));
 
     spec = BSON("$dateToString" << BSON("format" << "%Y-%m-%d"
                                                  << "date"
@@ -326,7 +327,7 @@ TEST_F(ExpressionEvaluateDateToStringTest, UsesDefaultFormatIfNoneSpecified) {
 
     auto spec = fromjson("{$dateToString: {date: '$date'}}");
     auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(Value("1970-01-01T00:00:00.000Z"_sd),
+    ASSERT_VALUE_EQ(Value("1970-01-01T00:00:00.000Z"sv),
                     dateExp->evaluate(Document{{"date", Date_t{}}}, &expCtx->variables));
 }
 
@@ -336,7 +337,7 @@ TEST_F(ExpressionEvaluateDateToStringTest, FailsForInvalidTimezoneRegardlessOfIn
     auto spec = fromjson("{$dateToString: {date: '$date', timezone: '$tz'}}");
     auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_CODE(
-        dateExp->evaluate(Document{{"date", BSONNULL}, {"tz", "invalid"_sd}}, &expCtx->variables),
+        dateExp->evaluate(Document{{"date", BSONNULL}, {"tz", "invalid"sv}}, &expCtx->variables),
         AssertionException,
         40485);
     ASSERT_THROWS_CODE(
@@ -369,15 +370,15 @@ TEST_F(ExpressionEvaluateDateToStringTest, FailsForInvalidFormatRegardlessOfInpu
         AssertionException,
         18533);
     ASSERT_THROWS_CODE(
-        dateExp->evaluate(Document{{"date", BSONNULL}, {"format", "%n"_sd}}, &expCtx->variables),
+        dateExp->evaluate(Document{{"date", BSONNULL}, {"format", "%n"sv}}, &expCtx->variables),
         AssertionException,
         18536);
     ASSERT_THROWS_CODE(
-        dateExp->evaluate(Document{{"date", BSONNULL}, {"format", "%"_sd}}, &expCtx->variables),
+        dateExp->evaluate(Document{{"date", BSONNULL}, {"format", "%"sv}}, &expCtx->variables),
         AssertionException,
         18535);
     ASSERT_THROWS_CODE(
-        dateExp->evaluate(Document{{"date", "Invalid date"_sd}, {"format", 5}}, &expCtx->variables),
+        dateExp->evaluate(Document{{"date", "Invalid date"sv}, {"format", 5}}, &expCtx->variables),
         AssertionException,
         18533);
 }
@@ -605,13 +606,13 @@ TEST_F(ExpressionEvaluateDateFromStringTest, ReturnsOnNullForNullishInput) {
     auto spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull"
                                                             << "Null default"));
     auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(Value("Null default"_sd), dateExp->evaluate({}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value("Null default"sv), dateExp->evaluate({}, &expCtx->variables));
 
     spec = BSON("$dateFromString" << BSON("dateString" << "$missing"
                                                        << "onNull"
                                                        << "Null default"));
     dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(Value("Null default"_sd), dateExp->evaluate({}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value("Null default"sv), dateExp->evaluate({}, &expCtx->variables));
 
     spec = BSON("$dateFromString" << BSON("dateString" << "$missing"
                                                        << "onNull"
@@ -701,13 +702,13 @@ TEST_F(ExpressionEvaluateDateFromStringTest, OnNullTakesPrecedenceOverOtherNulli
                                                             << "Null default"
                                                             << "timezone" << BSONNULL));
     auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(Value("Null default"_sd), dateExp->evaluate({}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value("Null default"sv), dateExp->evaluate({}, &expCtx->variables));
 
     spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull"
                                                        << "Null default"
                                                        << "format" << BSONNULL));
     dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(Value("Null default"_sd), dateExp->evaluate({}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value("Null default"sv), dateExp->evaluate({}, &expCtx->variables));
 }
 
 TEST_F(ExpressionEvaluateDateFromStringTest, OnNullOnlyUsedIfInputStringIsNullish) {
@@ -737,7 +738,7 @@ TEST_F(ExpressionEvaluateDateFromStringTest, ReturnsOnErrorForParseFailures) {
         auto spec = BSON("$dateFromString" << BSON("dateString" << date << "onError"
                                                                 << "Error default"));
         auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-        ASSERT_VALUE_EQ(Value("Error default"_sd), dateExp->evaluate({}, &expCtx->variables));
+        ASSERT_VALUE_EQ(Value("Error default"sv), dateExp->evaluate({}, &expCtx->variables));
     }
 }
 
@@ -751,7 +752,7 @@ TEST_F(ExpressionEvaluateDateFromStringTest, ReturnsOnErrorForFormatMismatch) {
             BSON("$dateFromString" << BSON("dateString" << date << "format" << format << "onError"
                                                         << "Error default"));
         auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-        ASSERT_VALUE_EQ(Value("Error default"_sd), dateExp->evaluate({}, &expCtx->variables));
+        ASSERT_VALUE_EQ(Value("Error default"sv), dateExp->evaluate({}, &expCtx->variables));
     }
 }
 
@@ -762,9 +763,8 @@ TEST_F(ExpressionEvaluateDateFromStringTest, OnNullEvaluatedLazily) {
                      << BSON("dateString" << "$date"
                                           << "onNull" << BSON("$divide" << BSON_ARRAY(1 << 0))));
     auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-    ASSERT_EQ(
-        "2018-02-14T00:00:00.000Z",
-        dateExp->evaluate(Document{{"date", "2018-02-14"_sd}}, &expCtx->variables).toString());
+    ASSERT_EQ("2018-02-14T00:00:00.000Z",
+              dateExp->evaluate(Document{{"date", "2018-02-14"sv}}, &expCtx->variables).toString());
     ASSERT_THROWS_CODE(
         dateExp->evaluate({}, &expCtx->variables), AssertionException, ErrorCodes::BadValue);
 }
@@ -776,9 +776,8 @@ TEST_F(ExpressionEvaluateDateFromStringTest, OnErrorEvaluatedLazily) {
                      << BSON("dateString" << "$date"
                                           << "onError" << BSON("$divide" << BSON_ARRAY(1 << 0))));
     auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-    ASSERT_EQ(
-        "2018-02-14T00:00:00.000Z",
-        dateExp->evaluate(Document{{"date", "2018-02-14"_sd}}, &expCtx->variables).toString());
+    ASSERT_EQ("2018-02-14T00:00:00.000Z",
+              dateExp->evaluate(Document{{"date", "2018-02-14"sv}}, &expCtx->variables).toString());
     ASSERT_THROWS_CODE(dateExp->evaluate(Document{{"date", 5}}, &expCtx->variables),
                        AssertionException,
                        ErrorCodes::BadValue);
@@ -817,8 +816,8 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
     auto expCtx = getExpCtx();
     const auto anyDate = Value{Date_t{}};
     const auto null = Value{BSONNULL};
-    const auto hour = Value{"hour"_sd};
-    const auto utc = Value{"GMT"_sd};
+    const auto hour = Value{"hour"sv};
+    const auto utc = Value{"GMT"sv};
     const auto objectId = Value{OID::gen()};
     const std::vector<TestCase> testCases{
         {// Sunny day case.
@@ -846,7 +845,7 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
          utc,
          null},
         {// Invalid 'startDate' type.
-         Value{"date"_sd},
+         Value{"date"sv},
          anyDate,
          hour,
          utc,
@@ -855,7 +854,7 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
          "$dateDiff requires 'startDate' to be a date, but got string"},
         {// Invalid 'endDate' type.
          anyDate,
-         Value{"date"_sd},
+         Value{"date"sv},
          hour,
          utc,
          null,
@@ -872,7 +871,7 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
         {// Invalid 'unit' value.
          anyDate,
          anyDate,
-         Value{"century"_sd},
+         Value{"century"sv},
          utc,
          null,
          ErrorCodes::FailedToParse,  // Error code.
@@ -882,7 +881,7 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
          anyDate,
          anyDate,
          hour,
-         Value{"INVALID"_sd},
+         Value{"INVALID"sv},
          null,
          40485,  // Error code.
          "$dateDiff parameter 'timezone' value parsing failed :: caused by :: unrecognized time "
@@ -896,39 +895,39 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
         {// Accepts timestamp.
          Value{Timestamp{Seconds(1604255016), 0} /* 2020-11-01T18:23:36 UTC+00:00 */},
          Value{Timestamp{Seconds(1604260800), 0} /* 2020-11-01T20:00:00 UTC+00:00 */},
-         Value{"minute"_sd},
+         Value{"minute"sv},
          Value{} /* 'timezone' not specified*/,
          Value{97}},
         {
             // Ignores 'startOfWeek' parameter value when unit is not week.
             anyDate,
             anyDate,
-            Value{"day"_sd},
-            Value{},             //'timezone' is not specified
-            Value{0},            // expectedResult
-            0,                   // expectedErrorCode
-            "",                  // expectedErrorMessage
-            Value{"INVALID"_sd}  // startOfWeek
+            Value{"day"sv},
+            Value{},            //'timezone' is not specified
+            Value{0},           // expectedResult
+            0,                  // expectedErrorCode
+            "",                 // expectedErrorMessage
+            Value{"INVALID"sv}  // startOfWeek
         },
         {
             // 'startOfWeek' is null.
             anyDate,
             anyDate,
-            Value{"week"_sd},  // unit
-            Value{},           //'timezone' is not specified
-            null,              // expectedResult
-            0,                 // expectedErrorCode
-            "",                // expectedErrorMessage
-            null               // startOfWeek
+            Value{"week"sv},  // unit
+            Value{},          //'timezone' is not specified
+            null,             // expectedResult
+            0,                // expectedErrorCode
+            "",               // expectedErrorMessage
+            null              // startOfWeek
         },
         {
             // Invalid 'startOfWeek' value type.
             anyDate,
             anyDate,
-            Value{"week"_sd},  // unit
-            Value{},           //'timezone' is not specified
-            null,              // expectedResult
-            5439015,           // expectedErrorCode
+            Value{"week"sv},  // unit
+            Value{},          //'timezone' is not specified
+            null,             // expectedResult
+            5439015,          // expectedErrorCode
             "$dateDiff requires 'startOfWeek' to be a string, but got int",  // expectedErrorMessage
             Value{1}                                                         // startOfWeek
         },
@@ -936,13 +935,13 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
             // Invalid 'startOfWeek' value.
             anyDate,
             anyDate,
-            Value{"week"_sd},  // unit
-            Value{},           //'timezone' is not specified
-            null,              // expectedResult
-            5439016,           // expectedErrorCode
+            Value{"week"sv},  // unit
+            Value{},          //'timezone' is not specified
+            null,             // expectedResult
+            5439016,          // expectedErrorCode
             "$dateDiff parameter 'startOfWeek' value cannot be recognized as a day of a week: "
-            "Satur",           // expectedErrorMessage
-            Value{"Satur"_sd}  // startOfWeek
+            "Satur",          // expectedErrorMessage
+            Value{"Satur"sv}  // startOfWeek
         },
         {
             // Sunny day case for 'startOfWeek'.
@@ -950,12 +949,12 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
                 1611446400000) /* 2021-01-24T00:00:00 UTC+00:00 Sunday*/},
             Value{Date_t::fromMillisSinceEpoch(
                 1611532800000) /* 2021-01-25T00:00:00 UTC+00:00 Monday*/},
-            Value{"week"_sd},   // unit
-            Value{},            //'timezone' is not specified
-            Value{1},           // expectedResult
-            0,                  // expectedErrorCode
-            "",                 // expectedErrorMessage
-            Value{"Monday"_sd}  // startOfWeek
+            Value{"week"sv},   // unit
+            Value{},           //'timezone' is not specified
+            Value{1},          // expectedResult
+            0,                 // expectedErrorCode
+            "",                // expectedErrorMessage
+            Value{"Monday"sv}  // startOfWeek
         },
         {
             // 'startOfWeek' not specified, defaults to "Sunday".
@@ -963,9 +962,9 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
                 1611360000000) /* 2021-01-23T00:00:00 UTC+00:00 Saturday*/},
             Value{Date_t::fromMillisSinceEpoch(
                 1611446400000) /* 2021-01-24T00:00:00 UTC+00:00 Sunday*/},
-            Value{"week"_sd},  // unit
-            Value{},           //'timezone' is not specified
-            Value{1},          // expectedResult
+            Value{"week"sv},  // unit
+            Value{},          //'timezone' is not specified
+            Value{1},         // expectedResult
         },
     };
 
@@ -993,7 +992,7 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
 namespace expression_evaluate_date_arithmetics_test {
 using ExpressionEvaluateDateArithmeticsTest = AggregationContextFixture;
 
-std::vector<StringData> dateArithmeticsExp = {"$dateAdd"_sd, "$dateSubtract"_sd};
+std::vector<std::string_view> dateArithmeticsExp = {"$dateAdd"sv, "$dateSubtract"sv};
 
 TEST_F(ExpressionEvaluateDateArithmeticsTest, EvaluatesToNullWithNullInput) {
     auto expCtx = getExpCtx();

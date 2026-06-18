@@ -32,11 +32,14 @@
 
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 
 HttpClient::HttpReply MockHttpClient::request(HttpMethod method,
-                                              StringData url,
+                                              std::string_view url,
                                               ConstDataRange data) const {
     if (url.starts_with("http://") && !url.starts_with("http://localhost")) {
         uassert(ErrorCodes::IllegalOperation,
@@ -51,12 +54,12 @@ HttpClient::HttpReply MockHttpClient::request(HttpMethod method,
 
     auto reply = it->second;
     DataBuilder headerBuilder;
-    for (StringData line : reply.header) {
+    for (std::string_view line : reply.header) {
         uassertStatusOK(headerBuilder.writeAndAdvance(line));
-        uassertStatusOK(headerBuilder.writeAndAdvance("\n"_sd));
+        uassertStatusOK(headerBuilder.writeAndAdvance("\n"sv));
     }
     DataBuilder bodyBuilder;
-    uassertStatusOK(bodyBuilder.writeAndAdvance<StringData>(reply.body));
+    uassertStatusOK(bodyBuilder.writeAndAdvance<std::string_view>(reply.body));
 
     HttpClient::HttpReply ret(reply.code, std::move(headerBuilder), std::move(bodyBuilder));
 

@@ -56,6 +56,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -87,7 +88,7 @@ Status checkUnknownFieldsOnParameter(BSONObj obj) {
 // to strict parsing; we cannot flip them all at once for backward compatibility reasons.
 // TODO (SERVER-118757): Consider removing this function after resolving this ticket.
 void checkUnknownFields(const BSONObj& command) {
-    StringData name = command.firstElement().fieldName();
+    std::string_view name = command.firstElement().fieldName();
 
     if (name == kFleCompactionOptionsName) {
         uassertStatusOK(
@@ -112,7 +113,7 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                                            bool skipValidation) {
 
     BSONObj cmdParamObj = cmd.getCommandParameter();
-    StringData parameterName = cmdParamObj.firstElement().fieldName();
+    std::string_view parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = _sps->get(parameterName);
     auto tenantId = cmd.getDbName().tenantId();
 
@@ -254,7 +255,7 @@ BatchedCommandResponse ClusterParameterDBClientService::updateParameterOnDisk(
     return response;
 }
 
-ServerParameter* ClusterParameterService::get(StringData name) {
+ServerParameter* ClusterParameterService::get(std::string_view name) {
     return ServerParameterSet::getClusterParameterSet()->get(name);
 }
 }  // namespace mongo

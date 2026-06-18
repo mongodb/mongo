@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
@@ -39,6 +38,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -218,7 +218,7 @@ BSONObj makeStatistics(double documents,
 /**
  * Returns an owned BSON Object representing data matching mongo::StatsPath IDL.
  */
-BSONObj makeStatsPath(StringData path,
+BSONObj makeStatsPath(std::string_view path,
                       double documents,
                       double sampleRate,
                       std::shared_ptr<const CEHistogram> ceHistogram);

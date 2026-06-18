@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -134,6 +133,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -635,7 +635,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> checkOutCursorWithRetries(
     OperationContext* opCtx,
     CursorId cursorId,
     AuthorizationSession* authzSession,
-    StringData commandName) {
+    std::string_view commandName) {
     auto cursorManager = Grid::get(opCtx)->getCursorManager();
     AuthzCheckFn authChecker = [&authzSession](AuthzCheckFnInputType userName) -> Status {
         return authzSession->isCoauthorizedWith(userName)

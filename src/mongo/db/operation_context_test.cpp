@@ -31,7 +31,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/operation_context.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
@@ -70,6 +69,7 @@
 #include <ostream>
 #include <ratio>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/move/utility_core.hpp>
@@ -82,6 +82,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 constexpr auto operator""_sec(unsigned long long n) noexcept {
     return Seconds{static_cast<long long>(n)};
@@ -1128,7 +1129,7 @@ TEST_F(OperationContextTest, CurrentOpExcludesPendingDestructionOperations) {
     auto opCtx = client->makeOperationContext();
     const auto expCtx = ExpressionContextBuilder{}
                             .opCtx(opCtx.get())
-                            .ns(NamespaceString::createNamespaceString_forTest("foo.bar"_sd))
+                            .ns(NamespaceString::createNamespaceString_forTest("foo.bar"sv))
                             .build();
     for (auto truncateOps : {true, false}) {
         BSONObjBuilder bobNoOpCtx, bobPendingDestructionOpCtx;

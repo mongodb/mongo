@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,6 +45,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -55,6 +55,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 const auto getChangeStreamOptionsManager =
     ServiceContext::declareDecoration<boost::optional<ChangeStreamOptionsManager>>();
@@ -98,11 +99,11 @@ const LogicalTime& ChangeStreamOptionsManager::getClusterParameterTime() const {
 
 void ChangeStreamOptionsParameter::append(OperationContext* opCtx,
                                           BSONObjBuilder* bob,
-                                          StringData name,
+                                          std::string_view name,
                                           const boost::optional<TenantId>&) {
     ChangeStreamOptionsManager& changeStreamOptionsManager =
         ChangeStreamOptionsManager::get(getGlobalServiceContext());
-    bob->append("_id"_sd, name);
+    bob->append("_id"sv, name);
     bob->appendElementsUnique(changeStreamOptionsManager.getOptions(opCtx).toBSON());
 }
 
@@ -132,21 +133,21 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
         // default- initialized to 'off'. This is useful for parameter initialization at startup but
         // causes the IDL parser to not enforce the presence of `expireAfterSeconds` in BSON
         // representations. We assert that and the existence of PreAndPostImages here.
-        IDLParserContext ctxt = IDLParserContext("changeStreamOptions"_sd);
-        if (auto preAndPostImagesObj = changeStreamOptionsObj["preAndPostImages"_sd];
+        IDLParserContext ctxt = IDLParserContext("changeStreamOptions"sv);
+        if (auto preAndPostImagesObj = changeStreamOptionsObj["preAndPostImages"sv];
             !preAndPostImagesObj.eoo()) {
-            if (preAndPostImagesObj["expireAfterSeconds"_sd].eoo()) {
-                ctxt.throwMissingField("expireAfterSeconds"_sd);
+            if (preAndPostImagesObj["expireAfterSeconds"sv].eoo()) {
+                ctxt.throwMissingField("expireAfterSeconds"sv);
             }
         } else {
-            ctxt.throwMissingField("preAndPostImages"_sd);
+            ctxt.throwMissingField("preAndPostImages"sv);
         }
 
         ChangeStreamOptions newOptions = ChangeStreamOptions::parse(changeStreamOptionsObj, ctxt);
         auto preAndPostImages = newOptions.getPreAndPostImages();
         visit(OverloadedVisitor{
                   [&](const std::string& expireAfterSeconds) {
-                      if (expireAfterSeconds != "off"_sd) {
+                      if (expireAfterSeconds != "off"sv) {
                           validateStatus = {
                               ErrorCodes::BadValue,
                               "Non-numeric value of 'expireAfterSeconds' should be 'off'"};

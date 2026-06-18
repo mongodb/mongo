@@ -36,17 +36,19 @@
 #include "mongo/util/assert_util.h"
 
 #include <random>
+#include <string_view>
 #include <vector>
 
 #include <benchmark/benchmark.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 const NamespaceString kNss =
     NamespaceString::createNamespaceString_forTest("canonical_query_init_test.bm");
 
-static constexpr StringData kCollName = "exampleCol"_sd;
-static constexpr StringData kDbName = "foo"_sd;
+static constexpr std::string_view kCollName = "exampleCol"sv;
+static constexpr std::string_view kDbName = "foo"sv;
 static constexpr uint64_t kRandomSeed = 619449996;
 
 enum QueryType {
@@ -186,7 +188,7 @@ std::vector<std::vector<std::string>> generateFieldNames(uint64_t numOfDistinctF
                                                          bool dottedPath = false,
                                                          int dottedPathLength = 1) {
     std::vector<std::vector<std::string>> result;
-    static constexpr StringData kViableChars = "abcdefghijklmnopqrstuvwxyz"_sd;
+    static constexpr std::string_view kViableChars = "abcdefghijklmnopqrstuvwxyz"sv;
     dottedPathLength = (dottedPathLength == 0) ? 1 : dottedPathLength;
     std::vector<int> ids = generateDistinctValues(
         numOfDistinctFields, noOfValues * dottedPathLength, 0, kViableChars.size() - 1);

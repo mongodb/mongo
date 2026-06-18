@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -48,6 +47,7 @@
 #include <algorithm>
 #include <iterator>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -59,6 +59,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
     OperationContext* opCtx, Shard& shard) {
@@ -68,7 +69,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
     // Find all tenant config databases.
     ListDatabasesForAllTenantsCommand listDbCommand;
     listDbCommand.setDbName(DatabaseName::kAdmin);
-    listDbCommand.setFilter(BSON("name"_sd << "config"));
+    listDbCommand.setFilter(BSON("name"sv << "config"));
     listDbCommand.setNameOnly(true);
     std::set<boost::optional<TenantId>> tenantIds;
 
@@ -82,7 +83,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
         return swListDbResponse.getStatus();
     }
     std::vector<BSONElement> databases =
-        swListDbResponse.getValue().response["databases"_sd].Array();
+        swListDbResponse.getValue().response["databases"sv].Array();
     LOGV2_DEBUG(6831301,
                 2,
                 "ListDatabasesForAllTenants w/ default executor finished",
@@ -92,7 +93,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
                    databases.end(),
                    std::inserter(tenantIds, tenantIds.end()),
                    [](const BSONElement& elem) -> boost::optional<TenantId> {
-                       auto tenantElem = elem.Obj()["tenantId"_sd];
+                       auto tenantElem = elem.Obj()["tenantId"sv];
                        if (tenantElem.eoo()) {
                            return boost::none;
                        } else {
@@ -114,7 +115,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
     // Find all tenant config databases.
     ListDatabasesForAllTenantsCommand listDbCommand;
     listDbCommand.setDbName(DatabaseName::kAdmin);
-    listDbCommand.setFilter(BSON("name"_sd << "config"));
+    listDbCommand.setFilter(BSON("name"sv << "config"));
     listDbCommand.setNameOnly(true);
     std::set<boost::optional<TenantId>> tenantIds;
 
@@ -143,7 +144,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
         return response.status;
     }
     std::vector<BSONElement> databases;
-    response.data["databases"_sd].Obj().elems(databases);
+    response.data["databases"sv].Obj().elems(databases);
     LOGV2_DEBUG(6831302,
                 2,
                 "ListDatabasesForAllTenants w/ special executor finished",
@@ -153,7 +154,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
                    databases.end(),
                    std::inserter(tenantIds, tenantIds.end()),
                    [](const BSONElement& elem) -> boost::optional<TenantId> {
-                       auto tenantElem = elem.Obj()["tenantId"_sd];
+                       auto tenantElem = elem.Obj()["tenantId"sv];
                        if (tenantElem.eoo()) {
                            return boost::none;
                        } else {

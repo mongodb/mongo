@@ -32,7 +32,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/classic/limit.h"

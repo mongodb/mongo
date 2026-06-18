@@ -35,6 +35,8 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <boost/optional.hpp>
 
 namespace mongo::transport::grpc {
@@ -105,7 +107,7 @@ public:
         const CancellationToken& token = CancellationToken::uncancelable(),
         boost::optional<std::string> authToken = boost::none) = 0;
 
-    StringData getNameForLogging() const override {
+    std::string_view getNameForLogging() const override {
         return "gRPC"_sd;
     }
 

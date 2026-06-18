@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -48,6 +47,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -55,6 +55,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class SortKeyGeneratorStageTest : public unittest::Test {
 protected:
@@ -156,7 +157,7 @@ TEST_F(SortKeyGeneratorStageTest, SortKeyNormal2) {
 TEST_F(SortKeyGeneratorStageTest, SortKeyString) {
     Value actualOut =
         extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", nullptr);
-    Value expectedOut("thing2"_sd);
+    Value expectedOut("thing2"sv);
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
@@ -230,7 +231,7 @@ TEST_F(SortKeyGeneratorStageTest, ExtractStringSortKeyWithCollatorUsesComparison
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     Value actualOut =
         extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", std::move(collator));
-    Value expectedOut = Value("2gniht"_sd);
+    Value expectedOut = Value("2gniht"sv);
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
@@ -252,7 +253,7 @@ TEST_F(SortKeyGeneratorStageTest, CollatorAppliesWhenExtractingCoveredSortKeyStr
                                                           0,
                                                           SnapshotId{}),
                                             std::move(collator));
-    Value expectedOut = Value("oof"_sd);
+    Value expectedOut = Value("oof"sv);
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
@@ -267,7 +268,7 @@ TEST_F(SortKeyGeneratorStageTest, EnsureSortKeyGenerationForArraysRespectsCollat
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     Value actualOut =
         extractSortKey("{a: 1}", "{_id: 0, a: ['aaz', 'zza', 'yya', 'zzb']}", std::move(collator));
-    Value expectedOut("ayy"_sd);
+    Value expectedOut("ayy"sv);
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 

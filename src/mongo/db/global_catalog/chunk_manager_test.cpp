@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_catalog/chunk_manager.h"
-
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"

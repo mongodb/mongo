@@ -45,6 +45,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -54,9 +55,9 @@ namespace mongo::window_function {
 
 class ExpressionShift : public Expression {
 public:
-    static constexpr StringData kDefaultArg = "default"_sd;
-    static constexpr StringData kOutputArg = "output"_sd;
-    static constexpr StringData kByArg = "by"_sd;
+    static constexpr std::string_view kDefaultArg = "default"_sd;
+    static constexpr std::string_view kOutputArg = "output"_sd;
+    static constexpr std::string_view kByArg = "by"_sd;
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
@@ -91,7 +92,7 @@ public:
 
 private:
     static boost::intrusive_ptr<Expression> parseShiftArgs(BSONObj obj,
-                                                           mongo::StringData accName,
+                                                           std::string_view accName,
                                                            ExpressionContext* expCtx);
 
     boost::optional<mongo::Value> _defaultVal;

@@ -29,7 +29,6 @@
 
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
@@ -51,6 +50,7 @@
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -93,7 +93,7 @@ protected:
      * Expects a correct find command to be dispatched for the config.settings namespace and returns
      * the specified result. If an empty boost::optional is passed, returns an empty results.
      */
-    void expectSettingsQuery(StringData key, StatusWith<boost::optional<BSONObj>> result) {
+    void expectSettingsQuery(std::string_view key, StatusWith<boost::optional<BSONObj>> result) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             auto opMsg = static_cast<OpMsgRequest>(request);
             auto findCommand = query_request_helper::makeFromFindCommandForTests(opMsg.body);

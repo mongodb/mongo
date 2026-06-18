@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -91,6 +90,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -99,7 +99,7 @@
 namespace mongo {
 namespace {
 
-void insertOplogDocument(OperationContext* opCtx, Timestamp ts, StringData ns) {
+void insertOplogDocument(OperationContext* opCtx, Timestamp ts, std::string_view ns) {
     AutoGetCollection coll(opCtx, NamespaceString::createNamespaceString_forTest(ns), MODE_IX);
     WriteUnitOfWork wuow(opCtx);
     auto doc = BSON("ts" << ts);
@@ -1348,7 +1348,7 @@ public:
         return CursorManager::get(&_opCtx)->numCursors();
     }
 
-    StringData ns() {
+    std::string_view ns() {
         return _nss.ns_forTest();
     }
     const NamespaceString& nss() {

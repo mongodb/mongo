@@ -29,7 +29,6 @@
 
 #include "mongo/db/stats/api_version_metrics.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters.h"

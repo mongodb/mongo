@@ -39,6 +39,7 @@
 #include "mongo/util/scopeguard.h"
 
 #include <memory>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -128,7 +129,7 @@ SpillTable::~SpillTable() {
     _storageEngine.dropSpillTable(*_ru, ident());
 }
 
-StringData SpillTable::ident() const {
+std::string_view SpillTable::ident() const {
     return _rs->getIdent();
 }
 

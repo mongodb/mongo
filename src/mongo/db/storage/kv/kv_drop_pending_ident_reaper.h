@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/ident.h"
@@ -43,6 +42,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -95,7 +95,7 @@ public:
      * timestamp it must either be no greater than that or be an ident *created* after the stable
      * timestamp.
      */
-    void dropUnknownIdent(const Timestamp& stableTimestamp, StringData ident);
+    void dropUnknownIdent(const Timestamp& stableTimestamp, std::string_view ident);
 
     /**
      * Marks the ident as in use and prevents the reaper from dropping the ident.
@@ -104,7 +104,7 @@ public:
      * being dropped. Returns a shared_ptr to the `dropToken` if it isn't expired, otherwise a new
      * shared_ptr is generated, stored in `dropToken`, and returned.
      */
-    std::shared_ptr<Ident> markIdentInUse(StringData ident);
+    std::shared_ptr<Ident> markIdentInUse(std::string_view ident);
 
     /**
      * Returns earliest drop timestamp in '_dropPendingIdents'.
@@ -152,7 +152,7 @@ public:
      *
      * Only untimestamped drops or drops added with dropUnknownIdent() can be immediately completed.
      */
-    Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident);
+    Status immediatelyCompletePendingDrop(OperationContext* opCtx, std::string_view ident);
 
     /**
      * If the given ident has been registered with the reaper, attempts to immediately drop it
@@ -165,7 +165,7 @@ public:
      * immediate drops are not replicated. Attempting to complete one of them will return BadValue.
      */
     Status immediatelyCompletePendingDropAtTimestamp(OperationContext* opCtx,
-                                                     StringData ident,
+                                                     std::string_view ident,
                                                      Timestamp timestamp);
 
 private:
@@ -208,7 +208,7 @@ private:
 
     Status _immediatelyAttemptToCompletePendingDrop(
         OperationContext* opCtx,
-        StringData ident,
+        std::string_view ident,
         boost::optional<Timestamp> replicatedIdentDropTimestamp);
 
     template <typename Field>

@@ -31,7 +31,6 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -66,6 +65,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -77,6 +77,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using logv2::LogComponent;
 using logv2::LogSeverity;
@@ -215,7 +216,7 @@ GetParameterOptions parseGetParameterOptions(BSONElement elem) {
     if (elem.type() == BSONType::object) {
         return GetParameterOptions::parse(elem.Obj(), IDLParserContext{"getParameter"});
     }
-    if ((elem.type() == BSONType::string) && (elem.valueStringDataSafe() == "*"_sd)) {
+    if ((elem.type() == BSONType::string) && (elem.valueStringDataSafe() == "*"sv)) {
         GetParameterOptions ret;
         ret.setAllParameters(true);
         return ret;
@@ -535,7 +536,7 @@ MONGO_REGISTER_COMMAND(CmdSet).forRouter().forShard();
 
 void LogLevelServerParameter::append(OperationContext*,
                                      BSONObjBuilder* builder,
-                                     StringData name,
+                                     std::string_view name,
                                      const boost::optional<TenantId>&) {
     builder->append(name,
                     logv2::LogManager::global()
@@ -559,7 +560,7 @@ Status LogLevelServerParameter::set(const BSONElement& newValueElement,
     return Status::OK();
 }
 
-Status LogLevelServerParameter::setFromString(StringData strLevel,
+Status LogLevelServerParameter::setFromString(std::string_view strLevel,
                                               const boost::optional<TenantId>&) {
     int newValue;
     Status status = NumberParser{}(strLevel, &newValue);
@@ -577,7 +578,7 @@ Status LogLevelServerParameter::setFromString(StringData strLevel,
 
 void LogComponentVerbosityServerParameter::append(OperationContext*,
                                                   BSONObjBuilder* builder,
-                                                  StringData name,
+                                                  std::string_view name,
                                                   const boost::optional<TenantId>&) {
     BSONObj currentSettings;
     getLogComponentVerbosity(&currentSettings);
@@ -594,7 +595,7 @@ Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElem
     return setLogComponentVerbosity(newValueElement.Obj());
 }
 
-Status LogComponentVerbosityServerParameter::setFromString(StringData str,
+Status LogComponentVerbosityServerParameter::setFromString(std::string_view str,
                                                            const boost::optional<TenantId>&) try {
     return setLogComponentVerbosity(fromjson(str));
 } catch (const DBException& ex) {
@@ -603,7 +604,7 @@ Status LogComponentVerbosityServerParameter::setFromString(StringData str,
 
 void AutomationServiceDescriptorServerParameter::append(OperationContext*,
                                                         BSONObjBuilder* builder,
-                                                        StringData name,
+                                                        std::string_view name,
                                                         const boost::optional<TenantId>&) {
     const std::lock_guard<std::mutex> lock(autoServiceDescriptorMutex);
     if (!autoServiceDescriptorValue.empty()) {
@@ -620,7 +621,7 @@ Status AutomationServiceDescriptorServerParameter::set(const BSONElement& newVal
     return setFromString(newValueElement.String(), boost::none);
 }
 
-Status AutomationServiceDescriptorServerParameter::setFromString(StringData str,
+Status AutomationServiceDescriptorServerParameter::setFromString(std::string_view str,
                                                                  const boost::optional<TenantId>&) {
     auto kMaxSize = 64U;
     if (str.size() > kMaxSize)

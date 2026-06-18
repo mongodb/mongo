@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -53,24 +54,24 @@ public:
      *    0 if `left == right`
      *   >0 if `left > right`
      */
-    virtual int compare(StringData left, StringData right) const = 0;
+    virtual int compare(std::string_view left, std::string_view right) const = 0;
 
     /**
      * Hash `str` in a way consistent with this comparator, storing the
      * result in the `seed` in-out parameter. Strings which `compare` equal
      * must have the same effect on all `seed` values.
      */
-    virtual void hash_combine(size_t& seed, StringData str) const = 0;
+    virtual void hash_combine(size_t& seed, std::string_view str) const = 0;
 };
 
-/** Uses `StringData::compare` and Murmur3 hashing. */
+/** Uses `std::string_view::compare` and Murmur3 hashing. */
 class SimpleStringDataComparator final : public StringDataComparator {
 public:
-    constexpr int compare(StringData left, StringData right) const override {
+    constexpr int compare(std::string_view left, std::string_view right) const override {
         return left.compare(right);
     }
 
-    void hash_combine(size_t& seed, StringData stringToHash) const override;
+    void hash_combine(size_t& seed, std::string_view stringToHash) const override;
 };
 
 /** Singleton instance for use in basic string comparisons. */

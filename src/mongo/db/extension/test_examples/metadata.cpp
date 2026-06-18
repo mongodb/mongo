@@ -30,6 +30,8 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 
+#include <string_view>
+
 namespace sdk = mongo::extension::sdk;
 
 /**

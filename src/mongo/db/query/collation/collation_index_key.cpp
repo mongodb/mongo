@@ -30,7 +30,6 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -41,6 +40,7 @@
 #include "mongo/util/str.h"
 
 #include <stack>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -92,7 +92,7 @@ using TranslateStack = std::stack<TranslateContext>;
 //
 // If ctxStack is null, _translate must *not* be called with an object or array.  Additionally,
 // an empty string will be used for the field name when appending 'element' to 'out'.
-void translateElement(StringData fieldName,
+void translateElement(std::string_view fieldName,
                       const BSONElement& element,
                       const CollatorInterface* collator,
                       BSONObjBuilder* out,

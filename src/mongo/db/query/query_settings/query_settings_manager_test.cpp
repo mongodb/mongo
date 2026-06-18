@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -48,12 +47,14 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
 
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::query_settings {
+using namespace std::literals::string_view_literals;
 namespace {
 
 bool operator==(const QuerySettings& lhs, const QuerySettings& rhs) {
@@ -77,8 +78,8 @@ static auto const kSerializationContext =
 
 class QuerySettingsManagerTest : public ServiceContextTest {
 public:
-    static constexpr StringData kCollName = "exampleCol"_sd;
-    static constexpr StringData kDbName = "foo"_sd;
+    static constexpr std::string_view kCollName = "exampleCol"sv;
+    static constexpr std::string_view kDbName = "foo"sv;
 
     std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(
         boost::optional<TenantId> tenantId) {

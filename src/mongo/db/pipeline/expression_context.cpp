@@ -41,6 +41,7 @@
 #include "mongo/db/version_context.h"
 #include "mongo/util/version/releases.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -137,25 +138,25 @@ void ExpressionContext::startExpressionCounters() {
     }
 }
 
-void ExpressionContext::incrementMatchExprCounter(StringData name) {
+void ExpressionContext::incrementMatchExprCounter(std::string_view name) {
     if (_params.enabledCounters && _expressionCounters) {
         ++_expressionCounters->matchExprCountersMap[name];
     }
 }
 
-void ExpressionContext::incrementAggExprCounter(StringData name) {
+void ExpressionContext::incrementAggExprCounter(std::string_view name) {
     if (_params.enabledCounters && _expressionCounters) {
         ++_expressionCounters->aggExprCountersMap[name];
     }
 }
 
-void ExpressionContext::incrementGroupAccumulatorExprCounter(StringData name) {
+void ExpressionContext::incrementGroupAccumulatorExprCounter(std::string_view name) {
     if (_params.enabledCounters && _expressionCounters) {
         ++_expressionCounters->groupAccumulatorExprCountersMap[name];
     }
 }
 
-void ExpressionContext::incrementWindowAccumulatorExprCounter(StringData name) {
+void ExpressionContext::incrementWindowAccumulatorExprCounter(std::string_view name) {
     if (_params.enabledCounters && _expressionCounters) {
         ++_expressionCounters->windowAccumulatorExprCountersMap[name];
     }
@@ -198,7 +199,7 @@ void ExpressionContext::initializeReferencedSystemVariables() {
     }
 }
 
-void ExpressionContext::throwIfParserShouldRejectFeature(StringData name, FeatureFlag& flag) {
+void ExpressionContext::throwIfParserShouldRejectFeature(std::string_view name, FeatureFlag& flag) {
     // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized.
     uassert(
         ErrorCodes::QueryFeatureNotAllowed,
@@ -211,7 +212,8 @@ void ExpressionContext::throwIfParserShouldRejectFeature(StringData name, Featur
                               ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS}));
 }
 
-void ExpressionContext::ignoreFeatureInParserOrRejectAndThrow(StringData name, FeatureFlag& flag) {
+void ExpressionContext::ignoreFeatureInParserOrRejectAndThrow(std::string_view name,
+                                                              FeatureFlag& flag) {
     if (!shouldParserIgnoreFeatureFlagCheck()) {
         throwIfParserShouldRejectFeature(name, flag);
     }

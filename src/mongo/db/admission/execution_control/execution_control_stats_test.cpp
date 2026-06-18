@@ -34,8 +34,11 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::admission::execution_control {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(AdmissionsHistogramTest, RecordIgnoresNonPositiveAdmissions) {
     AdmissionsHistogram histogram;
@@ -57,16 +60,16 @@ TEST(AdmissionsHistogramTest, RecordIgnoresNonPositiveAdmissions) {
 TEST(AdmissionsHistogramTest, RecordBucketBoundaries) {
     struct TestCase {
         int32_t admissions;
-        StringData expectedBucket;
+        std::string_view expectedBucket;
     };
 
     std::vector<TestCase> testCases = {
-        {1, "1-2"_sd},       {2, "1-2"_sd},       {3, "3-4"_sd},        {4, "3-4"_sd},
-        {5, "5-8"_sd},       {8, "5-8"_sd},       {9, "9-16"_sd},       {16, "9-16"_sd},
-        {17, "17-32"_sd},    {32, "17-32"_sd},    {33, "33-64"_sd},     {64, "33-64"_sd},
-        {65, "65-128"_sd},   {128, "65-128"_sd},  {129, "129-256"_sd},  {256, "129-256"_sd},
-        {257, "257-512"_sd}, {512, "257-512"_sd}, {513, "513-1024"_sd}, {1024, "513-1024"_sd},
-        {1025, "1025+"_sd},  {10000, "1025+"_sd},
+        {1, "1-2"sv},       {2, "1-2"sv},       {3, "3-4"sv},        {4, "3-4"sv},
+        {5, "5-8"sv},       {8, "5-8"sv},       {9, "9-16"sv},       {16, "9-16"sv},
+        {17, "17-32"sv},    {32, "17-32"sv},    {33, "33-64"sv},     {64, "33-64"sv},
+        {65, "65-128"sv},   {128, "65-128"sv},  {129, "129-256"sv},  {256, "129-256"sv},
+        {257, "257-512"sv}, {512, "257-512"sv}, {513, "513-1024"sv}, {1024, "513-1024"sv},
+        {1025, "1025+"sv},  {10000, "1025+"sv},
     };
 
     for (const auto& tc : testCases) {
@@ -102,7 +105,7 @@ TEST(AdmissionsHistogramTest, RecordAccumulatesInBucket) {
     histogram.appendStats(b);
     BSONObj stats = b.obj();
 
-    ASSERT_EQ(stats["1-2"_sd].Long(), 3);
+    ASSERT_EQ(stats["1-2"sv].Long(), 3);
 }
 
 TEST(AdmissionsHistogramTest, AppendStatsOutputsAllBuckets) {

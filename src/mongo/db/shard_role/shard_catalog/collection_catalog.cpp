@@ -88,13 +88,14 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 static constexpr auto kIsSanitizerBuild = __has_feature(thread_sanitizer) ||
     __has_feature(address_sanitizer) || __has_feature(memory_sanitizer);
 
 // Failpoint which causes catalog updates to hang right before performing a durable commit of them.
 // This causes updates to have been precommitted.
 MONGO_FAIL_POINT_DEFINE(hangAfterPreCommittingCatalogUpdates);
-static constexpr auto kDelayEntireCommitFailpointField = "pauseEntireCommitMillis"_sd;
+static constexpr auto kDelayEntireCommitFailpointField = "pauseEntireCommitMillis"sv;
 
 // Failpoint which causes to hang after wuow commits, before publishing the catalog updates on a
 // given namespace.
@@ -231,7 +232,7 @@ std::vector<DatabaseName> listDatabases(boost::optional<TenantId> tenantId) {
 }  // namespace catalog
 
 namespace {
-constexpr auto kNumDurableCatalogScansDueToMissingMapping = "numScansDueToMissingMapping"_sd;
+constexpr auto kNumDurableCatalogScansDueToMissingMapping = "numScansDueToMissingMapping"sv;
 
 class LatestCollectionCatalog {
 public:
@@ -355,7 +356,7 @@ bool isCSFLE1Validator(BSONObj doc) {
         if (iterator.more()) {
             BSONElement elem = iterator.next();
             if (elem.type() == BSONType::object) {
-                if (elem.fieldNameStringData() == "encrypt"_sd) {
+                if (elem.fieldNameStringData() == "encrypt"sv) {
                     return true;
                 }
 

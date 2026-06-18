@@ -38,7 +38,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -160,6 +159,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -425,7 +425,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             return topology_change_helpers::getExistingShard(
                 opCtx,
                 shardConnectionString,
-                shardProposedName ? boost::optional<StringData>(*shardProposedName) : boost::none,
+                shardProposedName ? boost::optional<std::string_view>(*shardProposedName)
+                                  : boost::none,
                 *_localCatalogClient);
         } catch (const DBException& ex) {
             return ex.toStatus();
@@ -476,7 +477,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             opCtx,
             *targeter,
             isConfigShard,
-            shardProposedName ? boost::optional<StringData>(*shardProposedName) : boost::none,
+            shardProposedName ? boost::optional<std::string_view>(*shardProposedName) : boost::none,
             _executorForAddShard);
     } catch (const DBException& ex) {
         return ex.toStatus();

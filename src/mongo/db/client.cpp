@@ -48,6 +48,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <boost/functional/hash.hpp>
 
@@ -78,7 +79,7 @@ std::function<bool(Client*)> checkAuthForInternalClient = [](Client*) {
 
 }  // namespace
 
-void Client::initThread(StringData desc,
+void Client::initThread(std::string_view desc,
                         Service* service,
                         std::shared_ptr<transport::Session> session,
                         ClientOperationKillableByStepdown killable,
@@ -200,7 +201,7 @@ void Client::setKilled() {
     }
 }
 
-ThreadClient::ThreadClient(StringData desc,
+ThreadClient::ThreadClient(std::string_view desc,
                            Service* service,
                            std::shared_ptr<transport::Session> session,
                            Killable killable,

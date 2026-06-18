@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 
 namespace mongo {
@@ -44,7 +45,7 @@ namespace MONGO_MOD_PUBLIC logv2 {
  * This function is only expected to be used when the bazel flag `dev_stacktrace`
  * is enabled.
  */
-void plainLogBypass(StringData message);
+void plainLogBypass(std::string_view message);
 
 }  // namespace MONGO_MOD_PUBLIC logv2
 }  // namespace mongo

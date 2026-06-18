@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -214,7 +214,7 @@ public:
 
     void setIsSecondary(bool secondary);
 
-    void setReplSetName(StringData setName);
+    void setReplSetName(std::string_view setName);
 
     void setReplSetVersion(long long version);
 

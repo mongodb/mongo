@@ -31,6 +31,7 @@
 
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -49,7 +50,7 @@ ReadWriteConcernProvenance ReadWriteConcernProvenance::parse(const IDLParserCont
     return ReadWriteConcernProvenance(ReadWriteConcernProvenanceBase::parse(bsonObject, ctxt));
 }
 
-StringData ReadWriteConcernProvenance::sourceToString(boost::optional<Source> source) {
+std::string_view ReadWriteConcernProvenance::sourceToString(boost::optional<Source> source) {
     return source ? idl::serialize(*source) : "(unset)";
 }
 

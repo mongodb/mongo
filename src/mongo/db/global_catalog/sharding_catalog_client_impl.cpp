@@ -89,6 +89,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <iterator>
+#include <string_view>
 #include <type_traits>
 #include <variant>
 
@@ -104,6 +105,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const ReadPreferenceSetting kConfigNearestReadPreference(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredReadPreference(ReadPreference::PrimaryPreferred,
@@ -175,7 +177,7 @@ template <typename KeyDocumentType>
 StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
                                                      std::shared_ptr<Shard> shard,
                                                      const NamespaceString& nss,
-                                                     StringData purpose,
+                                                     std::string_view purpose,
                                                      const LogicalTime& newerThanThis,
                                                      repl::ReadConcernLevel readConcernLevel) {
     BSONObjBuilder queryBuilder;
@@ -340,9 +342,9 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
         const auto letExpr = Doc{{"local_uuid", "$" + std::string{CollectionType::kUuidFieldName}}};
 
         const auto uuidExpr =
-            Arr{Value{"$" + ChunkType::collectionUUID.name()}, Value{"$$local_uuid"_sd}};
+            Arr{Value{"$" + ChunkType::collectionUUID.name()}, Value{"$$local_uuid"sv}};
 
-        constexpr auto chunksLookupOutputFieldName = "chunks"_sd;
+        constexpr auto chunksLookupOutputFieldName = "chunks"sv;
 
         const auto lookupPipeline = [&]() {
             return Doc{
@@ -725,7 +727,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectio
 }
 
 StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContext* opCtx,
-                                                                 StringData key) {
+                                                                 std::string_view key) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               getConfigReadPreference(opCtx),
                                               repl::ReadConcernLevel::kMajorityReadConcern,
@@ -1064,7 +1066,7 @@ repl::OpTimeWith<std::vector<ShardType>> ShardingCatalogClientImpl::getAllShards
 }
 
 Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* opCtx,
-                                                                StringData commandName,
+                                                                std::string_view commandName,
                                                                 const DatabaseName& dbname,
                                                                 const BSONObj& cmdObj,
                                                                 BSONObjBuilder* result) {
@@ -1365,7 +1367,7 @@ ShardingCatalogClientImpl::_exhaustiveFindOnConfig(OperationContext* opCtx,
 
 StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNewInternalKeys(
     OperationContext* opCtx,
-    StringData purpose,
+    std::string_view purpose,
     const LogicalTime& newerThanThis,
     repl::ReadConcernLevel readConcernLevel) {
     return _getNewKeys<KeysCollectionDocument>(opCtx,
@@ -1378,7 +1380,7 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNe
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
 ShardingCatalogClientImpl::getAllExternalKeys(OperationContext* opCtx,
-                                              StringData purpose,
+                                              std::string_view purpose,
                                               repl::ReadConcernLevel readConcernLevel) {
     return _getNewKeys<ExternalKeysCollectionDocument>(
         opCtx,

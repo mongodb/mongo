@@ -29,25 +29,25 @@
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_terminated.h"
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
 #include <utility>
 
 namespace mongo {
 
 TEST(DataTypeStringData, Basic) {
     char buf[100];
-    StringData a("a");
-    StringData b("bb");
-    StringData c("ccc");
+    std::string_view a("a");
+    std::string_view b("bb");
+    std::string_view c("ccc");
 
     {
         DataRangeCursor drc(buf, buf + sizeof(buf));
 
-        ASSERT_OK(drc.writeAndAdvanceNoThrow(Terminated<'\0', StringData>(a)));
-        ASSERT_OK(drc.writeAndAdvanceNoThrow(Terminated<'\0', StringData>(b)));
-        ASSERT_OK(drc.writeAndAdvanceNoThrow(Terminated<'\0', StringData>(c)));
+        ASSERT_OK(drc.writeAndAdvanceNoThrow(Terminated<'\0', std::string_view>(a)));
+        ASSERT_OK(drc.writeAndAdvanceNoThrow(Terminated<'\0', std::string_view>(b)));
+        ASSERT_OK(drc.writeAndAdvanceNoThrow(Terminated<'\0', std::string_view>(c)));
 
         ASSERT_EQUALS(1 + 2 + 3 + 3, drc.data() - buf);
     }
@@ -55,7 +55,7 @@ TEST(DataTypeStringData, Basic) {
     {
         ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
 
-        Terminated<'\0', StringData> tsd;
+        Terminated<'\0', std::string_view> tsd;
 
         ASSERT_OK(cdrc.readAndAdvanceNoThrow(&tsd));
         ASSERT_EQUALS(a, tsd.value);

@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -45,11 +46,11 @@ MONGO_MOD_PRIVATE void validateParameter(BSONObj doc, const boost::optional<Tena
 
 MONGO_MOD_PRIVATE void updateParameter(OperationContext* opCtx,
                                        BSONObj doc,
-                                       StringData mode,
+                                       std::string_view mode,
                                        const boost::optional<TenantId>& tenantId);
 
 MONGO_MOD_PRIVATE void clearParameter(OperationContext* opCtx,
-                                      StringData id,
+                                      std::string_view id,
                                       const boost::optional<TenantId>& tenantId);
 
 MONGO_MOD_PRIVATE void clearAllTenantParameters(OperationContext* opCtx,

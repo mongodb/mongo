@@ -29,7 +29,6 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonelement.h"
@@ -41,6 +40,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 #include <benchmark/benchmark.h>
 #include <fmt/format.h>
@@ -49,6 +49,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Returns number within a sensible range for human ages (measured in years) based on the given seed
 // 'i'.
@@ -380,7 +381,7 @@ void BM_objBuilderAppendInt(benchmark::State& state) {
     for (auto _ : state) {
         BSONObjBuilder bob;
         for (int i = 0; i < n; ++i) {
-            bob.append("a"_sd, i);
+            bob.append("a"sv, i);
         }
         benchmark::DoNotOptimize(bob.done());
         ++reps;

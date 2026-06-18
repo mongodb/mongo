@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
@@ -40,17 +39,19 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/synchronized_value.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 void QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode::append(
-    OperationContext*, BSONObjBuilder* b, StringData name, const boost::optional<TenantId>&) {
+    OperationContext*, BSONObjBuilder* b, std::string_view name, const boost::optional<TenantId>&) {
     *b << name << idl::serialize(_data.get());
 }
 
 Status QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode::setFromString(
-    StringData value, const boost::optional<TenantId>&) {
+    std::string_view value, const boost::optional<TenantId>&) {
     auto mode = idl::deserialize<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>(
         value, IDLParserContext("automaticCEPlanRankingStrategy"));
     if (mode ==

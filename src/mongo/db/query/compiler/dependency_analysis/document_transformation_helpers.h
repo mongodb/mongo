@@ -35,6 +35,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"
 
+#include <string_view>
+
 namespace mongo::document_transformation {
 
 /**
@@ -45,7 +47,7 @@ namespace mongo::document_transformation {
  */
 class NonArrayModifyPath final : public ModifyPath {
 public:
-    NonArrayModifyPath(StringData path, bool canLeafBeArray)
+    NonArrayModifyPath(std::string_view path, bool canLeafBeArray)
         : ModifyPath(path, ModifiedPrefixPolicy::kEnsureObjects), _canLeafBeArray(canLeafBeArray) {}
 
     bool canLeafBeArray() const override {
@@ -58,7 +60,9 @@ private:
 
 namespace detail {
 
-void describeProjectedPath(DocumentOperationVisitor& visitor, StringData path, bool isInclusion);
+void describeProjectedPath(DocumentOperationVisitor& visitor,
+                           std::string_view path,
+                           bool isInclusion);
 
 void describeComputedPath(DocumentOperationVisitor& visitor,
                           const std::string& path,
@@ -73,8 +77,11 @@ void describeComputedPath(DocumentOperationVisitor& visitor,
  * first, since inclusions are not valid unless ReplaceRoot is present.
  */
 template <typename It>
-void describeProjectedPaths(
-    DocumentOperationVisitor& visitor, It startIt, It endIt, StringData prefix, bool isInclusion) {
+void describeProjectedPaths(DocumentOperationVisitor& visitor,
+                            It startIt,
+                            It endIt,
+                            std::string_view prefix,
+                            bool isInclusion) {
     for (; startIt != endIt; ++startIt) {
         auto path = FieldPath::getFullyQualifiedPath(prefix, *startIt);
         detail::describeProjectedPath(visitor, path, isInclusion);
@@ -89,7 +96,7 @@ template <typename It>
 void describeComputedPaths(DocumentOperationVisitor& visitor,
                            It startIt,
                            It endIt,
-                           StringData prefix) {
+                           std::string_view prefix) {
     BSONDepthIndex depth = prefix.empty() ? 0 : 1 + std::count(prefix.begin(), prefix.end(), '.');
     for (; startIt != endIt; ++startIt) {
         auto&& computedPair = *startIt;
@@ -160,8 +167,8 @@ namespace detail {
  */
 class RenamePathWithFixedArrayness final : public RenamePath {
 public:
-    RenamePathWithFixedArrayness(StringData newPath,
-                                 StringData oldPath,
+    RenamePathWithFixedArrayness(std::string_view newPath,
+                                 std::string_view oldPath,
                                  BSONDepthIndex newPathMaxArrayTraversals,
                                  BSONDepthIndex oldPathMaxArrayTraversals);
 
@@ -200,7 +207,7 @@ auto wrapDocumentTransformation(const Inner& inner, MakeVisitor&& makeVisitor) {
  */
 template <typename T, typename CanPathBeArray>
 auto withArraynessInfo(const T& t, CanPathBeArray&& canPathBeArray) {
-    auto dottedPrefix = [](StringData path) {
+    auto dottedPrefix = [](std::string_view path) {
         return path.substr(0, path.rfind('.'));
     };
 

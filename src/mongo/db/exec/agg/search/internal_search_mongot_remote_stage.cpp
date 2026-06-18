@@ -36,6 +36,8 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -90,7 +92,7 @@ REGISTER_AGG_STAGE_MAPPING(internalSearchMongotRemoteStage,
 namespace exec::agg {
 
 InternalSearchMongotRemoteStage::InternalSearchMongotRemoteStage(
-    StringData stageName,
+    std::string_view stageName,
     InternalSearchMongotRemoteSpec spec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::shared_ptr<executor::TaskExecutor>& taskExecutor,
@@ -166,7 +168,7 @@ void InternalSearchMongotRemoteStage::tryToSetSearchMetaVar() {
         auto varsObj = Value(_sharedState->_cursor->getCursorVars().value());
         LOGV2_DEBUG(8569400, 4, "Setting meta vars", "varsObj"_attr = redact(varsObj.toString()));
         std::string varName = Variables::getBuiltinVariableName(Variables::kSearchMetaId);
-        auto metaVal = varsObj.getDocument().getField(StringData{varName});
+        auto metaVal = varsObj.getDocument().getField(std::string_view{varName});
         if (!metaVal.missing()) {
             pExpCtx->variables.setReservedValue(Variables::kSearchMetaId, metaVal, true);
             if (metaVal.isObject()) {

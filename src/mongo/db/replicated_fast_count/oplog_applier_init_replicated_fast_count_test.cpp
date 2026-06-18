@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -47,14 +46,15 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace repl {
 namespace {
 
-BSONObj makeInitReplicatedFastCountO2(StringData metadataIdent,
+BSONObj makeInitReplicatedFastCountO2(std::string_view metadataIdent,
                                       int metadataKeyFormat,
-                                      StringData timestampsIdent,
+                                      std::string_view timestampsIdent,
                                       int timestampsKeyFormat) {
     return BSON("fastCountMetadataStoreIdent"
                 << metadataIdent << "fastCountMetadataStoreKeyFormat" << metadataKeyFormat

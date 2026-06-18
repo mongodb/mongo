@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_oidc_client_params.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
@@ -46,8 +46,8 @@ class MONGO_MOD_PUBLIC SaslOIDCClientConversation : public SaslClientConversatio
 
 public:
     SaslOIDCClientConversation(SaslClientSession* clientSession,
-                               StringData principalName,
-                               StringData accessToken)
+                               std::string_view principalName,
+                               std::string_view accessToken)
         : SaslClientConversation(clientSession),
           _principalName(principalName),
           _accessToken(accessToken) {}
@@ -56,7 +56,7 @@ public:
         oidcClientGlobalParams.oidcIdPAuthCallback = std::move(callback);
     }
 
-    StatusWith<bool> step(StringData inputData, std::string* outputData) override;
+    StatusWith<bool> step(std::string_view inputData, std::string* outputData) override;
 
     boost::optional<std::uint32_t> currentStep() const override {
         return _step;
@@ -91,7 +91,7 @@ private:
     // device authorization grant flow to retrieve a device code, present a user code and
     // verification uri to the user, and poll the token endpoint with the device code until the user
     // authenticates and a token is provided.
-    StatusWith<bool> _secondStep(StringData input, std::string* outputData);
+    StatusWith<bool> _secondStep(std::string_view input, std::string* outputData);
 };
 
 }  // namespace mongo

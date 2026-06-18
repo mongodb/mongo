@@ -42,6 +42,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -51,7 +52,7 @@ public:
     class Capped;
     class Oplog;
 
-    RecordStoreBase(boost::optional<UUID>, StringData ident);
+    RecordStoreBase(boost::optional<UUID>, std::string_view ident);
 
     boost::optional<UUID> uuid() const final;
 
@@ -59,7 +60,7 @@ public:
 
     std::shared_ptr<Ident> getSharedIdent() const final;
 
-    StringData getIdent() const final;
+    std::string_view getIdent() const final;
 
     bool isColdCollection() const override {
         return false;

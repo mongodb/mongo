@@ -29,7 +29,6 @@
 
 #include "mongo/util/out_of_line_executor.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/executor_test_util.h"

@@ -39,8 +39,11 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
+
 namespace mongo::replicated_fast_count {
 namespace {
+using namespace std::literals::string_view_literals;
 void createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
                                          OperationContext* opCtx) {
     ASSERT_OK(storageInterface->createCollection(
@@ -66,7 +69,7 @@ UUID getOplogUuid(OperationContext* opCtx) {
 
 class ReplicatedFastCountAdvanceCheckpointTest : public CatalogTestFixture {
 protected:
-    static constexpr StringData kDbName = "advance_checkpoint_test"_sd;
+    static constexpr std::string_view kDbName = "advance_checkpoint_test"sv;
     const test_helpers::NsAndUUID collA{
         .nss = NamespaceString::createNamespaceString_forTest(kDbName, "collA"),
         .uuid = UUID::gen()};

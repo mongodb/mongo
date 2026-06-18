@@ -33,6 +33,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
@@ -49,7 +51,7 @@ std::string ServerGlobalParams::getPortSettingHelpText() {
     return str::stream() << "Specify port number - " << serverGlobalParams.port << " by default";
 }
 
-void ServerGlobalParams::FCVSnapshot::logFCVWithContext(StringData context) const {
+void ServerGlobalParams::FCVSnapshot::logFCVWithContext(std::string_view context) const {
     LOGV2_OPTIONS(5853300,
                   {logv2::LogComponent::kReplication},
                   "current featureCompatibilityVersion value",

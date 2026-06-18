@@ -42,12 +42,14 @@
 
 #include <algorithm>
 #include <new>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -66,7 +68,7 @@ StatusWith<UUID> UUID::parse(BSONElement from) {
     }
 }
 
-StatusWith<UUID> UUID::parse(StringData s) {
+StatusWith<UUID> UUID::parse(std::string_view s) {
     if (!isUUIDString(s)) {
         return {ErrorCodes::InvalidUUID, fmt::format("Invalid UUID string: {}", s)};
     }
@@ -93,8 +95,8 @@ UUID UUID::parse(const BSONObj& obj) {
     return res.getValue();
 }
 
-bool UUID::isUUIDString(StringData s) {
-    static constexpr auto pat = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"_sd;
+bool UUID::isUUIDString(std::string_view s) {
+    static constexpr auto pat = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"sv;
     return s.size() == pat.size() &&
         std::mismatch(s.begin(), s.end(), pat.begin(), [](char a, char b) {
             return b == 'x' ? ctype::isXdigit(a) : a == b;
@@ -119,7 +121,7 @@ UUID UUID::gen() {
     return UUID{randomBytes};
 }
 
-void UUID::appendToBuilder(BSONObjBuilder* builder, StringData name) const {
+void UUID::appendToBuilder(BSONObjBuilder* builder, std::string_view name) const {
     builder->appendBinData(name, sizeof(UUIDStorage), BinDataType::newUUID, &_uuid);
 }
 

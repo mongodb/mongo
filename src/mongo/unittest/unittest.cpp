@@ -48,7 +48,6 @@
 // IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
 // IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"

@@ -37,7 +37,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -84,6 +83,7 @@
 #include <algorithm>
 #include <iterator>
 #include <list>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -93,9 +93,10 @@
 namespace mongo {
 namespace shardkeyutil {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kCheckShardingIndexCmdName = "checkShardingIndex"_sd;
-constexpr StringData kKeyPatternField = "keyPattern"_sd;
+constexpr std::string_view kCheckShardingIndexCmdName = "checkShardingIndex"sv;
+constexpr std::string_view kKeyPatternField = "keyPattern"sv;
 
 /**
  * Create an index specification used for create index command. It is the responsibility of the
@@ -334,8 +335,8 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     return true;
 }
 
-void validateTimeseriesShardKey(StringData timeFieldName,
-                                boost::optional<StringData> metaFieldName,
+void validateTimeseriesShardKey(std::string_view timeFieldName,
+                                boost::optional<std::string_view> metaFieldName,
                                 const BSONObj& shardKeyPattern) {
     BSONObjIterator shardKeyElems{shardKeyPattern};
     while (auto elem = shardKeyElems.next()) {

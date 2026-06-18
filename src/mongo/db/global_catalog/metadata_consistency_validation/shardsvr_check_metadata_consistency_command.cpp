@@ -29,7 +29,6 @@
 
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -90,6 +89,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -104,6 +104,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(hangShardCheckMetadataBeforeDDLLock);
 MONGO_FAIL_POINT_DEFINE(tripwireShardCheckMetadataAfterDDLLock);
@@ -112,7 +113,7 @@ MONGO_FAIL_POINT_DEFINE(hangShardCheckMetadataBeforeEstablishCursors);
 MONGO_FAIL_POINT_DEFINE(throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors);
 MONGO_FAIL_POINT_DEFINE(tripwireShardCheckMetadataAfterEstablishCursors);
 
-constexpr StringData kDDLLockReason = "checkMetadataConsistency"_sd;
+constexpr std::string_view kDDLLockReason = "checkMetadataConsistency"sv;
 
 /*
  * Retrieve from config server the list of databases for which this shard is primary for.

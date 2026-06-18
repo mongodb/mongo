@@ -39,6 +39,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 MONGO_MOD_PUBLIC;
 
@@ -53,7 +54,7 @@ class BSONObjBuilder;
  */
 class LogicalTime {
 public:
-    static constexpr StringData kOperationTimeFieldName = "operationTime"_sd;
+    static constexpr std::string_view kOperationTimeFieldName = "operationTime"_sd;
 
 
     /** An uninitialized value of LogicalTime. Default constructed. */
@@ -104,7 +105,7 @@ public:
      * These methods support IDL parsing of logical times.
      */
     static LogicalTime parseFromBSON(const BSONElement& elem);
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
 
     bool operator==(const LogicalTime& o) const {
         return asTimestamp() == o.asTimestamp();

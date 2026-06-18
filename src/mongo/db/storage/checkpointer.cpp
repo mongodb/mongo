@@ -31,7 +31,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/storage/checkpointer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"

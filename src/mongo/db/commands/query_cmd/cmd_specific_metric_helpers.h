@@ -30,9 +30,10 @@
 #pragma once
 
 #include "mongo/base/counter.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -41,7 +42,7 @@ namespace mongo {
  * 'statPath' may be dotted to nest the metric under a sub-section within the command's section of
  * serverStatus.
  */
-Counter64* getSingletonMetricPtrWithinCmd(StringData commandName,
-                                          StringData statPath,
+Counter64* getSingletonMetricPtrWithinCmd(std::string_view commandName,
+                                          std::string_view statPath,
                                           boost::optional<ClusterRole> role = boost::none);
 }  // namespace mongo

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/scripting/engine.h"
 #include "mongo/unittest/unittest.h"
@@ -36,6 +35,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <jscustomallocator.h>
 
@@ -149,7 +149,7 @@ TEST_F(JSCustomAllocatorTest, SingleAlloc) {
             const view = new Uint8Array(buf);
             for (let i = 0; i < 128; i++) view[i] = i;
         )";
-    StringData code(codeStr);
+    std::string_view code(codeStr);
 
     ASSERT_DOES_NOT_THROW(scope->exec(code,
                                       "root_module",
@@ -193,7 +193,7 @@ TEST_F(JSCustomAllocatorTest, ResizeMany) {
                 }
             }
         )";
-    StringData code(codeStr);
+    std::string_view code(codeStr);
 
     ASSERT_DOES_NOT_THROW(scope->exec(code,
                                       "root_module",

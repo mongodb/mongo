@@ -36,6 +36,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -44,7 +45,7 @@
 
 namespace mongo {
 
-Status addAliasToTypeSet(StringData typeAlias,
+Status addAliasToTypeSet(std::string_view typeAlias,
                          const findBSONTypeAliasFun& aliasMapFind,
                          MatcherTypeSet* typeSet) {
     tassert(11052422, "typeSet must not be null", typeSet);
@@ -59,7 +60,7 @@ Status addAliasToTypeSet(StringData typeAlias,
         // The string "missing" can be returned from the $type agg expression, but is not valid for
         // use in the $type match expression predicate. Return a special error message for this
         // case.
-        if (typeAlias == StringData{typeName(BSONType::eoo)}) {
+        if (typeAlias == std::string_view{typeName(BSONType::eoo)}) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "'missing' is not a legal type name. To query for "
                                            "non-existence of a field, use {$exists:false}.");
@@ -81,7 +82,7 @@ const StringMap<BSONType> MatcherTypeSet::kJsonSchemaTypeAliasMap = {
     {std::string(JSONSchemaParser::kSchemaTypeString), BSONType::string},
 };
 
-boost::optional<BSONType> MatcherTypeSet::findJsonSchemaTypeAlias(StringData key) {
+boost::optional<BSONType> MatcherTypeSet::findJsonSchemaTypeAlias(std::string_view key) {
     const auto& aliasMap = kJsonSchemaTypeAliasMap;
     auto it = aliasMap.find(key);
     if (it == aliasMap.end())
@@ -90,7 +91,7 @@ boost::optional<BSONType> MatcherTypeSet::findJsonSchemaTypeAlias(StringData key
 }
 
 StatusWith<MatcherTypeSet> MatcherTypeSet::fromStringAliases(
-    std::set<StringData> typeAliases, const findBSONTypeAliasFun& aliasMapFind) {
+    std::set<std::string_view> typeAliases, const findBSONTypeAliasFun& aliasMapFind) {
     MatcherTypeSet typeSet;
     for (auto&& alias : typeAliases) {
         auto status = addAliasToTypeSet(alias, aliasMapFind, &typeSet);

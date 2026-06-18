@@ -37,6 +37,8 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_dotted_path_support.h"
 
+#include <string_view>
+
 #include <s2cellid.h>
 #include <s2regioncoverer.h>
 
@@ -100,7 +102,7 @@ Status S2GetKeysForElement(const BSONElement& element,
 }
 
 template <typename ExtraInfoT>
-[[noreturn]] void uassertGeoKeyExtractionFailure(StringData failingPath,
+[[noreturn]] void uassertGeoKeyExtractionFailure(std::string_view failingPath,
                                                  const BSONObj& document,
                                                  const BSONElement& elem,
                                                  const Status& underlyingStatus) {
@@ -151,7 +153,7 @@ void appendToS2Keys(const std::vector<key_string::HeapBuilder>& existingKeys,
  * Returns true if an indexed element of the document uses multiple cells for its covering, and
  * returns false otherwise.
  */
-bool getS2GeoKeys(StringData failingPath,
+bool getS2GeoKeys(std::string_view failingPath,
                   const BSONObj& document,
                   const BSONElementSet& elements,
                   const S2IndexingParams& params,
@@ -211,7 +213,7 @@ bool getS2GeoKeys(StringData failingPath,
  * Returns true if an indexed element of the document uses multiple cells for its covering, and
  * returns false otherwise.
  */
-bool getS2BucketGeoKeys(StringData failingPath,
+bool getS2BucketGeoKeys(std::string_view failingPath,
                         const BSONObj& document,
                         const BSONElementSet& elements,
                         const S2IndexingParams& params,
@@ -339,7 +341,7 @@ void getS2LiteralKeysArray(const BSONObj& obj,
                            maxKeys,
                            [&](key_string::HeapBuilder& ks) {
                                if (collator) {
-                                   ks.appendBSONElement(elem, [&](StringData stringData) {
+                                   ks.appendBSONElement(elem, [&](std::string_view stringData) {
                                        return collator->getComparisonString(stringData);
                                    });
                                } else {
@@ -378,7 +380,7 @@ bool getS2OneLiteralKey(const BSONElement& elt,
                        maxKeys,
                        [&](key_string::HeapBuilder& ks) {
                            if (collator) {
-                               ks.appendBSONElement(elt, [&](StringData stringData) {
+                               ks.appendBSONElement(elt, [&](std::string_view stringData) {
                                    return collator->getComparisonString(stringData);
                                });
                            } else {

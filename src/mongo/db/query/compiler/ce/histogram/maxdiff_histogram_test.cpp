@@ -37,6 +37,7 @@
 
 namespace mongo::ce {
 namespace {
+using namespace std::literals::string_view_literals;
 namespace value = sbe::value;
 
 using TypeTags = value::TypeTags;
@@ -227,7 +228,7 @@ TEST_F(HistogramTest, MaxDiffTestString) {
 
     sortValueVector(randData);
     const DataDistribution& dataDistrib = getDataDistribution(randData);
-    const auto [tag, val] = value::makeNewString("91YgOvBB"_sd);
+    const auto [tag, val] = value::makeNewString("91YgOvBB"sv);
     value::ValueGuard vg(tag, val);
 
     const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets, stats::SortArg::kArea);

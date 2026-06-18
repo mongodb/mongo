@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/agg/unwind_processor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -51,7 +51,7 @@ namespace agg {
  */
 class UnwindStage final : public Stage {
 public:
-    UnwindStage(StringData stageName,
+    UnwindStage(std::string_view stageName,
                 const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                 std::unique_ptr<UnwindProcessor> unwindProcessor);
 

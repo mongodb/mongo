@@ -31,6 +31,7 @@
 #include <filesystem>
 #include <fstream>
 #include <ostream>
+#include <string_view>
 #include <utility>
 
 #include <boost/algorithm/string/join.hpp>
@@ -1498,17 +1499,17 @@ class SetParameterOptionTest : public unittest::Test {
 public:
     class TestServerParameter : public ServerParameter {
     public:
-        TestServerParameter(StringData name, ServerParameterType spt, int x)
+        TestServerParameter(std::string_view name, ServerParameterType spt, int x)
             : ServerParameter(name, spt), val{x} {}
 
         void append(OperationContext*,
                     BSONObjBuilder* bob,
-                    StringData name,
+                    std::string_view name,
                     const boost::optional<TenantId>&) final {
             bob->append(name, val);
         }
 
-        Status setFromString(StringData str, const boost::optional<TenantId>&) final {
+        Status setFromString(std::string_view str, const boost::optional<TenantId>&) final {
             int value;
             Status status = NumberParser{}(str, &value);
             if (!status.isOK())

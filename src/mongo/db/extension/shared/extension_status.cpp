@@ -32,6 +32,8 @@
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <string_view>
+
 
 namespace mongo::extension {
 

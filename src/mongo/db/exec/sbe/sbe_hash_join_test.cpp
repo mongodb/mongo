@@ -55,6 +55,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 // Wraps a child stage and injects a saveState/restoreState on the root plan on the Nth call to
 // getNext(). This simulates a storage-layer yield that fires at a precise point deep inside the
@@ -63,7 +64,7 @@ namespace mongo::sbe {
 class YieldInjectingStage final : public PlanStage {
 public:
     YieldInjectingStage(std::unique_ptr<PlanStage> child, int yieldOnCallN, PlanNodeId nodeId)
-        : PlanStage("yield_inject"_sd, nullptr, nodeId, false), _yieldOnCallN(yieldOnCallN) {
+        : PlanStage("yield_inject"sv, nullptr, nodeId, false), _yieldOnCallN(yieldOnCallN) {
         _children.emplace_back(std::move(child));
     }
 

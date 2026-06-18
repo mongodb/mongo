@@ -64,6 +64,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -105,11 +106,11 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalBoundedSort);
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceSort final : public DocumentSource {
 public:
-    static constexpr StringData kMin = "min"_sd;
-    static constexpr StringData kMax = "max"_sd;
-    static constexpr StringData kOffset = "offsetSeconds"_sd;
-    static constexpr StringData kInternalLimit = "$_internalLimit"_sd;
-    static constexpr StringData kInternalOutputSortKey = "$_internalOutputSortKeyMetadata"_sd;
+    static constexpr std::string_view kMin = "min"_sd;
+    static constexpr std::string_view kMax = "max"_sd;
+    static constexpr std::string_view kOffset = "offsetSeconds"_sd;
+    static constexpr std::string_view kInternalLimit = "$_internalLimit"_sd;
+    static constexpr std::string_view kInternalOutputSortKey = "$_internalOutputSortKeyMetadata"_sd;
 
     struct SortStageOptions {
         uint64_t limit = 0;
@@ -138,7 +139,7 @@ public:
 
     using TimeSorterInterface = BoundedSorterInterface<SortableDate, Document>;
 
-    static constexpr StringData kStageName = "$sort"_sd;
+    static constexpr std::string_view kStageName = "$sort"_sd;
 
     /**
      * Parses a $sort stage from the user-supplied BSON.
@@ -167,7 +168,7 @@ public:
     // outputSortKeyMetadata.
     static boost::intrusive_ptr<DocumentSourceSort> createBoundedSort(
         SortPattern pat,
-        StringData boundBase,
+        std::string_view boundBase,
         long long boundOffset,
         boost::optional<long long> limit,
         bool outputSortKeyMetadata,
@@ -186,7 +187,7 @@ public:
                        const SortPattern&,
                        SortStageOptions);
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

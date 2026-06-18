@@ -35,6 +35,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 static constexpr size_t kDefaultMaxRetries = 10;
@@ -45,7 +47,7 @@ namespace detail {
  * Shared implementation for retryOn() overloads.
  */
 template <ErrorCodes::Error E, typename Fn, typename OnError>
-auto retryOnImpl(StringData opName, Fn&& fn, OnError&& onError, size_t maxNumRetries) {
+auto retryOnImpl(std::string_view opName, Fn&& fn, OnError&& onError, size_t maxNumRetries) {
     size_t attempt = 0;
 
     while (true) {
@@ -82,7 +84,7 @@ auto retryOnImpl(StringData opName, Fn&& fn, OnError&& onError, size_t maxNumRet
  * of the callable or propagates the exception once retries are exhausted.
  */
 template <ErrorCodes::Error E, typename Fn>
-auto retryOn(StringData opName, Fn&& fn, size_t maxNumRetries = kDefaultMaxRetries) {
+auto retryOn(std::string_view opName, Fn&& fn, size_t maxNumRetries = kDefaultMaxRetries) {
     return detail::retryOnImpl<E>(
         opName, std::forward<Fn>(fn), [](const ExceptionFor<E>&) {}, maxNumRetries);
 }
@@ -92,7 +94,7 @@ auto retryOn(StringData opName, Fn&& fn, size_t maxNumRetries = kDefaultMaxRetri
  * to adjust state based on the exception before retrying.
  */
 template <ErrorCodes::Error E, typename Fn, typename OnError>
-auto retryOn(StringData opName, Fn&& fn, size_t maxNumRetries, OnError&& onError) {
+auto retryOn(std::string_view opName, Fn&& fn, size_t maxNumRetries, OnError&& onError) {
     return detail::retryOnImpl<E>(
         opName, std::forward<Fn>(fn), std::forward<OnError>(onError), maxNumRetries);
 }
@@ -103,7 +105,7 @@ auto retryOn(StringData opName, Fn&& fn, size_t maxNumRetries, OnError&& onError
  */
 template <ErrorCodes::Error E, typename State, typename Fn, typename OnError>
 auto retryOnWithState(
-    StringData opName, State initialState, size_t maxNumRetries, Fn&& fn, OnError&& onError) {
+    std::string_view opName, State initialState, size_t maxNumRetries, Fn&& fn, OnError&& onError) {
     State state = std::move(initialState);
 
     auto body = [&]() {
@@ -142,7 +144,7 @@ constexpr bool isErrorHandler = IsErrorHandler<T>::value;
  * Base case: no handlers left means that the exception was not handled and should be thrown.
  */
 template <typename State>
-bool tryHandleWithAny(State& state, size_t attempt, size_t maxNumRetries, StringData opName) {
+bool tryHandleWithAny(State& state, size_t attempt, size_t maxNumRetries, std::string_view opName) {
     return false;
 }
 
@@ -155,7 +157,7 @@ template <ErrorCodes::Error E, typename State, typename OnError, typename... Res
 bool tryHandleWithAny(State& state,
                       size_t attempt,
                       size_t maxNumRetries,
-                      StringData opName,
+                      std::string_view opName,
                       ErrorHandler<E, OnError> errorHandler,
                       RestHandlers... rest) {
     try {
@@ -187,8 +189,11 @@ bool tryHandleWithAny(State& state,
  * Main retry loop that handles multiple error codes.
  */
 template <typename State, typename Fn, typename... ErrorHandlers>
-auto retryOnWithStateMultiLoop(
-    StringData opName, State& state, Fn&& fn, size_t maxNumRetries, ErrorHandlers... handlers) {
+auto retryOnWithStateMultiLoop(std::string_view opName,
+                               State& state,
+                               Fn&& fn,
+                               size_t maxNumRetries,
+                               ErrorHandlers... handlers) {
     size_t attempt = 0;
     while (true) {
         try {
@@ -229,7 +234,7 @@ template <typename State,
           typename Fn,
           typename... ErrorHandlers,
           typename = std::enable_if_t<(detail::isErrorHandler<ErrorHandlers> || ...)>>
-auto retryOnWithState(StringData opName,
+auto retryOnWithState(std::string_view opName,
                       State initialState,
                       size_t maxNumRetries,
                       Fn&& fn,

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -46,6 +45,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -93,7 +93,7 @@ public:
      * - Returns 'kWriteAsFromMigrate' meaning that the 'doc' should be written to orphan chunk.
      */
     Action computeActionAndLogSpecialCases(const Document& doc,
-                                           StringData opKind,
+                                           std::string_view opKind,
                                            const NamespaceString& collNs) {
         const auto action = computeAction(doc);
         if (action == Action::kSkip) {
@@ -118,7 +118,10 @@ public:
      */
     template <typename F>
     std::pair<boost::optional<PlanStage::StageState>, bool> checkIfNotWritable(
-        const Document& doc, StringData opKind, const NamespaceString& collNs, F&& yieldHandler) {
+        const Document& doc,
+        std::string_view opKind,
+        const NamespaceString& collNs,
+        F&& yieldHandler) {
         try {
             auto action = computeActionAndLogSpecialCases(doc, opKind, collNs);
             // If the 'doc' should be skipped in a context of single update / delete, the caller
@@ -151,10 +154,10 @@ private:
     bool _documentBelongsToMe(const BSONObj& doc);
 
     static void logSkippingDocument(const Document& doc,
-                                    StringData opKind,
+                                    std::string_view opKind,
                                     const NamespaceString& collNs);
     static void logFromMigrate(const Document& doc,
-                               StringData opKind,
+                               std::string_view opKind,
                                const NamespaceString& collNs);
 
     OperationContext* _opCtx;

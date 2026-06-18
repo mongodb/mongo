@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -65,6 +64,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -184,7 +184,7 @@ TEST_F(PlanSizeTest, SimpleIndexScanStage) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto stage = makeS<SimpleIndexScanStage>(collUuid,
                                              DatabaseName(),
-                                             StringData(),
+                                             std::string_view(),
                                              true,
                                              generateSlotId(),
                                              generateSlotId(),
@@ -208,7 +208,7 @@ TEST_F(PlanSizeTest, GenericIndexScanStage) {
                                        Ordering::allAscending()};
     auto stage = makeS<GenericIndexScanStage>(collUuid,
                                               DatabaseName(),
-                                              StringData(),
+                                              std::string_view(),
                                               std::move(params),
                                               generateSlotId(),
                                               generateSlotId(),

@@ -31,7 +31,6 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -108,6 +107,7 @@
 #include <cstddef>
 #include <iterator>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>
@@ -117,6 +117,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 using repl::MutableOplogEntry;
 using ChangeStreamPreImageRecordingMode = repl::ReplOperation::ChangeStreamPreImageRecordingMode;
 
@@ -125,8 +126,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAndFailUnpreparedCommitAfterReservingOplogSlot);
 
-constexpr auto kNumRecordsFieldName = "numRecords"_sd;
-constexpr auto kMsgFieldName = "msg"_sd;
+constexpr auto kNumRecordsFieldName = "numRecords"sv;
+constexpr auto kMsgFieldName = "msg"sv;
 constexpr long long kInvalidNumRecords = -1LL;
 
 Date_t getWallClockTimeForOpLog(OperationContext* opCtx) {
@@ -1345,7 +1346,7 @@ repl::ContainerKey toContainerKey(std::variant<int64_t, std::span<const char>> k
 }
 
 OpTimeBundle logContainerInsert(OperationContext* opCtx,
-                                StringData container,
+                                std::string_view container,
                                 std::variant<int64_t, std::span<const char>> key,
                                 std::span<const char> value,
                                 OperationLogger& logger) {
@@ -1368,7 +1369,7 @@ OpTimeBundle logContainerInsert(OperationContext* opCtx,
 }
 
 void _onContainerInsert(OperationContext* opCtx,
-                        StringData ident,
+                        std::string_view ident,
                         std::variant<int64_t, std::span<const char>> key,
                         std::span<const char> value,
                         OperationLogger& logger) {
@@ -1420,7 +1421,7 @@ void _onContainerInsert(OperationContext* opCtx,
 }
 
 OpTimeBundle logContainerDelete(OperationContext* opCtx,
-                                StringData container,
+                                std::string_view container,
                                 std::variant<int64_t, std::span<const char>> key,
                                 OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
@@ -1441,7 +1442,7 @@ OpTimeBundle logContainerDelete(OperationContext* opCtx,
 }
 
 void _onContainerDelete(OperationContext* opCtx,
-                        StringData ident,
+                        std::string_view ident,
                         std::variant<int64_t, std::span<const char>> key,
                         OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
@@ -1491,7 +1492,7 @@ void _onContainerDelete(OperationContext* opCtx,
 }
 
 OpTimeBundle logContainerUpdate(OperationContext* opCtx,
-                                StringData container,
+                                std::string_view container,
                                 std::variant<int64_t, std::span<const char>> key,
                                 std::span<const char> value,
                                 OperationLogger& logger) {
@@ -1516,7 +1517,7 @@ OpTimeBundle logContainerUpdate(OperationContext* opCtx,
 }
 
 void _onContainerUpdate(OperationContext* opCtx,
-                        StringData ident,
+                        std::string_view ident,
                         std::variant<int64_t, std::span<const char>> key,
                         std::span<const char> value,
                         OperationLogger& logger) {
@@ -1572,39 +1573,41 @@ void _onContainerUpdate(OperationContext* opCtx,
 }  // namespace
 
 void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
-                                       StringData ident,
+                                       std::string_view ident,
                                        int64_t key,
                                        std::span<const char> value) {
     _onContainerInsert(opCtx, ident, key, value, *_operationLogger);
 }
 
 void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
-                                       StringData ident,
+                                       std::string_view ident,
                                        std::span<const char> key,
                                        std::span<const char> value) {
     _onContainerInsert(opCtx, ident, key, value, *_operationLogger);
 }
 
 void OpObserverImpl::onContainerUpdate(OperationContext* opCtx,
-                                       StringData ident,
+                                       std::string_view ident,
                                        int64_t key,
                                        std::span<const char> value) {
     _onContainerUpdate(opCtx, ident, key, value, *_operationLogger);
 }
 
 void OpObserverImpl::onContainerUpdate(OperationContext* opCtx,
-                                       StringData ident,
+                                       std::string_view ident,
                                        std::span<const char> key,
                                        std::span<const char> value) {
     _onContainerUpdate(opCtx, ident, key, value, *_operationLogger);
 }
 
-void OpObserverImpl::onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) {
+void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
+                                       std::string_view ident,
+                                       int64_t key) {
     _onContainerDelete(opCtx, ident, key, *_operationLogger);
 }
 
 void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
-                                       StringData ident,
+                                       std::string_view ident,
                                        std::span<const char> key) {
     _onContainerDelete(opCtx, ident, key, *_operationLogger);
 }
@@ -1700,7 +1703,7 @@ void OpObserverImpl::onCreateCollection(
         auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
             createCollCatalogIdentifier->ident, collectionName.dbName());
         auto idIndexIdentUniqueTag = createCollCatalogIdentifier->idIndexIdent
-            ? boost::optional<StringData>(storageEngine->getIndexIdentUniqueTag(
+            ? boost::optional<std::string_view>(storageEngine->getIndexIdentUniqueTag(
                   *createCollCatalogIdentifier->idIndexIdent, collectionName.dbName()))
             : boost::none;
         const auto o2 = repl::MutableOplogEntry::makeCreateCollObject2(
@@ -2700,7 +2703,7 @@ void OpObserverImpl::onTransactionPrepare(
         // We need to have at least one reserved slot.
         invariant(reservedSlots.size() > 0);
         BSONObjBuilder applyOpsBuilder;
-        BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
+        BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"sv));
         opsArray.done();
         applyOpsBuilder.append("prepare", true);
 

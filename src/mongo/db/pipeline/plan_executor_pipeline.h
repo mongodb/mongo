@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
@@ -56,6 +55,7 @@
 
 #include <memory>
 #include <queue>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -202,7 +202,7 @@ public:
             : _pipeline->writeExplainOps(opts);
     }
 
-    boost::optional<StringData> getExecutorType() const override {
+    boost::optional<std::string_view> getExecutorType() const override {
         tassert(6253504, "Can't get type string without pipeline", _pipeline);
         return _pipeline->getTypeString();
     }

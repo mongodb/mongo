@@ -42,6 +42,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -71,7 +72,7 @@ public:
      */
     struct ElemMatchContext {
         ArrayMatchingMatchExpression* innermostParentElemMatch{nullptr};
-        StringData fullPathToParentElemMatch{""_sd};
+        std::string_view fullPathToParentElemMatch{""_sd};
     };
 
     /**
@@ -218,7 +219,7 @@ private:
                             const IndexEntry& index,
                             std::size_t keyPatternIndex,
                             MatchExpression* node,
-                            StringData fullPathToNode,
+                            std::string_view fullPathToNode,
                             const QueryContext& queryContext,
                             bool nodeIsNotChild);
 

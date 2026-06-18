@@ -44,6 +44,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -68,28 +69,28 @@ public:
                   OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onContainerInsert(OperationContext* opCtx,
-                           StringData ident,
+                           std::string_view ident,
                            int64_t key,
                            std::span<const char> value) final {
         recordContainerWriteForFastCountTimestamp(opCtx, ident, value);
     }
 
     void onContainerInsert(OperationContext* opCtx,
-                           StringData ident,
+                           std::string_view ident,
                            std::span<const char> key,
                            std::span<const char> value) final {
         recordContainerWriteForFastCountTimestamp(opCtx, ident, value);
     }
 
     void onContainerUpdate(OperationContext* opCtx,
-                           StringData ident,
+                           std::string_view ident,
                            int64_t key,
                            std::span<const char> value) final {
         recordContainerWriteForFastCountTimestamp(opCtx, ident, value);
     }
 
     void onContainerUpdate(OperationContext* opCtx,
-                           StringData ident,
+                           std::string_view ident,
                            std::span<const char> key,
                            std::span<const char> value) final {
         recordContainerWriteForFastCountTimestamp(opCtx, ident, value);
@@ -144,7 +145,7 @@ void registerReplicatedFastCountOpObserver(ServiceContext* svcCtx) {
 }
 
 void recordContainerWriteForFastCountTimestamp(OperationContext* opCtx,
-                                               StringData ident,
+                                               std::string_view ident,
                                                std::span<const char> valueBytes) {
     if (ident != ::mongo::ident::kFastCountMetadataStoreTimestamps) {
         return;

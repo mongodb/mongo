@@ -42,6 +42,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -80,7 +81,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr StringData kStageType = "AND_HASH"_sd;
+    static constexpr std::string_view kStageType = "AND_HASH"_sd;
 
 private:
     static const size_t kLookAheadWorks;

@@ -31,6 +31,8 @@
 
 #include "mongo/config.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace otel {
 namespace traces {

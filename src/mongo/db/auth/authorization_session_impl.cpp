@@ -74,6 +74,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -90,8 +91,9 @@ namespace mongo {
 
 using std::vector;
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData SYSTEM_BUCKETS_PREFIX = "system.buckets."_sd;
+constexpr std::string_view SYSTEM_BUCKETS_PREFIX = "system.buckets."sv;
 
 bool checkContracts() {
     // Only check contracts in testing modes, invalid contracts should not break customers.
@@ -364,7 +366,7 @@ void AuthorizationSessionImpl::logoutSecurityTokenUser() {
     _loginTime = boost::none;
 }
 
-void AuthorizationSessionImpl::logoutAllDatabases(StringData reason) {
+void AuthorizationSessionImpl::logoutAllDatabases(std::string_view reason) {
     std::lock_guard<Client> lk(*_client);
 
     uassert(6161504,
@@ -391,7 +393,7 @@ void AuthorizationSessionImpl::logoutAllDatabases(StringData reason) {
 }
 
 
-void AuthorizationSessionImpl::logoutDatabase(const DatabaseName& dbname, StringData reason) {
+void AuthorizationSessionImpl::logoutDatabase(const DatabaseName& dbname, std::string_view reason) {
     bool isLoggedInOnDB =
         (_authenticatedUser && _authenticatedUser.value()->getName().getDatabaseName() == dbname);
     bool isExpiredOnDB = (_expiredUserName && _expiredUserName.value().getDatabaseName() == dbname);

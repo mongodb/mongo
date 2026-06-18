@@ -32,7 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -52,6 +51,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -130,7 +130,7 @@ public:
 
     StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   boost::optional<StringData> indexName,
+                                                   boost::optional<std::string_view> indexName,
                                                    ScanDirection scanDirection,
                                                    const BSONObj& startKey,
                                                    BoundInclusion boundInclusion,
@@ -138,7 +138,7 @@ public:
 
     StatusWith<std::vector<BSONObj>> deleteDocuments(OperationContext* opCtx,
                                                      const NamespaceString& nss,
-                                                     boost::optional<StringData> indexName,
+                                                     boost::optional<std::string_view> indexName,
                                                      ScanDirection scanDirection,
                                                      const BSONObj& startKey,
                                                      BoundInclusion boundInclusion,

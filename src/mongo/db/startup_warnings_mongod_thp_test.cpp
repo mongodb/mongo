@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"

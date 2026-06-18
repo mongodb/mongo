@@ -31,9 +31,12 @@
 
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 
+#include <string_view>
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
-IndexSpec makeIndexSpec(const BSONObj& index, StringData indexName) {
+IndexSpec makeIndexSpec(const BSONObj& index, std::string_view indexName) {
     IndexSpec spec;
     spec.name(indexName);
     spec.addKeys(index);
@@ -79,7 +82,7 @@ void QueryShardServerTestFixture::setUp() {
     ShardServerTestFixture::setUp();
     OperationContext* opCtx = operationContext();
 
-    _testNss = NamespaceString::createNamespaceString_forTest("test_db.distinct_test"_sd);
+    _testNss = NamespaceString::createNamespaceString_forTest("test_db.distinct_test"sv);
     _expCtx = std::make_unique<ExpressionContextForTest>(opCtx, _testNss);
     _client = std::make_unique<DBDirectClient>(opCtx);
 }
@@ -110,7 +113,7 @@ void QueryShardServerTestFixture::insertDocs(const std::vector<BSONObj>& docs) {
 }
 
 const IndexCatalogEntry& QueryShardServerTestFixture::getIndexEntry(const CollectionPtr& coll,
-                                                                    StringData indexName) {
+                                                                    std::string_view indexName) {
     auto* opCtx = operationContext();
     const auto* entry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
     ASSERT_NE(entry, nullptr);

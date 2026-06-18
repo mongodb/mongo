@@ -39,6 +39,7 @@
 
 #include <memory>
 #include <queue>
+#include <string_view>
 
 namespace mongo {
 
@@ -85,7 +86,7 @@ public:
      */
     void pushBack(const WorkingSetID& id);
 
-    static constexpr StringData kStageType = "QUEUED_DATA"_sd;
+    static constexpr std::string_view kStageType = "QUEUED_DATA"_sd;
 
 private:
     // The data we return.

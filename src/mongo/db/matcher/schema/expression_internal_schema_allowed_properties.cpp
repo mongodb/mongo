@@ -38,16 +38,17 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string_view>
 #include <type_traits>
 
 #include <absl/container/node_hash_map.h>
 
 namespace mongo {
-constexpr StringData InternalSchemaAllowedPropertiesMatchExpression::kName;
+constexpr std::string_view InternalSchemaAllowedPropertiesMatchExpression::kName;
 
 InternalSchemaAllowedPropertiesMatchExpression::InternalSchemaAllowedPropertiesMatchExpression(
     StringDataSet properties,
-    StringData namePlaceholder,
+    std::string_view namePlaceholder,
     std::vector<PatternSchema> patternProperties,
     std::unique_ptr<ExpressionWithPlaceholder> otherwise,
     clonable_ptr<ErrorAnnotation> annotation)
@@ -100,7 +101,7 @@ void InternalSchemaAllowedPropertiesMatchExpression::serialize(
     BSONObjBuilder expressionBuilder(
         builder->subobjStart(InternalSchemaAllowedPropertiesMatchExpression::kName));
 
-    std::vector<StringData> sortedProperties(_properties.begin(), _properties.end());
+    std::vector<std::string_view> sortedProperties(_properties.begin(), _properties.end());
     std::sort(sortedProperties.begin(), sortedProperties.end());
     opts.appendLiteral(&expressionBuilder, "properties", sortedProperties);
     // This will be serialized to "i", which is the parser chosen namePlaceholder. Using this

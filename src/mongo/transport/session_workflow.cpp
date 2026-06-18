@@ -33,7 +33,6 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -94,6 +93,7 @@
 #include <memory>
 #include <ratio>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/move/utility_core.hpp>
@@ -105,7 +105,10 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 
 namespace mongo::transport {
+using namespace std::literals::string_view_literals;
 namespace {
+
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 MONGO_FAIL_POINT_DEFINE(beforeCompressingExhaustResponse);
@@ -175,25 +178,25 @@ constexpr inline size_t enumExtent<TimeSplitId> = EXPAND_TIME_SPLIT_IDS(X_COUNT)
 
 struct TimeSplitDef {
     TimeSplitId id;
-    StringData name;
+    std::string_view name;
 };
 
 struct IntervalDef {
     IntervalId id;
-    StringData name;
+    std::string_view name;
     TimeSplitId start;
     TimeSplitId end;
 };
 
 constexpr inline auto timeSplitDefs = std::array{
-#define X(id) TimeSplitDef{TimeSplitId::id, #id ""_sd},
+#define X(id) TimeSplitDef{TimeSplitId::id, #id ""sv},
     EXPAND_TIME_SPLIT_IDS(X)
 #undef X
 };
 
 constexpr inline auto intervalDefs = std::array{
 #define X(id, start, end) \
-    IntervalDef{IntervalId::id, #id "Millis"_sd, TimeSplitId::start, TimeSplitId::end},
+    IntervalDef{IntervalId::id, #id "Millis"sv, TimeSplitId::start, TimeSplitId::end},
     EXPAND_INTERVAL_IDS(X)
 #undef X
 };
@@ -213,7 +216,7 @@ struct SplitTimerPolicy {
         return static_cast<size_t>(e);
     }
 
-    static constexpr StringData getName(IntervalIdType iId) {
+    static constexpr std::string_view getName(IntervalIdType iId) {
         return intervalDefs[toIdx(iId)].name;
     }
 
@@ -225,7 +228,7 @@ struct SplitTimerPolicy {
         return intervalDefs[toIdx(iId)].end;
     }
 
-    static constexpr StringData getName(TimeSplitIdType tsId) {
+    static constexpr std::string_view getName(TimeSplitIdType tsId) {
         return timeSplitDefs[toIdx(tsId)].name;
     }
 

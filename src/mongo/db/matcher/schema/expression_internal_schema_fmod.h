@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -54,7 +54,7 @@ namespace mongo {
  */
 class InternalSchemaFmodMatchExpression final : public LeafMatchExpression {
 public:
-    InternalSchemaFmodMatchExpression(boost::optional<StringData> path,
+    InternalSchemaFmodMatchExpression(boost::optional<std::string_view> path,
                                       Decimal128 divisor,
                                       Decimal128 remainder,
                                       clonable_ptr<ErrorAnnotation> annotation = nullptr);

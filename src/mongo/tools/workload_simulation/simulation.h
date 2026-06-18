@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/tools/workload_simulation/event_queue.h"
 #include "mongo/util/modules.h"
@@ -37,6 +36,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 
 #define CLASS_NAME(SUITE, WORKLOAD) SUITE##_##WORKLOAD
 
@@ -75,7 +75,7 @@ namespace mongo::workload_simulation {
 class Simulation {
 public:
     Simulation() = delete;
-    Simulation(StringData suiteName, StringData workloadName);
+    Simulation(std::string_view suiteName, std::string_view workloadName);
     virtual ~Simulation();
 
     /**

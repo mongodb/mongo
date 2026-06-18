@@ -59,6 +59,7 @@ MONGO_FAIL_POINT_DEFINE(convertToCappedFailBeforeCappingTheCollection);
 MONGO_FAIL_POINT_DEFINE(convertToCappedFailAfterCappingTheCollection);
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 void logConvertToCappedOnChangelog(OperationContext* opCtx,
                                    const NamespaceString& nss,
@@ -111,7 +112,7 @@ bool isCollectionCappedWithRequestedSize(OperationContext* opCtx,
     listCollections.setDbName(nss.dbName());
 
     BSONObjBuilder filterBuilder;
-    expectedUUID.appendToBuilder(&filterBuilder, "info.uuid"_sd);
+    expectedUUID.appendToBuilder(&filterBuilder, "info.uuid"sv);
     filterBuilder.append("name", nss.coll());
     filterBuilder.append("options.capped", true);
     filterBuilder.append("options.size", size);

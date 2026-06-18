@@ -28,13 +28,13 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/immutable/unordered_set.h"
 #include "mongo/util/string_map.h"
 
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -48,6 +48,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class UserDefinedKey {
 public:
@@ -112,11 +113,11 @@ TEST(ImmutableUnorderedMap, HeterogeneousLookup) {
     immutable::unordered_map<std::string, int, StringMapHasher, StringMapEq> v0;
     auto v1 = v0.set("str", 1);
 
-    // Lookup using StringData without the need to convert to string.
-    ASSERT(v1.find("str"_sd));
+    // Lookup using std::string_view without the need to convert to string.
+    ASSERT(v1.find("str"sv));
 
     // Lookup using pre-hash
-    StringMapHashedKey hashedKey = StringMapHasher().hashed_key("str"_sd);
+    StringMapHashedKey hashedKey = StringMapHasher().hashed_key("str"sv);
     ASSERT(v1.find(hashedKey));
 }
 
@@ -201,11 +202,11 @@ TEST(ImmutableUnorderedSet, HeterogeneousLookup) {
     immutable::unordered_set<std::string, StringMapHasher, StringMapEq> v0;
     auto v1 = v0.insert("str");
 
-    // Lookup using StringData without the need to convert to string.
-    ASSERT(v1.find("str"_sd));
+    // Lookup using std::string_view without the need to convert to string.
+    ASSERT(v1.find("str"sv));
 
     // Lookup using pre-hash
-    StringMapHashedKey hashedKey = StringMapHasher().hashed_key("str"_sd);
+    StringMapHashedKey hashedKey = StringMapHasher().hashed_key("str"sv);
     ASSERT(v1.find(hashedKey));
 }
 

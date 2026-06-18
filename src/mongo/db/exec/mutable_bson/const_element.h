@@ -33,6 +33,8 @@
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace mutablebson {
 
@@ -63,9 +65,9 @@ public:
     inline ConstElement parent() const;
     inline ConstElement findNthChild(size_t n) const;
     inline ConstElement operator[](size_t n) const;
-    inline ConstElement findFirstChildNamed(StringData name) const;
-    inline ConstElement operator[](StringData n) const;
-    inline ConstElement findElementNamed(StringData name) const;
+    inline ConstElement findFirstChildNamed(std::string_view name) const;
+    inline ConstElement operator[](std::string_view n) const;
+    inline ConstElement findElementNamed(std::string_view name) const;
 
     inline size_t countSiblingsLeft() const;
     inline size_t countSiblingsRight() const;
@@ -75,7 +77,7 @@ public:
     inline BSONElement getValue() const;
 
     inline double getValueDouble() const;
-    inline StringData getValueString() const;
+    inline std::string_view getValueString() const;
     inline BSONObj getValueObject() const;
     inline BSONArray getValueArray() const;
     inline bool isValueUndefined() const;
@@ -83,7 +85,7 @@ public:
     inline bool getValueBool() const;
     inline Date_t getValueDate() const;
     inline bool isValueNull() const;
-    inline StringData getValueSymbol() const;
+    inline std::string_view getValueSymbol() const;
     inline int32_t getValueInt() const;
     inline Timestamp getValueTimestamp() const;
     inline int64_t getValueLong() const;
@@ -111,7 +113,7 @@ public:
     inline const Document& getDocument() const;
     inline BSONType getType() const;
     inline bool isType(BSONType type) const;
-    inline StringData getFieldName() const;
+    inline std::string_view getFieldName() const;
     inline Element::RepIdx getIdx() const;
 
     inline std::string toString() const;
@@ -122,7 +124,7 @@ private:
     friend class Document;
 
     template <typename Builder>
-    inline void writeElement(Builder* builder, const StringData* fieldName = nullptr) const;
+    inline void writeElement(Builder* builder, const std::string_view* fieldName = nullptr) const;
 
     Element _basis;
 };
@@ -171,15 +173,15 @@ inline ConstElement ConstElement::operator[](size_t n) const {
     return _basis[n];
 }
 
-inline ConstElement ConstElement::findFirstChildNamed(StringData name) const {
+inline ConstElement ConstElement::findFirstChildNamed(std::string_view name) const {
     return _basis.findFirstChildNamed(name);
 }
 
-inline ConstElement ConstElement::operator[](StringData name) const {
+inline ConstElement ConstElement::operator[](std::string_view name) const {
     return _basis[name];
 }
 
-inline ConstElement ConstElement::findElementNamed(StringData name) const {
+inline ConstElement ConstElement::findElementNamed(std::string_view name) const {
     return _basis.findElementNamed(name);
 }
 
@@ -207,7 +209,7 @@ inline double ConstElement::getValueDouble() const {
     return _basis.getValueDouble();
 }
 
-inline StringData ConstElement::getValueString() const {
+inline std::string_view ConstElement::getValueString() const {
     return _basis.getValueString();
 }
 
@@ -239,7 +241,7 @@ inline bool ConstElement::isValueNull() const {
     return _basis.isValueNull();
 }
 
-inline StringData ConstElement::getValueSymbol() const {
+inline std::string_view ConstElement::getValueSymbol() const {
     return _basis.getValueSymbol();
 }
 
@@ -313,7 +315,7 @@ inline bool ConstElement::isType(BSONType type) const {
     return _basis.isType(type);
 }
 
-inline StringData ConstElement::getFieldName() const {
+inline std::string_view ConstElement::getFieldName() const {
     return _basis.getFieldName();
 }
 

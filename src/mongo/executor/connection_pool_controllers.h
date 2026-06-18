@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/stdx/unordered_map.h"
@@ -41,6 +40,7 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -65,7 +65,7 @@ class MONGO_MOD_PUBLIC DynamicLimitController final : public ConnectionPool::Con
 public:
     DynamicLimitController(std::function<size_t()> minLoader,
                            std::function<size_t()> maxLoader,
-                           StringData name)
+                           std::string_view name)
         : _minLoader(std::move(minLoader)),
           _maxLoader(std::move(maxLoader)),
           _name(std::move(name)) {}
@@ -98,7 +98,7 @@ public:
         return _maxLoader();
     }
 
-    StringData name() const override {
+    std::string_view name() const override {
         return _name;
     }
 

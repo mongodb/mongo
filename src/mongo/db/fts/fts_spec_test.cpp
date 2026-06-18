@@ -38,6 +38,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -272,7 +273,7 @@ TEST(FTSSpec, Extra2) {
     FTSSpec spec(fixed);
     ASSERT_EQUALS(0U, spec.numExtraBefore());
     ASSERT_EQUALS(1U, spec.numExtraAfter());
-    ASSERT_EQUALS(StringData("x"), spec.extraAfter(0));
+    ASSERT_EQUALS(std::string_view("x"), spec.extraAfter(0));
 
     BSONObj fixed2 = assertGet(FTSSpec::fixSpec(fixed));
     ASSERT_BSONOBJ_EQ(fixed, fixed2);
@@ -294,7 +295,7 @@ TEST(FTSSpec, Extra3) {
 
     FTSSpec spec(fixed);
     ASSERT_EQUALS(1U, spec.numExtraBefore());
-    ASSERT_EQUALS(StringData("x"), spec.extraBefore(0));
+    ASSERT_EQUALS(std::string_view("x"), spec.extraBefore(0));
     ASSERT_EQUALS(0U, spec.numExtraAfter());
 
     BSONObj prefix;

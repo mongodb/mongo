@@ -47,12 +47,13 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(InternalSchemaXorOp, Equivalent) {
     BSONObj baseOperand1 = BSON("a" << 1);
     BSONObj baseOperand2 = BSON("b" << 2);
-    EqualityMatchExpression sub1("a"_sd, baseOperand1["a"]);
-    EqualityMatchExpression sub2("b"_sd, baseOperand2["b"]);
+    EqualityMatchExpression sub1("a"sv, baseOperand1["a"]);
+    EqualityMatchExpression sub2("b"sv, baseOperand2["b"]);
 
     InternalSchemaXorMatchExpression e1;
     e1.add(sub1.clone());

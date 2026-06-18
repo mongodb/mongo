@@ -31,13 +31,13 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/jwk_manager.h"
 #include "mongo/crypto/jwt_types_gen.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC crypto {
@@ -58,13 +58,13 @@ public:
      * Upon completion, header and body payloads
      * and parsed structs are available.
      */
-    JWSValidatedToken(JWKManager* keyMgr, StringData token);
+    JWSValidatedToken(JWKManager* keyMgr, std::string_view token);
 
     /**
      * Extract the Issuer name ('iss') and the audience list ('aud') from the token.
      */
     static StatusWith<IssuerAudiencePair> extractIssuerAndAudienceFromCompactSerialization(
-        StringData token);
+        std::string_view token);
 
     /**
      * Validates token is not expired or issued on a later date,

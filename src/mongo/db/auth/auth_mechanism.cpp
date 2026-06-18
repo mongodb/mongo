@@ -32,10 +32,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace auth {
 
-StringData toString(AuthMechanism mechanism) {
+std::string_view toString(AuthMechanism mechanism) {
     switch (mechanism) {
         case AuthMechanism::kMongoX509:
             return kMechanismMongoX509;
@@ -57,7 +59,7 @@ StringData toString(AuthMechanism mechanism) {
     MONGO_UNREACHABLE;
 }
 
-StatusWith<AuthMechanism> authMechanismFromString(StringData s) {
+StatusWith<AuthMechanism> authMechanismFromString(std::string_view s) {
     if (s == kMechanismMongoX509)
         return AuthMechanism::kMongoX509;
     if (s == kMechanismSaslPlain)
@@ -78,7 +80,7 @@ StatusWith<AuthMechanism> authMechanismFromString(StringData s) {
                   str::stream() << "Unsupported authentication mechanism: " << s};
 }
 
-Status validateAuthMechanism(StringData value) {
+Status validateAuthMechanism(std::string_view value) {
     auto sw = authMechanismFromString(value);
     if (!sw.isOK())
         return {ErrorCodes::BadValue,

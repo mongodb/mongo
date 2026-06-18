@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 namespace bson {
@@ -49,15 +50,15 @@ const BSONElement kNullElt = kNullObj.firstElement();
 
 }  // namespace
 
-BSONElement extractElementAtDottedPath(const BSONObj& obj, StringData path) {
+BSONElement extractElementAtDottedPath(const BSONObj& obj, std::string_view path) {
     size_t dot_offset = path.find('.');
 
     if (dot_offset == std::string::npos) {
         return obj.getField(path);
     }
 
-    StringData left = path.substr(0, dot_offset);
-    StringData right = path.substr(dot_offset + 1);
+    std::string_view left = path.substr(0, dot_offset);
+    std::string_view right = path.substr(dot_offset + 1);
     BSONObj sub = obj.getObjectField(left);
     return sub.isEmpty() ? BSONElement() : extractElementAtDottedPath(sub, right);
 }
@@ -68,7 +69,7 @@ BSONElement extractElementAtOrArrayAlongDottedPath(const BSONObj& obj, const cha
     BSONElement sub;
 
     if (p) {
-        sub = obj.getField(StringData(path, p - path));
+        sub = obj.getField(std::string_view(path, p - path));
         path = p + 1;
     } else {
         sub = obj.getField(path);

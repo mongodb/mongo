@@ -39,6 +39,8 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+using namespace std::literals::string_view_literals;
+
 namespace mongo::evaluate_matcher_geo_test {
 
 class InternalBucketGeoWithinExpression : public mongo::unittest::Test {
@@ -384,7 +386,7 @@ TEST(ExpressionGeoTest, Geo1) {
     std::unique_ptr<GeoExpression> gq(new GeoExpression);
     ASSERT_OK(parsers::matcher::parseGeoExpressionFromBSON(query["loc"].Obj(), *gq));
 
-    GeoMatchExpression ge("a"_sd, gq.release(), query);
+    GeoMatchExpression ge("a"sv, gq.release(), query);
 
     ASSERT(!exec::matcher::matchesBSON(&ge, fromjson("{a: [3,4]}")));
     ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [4,4]}")));

@@ -33,13 +33,15 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
+#include <string_view>
+
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
 class ShardedExecutionSerializationLogicalStage
     : public sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage> {
 public:
-    static constexpr StringData kShardedAssertFlagFieldName = "assertFlag";
+    static constexpr std::string_view kShardedAssertFlagFieldName = "assertFlag";
 
     ShardedExecutionSerializationLogicalStage(std::string_view stageName, const BSONObj& spec)
         : sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage>(stageName, spec) {}

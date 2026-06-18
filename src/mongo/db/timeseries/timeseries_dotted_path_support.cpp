@@ -43,6 +43,7 @@
 #include <limits>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -56,20 +57,20 @@ namespace dotted_path_support {
 
 namespace {
 
-boost::optional<std::pair<StringData, StringData>> _splitPath(StringData path) {
+boost::optional<std::pair<std::string_view, std::string_view>> _splitPath(std::string_view path) {
     size_t idx = path.find('.');
     if (idx == std::string::npos) {
         return boost::none;
     }
 
-    StringData left = path.substr(0, idx);
-    StringData next = path.substr(idx + 1, path.size());
+    std::string_view left = path.substr(0, idx);
+    std::string_view next = path.substr(idx + 1, path.size());
 
     return std::make_pair(left, next);
 }
 
 void _handleElementForExtractAllElementsOnBucketPath(const BSONObj& obj,
-                                                     StringData path,
+                                                     std::string_view path,
                                                      BSONElementSet& elements,
                                                      bool expandArrayOnTrailingField,
                                                      BSONDepthIndex depth,
@@ -77,7 +78,7 @@ void _handleElementForExtractAllElementsOnBucketPath(const BSONObj& obj,
 
 void _handleIntermediateElementForExtractAllElementsOnBucketPath(
     BSONElement elem,
-    StringData path,
+    std::string_view path,
     BSONElementSet& elements,
     bool expandArrayOnTrailingField,
     BSONDepthIndex depth,
@@ -140,7 +141,7 @@ void _handleTerminalElementForExtractAllElementsOnBucketPath(BSONElement elem,
 }
 
 void _handleElementForExtractAllElementsOnBucketPath(const BSONObj& obj,
-                                                     StringData path,
+                                                     std::string_view path,
                                                      BSONElementSet& elements,
                                                      bool expandArrayOnTrailingField,
                                                      BSONDepthIndex depth,
@@ -148,8 +149,8 @@ void _handleElementForExtractAllElementsOnBucketPath(const BSONObj& obj,
     size_t idx = path.find('.');
     if (idx != std::string::npos) {
         invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
-        StringData left = path.substr(0, idx);
-        StringData next = path.substr(idx + 1, path.size());
+        std::string_view left = path.substr(0, idx);
+        std::string_view next = path.substr(idx + 1, path.size());
 
         BSONElement e = obj.getField(left);
 
@@ -164,7 +165,7 @@ void _handleElementForExtractAllElementsOnBucketPath(const BSONObj& obj,
 
 boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
     const BSONObj& obj,
-    StringData path,
+    std::string_view path,
     BSONElementSet& elements,
     bool expandArrayOnTrailingField,
     bool isCompressed,
@@ -217,7 +218,7 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
                 BSONElement e = obj.getField(path);
                 if (BSONType::object == e.type()) {
                     _extractAllElementsAlongBucketPath(e.embeddedObject(),
-                                                       StringData(),
+                                                       std::string_view(),
                                                        elements,
                                                        expandArrayOnTrailingField,
                                                        isCompressed,
@@ -279,14 +280,14 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
     return boost::none;
 }
 
-bool _haveArrayAlongBucketDataPath(const BSONObj& obj, StringData path, BSONDepthIndex depth);
+bool _haveArrayAlongBucketDataPath(const BSONObj& obj, std::string_view path, BSONDepthIndex depth);
 
 bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
-                                                   StringData path,
+                                                   std::string_view path,
                                                    BSONDepthIndex depth);
 
 bool _handleIntermediateElementForHaveArrayAlongBucketDataPath(BSONElement elem,
-                                                               StringData path,
+                                                               std::string_view path,
                                                                BSONDepthIndex depth) {
     if (elem.type() == BSONType::object) {
         auto embedded = elem.embeddedObject();
@@ -304,14 +305,14 @@ bool _handleTerminalElementForHaveArrayAlongBucketDataPath(BSONElement elem) {
 
 
 bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
-                                                   StringData path,
+                                                   std::string_view path,
                                                    BSONDepthIndex depth) {
     size_t idx = path.find('.');
     if (idx != std::string::npos) {
         tassert(
             5930502, "BSON depth too great", depth != std::numeric_limits<BSONDepthIndex>::max());
-        StringData left = path.substr(0, idx);
-        StringData next = path.substr(idx + 1, path.size());
+        std::string_view left = path.substr(0, idx);
+        std::string_view next = path.substr(idx + 1, path.size());
 
         BSONElement e = obj.getField(left);
 
@@ -321,7 +322,7 @@ bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
 }
 
 bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
-                                   StringData path,
+                                   std::string_view path,
                                    bool isCompressed,
                                    BSONDepthIndex depth) {
     switch (depth) {
@@ -360,7 +361,7 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
                 BSONElement e = obj.getField(path);
                 if (BSONType::object == e.type()) {
                     return _haveArrayAlongBucketDataPath(
-                        e.embeddedObject(), StringData(), isCompressed, depth + 1);
+                        e.embeddedObject(), std::string_view(), isCompressed, depth + 1);
                 } else if (BSONType::binData == e.type()) {
                     // Unbucketing happens here for top-level measurement fields (i.e. data.a) in
                     // compressed buckets. We know that 'e' corresponds to the top-level
@@ -415,7 +416,7 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
 
 std::pair<BSONElement, BSONElement> _getLiteralFields(const BSONObj& min,
                                                       const BSONObj& max,
-                                                      StringData field) {
+                                                      std::string_view field) {
     return std::make_pair(min.getField(field), max.getField(field));
 }
 
@@ -437,7 +438,7 @@ Decision _controlTypesIndicateArrayData(const BSONElement& min,
 
 std::tuple<BSONElement, BSONElement, std::string> _getNextFields(const BSONObj& min,
                                                                  const BSONObj& max,
-                                                                 StringData field) {
+                                                                 std::string_view field) {
     if (auto res = _splitPath(field)) {
         auto& [left, next] = *res;
         return std::make_tuple(min.getField(left), max.getField(left), std::string{next});
@@ -445,7 +446,7 @@ std::tuple<BSONElement, BSONElement, std::string> _getNextFields(const BSONObj& 
     return std::make_tuple(BSONElement(), BSONElement(), std::string());
 }
 
-Decision _fieldContainsArrayData(const BSONObj& maxObj, StringData field) {
+Decision _fieldContainsArrayData(const BSONObj& maxObj, std::string_view field) {
     // When we get here, we know that some prefix value on the control.min path was a non-object
     // type < Object. We can also assume that our parent was an Object.
 
@@ -476,7 +477,7 @@ Decision _fieldContainsArrayData(const BSONObj& maxObj, StringData field) {
     return Decision::No;
 }
 
-Decision _fieldContainsArrayData(const BSONObj& min, const BSONObj& max, StringData field) {
+Decision _fieldContainsArrayData(const BSONObj& min, const BSONObj& max, std::string_view field) {
     // Invariants to consider coming into this function.
     //  1. min an max are both known to be objects
     //  2. field is some (possibly whole) suffix of the indexed user field (e.g. if the user defines
@@ -522,7 +523,7 @@ Decision _fieldContainsArrayData(const BSONObj& min, const BSONObj& max, StringD
 }  // namespace
 
 boost::optional<BSONColumn> extractAllElementsAlongBucketPath(const BSONObj& obj,
-                                                              StringData path,
+                                                              std::string_view path,
                                                               BSONElementSet& elements,
                                                               bool expandArrayOnTrailingField,
                                                               MultikeyComponents* arrayComponents) {
@@ -537,7 +538,7 @@ boost::optional<BSONColumn> extractAllElementsAlongBucketPath(const BSONObj& obj
                                               arrayComponents);
 }
 
-bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path) {
+bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, std::string_view path) {
     // Shortcut: if we aren't checking a `data.` path, then we don't care.
     if (!path.starts_with(timeseries::kDataFieldNamePrefix)) {
         return false;
@@ -566,7 +567,7 @@ std::ostream& operator<<(std::ostream& s, const Decision& i) {
     return s;
 }
 
-Decision fieldContainsArrayData(const BSONObj& bucketObj, StringData userField) {
+Decision fieldContainsArrayData(const BSONObj& bucketObj, std::string_view userField) {
     // In general, we are searching for an array, or for a type mismatch somewhere along the path
     // in the summary fields, such that it can hide array values in the data field. For example if
     // we are interested in the user field 'a.b', we will examine the paths 'control.min.a.b' and

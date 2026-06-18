@@ -29,7 +29,6 @@
 
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_initializer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
@@ -44,6 +43,7 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -54,13 +54,14 @@
 namespace mongo {
 
 namespace {
+using namespace std::literals::string_view_literals;
 const auto getInstance = ServiceContext::declareDecoration<ClusterServerParameterInitializer>();
 const ReplicaSetAwareServiceRegistry::Registerer<ClusterServerParameterInitializer> _registerer(
     "ClusterServerParameterInitializerRegistry");
 
-constexpr auto kIdField = "_id"_sd;
-constexpr auto kCPTField = "clusterParameterTime"_sd;
-constexpr auto kOplog = "oplog"_sd;
+constexpr auto kIdField = "_id"sv;
+constexpr auto kCPTField = "clusterParameterTime"sv;
+constexpr auto kOplog = "oplog"sv;
 
 }  // namespace
 

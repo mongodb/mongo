@@ -28,7 +28,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_util.h"
@@ -43,13 +42,15 @@
 #include <csignal>
 #include <cstdlib>
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kTestLogTag = "test"_sd;
+constexpr auto kTestLogTag = "test"sv;
 
 class LogRotateSignalTest : public unittest::Test {
 public:
@@ -62,7 +63,7 @@ public:
 
         startSignalProcessingThread(LogFileStatus::kNeedToRotateLogFile);
 
-        logv2::addLogRotator(kTestLogTag, [&](bool, StringData, std::function<void(Status)>) {
+        logv2::addLogRotator(kTestLogTag, [&](bool, std::string_view, std::function<void(Status)>) {
             LOGV2(9493700, "Test log rotator called");
             _barrier->countDownAndWait();
             return Status::OK();

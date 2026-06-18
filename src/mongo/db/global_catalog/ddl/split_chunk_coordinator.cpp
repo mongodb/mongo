@@ -49,6 +49,8 @@
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -166,7 +168,7 @@ void releaseCriticalSection(OperationContext* opCtx,
 
 void commitToGlobalCatalog(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           StringData shardName,
+                           std::string_view shardName,
                            const OID& epoch,
                            const boost::optional<Timestamp>& timestamp,
                            const ChunkRange& chunkRange,

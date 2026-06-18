@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
@@ -40,6 +39,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
@@ -60,7 +60,7 @@ void RecordMyLocation(const char* _argv0);
 void installShellUtils(Scope& scope);
 
 void initScope(Scope& scope);
-void onConnect(DBClientBase& c, StringData uri);
+void onConnect(DBClientBase& c, std::string_view uri);
 
 boost::filesystem::path getHistoryFilePath();
 void setEnterpriseShellCallback(EnterpriseShellCallback* callback);
@@ -85,7 +85,7 @@ private:
 class ConnectionRegistry {
 public:
     ConnectionRegistry();
-    void registerConnection(DBClientBase& client, StringData uri);
+    void registerConnection(DBClientBase& client, std::string_view uri);
     void killOperationsOnAllConnections(bool withPrompt) const;
 
 private:

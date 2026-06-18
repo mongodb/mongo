@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/query/search/mongot_cursor_getmore_strategy.h"
@@ -40,6 +39,8 @@
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <string_view>
 
 namespace mongo {
 namespace executor {
@@ -65,7 +66,7 @@ public:
         Base::tearDown();
     }
 
-    BSONObj scheduleSuccessfulCursorResponse(StringData fieldName,
+    BSONObj scheduleSuccessfulCursorResponse(std::string_view fieldName,
                                              size_t start,
                                              size_t end,
                                              size_t cursorId,
@@ -74,7 +75,7 @@ public:
             fieldName, start, end, cursorId, expectedPrefetch);
     }
 
-    BSONObj scheduleSuccessfulMultiCursorResponse(StringData fieldName,
+    BSONObj scheduleSuccessfulMultiCursorResponse(std::string_view fieldName,
                                                   size_t start,
                                                   size_t end,
                                                   std::vector<size_t> cursorIds,

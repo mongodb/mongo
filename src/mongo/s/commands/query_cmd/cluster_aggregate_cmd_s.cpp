@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
@@ -41,19 +40,21 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the cluster aggregate command on mongos.
  */
 struct ClusterAggregateCommandS {
     using Request = AggregateCommandRequest;
-    static constexpr StringData kCommandName = "aggregate"_sd;
+    static constexpr std::string_view kCommandName = "aggregate"sv;
     static constexpr bool kAlwaysUsingMongos = true;
 
     static const std::set<std::string>& getApiVersions() {

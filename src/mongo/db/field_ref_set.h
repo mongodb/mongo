@@ -32,7 +32,6 @@
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/util/modules.h"
 

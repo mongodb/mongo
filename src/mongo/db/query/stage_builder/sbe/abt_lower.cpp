@@ -44,6 +44,7 @@
 
 
 namespace mongo::stage_builder::abt_lower {
+using namespace std::literals::string_view_literals;
 
 static sbe::EExpression::Vector toInlinedVector(
     std::vector<std::unique_ptr<sbe::EExpression>> args) {
@@ -211,7 +212,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     sbe::EPrimBinary::Op sbeOp = getEPrimBinaryOp(op.op());
 
     if (sbe::EPrimBinary::isComparisonOp(sbeOp)) {
-        auto collatorSlot = _providedSlots.getSlotIfExists("collator"_sd);
+        auto collatorSlot = _providedSlots.getSlotIfExists("collator"sv);
 
         auto hasNonCollatableType = [](const std::unique_ptr<sbe::EExpression>& arg) {
             auto constExpr = arg->as<sbe::EConstant>();

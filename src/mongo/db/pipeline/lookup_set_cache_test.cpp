@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/lookup_set_cache.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
@@ -39,9 +38,11 @@
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 bool vectorContains(const std::vector<Document>* vector, const Document& expectedDoc) {
     ASSERT_TRUE(vector);
@@ -176,18 +177,18 @@ TEST(LookupSetCacheTest, CacheKeysRespectCollation) {
     ValueComparator comparator{&collator};
     LookupSetCache cache(comparator);
 
-    cache.insert(Value("foo"_sd), intToDoc(1));
-    cache.insert(Value("FOO"_sd), intToDoc(2));
-    cache.insert(Value("FOOz"_sd), intToDoc(3));
+    cache.insert(Value("foo"sv), intToDoc(1));
+    cache.insert(Value("FOO"sv), intToDoc(2));
+    cache.insert(Value("FOOz"sv), intToDoc(3));
 
     {
-        auto fooResult = cache[Value("FoO"_sd)];
+        auto fooResult = cache[Value("FoO"sv)];
         ASSERT_TRUE(fooResult);
         ASSERT_EQ(2U, fooResult->size());
     }
 
     {
-        auto foozResult = cache[Value("fooZ"_sd)];
+        auto foozResult = cache[Value("fooZ"sv)];
         ASSERT_TRUE(foozResult);
         ASSERT_EQ(1U, foozResult->size());
     }
@@ -200,10 +201,10 @@ TEST(LookupSetCacheTest, CachedValuesDontRespectCollation) {
     ValueComparator comparator{&collator};
     LookupSetCache cache(comparator);
 
-    cache.insert(Value("foo"_sd), Document{{"foo", "bar"_sd}});
-    cache.insert(Value("foo"_sd), Document{{"foo", "BAR"_sd}});
+    cache.insert(Value("foo"sv), Document{{"foo", "bar"sv}});
+    cache.insert(Value("foo"sv), Document{{"foo", "BAR"sv}});
 
-    auto fooResult = cache[Value("foo"_sd)];
+    auto fooResult = cache[Value("foo"sv)];
     ASSERT_TRUE(fooResult);
     ASSERT_EQ(2U, fooResult->size());
 }
@@ -216,7 +217,7 @@ TEST(LookupSetCacheTest, DocumentWithStorageCachePopulated) {
     BSONObj input = BSON("a" << 1);
     const auto doc1 = Document(input);
     const auto sizeOfDoc1Before = doc1.getCurrentApproximateSize();
-    auto key = Value("foo"_sd);
+    auto key = Value("foo"sv);
 
     // Insert a cache entry and verify that both the key and the document are accounted for in the
     // cache size.

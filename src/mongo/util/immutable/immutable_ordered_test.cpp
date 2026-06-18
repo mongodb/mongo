@@ -28,7 +28,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/set.h"
@@ -40,6 +39,7 @@
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -54,6 +54,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class UserDefinedKey {
 public:
@@ -111,10 +112,10 @@ struct StringCompare {
     bool operator()(const std::string& a, const std::string& b) const {
         return a < b;
     }
-    bool operator()(const std::string& a, StringData b) const {
+    bool operator()(const std::string& a, std::string_view b) const {
         return a < b;
     }
-    bool operator()(StringData a, const std::string& b) const {
+    bool operator()(std::string_view a, const std::string& b) const {
         return a < b;
     }
     bool operator()(const std::string& a, const char* b) const {
@@ -424,8 +425,8 @@ TEST(ImmutableMap, HeterogeneousLookup) {
     immutable::map<std::string, int, StringCompare> v0;
     auto v1 = v0.set("str", 1);
 
-    // Lookup using StringData without the need to convert to string.
-    ASSERT_NE(v1.find("str"_sd), v1.end());
+    // Lookup using std::string_view without the need to convert to string.
+    ASSERT_NE(v1.find("str"sv), v1.end());
 
     ensureContainerInvariants({v0, v1});
 }
@@ -1098,8 +1099,8 @@ TEST(ImmutableSet, HeterogeneousLookup) {
     immutable::set<std::string, StringCompare> v0;
     auto v1 = v0.insert("str");
 
-    // Lookup using StringData without the need to convert to string.
-    ASSERT_NE(v1.find("str"_sd), v1.end());
+    // Lookup using std::string_view without the need to convert to string.
+    ASSERT_NE(v1.find("str"sv), v1.end());
 
     ensureContainerInvariants({v0, v1});
 }

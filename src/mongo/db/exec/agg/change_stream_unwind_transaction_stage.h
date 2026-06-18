@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/stage.h"
@@ -50,6 +49,7 @@
 #include <limits>
 #include <memory>
 #include <stack>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/flat_hash_set.h>
@@ -64,7 +64,7 @@ namespace mongo::exec::agg {
  */
 class ChangeStreamUnwindTransactionStage final : public Stage {
 public:
-    ChangeStreamUnwindTransactionStage(StringData stageName,
+    ChangeStreamUnwindTransactionStage(std::string_view stageName,
                                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                        BSONObj filter,
                                        std::shared_ptr<MatchExpression> expression);

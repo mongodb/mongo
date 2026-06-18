@@ -37,6 +37,8 @@
 #include "mongo/db/query/search/mongotmock/mongotmock_state.h"
 #include "mongo/util/fail_point.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(mongotWaitBeforeRespondingToQuery);
@@ -60,7 +62,7 @@ void assertGivenCommandMatchesExpectedCommand(BSONObj givenCmd, BSONObj expected
  */
 class MongotMockBaseCmd : public BasicCommand {
 public:
-    MongotMockBaseCmd(StringData name) : BasicCommand(name, "") {}
+    MongotMockBaseCmd(std::string_view name) : BasicCommand(name, "") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         MONGO_UNREACHABLE;
@@ -105,7 +107,7 @@ class MongotMockCursorCommand : public MongotMockBaseCmd {
 public:
     // This is not a real command, and thus must be built with a real command name.
     MongotMockCursorCommand() = delete;
-    MongotMockCursorCommand(StringData commandName) : MongotMockBaseCmd(commandName) {}
+    MongotMockCursorCommand(std::string_view commandName) : MongotMockBaseCmd(commandName) {}
 
 private:
     void processCommand(OperationContext* opCtx,

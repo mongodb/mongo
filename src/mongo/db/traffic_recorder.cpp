@@ -35,7 +35,6 @@
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -68,6 +67,7 @@
 #include <ios>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -152,7 +152,8 @@ void PacketWriter::serializeHeaderForPacket(DataBuilder& db, const TrafficRecord
     uassertStatusOK(db.writeAndAdvance<LittleEndian<uint32_t>>(0));
     uassertStatusOK(db.writeAndAdvance<EventType>(packet.eventType));
     uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.id));
-    uassertStatusOK(db.writeAndAdvance<Terminated<'\0', StringData>>(StringData(packet.session)));
+    uassertStatusOK(
+        db.writeAndAdvance<Terminated<'\0', std::string_view>>(std::string_view(packet.session)));
     uassertStatusOK(
         db.writeAndAdvance<LittleEndian<uint64_t>>(durationCount<Microseconds>(packet.offset)));
     uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.order));

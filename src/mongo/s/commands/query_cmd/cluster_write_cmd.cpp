@@ -92,6 +92,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterThrowWouldChangeOwningShardRetryableWrite);
 namespace {
@@ -576,7 +577,7 @@ bool cluster_write_cmd::runExplainWithoutShardKey(OperationContext* opCtx,
     sharding::router::CollectionRouter router(opCtx, originalNss);
     try {
         return router.routeWithRoutingContext(
-            "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+            "explain write"sv, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                 // If supported, compute QueryShapeHash and record it in CurOp
                 query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
                     opCtx, WriteCommandRef{req}, true /* skipRegistration */);
@@ -672,7 +673,7 @@ void cluster_write_cmd::executeWriteOpExplain(OperationContext* opCtx,
     sharding::router::CollectionRouter router(opCtx, originalNss);
     try {
         router.routeWithRoutingContext(
-            "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+            "explain write"sv, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                 // If supported, compute QueryShapeHash and record it in CurOp
                 query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
                     opCtx, WriteCommandRef{*requestPtr}, true /* skipRegistration */);

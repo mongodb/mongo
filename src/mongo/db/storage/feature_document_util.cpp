@@ -32,8 +32,9 @@
 namespace mongo {
 
 namespace {
-static constexpr auto kIsFeatureDocumentFieldName = "isFeatureDoc"_sd;
-}
+using namespace std::literals::string_view_literals;
+static constexpr auto kIsFeatureDocumentFieldName = "isFeatureDoc"sv;
+}  // namespace
 
 namespace feature_document_util {
 bool isFeatureDocument(const BSONObj& obj) {

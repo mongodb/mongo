@@ -29,7 +29,6 @@
 
 #include "mongo/db/stats/top.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/transport/mock_session.h"

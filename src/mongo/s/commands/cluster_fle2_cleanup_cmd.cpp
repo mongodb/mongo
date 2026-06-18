@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -57,11 +56,13 @@
 
 #include <memory>
 #include <set>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class ClusterCleanupStructuredEncryptionDataCmd final
     : public TypedCommand<ClusterCleanupStructuredEncryptionDataCmd> {
@@ -102,7 +103,7 @@ public:
         return false;
     }
 
-    std::set<StringData> sensitiveFieldNames() const final {
+    std::set<std::string_view> sensitiveFieldNames() const final {
         return {CleanupStructuredEncryptionData::kCleanupTokensFieldName};
     }
 };
@@ -145,8 +146,7 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
 
             auto reply = CommandHelpers::filterCommandReplyForPassthrough(response.data);
             uassertStatusOK(getStatusFromCommandResult(reply));
-            return Reply::parse(reply.removeField("ok"_sd),
-                                IDLParserContext{Request::kCommandName});
+            return Reply::parse(reply.removeField("ok"sv), IDLParserContext{Request::kCommandName});
         });
 }
 

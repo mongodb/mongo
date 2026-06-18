@@ -39,11 +39,14 @@
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/functional/hash.hpp>
 
 namespace mongo {
 namespace {
-static constexpr auto kNaturalFieldName = "$natural"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr auto kNaturalFieldName = "$natural"sv;
 
 std::strong_ordering compare(const IndexKeyPattern& a, const IndexKeyPattern& b) {
     return a.woCompare(b) <=> 0;
@@ -97,7 +100,7 @@ IndexHint IndexHint::parse(const BSONElement& element) {
     }
 }
 
-void IndexHint::append(const IndexHint& hint, StringData fieldName, BSONObjBuilder* builder) {
+void IndexHint::append(const IndexHint& hint, std::string_view fieldName, BSONObjBuilder* builder) {
     visit(OverloadedVisitor{
               [&](const IndexKeyPattern& keyPattern) { builder->append(fieldName, keyPattern); },
               [&](const IndexName& indexName) { builder->append(fieldName, indexName); },

@@ -87,6 +87,7 @@
 namespace mongo::map_reduce_common {
 
 namespace {
+using namespace std::literals::string_view_literals;
 using namespace std::string_literals;
 
 Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest& parsedMr) {
@@ -96,7 +97,7 @@ Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest&
     const auto outNss = outOptions.getDatabaseName()
         ? NamespaceStringUtil::deserialize(parsedMr.getDbName().tenantId(),
                                            *outOptions.getDatabaseName(),
-                                           ""_sd,
+                                           ""sv,
                                            SerializationContext::stateDefault())
         : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
                                            outOptions.getCollectionName());

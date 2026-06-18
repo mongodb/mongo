@@ -76,6 +76,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -255,7 +256,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                 sharding::router::CollectionRouter router(opCtx, ns);
                 router.routeWithRoutingContext(
-                    "validating indexes for refineCollectionShardKey"_sd,
+                    "validating indexes for refineCollectionShardKey"sv,
                     [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                         sharding_ddl_util::sendAuthenticatedVersionedCommandTargetedByRoutingTable(
                             opCtx, opts, routingCtx, ns);

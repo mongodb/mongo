@@ -61,9 +61,12 @@
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo::extension {
+#include <string_view>
 
-auto nss = NamespaceString::createNamespaceString_forTest("document_source_extension_test"_sd);
+namespace mongo::extension {
+using namespace std::literals::string_view_literals;
+
+auto nss = NamespaceString::createNamespaceString_forTest("document_source_extension_test"sv);
 
 /**
  * A parse node that expands into one CustomProperties AST node per BSON in `propertiesList`,
@@ -2664,8 +2667,8 @@ void testViewPolicyHelper(const NamespaceString& nss,
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded liteParsed(
         ConfigurableViewPolicyTestAstNode::kStageName, std::move(handle), nss, ifrContext);
 
-    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
-    const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.collection"_sd);
+    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"sv);
+    const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.collection"sv);
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("x" << 1))};
     auto view = ResolvedNamespace::makeForView(viewNss, resolvedNss, std::move(viewPipeline));
 
@@ -2696,7 +2699,7 @@ public:
             if (stage.isEmpty()) {
                 continue;
             }
-            StringData stageName = stage.firstElement().fieldNameStringData();
+            std::string_view stageName = stage.firstElement().fieldNameStringData();
             if (stageName != "$match" && stageName != "$addFields" && stageName != "$set") {
                 uasserted(
                     ErrorCodes::BadValue,
@@ -2717,8 +2720,8 @@ void runViewPipelineValidatorCallback(const std::vector<BSONObj>& viewPipeline) 
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded liteParsed(
         ViewPipelineValidatorTestAstNode::kStageName, std::move(handle), nss, ifrContext);
 
-    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
-    const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.coll"_sd);
+    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"sv);
+    const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.coll"sv);
     std::vector<BSONObj> pipelineCopy = viewPipeline;
     auto view = ResolvedNamespace::makeForView(viewNss, resolvedNss, std::move(pipelineCopy));
 
@@ -2729,7 +2732,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedGetViewPolicyWithDefaultPrependAndCallback) {
     unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
 
-    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
+    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"sv);
     testViewPolicyHelper(_nss,
                          MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend,
                          FirstStageViewApplicationPolicy::kDefaultPrepend,
@@ -2740,7 +2743,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedGetViewPolicyWithDoNothingAndCallback) {
     unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
 
-    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
+    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"sv);
     testViewPolicyHelper(_nss,
                          MongoExtensionFirstStageViewApplicationPolicy::kDoNothing,
                          FirstStageViewApplicationPolicy::kDoNothing,
@@ -3140,7 +3143,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsUnk
 
 class StageRulesTest : public DocumentSourceExtensionOptimizableTest {
 public:
-    static constexpr StringData kStageName = "$testRulesStage"_sd;
+    static constexpr std::string_view kStageName = "$testRulesStage"sv;
 
     inline static const PipelineRewriteRule kReorderRule{"reorderRule",
                                                          kPipelineRewriteRuleTagReordering};

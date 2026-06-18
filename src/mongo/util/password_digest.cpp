@@ -31,9 +31,11 @@
 
 #include "mongo/util/md5.h"
 
+#include <string_view>
+
 namespace mongo {
 
-std::string createPasswordDigest(StringData username, StringData clearTextPassword) {
+std::string createPasswordDigest(std::string_view username, std::string_view clearTextPassword) {
     md5digest d;
     {
         md5_state_t st;

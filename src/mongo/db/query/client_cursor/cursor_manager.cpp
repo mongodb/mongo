@@ -61,6 +61,7 @@
 
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/none.hpp>
@@ -194,7 +195,7 @@ std::vector<CursorId> CursorManager::getCursorIdsForNamespace(const NamespaceStr
 StatusWith<ClientCursorPin> CursorManager::pinCursor(
     OperationContext* opCtx,
     CursorId id,
-    StringData commandName,
+    std::string_view commandName,
     const std::function<void(const ClientCursor&)>& checkPinAllowed,
     AuthCheck checkSessionAuth) {
     auto lockedPartition = _cursorMap->lockOnePartition(id);

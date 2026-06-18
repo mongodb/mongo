@@ -43,6 +43,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -107,7 +108,7 @@ public:
 class LiteParsedGraphLookUp final
     : public LiteParsedDocumentSourceNestedPipelines<LiteParsedGraphLookUp> {
 public:
-    static constexpr StringData kStageName = "$graphLookup"_sd;
+    static constexpr std::string_view kStageName = "$graphLookup"_sd;
 
     static std::unique_ptr<LiteParsedGraphLookUp> parse(const NamespaceString& nss,
                                                         const BSONElement& spec,

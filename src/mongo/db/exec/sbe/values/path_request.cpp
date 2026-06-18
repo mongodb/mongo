@@ -31,6 +31,8 @@
 
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo::sbe::value {
 std::string pathToString(const Path& p) {
     std::string out;
@@ -64,7 +66,7 @@ std::string PathRequest::toString() const {
                          << pathToString(path) << ")";
 }
 
-StringData PathRequest::getTopLevelField() const {
+std::string_view PathRequest::getTopLevelField() const {
     return get<Get>(path[0]).field;
 }
 

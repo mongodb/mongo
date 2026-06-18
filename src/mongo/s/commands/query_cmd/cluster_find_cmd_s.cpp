@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -42,17 +41,19 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the cluster find command on mongos.
  */
 struct ClusterFindCmdS {
     using Request = FindCommandRequest;
-    static constexpr StringData kCommandName = "find"_sd;
+    static constexpr std::string_view kCommandName = "find"sv;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;

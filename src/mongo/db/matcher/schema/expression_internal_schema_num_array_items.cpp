@@ -33,6 +33,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/value.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -42,9 +43,9 @@ namespace mongo {
 
 InternalSchemaNumArrayItemsMatchExpression::InternalSchemaNumArrayItemsMatchExpression(
     MatchType type,
-    boost::optional<StringData> path,
+    boost::optional<std::string_view> path,
     long long numItems,
-    StringData name,
+    std::string_view name,
     clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(type, path, std::move(std::move(annotation))),
       _name(name),

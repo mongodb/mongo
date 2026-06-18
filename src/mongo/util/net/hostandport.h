@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 #include <fmt/format.h>
@@ -50,7 +50,7 @@ class StatusWith;
  * Validate that a string is either empty or is parseable to a HostAndPort. This is intended for use
  * as an IDL validator callback.
  */
-Status validateHostAndPort(StringData hostAndPortStr, const boost::optional<TenantId>&);
+Status validateHostAndPort(std::string_view hostAndPortStr, const boost::optional<TenantId>&);
 
 /**
  * Name of a process on the network.
@@ -64,12 +64,12 @@ struct HostAndPort {
      * Parses "text" to produce a HostAndPort.  Returns either that or an error status describing
      * the parse failure.
      */
-    static StatusWith<HostAndPort> parse(StringData text);
+    static StatusWith<HostAndPort> parse(std::string_view text);
 
     /**
      * A version of 'parse' that throws a UserException if a parsing error is encountered.
      */
-    static HostAndPort parseThrowing(StringData text) {
+    static HostAndPort parseThrowing(std::string_view text) {
         return uassertStatusOK(parse(text));
     }
 
@@ -82,7 +82,7 @@ struct HostAndPort {
      * Constructs a HostAndPort by parsing "text" of the form hostname[:portnumber]
      * Throws an AssertionException if bad config std::string or bad port #.
      */
-    explicit HostAndPort(StringData text);
+    explicit HostAndPort(std::string_view text);
 
     /**
      * Constructs a HostAndPort with the hostname "h" and port "p".
@@ -97,7 +97,7 @@ struct HostAndPort {
      * after initialize() returns a non-OK status, though it is safe to
      * assign to it or re-initialize it.
      */
-    Status initialize(StringData s);
+    Status initialize(std::string_view s);
 
     bool operator<(const HostAndPort& r) const;
     bool operator==(const HostAndPort& r) const;
@@ -151,7 +151,7 @@ private:
     friend struct fmt::formatter<HostAndPort>;
 
     struct AppendVisitor {
-        virtual void operator()(StringData v) = 0;
+        virtual void operator()(std::string_view v) = 0;
         virtual void operator()(std::uint16_t v) = 0;
         virtual ~AppendVisitor() = default;
     };
@@ -185,7 +185,7 @@ template <typename F>
 void HostAndPort::_appendToPolymorphicFunc(F f) const {
     struct Vis : AppendVisitor {
         explicit Vis(F f) : _f{std::move(f)} {}
-        void operator()(StringData v) override {
+        void operator()(std::string_view v) override {
             _f(v);
         }
         void operator()(std::uint16_t v) override {

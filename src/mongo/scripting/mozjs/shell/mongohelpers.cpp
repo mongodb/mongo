@@ -36,6 +36,8 @@
 #include "mongo/scripting/mozjs/shell/implscope.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <jsapi.h>
 
 #include <js/GlobalObject.h>
@@ -52,7 +54,7 @@ const char kParseHelperName[] = "__parseJSFunctionOrExpression";
 const char kReflectName[] = "Reflect";
 }  // namespace
 
-std::string parseJSFunctionOrExpression(JSContext* cx, const StringData input) {
+std::string parseJSFunctionOrExpression(JSContext* cx, const std::string_view input) {
     JS::RootedObject proto(cx, getScope(cx)->getProto<MongoHelpersInfo>().getProto());
     std::string out;
     uassert(ErrorCodes::JSInterpreterFailure,

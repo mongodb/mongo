@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <list>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -47,7 +48,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(SortByCount);
  */
 class DocumentSourceSortByCount final {
 public:
-    static constexpr StringData kStageName = "$sortByCount"_sd;
+    static constexpr std::string_view kStageName = "$sortByCount"_sd;
 
     /**
      * Returns a $group stage followed by a $sort stage.

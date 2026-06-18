@@ -39,29 +39,31 @@
 #include "mongo/util/hex.h"
 
 #include <string>
+#include <string_view>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 
 namespace mongo::crypto {
+using namespace std::literals::string_view_literals;
 
 class AsymmetricCryptoTestVectors : public unittest::Test {
 public:
     class RSAKeySignatureVerificationVector {
     public:
-        RSAKeySignatureVerificationVector(StringData keyID,
-                                          StringData e,
-                                          StringData n,
-                                          StringData msg,
-                                          StringData signature,
+        RSAKeySignatureVerificationVector(std::string_view keyID,
+                                          std::string_view e,
+                                          std::string_view n,
+                                          std::string_view msg,
+                                          std::string_view signature,
                                           bool shouldPass) {
             this->keyID = std::string{keyID};
 
             std::string strE = hexblob::decode(e);
-            std::string base64E = base64url::encode(StringData(strE.data(), strE.length()));
+            std::string base64E = base64url::encode(std::string_view(strE.data(), strE.length()));
             this->e = base64E;
 
             std::string strN = hexblob::decode(n);
-            std::string base64N = base64url::encode(StringData(strN.data(), strN.length()));
+            std::string base64N = base64url::encode(std::string_view(strN.data(), strN.length()));
             this->n = base64N;
 
             this->msg = hexblob::decode(msg);
@@ -83,14 +85,14 @@ public:
         // verification vectors are specified in hex format but the validate() API expects the
         // input to be in Base64URL-encoded format. Hence, we need to decode the hex blob first,
         // and then re-encode it in Base64URL.
-        ECKeySignatureVerificationVector(StringData keyID,
-                                         StringData alg,
-                                         StringData crv,
-                                         StringData msg,
-                                         StringData Qx,
-                                         StringData Qy,
-                                         StringData R,
-                                         StringData S,
+        ECKeySignatureVerificationVector(std::string_view keyID,
+                                         std::string_view alg,
+                                         std::string_view crv,
+                                         std::string_view msg,
+                                         std::string_view Qx,
+                                         std::string_view Qy,
+                                         std::string_view R,
+                                         std::string_view S,
                                          bool shouldPass) {
 
             // The key ID
@@ -107,12 +109,14 @@ public:
 
             // The x-coordinate of the private key
             std::string strQX = hexblob::decode(Qx);
-            std::string base64QX = base64url::encode(StringData(strQX.data(), strQX.length()));
+            std::string base64QX =
+                base64url::encode(std::string_view(strQX.data(), strQX.length()));
             this->ec_x = base64QX;
 
             // The y-coordinate of the private key
             std::string strQY = hexblob::decode(Qy);
-            std::string base64QY = base64url::encode(StringData(strQY.data(), strQY.length()));
+            std::string base64QY =
+                base64url::encode(std::string_view(strQY.data(), strQY.length()));
             this->ec_y = base64QY;
 
             // The R component of the signature
@@ -201,7 +205,7 @@ public:
 
         // Don't append the signature directly as it is a concatenation of r and s components
         auto asymmetricKey = uassertStatusOK(JWSValidator::create(kKeyType, ecKey.obj()));
-        StringData sMsg(test.msg.data(), test.msg.length());
+        std::string_view sMsg(test.msg.data(), test.msg.length());
         Status result = asymmetricKey->validate(
             test.ec_alg,
             sMsg,
@@ -243,9 +247,9 @@ public:
         auto asymmetricKey = uassertStatusOK(JWSValidator::create(kKeyType, ecKey.obj()));
 
         // call validate() with an invalid algorithm
-        StringData sMsg(test.msg.data(), test.msg.length());
+        std::string_view sMsg(test.msg.data(), test.msg.length());
         Status result = asymmetricKey->validate(
-            StringData("invalid_algorithm"),
+            std::string_view("invalid_algorithm"),
             sMsg,
             ConstDataRange(test.signature.data(), test.signature.length()).data());
         ASSERT_NOT_OK(result);
@@ -264,7 +268,7 @@ public:
         // call validate() with an invalid algorithm
         Status result = asymmetricKey->validate(
             test.ec_crv,
-            StringData(""),  // empty payload
+            std::string_view(""),  // empty payload
             ConstDataRange(test.signature.data(), test.signature.length()).data());
         ASSERT_NOT_OK(result);
         ASSERT_EQ(result.code(), expectedError);
@@ -278,61 +282,61 @@ public:
 
 TEST_F(AsymmetricCryptoTestVectors, RSASignatureVerificationTest1) {
     evaluateRSA(RSAKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "49d2a1"_sd,
-        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"_sd,
-        "95123c8d1b236540b86976a11cea31f8bd4e6c54c235147d20ce722b03a6ad756fbd918c27df8ea9ce3104444c0bbe877305bc02e35535a02a58dcda306e632ad30b3dc3ce0ba97fdf46ec192965dd9cd7f4a71b02b8cba3d442646eeec4af590824ca98d74fbca934d0b6867aa1991f3040b707e806de6e66b5934f05509bea"_sd,
-        "51265d96f11ab338762891cb29bf3f1d2b3305107063f5f3245af376dfcc7027d39365de70a31db05e9e10eb6148cb7f6425f0c93c4fb0e2291adbd22c77656afc196858a11e1c670d9eeb592613e69eb4f3aa501730743ac4464486c7ae68fd509e896f63884e9424f69c1c5397959f1e52a368667a598a1fc90125273d9341295d2f8e1cc4969bf228c860e07a3546be2eeda1cde48ee94d062801fe666e4a7ae8cb9cd79262c017b081af874ff00453ca43e34efdb43fffb0bb42a4e2d32a5e5cc9e8546a221fe930250e5f5333e0efe58ffebf19369a3b8ae5a67f6a048bc9ef915bda25160729b508667ada84a0c27e7e26cf2abca413e5e4693f4a9405"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "49d2a1"sv,
+        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"sv,
+        "95123c8d1b236540b86976a11cea31f8bd4e6c54c235147d20ce722b03a6ad756fbd918c27df8ea9ce3104444c0bbe877305bc02e35535a02a58dcda306e632ad30b3dc3ce0ba97fdf46ec192965dd9cd7f4a71b02b8cba3d442646eeec4af590824ca98d74fbca934d0b6867aa1991f3040b707e806de6e66b5934f05509bea"sv,
+        "51265d96f11ab338762891cb29bf3f1d2b3305107063f5f3245af376dfcc7027d39365de70a31db05e9e10eb6148cb7f6425f0c93c4fb0e2291adbd22c77656afc196858a11e1c670d9eeb592613e69eb4f3aa501730743ac4464486c7ae68fd509e896f63884e9424f69c1c5397959f1e52a368667a598a1fc90125273d9341295d2f8e1cc4969bf228c860e07a3546be2eeda1cde48ee94d062801fe666e4a7ae8cb9cd79262c017b081af874ff00453ca43e34efdb43fffb0bb42a4e2d32a5e5cc9e8546a221fe930250e5f5333e0efe58ffebf19369a3b8ae5a67f6a048bc9ef915bda25160729b508667ada84a0c27e7e26cf2abca413e5e4693f4a9405"sv,
         true));
 }
 
 TEST_F(AsymmetricCryptoTestVectors, RSASignatureVerificationTest2) {
     evaluateRSA(RSAKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "49d2a1"_sd,
-        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"_sd,
-        "f89fd2f6c45a8b5066a651410b8e534bfec0d9a36f3e2b887457afd44dd651d1ec79274db5a455f182572fceea5e9e39c3c7c5d9e599e4fe31c37c34d253b419c3e8fb6b916aef6563f87d4c37224a456e5952698ba3d01b38945d998a795bd285d69478e3131f55117284e27b441f16095dca7ce9c5b68890b09a2bfbb010a5"_sd,
-        "ba48538708512d45c0edcac57a9b4fb637e9721f72003c60f13f5c9a36c968cef9be8f54665418141c3d9ecc02a5bf952cfc055fb51e18705e9d8850f4e1f5a344af550de84ffd0805e27e557f6aa50d2645314c64c1c71aa6bb44faf8f29ca6578e2441d4510e36052f46551df341b2dcf43f761f08b946ca0b7081dadbb88e955e820fd7f657c4dd9f4554d167dd7c9a487ed41ced2b40068098deedc951060faf7e15b1f0f80ae67ff2ee28a238d80bf72dd71c8d95c79bc156114ece8ec837573a4b66898d45b45a5eacd0b0e41447d8fa08a367f437645e50c9920b88a16bc0880147acfb9a79de9e351b3fa00b3f4e9f182f45553dffca55e393c5eab6"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "49d2a1"sv,
+        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"sv,
+        "f89fd2f6c45a8b5066a651410b8e534bfec0d9a36f3e2b887457afd44dd651d1ec79274db5a455f182572fceea5e9e39c3c7c5d9e599e4fe31c37c34d253b419c3e8fb6b916aef6563f87d4c37224a456e5952698ba3d01b38945d998a795bd285d69478e3131f55117284e27b441f16095dca7ce9c5b68890b09a2bfbb010a5"sv,
+        "ba48538708512d45c0edcac57a9b4fb637e9721f72003c60f13f5c9a36c968cef9be8f54665418141c3d9ecc02a5bf952cfc055fb51e18705e9d8850f4e1f5a344af550de84ffd0805e27e557f6aa50d2645314c64c1c71aa6bb44faf8f29ca6578e2441d4510e36052f46551df341b2dcf43f761f08b946ca0b7081dadbb88e955e820fd7f657c4dd9f4554d167dd7c9a487ed41ced2b40068098deedc951060faf7e15b1f0f80ae67ff2ee28a238d80bf72dd71c8d95c79bc156114ece8ec837573a4b66898d45b45a5eacd0b0e41447d8fa08a367f437645e50c9920b88a16bc0880147acfb9a79de9e351b3fa00b3f4e9f182f45553dffca55e393c5eab6"sv,
         false));
 }
 
 TEST_F(AsymmetricCryptoTestVectors, RSASignatureVerificationTest3) {
     evaluateRSA(RSAKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "49d2a1"_sd,
-        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"_sd,
-        "915c5e4c16acfa0f49de43d6491f0060a944034475ba518572c08366a8d36c7f1e6afc11e5e4649757bf7b9da10a61d57f1d626847871d8a2948e551b54167c79de88d3ebd40a3e35809b996a53348f98a9918c7a7ec606896ed30c271e00c51953dd97aa6a8fe1cd423c3695c83fcf45120ec0a9cd1644642182b60e599a246"_sd,
-        "3d57ea5961db8fc144301ca4278f799911229d865ea3e992c7fbc4d03c6551729e26034e95dd71da312340e4051c9dd9b12f7700a821fe3b7c37785d5106350b667ac255a57c13da5842d90bcadea9e6b1f720c607d6893a2caa3c5f3c4074e914451a45380a767c291a67cac3f1cab1fbd05adc37036856a8404e7cea3654019466de449ad6e92b27254f3d25949b1b860065406455a13db7c5fe25d1af7a84cddf7792c64e16260c950d60bd86d005924148ad097c126b84947ab6e89d48f61e711d62522b6e48f16186d1339e6ab3f58c359eb24cb68043737591cd7d9390a468c0022b3b253be52f1a7fc408f84e9ffb4c34fa9e01605851d6583aa13032"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "49d2a1"sv,
+        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"sv,
+        "915c5e4c16acfa0f49de43d6491f0060a944034475ba518572c08366a8d36c7f1e6afc11e5e4649757bf7b9da10a61d57f1d626847871d8a2948e551b54167c79de88d3ebd40a3e35809b996a53348f98a9918c7a7ec606896ed30c271e00c51953dd97aa6a8fe1cd423c3695c83fcf45120ec0a9cd1644642182b60e599a246"sv,
+        "3d57ea5961db8fc144301ca4278f799911229d865ea3e992c7fbc4d03c6551729e26034e95dd71da312340e4051c9dd9b12f7700a821fe3b7c37785d5106350b667ac255a57c13da5842d90bcadea9e6b1f720c607d6893a2caa3c5f3c4074e914451a45380a767c291a67cac3f1cab1fbd05adc37036856a8404e7cea3654019466de449ad6e92b27254f3d25949b1b860065406455a13db7c5fe25d1af7a84cddf7792c64e16260c950d60bd86d005924148ad097c126b84947ab6e89d48f61e711d62522b6e48f16186d1339e6ab3f58c359eb24cb68043737591cd7d9390a468c0022b3b253be52f1a7fc408f84e9ffb4c34fa9e01605851d6583aa13032"sv,
         false));
 }
 
 TEST_F(AsymmetricCryptoTestVectors, RSASignatureVerificationTest4) {
     evaluateRSA(RSAKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "7485b2"_sd,
-        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"_sd,
-        "3d2f0693517cffb2b724c1f30502c5359c051c1bcd88dc1dd54b89e6981009d275a813b2bf016b74d0f6ed0d91e62d0884785c9afd8fd1fb7e99246cd4005cdda71a39cb649197a996d8ad2d23fdfb6bb015f24ec3d7f88af64fb83b4b525eb06607d133eec834cf7d6c9ab817b4c0dda370459d9cfba05ad0c1adc86a909fe1"_sd,
-        "511abd82218cab344979b2887b02600d2427f1eb12ac01d97684c2a443a9272834c3f79cded07a39dbee3770dde827a74dc994b17bfd8a26d07b239d26d58c42f79d560264c31b7e1c3dddef6d7556f228c394414f4cec561c3da2686a8eebec7702f32850809a93deeb84b2a02fcdba224d2fd9efb8e056e796f49b57d56e9f3e90d0b49b08bdee93a2e12e676fb4d4fa838c5bd88eda008f1b592a72465587be0ae17d9b156b904f44a7e04d3b58d24ad67b71b0f4c699fa51639546b62b9f83597ff03d465f1bb396ae15e92d0e92e85647d5df113e2c7518d0e3ad2e7aa7dac720c98347aa151e4f37fea081dbed350cc9c93f606b38f21a3e5de6d140d2"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "7485b2"sv,
+        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"sv,
+        "3d2f0693517cffb2b724c1f30502c5359c051c1bcd88dc1dd54b89e6981009d275a813b2bf016b74d0f6ed0d91e62d0884785c9afd8fd1fb7e99246cd4005cdda71a39cb649197a996d8ad2d23fdfb6bb015f24ec3d7f88af64fb83b4b525eb06607d133eec834cf7d6c9ab817b4c0dda370459d9cfba05ad0c1adc86a909fe1"sv,
+        "511abd82218cab344979b2887b02600d2427f1eb12ac01d97684c2a443a9272834c3f79cded07a39dbee3770dde827a74dc994b17bfd8a26d07b239d26d58c42f79d560264c31b7e1c3dddef6d7556f228c394414f4cec561c3da2686a8eebec7702f32850809a93deeb84b2a02fcdba224d2fd9efb8e056e796f49b57d56e9f3e90d0b49b08bdee93a2e12e676fb4d4fa838c5bd88eda008f1b592a72465587be0ae17d9b156b904f44a7e04d3b58d24ad67b71b0f4c699fa51639546b62b9f83597ff03d465f1bb396ae15e92d0e92e85647d5df113e2c7518d0e3ad2e7aa7dac720c98347aa151e4f37fea081dbed350cc9c93f606b38f21a3e5de6d140d2"sv,
         false));
 }
 
 TEST_F(AsymmetricCryptoTestVectors, RSASignatureVerificationTest5) {
     evaluateRSA(RSAKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "49d2a1"_sd,
-        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"_sd,
-        "dffe42bfda886e1a73fe8a8dfcf71c9fb44deb054588a9bb9199d554aecce08f2ff88f2aa6f8a0fb675fb03c8e685c27432ca7c33c189bfd849d34fa7b2979ac1f57eca389632426bae0b98398ad60a3342557e14e96041c1bf4d90b46cf7ad1348322d28caf43c4f7e86c0924ae703c109ec50a84ea2a43df078c3015a52b28"_sd,
-        "8f4dd479239f2d08dc05d7d40539288b67c4d77210ecb16be76f0b1925e8b088570831e361a1ca57893135f8af64b8e2996b8d635899da4e04c68acb9b1b3813697d57da90c57f18509e0ab6705c704feb448cca5c07d258ecd884ab93f508cefdb25f2bc3061c4006099e2e33b27972c3edb0a0a33114d381c82ab506d041ff680af595ef3400a8bb6774030d2e38dd304272092bd32a553017f7bda4b998b27aa8aca12def327b1f11063a5342b0d55738183417d321c5682fc4ab64e79174216feebb989521e1e3d827647068003be34fe1d093964d28f4877c49b4065672448597a89b91919cfb55ca13836e7e6f3b3fd04f417cf1c16d9872538bf4e87a"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "49d2a1"sv,
+        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"sv,
+        "dffe42bfda886e1a73fe8a8dfcf71c9fb44deb054588a9bb9199d554aecce08f2ff88f2aa6f8a0fb675fb03c8e685c27432ca7c33c189bfd849d34fa7b2979ac1f57eca389632426bae0b98398ad60a3342557e14e96041c1bf4d90b46cf7ad1348322d28caf43c4f7e86c0924ae703c109ec50a84ea2a43df078c3015a52b28"sv,
+        "8f4dd479239f2d08dc05d7d40539288b67c4d77210ecb16be76f0b1925e8b088570831e361a1ca57893135f8af64b8e2996b8d635899da4e04c68acb9b1b3813697d57da90c57f18509e0ab6705c704feb448cca5c07d258ecd884ab93f508cefdb25f2bc3061c4006099e2e33b27972c3edb0a0a33114d381c82ab506d041ff680af595ef3400a8bb6774030d2e38dd304272092bd32a553017f7bda4b998b27aa8aca12def327b1f11063a5342b0d55738183417d321c5682fc4ab64e79174216feebb989521e1e3d827647068003be34fe1d093964d28f4877c49b4065672448597a89b91919cfb55ca13836e7e6f3b3fd04f417cf1c16d9872538bf4e87a"sv,
         false));
 }
 
 TEST_F(AsymmetricCryptoTestVectors, RSASignatureVerificationTest6) {
     evaluateRSA(RSAKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "49d2a1"_sd,
-        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"_sd,
-        "cfe99788f55ec6944942bd0a187d51b80fd8bd4051bd4f07c73e614eb75a8b9f997b176b2642b5f1b1877061ba9ce142c1d2a311583f072b7cbe08ed253681191c209d7b0d438fcdddc284d93d59d6dd80e48333a921dd31c9b6834f88768f8701e01102d3e8bdf074fbe0b8c93d9951f41545ef6eeb3be35530babc079f1fb3"_sd,
-        "9fd6f6107e838107f906c26cb2910704599f175b6a84db485fbc30776eb7fd53bfe20c38c537b154a3e519b662bd9fdc8e3045e21f6e5ae97d0ff6a9d8632825544525d84f99f80e3ed4e69dc5e219d59ccfbb37c23c84fe3b3e6fb22f402f94e5225c6387fdf8bcdb3508f8832908fe05771521e92234348004e8fe19a8f24bebcab9f074327c88d066bc12081748d696be6135c6aea32220ea786ebd7800e6936365ff25831c28cb6c8a59237ff84f5cf89036cff188ee0f9a6195f2b1aca2e4442af8369f1b49322fa2f891b83a14a97b60c6aeafd6c2928047affda9c8d869ff5294bb5943ad14a6d64e784d126c469d51e292b9ce33e1d8371ba5f467b3"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "49d2a1"sv,
+        "c47abacc2a84d56f3614d92fd62ed36ddde459664b9301dcd1d61781cfcc026bcb2399bee7e75681a80b7bf500e2d08ceae1c42ec0b707927f2b2fe92ae852087d25f1d260cc74905ee5f9b254ed05494a9fe06732c3680992dd6f0dc634568d11542a705f83ae96d2a49763d5fbb24398edf3702bc94bc168190166492b8671de874bb9cecb058c6c8344aa8c93754d6effcd44a41ed7de0a9dcd9144437f212b18881d042d331a4618a9e630ef9bb66305e4fdf8f0391b3b2313fe549f0189ff968b92f33c266a4bc2cffc897d1937eeb9e406f5d0eaa7a14782e76af3fce98f54ed237b4a04a4159a5f6250a296a902880204e61d891c4da29f2d65f34cbb"sv,
+        "cfe99788f55ec6944942bd0a187d51b80fd8bd4051bd4f07c73e614eb75a8b9f997b176b2642b5f1b1877061ba9ce142c1d2a311583f072b7cbe08ed253681191c209d7b0d438fcdddc284d93d59d6dd80e48333a921dd31c9b6834f88768f8701e01102d3e8bdf074fbe0b8c93d9951f41545ef6eeb3be35530babc079f1fb3"sv,
+        "9fd6f6107e838107f906c26cb2910704599f175b6a84db485fbc30776eb7fd53bfe20c38c537b154a3e519b662bd9fdc8e3045e21f6e5ae97d0ff6a9d8632825544525d84f99f80e3ed4e69dc5e219d59ccfbb37c23c84fe3b3e6fb22f402f94e5225c6387fdf8bcdb3508f8832908fe05771521e92234348004e8fe19a8f24bebcab9f074327c88d066bc12081748d696be6135c6aea32220ea786ebd7800e6936365ff25831c28cb6c8a59237ff84f5cf89036cff188ee0f9a6195f2b1aca2e4442af8369f1b49322fa2f891b83a14a97b60c6aeafd6c2928047affda9c8d869ff5294bb5943ad14a6d64e784d126c469d51e292b9ce33e1d8371ba5f467b3"sv,
         false));
 }
 
@@ -340,15 +344,16 @@ TEST_F(AsymmetricCryptoTestVectors, RSASignatureVerificationTest6) {
 // EC test vectors are otained from FIPS 186-4 RSA SigVer.rsp:
 // https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/dss/186-4ecdsatestvectors.zip
 // We initialize these test vectors to
-// ECKeySignatureVerificationVector(StringData keyID, StringData crv, StringData msg, StringData Qx,
-// StringData Qy, StringData R, StringData S, bool shouldPass) {
+// ECKeySignatureVerificationVector(std::string_view keyID, std::string_view crv, std::string_view
+// msg, std::string_view Qx, std::string_view Qy, std::string_view R, std::string_view S, bool
+// shouldPass) {
 
 /* P-256, SHA-256 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test1) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES256"_sd,
-                   "P-256"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES256"sv,
+                   "P-256"sv,
                    "e4796db5f785f207aa30d311693b3702821dff1168fd2e04c0836825aefd850d9aa60326d88cde1"
                    "a23c7745351"
                    "392ca2288d632c264f197d05cd424a30336c19fd09bb229654f0222fcb881a4b35c290a093ac159"
@@ -365,9 +370,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test1) {
 /* P-256, SHA-256 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test2) {
     evaluateEC(ECKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "ES256"_sd,
-        "P-256"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "ES256"sv,
+        "P-256"sv,
         "e1130af6a38ccb412a9c8d13e15dbfc9e69a16385af3c3f1e5da954fd5e7c45fd75e2b8c36699228e92840c056"
         "2fbf3772f07e17f1add56588dd45f7450e1217ad239922dd9c32695dc71ff2424ca0dec1321aa47064a044b7fe"
         "3c2b97d03ce470a592304c5ef21eed9f93da56bb232d1eeb0035f9bf0dfafdcc4606272b20a3",
@@ -381,9 +386,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test2) {
 /* P-256, SHA-256 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test3) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES256"_sd,
-                   "P-256"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES256"sv,
+                   "P-256"sv,
                    "069a6e6b93dfee6df6ef6997cd80dd2182c36653cef10c655d524585655462d683877f95ecc6d6c"
                    "81623d8fac4"
                    "e900ed0019964094e7de91f1481989ae1873004565789cbf5dc56c62aedc63f62f3b894c9c6f778"
@@ -400,9 +405,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test3) {
 /* P-256, SHA-256 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test4) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES256"_sd,
-                   "P-256"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES256"sv,
+                   "P-256"sv,
                    "df04a346cf4d0e331a6db78cca2d456d31b0a000aa51441defdb97bbeb20b94d8d746429a393ba8"
                    "8840d661615"
                    "e07def615a342abedfa4ce912e562af714959896858af817317a840dcff85a057bb91a3c2bf9010"
@@ -419,9 +424,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test4) {
 /* P-256, SHA-256 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test5) {
     evaluateEC(ECKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "ES256"_sd,
-        "P-256"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "ES256"sv,
+        "P-256"sv,
         "73c5f6a67456ae48209b5f85d1e7de7758bf235300c6ae2bdceb1dcb27a7730fb68c950b7fcada0ecc4661d357"
         "8230f225a875e69aaa17f1e71c6be5c831f22663bac63d0c7a9635edb0043ff8c6f26470f02a7bc56556f1437f"
         "06dfa27b487a6c4290d8bad38d4879b334e341ba092dde4e4ae694a9c09302e2dbf443581c08",
@@ -434,9 +439,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test5) {
 
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test6) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES256"_sd,
-                   "P-256"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES256"sv,
+                   "P-256"sv,
                    "666036d9b4a2426ed6585a4e0fd931a8761451d29ab04bd7dc6d0c5b9e38e6c2b263ff6cb837bd0"
                    "4399de3d757"
                    "c6c7005f6d7a987063cf6d7e8cb38a4bf0d74a282572bd01d0f41e3fd066e3021575f0fa04f27b7"
@@ -453,9 +458,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test6) {
 /* P-256, SHA-256 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test7) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES256"_sd,
-                   "P-256"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES256"sv,
+                   "P-256"sv,
                    "7e80436bce57339ce8da1b5660149a20240b146d108deef3ec5da4ae256f8f894edcbbc57b34ce3"
                    "7089c0daa17"
                    "f0c46cd82b5a1599314fd79d2fd2f446bd5a25b8e32fcf05b76d644573a6df4ad1dfea707b479d9"
@@ -471,9 +476,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test7) {
 
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test8) {
     evaluateEC(ECKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "ES256"_sd,
-        "P-256"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "ES256"sv,
+        "P-256"sv,
         "60cd64b2cd2be6c33859b94875120361a24085f3765cb8b2bf11e026fa9d8855dbe435acf7882e84f3c7857f96"
         "e2baab4d9afe4588e4a82e17a78827bfdb5ddbd1c211fbc2e6d884cddd7cb9d90d5bf4a7311b83f35250803381"
         "2c776a0e00c003c7e0d628e50736c7512df0acfa9f2320bd102229f46495ae6d0857cc452a84",
@@ -487,9 +492,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP256Test8) {
 /* P-384, SHA-384 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test1) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES384"_sd,
-                   "P-384"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES384"sv,
+                   "P-384"sv,
                    "4132833a525aecc8a1a6dea9f4075f44feefce810c4668423b38580417f7bdca5b21061a45eaa3c"
                    "be2a7035ed1"
                    "89523af8002d65c2899e65735e4d93a16503c145059f365c32b3acc6270e29a09131299181c98b3"
@@ -514,9 +519,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test1) {
 /* P-384, SHA-384 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test2) {
     evaluateEC(ECKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "ES384"_sd,
-        "P-384"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "ES384"sv,
+        "P-384"sv,
         "9dd789ea25c04745d57a381f22de01fb0abd3c72dbdefd44e43213c189583eef85ba662044da3de2dd8670e632"
         "5154480155bbeebb702c75781ac32e13941860cb576fe37a05b757da5b5b418f6dd7c30b042e40f4395a342ae4"
         "dce05634c33625e2bc524345481f7e253d9551266823771b251705b4a85166022a37ac28f1bd",
@@ -534,9 +539,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test2) {
 /* P-384, SHA-384 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test3) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES384"_sd,
-                   "P-384"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES384"sv,
+                   "P-384"sv,
                    "9c4479977ed377e75f5cc047edfa689ef232799513a2e70280e9b124b6c8d166e107f5494b40685"
                    "3aec4cff0f2"
                    "ca00c6f89f0f4a2d4ab0267f44512dfff110d1b1b2e5e78832022c14ac06a493ab789e696f7f0f0"
@@ -561,9 +566,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test3) {
 /* P-384, SHA-384 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test4) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES384"_sd,
-                   "P-384"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES384"sv,
+                   "P-384"sv,
                    "137b215c0150ee95e8494b79173d7ae3c3e71efcc7c75ad92f75659ce1b2d7eb555aad8026277ae"
                    "3709f46e896"
                    "963964486946b9fe269df444a6ea289ec2285e7946db57ff18f722a583194a9644e863ae452d145"
@@ -588,9 +593,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test4) {
 /* P-384, SHA-384 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test5) {
     evaluateEC(ECKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "ES384"_sd,
-        "P-384"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "ES384"sv,
+        "P-384"sv,
         "93e7e75cfaf3fa4e71df80f7f8c0ef6672a630d2dbeba1d61349acbaaa476f5f0e34dccbd85b9a815d90820331"
         "3a22fe3e919504cb222d623ad95662ea4a90099742c048341fe3a7a51110d30ad3a48a777c6347ea8b71749316"
         "e0dd1902facb304a76324b71f3882e6e70319e13fc2bb9f3f5dbb9bd2cc7265f52dfc0a3bb91",
@@ -608,9 +613,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test5) {
 /* P-384, SHA-384 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test6) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES384"_sd,
-                   "P-384"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES384"sv,
+                   "P-384"sv,
                    "15493aa10cfb804b3d80703ca02af7e2cfdc671447d9a171b418ecf6ca48b450414a28e7a058a78"
                    "ab0946186ad"
                    "2fe297e1b7e20e40547c74f94887a00f27dde7f78a3c15eb1115d704972b35a27caf8f7cdcce02b"
@@ -635,9 +640,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test6) {
 /* P-384, SHA-384 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test7) {
     evaluateEC(ECKeySignatureVerificationVector(
-        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-        "ES384"_sd,
-        "P-384"_sd,
+        "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+        "ES384"sv,
+        "P-384"sv,
         "bc5582967888a425fb757bd4965900f01e6695d1547ed967c1d4f67b1b1de365d203f407698761699fec5f5a61"
         "4c21e36a9f57a8aaf852e95538f5615785534568811a9a9ccc349843f6c16dc90a4ac96a8f72c33d9589a860f4"
         "981d7b4ee7173d1db5d49c4361368504c9a6cbbaedc2c9bff2b12884379ba90433698ceb881d",
@@ -655,9 +660,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test7) {
 /* P-384, SHA-384 */
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test8) {
     evaluateEC(ECKeySignatureVerificationVector(
-                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-                   "ES384"_sd,
-                   "P-384"_sd,
+                   "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+                   "ES384"sv,
+                   "P-384"sv,
                    "4f31331e20a3273da8fce6b03f2a86712ed5df41120a81e994d2b2f370e98ef35b847f3047d3cf5"
                    "7e88350e27b"
                    "9ac3f02073ac1838db25b5ad477aee68930882304fc052f273821056df7500dc9eab037ed3ac3c7"
@@ -684,9 +689,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationP384Test8) {
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidECCurveTest1) {
     evaluateFailedEC(
         ECKeySignatureVerificationVector(
-            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-            "XXX"_sd,
-            "XXX"_sd,
+            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+            "XXX"sv,
+            "XXX"sv,
             "e1130af6a38ccb412a9c8d13e15dbfc9e69a16385af3c3f1e5da954fd5e7c45fd75e2b8c3669922"
             "8e92840c056"
             "2fbf3772f07e17f1add56588dd45f7450e1217ad239922dd9c32695dc71ff2424ca0dec1321aa47"
@@ -703,9 +708,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidECCurveTest1) 
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidXCoordinateTest2) {
     evaluateFailedEC(
         ECKeySignatureVerificationVector(
-            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-            "ES256"_sd,
-            "P-256"_sd,
+            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+            "ES256"sv,
+            "P-256"sv,
             "60cd64b2cd2be6c33859b94875120361a24085f3765cb8b2bf11e026fa9d8855dbe435acf7882e8"
             "4f3c7857f96"
             "e2baab4d9afe4588e4a82e17a78827bfdb5ddbd1c211fbc2e6d884cddd7cb9d90d5bf4a7311b83f"
@@ -722,9 +727,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidXCoordinateTes
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidYCoordinateTest3) {
     evaluateFailedEC(
         ECKeySignatureVerificationVector(
-            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-            "ES384"_sd,
-            "P-384"_sd,
+            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+            "ES384"sv,
+            "P-384"sv,
             "93e7e75cfaf3fa4e71df80f7f8c0ef6672a630d2dbeba1d61349acbaaa476f5f0e34dccbd85b9a815d9082"
             "03313a22fe3e919504cb222d623ad95662ea4a90099742c048341fe3a7a51110d30ad3a48a777c6347ea8b"
             "71749316e0dd1902facb304a76324b71f3882e6e70319e13fc2bb9f3f5dbb9bd2cc7265f52dfc0a3bb91",
@@ -743,9 +748,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidYCoordinateTes
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidRLength) {
     evaluateEC(
         ECKeySignatureVerificationVector(
-            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-            "ES256"_sd,
-            "P-256"_sd,
+            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+            "ES256"sv,
+            "P-256"sv,
             "73c5f6a67456ae48209b5f85d1e7de7758bf235300c6ae2bdceb1dcb27a7730fb68c950b7fcada0ecc4661"
             "d357"
             "8230f225a875e69aaa17f1e71c6be5c831f22663bac63d0c7a9635edb0043ff8c6f26470f02a7bc56556f1"
@@ -762,9 +767,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidRLength) {
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidSLength) {
     evaluateEC(
         ECKeySignatureVerificationVector(
-            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-            "ES256"_sd,
-            "P-256"_sd,
+            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+            "ES256"sv,
+            "P-256"sv,
             "73c5f6a67456ae48209b5f85d1e7de7758bf235300c6ae2bdceb1dcb27a7730fb68c950b7fcada0ecc4661"
             "d357"
             "8230f225a875e69aaa17f1e71c6be5c831f22663bac63d0c7a9635edb0043ff8c6f26470f02a7bc56556f1"
@@ -780,7 +785,7 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidSLength) {
 
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationUnsupportedAlgorithm) {
     BSONObj key;
-    auto asymmetricKey = JWSValidator::create("XX"_sd, key);
+    auto asymmetricKey = JWSValidator::create("XX"sv, key);
     Status status = asymmetricKey.getStatus();
     ASSERT_EQ(status.code(), ErrorCodes::UnsupportedFormat);
 }
@@ -788,9 +793,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationUnsupportedAlgorithm)
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidAlgorithmAtValidate) {
     evaluateInvalidAlgorithmEC(
         ECKeySignatureVerificationVector(
-            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-            "ES256"_sd,
-            "P-256"_sd,
+            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+            "ES256"sv,
+            "P-256"sv,
             "73c5f6a67456ae48209b5f85d1e7de7758bf235300c6ae2bdceb1dcb27a7730fb68c950b7fcada0ecc4661"
             "d357"
             "8230f225a875e69aaa17f1e71c6be5c831f22663bac63d0c7a9635edb0043ff8c6f26470f02a7bc56556f1"
@@ -807,9 +812,9 @@ TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationInvalidAlgorithmAtVal
 TEST_F(AsymmetricCryptoTestVectors, ECSignatureVerificationEmptyPayloadAtValidate) {
     evaluateEmptyPayload(
         ECKeySignatureVerificationVector(
-            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"_sd,
-            "ES256"_sd,
-            "P-256"_sd,
+            "0UhWwyvtfIdxPvR9zCWYJB5_AM0LE2qc6RGOcI0cQjw"sv,
+            "ES256"sv,
+            "P-256"sv,
             "73c5f6a67456ae48209b5f85d1e7de7758bf235300c6ae2bdceb1dcb27a7730fb68c950b7fcada0ecc4661"
             "d357"
             "8230f225a875e69aaa17f1e71c6be5c831f22663bac63d0c7a9635edb0043ff8c6f26470f02a7bc56556f1"

@@ -30,8 +30,9 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo {
 
@@ -39,7 +40,7 @@ namespace fts {
 
 struct QueryToken {
     enum Type { WHITESPACE, DELIMITER, TEXT, INVALID };
-    QueryToken(Type type, StringData data, unsigned offset, bool previousWhiteSpace)
+    QueryToken(Type type, std::string_view data, unsigned offset, bool previousWhiteSpace)
         : type(type), data(data), offset(offset), previousWhiteSpace(previousWhiteSpace) {}
 
     bool ok() const {
@@ -47,7 +48,7 @@ struct QueryToken {
     }
 
     Type type;
-    StringData data;
+    std::string_view data;
     unsigned offset;
     bool previousWhiteSpace;
 };
@@ -73,7 +74,7 @@ class FTSQueryParser {
     FTSQueryParser& operator=(const FTSQueryParser&) = delete;
 
 public:
-    FTSQueryParser(StringData str);
+    FTSQueryParser(std::string_view str);
     bool more() const;
     QueryToken next();
 
@@ -83,7 +84,7 @@ private:
 
     unsigned _pos;
     bool _previousWhiteSpace;
-    const StringData _raw;
+    const std::string_view _raw;
 };
 }  // namespace fts
 }  // namespace mongo

@@ -42,6 +42,7 @@
 #include <cstddef>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -279,7 +280,7 @@ std::pair<const ASTNode*, size_t> findCommonPoint(const ASTNode* astNode,
     const auto* pathNode = exact_pointer_cast<const ProjectionPathASTNode*>(astNode);
     if (pathNode) {
         // We can look up children.
-        StringData field = path.getFieldName(pathIndex);
+        std::string_view field = path.getFieldName(pathIndex);
         const auto* child = pathNode->getChild(field);
 
         if (!child) {
@@ -296,7 +297,7 @@ std::pair<const ASTNode*, size_t> findCommonPoint(const ASTNode* astNode,
 }
 }  // namespace
 
-bool Projection::isFieldRetainedExactly(StringData path) const {
+bool Projection::isFieldRetainedExactly(std::string_view path) const {
     FieldPath fieldPath(path);
 
     const auto [node, pathIndex] = findCommonPoint(&_root, fieldPath, 0);

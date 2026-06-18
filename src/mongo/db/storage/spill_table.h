@@ -36,6 +36,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -86,7 +87,7 @@ public:
 
     ~SpillTable();
 
-    StringData ident() const;
+    std::string_view ident() const;
 
     /**
      * The dataSize is an approximation of the sum of the sizes (in bytes) of the documents or

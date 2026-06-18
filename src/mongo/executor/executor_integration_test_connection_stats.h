@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 namespace mongo::executor {
 
@@ -46,7 +47,7 @@ MONGO_MOD_PUBLIC void assertConnectionStats(
     const HostAndPort& remote,
     std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,
     std::function<bool(const GRPCConnectionStats&)> gRPCTest,
-    StringData errMsg);
+    std::string_view errMsg);
 
 /**
  * Asserts that the connection stats reach a certain value within a 30 second window. If the test is
@@ -61,6 +62,6 @@ MONGO_MOD_PUBLIC void assertConnectionStatsSoon(
     const HostAndPort& remote,
     std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,
     std::function<bool(const GRPCConnectionStats&)> gRPCTest,
-    StringData errMsg);
+    std::string_view errMsg);
 
 }  // namespace mongo::executor

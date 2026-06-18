@@ -31,7 +31,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
@@ -54,6 +53,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 
@@ -62,7 +62,7 @@ namespace {
 
 class ConfigSvrBalancerControlCommand : public BasicCommand {
 public:
-    ConfigSvrBalancerControlCommand(StringData name) : BasicCommand(name) {}
+    ConfigSvrBalancerControlCommand(std::string_view name) : BasicCommand(name) {}
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).

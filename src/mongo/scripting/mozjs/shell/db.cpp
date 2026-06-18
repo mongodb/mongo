@@ -30,7 +30,6 @@
 #include "mongo/scripting/mozjs/shell/db.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/scripting/mozjs/common/idwrapper.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/str.h"
 
 #include <string>
+#include <string_view>
 
 #include <jsapi.h>
 #include <jsfriendapi.h>
@@ -55,6 +55,7 @@
 
 namespace mongo {
 namespace mozjs {
+using namespace std::literals::string_view_literals;
 
 const char* const DBInfo::className = "DB";
 
@@ -81,7 +82,7 @@ void DBInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool*
         }
 
         // SpiderMonkey will call resolve even for __proto__ so acknowledge it exists.
-        if (sname == "__proto__"_sd) {
+        if (sname == "__proto__"sv) {
             *resolvedp = true;
             return;
         }

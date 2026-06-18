@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/scripting/mozjs/common/base.h"
 #include "mongo/scripting/mozjs/common/wraptype.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 #include <js/TypeDecls.h>
 
@@ -55,7 +55,7 @@ struct MongoHelpersInfo : public BaseInfo {
     static const char* const className;
 };
 
-std::string parseJSFunctionOrExpression(JSContext* cx, StringData input);
+std::string parseJSFunctionOrExpression(JSContext* cx, std::string_view input);
 
 }  // namespace mozjs
 }  // namespace mongo

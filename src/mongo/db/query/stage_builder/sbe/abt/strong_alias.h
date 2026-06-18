@@ -33,6 +33,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo::abt {
 
 /**
@@ -58,14 +60,14 @@ public:
     template <class TagType1 = TagType, class = typename std::enable_if_t<!TagType1::kAllowEmpty>>
     StrongStringAlias(const char (&value)[1]) = delete;
 
-    // Need to explicitly construct from StringData, const char*, or std::string.
+    // Need to explicitly construct from std::string_view, const char*, or std::string.
     explicit StrongStringAlias(std::string value) : _value(std::move(value)) {
         if constexpr (!TagType::kAllowEmpty) {
             invariant(!_value.empty());
         }
     }
 
-    explicit StrongStringAlias(StringData value) : _value(value) {
+    explicit StrongStringAlias(std::string_view value) : _value(value) {
         if constexpr (!TagType::kAllowEmpty) {
             invariant(!_value.empty());
         }
@@ -100,7 +102,7 @@ public:
         return _value != value;
     }
 
-    StringData value() const {
+    std::string_view value() const {
         return _value;
     }
 

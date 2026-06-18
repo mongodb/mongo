@@ -39,6 +39,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
 
@@ -156,7 +158,7 @@ TEST_F(ServiceContextClientTest, MakeAndDeleteClientWithOperationIdManager) {
     ASSERT_FALSE(clientLock);
 }
 
-bool isExcludedThread(const StringData threadName) {
+bool isExcludedThread(const std::string_view threadName) {
     return threadName == "Excluded";
 }
 

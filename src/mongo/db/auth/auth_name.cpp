@@ -38,18 +38,20 @@
 #include "mongo/util/assert_util.h"
 
 #include <bitset>
+#include <string_view>
 #include <type_traits>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
-constexpr auto kTenantFieldName = "tenant"_sd;
+constexpr auto kTenantFieldName = "tenant"sv;
 }  // namespace
 
 template <typename T>
-StatusWith<T> AuthName<T>::parse(StringData str, const boost::optional<TenantId>& tenant) {
+StatusWith<T> AuthName<T>::parse(std::string_view str, const boost::optional<TenantId>& tenant) {
     auto split = str.find('.');
 
     if (split == std::string::npos) {
@@ -77,7 +79,7 @@ T AuthName<T>::parseFromBSONObj(const BSONObj& obj, const boost::optional<Tenant
     constexpr size_t kNameFieldBit = 0;
     constexpr size_t kDbFieldBit = 1;
     constexpr size_t kTenantFieldBit = 2;
-    StringData name, db;
+    std::string_view name, db;
     boost::optional<TenantId> tenant = activeTenant;
 
     const auto validateField = [&](const BSONElement& elem, const size_t bit, BSONType expType) {
@@ -100,7 +102,7 @@ T AuthName<T>::parseFromBSONObj(const BSONObj& obj, const boost::optional<Tenant
             validateField(element, kNameFieldBit, BSONType::string);
             name = element.valueStringData();
 
-        } else if (fieldName == "db"_sd) {
+        } else if (fieldName == "db"sv) {
             validateField(element, kDbFieldBit, BSONType::string);
             db = element.valueStringData();
 
@@ -149,7 +151,7 @@ T AuthName<T>::parseFromBSON(const BSONElement& elem,
 }
 
 template <typename T>
-void AuthName<T>::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+void AuthName<T>::serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const {
     BSONObjBuilder builder(bob->subobjStart(fieldName));
     appendToBSON(&builder);
 }
@@ -162,7 +164,7 @@ void AuthName<T>::serializeToBSON(BSONArrayBuilder* bob) const {
 
 template <typename T>
 void AuthName<T>::appendToBSON(BSONObjBuilder* bob, bool encodeTenant) const {
-    *bob << T::kFieldName << getName() << "db"_sd << getDB();
+    *bob << T::kFieldName << getName() << "db"sv << getDB();
     if (encodeTenant) {
         if (auto tenant = _dbname.tenantId()) {
             *bob << kTenantFieldName << *tenant;
@@ -182,7 +184,7 @@ std::size_t AuthName<T>::getBSONObjSize() const {
     return 4UL +                            // BSONObj size
         1UL + T::kFieldName.size() + 1UL +  // FieldName elem type, FieldName, terminating NULL.
         4UL + getName().size() + 1UL +      // Length of name data, name data, terminating NULL.
-        1UL + ("db"_sd).size() + 1UL +      // DB field elem type, "db", terminating NULL.
+        1UL + ("db"sv).size() + 1UL +       // DB field elem type, "db", terminating NULL.
         4UL + getDB().size() + 1UL +        // DB value length, DB value, terminating NULL.
         1UL;                                // EOD marker.
 }

@@ -33,7 +33,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -89,12 +88,14 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Use this new name to register these tests under their own unit test suite.
 using ShardedUnionTest = ShardedAggTestFixture;
@@ -117,7 +118,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnNetworkError) {
     auto queue = makeQueueStage(expCtx());
     exec::agg::MockStage::setSource_forTest(unionWith, queue.get());
 
-    auto expectedResult = Document{{"_id"_sd, "unionResult"_sd}};
+    auto expectedResult = Document{{"_id"sv, "unionResult"sv}};
 
     auto future = launchAsync([&] {
         auto next = unionWith->getNext();
@@ -156,7 +157,7 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
     auto queue = makeQueueStage(expCtx());
     exec::agg::MockStage::setSource_forTest(unionWith, queue.get());
 
-    auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
+    auto expectedResult = Document{{"_id"sv, BSONNULL}, {"count"sv, 1}};
 
     expCtx()->getOperationContext()->setDeadlineAfterNowBy(Seconds(15),
                                                            ErrorCodes::MaxTimeMSExpired);
@@ -207,7 +208,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     auto queue = makeQueueStage(expCtx());
     exec::agg::MockStage::setSource_forTest(unionWith, queue.get());
 
-    auto expectedResult = Document{{"_id"_sd, "unionResult"_sd}};
+    auto expectedResult = Document{{"_id"sv, "unionResult"sv}};
 
     auto future = launchAsync([&] {
         auto next = unionWith->getNext();
@@ -291,7 +292,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     auto queue = makeQueueStage(expCtx());
     exec::agg::MockStage::setSource_forTest(unionWith, queue.get());
 
-    auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
+    auto expectedResult = Document{{"_id"sv, BSONNULL}, {"count"sv, 1}};
 
     auto future = launchAsync([&] {
         auto next = unionWith->getNext();
@@ -392,7 +393,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     auto queue = makeQueueStage(expCtx());
     exec::agg::MockStage::setSource_forTest(unionWith, queue.get());
 
-    auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
+    auto expectedResult = Document{{"_id"sv, BSONNULL}, {"count"sv, 1}};
 
     auto future = launchAsync([&] {
         auto next = unionWith->getNext();
@@ -472,8 +473,8 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     exec::agg::MockStage::setSource_forTest(unionWithStage, queue.get());
 
     NamespaceString expectedBackingNs(kTestAggregateNss);
-    auto expectedResult = Document{{"_id"_sd, "unionResult"_sd}};
-    auto expectToBeFiltered = Document{{"_id"_sd, "notTheUnionResult"_sd}};
+    auto expectedResult = Document{{"_id"sv, "unionResult"sv}};
+    auto expectToBeFiltered = Document{{"_id"sv, "notTheUnionResult"sv}};
 
     auto future = launchAsync([&] {
         auto next = unionWithStage->getNext();
@@ -518,11 +519,11 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
                                          fromjson("{$match: {_id: 'unionResult'}}")};
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
-            Status{ResolvedView{expectedBackingNs, viewPipeline, BSONObj()}, "It was a view!"_sd});
+            Status{ResolvedView{expectedBackingNs, viewPipeline, BSONObj()}, "It was a view!"sv});
     });
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
-            Status{ResolvedView{expectedBackingNs, viewPipeline, BSONObj()}, "It was a view!"_sd});
+            Status{ResolvedView{expectedBackingNs, viewPipeline, BSONObj()}, "It was a view!"sv});
     });
 
     // That error should be incorporated, then we should target both shards. The results should be
@@ -568,7 +569,7 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
     auto queue = makeQueueStage(expCtx());
     exec::agg::MockStage::setSource_forTest(unionWith, queue.get());
 
-    auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 2}};
+    auto expectedResult = Document{{"_id"sv, BSONNULL}, {"count"sv, 2}};
 
     auto readConcernArgs = repl::ReadConcernArgs{repl::ReadConcernLevel::kMajorityReadConcern};
     {

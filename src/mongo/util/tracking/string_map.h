@@ -35,20 +35,21 @@
 #include "mongo/util/tracking/string.h"
 
 #include <scoped_allocator>
+#include <string_view>
 
 namespace MONGO_MOD_PUB mongo {
 namespace tracking {
 
 struct StringMapHashedKey {
 public:
-    StringMapHashedKey(Context& Context, StringData sd, size_t hash)
+    StringMapHashedKey(Context& Context, std::string_view sd, size_t hash)
         : _Context(Context), _sd(sd), _hash(hash) {}
 
     operator string() const {
         return make_string(_Context, _sd.data(), _sd.size());
     }
 
-    StringData key() const {
+    std::string_view key() const {
         return _sd;
     }
 
@@ -58,26 +59,26 @@ public:
 
 private:
     std::reference_wrapper<Context> _Context;
-    StringData _sd;
+    std::string_view _sd;
     size_t _hash;
 };
 
 struct StringMapHasher {
     using is_transparent = void;
 
-    size_t operator()(StringData sd) const {
+    size_t operator()(std::string_view sd) const {
         return absl::Hash<absl::string_view>{}(absl::string_view{sd.data(), sd.size()});
     }
 
     size_t operator()(const string& s) const {
-        return operator()(StringData{s.data(), s.size()});
+        return operator()(std::string_view{s.data(), s.size()});
     }
 
     size_t operator()(StringMapHashedKey key) const {
         return key.hash();
     }
 
-    StringMapHashedKey hashed_key(Context& Context, StringData sd) {
+    StringMapHashedKey hashed_key(Context& Context, std::string_view sd) {
         return {Context, sd, operator()(sd)};
     }
 };
@@ -85,16 +86,16 @@ struct StringMapHasher {
 struct StringMapEq {
     using is_transparent = void;
 
-    bool operator()(StringData lhs, StringData rhs) const {
+    bool operator()(std::string_view lhs, std::string_view rhs) const {
         return lhs == rhs;
     }
 
-    bool operator()(const string& lhs, StringData rhs) const {
-        return StringData{lhs.data(), lhs.size()} == rhs;
+    bool operator()(const string& lhs, std::string_view rhs) const {
+        return std::string_view{lhs.data(), lhs.size()} == rhs;
     }
 
-    bool operator()(StringData lhs, const string& rhs) const {
-        return lhs == StringData{rhs.data(), rhs.size()};
+    bool operator()(std::string_view lhs, const string& rhs) const {
+        return lhs == std::string_view{rhs.data(), rhs.size()};
     }
 
     bool operator()(StringMapHashedKey lhs, StringMapHashedKey rhs) const {
@@ -102,11 +103,11 @@ struct StringMapEq {
     }
 
     bool operator()(const string& lhs, StringMapHashedKey rhs) const {
-        return StringData{lhs.data(), lhs.size()} == rhs.key();
+        return std::string_view{lhs.data(), lhs.size()} == rhs.key();
     }
 
     bool operator()(StringMapHashedKey lhs, const string& rhs) const {
-        return lhs.key() == StringData{rhs.data(), rhs.size()};
+        return lhs.key() == std::string_view{rhs.data(), rhs.size()};
     }
 
     bool operator()(const string& lhs, const string& rhs) const {

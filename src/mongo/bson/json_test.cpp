@@ -35,6 +35,7 @@
 #include "mongo/util/overloaded_visitor.h"
 
 #include <stack>
+#include <string_view>
 
 namespace mongo {
 
@@ -255,7 +256,7 @@ TEST(JParseTest, InvalidDBRefObjectErrors) {
 }
 
 TEST(JParseTest, FailEarlyOnMissingOpeningBrace) {
-    auto testEarlyParseFailure = [](StringData jsonString) -> void {
+    auto testEarlyParseFailure = [](std::string_view jsonString) -> void {
         BSONObjBuilder builder;
         JParse jparse(jsonString);
         Status status = jparse.parse(builder);
@@ -274,7 +275,7 @@ TEST(JParseTest, FailEarlyOnMissingOpeningBrace) {
 }
 
 TEST(JParseTest, FailEarlyOnMissingClosingBrace) {
-    auto testEarlyParseFailure = [](StringData jsonString) -> void {
+    auto testEarlyParseFailure = [](std::string_view jsonString) -> void {
         BSONObjBuilder builder;
         JParse jparse(jsonString);
         Status status = jparse.parse(builder);

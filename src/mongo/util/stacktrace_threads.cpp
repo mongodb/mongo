@@ -43,6 +43,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -60,7 +61,6 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -84,10 +84,11 @@ namespace mongo {
 namespace stacktrace_details {
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr StringData kTaskDir = "/proc/self/task"_sd;
+constexpr std::string_view kTaskDir = "/proc/self/task"sv;
 
-StringData getBaseName(StringData path) {
+std::string_view getBaseName(std::string_view path) {
     size_t lastSlash = path.rfind('/');
     if (lastSlash == std::string::npos)
         return path;
@@ -109,7 +110,7 @@ public:
             return _base;
         }
 
-        StringData id() const {
+        std::string_view id() const {
             return _id;
         }
 
@@ -129,7 +130,7 @@ public:
         uintptr_t base() const {
             return _base;
         }
-        StringData name() const {
+        std::string_view name() const {
             return _name;
         }
 
@@ -526,21 +527,21 @@ void State::printToEmitter(AbstractEmitter& emitter) {
     {
         BSONObjBuilder prologue;
         if (!missedTids.empty()) {
-            BSONArrayBuilder tidArray(prologue.subarrayStart("missedThreadIds"_sd));
+            BSONArrayBuilder tidArray(prologue.subarrayStart("missedThreadIds"sv));
             for (int tid : missedTids)
                 tidArray.append(tid);
         }
         {
-            BSONObjBuilder procInfo(prologue.subobjStart("processInfo"_sd));
+            BSONObjBuilder procInfo(prologue.subobjStart("processInfo"sv));
             for (const BSONElement& be : bsonProcInfo) {
-                StringData key = be.fieldNameStringData();
+                std::string_view key = be.fieldNameStringData();
 
                 // Handle 'somap' specially. Pass everything else through.
-                if (be.type() == BSONType::array && key == "somap"_sd) {
+                if (be.type() == BSONType::array && key == "somap"sv) {
                     BSONArrayBuilder soMapArr(procInfo.subarrayStart(key));
                     for (const BSONElement& ae : be.Array()) {
                         BSONObj bRec = ae.embeddedObject();
-                        uintptr_t soBase = Hex::fromHex(bRec.getStringField("b"_sd));
+                        uintptr_t soBase = Hex::fromHex(bRec.getStringField("b"sv));
 
                         // Skip any files that aren't present in the metaGen.
                         const auto* file = metaGen.findFile(soBase);
@@ -550,8 +551,8 @@ void State::printToEmitter(AbstractEmitter& emitter) {
 
                         // Replace "b" with the `file->id()`. Pass everything else through.
                         for (auto&& be : bRec) {
-                            if (be.fieldNameStringData() == "b"_sd) {
-                                outLibrary.append("b"_sd, file->id());
+                            if (be.fieldNameStringData() == "b"sv) {
+                                outLibrary.append("b"sv, file->id());
                             } else {
                                 outLibrary.append(be);
                             }
@@ -568,23 +569,23 @@ void State::printToEmitter(AbstractEmitter& emitter) {
     for (ThreadBacktrace* msg : received) {
         BSONObjBuilder threadRecord;
         if (auto threadName = stacktrace_details::readThreadName(msg->tid); !threadName.empty()) {
-            threadRecord.append("name"_sd, threadName);
+            threadRecord.append("name"sv, threadName);
         }
-        threadRecord.append("tid"_sd, msg->tid);
+        threadRecord.append("tid"sv, msg->tid);
         {
-            BSONArrayBuilder backtrace(threadRecord.subarrayStart("backtrace"_sd));
+            BSONArrayBuilder backtrace(threadRecord.subarrayStart("backtrace"sv));
             for (void* const addrPtr : msg->addrRange()) {
                 const auto& meta = metaGen.load(addrPtr);
                 const uintptr_t addr = reinterpret_cast<uintptr_t>(addrPtr);
                 BSONObjBuilder frame(backtrace.subobjStart());
                 if (const auto& mf = meta.file(); mf) {
-                    StringData base = mf->id();  // really a made-up id string
-                    frame.append("b"_sd, base);
-                    frame.append("o"_sd, Hex(offsetFromBase(mf->base(), addr)));
+                    std::string_view base = mf->id();  // really a made-up id string
+                    frame.append("b"sv, base);
+                    frame.append("o"sv, Hex(offsetFromBase(mf->base(), addr)));
                 }
                 if (const auto& sym = meta.symbol(); sym) {
-                    frame.append("s"_sd, sym->name());
-                    frame.append("s+"_sd, Hex(offsetFromBase(sym->base(), addr)));
+                    frame.append("s"sv, sym->name());
+                    frame.append("s+"sv, Hex(offsetFromBase(sym->base(), addr)));
                 }
             }
         }

@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/path.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -42,10 +43,12 @@
 
 namespace mongo {
 
-constexpr StringData InternalSchemaEqMatchExpression::kName;
+constexpr std::string_view InternalSchemaEqMatchExpression::kName;
 
 InternalSchemaEqMatchExpression::InternalSchemaEqMatchExpression(
-    boost::optional<StringData> path, BSONElement rhs, clonable_ptr<ErrorAnnotation> annotation)
+    boost::optional<std::string_view> path,
+    BSONElement rhs,
+    clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_EQ,
                           path,
                           ElementPath::LeafArrayBehavior::kNoTraversal,

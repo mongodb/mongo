@@ -37,6 +37,8 @@
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::timeseries {
@@ -198,7 +200,7 @@ bool augmentPredicates(const Params& params, AndMatchExpression* andExpr) {
         const ComparisonMatchExpressionBase* cmpExpr =
             dynamic_cast<const ComparisonMatchExpressionBase*>(expr);
 
-        StringData path = cmpExpr->path();
+        std::string_view path = cmpExpr->path();
         if (path != params.controlMaxTimePath && path != params.controlMinTimePath) {
             continue;
         }

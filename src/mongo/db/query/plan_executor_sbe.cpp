@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/plan_executor_sbe.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -54,6 +53,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <tuple>
 
 #include <boost/none.hpp>
@@ -64,6 +64,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 // This failpoint is defined by the classic executor but is also accessed here.
 extern FailPoint planExecutorHangBeforeShouldWaitForInserts;
 
@@ -109,8 +110,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    _minRecordIdSlot = env->getSlotIfExists("minRecordId"_sd);
-    _maxRecordIdSlot = env->getSlotIfExists("maxRecordId"_sd);
+    _minRecordIdSlot = env->getSlotIfExists("minRecordId"sv);
+    _maxRecordIdSlot = env->getSlotIfExists("maxRecordId"sv);
 
     if (_cq) {
         initializeAccessors(_metadataAccessors, _rootData.staticData->metadataSlots);
@@ -347,7 +348,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
                         const auto fpNss =
-                            NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
+                            NamespaceStringUtil::parseFailPointData(data, "namespace"sv);
                         return fpNss.isEmpty() || _nss == fpNss;
                     }))) {
                 LOGV2(5567001,
@@ -548,7 +549,7 @@ void PlanExecutorSBE::initializeAccessors(
     }
     if (auto slot = metadataSlots.sortKeySlot) {
         accessor.sortKey = _root->getAccessor(_rootData.env.ctx, *slot);
-        if (auto sortSpecSlot = _rootData.env->getSlotIfExists("searchSortSpec"_sd)) {
+        if (auto sortSpecSlot = _rootData.env->getSlotIfExists("searchSortSpec"sv)) {
             auto [sortSpecTag, sortSpecVal] =
                 _root->getAccessor(_rootData.env.ctx, *sortSpecSlot)->getViewOfValue();
             if (sortSpecTag != sbe::value::TypeTags::Nothing) {
@@ -807,12 +808,12 @@ template sbe::PlanState fetchNext<BSONObj::LargeSizeTrait>(sbe::PlanStage* root,
                                                            RecordId* dlOut,
                                                            bool returnOwnedBson);
 
-StringData PlanExecutorSBE::serializeState(PlanExecutorSBE::State state) {
+std::string_view PlanExecutorSBE::serializeState(PlanExecutorSBE::State state) {
     switch (state) {
         case PlanExecutorSBE::State::kClosed:
-            return "CLOSED"_sd;
+            return "CLOSED"sv;
         case PlanExecutorSBE::State::kOpened:
-            return "OPENED"_sd;
+            return "OPENED"sv;
         default:
             MONGO_UNREACHABLE_TASSERT(11321413);
     }

@@ -33,7 +33,6 @@
 
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/slots_provider.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
@@ -44,6 +43,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -266,7 +266,7 @@ auto makeAggExprVector(Ts&&... pack) {
 class EConstant final : public EExpression {
 public:
     EConstant(value::TypeTags tag, value::Value val) : _tag(tag), _val(val) {}
-    EConstant(StringData str) {
+    EConstant(std::string_view str) {
         // Views are non-owning so we have to make a copy.
         std::tie(_tag, _val) = value::makeNewString(str);
     }
@@ -642,7 +642,7 @@ private:
  */
 class EFail final : public EExpression {
 public:
-    EFail(ErrorCodes::Error code, StringData message) : _code(code) {
+    EFail(ErrorCodes::Error code, std::string_view message) : _code(code) {
         std::tie(_messageTag, _messageVal) = value::makeNewString(message);
     }
 

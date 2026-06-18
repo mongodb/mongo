@@ -35,6 +35,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 MONGO_MOD_NEEDS_REPLACEMENT constexpr inline auto kRawDataFieldName = "rawData"_sd;
@@ -52,7 +54,7 @@ MONGO_MOD_NEEDS_REPLACEMENT bool& isRawDataOperation(OperationContext*);
  */
 template <class CommandRequest>
 MONGO_MOD_NEEDS_REPLACEMENT BSONObj rewriteCommandForRawDataOperation(const BSONObj& cmd,
-                                                                      StringData coll) {
+                                                                      std::string_view coll) {
     BSONObjBuilder builder{cmd.objsize()};
     for (auto&& [fieldName, elem] : cmd) {
         if (fieldName == CommandRequest::kCommandName) {

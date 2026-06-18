@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_list_extensions.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/database_name.h"

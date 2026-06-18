@@ -31,7 +31,6 @@
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -45,6 +44,7 @@
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -70,19 +70,19 @@ public:
         if constexpr (std::is_same_v<Name, std::string>) {
             _name = std::move(name);
         } else {
-            _name = std::string{StringData(name)};
+            _name = std::string{std::string_view(name)};
         }
         _dbname = std::move(dbname);
     }
 
     template <typename Name>
-    AuthName(Name name, StringData db, boost::optional<TenantId> tenantId = boost::none)
+    AuthName(Name name, std::string_view db, boost::optional<TenantId> tenantId = boost::none)
         : AuthName(std::move(name), DatabaseName(std::move(tenantId), std::move(db))) {}
 
     /**
      * Parses a string of the form "db.name" into an AuthName object with an optional tenant.
      */
-    static StatusWith<T> parse(StringData str,
+    static StatusWith<T> parse(std::string_view str,
                                const boost::optional<TenantId>& tenant = boost::none);
 
     /**
@@ -94,7 +94,7 @@ public:
                               const boost::optional<TenantId>& tenant = boost::none);
     static T parseFromBSON(const BSONElement& elem,
                            const boost::optional<TenantId>& tenant = boost::none);
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
     void serializeToBSON(BSONArrayBuilder* bob) const;
     void appendToBSON(BSONObjBuilder* bob, bool encodeTenant = false) const;
     BSONObj toBSON(bool encodeTenant = false) const;
@@ -111,7 +111,7 @@ public:
     /**
      * Gets the database name part of an AuthName.
      */
-    StringData getDB() const {
+    std::string_view getDB() const {
         return _dbname.db(OmitTenant{});
     }
 

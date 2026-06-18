@@ -44,8 +44,9 @@
 namespace mongo {
 namespace repl {
 namespace {
+using namespace std::literals::string_view_literals;
 
-const auto kDbName = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
+const auto kDbName = DatabaseName::createDatabaseName_forTest(boost::none, "test"sv);
 const auto kNss1 = NamespaceString::createNamespaceString_forTest(kDbName, "foo");
 const auto kNss2 = NamespaceString::createNamespaceString_forTest(kDbName, "bar");
 

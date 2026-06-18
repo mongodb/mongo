@@ -31,7 +31,6 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -46,6 +45,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -84,7 +84,7 @@ struct DocumentDiffTables {
      * Inserts to the table and throws if the key exists already, which would mean that the
      * diff is invalid.
      */
-    void safeInsert(StringData fieldName, FieldModification mod) {
+    void safeInsert(std::string_view fieldName, FieldModification mod) {
         auto [it, inserted] = fieldMap.insert({fieldName, std::move(mod)});
         uassert(4728000, str::stream() << "duplicate field name in diff: " << fieldName, inserted);
     }
@@ -103,7 +103,7 @@ DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader,
     DocumentDiffTables out;
     out.insertOnly = true;
 
-    boost::optional<StringData> optFieldName;
+    boost::optional<std::string_view> optFieldName;
     while ((optFieldName = reader->nextDelete())) {
         out.safeInsert(*optFieldName, Delete{});
         out.insertOnly = false;

@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/egress_networking_parameters_gen.h"
 #include "mongo/logv2/log.h"
+
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -42,7 +43,7 @@ namespace mongo::executor {
 
 void OpportunisticSecondaryTargetingParameter::append(OperationContext*,
                                                       BSONObjBuilder* b,
-                                                      StringData name,
+                                                      std::string_view name,
                                                       const boost::optional<TenantId>&) {
     return;
 }
@@ -58,7 +59,7 @@ Status OpportunisticSecondaryTargetingParameter::set(const BSONElement& newValue
     return Status::OK();
 }
 
-Status OpportunisticSecondaryTargetingParameter::setFromString(StringData modeStr,
+Status OpportunisticSecondaryTargetingParameter::setFromString(std::string_view modeStr,
                                                                const boost::optional<TenantId>&) {
     LOGV2_WARNING(
         9206305,

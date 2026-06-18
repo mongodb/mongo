@@ -39,6 +39,7 @@
 
 #include <algorithm>
 #include <array>
+#include <string_view>
 
 #include <pcre2.h>
 
@@ -289,9 +290,9 @@ public:
     }
 
     MatchData match(std::string input, MatchOptions options, size_t startPos) const;
-    MatchData matchView(StringData input, MatchOptions options, size_t startPos) const;
+    MatchData matchView(std::string_view input, MatchOptions options, size_t startPos) const;
 
-    int substitute(StringData replacement,
+    int substitute(std::string_view replacement,
                    std::string* str,
                    MatchOptions options,
                    size_t startPos) const {
@@ -390,7 +391,7 @@ public:
         return _regex->captureCount();
     }
 
-    StringData operator[](size_t i) const {
+    std::string_view operator[](size_t i) const {
         invariant(_data);
         // Using direct offset vector access. It's pairs of size_t offsets.
         // Captures can be unpopulated, represented by PCRE2_UNSET elements.
@@ -402,10 +403,10 @@ public:
         size_t e = p[2 * i + 1];
         if (b == PCRE2_UNSET)
             return {};
-        return StringData(_input.substr(b, e - b));
+        return std::string_view(_input.substr(b, e - b));
     }
 
-    StringData operator[](const std::string& name) const {
+    std::string_view operator[](const std::string& name) const {
         invariant(*_regex);
         int rc = pcre2_substring_number_from_name(_regex->code(), (PCRE2_SPTR)name.c_str());
         if (rc < 0) {
@@ -415,8 +416,8 @@ public:
         return (*this)[rc];
     }
 
-    std::vector<StringData> getMatchList() const {
-        std::vector<StringData> vec;
+    std::vector<std::string_view> getMatchList() const {
+        std::vector<std::string_view> vec;
         if (*_regex) {
             const size_t n = captureCount();
             vec.reserve(n);
@@ -426,8 +427,8 @@ public:
         return vec;
     }
 
-    std::vector<StringData> getCaptures() const {
-        std::vector<StringData> vec;
+    std::vector<std::string_view> getCaptures() const {
+        std::vector<std::string_view> vec;
         if (*_regex) {
             const size_t n = captureCount();
             vec.reserve(n);
@@ -441,7 +442,7 @@ public:
         return _error;
     }
 
-    StringData input() const {
+    std::string_view input() const {
         return _input;
     }
 
@@ -453,7 +454,7 @@ public:
         _input = _inputStorage = std::move(s);
     }
 
-    void setInputView(StringData s) {
+    void setInputView(std::string_view s) {
         _input = s;
     }
 
@@ -482,7 +483,7 @@ public:
         // returns 0, it is ensured that all entries in the ovector have been initialized to
         // 'PCRE2_UNSET' before. When accessing the ovector entries later via
         // 'MatchDataImpl::operator[](size_t)', the accessed ovector entry is compared against
-        // PCRE2_UNSET, and an empty 'StringData' value is returned.
+        // PCRE2_UNSET, and an empty 'std::string_view' value is returned.
         if (matched < 0)
             _error = toErrc(matched);
     }
@@ -497,7 +498,7 @@ private:
     const RegexImpl* _regex;
     std::error_code _error;
     std::string _inputStorage;
-    StringData _input;
+    std::string_view _input;
     size_t _startPos = 0;
     std::unique_ptr<pcre2_match_data, FreeMatchData> _data;
 };
@@ -508,7 +509,9 @@ MatchData RegexImpl::match(std::string input, MatchOptions options, size_t start
     return _doMatch(std::move(m), options, startPos);
 }
 
-MatchData RegexImpl::matchView(StringData input, MatchOptions options, size_t startPos) const {
+MatchData RegexImpl::matchView(std::string_view input,
+                               MatchOptions options,
+                               size_t startPos) const {
     auto m = std::make_unique<MatchDataImpl>(this);
     m->setInputView(input);
     return _doMatch(std::move(m), options, startPos);
@@ -566,21 +569,21 @@ IFWD(Regex, errorPosition, (size_t), (), ())
 IFWD(Regex, captureCount, (size_t), (), ())
 IFWD(Regex, codeSize, (size_t), (), ())
 IFWD(Regex, match, (MatchData), (std::string in, MatchOptions opt, size_t p), (in, opt, p))
-IFWD(Regex, matchView, (MatchData), (StringData in, MatchOptions opt, size_t p), (in, opt, p))
+IFWD(Regex, matchView, (MatchData), (std::string_view in, MatchOptions opt, size_t p), (in, opt, p))
 IFWD(Regex,
      substitute,
      (int),
-     (StringData r, std::string* s, MatchOptions o, size_t p),
+     (std::string_view r, std::string* s, MatchOptions o, size_t p),
      (r, s, o, p))
 
 IFWD(MatchData, operator bool, (), (), ())
 IFWD(MatchData, captureCount, (size_t), (), ())
-IFWD(MatchData, operator[], (StringData), (size_t i), (i))
-IFWD(MatchData, operator[], (StringData), (const std::string& name), (name))
-IFWD(MatchData, getCaptures, (std::vector<StringData>), (), ())
-IFWD(MatchData, getMatchList, (std::vector<StringData>), (), ())
+IFWD(MatchData, operator[], (std::string_view), (size_t i), (i))
+IFWD(MatchData, operator[], (std::string_view), (const std::string& name), (name))
+IFWD(MatchData, getCaptures, (std::vector<std::string_view>), (), ())
+IFWD(MatchData, getMatchList, (std::vector<std::string_view>), (), ())
 IFWD(MatchData, error, (std::error_code), (), ())
-IFWD(MatchData, input, (StringData), (), ())
+IFWD(MatchData, input, (std::string_view), (), ())
 IFWD(MatchData, startPos, (size_t), (), ())
 
 #undef IFWD

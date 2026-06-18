@@ -37,6 +37,8 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace catalog {
 
@@ -149,7 +151,7 @@ enum class MONGO_MOD_PUBLIC DataRemoval {
  */
 MONGO_MOD_PUBLIC
 void removeIndex(OperationContext* opCtx,
-                 StringData indexName,
+                 std::string_view indexName,
                  Collection* collection,
                  std::shared_ptr<IndexCatalogEntry> entry,
                  DataRemoval dataRemoval = DataRemoval::kTwoPhase);

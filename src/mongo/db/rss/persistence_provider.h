@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/storage/checkpoint_schedule_policy.h"

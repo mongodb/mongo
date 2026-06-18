@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -42,6 +41,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -49,7 +49,7 @@
 
 namespace mongo::projection_executor_utils {
 bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor,
-                               StringData field) {
+                               std::string_view field) {
     // Skip field name validation if 'field' contains '$' or '.'.
     bool skipValidation = field.find('\0') == std::string::npos &&
         (field.find('$') != std::string::npos || field.find('.') != std::string::npos);
@@ -279,7 +279,7 @@ Value applyFindElemMatchProjection(const Document& input,
     }
 
     const auto& fullPath = path.fullPath();
-    auto val = input[StringData{fullPath}];
+    auto val = input[std::string_view{fullPath}];
     tassert(7241707,
             str::stream()
                 << "$elemMatch projection operator requires an array field, found field of type:"

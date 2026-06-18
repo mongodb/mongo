@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <type_traits>
 
 #include <boost/optional/optional.hpp>
@@ -52,6 +52,7 @@
 
 namespace mongo {
 namespace sbe {
+using namespace std::literals::string_view_literals;
 HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                            value::SlotVector gbs,
                            std::vector<std::unique_ptr<HashAggAccumulator>> accumulatorList,
@@ -62,7 +63,7 @@ HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                            PlanNodeId planNodeId,
                            bool participateInTrialRunTracking,
                            bool forceIncreasedSpilling)
-    : HashAggBaseStage("group"_sd,
+    : HashAggBaseStage("group"sv,
                        yieldPolicy,
                        planNodeId,
                        nullptr /* _collatorAccessor */,

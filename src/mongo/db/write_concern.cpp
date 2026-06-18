@@ -63,6 +63,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <variant>
 
 #include <absl/container/node_hash_map.h>
@@ -162,7 +163,7 @@ _tryGetWCFailureFromFailPoint_ForTest(const OpTime& replOpTime,
 
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                                                     const GenericArguments& genericArgs,
-                                                    StringData commandName,
+                                                    std::string_view commandName,
                                                     bool isInternalClient) {
     WriteConcernOptions writeConcern =
         genericArgs.getWriteConcern().value_or_eval([]() { return WriteConcernOptions(); });

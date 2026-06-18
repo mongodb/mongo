@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -66,6 +65,7 @@
 #include <functional>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include <boost/intrusive_ptr.hpp>
@@ -381,7 +381,7 @@ public:
      * Removes and returns the first stage of the pipeline if its name is 'targetStageName'.
      * Returns nullptr if there is no first stage with that name.
      */
-    boost::intrusive_ptr<DocumentSource> popFrontWithName(StringData targetStageName);
+    boost::intrusive_ptr<DocumentSource> popFrontWithName(std::string_view targetStageName);
 
     /**
      * Removes and returns the last stage of the pipeline. Returns nullptr if the pipeline is empty.

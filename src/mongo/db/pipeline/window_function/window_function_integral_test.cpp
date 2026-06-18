@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/window_function/window_function_integral.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cmath>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -294,18 +294,18 @@ TEST_F(WindowFunctionIntegralTest, InputParameterWrongTypeTest) {
     auto singleton = Value{std::vector<Value>{{Value(5.0)}}};
     ASSERT_THROWS_CODE(integral->add(singleton), DBException, 5423900);
 
-    auto doubleString =
-        Value(std::vector<Value>{Value{StringData{"hello"}}, Value{StringData{"world"}}});
+    auto doubleString = Value(
+        std::vector<Value>{Value{std::string_view{"hello"}}, Value{std::string_view{"world"}}});
     ASSERT_THROWS_CODE(integral->add(doubleString), DBException, 5423900);
 
-    auto str1 = Value(std::vector<Value>{Value{StringData{"hello"}}, Value{1}});
+    auto str1 = Value(std::vector<Value>{Value{std::string_view{"hello"}}, Value{1}});
     ASSERT_THROWS_CODE(integral->add(str1), DBException, 5423900);
 
-    auto str2 = Value(std::vector<Value>{Value{1}, Value{StringData{"world"}}});
+    auto str2 = Value(std::vector<Value>{Value{1}, Value{std::string_view{"world"}}});
     ASSERT_THROWS_CODE(integral->add(str2), DBException, 5423900);
 
-    auto str2date = Value(
-        std::vector<Value>{Value{Date_t::fromMillisSinceEpoch(1000)}, Value{StringData{"world"}}});
+    auto str2date = Value(std::vector<Value>{Value{Date_t::fromMillisSinceEpoch(1000)},
+                                             Value{std::string_view{"world"}}});
     ASSERT_THROWS_CODE(integral->add(str2), DBException, 5423900);
 }
 

@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -39,10 +38,12 @@
 #include "mongo/util/str.h"
 
 #include <cstddef>
+#include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-const StringData CommitQuorumOptions::kCommitQuorumField = "commitQuorum"_sd;
+const std::string_view CommitQuorumOptions::kCommitQuorumField = "commitQuorum"sv;
 const char CommitQuorumOptions::kMajority[] = "majority";
 const char CommitQuorumOptions::kVotingMembers[] = "votingMembers";
 
@@ -105,7 +106,8 @@ BSONObj CommitQuorumOptions::toBSON() const {
     return builder.obj();
 }
 
-void CommitQuorumOptions::appendToBuilder(StringData fieldName, BSONObjBuilder* builder) const {
+void CommitQuorumOptions::appendToBuilder(std::string_view fieldName,
+                                          BSONObjBuilder* builder) const {
     if (mode.empty()) {
         builder->append(fieldName, numNodes);
     } else {

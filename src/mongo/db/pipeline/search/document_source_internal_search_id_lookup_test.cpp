@@ -72,6 +72,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
 using std::vector;
@@ -238,13 +239,13 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, BasicSearchTest) {
 
     // We should find one document here with _id = 0.
     auto next = idLookupStage->getNext();
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 0}, {"color", "red"_sd}}));
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 0}, {"color", "red"sv}}));
 
     next = idLookupStage->getNext();
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 1}, {"color", "blue"_sd}}));
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 1}, {"color", "blue"sv}}));
 
     next = idLookupStage->getNext();
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 2}, {"color", "yellow"_sd}}));
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 2}, {"color", "yellow"sv}}));
 
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
 
@@ -256,7 +257,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldSkipResultsWhenIdNotFound) {
     expCtx->setUUID(UUID::gen());
 
     // Create documents for the collection - only _id = 0 exists.
-    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"_sd)};
+    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv)};
     insertDocuments(kTestNss, docs);
 
     auto [idLookup, idLookupStage, collections] = createIdLookup();
@@ -269,7 +270,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldSkipResultsWhenIdNotFound) {
     // We should find one document here with _id = 0.
     auto next = idLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 0}, {"color", "red"_sd}}));
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 0}, {"color", "red"sv}}));
 
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
@@ -282,8 +283,8 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotRemoveMetadata) {
     expCtx->setUUID(UUID::gen());
 
     // Create documents for the collection.
-    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"_sd << "something else"
-                                         << "will be projected out"_sd)};
+    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv << "something else"
+                                         << "will be projected out"sv)};
     insertDocuments(kTestNss, docs);
 
     // Create a mock data source with metadata.
@@ -310,7 +311,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotRemoveMetadata) {
     ASSERT_DOCUMENT_EQ(
         next.releaseDocument(),
         (Document{
-            {"_id", 0}, {"color", "red"_sd}, {"score", 0.123}, {"scoreInfo", searchScoreDetails}}));
+            {"_id", 0}, {"color", "red"sv}, {"score", 0.123}, {"scoreInfo", searchScoreDetails}}));
 
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
@@ -323,16 +324,16 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldAllowStringOrObjectIdValues)
     expCtx->setUUID(UUID::gen());
 
     // Create documents for the collection with string and document _ids.
-    std::vector<BSONObj> docs{BSON("_id" << "tango"_sd << "color"
-                                         << "red"_sd),
+    std::vector<BSONObj> docs{BSON("_id" << "tango"sv << "color"
+                                         << "red"sv),
                               BSON("_id" << BSON("number" << 42 << "irrelevant"
-                                                          << "something"_sd))};
+                                                          << "something"sv))};
     insertDocuments(kTestNss, docs);
 
     // Mock its input with string and document _ids.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        {Document{{"_id", "tango"_sd}},
-         Document{{"_id", Document{{"number", 42}, {"irrelevant", "something"_sd}}}}},
+        {Document{{"_id", "tango"sv}},
+         Document{{"_id", Document{{"number", 42}, {"irrelevant", "something"sv}}}}},
         expCtx);
 
     auto [idLookup, idLookupStage, collections] = createIdLookup();
@@ -341,14 +342,13 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldAllowStringOrObjectIdValues)
     // Find documents when _id is a string or document.
     auto next = idLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                       (Document{{"_id", "tango"_sd}, {"color", "red"_sd}}));
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", "tango"sv}, {"color", "red"sv}}));
 
     next = idLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(
         next.releaseDocument(),
-        (Document{{"_id", Document{{"number", 42}, {"irrelevant", "something"_sd}}}}));
+        (Document{{"_id", Document{{"number", 42}, {"irrelevant", "something"sv}}}}));
 
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
@@ -361,7 +361,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotErrorOnEmptyResult) {
     expCtx->setUUID(UUID::gen());
 
     // Create a document for the collection.
-    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"_sd)};
+    std::vector<BSONObj> docs{BSON("_id" << 0 << "color" << "red"sv)};
     insertDocuments(kTestNss, docs);
 
     auto [idLookup, idLookupStage, collections] = createIdLookup();
@@ -535,13 +535,13 @@ TEST_F(InternalSearchIdLookupOrphanFilteringTest, ShouldFilterOrphanDocuments) {
     auto next = idLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                       (Document{{"_id", 0}, {"skey", 0}, {"color", "red"_sd}}));
+                       (Document{{"_id", 0}, {"skey", 0}, {"color", "red"sv}}));
 
     // Document with _id = 1, skey = 5 (owned)
     next = idLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                       (Document{{"_id", 1}, {"skey", 5}, {"color", "blue"_sd}}));
+                       (Document{{"_id", 1}, {"skey", 5}, {"color", "blue"sv}}));
 
     // Documents with _id = 2 and _id = 3 are orphans (skey >= 10), they should be skipped.
 
@@ -549,7 +549,7 @@ TEST_F(InternalSearchIdLookupOrphanFilteringTest, ShouldFilterOrphanDocuments) {
     next = idLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                       (Document{{"_id", 4}, {"skey", 9}, {"color", "purple"_sd}}));
+                       (Document{{"_id", 4}, {"skey", 9}, {"color", "purple"sv}}));
 
     // Should be EOF - the orphan documents were filtered out.
     ASSERT_TRUE(idLookupStage->getNext().isEOF());

@@ -29,12 +29,13 @@
 
 #include "mongo/logv2/text_formatter.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/util/time_support.h"
+
+#include <string_view>
 
 #include <boost/exception/exception.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
@@ -52,12 +53,12 @@ void TextFormatter::operator()(boost::log::record_view const& rec,
     fmt::memory_buffer buffer;
     fmt::format_to(std::back_inserter(buffer),
                    "{} {:<2} {:<8} [{}] ",
-                   StringData{DateStringBuffer{}.iso8601(
+                   std::string_view{DateStringBuffer{}.iso8601(
                        extract<Date_t>(attributes::timeStamp(), rec).get(),
                        _timestampFormat == LogTimestampFormat::kISO8601Local)},
                    extract<LogSeverity>(attributes::severity(), rec).get().toStringDataCompact(),
                    extract<LogComponent>(attributes::component(), rec).get().getNameForLog(),
-                   extract<StringData>(attributes::threadName(), rec).get());
+                   extract<std::string_view>(attributes::threadName(), rec).get());
     strm.write(buffer.data(), buffer.size());
 
     if (extract<LogTag>(attributes::tags(), rec).get().has(LogTag::kStartupWarnings)) {

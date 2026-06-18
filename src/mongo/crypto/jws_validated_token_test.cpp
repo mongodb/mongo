@@ -38,6 +38,7 @@
 #include "mongo/util/base64.h"
 
 #include <string>
+#include <string_view>
 
 #include <fmt/format.h>
 #include <openssl/opensslv.h>
@@ -45,6 +46,7 @@
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 
 namespace mongo::crypto::test {
+using namespace std::literals::string_view_literals;
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L || \
     (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER >= 0x2070000fL)
 
@@ -228,7 +230,7 @@ constexpr auto expiredTokenSignatureES384 =
 
 BSONObj getTestJWKSet() {
     BSONObjBuilder set;
-    BSONArrayBuilder keys(set.subarrayStart("keys"_sd));
+    BSONArrayBuilder keys(set.subarrayStart("keys"sv));
 
     {
         BSONObjBuilder key(keys.subobjStart());
@@ -281,7 +283,7 @@ BSONObj getTestJWKSet() {
 }
 
 
-void validateJWKManagerWithToken(JWKManagerTest* instance, StringData token) {
+void validateJWKManagerWithToken(JWKManagerTest* instance, std::string_view token) {
     unittest::ServerParameterGuard quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
     instance->jwksFetcher()->setKeys(getTestJWKSet());
     ASSERT_OK(instance->jwkManager()->loadKeys());
@@ -506,7 +508,7 @@ TEST_F(JWKManagerTest, getLastAttemptedFetchTime) {
     // Load just the second key (custom-key-2) from testJWKSet into the JWKManager.
     auto key = [this]() {
         BSONObjBuilder singleKeySetBuilder;
-        BSONArrayBuilder keysBuilder(singleKeySetBuilder.subarrayStart("keys"_sd));
+        BSONArrayBuilder keysBuilder(singleKeySetBuilder.subarrayStart("keys"sv));
 
         auto fullJWKSet = getTestJWKSet();
         keysBuilder.append(fullJWKSet.getField("keys").Array()[1]);

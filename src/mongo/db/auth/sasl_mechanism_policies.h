@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/hash_block.h"
 #include "mongo/db/auth/auth_mechanism.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 struct AWSIAMPolicy {
-    static constexpr StringData getName() {
+    static constexpr std::string_view getName() {
         return auth::kMechanismMongoAWS;
     }
     static SecurityPropertySet getProperties() {
@@ -53,7 +54,7 @@ struct AWSIAMPolicy {
 };
 
 struct PLAINPolicy {
-    static constexpr StringData getName() {
+    static constexpr std::string_view getName() {
         return auth::kMechanismSaslPlain;
     }
     static SecurityPropertySet getProperties() {
@@ -70,7 +71,7 @@ struct PLAINPolicy {
 struct SCRAMSHA1Policy {
     using HashBlock = SHA1Block;
 
-    static constexpr StringData getName() {
+    static constexpr std::string_view getName() {
         return auth::kMechanismScramSha1;
     }
     static SecurityPropertySet getProperties() {
@@ -87,7 +88,7 @@ struct SCRAMSHA1Policy {
 struct SCRAMSHA256Policy {
     using HashBlock = SHA256Block;
 
-    static constexpr StringData getName() {
+    static constexpr std::string_view getName() {
         return auth::kMechanismScramSha256;
     }
     static SecurityPropertySet getProperties() {
@@ -102,7 +103,7 @@ struct SCRAMSHA256Policy {
 };
 
 struct GSSAPIPolicy {
-    static constexpr StringData getName() {
+    static constexpr std::string_view getName() {
         return auth::kMechanismGSSAPI;
     }
     static SecurityPropertySet getProperties() {
@@ -117,7 +118,7 @@ struct GSSAPIPolicy {
 };
 
 struct X509Policy {
-    static constexpr StringData getName() {
+    static constexpr std::string_view getName() {
         return auth::kMechanismMongoX509;
     }
 

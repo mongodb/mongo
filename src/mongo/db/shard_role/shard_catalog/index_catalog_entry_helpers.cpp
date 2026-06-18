@@ -32,7 +32,10 @@
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/planner_ixselect.h"
 
+#include <string_view>
+
 namespace mongo::index_catalog_helpers {
+using namespace std::literals::string_view_literals;
 
 void computeUpdateIndexData(const IndexCatalogEntry* entry,
                             const IndexAccessMethod* accessMethod,
@@ -60,8 +63,8 @@ void computeUpdateIndexData(const IndexCatalogEntry* entry,
             BSONObj key = descriptor->keyPattern();
             BSONObjIterator j(key);
             while (j.more()) {
-                StringData fieldName(j.next().fieldName());
-                if (!fieldName.ends_with("$**"_sd)) {
+                std::string_view fieldName(j.next().fieldName());
+                if (!fieldName.ends_with("$**"sv)) {
                     outData->addPath(FieldRef{fieldName});
                 }
             }

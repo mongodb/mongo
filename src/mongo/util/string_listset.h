@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
@@ -41,6 +40,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -56,7 +56,7 @@ private:
         return val & ((1u << n) - 1u);
     }
 
-    inline static size_t computeFastHash1(StringData s) {
+    inline static size_t computeFastHash1(std::string_view s) {
         size_t len = s.size();
         if (MONGO_unlikely(len == 0)) {
             return 126;
@@ -67,11 +67,11 @@ private:
         return h;
     }
 
-    inline static size_t computeFastHash2(StringData s, size_t fastHash1) {
+    inline static size_t computeFastHash2(std::string_view s, size_t fastHash1) {
         if (MONGO_unlikely(s.empty())) {
             return 38;
         }
-        // The lowest 5 bits of 'str[0]' are a decent source of entropy. Using 'str[0]' and
+        // The lowest 5 bits of 's[0]' are a decent source of entropy. Using 's[0]' and
         // 'fastHash1', generate a pseudo-random number 'h' where 0 <= h <= 127 and where
         // h != fastHash1.
         uint8_t b0 = s[0];
@@ -139,7 +139,7 @@ public:
         return _strings.at(idx);
     }
 
-    inline size_t findPos(StringData str) const {
+    inline size_t findPos(std::string_view str) const {
         size_t len = str.size();
         size_t fastHash = computeFastHash1(str);
         size_t encodedIdx = 0;
@@ -183,12 +183,12 @@ public:
         return findInMapImpl(str);
     }
 
-    inline std::vector<std::string>::const_iterator find(StringData str) const {
+    inline std::vector<std::string>::const_iterator find(std::string_view str) const {
         auto pos = findPos(str);
         return pos != npos ? _strings.cbegin() + pos : _strings.cend();
     }
 
-    inline size_t count(StringData str) const {
+    inline size_t count(std::string_view str) const {
         auto pos = findPos(str);
         return pos != npos ? 1 : 0;
     }
@@ -211,7 +211,7 @@ private:
 
     std::array<uint8_t, 128> buildFastHash();
 
-    size_t findInMapImpl(StringData str) const;
+    size_t findInMapImpl(std::string_view str) const;
 
     std::vector<std::string> _strings;
     StringDataMap<size_t> _stringToIndexMap;

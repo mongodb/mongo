@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -46,6 +45,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <new>
+#include <string_view>
 
 #include <boost/intrusive_ptr.hpp>
 
@@ -59,7 +59,7 @@ class Value;
 /** An immutable reference-counted string of inline data. */
 class RCString final : public RefCountable {
 public:
-    static boost::intrusive_ptr<const RCString> create(StringData s) {
+    static boost::intrusive_ptr<const RCString> create(std::string_view s) {
         static constexpr size_t sizeLimit = BSONObjMaxUserSize;
         uassert(ErrorCodes::BSONObjectTooLarge,
                 fmt::format("RCString too large. Requires size={} < limit={}", s.size(), sizeLimit),
@@ -67,16 +67,16 @@ public:
         return boost::intrusive_ptr{new (s) RCString{s}};
     }
 
-    explicit operator StringData() const noexcept {
-        return StringData{_data(), _size};
+    explicit operator std::string_view() const noexcept {
+        return std::string_view{_data(), _size};
     }
 
-    void* operator new(size_t, StringData s) {
+    void* operator new(size_t, std::string_view s) {
         return ::operator new(_allocSize(s.size()));
     }
 
-    /** Used if constructor fails after placement `new (StringData)`. */
-    void operator delete(void* ptr, StringData s) {
+    /** Used if constructor fails after placement `new (std::string_view)`. */
+    void operator delete(void* ptr, std::string_view s) {
         ::operator delete(ptr, _allocSize(s.size()));
     }
 
@@ -99,7 +99,7 @@ private:
     }
 
     /** Use static `create()` instead. */
-    explicit RCString(StringData s) : _size{s.size()} {
+    explicit RCString(std::string_view s) : _size{s.size()} {
         if (_size)
             memcpy(_data(), s.data(), _size);
         _data()[_size] = '\0';
@@ -202,7 +202,7 @@ public:
         type = stdx::to_underlying(t);
         putVector(std::move(a));
     }
-    ValueStorage(BSONType t, StringData s) {
+    ValueStorage(BSONType t, std::string_view s) {
         zero();
         type = stdx::to_underlying(t);
         putString(s);
@@ -299,13 +299,14 @@ public:
     }
 
     /// These are only to be called during Value construction on an empty Value
-    void putString(StringData s);
+    void putString(std::string_view s);
     void putVector(boost::intrusive_ptr<RCVector<Value>>&& v);
     void putDocument(const Document& d);
     void putDocument(Document&& d);
     void putRegEx(const BSONRegEx& re);
     void putBinData(const BSONBinData& bd) {
-        putRefCountable(RCString::create(StringData(static_cast<const char*>(bd.data), bd.length)));
+        putRefCountable(
+            RCString::create(std::string_view(static_cast<const char*>(bd.data), bd.length)));
         binSubType = bd.type;
     }
 
@@ -331,13 +332,13 @@ public:
             verifyRefCountingIfShould();
     }
 
-    StringData getString() const {
+    std::string_view getString() const {
         if (shortStr) {
-            return StringData(shortStrStorage, shortStrSize);
+            return std::string_view(shortStrStorage, shortStrSize);
         } else {
             dassert(typeid(*genericRCPtr) == typeid(const RCString));
             const RCString* stringPtr = static_cast<const RCString*>(genericRCPtr);
-            return StringData{*stringPtr};
+            return std::string_view{*stringPtr};
         }
     }
 

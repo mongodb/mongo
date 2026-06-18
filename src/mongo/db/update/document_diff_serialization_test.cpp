@@ -37,6 +37,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <exception>
+#include <string_view>
 
 #include <boost/none.hpp>
 
@@ -50,7 +51,7 @@ namespace {
 // Convenient (but inefficient) way to rename a BSONElement. The returned BSONElement is not safe
 // to use after another call to withFieldName(). Note that this is not thread-safe so do not
 // copy/paste this into real server code.
-BSONElement withFieldName(BSONElement elem, StringData fieldName) {
+BSONElement withFieldName(BSONElement elem, std::string_view fieldName) {
     static BSONObj storage;
     storage = elem.wrap(fieldName);
 
@@ -59,9 +60,9 @@ BSONElement withFieldName(BSONElement elem, StringData fieldName) {
 
 TEST(DiffSerializationTest, DeleteSimple) {
     diff_tree::DocumentSubDiffNode diffNode;
-    StringData fieldName1 = "f1";
-    StringData fieldName2 = "f2";
-    StringData fieldName3 = "f3";
+    std::string_view fieldName1 = "f1";
+    std::string_view fieldName2 = "f2";
+    std::string_view fieldName3 = "f3";
     diffNode.addDelete(fieldName1);
     diffNode.addDelete(fieldName2);
     diffNode.addDelete(fieldName3);

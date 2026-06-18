@@ -32,7 +32,6 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/future.h"
@@ -44,6 +43,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <utility>
 
 MONGO_MOD_PUBLIC;
@@ -67,13 +67,13 @@ const size_t kStackTraceFrameMax = 100;
 /** Abstract sink onto which stacktrace is piecewise emitted. */
 class StackTraceSink {
 public:
-    StackTraceSink& operator<<(StringData v) {
+    StackTraceSink& operator<<(std::string_view v) {
         doWrite(v);
         return *this;
     }
 
 private:
-    virtual void doWrite(StringData v) = 0;
+    virtual void doWrite(std::string_view v) = 0;
 };
 
 class OstreamStackTraceSink : public StackTraceSink {
@@ -81,7 +81,7 @@ public:
     explicit OstreamStackTraceSink(std::ostream& os) : _os(os) {}
 
 private:
-    void doWrite(StringData v) override {
+    void doWrite(std::string_view v) override {
         _os << v;
     }
     std::ostream& _os;
@@ -92,7 +92,7 @@ public:
     StringStackTraceSink(std::string& s) : _s{s} {}
 
 private:
-    void doWrite(StringData v) override {
+    void doWrite(std::string_view v) override {
         _s.append(v.data(), v.size());
     }
 
@@ -142,51 +142,51 @@ private:
 namespace stacktrace_details {
 /**
  * A utility for uint64_t <=> uppercase hex string conversions. It
- * can be used to produce a StringData.
+ * can be used to produce a std::string_view.
  *
  *     sink << Hex(x);  // as a temporary
  *
  *     Hex hx(x);
- *     StringData sd = hx;  // sd storage is in `hx`.
+ *     std::string_view sd = hx;  // sd storage is in `hx`.
  */
 class Hex {
 public:
     using Buf = std::array<char, 18>;  // 64/4 hex digits plus potential "0x"
 
-    static StringData toHex(uint64_t x, Buf& buf, bool showBase = false);
+    static std::string_view toHex(uint64_t x, Buf& buf, bool showBase = false);
 
-    static uint64_t fromHex(StringData s);
+    static uint64_t fromHex(std::string_view s);
 
     explicit Hex(uint64_t x, bool showBase = false) : _str{toHex(x, _buf, showBase)} {}
     explicit Hex(const void* x, bool showBase = false)
         : Hex{reinterpret_cast<uintptr_t>(x), showBase} {}
 
-    operator StringData() const {
+    operator std::string_view() const {
         return _str;
     }
 
 private:
     Buf _buf;
-    StringData _str;
+    std::string_view _str;
 };
 
 class Dec {
 public:
     using Buf = std::array<char, 20>;  // ceil(64*log10(2))
 
-    static StringData toDec(uint64_t x, Buf& buf);
+    static std::string_view toDec(uint64_t x, Buf& buf);
 
-    static uint64_t fromDec(StringData s);
+    static uint64_t fromDec(std::string_view s);
 
     explicit Dec(uint64_t x) : _str(toDec(x, _buf)) {}
 
-    operator StringData() const {
+    operator std::string_view() const {
         return _str;
     }
 
 private:
     Buf _buf;
-    StringData _str;
+    std::string_view _str;
 };
 
 void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanReadable);
@@ -274,7 +274,7 @@ public:
             _name.clear();
         }
 
-        void assign(uintptr_t newBase, StringData newName) {
+        void assign(uintptr_t newBase, std::string_view newName) {
             _base = newBase;
             if (newBase != 0)
                 _name.assign(newName.begin(), newName.end());
@@ -285,7 +285,7 @@ public:
         uintptr_t base() const {
             return _base;
         }
-        StringData name() const {
+        std::string_view name() const {
             return _name;
         }
 

@@ -49,6 +49,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -71,6 +73,7 @@ REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(score,
                                                              ScoreStageParams);
 
 namespace {
+using namespace std::literals::string_view_literals;
 static const std::string scoreScoreDetailsDescription =
     "the score calculated from multiplying a weight in the range [0,1] with either a normalized or "
     "nonnormalized value:";
@@ -78,13 +81,13 @@ static const std::string scoreScoreDetailsDescription =
 // Internal, intermediate top-level field name used for the raw score calculated that will be put
 // into scoreDetails. This is required because the 'score' expression in $score can only be
 // calculated once, in case it has a recursive reference to {$meta: score}.
-static constexpr StringData kInternalRawScoreField = "internal_raw_score";
+static constexpr std::string_view kInternalRawScoreField = "internal_raw_score";
 
 // Internal, intermediate top-level field name used for minMaxScaler normalization. The
 // $minMaxScaler is output into this field during intermediate processing, and then written back to
 // the score metadata variable.
-static constexpr StringData kInternalMinMaxScalerNormalizationField =
-    "internal_min_max_scaler_normalization_score"_sd;
+static constexpr std::string_view kInternalMinMaxScalerNormalizationField =
+    "internal_min_max_scaler_normalization_score"sv;
 
 /**
  * Builds a $setMetadata expression to set the score metadata variable.

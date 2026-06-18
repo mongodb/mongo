@@ -46,8 +46,10 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 
+#include <string_view>
+
 namespace mongo {
-Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {
+Status createIndex(OperationContext* opCtx, std::string_view ns, const BSONObj& keys, bool unique) {
     BSONObjBuilder specBuilder;
     specBuilder.append("name", DBClientBase::genIndexName(keys));
     specBuilder.append("key", keys);
@@ -58,13 +60,13 @@ Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, 
     return createIndexFromSpec(opCtx, ns, specBuilder.done());
 }
 
-Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
+Status createIndexFromSpec(OperationContext* opCtx, std::string_view ns, const BSONObj& spec) {
     return createIndexFromSpec(opCtx, nullptr, ns, spec);
 }
 
 Status createIndexFromSpec(OperationContext* opCtx,
                            VectorClockMutable* clock,
-                           StringData ns,
+                           std::string_view ns,
                            const BSONObj& spec) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
     invariant(!shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));

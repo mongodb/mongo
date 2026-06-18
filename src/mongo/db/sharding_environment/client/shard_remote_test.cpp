@@ -52,13 +52,14 @@
 
 #include <cstddef>
 #include <set>
+#include <string_view>
 #include <system_error>
 #include <utility>
 
 namespace mongo {
 namespace {
 
-constexpr StringData kNamespaceName = "unittests.shard_remote_test";
+constexpr std::string_view kNamespaceName = "unittests.shard_remote_test";
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 
 struct TestShardInfo {

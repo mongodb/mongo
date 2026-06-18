@@ -30,7 +30,6 @@
 #include "mongo/db/repl/oplog_fetcher.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -78,6 +77,7 @@
 #include "mongo/util/uuid.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -204,7 +204,7 @@ void validateFindCommand(Message m,
                                           << "afterClusterTime" << Timestamp(0, 1))),
                          bool requestResumeToken = false) {
     auto msg = mongo::OpMsg::parse(m);
-    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "find");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "find");
     ASSERT_TRUE(msg.body.getBoolField("tailable"));
     ASSERT_TRUE(msg.body.getBoolField("awaitData"));
     ASSERT_EQUALS(findTimeout, msg.body.getIntField("maxTimeMS"));
@@ -235,7 +235,7 @@ void validateGetMoreCommand(Message m,
                             OpTimeWithTerm lastCommittedWithCurrentTerm,
                             bool exhaustSupported = true) {
     auto msg = mongo::OpMsg::parse(m);
-    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     ASSERT_EQ(cursorId, msg.body.getIntField("getMore"));
     ASSERT_EQUALS(timeout, msg.body.getIntField("maxTimeMS"));
 
@@ -913,7 +913,7 @@ TEST_F(
         conn, makeSubsequentBatch(0LL, {secondEntry}, metadataObj, false /* moreToCome */), false);
 
     auto msg = mongo::OpMsg::parse(m);
-    ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "getMore");
+    ASSERT_EQ(std::string_view(msg.body.firstElement().fieldName()), "getMore");
     // Test that the getMore query does not contain the term or the lastKnownCommittedOpTime field.
     ASSERT_FALSE(msg.body.hasField("term"));
     ASSERT_FALSE(msg.body.hasField("lastKnownCommittedOpTime"));
@@ -2497,7 +2497,7 @@ TEST_F(OplogFetcherTest, DisconnectsOnErrorsDuringExhaustStream) {
     // Temporarily override the metatdata reader to introduce failure after successfully receiving a
     // batch from the first getMore. And the exhaust stream is now established.
     conn->setReplyMetadataReader(
-        [&](OperationContext* opCtx, const BSONObj& metadataObj, StringData target) {
+        [&](OperationContext* opCtx, const BSONObj& metadataObj, std::string_view target) {
             return Status(ErrorCodes::FailedToParse, "Fake error");
         });
     processSingleRequestResponse(

@@ -54,6 +54,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -70,7 +71,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(CollStats);
  */
 class DocumentSourceCollStats : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$collStats"_sd;
+    static constexpr std::string_view kStageName = "$collStats"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
@@ -126,7 +127,7 @@ public:
           _collStatsSpec(std::move(spec)),
           _targetAllNodes(_collStatsSpec.getTargetAllNodes().value_or(false)) {}
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 

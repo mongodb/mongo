@@ -37,6 +37,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -64,7 +65,7 @@ struct MemorySize {
 
     static MemorySize parseFromBSON(const BSONElement& element);
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const;
     void serializeToBSON(BSONArrayBuilder* builder) const;
 
     operator uint64_t() const {

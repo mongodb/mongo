@@ -30,9 +30,12 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
-const DatabaseName kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
+using namespace std::literals::string_view_literals;
+const DatabaseName kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"sv);
 
 /*
  *
@@ -47,7 +50,7 @@ protected:
         EXPECT_TRUE(ident::isCollectionOrIndexIdent(ident)) << "ident: " << ident;
 
         EXPECT_FALSE(ident::isInternalIdent(ident)) << "ident: " << ident;
-        EXPECT_FALSE(ident::isInternalIdent(ident, "arbitraryInternalIdentStem"_sd))
+        EXPECT_FALSE(ident::isInternalIdent(ident, "arbitraryInternalIdentStem"sv))
             << "ident: " << ident;
     }
 
@@ -56,7 +59,7 @@ protected:
         EXPECT_TRUE(ident::isCollectionOrIndexIdent(ident)) << "ident: " << ident;
 
         EXPECT_FALSE(ident::isInternalIdent(ident)) << "ident: " << ident;
-        EXPECT_FALSE(ident::isInternalIdent(ident, "arbitraryInternalIdentStem"_sd))
+        EXPECT_FALSE(ident::isInternalIdent(ident, "arbitraryInternalIdentStem"sv))
             << "ident: " << ident;
     }
 };
@@ -190,7 +193,7 @@ TEST_F(IdentGenerationTest, InternalIdentsAreGeneratedAndClassifiedCorrectly) {
     EXPECT_TRUE(ident::isInternalIdent(defaultInternalIdent2))
         << "ident: " << defaultInternalIdent2;
 
-    const auto specificIdentStem = "specificInternalIdentCategory"_sd;
+    const auto specificIdentStem = "specificInternalIdentCategory"sv;
 
     // 'defaultInternalIdent' wasn't generated with 'specificIdentStem', and doesn't fall under the
     // same ident category as internal idents with 'specificIdentStem'.
@@ -287,27 +290,27 @@ TEST_F(IdentGenerationTest, IdentDirectoryForCollectionIdents) {
     const auto identDefault = ident::generateNewCollectionIdent(
         kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */);
 
-    EXPECT_EQ(ident::getDirectory(identDefault), ""_sd);
+    EXPECT_EQ(ident::getDirectory(identDefault), ""sv);
 
     const auto identDirectoryPerDB = ident::generateNewCollectionIdent(
         kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */);
     const auto dbComponent = ident::createDBNamePathComponent(kTestDB);
-    EXPECT_EQ(ident::getDirectory(identDirectoryPerDB), StringData{dbComponent});
+    EXPECT_EQ(ident::getDirectory(identDirectoryPerDB), std::string_view{dbComponent});
 
     const auto identDirectoryForIndexes = ident::generateNewCollectionIdent(
         kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
-    EXPECT_EQ(ident::getDirectory(identDirectoryForIndexes), "collection"_sd);
+    EXPECT_EQ(ident::getDirectory(identDirectoryForIndexes), "collection"sv);
 
     const auto identDirectoryPerDBAndIndexes = ident::generateNewCollectionIdent(
         kTestDB, true /* directoryPerDB */, true /* directoryForIndexes */);
     const auto dbComponentWithCollection = dbComponent + "/collection";
     EXPECT_EQ(ident::getDirectory(identDirectoryPerDBAndIndexes),
-              StringData{dbComponentWithCollection});
+              std::string_view{dbComponentWithCollection});
 }
 
 TEST_F(IdentGenerationTest, IdentDirectoryForSpecialIdents) {
-    EXPECT_EQ(ident::getDirectory(ident::kMdbCatalog), ""_sd);
-    EXPECT_EQ(ident::getDirectory(ident::kSizeStorer), ""_sd);
+    EXPECT_EQ(ident::getDirectory(ident::kMdbCatalog), ""sv);
+    EXPECT_EQ(ident::getDirectory(ident::kSizeStorer), ""sv);
 }
 
 TEST_F(IdentGenerationTest, InvalidIdents) {

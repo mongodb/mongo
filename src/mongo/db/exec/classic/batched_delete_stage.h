@@ -47,6 +47,7 @@
 #include <cstddef>
 #include <memory>
 #include <set>
+#include <string_view>
 
 namespace mongo {
 
@@ -115,7 +116,7 @@ class BatchedDeleteStage final : public DeleteStage {
     BatchedDeleteStage& operator=(const BatchedDeleteStage&) = delete;
 
 public:
-    static constexpr StringData kStageType = "BATCHED_DELETE"_sd;
+    static constexpr std::string_view kStageType = "BATCHED_DELETE"_sd;
     BatchedDeleteStage(ExpressionContext* expCtx,
                        DeleteStageParams params,
                        std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,

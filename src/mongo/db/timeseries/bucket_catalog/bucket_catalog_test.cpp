@@ -55,6 +55,7 @@
 #include <initializer_list>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -65,13 +66,16 @@
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
-constexpr StringData kNumActiveBuckets = "numActiveBuckets"_sd;
-constexpr StringData kNumSchemaChanges = "numBucketsClosedDueToSchemaChange"_sd;
-constexpr StringData kNumBucketsReopened = "numBucketsReopened"_sd;
-constexpr StringData kNumArchivedDueToMemoryThreshold = "numBucketsArchivedDueToMemoryThreshold"_sd;
-constexpr StringData kNumClosedDueToReopening = "numBucketsClosedDueToReopening"_sd;
-constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
-constexpr StringData kNumClosedDueToMemoryThreshold = "numBucketsClosedDueToMemoryThreshold"_sd;
+using namespace std::literals::string_view_literals;
+constexpr std::string_view kNumActiveBuckets = "numActiveBuckets"sv;
+constexpr std::string_view kNumSchemaChanges = "numBucketsClosedDueToSchemaChange"sv;
+constexpr std::string_view kNumBucketsReopened = "numBucketsReopened"sv;
+constexpr std::string_view kNumArchivedDueToMemoryThreshold =
+    "numBucketsArchivedDueToMemoryThreshold"sv;
+constexpr std::string_view kNumClosedDueToReopening = "numBucketsClosedDueToReopening"sv;
+constexpr std::string_view kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"sv;
+constexpr std::string_view kNumClosedDueToMemoryThreshold =
+    "numBucketsClosedDueToMemoryThreshold"sv;
 
 class BucketCatalogTest : public TimeseriesTestFixture {
 protected:
@@ -2319,7 +2323,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToHashCollision) {
     auto invalidKey = BucketKey{dummyUUID.getValue(),
                                 BucketMetadata{dummyTrackingContext,
                                                incorrectMetadata.firstElement(),
-                                               StringData("incorrect field")}};
+                                               std::string_view("incorrect field")}};
 
     ASSERT_NOT_OK(
         _reopenBucket(*autoColl, compressedBucketDoc, boost::none, boost::none, invalidKey));
@@ -3556,13 +3560,13 @@ TEST_F(BucketCatalogTest, BuildBatchedInsertContextsOneBatchWithMetafield) {
 
 TEST_F(BucketCatalogTest, BuildBatchedInsertContextsMultipleBatchesWithMetafield) {
     // Test with BSONTypes that aren't constant (so we create distinct batches).
-    // BSONTypes that have a StringData component.
+    // BSONTypes that have a std::string_view component.
     for (BSONType type : _stringComponentBSONTypes) {
         _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
-            type, std::vector<StringData>{_metaValue, _metaValue2, _metaValue3});
+            type, std::vector<std::string_view>{_metaValue, _metaValue2, _metaValue3});
     }
 
-    // Test with BSONTypes that don't have a StringData type metaValue.
+    // Test with BSONTypes that don't have a std::string_view type metaValue.
     _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
         BSONType::timestamp,
         std::vector<Timestamp>{Timestamp(1, 2), Timestamp(2, 3), Timestamp(3, 4)});

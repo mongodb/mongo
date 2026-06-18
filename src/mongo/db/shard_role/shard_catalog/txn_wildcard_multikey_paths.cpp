@@ -33,7 +33,10 @@
 #include "mongo/db/shard_role/shard_catalog/multikey_state.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -50,7 +53,7 @@ const TxnWildcardMultikeyPaths* TxnWildcardMultikeyPaths::tryGet(OperationContex
 }
 
 void TxnWildcardMultikeyPaths::append(const UUID& collectionUuid,
-                                      StringData indexName,
+                                      std::string_view indexName,
                                       const std::set<FieldRef>& paths) {
     if (paths.empty()) {
         return;
@@ -60,7 +63,7 @@ void TxnWildcardMultikeyPaths::append(const UUID& collectionUuid,
 }
 
 void TxnWildcardMultikeyPaths::appendMatchingPaths(const UUID& collectionUuid,
-                                                   StringData indexName,
+                                                   std::string_view indexName,
                                                    std::set<FieldRef>* out) const {
     auto it = _byIndex.find(std::make_pair(collectionUuid, std::string{indexName}));
     if (it == _byIndex.end()) {

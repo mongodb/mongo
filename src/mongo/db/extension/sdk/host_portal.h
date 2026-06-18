@@ -35,6 +35,8 @@
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <yaml-cpp/yaml.h>
 
 namespace mongo::extension {

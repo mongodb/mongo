@@ -30,18 +30,19 @@
 #include "mongo/util/executor_stats.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 
 #include <cmath>
+#include <string_view>
 
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -96,10 +97,10 @@ ExecutorStats::Task ExecutorStats::wrapTask(ExecutorStats::Task&& task) {
 
 void ExecutorStats::serialize(BSONObjBuilder* bob, bool forServerStatus) const {
     invariant(bob);
-    bob->append("scheduled"_sd, _scheduled.get());
-    bob->append("executed"_sd, _executed.get());
-    bob->append("averageWaitTimeMicros"_sd, _averageWaitTimeMicros.get().value_or(0));
-    bob->append("averageRunTimeMicros"_sd, _averageRunTimeMicros.get().value_or(0));
+    bob->append("scheduled"sv, _scheduled.get());
+    bob->append("executed"sv, _executed.get());
+    bob->append("averageWaitTimeMicros"sv, _averageWaitTimeMicros.get().value_or(0));
+    bob->append("averageRunTimeMicros"sv, _averageRunTimeMicros.get().value_or(0));
     if (!forServerStatus) {
         appendHistogram(*bob, _waiting, "waitTime");
         appendHistogram(*bob, _running, "runTime");

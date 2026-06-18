@@ -35,7 +35,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
@@ -48,6 +47,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -74,7 +74,7 @@ protected:
      */
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 
-    void assertCommandSentAndRespondWith(StringData commandName,
+    void assertCommandSentAndRespondWith(std::string_view commandName,
                                          const StatusWith<BSONObj>& response,
                                          boost::optional<WriteConcernOptions> expectedWriteConcern);
     /**

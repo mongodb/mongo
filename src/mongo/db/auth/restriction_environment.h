@@ -35,11 +35,12 @@
 #include "mongo/util/net/sockaddr.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace mongo {
 
-inline Status validateClientSourceAuthenticationRestrictionMode(StringData mode,
+inline Status validateClientSourceAuthenticationRestrictionMode(std::string_view mode,
                                                                 const boost::optional<TenantId>&) {
     if (mode != "origin" && mode != "peer") {
         return Status(ErrorCodes::BadValue,

@@ -32,6 +32,8 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -42,15 +44,17 @@ ALLOCATE_DOCUMENT_SOURCE_ID(teeConsumer, DocumentSourceTeeConsumer::id)
 
 DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<ExpressionContext>& expCtx,
                                                      size_t facetId,
-                                                     StringData stageName)
+                                                     std::string_view stageName)
     : DocumentSource(stageName, expCtx), _facetId(facetId), _stageName(std::string{stageName}) {}
 
 boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, size_t facetId, StringData stageName) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    size_t facetId,
+    std::string_view stageName) {
     return new DocumentSourceTeeConsumer(expCtx, facetId, stageName);
 }
 
-StringData DocumentSourceTeeConsumer::getSourceName() const {
+std::string_view DocumentSourceTeeConsumer::getSourceName() const {
     return _stageName;
 }
 

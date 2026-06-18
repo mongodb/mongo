@@ -115,6 +115,7 @@ bool operator!=(const ProvidedSortSet& lhs, const ProvidedSortSet& rhs) {
 }  // namespace mongo
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace mongo;
 
@@ -1497,7 +1498,7 @@ TEST(QuerySolutionTest, MultikeyIndexWithoutPathLevelInfoCannotProvideAnySorts) 
         node.bounds.fields.push_back(oil);
     }
 
-    for (auto&& name : {"b"_sd, "c"_sd}) {
+    for (auto&& name : {"b"sv, "c"sv}) {
         OrderedIntervalList oil{};
         oil.name = std::string{name};
         oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
@@ -1579,7 +1580,7 @@ TEST(QuerySolutionTest, NonSimpleRangeAllEqualExcludesFieldWithMultikeyComponent
     node.index.multikey = true;
     node.index.multikeyPaths = MultikeyPaths{{}, {}, {1U}, {}, {}};
 
-    for (auto&& name : {"a"_sd, "b"_sd, "c.z"_sd, "d"_sd, "e"_sd}) {
+    for (auto&& name : {"a"sv, "b"sv, "c.z"sv, "d"sv, "e"sv}) {
         OrderedIntervalList oil{};
         oil.name = std::string{name};
         oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << 1)));

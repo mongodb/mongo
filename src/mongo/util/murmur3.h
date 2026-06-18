@@ -32,8 +32,9 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <MurmurHash3.h>
 
@@ -47,25 +48,25 @@ namespace mongo {
  * This interface is intended to be easier to consume safely.
  */
 template <int SizeOfOutput>
-inline size_t murmur3(StringData str, size_t seed);
+inline size_t murmur3(std::string_view str, size_t seed);
 
 /**
- * Template specialization for hashing a 'StringData' to a 32-bit hash code.
+ * Template specialization for hashing a 'std::string_view' to a 32-bit hash code.
  */
 template <>
-inline size_t murmur3<4>(StringData str, size_t seed) {
+inline size_t murmur3<4>(std::string_view str, size_t seed) {
     char hash[4];
     MurmurHash3_x86_32(str.data(), str.size(), seed, &hash);
     return ConstDataView(hash).read<LittleEndian<std::uint32_t>>();
 }
 
 /**
- * Template specialization for hashing a 'StringData' to a 64-bit hash code. Returns the first 8
- * bytes of the 128-bit version of MurmurHash, interpreting these 8 bytes as having a little-endian
- * byte order.
+ * Template specialization for hashing a 'std::string_view' to a 64-bit hash code. Returns the first
+ * 8 bytes of the 128-bit version of MurmurHash, interpreting these 8 bytes as having a
+ * little-endian byte order.
  */
 template <>
-inline size_t murmur3<8>(StringData str, size_t seed) {
+inline size_t murmur3<8>(std::string_view str, size_t seed) {
     char hash[16];
     MurmurHash3_x64_128(str.data(), str.size(), seed, hash);
     return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
@@ -73,7 +74,7 @@ inline size_t murmur3<8>(StringData str, size_t seed) {
 
 /**
  * Overload for callers which use a byte-array representation for the data and thus cannot easily
- * represent the input as a 'StringData'.
+ * represent the input as a 'std::string_view'.
  */
 template <int SizeOfOutput>
 inline size_t murmur3(ConstDataRange data, size_t seed);
@@ -103,7 +104,7 @@ inline size_t murmur3<8>(ConstDataRange data, size_t seed) {
 /**
  * Writes the full output of the 128-bit version of MurmurHash to the given 'output' array.
  */
-inline void murmur3(StringData str, size_t seed, std::array<char, 16>& output) {
+inline void murmur3(std::string_view str, size_t seed, std::array<char, 16>& output) {
     MurmurHash3_x64_128(str.data(), str.size(), seed, output.data());
 }
 

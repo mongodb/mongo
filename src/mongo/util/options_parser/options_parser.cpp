@@ -41,6 +41,7 @@
 #include <map>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -91,7 +92,6 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -122,6 +122,7 @@
 
 namespace mongo {
 namespace optionenvironment {
+using namespace std::literals::string_view_literals;
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -364,7 +365,7 @@ public:
             }
         };
 
-        const auto uassertedElement = [&prefix](Status status, StringData element) {
+        const auto uassertedElement = [&prefix](Status status, std::string_view element) {
             uasserted(status.code(), str::stream() << prefix << element << ": " << status.reason());
         };
 
@@ -538,7 +539,7 @@ public:
     }
 
 private:
-    static StatusWith<std::vector<std::uint8_t>> hexToVec(StringData hex) {
+    static StatusWith<std::vector<std::uint8_t>> hexToVec(std::string_view hex) {
         if (!hexblob::validate(hex))
             return {ErrorCodes::BadValue, "Not a valid, even length hex string"};
         std::string blob = hexblob::decode(hex);
@@ -572,7 +573,7 @@ private:
     std::string _action;
 };
 
-std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
+std::string runYAMLRestExpansion(std::string_view url, Seconds timeout) {
 
     auto client = HttpClient::createWithoutConnectionPool();
     uassert(
@@ -866,8 +867,8 @@ Status checkLongName(const po::variables_map& vm,
             for (StringVector_t::iterator keyValueVectorIt = keyValueVector.begin();
                  keyValueVectorIt != keyValueVector.end();
                  ++keyValueVectorIt) {
-                StringData keySD;
-                StringData valueSD;
+                std::string_view keySD;
+                std::string_view valueSD;
                 if (!str::splitOn(*keyValueVectorIt, '=', keySD, valueSD)) {
                     StringBuilder sb;
                     sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
@@ -1400,7 +1401,7 @@ bool isYAMLConfig(const YAML::Node& config) {
 }
 
 #ifndef _WIN32
-Status checkFileOwnershipAndMode(int fd, mode_t prohibit, StringData modeDesc) {
+Status checkFileOwnershipAndMode(int fd, mode_t prohibit, std::string_view modeDesc) {
     struct stat stats;
 
     if (::fstat(fd, &stats) == -1) {
@@ -1462,7 +1463,7 @@ Status OptionsParser::readConfigFile(const std::string& filename,
  */
 Status readRawFile(const std::string& filename, std::string* contents, ConfigExpand configExpand) {
     // check if it's a valid file
-    const auto badFile = [&](StringData errMsg) -> Status {
+    const auto badFile = [&](std::string_view errMsg) -> Status {
         return {ErrorCodes::BadValue,
                 str::stream() << "Error opening config file '" << filename << "': " << errMsg};
     };
@@ -1495,7 +1496,7 @@ Status readRawFile(const std::string& filename, std::string* contents, ConfigExp
     ScopeGuard fdguard([&fd] { ::close(fd); });
 
     if (configExpand.rest) {
-        auto status = checkFileOwnershipAndMode(fd, S_IRGRP | S_IROTH, "readable"_sd);
+        auto status = checkFileOwnershipAndMode(fd, S_IRGRP | S_IROTH, "readable"sv);
         if (!status.isOK()) {
             return {status.code(),
                     str::stream() << "When using --configExpand=rest, config file must be "
@@ -1505,7 +1506,7 @@ Status readRawFile(const std::string& filename, std::string* contents, ConfigExp
     }
 
     if (configExpand.exec) {
-        auto status = checkFileOwnershipAndMode(fd, S_IWGRP | S_IWOTH, "writable"_sd);
+        auto status = checkFileOwnershipAndMode(fd, S_IWGRP | S_IWOTH, "writable"sv);
         if (!status.isOK()) {
             return {status.code(),
                     str::stream() << "When using --configExpand=exec, config file must be "
@@ -1753,13 +1754,13 @@ StatusWith<ConfigExpand> parseConfigExpand(const Environment& cli) {
         ret.timeout = Seconds{timeout};
     }
 
-    StringData expandSD(expand);
+    std::string_view expandSD(expand);
     while (!expandSD.empty()) {
-        StringData elem;
+        std::string_view elem;
         auto comma = expandSD.find(',');
         if (comma == std::string::npos) {
             elem = expandSD;
-            expandSD = StringData();
+            expandSD = std::string_view();
         } else {
             elem = expandSD.substr(0, comma);
             expandSD = expandSD.substr(comma + 1);

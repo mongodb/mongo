@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -50,6 +49,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -165,8 +165,8 @@ BSONObj reopenQueriedBucket(OperationContext* opCtx,
                             const std::vector<BSONObj>& pipeline,
                             ExecutionStatsController& stats);
 
-using CompressAndWriteBucketFunc =
-    std::function<void(OperationContext*, const BucketId&, const NamespaceString&, StringData)>;
+using CompressAndWriteBucketFunc = std::function<void(
+    OperationContext*, const BucketId&, const NamespaceString&, std::string_view)>;
 
 /**
  * Compress and write the bucket document to storage with 'compressAndWriteBucketFunc'. Return the
@@ -176,7 +176,7 @@ Status compressAndWriteBucket(OperationContext* opCtx,
                               BucketCatalog& catalog,
                               const Collection* bucketsColl,
                               const BucketId& uncompressedBucketId,
-                              StringData timeField,
+                              std::string_view timeField,
                               const CompressAndWriteBucketFunc& compressAndWriteBucketFunc);
 
 /**

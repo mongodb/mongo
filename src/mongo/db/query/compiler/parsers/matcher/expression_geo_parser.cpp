@@ -43,6 +43,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <s2cellid.h>
@@ -119,7 +120,7 @@ bool parseLegacyQuery(const BSONObj& obj, GeoNearExpression& expr) {
     BSONObjIterator it(obj);
     while (it.more()) {
         BSONElement e = it.next();
-        StringData fieldName = e.fieldNameStringData();
+        std::string_view fieldName = e.fieldNameStringData();
         if ((fieldName == kNearField) || (fieldName == kGeoNearField) ||
             (fieldName == kNearSphereField)) {
             if (!e.isABSONObj()) {
@@ -201,7 +202,7 @@ Status parseNewQuery(const BSONObj& obj, GeoNearExpression& expr) {
     BSONObjIterator it(e.embeddedObject());
     while (it.more()) {
         BSONElement e = it.next();
-        StringData fieldName = e.fieldNameStringData();
+        std::string_view fieldName = e.fieldNameStringData();
         if (fieldName == kGeometryField) {
             if (e.isABSONObj()) {
                 BSONObj embeddedObj = e.embeddedObject();

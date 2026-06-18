@@ -42,6 +42,7 @@
 #include <iterator>
 #include <memory>
 #include <numeric>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -277,7 +278,7 @@ EphemeralForTestRecordStore::_makeContainer() {
 }
 
 EphemeralForTestRecordStore::EphemeralForTestRecordStore(boost::optional<UUID> uuid,
-                                                         StringData identName,
+                                                         std::string_view identName,
                                                          std::shared_ptr<void>* dataInOut,
                                                          bool isCapped,
                                                          bool isOplog)

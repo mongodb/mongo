@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/classic/or.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/collection_scan.h"
 #include "mongo/db/exec/classic/plan_stage.h"

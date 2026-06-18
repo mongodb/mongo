@@ -33,6 +33,8 @@
 #include "mongo/util/modules.h"
 
 #ifdef MONGO_CONFIG_OTEL
+#include <string_view>
+
 #include <opentelemetry/exporters/memory/in_memory_data.h>
 #include <opentelemetry/exporters/memory/in_memory_metric_data.h>
 #include <opentelemetry/exporters/memory/in_memory_metric_exporter_factory.h>
@@ -240,7 +242,7 @@ public:
     static bool canReadMetrics();
 
 private:
-    static constexpr StringData kUsingOtelOnWindows =
+    static constexpr std::string_view kUsingOtelOnWindows =
         "You're trying to read metrics in an environment that doesn't have otel enabled (likely "
         "Windows). In tests this can be avoided by checking OtelMetricsCapturer::canReadMetrics()";
 
@@ -293,7 +295,7 @@ opentelemetry::sdk::common::OrderedAttributeMap buildAttrMap(
         [&attrNames, &nameAndValues](const auto&... vals) {
             size_t i = 0;
             (nameAndValues.push_back(
-                 {.name = StringData(attrNames[i++]), .value = AnyAttributeType(vals)}),
+                 {.name = std::string_view(attrNames[i++]), .value = AnyAttributeType(vals)}),
              ...);
         },
         attributes);

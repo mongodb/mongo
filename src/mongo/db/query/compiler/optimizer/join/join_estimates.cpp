@@ -31,9 +31,11 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 
+#include <string_view>
+
 namespace mongo::join_ordering {
 
-StringData toStringData(MackertLohmanCase c) {
+std::string_view toStringData(MackertLohmanCase c) {
     switch (c) {
         case MackertLohmanCase::kCollectionFitsCache:
             return "collection-fits-cache";

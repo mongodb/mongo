@@ -37,9 +37,11 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo::admission {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class AppNameExemptionMatcherTest : public ServiceContextTest {
 protected:
@@ -58,9 +60,9 @@ protected:
         ServiceContextTest::tearDown();
     }
 
-    void setClientMetadata(StringData driverName, StringData appName) {
+    void setClientMetadata(std::string_view driverName, std::string_view appName) {
         BSONObjBuilder builder;
-        ASSERT_OK(ClientMetadata::serialize(driverName, "1.0.0"_sd, appName, &builder));
+        ASSERT_OK(ClientMetadata::serialize(driverName, "1.0.0"sv, appName, &builder));
         auto doc = builder.obj();
         ClientMetadata::setFromMetadata(_client.get(), doc.firstElement(), false);
     }

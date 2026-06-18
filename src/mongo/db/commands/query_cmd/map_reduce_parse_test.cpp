@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,16 +37,18 @@
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // The parser treats Javascript objects as black boxes so there's no need for realistic examples
 // here.
-constexpr auto initJavascript = "init!"_sd;
-constexpr auto mapJavascript = "map!"_sd;
-constexpr auto reduceJavascript = "reduce!"_sd;
-constexpr auto finalizeJavascript = "finalize!"_sd;
+constexpr auto initJavascript = "init!"sv;
+constexpr auto mapJavascript = "map!"sv;
+constexpr auto reduceJavascript = "reduce!"sv;
+constexpr auto finalizeJavascript = "finalize!"sv;
 
 TEST(MapReduceParseTest, failedParse) {
     auto ctx = IDLParserContext("mapReduce");

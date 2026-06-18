@@ -33,6 +33,8 @@
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 #include "mongo/db/query/search/search_index_common.h"
 
+#include <string_view>
+
 namespace mongo {
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceListSearchIndexesToStageFn(
@@ -52,7 +54,9 @@ REGISTER_AGG_STAGE_MAPPING(listSearchIndexesStage,
                            documentSourceListSearchIndexesToStageFn);
 
 ListSearchIndexesStage::ListSearchIndexesStage(
-    StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx, BSONObj cmdObj)
+    std::string_view stageName,
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+    BSONObj cmdObj)
     : Stage(stageName, pExpCtx), _cmdObj(cmdObj.getOwned()) {}
 
 GetNextResult ListSearchIndexesStage::doGetNext() {

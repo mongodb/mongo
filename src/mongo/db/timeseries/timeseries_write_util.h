@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_context.h"
@@ -47,6 +46,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -113,7 +113,7 @@ void performAtomicWritesForUpdate(
 /**
  * Change the bucket namespace to time-series view namespace for time-series command.
  */
-BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, StringData viewNss);
+BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, std::string_view viewNss);
 
 /**
  * Translates the hint provided for an update/delete request on a timeseries view to match the

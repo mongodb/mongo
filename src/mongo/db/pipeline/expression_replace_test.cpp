@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -44,11 +43,13 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace {
+using namespace std::literals::string_view_literals;
 using namespace mongo;
 
 auto parse(const std::string& expressionName, ImplicitValue operand) {
@@ -65,13 +66,13 @@ TEST(ExpressionReplaceTest, Expects3NamedArgs) {
     ASSERT_THROWS(parse("$replaceOne", 1), AssertionException);
     ASSERT_THROWS(parse("$replaceOne", BSON_ARRAY(1 << 2)), AssertionException);
     ASSERT_THROWS(parse("$replaceOne", BSONNULL), AssertionException);
-    ASSERT_THROWS(parse("$replaceOne", "string"_sd), AssertionException);
+    ASSERT_THROWS(parse("$replaceOne", "string"sv), AssertionException);
     parse("$replaceOne", Document{{"input", 1}, {"find", 1}, {"replacement", 1}});
 
     ASSERT_THROWS(parse("$replaceAll", 1), AssertionException);
     ASSERT_THROWS(parse("$replaceAll", BSON_ARRAY(1 << 2)), AssertionException);
     ASSERT_THROWS(parse("$replaceAll", BSONNULL), AssertionException);
-    ASSERT_THROWS(parse("$replaceAll", "string"_sd), AssertionException);
+    ASSERT_THROWS(parse("$replaceAll", "string"sv), AssertionException);
     parse("$replaceAll", Document{{"input", 1}, {"find", 1}, {"replacement", 1}});
 }
 

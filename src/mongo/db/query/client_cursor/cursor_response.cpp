@@ -40,6 +40,8 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -134,7 +136,7 @@ void CursorResponseBuilder::abandon() {
 void appendCursorResponseObject(long long cursorId,
                                 const NamespaceString& cursorNamespace,
                                 BSONArray firstBatch,
-                                boost::optional<StringData> cursorType,
+                                boost::optional<std::string_view> cursorType,
                                 BSONObjBuilder* builder,
                                 const SerializationContext& serializationContext) {
     BSONObjBuilder cursorObj(builder->subobjStart(kCursorField));

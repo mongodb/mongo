@@ -29,13 +29,15 @@
 
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(TimeseriesExtendedRangeSupport, DateOutsideStandardRange) {
     Date_t minStandard = Date_t::fromDurationSinceEpoch(Milliseconds(0));
@@ -53,7 +55,7 @@ TEST(TimeseriesExtendedRangeSupport, DateOutsideStandardRange) {
 
 TEST(TimeseriesExtendedRangeSupport, BucketsHaveDateOutsideStandardRange) {
     TimeseriesOptions options;
-    options.setTimeField("time"_sd);
+    options.setTimeField("time"sv);
 
     const std::vector<InsertStatement> standardRange = {
         {0,
@@ -126,8 +128,8 @@ TEST(TimeseriesExtendedRangeSupport, BucketSplitAcrossEpochalypse) {
     EXPECT_FALSE(timeseries::bucketsHaveDateOutsideStandardRange(options, inserts));
 }
 
-using OIDExtendedRangeTestParams = std::pair<StringData, bool>;
-class OIDExtendedRangeTests : public testing::TestWithParam<std::pair<StringData, bool>> {};
+using OIDExtendedRangeTestParams = std::pair<std::string_view, bool>;
+class OIDExtendedRangeTests : public testing::TestWithParam<std::pair<std::string_view, bool>> {};
 
 TEST_P(OIDExtendedRangeTests, OIDHasExtendedRangeTimeComponent) {
     const auto [oidSd, isExtendedRange] = GetParam();
@@ -139,9 +141,9 @@ TEST_P(OIDExtendedRangeTests, OIDHasExtendedRangeTimeComponent) {
 INSTANTIATE_TEST_SUITE_P(
     OIDExtendedRange,
     OIDExtendedRangeTests,
-    testing::Values(OIDExtendedRangeTestParams{"e980f6cc8bee049fcc1c4d88"_sd, true},
-                    OIDExtendedRangeTestParams{"61be04541ad72e8d5d257550"_sd, false},
-                    OIDExtendedRangeTestParams{"091cd800d486dbad9374ac77"_sd, false}));
+    testing::Values(OIDExtendedRangeTestParams{"e980f6cc8bee049fcc1c4d88"sv, true},
+                    OIDExtendedRangeTestParams{"61be04541ad72e8d5d257550"sv, false},
+                    OIDExtendedRangeTestParams{"091cd800d486dbad9374ac77"sv, false}));
 
 }  // namespace
 }  // namespace mongo

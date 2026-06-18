@@ -32,6 +32,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::bsoncolumn {
 namespace {
 using namespace mongo::bsoncolumn::internal;
@@ -98,9 +100,9 @@ TEST_F(BSONColumnBlockBasedTest, BSONMaterializer) {
     assertRoundtrip(Timestamp{date});
     assertRoundtrip(date);
     assertRoundtrip(OID::gen());
-    assertRoundtrip(StringData{"foo/bar"});
+    assertRoundtrip(std::string_view{"foo/bar"});
     assertRoundtrip(BSONBinData{binData, sizeof(binData), BinDataGeneral});
-    assertRoundtrip(BSONCode{StringData{"x = 0"}});
+    assertRoundtrip(BSONCode{std::string_view{"x = 0"}});
 }
 
 TEST_F(BSONColumnBlockBasedTest, BSONMaterializerBSONElement) {
@@ -158,7 +160,7 @@ void extractValueTo<int32_t>(int32_t& val, BSONElement elem) {
 }
 
 template <>
-void extractValueTo<StringData>(StringData& val, BSONElement elem) {
+void extractValueTo<std::string_view>(std::string_view& val, BSONElement elem) {
     val = elem.valueStringDataSafe();
 }
 
@@ -616,12 +618,12 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithOID) {
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithStrings) {
-    std::vector<StringData> strs = {StringData("hello_world0"),
-                                    StringData("hello_world1"),
-                                    StringData("hello_world2"),
-                                    StringData("hello_world3"),
-                                    StringData("hello_world4"),
-                                    StringData("hello_world5")};
+    std::vector<std::string_view> strs = {std::string_view("hello_world0"),
+                                          std::string_view("hello_world1"),
+                                          std::string_view("hello_world2"),
+                                          std::string_view("hello_world3"),
+                                          std::string_view("hello_world4"),
+                                          std::string_view("hello_world5")};
     verifyDecompressPaths(strs);
 }
 
@@ -647,12 +649,12 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithTimestamp) {
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressWithCode) {
-    std::vector<BSONCode> codes = {BSONCode(StringData{"x = 0"}),
-                                   BSONCode(StringData{"x = 1"}),
-                                   BSONCode(StringData{"x = 2"}),
-                                   BSONCode(StringData{"x = 3"}),
-                                   BSONCode(StringData{"x = 4"}),
-                                   BSONCode(StringData{"x = 5"})};
+    std::vector<BSONCode> codes = {BSONCode(std::string_view{"x = 0"}),
+                                   BSONCode(std::string_view{"x = 1"}),
+                                   BSONCode(std::string_view{"x = 2"}),
+                                   BSONCode(std::string_view{"x = 3"}),
+                                   BSONCode(std::string_view{"x = 4"}),
+                                   BSONCode(std::string_view{"x = 5"})};
     verifyDecompressPaths(codes);
 }
 

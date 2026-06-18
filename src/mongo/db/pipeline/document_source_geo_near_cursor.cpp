@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -38,6 +37,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -73,7 +73,7 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
     tassert(9911901, "", _distanceMultiplier >= 0);
 }
 
-StringData DocumentSourceGeoNearCursor::getSourceName() const {
+std::string_view DocumentSourceGeoNearCursor::getSourceName() const {
     return DocumentSourceGeoNearCursor::kStageName;
 }
 }  // namespace mongo

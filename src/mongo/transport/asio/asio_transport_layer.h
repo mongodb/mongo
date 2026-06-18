@@ -47,6 +47,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 #include <asio/basic_socket_acceptor.hpp>
@@ -211,7 +212,7 @@ public:
 
     void appendStatsForFTDC(BSONObjBuilder& bob) const override;
 
-    StringData getNameForLogging() const override {
+    std::string_view getNameForLogging() const override {
         return "asio"_sd;
     }
 

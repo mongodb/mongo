@@ -30,7 +30,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
@@ -42,6 +41,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-DBClientBase* MongoURI::connect(StringData applicationName,
+DBClientBase* MongoURI::connect(std::string_view applicationName,
                                 std::string& errmsg,
                                 boost::optional<double> socketTimeoutSecs,
                                 const ClientAPIVersionParameters* apiParameters,

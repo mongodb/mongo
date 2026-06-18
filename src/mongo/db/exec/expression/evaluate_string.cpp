@@ -32,6 +32,8 @@
 #include "mongo/db/exec/str_trim_utils.h"
 #include "mongo/db/exec/substr_utils.h"
 
+#include <string_view>
+
 #include <boost/algorithm/string/case_conv.hpp>
 
 namespace mongo {
@@ -134,9 +136,9 @@ Value evaluate(const ExpressionSubstrBytes& expr,
     if (lower >= str.length()) {
         // If lower > str.length() then string::substr() will throw out_of_range, so return an
         // empty string if lower is not a valid string index.
-        return Value(StringData());
+        return Value(std::string_view());
     }
-    return Value(StringData(str).substr(lower, length));
+    return Value(std::string_view(str).substr(lower, length));
 }
 
 Value evaluate(const ExpressionSubstrCP& expr,
@@ -185,7 +187,7 @@ Value evaluate(const ExpressionSubstrCP& expr,
 }
 
 namespace {
-Value strLenBytes(StringData str) {
+Value strLenBytes(std::string_view str) {
     size_t strLen = str.size();
 
     uassert(34470,
@@ -285,12 +287,12 @@ Value evaluate(const ExpressionTrim& expr,
                           << unvalidatedInput.toString() << " (of type "
                           << typeName(unvalidatedInput.getType()) << ") instead.",
             unvalidatedInput.getType() == BSONType::string);
-    const StringData input(unvalidatedInput.getStringData());
+    const std::string_view input(unvalidatedInput.getStringData());
 
     auto trimType = expr.getTrimType();
     if (!expr.getCharacters()) {
         return Value(str_trim_utils::doTrim(input,
-                                            str_trim_utils::kDefaultTrimWhitespaceChars,
+                                            str_trim_utils::defaultTrimWhitespaceChars(),
                                             trimType == ExpressionTrim::TrimType::kBoth ||
                                                 trimType == ExpressionTrim::TrimType::kLeft,
                                             trimType == ExpressionTrim::TrimType::kBoth ||
@@ -332,8 +334,8 @@ bool stringHasTokenAtIndex(size_t index, const std::string& input, const std::st
 }
 
 void uassertIfNotIntegralAndNonNegative(Value val,
-                                        StringData expressionName,
-                                        StringData argumentName) {
+                                        std::string_view expressionName,
+                                        std::string_view argumentName) {
     uassert(40096,
             str::stream() << expressionName << "requires an integral " << argumentName
                           << ", found a value of type: " << typeName(val.getType())

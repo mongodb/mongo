@@ -68,6 +68,8 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -121,7 +123,7 @@ GetNextResult createResult(OperationContext* opCtx,
 }
 }  // namespace
 
-QuerySettingsStage::QuerySettingsStage(StringData stageName,
+QuerySettingsStage::QuerySettingsStage(std::string_view stageName,
                                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                        bool showDebugQueryShape)
     : Stage(stageName, pExpCtx), _showDebugQueryShape(showDebugQueryShape) {

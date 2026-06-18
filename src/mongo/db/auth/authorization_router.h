@@ -32,6 +32,8 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 
 class AuthorizationManager;
@@ -61,7 +63,7 @@ public:
     virtual bool hasAnyPrivilegeDocuments(OperationContext* opCtx) = 0;
 
     virtual void notifyDDLOperation(OperationContext* opCtx,
-                                    StringData op,
+                                    std::string_view op,
                                     const NamespaceString& nss,
                                     const BSONObj& o,
                                     const BSONObj* o2) = 0;

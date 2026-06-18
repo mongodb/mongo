@@ -40,6 +40,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace {
@@ -77,7 +78,7 @@ TEST(DocGenTest, NoDuplicateDocs) {
 TEST(DocGenTest, SomePreChosenDocExists) {
     BSONObj specialDoc = BSON("a" << BSON("b" << 0));
 
-    std::set<StringData> fields{"a", "b"};
+    std::set<std::string_view> fields{"a", "b"};
     std::size_t depth = 2;
     std::size_t length = 1;
     TrivialScalarGenerator trivialScalarGenerator;
@@ -328,7 +329,7 @@ TEST(DocGenTest, EntireCollectionExistsABDepth1Length2BothDisabled) {
 }
 
 TEST(EnumerateArrsTest, NumArrsIsCorrect) {
-    std::set<StringData> fields{"a"};
+    std::set<std::string_view> fields{"a"};
     std::size_t depth = 2;
     std::size_t length = 2;
     TrivialScalarGenerator trivialScalarGenerator;
@@ -338,7 +339,7 @@ TEST(EnumerateArrsTest, NumArrsIsCorrect) {
 }
 
 TEST(EnumerateArrsTest, NoDuplicateArrs) {
-    std::set<StringData> fields{"a", "b"};
+    std::set<std::string_view> fields{"a", "b"};
     std::size_t depth = 2;
     std::size_t length = 2;
     TrivialScalarGenerator trivialScalarGenerator;

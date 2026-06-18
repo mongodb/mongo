@@ -41,6 +41,7 @@
 
 namespace mongo {
 namespace expression_evaluation_test {
+using namespace std::literals::string_view_literals;
 
 TEST(ExpressionBsonSize, WorksOnDocumentLargerThan16MB) {
     auto expCtx = ExpressionContextForTest{};
@@ -67,7 +68,7 @@ TEST(ExpressionBsonSize, WorksOnDocumentLargerThan16MB) {
 TEST(ExpressionInternalFindAllValuesAtPath, PreservesSimpleArray) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
-    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a"_sd));
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a"sv));
     auto expression = Expression::parseExpression(&expCtx, obj, vps);
     auto result =
         expression->evaluate(Document{{"a", Value({Value(1), Value(2)})}}, &expCtx.variables);
@@ -77,7 +78,7 @@ TEST(ExpressionInternalFindAllValuesAtPath, PreservesSimpleArray) {
 TEST(ExpressionInternalFindAllValuesAtPath, PreservesSimpleNestedArray) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
-    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"_sd));
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"sv));
     auto expression = Expression::parseExpression(&expCtx, obj, vps);
     auto doc = Document{{"a", Value(Document{{"b", Value({Value(1), Value(2)})}})}};
     auto result = expression->evaluate(doc, &expCtx.variables);
@@ -87,7 +88,7 @@ TEST(ExpressionInternalFindAllValuesAtPath, PreservesSimpleNestedArray) {
 TEST(ExpressionInternalFindAllValuesAtPath, DescendsThroughSingleArrayAndObject) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
-    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"_sd));
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"sv));
     auto expression = Expression::parseExpression(&expCtx, obj, vps);
     Document doc = Document{
         {"a",
@@ -99,7 +100,7 @@ TEST(ExpressionInternalFindAllValuesAtPath, DescendsThroughSingleArrayAndObject)
 TEST(ExpressionInternalFindAllValuesAtPath, DescendsThroughMultipleObjectArrayPairs) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
-    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"_sd));
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"sv));
     auto expression = Expression::parseExpression(&expCtx, obj, vps);
     Document doc = Document{{"a",
                              Value({Document{{"b", Value({Value(1), Value(2)})}},
@@ -112,7 +113,7 @@ TEST(ExpressionInternalFindAllValuesAtPath, DescendsThroughMultipleObjectArrayPa
 TEST(ExpressionInternalFindAllValuesAtPath, DoesNotDescendThroughDoubleArray) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
-    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"_sd));
+    const BSONObj obj = BSON("$_internalFindAllValuesAtPath" << Value("a.b"sv));
     auto expression = Expression::parseExpression(&expCtx, obj, vps);
     Document seenDoc1 = Document{{"b", Value({Value(5), Value(6)})}};
     Document seenDoc2 = Document{{"b", Value({Value(3), Value(4)})}};

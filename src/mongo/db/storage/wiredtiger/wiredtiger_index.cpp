@@ -29,7 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id_helpers.h"
@@ -49,6 +48,8 @@
 #include "mongo/db/validate/validate_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -74,6 +75,8 @@
 namespace mongo {
 namespace {
 
+using namespace std::literals::string_view_literals;
+
 MONGO_FAIL_POINT_DEFINE(WTIndexUassertDuplicateRecordForKeyOnIdUnindex);
 MONGO_FAIL_POINT_DEFINE(WTIndexCreateUniqueIndexesInOldFormat);
 MONGO_FAIL_POINT_DEFINE(WTIndexInsertUniqueKeysInOldFormat);
@@ -86,8 +89,8 @@ static CompiledConfiguration upperInclusiveBoundConfig("WT_CURSOR.bound",
                                                        "bound=upper,inclusive=true");
 static CompiledConfiguration clearBoundConfig("WT_CURSOR.bound", "action=clear");
 
-constexpr StringData kExactKeyWithRecordIdAlreadyExists =
-    "exact key, including RecordId, already exists in the index"_sd;
+constexpr std::string_view kExactKeyWithRecordIdAlreadyExists =
+    "exact key, including RecordId, already exists in the index"sv;
 
 /**
  * Returns the logv2::LogOptions controlling the behaviour after logging a data corruption error.
@@ -164,7 +167,7 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexConfig& config
 StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string& engineName,
                                                               const std::string& sysIndexConfig,
                                                               const std::string& collIndexConfig,
-                                                              StringData tableName,
+                                                              std::string_view tableName,
                                                               const IndexConfig& config,
                                                               bool isLogged) {
     str::stream ss;
@@ -241,7 +244,7 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  RecoveryUnit& ru,
                                  const std::string& uri,
                                  const UUID& collectionUUID,
-                                 StringData ident,
+                                 std::string_view ident,
                                  KeyFormat rsKeyFormat,
                                  const IndexConfig& config,
                                  bool isLogged)
@@ -374,8 +377,11 @@ IndexValidateResults WiredTigerIndex::validate(
     const collection_validation::ValidationOptions& options) const {
     IndexValidateResults results;
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    WiredTigerUtil::validateTableLogging(
-        *wtRu.getSessionNoTxn(), _container.uri(), _isLogged, StringData{_indexName}, results);
+    WiredTigerUtil::validateTableLogging(*wtRu.getSessionNoTxn(),
+                                         _container.uri(),
+                                         _isLogged,
+                                         std::string_view{_indexName},
+                                         results);
 
     if (!options.isFullIndexValidation()) {
         invariant(!options.verifyConfigurationOverride().has_value());
@@ -676,7 +682,7 @@ std::variant<bool, SortedDataInterface::DuplicateKey> WiredTigerIndex::_checkDup
 int WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
                                               RecoveryUnit& ru,
                                               const std::string& uri,
-                                              StringData ident,
+                                              std::string_view ident,
                                               const IndexConfig& config,
                                               int dataFormatVersion) {
     auto indexVersion = config.version;
@@ -720,7 +726,7 @@ int WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
 int WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                         RecoveryUnit& ru,
                                         const std::string& uri,
-                                        StringData ident,
+                                        std::string_view ident,
                                         const IndexConfig& config,
                                         bool isLogged) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
@@ -1382,7 +1388,7 @@ WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              RecoveryUnit& ru,
                                              const std::string& uri,
                                              const UUID& collectionUUID,
-                                             StringData ident,
+                                             std::string_view ident,
                                              KeyFormat rsKeyFormat,
                                              const IndexConfig& config,
                                              bool isLogged)
@@ -1451,7 +1457,7 @@ WiredTigerIdIndex::WiredTigerIdIndex(OperationContext* ctx,
                                      RecoveryUnit& ru,
                                      const std::string& uri,
                                      const UUID& collectionUUID,
-                                     StringData ident,
+                                     std::string_view ident,
                                      const IndexConfig& config,
                                      bool isLogged)
     : WiredTigerIndex(ctx, ru, uri, collectionUUID, ident, KeyFormat::Long, config, isLogged) {
@@ -1785,7 +1791,7 @@ WiredTigerIndexStandard::WiredTigerIndexStandard(OperationContext* ctx,
                                                  RecoveryUnit& ru,
                                                  const std::string& uri,
                                                  const UUID& collectionUUID,
-                                                 StringData ident,
+                                                 std::string_view ident,
                                                  KeyFormat rsKeyFormat,
                                                  const IndexConfig& config,
                                                  bool isLogged)

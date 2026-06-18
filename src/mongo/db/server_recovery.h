@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <mutex>
+#include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
 /**
@@ -61,18 +61,18 @@ public:
      *
      * If the system is not currently undergoing replication recovery, always returns true.
      */
-    bool collectionNeedsSizeAdjustment(StringData ident) const;
+    bool collectionNeedsSizeAdjustment(std::string_view ident) const;
 
     /**
      * Returns whether 'ident' has been specifically marked as requiring adjustment even during
      * recovery.
      */
-    bool collectionAlwaysNeedsSizeAdjustment(StringData ident) const;
+    bool collectionAlwaysNeedsSizeAdjustment(std::string_view ident) const;
 
     /**
      * Mark 'ident' as always requiring size adjustment, even if replication recovery is ongoing.
      */
-    void markCollectionAsAlwaysNeedsSizeAdjustment(StringData ident);
+    void markCollectionAsAlwaysNeedsSizeAdjustment(std::string_view ident);
 
     /**
      * Clears all internal state. This method should be called before calling 'recover to a stable

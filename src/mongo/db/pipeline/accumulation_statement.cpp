@@ -38,6 +38,7 @@
 #include "mongo/util/string_map.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -64,7 +65,7 @@ void AccumulationStatement::registerAccumulator(std::string name,
     operatorCountersGroupAccumulatorExpressions.addCounter(name);
 }
 
-AccumulationStatement::ParserRegistration& AccumulationStatement::getParser(StringData name) {
+AccumulationStatement::ParserRegistration& AccumulationStatement::getParser(std::string_view name) {
     auto it = parserMap.find(name);
     uassert(
         15952, str::stream() << "unknown group operator '" << name << "'", it != parserMap.end());

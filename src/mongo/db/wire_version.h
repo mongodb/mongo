@@ -40,6 +40,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -175,7 +176,8 @@ public:
         bool isInternalClient = false;
 
         static void appendToBSON(const Specification& spec, BSONObjBuilder* bob) {
-            auto appendWireVersion = [bob](StringData tag, const WireVersionInfo& wireVersionInfo) {
+            auto appendWireVersion = [bob](std::string_view tag,
+                                           const WireVersionInfo& wireVersionInfo) {
                 BSONObjBuilder builder = bob->subobjStart(tag);
                 WireVersionInfo::appendToBSON(wireVersionInfo, &builder);
             };

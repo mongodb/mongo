@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -47,6 +46,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -61,7 +61,7 @@ namespace mongo::exec::agg {
  */
 class MONGO_MOD_NEEDS_REPLACEMENT LookUpStage final : public Stage {
 public:
-    LookUpStage(StringData stageName,
+    LookUpStage(std::string_view stageName,
                 const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                 boost::intrusive_ptr<ExpressionContext> fromExpCtx,
                 NamespaceString fromNs,

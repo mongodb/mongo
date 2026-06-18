@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -68,6 +67,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -78,6 +78,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(preventSessionsCollectionSharding);
 
@@ -138,7 +139,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
     const auto nss = NamespaceString::kLogicalSessionsNamespace;
     sharding::router::CollectionRouter router(opCtx, nss);
     router.routeWithRoutingContext(
-        "SessionsCollectionConfigServer::_generateIndexesIfNeeded"_sd,
+        "SessionsCollectionConfigServer::_generateIndexesIfNeeded"sv,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
             // (SERVER-61214) This assertion ensures that the catalog cache recognizes

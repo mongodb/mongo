@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <jsapi.h>
@@ -51,7 +51,9 @@ class ModuleLoader {
 public:
     bool init(JSContext* ctx, const std::string& loadPath);
     JSObject* loadRootModuleFromPath(JSContext* cx, const std::string& path);
-    JSObject* loadRootModuleFromSource(JSContext* cx, const std::string& path, StringData source);
+    JSObject* loadRootModuleFromSource(JSContext* cx,
+                                       const std::string& path,
+                                       std::string_view source);
     std::string getBaseURL() const {
         return _baseUrl;
     };
@@ -69,7 +71,7 @@ private:
 
     JSObject* loadRootModule(JSContext* cx,
                              const std::string& path,
-                             boost::optional<StringData> source);
+                             boost::optional<std::string_view> source);
     JSObject* resolveImportedModule(JSContext* cx,
                                     JS::HandleValue referencingPrivate,
                                     JS::HandleObject moduleRequest);
@@ -96,7 +98,7 @@ private:
 
     JSObject* createScriptPrivateInfo(JSContext* cx,
                                       JS::Handle<JSString*> path,
-                                      boost::optional<StringData> source = boost::none);
+                                      boost::optional<std::string_view> source = boost::none);
 
     std::string _baseUrl;
     std::vector<std::string> _searchPaths;

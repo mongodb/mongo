@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -55,9 +56,9 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Group);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceGroup final : public DocumentSourceGroupBase {
 public:
-    static constexpr StringData kStageName = "$group"_sd;
+    static constexpr std::string_view kStageName = "$group"_sd;
 
-    StringData getSourceName() const final;
+    std::string_view getSourceName() const final;
 
     static const Id& id;
 
@@ -99,7 +100,7 @@ public:
                              DocumentSourceContainer* container);
 
 protected:
-    bool isSpecFieldReserved(StringData) final {
+    bool isSpecFieldReserved(std::string_view) final {
         return false;
     }
 

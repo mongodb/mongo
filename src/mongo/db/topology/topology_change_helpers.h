@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
@@ -58,6 +57,7 @@
 #include "mongo/util/uuid.h"
 
 #include <climits>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -88,10 +88,11 @@ void joinMigrations(OperationContext* opCtx);
  * shards from disk or more likely indicates that an existing shard conflicts with the shard being
  * added and they have different options, so the addShard attempt must be aborted.
  */
-boost::optional<ShardType> getExistingShard(OperationContext* opCtx,
-                                            const ConnectionString& proposedShardConnectionString,
-                                            const boost::optional<StringData>& proposedShardName,
-                                            ShardingCatalogClient& localCatalogClient);
+boost::optional<ShardType> getExistingShard(
+    OperationContext* opCtx,
+    const ConnectionString& proposedShardConnectionString,
+    const boost::optional<std::string_view>& proposedShardName,
+    ShardingCatalogClient& localCatalogClient);
 
 /**
  * Runs a command against a "shard" that is not yet in the cluster and thus not present in the
@@ -185,7 +186,7 @@ void getClusterTimeKeysFromReplicaSet(OperationContext* opCtx,
 std::string createShardName(OperationContext* opCtx,
                             RemoteCommandTargeter& targeter,
                             bool isConfigShard,
-                            const boost::optional<StringData>& proposedShardName,
+                            const boost::optional<std::string_view>& proposedShardName,
                             std::shared_ptr<executor::TaskExecutor> executor);
 
 /**

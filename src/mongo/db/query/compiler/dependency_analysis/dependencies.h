@@ -39,6 +39,7 @@
 #include <cstddef>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -52,7 +53,7 @@ struct PathComparator {
     using is_transparent = void;
 
     /* Returns true if the lhs value should sort before the rhs, false otherwise. */
-    bool operator()(StringData lhs, StringData rhs) const;
+    bool operator()(std::string_view lhs, std::string_view rhs) const;
 };
 
 /**
@@ -63,7 +64,7 @@ struct ThreeWayPathComparator {
     using is_transparent = void;
 
     /* Returns strong_ordering::less, equal, greater indicating the relation lhs <=> rhs */
-    std::strong_ordering operator()(StringData lhs, StringData rhs) const;
+    std::strong_ordering operator()(std::string_view lhs, std::string_view rhs) const;
 };
 
 /**

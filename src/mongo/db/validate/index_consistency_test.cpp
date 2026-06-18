@@ -42,6 +42,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 
 // Namespace String for the collection used in these tests.
@@ -354,7 +355,7 @@ TEST_F(IndexConsistencyTest, FailedKeygen) {
     auto opCtx = operationContext();
     ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions()));
 
-    static constexpr auto secondaryIndexKey{"xHashed"_sd};
+    static constexpr auto secondaryIndexKey{"xHashed"sv};
 
     AutoGetCollection coll(opCtx, kNss, MODE_X);
     CollectionWriter writer(opCtx, coll);
@@ -398,7 +399,7 @@ TEST_F(IndexConsistencyTest, GeoKeygenFailureReportsStructuredError) {
     auto opCtx = operationContext();
     ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions()));
 
-    static constexpr auto geoIndexName{"loc_2dsphere"_sd};
+    static constexpr auto geoIndexName{"loc_2dsphere"sv};
 
     AutoGetCollection coll(opCtx, kNss, MODE_X);
     CollectionWriter writer(opCtx, coll);
@@ -448,7 +449,7 @@ TEST_F(IndexConsistencyTest, GeoKeygenFailuresCollapseAcrossDocuments) {
     auto opCtx = operationContext();
     ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions()));
 
-    static constexpr auto geoIndexName{"loc_2dsphere"_sd};
+    static constexpr auto geoIndexName{"loc_2dsphere"sv};
 
     AutoGetCollection coll(opCtx, kNss, MODE_X);
     CollectionWriter writer(opCtx, coll);

@@ -29,22 +29,24 @@
 
 #include "mongo/db/namespace_string.h"
 
+#include <string_view>
+
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
-constexpr auto bulkWriteCursorCol = "$cmd.bulkWrite"_sd;
-constexpr auto collectionlessShardsvrParticipantBlockCollection =
-    "$cmd.shardsvrParticipantBlock"_sd;
-constexpr auto dropPendingNSPrefix = "system.drop."_sd;
+constexpr auto listCollectionsCursorCol = "$cmd.listCollections"sv;
+constexpr auto bulkWriteCursorCol = "$cmd.bulkWrite"sv;
+constexpr auto collectionlessShardsvrParticipantBlockCollection = "$cmd.shardsvrParticipantBlock"sv;
+constexpr auto dropPendingNSPrefix = "system.drop."sv;
 
-constexpr auto fle2Prefix = "enxcol_."_sd;
-constexpr auto fle2EscSuffix = ".esc"_sd;
-constexpr auto fle2EcocSuffix = ".ecoc"_sd;
-constexpr auto fle2EcocCompactSuffix = ".ecoc.compact"_sd;
+constexpr auto fle2Prefix = "enxcol_."sv;
+constexpr auto fle2EscSuffix = ".esc"sv;
+constexpr auto fle2EcocSuffix = ".ecoc"sv;
+constexpr auto fle2EcocCompactSuffix = ".ecoc.compact"sv;
 
 // The following are namespaces in the form of config.xxx for which only one instance exist globally
 // within the cluster.
@@ -186,11 +188,11 @@ NamespaceString NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(
     return nss;
 }
 
-NamespaceString NamespaceString::makeGlobalConfigCollection(StringData collName) {
+NamespaceString NamespaceString::makeGlobalConfigCollection(std::string_view collName) {
     return NamespaceString(DatabaseName::kConfig, collName);
 }
 
-NamespaceString NamespaceString::makeLocalCollection(StringData collName) {
+NamespaceString NamespaceString::makeLocalCollection(std::string_view collName) {
     return NamespaceString(DatabaseName::kLocal, collName);
 }
 
@@ -231,12 +233,13 @@ NamespaceString NamespaceString::makeCommandNamespace(const DatabaseName& dbName
     return NamespaceString(dbName, "$cmd");
 }
 
-std::string NamespaceString::getSisterNS(StringData local) const {
+std::string NamespaceString::getSisterNS(std::string_view local) const {
     MONGO_verify(local.size() && local[0] != '.');
     return std::string{db_deprecated()} + "." + std::string{local};
 }
 
-void NamespaceString::serializeCollectionName(BSONObjBuilder* builder, StringData fieldName) const {
+void NamespaceString::serializeCollectionName(BSONObjBuilder* builder,
+                                              std::string_view fieldName) const {
     if (isCollectionlessAggregateNS()) {
         builder->append(fieldName, 1);
     } else {
@@ -327,7 +330,7 @@ bool NamespaceString::isFLE2StateCollection() const {
          coll().ends_with(fle2EcocCompactSuffix));
 }
 
-bool NamespaceString::isFLE2StateCollection(StringData coll) {
+bool NamespaceString::isFLE2StateCollection(std::string_view coll) {
     return coll.starts_with(fle2Prefix) &&
         (coll.ends_with(fle2EscSuffix) || coll.ends_with(fle2EcocSuffix));
 }
@@ -410,7 +413,7 @@ std::string toStringForLogging(const NamespaceStringOrUUID& nssOrUUID) {
     return nssOrUUID.uuid().toString();
 }
 
-void NamespaceStringOrUUID::serialize(BSONObjBuilder* builder, StringData fieldName) const {
+void NamespaceStringOrUUID::serialize(BSONObjBuilder* builder, std::string_view fieldName) const {
     if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
         builder->append(fieldName, nss->coll());
     } else {

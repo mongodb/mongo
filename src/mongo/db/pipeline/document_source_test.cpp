@@ -42,16 +42,19 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(MockExtension)
 
 class DocumentSourceMockExtension : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$mockExtension"_sd;
+    static constexpr std::string_view kStageName = "$mockExtension"sv;
 
     DocumentSourceMockExtension(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {}
@@ -78,7 +81,7 @@ public:
                                 UnionRequirement::kAllowed);
     }
 
-    StringData getSourceName() const override {
+    std::string_view getSourceName() const override {
         return kStageName;
     }
 

@@ -63,6 +63,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <variant>
 
 #include <boost/optional/optional.hpp>
@@ -215,7 +216,7 @@ boost::optional<std::string> findPersistedResumeState(
 // Count the number of records stored in the internal record store identified by `ident`.
 size_t countRecordsInIdent(OperationContext* opCtx,
                            StorageEngine* storageEngine,
-                           StringData ident) {
+                           std::string_view ident) {
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto rs = storageEngine->getEngine()->getInternalRecordStore(ru, ident, KeyFormat::Long);
@@ -1289,7 +1290,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringDrain) {
     }
 
     // Count committed records in an internal table by iterating its cursor.
-    auto countRecords = [&](StringData ident) -> size_t {
+    auto countRecords = [&](std::string_view ident) -> size_t {
         shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
         auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
         auto rs = storageEngine->getEngine()->getInternalRecordStore(ru, ident, KeyFormat::Long);
@@ -1763,14 +1764,14 @@ TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
 class ResumeStateContainerInsertObserver : public OpObserverNoop {
 public:
     void onContainerInsert(OperationContext*,
-                           StringData ident,
+                           std::string_view ident,
                            int64_t key,
                            std::span<const char> value) override {
         inserts.push_back({std::string{ident}, key, std::string{value.begin(), value.end()}});
     }
 
     void onContainerInsert(OperationContext*,
-                           StringData ident,
+                           std::string_view ident,
                            std::span<const char> key,
                            std::span<const char> value) override {
         inserts.push_back({std::string{ident},
@@ -1779,14 +1780,14 @@ public:
     }
 
     void onContainerUpdate(OperationContext*,
-                           StringData ident,
+                           std::string_view ident,
                            int64_t key,
                            std::span<const char> value) override {
         updates.push_back({std::string{ident}, key, std::string{value.begin(), value.end()}});
     }
 
     void onContainerUpdate(OperationContext*,
-                           StringData ident,
+                           std::string_view ident,
                            std::span<const char> key,
                            std::span<const char> value) override {
         updates.push_back({std::string{ident},
@@ -1802,12 +1803,12 @@ public:
     std::vector<Op> inserts;
     std::vector<Op> updates;
 
-    size_t countInsertsForIdent(StringData ident) const {
+    size_t countInsertsForIdent(std::string_view ident) const {
         return std::count_if(
             inserts.begin(), inserts.end(), [&](const Op& op) { return op.ident == ident; });
     }
 
-    size_t countUpdatesForIdent(StringData ident) const {
+    size_t countUpdatesForIdent(std::string_view ident) const {
         return std::count_if(
             updates.begin(), updates.end(), [&](const Op& op) { return op.ident == ident; });
     }
@@ -2259,7 +2260,7 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordIdForMultipleIndexes)
     wuow.commit();
 
     auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
-    auto makeInfo = [&](StringData field, StringData ident) {
+    auto makeInfo = [&](std::string_view field, std::string_view ident) {
         return IndexBuildInfo(BSON("key" << BSON(field << 1) << "name"
                                          << (std::string(field) + "_1") << "v"
                                          << static_cast<int>(IndexConfig::kLatestIndexVersion)),
@@ -2552,7 +2553,7 @@ TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpi
     };
 
     auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
-    auto makeInfo = [&](StringData field, StringData ident) {
+    auto makeInfo = [&](std::string_view field, std::string_view ident) {
         return IndexBuildInfo{BSON("key" << BSON(field << 1) << "name"
                                          << (std::string(field) + "_1") << "v"
                                          << static_cast<int>(IndexConfig::kLatestIndexVersion)),
@@ -2690,7 +2691,7 @@ TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpi
                                          repl::ReadConcernArgs::get(operationContext()),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
-        auto numEntries = [&](StringData name) {
+        auto numEntries = [&](std::string_view name) {
             auto* entry = coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
                 operationContext(), name, IndexCatalog::InclusionPolicy::kUnfinished);
             ASSERT(entry);

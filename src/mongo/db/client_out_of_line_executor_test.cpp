@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -44,11 +43,13 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * The following implements a pseudo garbage collector to test client's out-of-line executor.
@@ -98,7 +99,7 @@ public:
         return _instanceCount.load();
     }
 
-    static constexpr auto kClientThreadName = "ClientOutOfLineExecutorTest"_sd;
+    static constexpr auto kClientThreadName = "ClientOutOfLineExecutorTest"sv;
 
 private:
     friend class DummyInstance;
@@ -131,7 +132,7 @@ TEST_F(ClientOutOfLineExecutorTest, DestructorExecutesLeftovers) {
     unittest::Barrier b1(2), b2(2);
 
     auto thread = stdx::thread([this, kDummiesCount, b1 = &b1, b2 = &b2]() {
-        Client::initThread("ThreadWithLeftovers"_sd, getGlobalServiceContext()->getService());
+        Client::initThread("ThreadWithLeftovers"sv, getGlobalServiceContext()->getService());
 
         auto handle = ClientOutOfLineExecutor::get(Client::getCurrent())->getHandle();
         for (auto i = 0; i < kDummiesCount; i++) {
@@ -161,7 +162,7 @@ TEST_F(ClientOutOfLineExecutorTest, ScheduleAfterClientThreadReturns) {
     ClientOutOfLineExecutor::QueueHandle handle;
 
     auto thread = stdx::thread([&handle]() mutable {
-        Client::initThread("ClientThread"_sd, getGlobalServiceContext()->getService());
+        Client::initThread("ClientThread"sv, getGlobalServiceContext()->getService());
         handle = ClientOutOfLineExecutor::get(Client::getCurrent())->getHandle();
         // Return to destroy the client, and close the task queue.
     });

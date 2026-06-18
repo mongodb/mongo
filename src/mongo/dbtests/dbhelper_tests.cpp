@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -69,11 +68,13 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Unit tests related to DBHelpers
@@ -191,7 +192,7 @@ public:
         BSONObj oplogEntry;
         Helpers::getLast(opCtx1.get(), NamespaceString::kRsOplogNamespace, oplogEntry);
         ASSERT_BSONOBJ_NE(oplogEntry, BSONObj());
-        ASSERT_TRUE(oplogEntry.getStringField("op") == "i"_sd);
+        ASSERT_TRUE(oplogEntry.getStringField("op") == "i"sv);
 
         // Run two concurrent storage transactions. Run findByIdAndNoopUpdate in one, and then
         // attempt to delete all docs in the collection in the other. Assert that the delete op
@@ -249,7 +250,7 @@ private:
         BSONObj oplogEntry;
         Helpers::getLast(opCtx2, NamespaceString::kRsOplogNamespace, oplogEntry);
         ASSERT_BSONOBJ_NE(oplogEntry, BSONObj());
-        ASSERT_TRUE(oplogEntry.getStringField("op") == "i"_sd);
+        ASSERT_TRUE(oplogEntry.getStringField("op") == "i"sv);
     }
 
     void assertFindAndNoopUpdateAfterWriteThrowsWCE(OperationContext* opCtx1,

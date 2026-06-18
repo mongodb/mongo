@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -56,7 +56,7 @@ public:
     RangePredicate(const QueryRewriterInterface* rewriter) : EncryptedPredicate(rewriter) {}
 
 protected:
-    std::vector<PrfBlock> generateTags(BSONValue payload, StringData path) const override;
+    std::vector<PrfBlock> generateTags(BSONValue payload, std::string_view path) const override;
 
     std::unique_ptr<MatchExpression> rewriteToTagDisjunction(MatchExpression* expr) const override;
     std::unique_ptr<Expression> rewriteToTagDisjunction(Expression* expr) const override;
@@ -90,7 +90,7 @@ private:
      * Generate an expression for encrypted collscan for a range index.
      */
     std::unique_ptr<ExpressionInternalFLEBetween> fleBetweenFromPayload(
-        StringData path, ParsedFindRangePayload payload) const;
+        std::string_view path, ParsedFindRangePayload payload) const;
 
     std::unique_ptr<ExpressionInternalFLEBetween> fleBetweenFromPayload(
         boost::intrusive_ptr<Expression> fieldpath, ParsedFindRangePayload payload) const;

@@ -33,6 +33,8 @@
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 #include <sasl/sasl.h>
 
 namespace mongo {
@@ -52,7 +54,7 @@ public:
     /**
      * Overriding to store the password data in sasl_secret_t format
      */
-    void setParameter(Parameter id, StringData value) override;
+    void setParameter(Parameter id, std::string_view value) override;
 
     /**
      * Returns the value of the parameterPassword parameter in the form of a sasl_secret_t, used
@@ -64,7 +66,7 @@ public:
 
     Status initialize() override;
 
-    Status step(StringData inputData, std::string* outputData) override;
+    Status step(std::string_view inputData, std::string* outputData) override;
 
     boost::optional<std::uint32_t> currentStep() const override;
 

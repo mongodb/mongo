@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -104,6 +103,7 @@
 #include <cstdlib>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -114,6 +114,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
                                   const UUID& uuid,
@@ -568,7 +569,7 @@ public:
 
     long long currentOpFetchedCount() const {
         auto curOp = _metrics->reportForCurrentOp();
-        return curOp["oplogEntriesFetched"_sd].Long();
+        return curOp["oplogEntriesFetched"sv].Long();
     }
 
     long long persistedFetchedCount(OperationContext* opCtx) const {
@@ -1621,9 +1622,9 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_Targ
     bool scheduledAggResponse = false;
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         auto cmdName = request.cmdObj.firstElementFieldName();
-        if (cmdName == "killCursors"_sd) {
+        if (cmdName == "killCursors"sv) {
             return makeKillCursorResponse(request);
-        } else if (cmdName == "aggregate"_sd) {
+        } else if (cmdName == "aggregate"sv) {
             scheduledAggResponse = true;
             return makeAggResponse(request);
         }

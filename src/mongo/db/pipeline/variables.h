@@ -46,6 +46,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -117,18 +118,18 @@ public:
     static constexpr auto kIsMapReduceId = Id(-7);
     static constexpr auto kUserRolesId = Id(-8);
 
-    static constexpr StringData kRootName = "ROOT"_sd;
-    static constexpr StringData kRemoveName = "REMOVE"_sd;
-    static constexpr StringData kNowName = "NOW"_sd;
-    static constexpr StringData kClusterTimeName = "CLUSTER_TIME"_sd;
-    static constexpr StringData kJsScopeName = "JS_SCOPE"_sd;
-    static constexpr StringData kIsMapReduceName = "IS_MR"_sd;
-    static constexpr StringData kSearchMetaName = "SEARCH_META"_sd;
-    static constexpr StringData kUserRolesName = "USER_ROLES"_sd;
+    static constexpr std::string_view kRootName = "ROOT"_sd;
+    static constexpr std::string_view kRemoveName = "REMOVE"_sd;
+    static constexpr std::string_view kNowName = "NOW"_sd;
+    static constexpr std::string_view kClusterTimeName = "CLUSTER_TIME"_sd;
+    static constexpr std::string_view kJsScopeName = "JS_SCOPE"_sd;
+    static constexpr std::string_view kIsMapReduceName = "IS_MR"_sd;
+    static constexpr std::string_view kSearchMetaName = "SEARCH_META"_sd;
+    static constexpr std::string_view kUserRolesName = "USER_ROLES"_sd;
 
     // Map from builtin var name to reserved id number.
     static const StringMap<Id> kBuiltinVarNameToId;
-    static const std::map<StringData, std::function<void(const Value&)>> kSystemVarValidators;
+    static const std::map<std::string_view, std::function<void(const Value&)>> kSystemVarValidators;
     static const std::map<Id, std::string> kIdToBuiltinVarName;
 
     /**
@@ -261,7 +262,7 @@ public:
     /**
      * Return true if the passed-in variable name belongs to a builtin variable.
      */
-    static auto isBuiltin(StringData name) {
+    static auto isBuiltin(std::string_view name) {
         return kBuiltinVarNameToId.find(name) != kBuiltinVarNameToId.end();
     }
 
@@ -341,7 +342,7 @@ public:
      *
      * NOTE: Name validation is responsibility of caller.
      */
-    Variables::Id defineVariable(StringData name);
+    Variables::Id defineVariable(std::string_view name);
 
     /**
      * Returns true if there are any variables defined in this scope.
@@ -353,7 +354,7 @@ public:
     /**
      * Returns the current Id for a variable. uasserts if the variable isn't defined.
      */
-    Variables::Id getVariable(StringData name) const;
+    Variables::Id getVariable(std::string_view name) const;
 
     /**
      * Returns the set of variable IDs defined at this scope.

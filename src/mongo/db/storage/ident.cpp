@@ -37,12 +37,15 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
-constexpr auto kCollectionIdentStem = "collection"_sd;
-constexpr auto kIndexIdentStem = "index"_sd;
-constexpr auto kInternalIdentStem = "internal"_sd;
+constexpr auto kCollectionIdentStem = "collection"sv;
+constexpr auto kIndexIdentStem = "index"sv;
+constexpr auto kInternalIdentStem = "internal"sv;
 
 // Does not escape letters, digits, '.', or '_'.
 // Otherwise escapes to a '.' followed by a zero-filled 2- or 3-digit decimal number.
@@ -53,42 +56,39 @@ constexpr auto kInternalIdentStem = "internal"_sd;
 //       {'d','b','1','2','3'} => "d" + "b" + "." + "1" + "2" + "3" => "db.123"
 //       {'d','b','\x0c','3'}  => "d" + "b" + ".12" + "3"           => "db.123"
 //       {'d','b','\x3b'}      => "d" + "b" + ".123"                => "db.123"
-constexpr std::array<StringData, 256> escapeTable = {
-    ".00"_sd,  ".01"_sd,  ".02"_sd,  ".03"_sd,  ".04"_sd,  ".05"_sd,  ".06"_sd,  ".07"_sd,
-    ".08"_sd,  ".09"_sd,  ".10"_sd,  ".11"_sd,  ".12"_sd,  ".13"_sd,  ".14"_sd,  ".15"_sd,
-    ".16"_sd,  ".17"_sd,  ".18"_sd,  ".19"_sd,  ".20"_sd,  ".21"_sd,  ".22"_sd,  ".23"_sd,
-    ".24"_sd,  ".25"_sd,  ".26"_sd,  ".27"_sd,  ".28"_sd,  ".29"_sd,  ".30"_sd,  ".31"_sd,
-    ".32"_sd,  ".33"_sd,  ".34"_sd,  ".35"_sd,  ".36"_sd,  ".37"_sd,  ".38"_sd,  ".39"_sd,
-    ".40"_sd,  ".41"_sd,  ".42"_sd,  ".43"_sd,  ".44"_sd,  ".45"_sd,  "."_sd,    ".47"_sd,
-    "0"_sd,    "1"_sd,    "2"_sd,    "3"_sd,    "4"_sd,    "5"_sd,    "6"_sd,    "7"_sd,
-    "8"_sd,    "9"_sd,    ".58"_sd,  ".59"_sd,  ".60"_sd,  ".61"_sd,  ".62"_sd,  ".63"_sd,
-    ".64"_sd,  "A"_sd,    "B"_sd,    "C"_sd,    "D"_sd,    "E"_sd,    "F"_sd,    "G"_sd,
-    "H"_sd,    "I"_sd,    "J"_sd,    "K"_sd,    "L"_sd,    "M"_sd,    "N"_sd,    "O"_sd,
-    "P"_sd,    "Q"_sd,    "R"_sd,    "S"_sd,    "T"_sd,    "U"_sd,    "V"_sd,    "W"_sd,
-    "X"_sd,    "Y"_sd,    "Z"_sd,    ".91"_sd,  ".92"_sd,  ".93"_sd,  ".94"_sd,  "_"_sd,
-    ".96"_sd,  "a"_sd,    "b"_sd,    "c"_sd,    "d"_sd,    "e"_sd,    "f"_sd,    "g"_sd,
-    "h"_sd,    "i"_sd,    "j"_sd,    "k"_sd,    "l"_sd,    "m"_sd,    "n"_sd,    "o"_sd,
-    "p"_sd,    "q"_sd,    "r"_sd,    "s"_sd,    "t"_sd,    "u"_sd,    "v"_sd,    "w"_sd,
-    "x"_sd,    "y"_sd,    "z"_sd,    ".123"_sd, ".124"_sd, ".125"_sd, ".126"_sd, ".127"_sd,
-    ".128"_sd, ".129"_sd, ".130"_sd, ".131"_sd, ".132"_sd, ".133"_sd, ".134"_sd, ".135"_sd,
-    ".136"_sd, ".137"_sd, ".138"_sd, ".139"_sd, ".140"_sd, ".141"_sd, ".142"_sd, ".143"_sd,
-    ".144"_sd, ".145"_sd, ".146"_sd, ".147"_sd, ".148"_sd, ".149"_sd, ".150"_sd, ".151"_sd,
-    ".152"_sd, ".153"_sd, ".154"_sd, ".155"_sd, ".156"_sd, ".157"_sd, ".158"_sd, ".159"_sd,
-    ".160"_sd, ".161"_sd, ".162"_sd, ".163"_sd, ".164"_sd, ".165"_sd, ".166"_sd, ".167"_sd,
-    ".168"_sd, ".169"_sd, ".170"_sd, ".171"_sd, ".172"_sd, ".173"_sd, ".174"_sd, ".175"_sd,
-    ".176"_sd, ".177"_sd, ".178"_sd, ".179"_sd, ".180"_sd, ".181"_sd, ".182"_sd, ".183"_sd,
-    ".184"_sd, ".185"_sd, ".186"_sd, ".187"_sd, ".188"_sd, ".189"_sd, ".190"_sd, ".191"_sd,
-    ".192"_sd, ".193"_sd, ".194"_sd, ".195"_sd, ".196"_sd, ".197"_sd, ".198"_sd, ".199"_sd,
-    ".200"_sd, ".201"_sd, ".202"_sd, ".203"_sd, ".204"_sd, ".205"_sd, ".206"_sd, ".207"_sd,
-    ".208"_sd, ".209"_sd, ".210"_sd, ".211"_sd, ".212"_sd, ".213"_sd, ".214"_sd, ".215"_sd,
-    ".216"_sd, ".217"_sd, ".218"_sd, ".219"_sd, ".220"_sd, ".221"_sd, ".222"_sd, ".223"_sd,
-    ".224"_sd, ".225"_sd, ".226"_sd, ".227"_sd, ".228"_sd, ".229"_sd, ".230"_sd, ".231"_sd,
-    ".232"_sd, ".233"_sd, ".234"_sd, ".235"_sd, ".236"_sd, ".237"_sd, ".238"_sd, ".239"_sd,
-    ".240"_sd, ".241"_sd, ".242"_sd, ".243"_sd, ".244"_sd, ".245"_sd, ".246"_sd, ".247"_sd,
-    ".248"_sd, ".249"_sd, ".250"_sd, ".251"_sd, ".252"_sd, ".253"_sd, ".254"_sd, ".255"_sd};
+constexpr std::array<std::string_view, 256> escapeTable = {
+    ".00"sv,  ".01"sv,  ".02"sv,  ".03"sv,  ".04"sv,  ".05"sv,  ".06"sv,  ".07"sv,  ".08"sv,
+    ".09"sv,  ".10"sv,  ".11"sv,  ".12"sv,  ".13"sv,  ".14"sv,  ".15"sv,  ".16"sv,  ".17"sv,
+    ".18"sv,  ".19"sv,  ".20"sv,  ".21"sv,  ".22"sv,  ".23"sv,  ".24"sv,  ".25"sv,  ".26"sv,
+    ".27"sv,  ".28"sv,  ".29"sv,  ".30"sv,  ".31"sv,  ".32"sv,  ".33"sv,  ".34"sv,  ".35"sv,
+    ".36"sv,  ".37"sv,  ".38"sv,  ".39"sv,  ".40"sv,  ".41"sv,  ".42"sv,  ".43"sv,  ".44"sv,
+    ".45"sv,  "."sv,    ".47"sv,  "0"sv,    "1"sv,    "2"sv,    "3"sv,    "4"sv,    "5"sv,
+    "6"sv,    "7"sv,    "8"sv,    "9"sv,    ".58"sv,  ".59"sv,  ".60"sv,  ".61"sv,  ".62"sv,
+    ".63"sv,  ".64"sv,  "A"sv,    "B"sv,    "C"sv,    "D"sv,    "E"sv,    "F"sv,    "G"sv,
+    "H"sv,    "I"sv,    "J"sv,    "K"sv,    "L"sv,    "M"sv,    "N"sv,    "O"sv,    "P"sv,
+    "Q"sv,    "R"sv,    "S"sv,    "T"sv,    "U"sv,    "V"sv,    "W"sv,    "X"sv,    "Y"sv,
+    "Z"sv,    ".91"sv,  ".92"sv,  ".93"sv,  ".94"sv,  "_"sv,    ".96"sv,  "a"sv,    "b"sv,
+    "c"sv,    "d"sv,    "e"sv,    "f"sv,    "g"sv,    "h"sv,    "i"sv,    "j"sv,    "k"sv,
+    "l"sv,    "m"sv,    "n"sv,    "o"sv,    "p"sv,    "q"sv,    "r"sv,    "s"sv,    "t"sv,
+    "u"sv,    "v"sv,    "w"sv,    "x"sv,    "y"sv,    "z"sv,    ".123"sv, ".124"sv, ".125"sv,
+    ".126"sv, ".127"sv, ".128"sv, ".129"sv, ".130"sv, ".131"sv, ".132"sv, ".133"sv, ".134"sv,
+    ".135"sv, ".136"sv, ".137"sv, ".138"sv, ".139"sv, ".140"sv, ".141"sv, ".142"sv, ".143"sv,
+    ".144"sv, ".145"sv, ".146"sv, ".147"sv, ".148"sv, ".149"sv, ".150"sv, ".151"sv, ".152"sv,
+    ".153"sv, ".154"sv, ".155"sv, ".156"sv, ".157"sv, ".158"sv, ".159"sv, ".160"sv, ".161"sv,
+    ".162"sv, ".163"sv, ".164"sv, ".165"sv, ".166"sv, ".167"sv, ".168"sv, ".169"sv, ".170"sv,
+    ".171"sv, ".172"sv, ".173"sv, ".174"sv, ".175"sv, ".176"sv, ".177"sv, ".178"sv, ".179"sv,
+    ".180"sv, ".181"sv, ".182"sv, ".183"sv, ".184"sv, ".185"sv, ".186"sv, ".187"sv, ".188"sv,
+    ".189"sv, ".190"sv, ".191"sv, ".192"sv, ".193"sv, ".194"sv, ".195"sv, ".196"sv, ".197"sv,
+    ".198"sv, ".199"sv, ".200"sv, ".201"sv, ".202"sv, ".203"sv, ".204"sv, ".205"sv, ".206"sv,
+    ".207"sv, ".208"sv, ".209"sv, ".210"sv, ".211"sv, ".212"sv, ".213"sv, ".214"sv, ".215"sv,
+    ".216"sv, ".217"sv, ".218"sv, ".219"sv, ".220"sv, ".221"sv, ".222"sv, ".223"sv, ".224"sv,
+    ".225"sv, ".226"sv, ".227"sv, ".228"sv, ".229"sv, ".230"sv, ".231"sv, ".232"sv, ".233"sv,
+    ".234"sv, ".235"sv, ".236"sv, ".237"sv, ".238"sv, ".239"sv, ".240"sv, ".241"sv, ".242"sv,
+    ".243"sv, ".244"sv, ".245"sv, ".246"sv, ".247"sv, ".248"sv, ".249"sv, ".250"sv, ".251"sv,
+    ".252"sv, ".253"sv, ".254"sv, ".255"sv};
 
 StringBuilder buildIdentPrefix(const DatabaseName& dbName,
-                               StringData identType,
+                               std::string_view identType,
                                bool directoryPerDB,
                                bool directoryForIndexes) {
     StringBuilder buf;
@@ -101,8 +101,8 @@ StringBuilder buildIdentPrefix(const DatabaseName& dbName,
 }
 
 std::string generateNewIdent(const DatabaseName& dbName,
-                             StringData identType,
-                             const boost::optional<StringData>& optIdentUniqueTag,
+                             std::string_view identType,
+                             const boost::optional<std::string_view>& optIdentUniqueTag,
                              bool directoryPerDB,
                              bool directoryForIndexes) {
     auto buf = buildIdentPrefix(dbName, identType, directoryPerDB, directoryForIndexes);
@@ -122,7 +122,7 @@ std::string generateNewIdent(const DatabaseName& dbName,
 
 enum class IdentType { collection, index, internal };
 
-boost::optional<IdentType> getIdentType(StringData str) {
+boost::optional<IdentType> getIdentType(std::string_view str) {
     if (str == kCollectionIdentStem)
         return IdentType::collection;
     if (str == kIndexIdentStem)
@@ -133,13 +133,13 @@ boost::optional<IdentType> getIdentType(StringData str) {
 }
 struct ParsedIdent {
     IdentType identType;
-    StringData uniqueTag;
-    boost::optional<StringData> dbName;
+    std::string_view uniqueTag;
+    boost::optional<std::string_view> dbName;
 };
 
-boost::optional<ParsedIdent> validateIdent(boost::optional<StringData> dbName,
-                                           StringData identType,
-                                           StringData uniqueTag) {
+boost::optional<ParsedIdent> validateIdent(boost::optional<std::string_view> dbName,
+                                           std::string_view identType,
+                                           std::string_view uniqueTag) {
     // Ident type must be one of a fixed set of values
     auto parsedIdentType = getIdentType(identType);
     if (!parsedIdentType)
@@ -150,7 +150,7 @@ boost::optional<ParsedIdent> validateIdent(boost::optional<StringData> dbName,
     // If the dbName is present it must be non-empty, must not change when escaped with
     // createDBNamePathComponent(), and must not be "." or ".."
     if (dbName) {
-        if (dbName->empty() || dbName == "."_sd || dbName == ".."_sd)
+        if (dbName->empty() || dbName == "."sv || dbName == ".."sv)
             return boost::none;
         for (char c : *dbName) {
             if (escapeTable[c].size() != 1)
@@ -172,13 +172,13 @@ boost::optional<ParsedIdent> validateIdent(boost::optional<StringData> dbName,
 // $dbName is a string escaped by createDBNamePathComponent().
 // $uniqueTag is fairly free-form, but must not start with an ident type or contain any characters
 // which would be special when interpreted as a path.
-boost::optional<ParsedIdent> parseIdent(StringData str) {
+boost::optional<ParsedIdent> parseIdent(std::string_view str) {
     struct Parts {
         char delim;
-        StringData head;
-        StringData tail;
+        std::string_view head;
+        std::string_view tail;
     };
-    auto split = [](StringData in, StringData delims) -> boost::optional<Parts> {
+    auto split = [](std::string_view in, std::string_view delims) -> boost::optional<Parts> {
         auto pos = in.find_first_of(delims);
         if (pos == in.npos)
             return {};
@@ -234,7 +234,7 @@ namespace ident {
 std::string generateNewCollectionIdent(const DatabaseName& dbName,
                                        bool directoryPerDB,
                                        bool directoryForIndexes,
-                                       const boost::optional<StringData>& optIdentUniqueTag) {
+                                       const boost::optional<std::string_view>& optIdentUniqueTag) {
     return generateNewIdent(
         dbName, kCollectionIdentStem, optIdentUniqueTag, directoryPerDB, directoryForIndexes);
 }
@@ -242,16 +242,17 @@ std::string generateNewCollectionIdent(const DatabaseName& dbName,
 std::string generateNewIndexIdent(const DatabaseName& dbName,
                                   bool directoryPerDB,
                                   bool directoryForIndexes,
-                                  const boost::optional<StringData>& optIdentUniqueTag) {
+                                  const boost::optional<std::string_view>& optIdentUniqueTag) {
     return generateNewIdent(
         dbName, kIndexIdentStem, optIdentUniqueTag, directoryPerDB, directoryForIndexes);
 }
 
-std::string generateNewInternalIdent(StringData identStem) {
+std::string generateNewInternalIdent(std::string_view identStem) {
     return fmt::format("{}-{}{}", kInternalIdentStem, identStem, UUID::gen().toString());
 }
 
-std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData indexIdent) {
+std::string generateNewInternalIndexBuildIdent(std::string_view identStem,
+                                               std::string_view indexIdent) {
     auto parsed = parseIdent(indexIdent);
     massert(11570700,
             str::stream() << "Invalid ident supplied to generateNewInternalIndexBuildIdent: "
@@ -273,67 +274,67 @@ std::string generateNewIndexBuildIdent(const UUID& buildUUID) {
     return fmt::format("{}-{}-{}", kInternalIdentStem, kIndexBuildIdentStem, buildUUID.toString());
 }
 
-StringData getCollectionIdentUniqueTag(StringData ident,
-                                       const DatabaseName& dbName,
-                                       bool directoryPerDB,
-                                       bool directoryForIndexes) {
+std::string_view getCollectionIdentUniqueTag(std::string_view ident,
+                                             const DatabaseName& dbName,
+                                             bool directoryPerDB,
+                                             bool directoryForIndexes) {
     auto identPrefix =
         buildIdentPrefix(dbName, kCollectionIdentStem, directoryPerDB, directoryForIndexes);
     invariant(ident.starts_with(identPrefix.stringData()));
     return ident.substr(identPrefix.len());
 }
 
-StringData getIndexIdentUniqueTag(StringData ident,
-                                  const DatabaseName& dbName,
-                                  bool directoryPerDB,
-                                  bool directoryForIndexes) {
+std::string_view getIndexIdentUniqueTag(std::string_view ident,
+                                        const DatabaseName& dbName,
+                                        bool directoryPerDB,
+                                        bool directoryForIndexes) {
     auto identPrefix =
         buildIdentPrefix(dbName, kIndexIdentStem, directoryPerDB, directoryForIndexes);
     invariant(ident.starts_with(identPrefix.stringData()));
     return ident.substr(identPrefix.len());
 }
 
-bool isCollectionOrIndexIdent(StringData ident) {
+bool isCollectionOrIndexIdent(std::string_view ident) {
     auto parsed = parseIdent(ident);
     return parsed &&
         (parsed->identType == IdentType::collection || parsed->identType == IdentType::index);
 }
 
-bool isInternalIdent(StringData ident, StringData identStem) {
+bool isInternalIdent(std::string_view ident, std::string_view identStem) {
     auto parsed = parseIdent(ident);
     return parsed && parsed->identType == IdentType::internal &&
         parsed->uniqueTag.starts_with(identStem);
 }
 
-bool isReplicatedFastCountIdent(StringData ident) {
+bool isReplicatedFastCountIdent(std::string_view ident) {
     return ident == kFastCountMetadataStore || ident == kFastCountMetadataStoreTimestamps;
 }
 
-bool isCollectionIdent(StringData ident) {
+bool isCollectionIdent(std::string_view ident) {
     // Internal idents prefixed "internal-" should not be considered collections, because
     // they are not eligible for orphan recovery through repair.
     auto parsed = parseIdent(ident);
     return parsed && parsed->identType == IdentType::collection;
 }
 
-bool validateTag(StringData uniqueTag) {
+bool validateTag(std::string_view uniqueTag) {
     return !uniqueTag.empty() && uniqueTag.find_first_of("./\\:") == uniqueTag.npos;
 }
 
-bool isValidIdent(StringData ident) {
+bool isValidIdent(std::string_view ident) {
     // These internal idents do not follow the normal scheme
     if (ident == kSizeStorer || ident == kMdbCatalog)
         return true;
     return parseIdent(ident).has_value();
 }
 
-StringData getDirectory(StringData ident) {
+std::string_view getDirectory(std::string_view ident) {
     uassert(11558900,
             str::stream() << "Invalid ident supplied to getDirectory: " << ident,
             isValidIdent(ident));
     auto pos = ident.rfind('/');
-    if (pos == StringData::npos) {
-        return ""_sd;
+    if (pos == std::string_view::npos) {
+        return ""sv;
     }
     return ident.substr(0, pos);
 }
@@ -343,7 +344,7 @@ std::string createDBNamePathComponent(const DatabaseName& dbName) {
     const auto db = DatabaseNameUtil::serialize(dbName, SerializationContext::stateCatalog());
     escaped.reserve(db.size());
     for (unsigned char c : db) {
-        StringData ce = escapeTable[c];
+        std::string_view ce = escapeTable[c];
         escaped.append(ce.begin(), ce.end());
     }
     return escaped;

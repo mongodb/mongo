@@ -64,6 +64,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -74,7 +75,7 @@ namespace mongo {
 
 class MONGO_MOD_PUBLIC ReshardingDonorService : public repl::PrimaryOnlyService {
 public:
-    static constexpr StringData kServiceName = "ReshardingDonorService"_sd;
+    static constexpr std::string_view kServiceName = "ReshardingDonorService"_sd;
 
     explicit ReshardingDonorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
@@ -84,7 +85,7 @@ public:
 
     class MONGO_MOD_PRIVATE DonorStateMachineExternalState;
 
-    MONGO_MOD_PRIVATE StringData getServiceName() const override {
+    MONGO_MOD_PRIVATE std::string_view getServiceName() const override {
         return kServiceName;
     }
 

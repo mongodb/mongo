@@ -33,7 +33,6 @@
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "bits/types/siginfo_t.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_util.h"

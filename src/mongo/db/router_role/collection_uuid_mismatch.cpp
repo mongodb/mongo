@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
@@ -55,11 +54,13 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 Status populateCollectionUUIDMismatch(OperationContext* opCtx,
                                       const Status& collectionUUIDMismatch) {
     tassert(6487200,
@@ -86,7 +87,7 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
 
     sharding::router::DBPrimaryRouter router(opCtx, info->dbName());
     return router.route(
-        "populateCollectionUUIDMismatch"_sd,
+        "populateCollectionUUIDMismatch"sv,
         [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) -> Status {
             auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                 opCtx,

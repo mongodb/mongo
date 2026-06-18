@@ -38,8 +38,12 @@
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo::query_shape {
 namespace {
+
+using namespace std::literals::string_view_literals;
 
 using write_ops::UpdateCommandRequest;
 
@@ -59,7 +63,7 @@ public:
         return makeShapesFromUpdateRequest(updateRequest);
     }
 
-    std::vector<UpdateCmdShape> makeShapesFromUpdate(StringData updateCmd) {
+    std::vector<UpdateCmdShape> makeShapesFromUpdate(std::string_view updateCmd) {
         return makeShapesFromUpdate(fromjson(updateCmd));
     }
 
@@ -84,7 +88,7 @@ public:
     }
 
     template <typename T>
-    requires std::is_same_v<T, StringData> || std::is_same_v<T, BSONObj>
+    requires std::is_same_v<T, std::string_view> || std::is_same_v<T, BSONObj>
     UpdateCmdShape makeOneShapeFromUpdate(T updateCmd) {
         auto shapes = makeShapesFromUpdate(updateCmd);
         ASSERT_EQ(shapes.size(), 1);
@@ -124,7 +128,7 @@ TEST_F(UpdateCmdShapeTest, BasicReplacementUpdateShape) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -173,7 +177,7 @@ TEST_F(UpdateCmdShapeTest, EmptyDocReplacementUpdateShape) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -241,7 +245,7 @@ TEST_F(UpdateCmdShapeTest, BasicModifierUpdateShape) {
                 upsert: true 
             } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -324,7 +328,7 @@ TEST_F(UpdateCmdShapeTest, BasicPipelineUpdateShape) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: [ { "$set": { "foo": "bar", "num": 42 } } ], multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -390,7 +394,7 @@ TEST_F(UpdateCmdShapeTest, NoopPipelineUpdateShape) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: [], multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -450,7 +454,7 @@ TEST_F(UpdateCmdShapeTest, CurrentDateModifierUpdateShape) {
                 upsert: true 
             } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
             cmdNs: { 
@@ -535,7 +539,7 @@ TEST_F(UpdateCmdShapeTest, ArithmeticModifierUpdateShape) {
                 upsert: true 
             } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
             cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -601,7 +605,7 @@ TEST_F(UpdateCmdShapeTest, CompareModifierUpdateShape) {
                 upsert: true 
             } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
             cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -662,7 +666,7 @@ TEST_F(UpdateCmdShapeTest, AddToSetModifierUpdateShape) {
                 upsert: true 
             } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
             cmdNs: { 
@@ -759,7 +763,7 @@ TEST_F(UpdateCmdShapeTest, PushModifierUpdateShape) {
                 upsert: true 
             } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
             cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -844,7 +848,7 @@ TEST_F(UpdateCmdShapeTest, PullModifierUpdateShape) {
                 upsert: true 
             } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
         cmdNs : {db : "testDB", coll : "testColl"},
@@ -941,7 +945,7 @@ TEST_F(UpdateCmdShapeTest, PullModifierWithNotExpressionShape) {
                 upsert: true
             } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             cmdNs : {db : "testDB", coll : "testColl"},
@@ -999,7 +1003,7 @@ TEST_F(UpdateCmdShapeTest, BitModifierUpdateShape) {
     auto shape = makeOneShapeFromUpdate(R"({
         update: "testColl",
         updates: [{  q: { x: {$eq: 3} },  u: { $bit: { expdata: { and: 10 } }, $bit: {} }, multi: false, upsert: true }],
-        "$db": "testDB"})"_sd);
+        "$db": "testDB"})"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1037,7 +1041,7 @@ TEST_F(UpdateCmdShapeTest, UnsetModifierUpdateShape) {
     auto shape = makeOneShapeFromUpdate(R"({
         update: "testColl",
         updates: [{ q: { x: {$eq: 3} },  u: {$unset : {tagsToRemove: {"this.should" : "beignored"}}, $unset: {}}, multi: false, upsert: true }],
-        "$db": "testDB"})"_sd);
+        "$db": "testDB"})"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1075,7 +1079,7 @@ TEST_F(UpdateCmdShapeTest, RenameModifierUpdateShape) {
     auto shape = makeOneShapeFromUpdate(R"({
         update: "testColl",
         updates: [{ q: { x: {$eq: 3} },  u: {$rename : {oldName : "newName"}, $rename: {}}, multi: false, upsert: true }],
-        "$db": "testDB"})"_sd);
+        "$db": "testDB"})"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1113,7 +1117,7 @@ TEST_F(UpdateCmdShapeTest, PopModifierUpdateShape) {
     auto shape = makeOneShapeFromUpdate(R"({
         update: "testColl",
         updates: [{ q: { x: {$eq: 3} },  u: {$pop: {popFirstElement : -1}, $pop : {popLastElement : 1}, $pop: {}}, multi: false, upsert: true }],
-        "$db": "testDB"})"_sd);
+        "$db": "testDB"})"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1151,7 +1155,7 @@ TEST_F(UpdateCmdShapeTest, PullAllModifierUpdateShape) {
     auto shape = makeOneShapeFromUpdate(R"({
         update: "testColl",
         updates: [{ q: { x: {$eq: 3} },  u: {$pullAll: {colorsToRemove: [ "red", "blue" ]}, $pullAll: {colorsToRemoveEmpty: []}, $pullAll: {}}, multi: false, upsert: true }],
-        "$db": "testDB"})"_sd);
+        "$db": "testDB"})"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1202,7 +1206,7 @@ TEST_F(UpdateCmdShapeTest, ArrayFiltersModifierUpdateShape) {
         ], 
         multi: false, 
         upsert: true }],
-        "$db": "testDB"})"_sd);
+        "$db": "testDB"})"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
             command: "update", 
@@ -1287,7 +1291,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithExpressionsShape) {
             upsert: false 
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1379,7 +1383,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithConstantsShape) {
             upsert: false 
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1464,7 +1468,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithComplexConstantsShape) {
             upsert: false 
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1551,7 +1555,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithAllAllowedStagesShape) {
             upsert: false 
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1707,7 +1711,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithStageAliasesShape) {
             upsert: true 
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1818,7 +1822,7 @@ TEST_F(UpdateCmdShapeTest, NoopUpdateShape) {
             upsert: false
         }],
         $db: "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1917,7 +1921,7 @@ TEST_F(UpdateCmdShapeTest, PartialNoopUpdateShape) {
             upsert: false
         }],
         $db: "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2018,7 +2022,7 @@ TEST_F(UpdateCmdShapeTest, BatchReplacementUpdateShape) {
           { q: { x: {$gt: 3}, y: "foo" }, u: { x: {y: 100}, z: false }, multi: false, upsert: true }
         ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_EQ(shapes.size(), 2);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2077,7 +2081,7 @@ TEST_F(UpdateCmdShapeTest, BatchModifierUpdateShape) {
           { q: { x: {$gt: 3}, y: "foo" }, u: {$set: { x: {y: 100}, z: false }}, multi: true, upsert: true }
         ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_EQ(shapes.size(), 2);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2136,7 +2140,7 @@ TEST_F(UpdateCmdShapeTest, BatchPipelineUpdateShape) {
           { q: { z: true }, u: [ { "$replaceWith": { "newDoc": "$$ROOT", "timestamp": "$$NOW" } } ], multi: false, upsert: true }
         ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_EQ(shapes.size(), 2);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2209,7 +2213,7 @@ TEST_F(UpdateCmdShapeTest, IncludesOptionalValues) {
         bypassDocumentValidation: true,
         let: {x: 4, y: "abc"},
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "cmdNs": {
@@ -2245,7 +2249,7 @@ TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValue) {
     updateCmd.u = BSON("foo" << "bar");
     auto serializationContext = SerializationContext::stateCommandRequest();
 
-    auto verifyHash = [&](StringData expectedHash, const UpdateCmdBuilder& updateCmd) {
+    auto verifyHash = [&](std::string_view expectedHash, const UpdateCmdBuilder& updateCmd) {
         BSONObj updateBson = updateCmd.toBSON();
         auto updateRequest = UpdateCommandRequest::parseOwned(std::move(updateBson));
         auto shapes = makeShapesFromUpdateRequest(updateRequest);
@@ -2303,7 +2307,7 @@ TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValue) {
     verifyHash(expectedHash, updateCmd);
 
     // Changing the literal values to constants should change the hash.
-    updateCmd.u = BSON_ARRAY(fromjson(R"({ "$set": { "foo": "$$myVar", "num": "$$myNum" }})"_sd));
+    updateCmd.u = BSON_ARRAY(fromjson(R"({ "$set": { "foo": "$$myVar", "num": "$$myNum" }})"sv));
     expectedHash = "474D7DED0A5B2CB2FE8872E8144050C4AAC3A2C6E35A6B48ADB61DA277EF64A0";
     verifyHash(expectedHash, updateCmd);
 
@@ -2318,13 +2322,13 @@ TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValue) {
 
     // Changing update to a modifier style with array filter should change the hash.
     updateCmd.c = boost::none;
-    updateCmd.u = fromjson(R"({ "$set": { "foo": "bar", "myArray.$[element]": "mynum" }})"_sd);
-    updateCmd.arrayFilters = BSON_ARRAY(fromjson(R"({ "element": "myVal" })"_sd));
+    updateCmd.u = fromjson(R"({ "$set": { "foo": "bar", "myArray.$[element]": "mynum" }})"sv);
+    updateCmd.arrayFilters = BSON_ARRAY(fromjson(R"({ "element": "myVal" })"sv));
     expectedHash = "68E51CA20FBCF067D764ACBEAF14891E36F20DB95070818CCF1425EFA9840DA1";
     verifyHash(expectedHash, updateCmd);
 
     // Changing arrayFilters should change the hash.
-    updateCmd.arrayFilters = BSON_ARRAY(fromjson(R"({ "element": { $ne: "Bachelor" }})"_sd));
+    updateCmd.arrayFilters = BSON_ARRAY(fromjson(R"({ "element": { $ne: "Bachelor" }})"sv));
     expectedHash = "771C202F22A12BF9C19B774983DCA99863A40D19E2BE3B7195EF7CAE2E657BD0";
     verifyHash(expectedHash, updateCmd);
 }
@@ -2334,7 +2338,7 @@ TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponents) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     validateShapeSize(shape);
 }
 
@@ -2349,7 +2353,7 @@ TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponentsForModifierUpdate) {
             upsert: false 
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     validateShapeSize(shape);
 }
@@ -2365,7 +2369,7 @@ TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponentsWithPipelineAndConstant
             upsert: false 
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     auto updateComponents =
         static_cast<const UpdateCmdShapeComponents&>(shape.specificComponents());
@@ -2378,14 +2382,14 @@ TEST_F(UpdateCmdShapeTest, EquivalentUpdateCmdShapeSizes) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
     auto shapeOptionalValues = makeOneShapeFromUpdate(R"({
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: true } ],
         "$db": "testDB",
         ordered: false,
         bypassDocumentValidation: true
-    })"_sd);
+    })"sv);
     ASSERT_EQ(shape.size(), shapeOptionalValues.size());
 }
 
@@ -2398,7 +2402,7 @@ TEST_F(UpdateCmdShapeTest, ShapifiesUnoptimizedMatchExpression) {
         update: "testColl",
         updates: [ { q: { $or: [{_id: 2}, {_id: 2}] }, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2470,13 +2474,13 @@ TEST_F(UpdateCmdShapeTest, CanShapifyUpdateWithSimpleIdQuery) {
         update: "testColl",
         updates: [ { q: { _id: 2 }, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     auto eqShape = makeOneShapeFromUpdate(R"({
         update: "testColl",
         updates: [ { q: { _id: {$eq: 2 }}, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     for (auto* s : {&shape, &eqShape}) {
         ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -2526,13 +2530,13 @@ TEST_F(UpdateCmdShapeTest, CanShapifyUpdateWithSimpleIdQuery) {
         update: "testColl",
         updates: [ { q: { _id: {a: 1} }, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     auto eqObjectShape = makeOneShapeFromUpdate(R"({
         update: "testColl",
         updates: [ { q: { _id: {$eq: {a: 1} }}, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     for (auto* s : {&objectShape, &eqObjectShape}) {
         ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -2586,7 +2590,7 @@ TEST_F(UpdateCmdShapeTest, ReplacementUpdateShapeTokenization) {
         update: "testColl",
         updates: [ { q: { "x.$[identifier1]": {$eq: 3} }, u: { "foo.$[identifier2]": "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
@@ -2624,7 +2628,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateShapeTokenization) {
             }
         ],
         "$db": "testDB"
-        })"_sd);
+        })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
@@ -2653,7 +2657,7 @@ TEST_F(UpdateCmdShapeTest, ReplacementUpdateRedaction) {
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2687,7 +2691,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateRedaction) {
             upsert: false
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2745,7 +2749,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithConstantsRedaction) {
             upsert: false 
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2793,7 +2797,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithNestedConstantsRedaction) {
             upsert: false
         } ],
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2833,7 +2837,7 @@ TEST_F(UpdateCmdShapeTest, LetRedaction) {
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: true } ],
         let: {x: 4, y: "abc"},
         "$db": "testDB"
-    })"_sd);
+    })"sv);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({

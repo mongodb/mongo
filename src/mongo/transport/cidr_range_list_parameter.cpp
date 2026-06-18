@@ -33,7 +33,10 @@
 #include "mongo/transport/cidr_range_list_parameter_gen.h"
 #include "mongo/util/overloaded_visitor.h"
 
+#include <string_view>
+
 namespace mongo::transport {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -57,12 +60,12 @@ CIDRList parseCIDRRangeListParameters(const BSONObj& obj) {
 // TODO: SERVER-106468 Move this function to the anonymous namespace.
 void appendCIDRRangeListParameter(VersionedValue<CIDRList>& value,
                                   BSONObjBuilder* bob,
-                                  StringData name) {
+                                  std::string_view name) {
 
     invariant(bob);
 
     BSONObjBuilder subBob(bob->subobjStart(name));
-    BSONArrayBuilder subArray(subBob.subarrayStart("ranges"_sd));
+    BSONArrayBuilder subArray(subBob.subarrayStart("ranges"sv));
 
     auto snapshot = value.makeSnapshot();
     if (!snapshot)

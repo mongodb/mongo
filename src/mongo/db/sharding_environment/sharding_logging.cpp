@@ -54,6 +54,7 @@
 #include "mongo/util/time_support.h"
 
 #include <string>
+#include <string_view>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -79,7 +80,7 @@ ShardingLogging* ShardingLogging::get(OperationContext* operationContext) {
 }
 
 Status ShardingLogging::logAction(OperationContext* opCtx,
-                                  const StringData what,
+                                  const std::string_view what,
                                   const NamespaceString& ns,
                                   const BSONObj& detail,
                                   std::shared_ptr<Shard> configShard,
@@ -113,7 +114,7 @@ Status ShardingLogging::logAction(OperationContext* opCtx,
 }
 
 Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
-                                         const StringData what,
+                                         const std::string_view what,
                                          const NamespaceString& ns,
                                          const BSONObj& detail,
                                          const WriteConcernOptions& writeConcern,
@@ -150,8 +151,8 @@ Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
 }
 
 Status ShardingLogging::_log(OperationContext* opCtx,
-                             const StringData logCollName,
-                             const StringData what,
+                             const std::string_view logCollName,
+                             const std::string_view what,
                              const NamespaceString& operationNS,
                              const BSONObj& detail,
                              const WriteConcernOptions& writeConcern,
@@ -206,7 +207,7 @@ Status ShardingLogging::_log(OperationContext* opCtx,
 }
 
 Status ShardingLogging::_createCappedConfigCollection(OperationContext* opCtx,
-                                                      StringData collName,
+                                                      std::string_view collName,
                                                       int cappedSize,
                                                       const WriteConcernOptions& writeConcern,
                                                       std::shared_ptr<Shard> configShard) {

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <algorithm>
@@ -39,6 +38,7 @@
 #include <cstddef>
 #include <iterator>
 #include <ostream>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -54,7 +54,7 @@ namespace mongo {
  *
  *     template <FixedString name, typename Rep>
  *     struct UnitQuantity {
- *         constexpr static StringData unitName() const {
+ *         constexpr static std::string_view unitName() const {
  *             return name;
  *         }
  *         std::string toString() const {
@@ -100,8 +100,8 @@ public:
         std::copy(std::begin(str), std::end(str), _data.begin());
     }
 
-    /** Implicitly convert to StringData. */
-    explicit(false) constexpr operator StringData() const noexcept {
+    /** Implicitly convert to std::string_view. */
+    explicit(false) constexpr operator std::string_view() const noexcept {
         return {_data.data(), N};
     }
 
@@ -119,16 +119,16 @@ public:
 
     template <size_t BN>
     friend constexpr bool operator==(const FixedString& a, const FixedString<BN>& b) {
-        return StringData{a} == StringData{b};
+        return std::string_view{a} == std::string_view{b};
     }
 
     template <size_t BN>
     friend constexpr auto operator<=>(const FixedString& a, const FixedString<BN>& b) {
-        return StringData{a} <=> StringData{b};
+        return std::string_view{a} <=> std::string_view{b};
     }
 
     friend constexpr std::ostream& operator<<(std::ostream& os, const FixedString& s) {
-        return os << StringData{s};
+        return os << std::string_view{s};
     }
 
     /** Concatenation. */

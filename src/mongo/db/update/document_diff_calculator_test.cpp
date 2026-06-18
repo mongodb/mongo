@@ -29,7 +29,6 @@
 
 #include "mongo/db/update/document_diff_calculator.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -42,10 +41,12 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 void assertBsonObjEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
     UnorderedFieldsBSONObjComparator comparator;
@@ -84,7 +85,7 @@ TEST(IndexUpdateIdentifierTest, EmptyDiff) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("a"_sd);
+            uid.addPathComponent("a"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
@@ -115,7 +116,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndex) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("a"_sd);
+            uid.addPathComponent("a"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
@@ -160,7 +161,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndexDottedField) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("a"_sd);
+            uid.addPathComponent("a"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
@@ -173,7 +174,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndexDottedField) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("b"_sd);
+            uid.addPathComponent("b"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
@@ -186,7 +187,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndexDottedField) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("c"_sd);
+            uid.addPathComponent("c"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
@@ -229,19 +230,19 @@ TEST(IndexUpdateIdentifierTest, DiffForMultipleIndexesAllAffected) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(3 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("a"_sd);
+            uid.addPathComponent("a"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
         {
             UpdateIndexData uid;
-            uid.addPathComponent("b"_sd);
+            uid.addPathComponent("b"sv);
             updateIdentifier.addIndex(1, uid);
         }
 
         {
             UpdateIndexData uid;
-            uid.addPathComponent("c"_sd);
+            uid.addPathComponent("c"sv);
             updateIdentifier.addIndex(2, uid);
         }
 
@@ -293,25 +294,25 @@ TEST(IndexUpdateIdentifierTest, DiffForMultipleIndexesSomeAffected) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(4 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("a"_sd);
+            uid.addPathComponent("a"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
         {
             UpdateIndexData uid;
-            uid.addPathComponent("b"_sd);
+            uid.addPathComponent("b"sv);
             updateIdentifier.addIndex(1, uid);
         }
 
         {
             UpdateIndexData uid;
-            uid.addPathComponent("c"_sd);
+            uid.addPathComponent("c"sv);
             updateIdentifier.addIndex(2, uid);
         }
 
         {
             UpdateIndexData uid;
-            uid.addPathComponent("d"_sd);
+            uid.addPathComponent("d"sv);
             updateIdentifier.addIndex(3, uid);
         }
 
@@ -351,13 +352,13 @@ TEST(IndexUpdateIdentifierTest, DiffOnlyForNonIndexedFields) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("a"_sd);
+            uid.addPathComponent("a"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
         {
             UpdateIndexData uid;
-            uid.addPathComponent("e"_sd);
+            uid.addPathComponent("e"sv);
             updateIdentifier.addIndex(1, uid);
         }
 
@@ -394,12 +395,12 @@ TEST(IndexUpdateIdentifierTest, DiffForArrayField) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("a"_sd);
+            uid.addPathComponent("a"sv);
             updateIdentifier.addIndex(0, uid);
         }
         {
             UpdateIndexData uid;
-            uid.addPathComponent("b"_sd);
+            uid.addPathComponent("b"sv);
             updateIdentifier.addIndex(1, uid);
         }
 
@@ -580,7 +581,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndex) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("a"_sd);
+            uid.addPathComponent("a"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
@@ -634,7 +635,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("a"_sd);
+            uid.addPathComponent("a"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
@@ -647,7 +648,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("b"_sd);
+            uid.addPathComponent("b"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
@@ -660,7 +661,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
         doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
         {
             UpdateIndexData uid;
-            uid.addPathComponent("c"_sd);
+            uid.addPathComponent("c"sv);
             updateIdentifier.addIndex(0, uid);
         }
 
@@ -1163,7 +1164,7 @@ TEST(DocumentDiffCalculatorTest, SubArrayInSubObjLargeDelta) {
 }
 
 void buildDeepObj(BSONObjBuilder* builder,
-                  StringData fieldName,
+                  std::string_view fieldName,
                   int depth,
                   int maxDepth,
                   std::function<void(BSONObjBuilder*, int, int)> function) {

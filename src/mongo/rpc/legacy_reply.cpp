@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbmessage.h"
@@ -41,9 +40,11 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace rpc {
+using namespace std::literals::string_view_literals;
 
 LegacyReply::LegacyReply(const Message* message) {
     invariant(message->operation() == opReply);
@@ -77,7 +78,7 @@ LegacyReply::LegacyReply(const Message* message) {
     _commandReply = BSONObj(qr.data());
     _commandReply.shareOwnershipWith(message->sharedBuffer());
 
-    if (_commandReply.firstElementFieldName() == "$err"_sd) {
+    if (_commandReply.firstElementFieldName() == "$err"sv) {
         // Upconvert legacy errors
         auto codeElement = _commandReply["code"];
         int code = codeElement.numberInt();

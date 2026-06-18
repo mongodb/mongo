@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo {
@@ -53,7 +53,7 @@ public:
     /**
      * Adds an item to the `wiredtiger_open` extensions list.
      */
-    void addExtension(StringData extensionConfigStr);
+    void addExtension(std::string_view extensionConfigStr);
 
 private:
     std::vector<std::string> _wtExtensions;
@@ -71,7 +71,7 @@ public:
     /**
      * Adds an item to the `wiredtiger_open` extensions list.
      */
-    void addExtension(StringData extensionConfigStr);
+    void addExtension(std::string_view extensionConfigStr);
 
 private:
     std::vector<std::string> _wtExtensions;

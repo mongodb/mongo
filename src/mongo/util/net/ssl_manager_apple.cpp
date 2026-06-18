@@ -53,6 +53,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -227,13 +228,14 @@ void uassertOSStatusOK(::OSStatus status, SocketErrorKind kind) {
 }
 
 namespace detail {
+using namespace std::literals::string_view_literals;
 template <typename T>
 struct CFTypeMap;
 
 template <>
 struct CFTypeMap<::CFStringRef> {
-    static constexpr StringData typeName() {
-        return "string"_sd;
+    static constexpr std::string_view typeName() {
+        return "string"sv;
     }
 
     static ::CFTypeID type() {
@@ -243,8 +245,8 @@ struct CFTypeMap<::CFStringRef> {
 
 template <>
 struct CFTypeMap<::CFDataRef> {
-    static constexpr StringData typeName() {
-        return "data"_sd;
+    static constexpr std::string_view typeName() {
+        return "data"sv;
     }
 
     static ::CFTypeID type() {
@@ -254,8 +256,8 @@ struct CFTypeMap<::CFDataRef> {
 
 template <>
 struct CFTypeMap<::CFNumberRef> {
-    static constexpr StringData typeName() {
-        return "number"_sd;
+    static constexpr std::string_view typeName() {
+        return "number"sv;
     }
 
     static ::CFTypeID type() {
@@ -265,8 +267,8 @@ struct CFTypeMap<::CFNumberRef> {
 
 template <>
 struct CFTypeMap<::CFArrayRef> {
-    static constexpr StringData typeName() {
-        return "array"_sd;
+    static constexpr std::string_view typeName() {
+        return "array"sv;
     }
 
     static ::CFTypeID type() {
@@ -276,8 +278,8 @@ struct CFTypeMap<::CFArrayRef> {
 
 template <>
 struct CFTypeMap<::CFDictionaryRef> {
-    static constexpr StringData typeName() {
-        return "dictionary"_sd;
+    static constexpr std::string_view typeName() {
+        return "dictionary"sv;
     }
 
     static ::CFTypeID type() {
@@ -289,7 +291,7 @@ struct CFTypeMap<::CFDictionaryRef> {
 
 template <typename T>
 StatusWith<T> extractDictionaryValue(::CFDictionaryRef dict, ::CFStringRef key) {
-    const auto badValue = [key](StringData msg) -> Status {
+    const auto badValue = [key](std::string_view msg) -> Status {
         auto swKey = toString(key);
         if (!swKey.isOK()) {
             return {ErrorCodes::InvalidSSLConfiguration, msg};
@@ -411,7 +413,7 @@ StatusWith<SSLX509Name> extractSubjectName(::CFDictionaryRef dict) {
 
 StatusWith<mongo::Date_t> extractValidityDate(::CFDictionaryRef dict,
                                               ::CFStringRef oid,
-                                              StringData name) {
+                                              std::string_view name) {
     auto swVal = extractDictionaryValue<::CFDictionaryRef>(dict, oid);
     if (!swVal.isOK()) {
         return swVal.getStatus();
@@ -479,7 +481,7 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(::CFDictionaryRef dict)
 }
 
 StatusWith<std::vector<std::string>> extractSubjectAlternateNames(::CFDictionaryRef dict) {
-    const auto badValue = [](StringData msg) -> Status {
+    const auto badValue = [](std::string_view msg) -> Status {
         return {ErrorCodes::InvalidSSLConfiguration,
                 str::stream() << "Certificate contains invalid SAN: " << msg};
     };
@@ -775,7 +777,7 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
         // Attempt to detect early and give a useful error message.
         // We'll use the key marker as a tombstone to determine that we're
         // not actually looking at a PKCS#12.
-        StringData pemDataView(reinterpret_cast<char*>(pemdata.data()), pemdata.size());
+        std::string_view pemDataView(reinterpret_cast<char*>(pemdata.data()), pemdata.size());
         if (pemDataView.find("PRIVATE KEY-----") != std::string::npos) {
             return {ErrorCodes::InvalidSSLConfiguration,
                     "Using encrypted PKCS#1/PKCS#8 PEM files is not supported on this platform"};
@@ -1610,7 +1612,7 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
 
     recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
-    const auto badCert = [&](StringData msg, bool warn = false) -> Future<SSLPeerInfo> {
+    const auto badCert = [&](std::string_view msg, bool warn = false) -> Future<SSLPeerInfo> {
         if (warn) {
             LOGV2_WARNING(23209, "SSL peer certificate validation failed", "error"_attr = msg);
             return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(sniName));

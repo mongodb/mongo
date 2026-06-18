@@ -29,7 +29,6 @@
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/mutable_bson/document.h"
@@ -37,6 +36,8 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string_view>
 
 #include <fmt/format.h>
 
@@ -85,7 +86,7 @@ protected:
         return bob.obj();
     }
 
-    Counter64& addCounter(StringData path, MetricTree& tree) {
+    Counter64& addCounter(std::string_view path, MetricTree& tree) {
         auto m = std::make_unique<
             BasicServerStatusMetric<ServerStatusMetricPolicySelectionT<Counter64>>>();
         auto& ref = m->value();
@@ -93,7 +94,7 @@ protected:
         return ref;
     }
 
-    Counter64& addCounter(StringData path, ClusterRole role = {}) {
+    Counter64& addCounter(std::string_view path, ClusterRole role = {}) {
         return addCounter(path, trees()[role]);
     }
 
@@ -102,7 +103,7 @@ protected:
         std::vector<std::string> nodes;
         // Extract node names from metrics tree
         for (auto&& el : metrics) {
-            StringData key = el.fieldNameStringData();
+            std::string_view key = el.fieldNameStringData();
             switch (el.type()) {
                 case BSONType::object:
                     for (auto&& v : extractTreeNodes(el.Obj(), pred))
@@ -117,8 +118,8 @@ protected:
         return nodes;
     }
 
-    std::vector<StringData> dotSplit(StringData path) {
-        std::vector<StringData> parts;
+    std::vector<std::string_view> dotSplit(std::string_view path) {
+        std::vector<std::string_view> parts;
         while (true) {
             auto dot = path.find(".");
             if (dot == std::string::npos) {
@@ -144,12 +145,12 @@ protected:
     }
 
     /** Parses `json` and nests the result under the "metrics" root. */
-    static BSONObj mJson(StringData json) {
+    static BSONObj mJson(std::string_view json) {
         return BSON("metrics" << fromjson(json));
     }
 
     /** Adds the implicit "metrics" root to the dotted `path`. */
-    static std::string mStr(StringData path) {
+    static std::string mStr(std::string_view path) {
         return fmt::format("metrics.{}", path);
     }
 
@@ -161,14 +162,14 @@ protected:
         return out;
     }
 
-    void appendJsonToTree(MetricTree& tree, StringData json) {
+    void appendJsonToTree(MetricTree& tree, std::string_view json) {
         for (auto&& path : extractTreeNodes(mJson(json)["metrics"].Obj()))
             addCounter(path, tree);
     }
 
     BSONObj actualMerged(const std::vector<std::string>& specs, BSONObj excludedPaths = {}) {
         std::vector<std::unique_ptr<MetricTree>> componentTrees;
-        for (StringData json : specs) {
+        for (std::string_view json : specs) {
             auto tree = std::make_unique<MetricTree>();
             appendJsonToTree(*tree, json);
             componentTrees.push_back(std::move(tree));
@@ -184,7 +185,7 @@ protected:
     BSONObj expectedMerged(const std::vector<std::string>& specs, BSONObj excludedPaths = {}) {
         BSONObjBuilder b;
         MetricTree mt;
-        for (StringData json : specs)
+        for (std::string_view json : specs)
             appendJsonToTree(mt, json);
         mt.appendTo(b);
         return erasePaths(b.obj(), extractTreeNodes(excludedPaths, falseNodesPredicate));
@@ -195,13 +196,13 @@ private:
 };
 
 TEST_F(MetricTreeTest, DefaultMetricsSubtree) {
-    for (StringData path : {"foo", "bar"})
+    for (std::string_view path : {"foo", "bar"})
         addCounter(path);
     ASSERT_BSONOBJ_EQ(serialize(), mJson("{bar:0,foo:0}"));
 }
 
 TEST_F(MetricTreeTest, LeadingDotMeansRoot) {
-    for (StringData path : {".foo", ".bar"})
+    for (std::string_view path : {".foo", ".bar"})
         addCounter(path);
     ASSERT_BSONOBJ_EQ(serialize(), fromjson("{bar:0,foo:0}"));
 }

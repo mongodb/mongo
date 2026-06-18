@@ -34,7 +34,6 @@
 #endif
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/base/system_error.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log_severity.h"
@@ -46,6 +45,8 @@
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
+
+#include <string_view>
 
 #include <asio.hpp>
 
@@ -139,7 +140,7 @@ inline HostAndPort endpointToHostAndPort(const asio::generic::stream_protocol::e
 }
 
 Status errorCodeToStatus(const std::error_code& ec);
-Status errorCodeToStatus(const std::error_code& ec, StringData context);
+Status errorCodeToStatus(const std::error_code& ec, std::string_view context);
 
 /**
  * Wrappers around asio socket's `local_endpoint` and `remote_endpoint` methods (which in turn wrap
@@ -147,9 +148,13 @@ Status errorCodeToStatus(const std::error_code& ec, StringData context);
  * coming from the underlying socket method, but they produce log messages indicating the error.
  */
 asio::generic::stream_protocol::endpoint getLocalEndpoint(
-    asio::generic::stream_protocol::socket& sock, StringData errorLogNote, logv2::LogSeverity sev);
+    asio::generic::stream_protocol::socket& sock,
+    std::string_view errorLogNote,
+    logv2::LogSeverity sev);
 asio::generic::stream_protocol::endpoint getRemoteEndpoint(
-    asio::generic::stream_protocol::socket& sock, StringData errorLogNote, logv2::LogSeverity sev);
+    asio::generic::stream_protocol::socket& sock,
+    std::string_view errorLogNote,
+    logv2::LogSeverity sev);
 
 /**
  * The ASIO implementation of poll (i.e. socket.wait()) cannot poll for a mask of events, and
@@ -204,7 +209,7 @@ size_t peekASIOStream(Stream& stream, const MutableBufferSequence& buffers) {
  * This is in the .cpp file just to keep LOGV2 out of this header.
  */
 void failedSetSocketOption(const std::system_error& ex,
-                           StringData errorLogNote,
+                           std::string_view errorLogNote,
                            BSONObj optionDescription,
                            logv2::LogSeverity errorLogSeverity);
 
@@ -228,7 +233,7 @@ void failedSetSocketOption(const std::system_error& ex,
 template <typename Socket, typename Option>
 void setSocketOption(Socket& socket,
                      const Option& opt,
-                     StringData errorLogNote,
+                     std::string_view errorLogNote,
                      logv2::LogSeverity errorLogSeverity) {
     try {
         socket.set_option(opt);
@@ -241,7 +246,7 @@ void setSocketOption(Socket& socket,
 template <typename Socket, typename Option>
 void setSocketOption(Socket& socket,
                      const Option& opt,
-                     StringData errorLogNote,
+                     std::string_view errorLogNote,
                      logv2::LogSeverity errorLogSeverity,
                      std::error_code& ec) {
     try {

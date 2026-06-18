@@ -36,7 +36,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
@@ -57,6 +56,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -71,6 +71,7 @@
 
 
 namespace {
+using namespace std::literals::string_view_literals;
 namespace mus = mongo::unittest::stringify;
 
 bool containsPattern(const std::string& pattern, const std::string& value) {
@@ -380,14 +381,14 @@ TEST(UnitTestSelfTest, ComparisonAssertionOverloadResolution) {
     char xBuf[] = "x";  // Guaranteed different address than "x".
     const char* x = xBuf;
 
-    // At least one StringData, compare contents:
-    ASSERT_EQ("x"_sd, "x"_sd);
-    ASSERT_EQ("x"_sd, "x");
-    ASSERT_EQ("x"_sd, xBuf);
-    ASSERT_EQ("x"_sd, x);
-    ASSERT_EQ("x", "x"_sd);
-    ASSERT_EQ(xBuf, "x"_sd);
-    ASSERT_EQ(x, "x"_sd);
+    // At least one std::string_view, compare contents:
+    ASSERT_EQ("x"sv, "x"sv);
+    ASSERT_EQ("x"sv, "x");
+    ASSERT_EQ("x"sv, xBuf);
+    ASSERT_EQ("x"sv, x);
+    ASSERT_EQ("x", "x"sv);
+    ASSERT_EQ(xBuf, "x"sv);
+    ASSERT_EQ(x, "x"sv);
 
     // Otherwise, compare pointers:
     ASSERT_EQ(x, +x);
@@ -420,7 +421,7 @@ public:
 
 TEST_F(UnitTestPrintingTest, String) {
     using namespace mongo;
-    ASSERT_EQ(pr(StringData{"hi"}), "\"hi\"");
+    ASSERT_EQ(pr(std::string_view{"hi"}), "\"hi\"");
     ASSERT_EQ(pr(std::string_view{"hi"}), "\"hi\"");
 }
 

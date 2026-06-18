@@ -34,6 +34,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/path.h"
 
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -41,10 +42,10 @@
 
 namespace mongo {
 
-constexpr StringData InternalSchemaObjectMatchExpression::kName;
+constexpr std::string_view InternalSchemaObjectMatchExpression::kName;
 
 InternalSchemaObjectMatchExpression::InternalSchemaObjectMatchExpression(
-    boost::optional<StringData> path,
+    boost::optional<std::string_view> path,
     std::unique_ptr<MatchExpression> expr,
     clonable_ptr<ErrorAnnotation> annotation)
     : PathMatchExpression(INTERNAL_SCHEMA_OBJECT_MATCH,

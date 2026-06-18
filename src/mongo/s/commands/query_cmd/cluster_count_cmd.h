@@ -466,7 +466,7 @@ public:
 
             sharding::router::CollectionRouter router(opCtx, originalNss);
             auto status = router.routeWithRoutingContext(
-                "explain count"_sd,
+                std::string_view{"explain count"},
                 [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                     // Clear the bodyBuilder since this lambda function may be retried if the router
                     // cache is stale.

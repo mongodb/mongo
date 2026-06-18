@@ -30,7 +30,6 @@
 
 #include "mongo/util/concurrency/with_lock.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 

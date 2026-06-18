@@ -28,6 +28,7 @@
  */
 
 #pragma once
+#include <string_view>
 
 // IWYU pragma: private, include "mongo/db/namespace_string.h"
 
@@ -36,7 +37,7 @@
  *
  * - `id`: the `ConstantProxy` data member of `NamespaceString` being defined.
  * - `db`: must be a constexpr DatabaseName::ConstantProxy expression.
- * - `coll`: must be a constexpr StringData expression.
+ * - `coll`: must be a constexpr std::string_view expression.
  */
 #define EXPAND_NSS_CONSTANT_TABLE(X)                                                               \
     /*  Namespace for storing configuration data, which needs to be replicated if the server is    \

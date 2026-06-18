@@ -48,6 +48,8 @@
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/util/fail_point.h"
 
+#include <string_view>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -266,7 +268,7 @@ Status DbCheckTest::runHashForExtraIndexKeysCheck(
 
 SecondaryIndexCheckParameters DbCheckTest::createSecondaryIndexCheckParams(
     DbCheckValidationModeEnum validateMode,
-    StringData secondaryIndex,
+    std::string_view secondaryIndex,
     bool skipLookupForExtraKeys,
     BSONValidateModeEnum bsonValidateMode) {
     auto params = SecondaryIndexCheckParameters();

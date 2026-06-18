@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/mutable_bson/element.h"
@@ -47,6 +46,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -90,7 +90,7 @@ protected:
 
 
 private:
-    StringData operatorName() const final {
+    std::string_view operatorName() const final {
         return "$push";
     }
 
@@ -117,10 +117,10 @@ private:
      */
     ModifyResult performPush(mutablebson::Element* element, const FieldRef* elementPath) const;
 
-    static const StringData kEachClauseName;
-    static const StringData kSliceClauseName;
-    static const StringData kSortClauseName;
-    static const StringData kPositionClauseName;
+    static const std::string_view kEachClauseName;
+    static const std::string_view kSliceClauseName;
+    static const std::string_view kSortClauseName;
+    static const std::string_view kPositionClauseName;
 
     std::vector<BSONElement> _valuesToPush;
     boost::optional<long long> _slice;

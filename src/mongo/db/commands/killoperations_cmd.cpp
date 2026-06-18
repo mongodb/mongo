@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/killoperations_common.h"
 #include "mongo/db/operation_context.h"

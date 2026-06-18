@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_manager_common.h"
@@ -38,11 +37,13 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 template <typename T>
 std::variant<CIDR, std::string> makeExemption(T exemption) {
@@ -54,7 +55,7 @@ std::variant<CIDR, std::string> makeExemption(T exemption) {
     }
 }
 
-std::shared_ptr<transport::Session> makeIPSession(StringData ip) {
+std::shared_ptr<transport::Session> makeIPSession(std::string_view ip) {
     return transport::MockSession::create(HostAndPort(std::string{ip}, 27017),
                                           SockAddr::create(ip, 27017, AF_INET),
                                           SockAddr(),
@@ -62,9 +63,9 @@ std::shared_ptr<transport::Session> makeIPSession(StringData ip) {
 }
 
 #ifndef _WIN32
-std::shared_ptr<transport::Session> makeUNIXSession(StringData path) {
-    return transport::MockSession::create(HostAndPort(std::string{""_sd}, -1),
-                                          SockAddr::create(""_sd, -1, AF_UNIX),
+std::shared_ptr<transport::Session> makeUNIXSession(std::string_view path) {
+    return transport::MockSession::create(HostAndPort(std::string{""sv}, -1),
+                                          SockAddr::create(""sv, -1, AF_UNIX),
                                           SockAddr::create(path, -1, AF_UNIX),
                                           nullptr);
 }

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/intrusive_counter.h"
@@ -38,6 +37,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -89,14 +89,14 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_GRANULARITY_ROUNDER or
      * REGISTER_GRANULARITY_ROUNDER_GENERAL macro defined in this file.
      */
-    static void registerGranularityRounder(StringData granularity, Rounder rounder);
+    static void registerGranularityRounder(std::string_view granularity, Rounder rounder);
 
     /**
      * Retrieves the GranularityRounder for the granularity given by 'granularity', and raises an
      * error if there is no such granularity registered.
      */
     static boost::intrusive_ptr<GranularityRounder> getGranularityRounder(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData granularity);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, std::string_view granularity);
 
     /**
      * Rounds up 'value' to the first value greater than 'value' in the granularity series. If

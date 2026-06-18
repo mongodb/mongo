@@ -31,13 +31,15 @@
 
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
 namespace mongo {
 
 inline void addWithOverflowCheck(uint64_t additionalValue,
-                                 StringData statName,
+                                 std::string_view statName,
                                  std::once_flag& warnForOverflow,
                                  uint64_t& currentValue) {
     uint64_t totalValue = 0;

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/sasl_mechanism_policies.h"
@@ -41,6 +40,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -64,7 +64,7 @@ public:
 
 private:
     StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                       StringData input) final;
+                                                       std::string_view input) final;
 };
 
 class PLAINServerFactory : public MakeServerFactory<SASLPlainServerMechanism> {

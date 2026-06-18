@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonmisc.h"
@@ -59,6 +58,7 @@
 #include <iosfwd>
 #include <span>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -81,7 +81,7 @@ public:
     virtual void append(const Timestamp& in) = 0;
     virtual void append(const OID& in) = 0;
     virtual void append(const std::string& in) = 0;
-    virtual void append(StringData in) = 0;
+    virtual void append(std::string_view in) = 0;
     virtual void append(const BSONSymbol& in) = 0;
     virtual void append(const BSONCode& in) = 0;
     virtual void append(const BSONCodeWScope& in) = 0;
@@ -105,7 +105,7 @@ public:
 
 enum class Version : uint8_t { V0 = 0, V1 = 1, kLatestVersion = V1 };
 
-inline StringData keyStringVersionToString(Version version) {
+inline std::string_view keyStringVersionToString(Version version) {
     return version == Version::V0 ? "V0" : "V1";
 }
 
@@ -808,7 +808,7 @@ enum MONGO_MOD_FILE_PRIVATE DecimalContinuationMarker {
     kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits = 0x3
 };
 
-using StringTransformFn = std::function<std::string(StringData)>;
+using StringTransformFn = std::function<std::string(std::string_view)>;
 
 template <class BuilderT>
 class BuilderBase {
@@ -908,8 +908,8 @@ public:
     void appendBSONElement(const BSONElement& elem, const StringTransformFn& f = nullptr);
 
     void appendBool(bool val);
-    void appendString(StringData val, const StringTransformFn& f = nullptr);
-    void appendSymbol(StringData val);
+    void appendString(std::string_view val, const StringTransformFn& f = nullptr);
+    void appendSymbol(std::string_view val);
     void appendNumberDouble(double num);
     void appendNumberLong(long long num);
     void appendNumberInt(int num);
@@ -927,7 +927,7 @@ public:
     void appendDBRef(const BSONDBRef& val);
     void appendObject(const BSONObj& val, const StringTransformFn& f = nullptr);
     void appendArray(const BSONArray& val, const StringTransformFn& f = nullptr);
-    void appendCode(StringData val);
+    void appendCode(std::string_view val);
 
     /**
      * Appends a Discriminator byte or kEnd byte to a key string.
@@ -1020,9 +1020,9 @@ protected:
     void _appendDate(Date_t val, bool invert);
     void _appendTimestamp(Timestamp val, bool invert);
     void _appendOID(OID val, bool invert);
-    void _appendString(StringData val, bool invert, const StringTransformFn& f);
-    void _appendSymbol(StringData val, bool invert);
-    void _appendCode(StringData val, bool invert);
+    void _appendString(std::string_view val, bool invert, const StringTransformFn& f);
+    void _appendSymbol(std::string_view val, bool invert);
+    void _appendCode(std::string_view val, bool invert);
     void _appendCodeWString(const BSONCodeWScope& val, bool invert);
     void _appendBinData(const BSONBinData& val, bool invert);
     void _appendRegex(const BSONRegEx& val, bool invert);
@@ -1045,10 +1045,10 @@ protected:
      */
     void _appendBsonValue(const BSONElement& elem,
                           bool invert,
-                          const StringData* name,
+                          const std::string_view* name,
                           const StringTransformFn& f);
 
-    void _appendStringLike(StringData str, bool invert);
+    void _appendStringLike(std::string_view str, bool invert);
     void _appendBson(const BSONObj& obj, bool invert, const StringTransformFn& f);
     void _appendSmallDouble(double value, DecimalContinuationMarker dcm, bool invert);
     void _appendLargeDouble(double value, DecimalContinuationMarker dcm, bool invert);
@@ -1415,7 +1415,7 @@ bool readValue(BufReader* reader,
  */
 void appendSingleFieldToBSONAs(const char* buf,
                                int len,
-                               StringData fieldName,
+                               std::string_view fieldName,
                                BSONObjBuilder* builder,
                                Version version = key_string::Version::kLatestVersion);
 

@@ -40,6 +40,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -180,7 +181,7 @@ public:
     /**
      * Returns the op's current state as a string.
      */
-    StringData getWriteStateAsString() const;
+    std::string_view getWriteStateAsString() const;
 
     /**
      * Returns the op's error.

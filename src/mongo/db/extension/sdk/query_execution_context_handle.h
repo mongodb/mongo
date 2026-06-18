@@ -35,6 +35,8 @@
 #include "mongo/db/extension/shared/handle/operation_metrics_handle.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::extension {
 namespace sdk {
 class QueryExecutionContextAPI;

@@ -33,6 +33,7 @@
 #include "mongo/util/modules.h"
 
 #include <forward_list>
+#include <string_view>
 
 namespace mongo::bsoncolumn {
 
@@ -60,26 +61,28 @@ BSONElement createNull(std::forward_list<BSONObj>& elementMemory);
 
 BSONElement createUndefined(std::forward_list<BSONObj>& elementMemory);
 
-BSONElement createRegex(StringData pattern,
-                        StringData options,
+BSONElement createRegex(std::string_view pattern,
+                        std::string_view options,
                         std::forward_list<BSONObj>& elementMemory);
 
-BSONElement createDBRef(StringData ns, const OID& oid, std::forward_list<BSONObj>& elementMemory);
+BSONElement createDBRef(std::string_view ns,
+                        const OID& oid,
+                        std::forward_list<BSONObj>& elementMemory);
 
-BSONElement createElementCode(StringData code, std::forward_list<BSONObj>& elementMemory);
+BSONElement createElementCode(std::string_view code, std::forward_list<BSONObj>& elementMemory);
 
-BSONElement createCodeWScope(StringData code,
+BSONElement createCodeWScope(std::string_view code,
                              const BSONObj& scope,
                              std::forward_list<BSONObj>& elementMemory);
 
-BSONElement createSymbol(StringData symbol, std::forward_list<BSONObj>& elementMemory);
+BSONElement createSymbol(std::string_view symbol, std::forward_list<BSONObj>& elementMemory);
 
 BSONElement createElementBinData(BinDataType binDataType,
                                  const char* buf,
                                  size_t len,
                                  std::forward_list<BSONObj>& elementMemory);
 
-BSONElement createElementString(StringData val, std::forward_list<BSONObj>& elementMemory);
+BSONElement createElementString(std::string_view val, std::forward_list<BSONObj>& elementMemory);
 
 BSONElement createElementObj(BSONObj obj, std::forward_list<BSONObj>& elementMemory);
 

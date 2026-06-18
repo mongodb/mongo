@@ -39,10 +39,12 @@
 
 #include <functional>
 #include <limits>
+#include <string_view>
 #include <tuple>
 
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 class SbeValueTest : public SbeStageBuilderTestFixture {};
 
@@ -112,11 +114,11 @@ TEST_F(SbeValueTest, CompareTwoArraySets) {
     };
 
     auto addShortStringFn = [](value::ArraySet* set) {
-        auto [rhsItemTag, rhsItemVal] = value::makeSmallString("abc"_sd);
+        auto [rhsItemTag, rhsItemVal] = value::makeSmallString("abc"sv);
         set->push_back_raw(rhsItemTag, rhsItemVal);
     };
     auto addLongStringFn = [](value::ArraySet* set) {
-        auto [rhsItemTag, rhsItemVal] = value::makeNewString("a long enough string"_sd);
+        auto [rhsItemTag, rhsItemVal] = value::makeNewString("a long enough string"sv);
         set->push_back_raw(rhsItemTag, rhsItemVal);
     };
     auto addArrayFn = [](value::ArraySet* set) {
@@ -237,15 +239,15 @@ TEST_F(SbeValueTest, CompareTwoValueMapTypes) {
     };
 
     auto addShortStringKeyFn = [](MapType* map) {
-        auto [rhsItemTag, rhsItemVal] = value::makeSmallString("abc"_sd);
+        auto [rhsItemTag, rhsItemVal] = value::makeSmallString("abc"sv);
         insertIntoMapType(map, rhsItemTag, rhsItemVal, 1);
     };
     auto addLongStringKeyFn1 = [](MapType* map) {
-        auto [rhsItemTag, rhsItemVal] = value::makeNewString("a long enough string"_sd);
+        auto [rhsItemTag, rhsItemVal] = value::makeNewString("a long enough string"sv);
         insertIntoMapType(map, rhsItemTag, rhsItemVal, 2);
     };
     auto addLongStringKeyFn2 = [](MapType* map) {
-        auto [rhsItemTag, rhsItemVal] = value::makeNewString("a long enough string"_sd);
+        auto [rhsItemTag, rhsItemVal] = value::makeNewString("a long enough string"sv);
         insertIntoMapType(map, rhsItemTag, rhsItemVal, 12);
     };
     auto addArrayKeyFn = [](MapType* map) {
@@ -315,7 +317,7 @@ TEST_F(SbeValueTest, ArrayMoveIsDestructive) {
     // Test that moving one SBE Array into another destroys the contents
     // of the first one.
     value::Array arr1;
-    auto pushStr = [](value::Array* arr, StringData str) {
+    auto pushStr = [](value::Array* arr, std::string_view str) {
         auto [t, v] = value::makeBigString(str);
         arr->push_back_raw(t, v);
     };
@@ -335,7 +337,7 @@ TEST_F(SbeValueTest, ArrayForEachMoveIsDestructive) {
 
     value::Array& arr1 = *value::getArrayView(val);
 
-    auto pushStr = [](value::Array* arr, StringData str) {
+    auto pushStr = [](value::Array* arr, std::string_view str) {
         auto [t, v] = value::makeBigString(str);
         arr->push_back_raw(t, v);
     };
@@ -375,7 +377,7 @@ TEST_F(SbeValueTest, ArraySetForEachMoveIsDestructive) {
 
     value::ArraySet& arr1 = *value::getArraySetView(val);
 
-    auto pushStr = [](value::ArraySet* arr, StringData str) {
+    auto pushStr = [](value::ArraySet* arr, std::string_view str) {
         auto [t, v] = value::makeBigString(str);
         arr->push_back_raw(t, v);
     };

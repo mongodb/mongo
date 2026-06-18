@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mongo_path_util.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
@@ -36,6 +35,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
@@ -43,12 +43,13 @@
 
 namespace mongo {
 namespace mozjs {
+using namespace std::literals::string_view_literals;
 
 TEST(ModuleLoaderTest, ImportBaseSpecifierFails) {
     mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
     std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
 
-    auto code = "import * as test from \"base_specifier\""_sd;
+    auto code = "import * as test from \"base_specifier\""sv;
     ASSERT_THROWS_WITH_CHECK(
         scope->exec(code,
                     "root_module",
@@ -85,7 +86,7 @@ TEST(ModuleLoaderTest, ImportInInteractiveFails) {
     mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
     std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
 
-    auto code = "import * as test from \"some_module\""_sd;
+    auto code = "import * as test from \"some_module\""sv;
     ASSERT_THROWS_WITH_CHECK(
         scope->exec(code,
                     MozJSImplScope::kInteractiveShellName,
@@ -104,7 +105,7 @@ TEST(ModuleLoaderTest, ImportInInteractiveFails) {
 TEST(ModuleLoaderTest, TopLevelAwaitWorks) {
     mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
     std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
-    auto code = "async function test() { return 42; } await test();"_sd;
+    auto code = "async function test() { return 42; } await test();"sv;
     ASSERT_DOES_NOT_THROW(scope->exec(code,
                                       "root_module",
                                       true /* printResult */,

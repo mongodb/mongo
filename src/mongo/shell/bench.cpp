@@ -37,7 +37,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -68,12 +67,14 @@
 #include <exception>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const std::map<OpType, std::string> kOpTypeNames{{OpType::NONE, "none"},
                                                  {OpType::NOP, "nop"},
@@ -217,7 +218,7 @@ void abortTransaction(DBClientBase* conn,
                               &abortCommandResult);
     } catch (const ExceptionFor<ErrorCodes::CommandFailed>&) {
         // `NoSuchTransaction` errors are tolerated if the command fails.
-        if (abortCommandResult["codeName"].valueStringData() != "NoSuchTransaction"_sd)
+        if (abortCommandResult["codeName"].valueStringData() != "NoSuchTransaction"sv)
             throw;
     }
 }
@@ -890,7 +891,7 @@ void BenchRunState::onWorkerFinished() {
 }
 
 namespace {
-void doAuth(DBClientBase& conn, StringData username, StringData password) {
+void doAuth(DBClientBase& conn, std::string_view username, std::string_view password) {
     try {
         conn.auth(DatabaseName::kAdmin, username, password);
     } catch (DBException& e) {
@@ -1506,7 +1507,7 @@ BSONObj BenchRunner::finish(BenchRunner* runner) {
     buf.append("errCount", static_cast<long long>(stats.errCount));
     buf.append("trapped", "error: not implemented");
 
-    const auto appendAverageMicrosIfAvailable = [&buf](StringData name,
+    const auto appendAverageMicrosIfAvailable = [&buf](std::string_view name,
                                                        const BenchRunEventCounter& counter) {
         if (counter.getNumEvents() > 0) {
             buf.append(name,
@@ -1523,7 +1524,7 @@ BSONObj BenchRunner::finish(BenchRunner* runner) {
 
     buf.append("totalOps", static_cast<long long>(stats.opCount));
 
-    const auto appendPerSec = [&buf, runner](StringData name, double total) {
+    const auto appendPerSec = [&buf, runner](std::string_view name, double total) {
         buf.append(name, total / (runner->_microsElapsed / 1000000.0));
     };
 

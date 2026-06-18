@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
 
@@ -47,7 +48,7 @@ namespace MONGO_MOD_PUBLIC mongo {
 struct SHA256BlockTraits {
     using HashType = MakeArrayType<std::uint8_t, 32, SHA256BlockTraits>;
 
-    static constexpr StringData name = "SHA256Block"_sd;
+    static constexpr std::string_view name = "SHA256Block"_sd;
 
     static void computeHash(std::initializer_list<ConstDataRange> input, HashType* output);
 

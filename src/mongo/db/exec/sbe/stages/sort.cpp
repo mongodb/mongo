@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/sort.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -37,8 +36,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 SortStage::SortStage(std::unique_ptr<PlanStage> input,
                      value::SlotVector obs,
                      std::vector<value::SortDirection> dirs,
@@ -49,7 +51,7 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
                      PlanYieldPolicySBE* yieldPolicy,
                      PlanNodeId planNodeId,
                      bool participateInTrialRunTracking)
-    : PlanStage("sort"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
+    : PlanStage("sort"sv, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _obs(std::move(obs)),
       _dirs(std::move(dirs)),
       _vals(std::move(vals)),

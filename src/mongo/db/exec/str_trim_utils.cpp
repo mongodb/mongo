@@ -32,6 +32,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <vector>
 
 namespace mongo::str_trim_utils {
@@ -48,8 +49,8 @@ size_t numberOfBytesForCodePoint(char charByte) {
     }
 }
 
-std::vector<StringData> extractCodePointsFromChars(StringData utf8String) {
-    std::vector<StringData> codePoints;
+std::vector<std::string_view> extractCodePointsFromChars(std::string_view utf8String) {
+    std::vector<std::string_view> codePoints;
 
     // Do a conservative upfront allocation for 'codePoints'. Each UTF-8 character is at most 4
     // bytes large. In the worst case, more allocations need to happen inside the loop, but this
@@ -77,7 +78,9 @@ std::vector<StringData> extractCodePointsFromChars(StringData utf8String) {
     return codePoints;
 }
 
-bool codePointMatchesAtIndex(StringData input, std::size_t indexOfInput, StringData testCP) {
+bool codePointMatchesAtIndex(std::string_view input,
+                             std::size_t indexOfInput,
+                             std::string_view testCP) {
     for (size_t i = 0; i < testCP.size(); ++i) {
         if (indexOfInput + i >= input.size() || input[indexOfInput + i] != testCP[i]) {
             return false;
@@ -86,7 +89,8 @@ bool codePointMatchesAtIndex(StringData input, std::size_t indexOfInput, StringD
     return true;
 };
 
-StringData trimFromLeft(StringData input, const std::vector<StringData>& trimCPs) {
+std::string_view trimFromLeft(std::string_view input,
+                              const std::vector<std::string_view>& trimCPs) {
     std::size_t bytesTrimmedFromLeft = 0u;
     while (bytesTrimmedFromLeft < input.size()) {
         // Look for any matching code point to trim.
@@ -102,7 +106,8 @@ StringData trimFromLeft(StringData input, const std::vector<StringData>& trimCPs
     return input.substr(bytesTrimmedFromLeft);
 }
 
-StringData trimFromRight(StringData input, const std::vector<StringData>& trimCPs) {
+std::string_view trimFromRight(std::string_view input,
+                               const std::vector<std::string_view>& trimCPs) {
     std::size_t bytesTrimmedFromRight = 0u;
     while (bytesTrimmedFromRight < input.size()) {
         std::size_t indexToTrimFrom = input.size() - bytesTrimmedFromRight;
@@ -122,10 +127,10 @@ StringData trimFromRight(StringData input, const std::vector<StringData>& trimCP
     return input.substr(0, input.size() - bytesTrimmedFromRight);
 }
 
-StringData doTrim(StringData input,
-                  const std::vector<StringData>& trimCPs,
-                  bool trimLeft,
-                  bool trimRight) {
+std::string_view doTrim(std::string_view input,
+                        const std::vector<std::string_view>& trimCPs,
+                        bool trimLeft,
+                        bool trimRight) {
     if (trimLeft) {
         input = trimFromLeft(input, trimCPs);
     }

@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_bucket.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
@@ -48,6 +47,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -237,7 +237,7 @@ TEST_F(BucketReturnsGroupAndSort, BucketWithEmptyGroupByStrDoesNotAccessPastEndO
         fromjson("{$bucket : {groupBy : '', boundaries : [ 1, 5, 8 ], default : 'other'}}");
 
     // Under a debug build, this would previously fail if an empty str for groupBy led to access
-    // past the end of the string, with pos() > size() in StringData::operator[].
+    // past the end of the string, with pos() > size() in std::string_view::operator[].
     // Verify that this reaches the intended uassert, rejecting the empty string, _without_ first
     // trying to read past the end of the string.
     ASSERT_THROWS_CODE(DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx()),

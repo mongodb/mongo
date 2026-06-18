@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/versioning_protocol/database_version.h"

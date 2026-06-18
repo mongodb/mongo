@@ -33,13 +33,16 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace change_stream_constants {
 namespace stage_names {
-static constexpr StringData kEnsureResumeTokenPresent =
+static constexpr std::string_view kEnsureResumeTokenPresent =
     "$_internalChangeStreamEnsureResumeTokenPresent"_sd;
-static constexpr StringData kHandleTopologyChange = "$_internalChangeStreamHandleTopologyChange"_sd;
-static constexpr StringData kHandleTopologyChangeV2 =
+static constexpr std::string_view kHandleTopologyChange =
+    "$_internalChangeStreamHandleTopologyChange"_sd;
+static constexpr std::string_view kHandleTopologyChangeV2 =
     "$_internalChangeStreamHandleTopologyChangeV2"_sd;
 }  // namespace stage_names
 

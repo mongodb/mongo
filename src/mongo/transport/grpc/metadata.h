@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 
 #include <map>
 #include <string>
+#include <string_view>
 
 namespace mongo::transport::grpc {
 
@@ -44,6 +44,6 @@ using MetadataContainer = std::multimap<std::string, std::string>;
 /**
  * A gRPC metadata map that references its keys and values but does not own them.
  */
-using MetadataView = std::multimap<StringData, StringData>;
+using MetadataView = std::multimap<std::string_view, std::string_view>;
 
 }  // namespace mongo::transport::grpc

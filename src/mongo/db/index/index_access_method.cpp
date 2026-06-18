@@ -79,6 +79,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -108,7 +109,7 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions,
     IndexCatalogEntry* entry,
-    StringData ident) {
+    std::string_view ident) {
 
     auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto desc = entry->descriptor();
@@ -974,7 +975,7 @@ private:
     std::unique_ptr<SortedDataBuilderInterface> _builder;
 
     key_string::Value _previousKey;
-    const StringData _progressMessage;
+    const std::string_view _progressMessage;
     const std::string _indexName;
     NamespaceString _ns;
 

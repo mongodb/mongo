@@ -29,7 +29,6 @@
 
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_op_observer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -58,6 +57,7 @@
 #include <iterator>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -69,13 +69,14 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using namespace cluster_server_parameter_test_util;
 
 const std::vector<NamespaceString> kIgnoredNamespaces = {
-    NamespaceString::createNamespaceString_forTest("config"_sd, "settings"_sd),
-    NamespaceString::createNamespaceString_forTest("local"_sd, "clusterParameters"_sd),
-    NamespaceString::createNamespaceString_forTest("test"_sd, "foo"_sd)};
+    NamespaceString::createNamespaceString_forTest("config"sv, "settings"sv),
+    NamespaceString::createNamespaceString_forTest("local"sv, "clusterParameters"sv),
+    NamespaceString::createNamespaceString_forTest("test"sv, "foo"sv)};
 
 typedef ClusterParameterWithStorage<ClusterServerParameterTest> ClusterTestParameter;
 
@@ -281,7 +282,7 @@ public:
     void assertParameterState(int line,
                               const boost::optional<TenantId>& tenantId,
                               int intVal,
-                              StringData strVal,
+                              std::string_view strVal,
                               boost::optional<LogicalTime> cpt = boost::none) {
         auto* sp =
             ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);

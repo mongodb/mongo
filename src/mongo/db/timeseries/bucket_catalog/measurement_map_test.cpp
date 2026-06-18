@@ -37,6 +37,7 @@
 #include "mongo/util/tracking/context.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -48,9 +49,9 @@ public:
 protected:
     tracking::Context trackingContext;
     MeasurementMap measurementMap;
-    static constexpr StringData _metaField = "meta";
-    static constexpr StringData _timeField = "time";
-    static constexpr StringData _metaValue = "a";
+    static constexpr std::string_view _metaField = "meta";
+    static constexpr std::string_view _timeField = "time";
+    static constexpr std::string_view _metaValue = "a";
 };
 
 TEST_F(MeasurementMapTest, IterationBasicWithoutMeta) {

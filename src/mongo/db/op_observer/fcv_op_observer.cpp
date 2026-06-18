@@ -30,7 +30,6 @@
 
 #include "mongo/db/op_observer/fcv_op_observer.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -62,6 +61,7 @@
 #include "mongo/util/fail_point.h"
 
 #include <string>
+#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
@@ -71,6 +71,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 MONGO_FAIL_POINT_DEFINE(pauseBeforeCloseCxns);
 MONGO_FAIL_POINT_DEFINE(finishedDropConnections);
 
@@ -92,7 +93,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     serverGlobalParams.mutableFCV.setVersion(newVersion);
 
     const auto newFcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    newFcvSnapshot.logFCVWithContext("setFCV"_sd);
+    newFcvSnapshot.logFCVWithContext("setFCV"sv);
     FeatureCompatibilityVersion::updateMinWireVersion(opCtx);
 
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.

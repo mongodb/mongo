@@ -50,6 +50,7 @@
 
 #include <algorithm>
 #include <queue>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -69,6 +70,7 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -822,7 +824,8 @@ FieldAvailability IndexScanNode::getFieldAvailability(const string& field) const
     // If the index has a non-simple collation and we have collation keys inside 'field', then this
     // index scan does not provide that field (and the query cannot be covered).
     if (index.collator) {
-        std::set<StringData> collatedFields = getFieldsWithStringBounds(bounds, index.keyPattern);
+        std::set<std::string_view> collatedFields =
+            getFieldsWithStringBounds(bounds, index.keyPattern);
         if (collatedFields.find(field) != collatedFields.end()) {
             return FieldAvailability::kNotProvided;
         }
@@ -837,7 +840,7 @@ FieldAvailability IndexScanNode::getFieldAvailability(const string& field) const
             tassert(7246701,
                     "Expected element at the position before the wildcard field to be the virtual "
                     "field $_path.",
-                    elt.fieldNameStringData() == "$_path"_sd);
+                    elt.fieldNameStringData() == "$_path"sv);
             ++keyPatternFieldIndex;
             continue;
         }
@@ -884,8 +887,8 @@ bool IndexScanNode::sortedByDiskLoc() const {
 }
 
 // static
-std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds& inputBounds,
-                                                              const BSONObj& indexKeyPattern) {
+std::set<std::string_view> IndexScanNode::getFieldsWithStringBounds(
+    const IndexBounds& inputBounds, const BSONObj& indexKeyPattern) {
     // Produce a copy of the bounds which are all ascending, as we can only compute intersections
     // of ascending bounds.
     IndexBounds bounds = inputBounds.forwardize();
@@ -913,7 +916,7 @@ std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds&
                 }
 
                 // Any remaining keys could have strings.
-                std::set<StringData> ret;
+                std::set<std::string_view> ret;
                 while (keyPatternIterator.more()) {
                     ret.insert(keyPatternIterator.next().fieldNameStringData());
                 }
@@ -923,10 +926,10 @@ std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds&
             keyPatternIterator.next();
         }
 
-        return std::set<StringData>{};
+        return std::set<std::string_view>{};
     }
 
-    std::set<StringData> ret;
+    std::set<std::string_view> ret;
     tassert(11051911,
             "Expect the number of input bounds to match the number of fields in index key pattern",
             bounds.fields.size() == static_cast<size_t>(indexKeyPattern.nFields()));
@@ -943,9 +946,9 @@ std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds&
 }
 
 namespace {
-std::set<StringData> getMultikeyFields(const BSONObj& keyPattern,
-                                       const MultikeyPaths& multikeyPaths) {
-    std::set<StringData> multikeyFields;
+std::set<std::string_view> getMultikeyFields(const BSONObj& keyPattern,
+                                             const MultikeyPaths& multikeyPaths) {
+    std::set<std::string_view> multikeyFields;
     size_t i = 0;
     for (auto&& elem : keyPattern) {
         if (!multikeyPaths[i].empty()) {
@@ -965,9 +968,9 @@ std::set<StringData> getMultikeyFields(const BSONObj& keyPattern,
  * further explained in SERVER-31898.
  */
 bool confirmBoundsProvideSortComponentGivenMultikeyness(
-    StringData sortPatternComponent,
+    std::string_view sortPatternComponent,
     const IndexBounds& bounds,
-    const std::set<StringData>& multikeyFields) {
+    const std::set<std::string_view>& multikeyFields) {
     // Forwardize the bounds to correctly apply checks to descending sorts and well as ascending
     // sorts.
     const auto ascendingBounds = bounds.forwardize();
@@ -1103,7 +1106,7 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
                                     int direction,
                                     const IndexBounds& bounds,
                                     const CollatorInterface* queryCollator,
-                                    const std::set<StringData>& multikeyFields,
+                                    const std::set<std::string_view>& multikeyFields,
                                     const std::vector<interval_evaluation_tree::IET>* iets) {
     // If 'index' is the result of expanding a wildcard index, then its key pattern should look like
     // {<optional non-wildcard prefix>, $_path: 1, <field>: 1, <optional non-wildcard suffix>}. The
@@ -1182,8 +1185,8 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
     // field 'b'.
     //
     std::set<std::string> equalityFields = extractEqualityFields(bounds, index, iets);
-    std::set<StringData> unsupportedFields;
-    std::set<StringData> ignoreFields;
+    std::set<std::string_view> unsupportedFields;
+    std::set<std::string_view> ignoreFields;
     if (!CollatorInterface::collatorsMatch(queryCollator, index.collator)) {
         for (auto&& collatedField :
              IndexScanNode::getFieldsWithStringBounds(bounds, index.keyPattern)) {
@@ -1221,7 +1224,7 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
         const auto& fieldName = elt.fieldNameStringData();
 
         // Exclude the "$_path" field, which shouldn't end up in the sort order.
-        if (isWildcardIndex && fieldName == "$_path"_sd) {
+        if (isWildcardIndex && fieldName == "$_path"sv) {
             // If the bounds for the "$_path" field are multi-interval then we can't provide sorts
             // on any following fields.
             tassert(7767200,
@@ -1273,7 +1276,7 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
  * scan. The second field is a set populated with the names of all fields that the index indicates
  * are multikey.
  */
-std::pair<ProvidedSortSet, std::set<StringData>> computeSortsAndMultikeyPathsForScan(
+std::pair<ProvidedSortSet, std::set<std::string_view>> computeSortsAndMultikeyPathsForScan(
     const IndexEntry& index,
     int direction,
     const IndexBounds& bounds,
@@ -1285,7 +1288,7 @@ std::pair<ProvidedSortSet, std::set<StringData>> computeSortsAndMultikeyPathsFor
         return {};
     }
 
-    std::set<StringData> multikeyFieldsOut;
+    std::set<std::string_view> multikeyFieldsOut;
     if (index.multikey) {
         multikeyFieldsOut = getMultikeyFields(index.keyPattern, index.multikeyPaths);
     }

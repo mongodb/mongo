@@ -35,6 +35,7 @@
 #include <filesystem>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 #pragma once
 
@@ -46,7 +47,7 @@ static const std::string kSessionEndOpType = "sessionEnd";
 struct TrafficReaderPacket {
     EventType eventType;
     uint64_t id;
-    StringData session;
+    std::string_view session;
     Microseconds offset;  // offset from the start of the recording in microseconds
     uint64_t order;
     MsgData::ConstView message;

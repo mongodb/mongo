@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -60,6 +59,7 @@
 
 #include <map>
 #include <memory>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -88,10 +88,11 @@ public:
      * Parses the 'updateExpr' update expression into the '_updateExecutor' member variable.
      * Uasserts if 'updateExpr' fails to parse.
      */
-    void parse(const write_ops::UpdateModification& updateExpr,
-               const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
-               boost::optional<BSONObj> constants = boost::none,
-               bool multi = false);
+    void parse(
+        const write_ops::UpdateModification& updateExpr,
+        const std::map<std::string_view, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+        boost::optional<BSONObj> constants = boost::none,
+        bool multi = false);
 
     /**
      * Fills in document with any fields in the query which are valid.
@@ -141,7 +142,7 @@ public:
      * set.
      */
     Status update(OperationContext* opCtx,
-                  StringData matchedField,
+                  std::string_view matchedField,
                   mutablebson::Document* doc,
                   bool validateForStorage,
                   const FieldRefSet& immutablePaths,

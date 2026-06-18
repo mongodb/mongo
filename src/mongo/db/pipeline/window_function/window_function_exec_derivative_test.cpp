@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/window_function/window_function_exec_derivative.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -46,6 +45,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -53,6 +53,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class WindowFunctionExecDerivativeTest : public AggregationContextFixture {
 public:
@@ -249,7 +250,7 @@ TEST_F(WindowFunctionExecDerivativeTest, NonNumbers) {
     auto t1 = Value{1};
     auto y0 = Value{5};
     auto y1 = Value{6};
-    auto bad = Value{"a string"_sd};
+    auto bad = Value{"a string"sv};
 
     // If the position or time is an invalid type, it's an error.
     ASSERT_THROWS_CODE(eval({t0, bad}, {t1, y1}), DBException, ErrorCodes::TypeMismatch);

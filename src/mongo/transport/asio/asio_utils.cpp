@@ -32,6 +32,8 @@
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 
@@ -41,12 +43,12 @@ Status errorCodeToStatus(const std::error_code& ec) {
     return errorCodeToStatus(ec, {});
 }
 
-Status errorCodeToStatus(const std::error_code& ec, StringData context) {
+Status errorCodeToStatus(const std::error_code& ec, std::string_view context) {
     if (!ec)
         return Status::OK();
 
     // Add additional context string to Status reason if included.
-    auto makeStatus = [&](ErrorCodes::Error code, StringData reason) {
+    auto makeStatus = [&](ErrorCodes::Error code, std::string_view reason) {
         Status result(code, reason);
         if (context.data())
             result.addContext(context);
@@ -108,7 +110,9 @@ BSONObj errorDescription(const std::system_error& ex) {
 }
 
 asio::generic::stream_protocol::endpoint getLocalEndpoint(
-    asio::generic::stream_protocol::socket& sock, StringData errorLogNote, logv2::LogSeverity sev) {
+    asio::generic::stream_protocol::socket& sock,
+    std::string_view errorLogNote,
+    logv2::LogSeverity sev) {
     try {
         return sock.local_endpoint();
     } catch (const std::system_error& ex) {
@@ -122,7 +126,9 @@ asio::generic::stream_protocol::endpoint getLocalEndpoint(
 }
 
 asio::generic::stream_protocol::endpoint getRemoteEndpoint(
-    asio::generic::stream_protocol::socket& sock, StringData errorLogNote, logv2::LogSeverity sev) {
+    asio::generic::stream_protocol::socket& sock,
+    std::string_view errorLogNote,
+    logv2::LogSeverity sev) {
     try {
         return sock.remote_endpoint();
     } catch (const std::system_error& ex) {
@@ -213,7 +219,7 @@ StatusWith<unsigned> pollASIOSocket(asio::generic::stream_protocol::socket& sock
 }
 
 void failedSetSocketOption(const std::system_error& ex,
-                           StringData errorLogNote,
+                           std::string_view errorLogNote,
                            BSONObj optionDescription,
                            logv2::LogSeverity errorLogSeverity) {
     LOGV2_DEBUG(5693100,

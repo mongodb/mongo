@@ -30,7 +30,6 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
@@ -56,6 +55,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
 
+#include <string_view>
+
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -72,6 +73,7 @@ static bool operator==(const QueryShapeConfigurationsWithTimestamp& lhs,
 }
 
 namespace {
+using namespace std::literals::string_view_literals;
 static auto const kSerializationContext =
     SerializationContext{SerializationContext::Source::Command,
                          SerializationContext::CallerType::Request,
@@ -108,12 +110,12 @@ QuerySettings makeQuerySettings(const IndexHintSpecs& indexHints, bool setFramew
     return settings;
 }
 
-auto makeDbName(StringData dbName) {
+auto makeDbName(std::string_view dbName) {
     return DatabaseNameUtil::deserialize(
         boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
 }
 
-NamespaceSpec makeNsSpec(StringData collName) {
+NamespaceSpec makeNsSpec(std::string_view collName) {
     NamespaceSpec ns;
     ns.setDb(makeDbName("testDbA"));
     ns.setColl(collName);
@@ -188,8 +190,8 @@ private:
 
 class QuerySettingsServiceTest : public ServiceContextTest {
 public:
-    static constexpr StringData kCollName = "exampleColl"_sd;
-    static constexpr StringData kDbName = "foo"_sd;
+    static constexpr std::string_view kCollName = "exampleColl"sv;
+    static constexpr std::string_view kDbName = "foo"sv;
 
     void setUp() final {
         // Initialize the query settings.
@@ -450,7 +452,7 @@ private:
 };
 
 TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForFind) {
-    auto findCmdStr = "{find: 'exampleColl', '$db': 'foo'}"_sd;
+    auto findCmdStr = "{find: 'exampleColl', '$db': 'foo'}"sv;
     auto findCmdBSON = fromjson(findCmdStr);
     auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
     auto parsedRequest =
@@ -468,7 +470,7 @@ TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForFind) {
 
 TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForAgg) {
     auto aggCmdStr =
-        "{aggregate: 'exampleColl', pipeline: [{$match: {_id: 0}}], cursor: {}, '$db': 'foo'}"_sd;
+        "{aggregate: 'exampleColl', pipeline: [{$match: {_id: 0}}], cursor: {}, '$db': 'foo'}"sv;
     auto aggCmdBSON = fromjson(aggCmdStr);
     auto aggCmd = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(aggCmdBSON));
     auto pipeline = pipeline_factory::makePipeline(
@@ -516,7 +518,7 @@ TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForDistinct) {
  */
 TEST_F(QuerySettingsServiceTest, ValidIndexHintsAreTheSameBeforeAndAfterSanitization) {
     IndexHintSpecs indexHintSpec{IndexHintSpec(
-        makeNsSpec("testCollA"_sd), {IndexHint(BSON("a" << 1)), IndexHint(BSON("b" << -1.0))})};
+        makeNsSpec("testCollA"sv), {IndexHint(BSON("a" << 1)), IndexHint(BSON("b" << -1.0))})};
     assertSanitizeInvalidIndexHints(indexHintSpec, indexHintSpec);
 }
 
@@ -524,12 +526,12 @@ TEST_F(QuerySettingsServiceTest, ValidIndexHintsAreTheSameBeforeAndAfterSanitiza
  * Tests that invalid key-pattern are removed after sanitization.
  */
 TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitization) {
-    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"sv),
                                                {IndexHint(BSON("a" << 1 << "c"
                                                                    << "invalid")),
                                                 IndexHint(BSON("b" << -1.0))})};
     IndexHintSpecs expectedHintSpec{
-        IndexHintSpec(makeNsSpec("testCollA"_sd), {IndexHint(BSON("b" << -1.0))})};
+        IndexHintSpec(makeNsSpec("testCollA"sv), {IndexHint(BSON("b" << -1.0))})};
     assertSanitizeInvalidIndexHints(indexHintSpec, expectedHintSpec);
 }
 
@@ -537,7 +539,7 @@ TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitiza
  * Same as the above test but with more complex examples.
  */
 TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitizationComplex) {
-    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"sv),
                                                {
                                                    IndexHint(BSON("a" << 1 << "c"
                                                                       << "invalid")),
@@ -548,7 +550,7 @@ TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitiza
                                                    IndexHint(BSON("$natural" << -1 << "a" << 2)),
                                                    IndexHint(BSON("a" << -1 << "$natural" << 1)),
                                                })};
-    IndexHintSpecs expectedHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+    IndexHintSpecs expectedHintSpec{IndexHintSpec(makeNsSpec("testCollA"sv),
                                                   {IndexHint(BSON("b" << -1.0)),
                                                    IndexHint(BSON("c" << -2.0 << "b" << 4)),
                                                    IndexHint("index_name")})};
@@ -560,7 +562,7 @@ TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitiza
  * empty.
  */
 TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitizationEmptyHints) {
-    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"sv),
                                                {
                                                    IndexHint(BSON("a" << 1 << "c"
                                                                       << "invalid")),

@@ -32,6 +32,8 @@
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
+
+#include <string_view>
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 

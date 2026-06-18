@@ -32,12 +32,14 @@
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo::extension::host_connector {
 
 ::MongoExtensionByteView HostLogicalAggStageAdapter::_hostGetName(
     const ::MongoExtensionLogicalAggStage* logicalStage) noexcept {
     auto sv = static_cast<const HostLogicalAggStageAdapter*>(logicalStage)->getImpl().getName();
-    StringData sd{sv.data(), sv.length()};
+    std::string_view sd{sv.data(), sv.length()};
     return stringDataAsByteView(sd);
 }
 

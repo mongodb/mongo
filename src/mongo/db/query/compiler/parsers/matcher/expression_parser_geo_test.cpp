@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"
@@ -42,10 +41,12 @@
 #include "mongo/util/intrusive_counter.h"
 
 #include <memory>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 TEST(MatchExpressionParserGeoNear, ParseNear) {
     BSONObj query = fromjson(
@@ -371,7 +372,7 @@ TEST(ExpressionGeoTest, GeoNear1) {
     std::unique_ptr<GeoNearExpression> nq(new GeoNearExpression);
     ASSERT_OK(parsers::matcher::parseGeoNearExpressionFromBSON(query["loc"].Obj(), *nq));
 
-    GeoNearMatchExpression gne("a"_sd, nq.release(), query);
+    GeoNearMatchExpression gne("a"sv, nq.release(), query);
 
     // We can't match the data but we can make sure it was parsed OK.
     ASSERT_EQUALS(gne.getData().centroid->crs, SPHERE);
@@ -384,7 +385,7 @@ std::unique_ptr<GeoMatchExpression> makeGeoMatchExpression(const BSONObj& locQue
     ASSERT_OK(parsers::matcher::parseGeoExpressionFromBSON(locQuery, *gq));
 
     std::unique_ptr<GeoMatchExpression> ge =
-        std::make_unique<GeoMatchExpression>("a"_sd, gq.release(), locQuery);
+        std::make_unique<GeoMatchExpression>("a"sv, gq.release(), locQuery);
 
     return ge;
 }
@@ -394,7 +395,7 @@ std::unique_ptr<GeoNearMatchExpression> makeGeoNearMatchExpression(const BSONObj
     ASSERT_OK(parsers::matcher::parseGeoNearExpressionFromBSON(locQuery, *nq));
 
     std::unique_ptr<GeoNearMatchExpression> gne =
-        std::make_unique<GeoNearMatchExpression>("a"_sd, nq.release(), locQuery);
+        std::make_unique<GeoNearMatchExpression>("a"sv, nq.release(), locQuery);
 
     return gne;
 }

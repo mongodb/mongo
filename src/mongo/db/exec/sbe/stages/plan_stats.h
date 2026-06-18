@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
@@ -40,6 +39,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -47,13 +47,14 @@ namespace mongo::sbe {
 struct CommonStats {
     CommonStats() = delete;
 
-    CommonStats(StringData stageType, PlanNodeId nodeId) : stageType{stageType}, nodeId{nodeId} {}
+    CommonStats(std::string_view stageType, PlanNodeId nodeId)
+        : stageType{stageType}, nodeId{nodeId} {}
 
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
     }
 
-    const StringData stageType;
+    const std::string_view stageType;
 
     // An identifier for the node, or zero if the identifier was not provided. Useful for displaying
     // debug output such as explain.

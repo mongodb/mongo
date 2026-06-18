@@ -38,6 +38,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 using boolean_simplification::BitsetTreeNode;
 using boolean_simplification::Maxterm;
 using boolean_simplification::Minterm;
@@ -61,7 +62,7 @@ DEATH_TEST_REGEX(RestoreSingleMatchExpressionTestsDeathTest,
                  AssertOnRestoringNegativeNodes,
                  "Tripwire assertion.*8163020") {
     auto operand = BSON("$gt" << 5);
-    auto gtExpr = std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]);
+    auto gtExpr = std::make_unique<GTMatchExpression>("a"sv, operand["$gt"]);
     BitsetTreeTransformResult::ExpressionList expressions{ExpressionBitInfo{gtExpr.get()}};
 
     BitsetTreeNode root{BitsetTreeNode::And, /* isNegated */ true};
@@ -126,14 +127,14 @@ TEST(RestoreSingleMatchExpressionTests, NotAlwaysFalse) {
 
 TEST(RestoreSingleMatchExpressionTests, GtExpression) {
     auto operand = BSON("$gt" << 5);
-    auto gtExpr = std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]);
+    auto gtExpr = std::make_unique<GTMatchExpression>("a"sv, operand["$gt"]);
     BitsetTreeTransformResult::ExpressionList expressions{ExpressionBitInfo{gtExpr.get()}};
 
     Maxterm maxterm{
         {"1", "1"},
     };
 
-    GTMatchExpression expectedExpr{"a"_sd, operand["$gt"]};
+    GTMatchExpression expectedExpr{"a"sv, operand["$gt"]};
 
     auto expr = restoreMatchExpression(maxterm, expressions);
     ASSERT_EXPR(expectedExpr, expr);
@@ -142,8 +143,8 @@ TEST(RestoreSingleMatchExpressionTests, GtExpression) {
 TEST(RestoreSingleMatchExpressionTests, AndExpression) {
     auto firstOperand = BSON("$gt" << 5);
     auto secondOperand = BSON("$eq" << 10);
-    auto gtExpr = std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]);
-    auto eqExpr = std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"]);
+    auto gtExpr = std::make_unique<GTMatchExpression>("a"sv, firstOperand["$gt"]);
+    auto eqExpr = std::make_unique<EqualityMatchExpression>("b"sv, secondOperand["$eq"]);
     BitsetTreeTransformResult::ExpressionList expressions{
         ExpressionBitInfo{gtExpr.get()},
         ExpressionBitInfo{eqExpr.get()},
@@ -165,9 +166,9 @@ TEST(RestoreSingleMatchExpressionTests, OrExpression) {
     auto firstOperand = BSON("$gt" << 5);
     auto secondOperand = BSON("$eq" << 10);
     auto thirdOperand = BSON("$lt" << 10);
-    auto gtExpr = std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]);
-    auto eqExpr = std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"]);
-    auto ltExpr = std::make_unique<LTMatchExpression>("c"_sd, thirdOperand["$lt"]);
+    auto gtExpr = std::make_unique<GTMatchExpression>("a"sv, firstOperand["$gt"]);
+    auto eqExpr = std::make_unique<EqualityMatchExpression>("b"sv, secondOperand["$eq"]);
+    auto ltExpr = std::make_unique<LTMatchExpression>("c"sv, thirdOperand["$lt"]);
     BitsetTreeTransformResult::ExpressionList expressions{
         ExpressionBitInfo{gtExpr.get()},
         ExpressionBitInfo{eqExpr.get()},
@@ -201,9 +202,9 @@ TEST(RestoreSingleMatchExpressionTests, NorExpression) {
     auto secondOperand = BSON("$eq" << 10);
     auto thirdOperand = BSON("$lt" << 10);
 
-    auto firstExpr = std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]);
-    auto secondExpr = std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"]);
-    auto thirdExpr = std::make_unique<LTMatchExpression>("c"_sd, thirdOperand["$lt"]);
+    auto firstExpr = std::make_unique<GTMatchExpression>("a"sv, firstOperand["$gt"]);
+    auto secondExpr = std::make_unique<EqualityMatchExpression>("b"sv, secondOperand["$eq"]);
+    auto thirdExpr = std::make_unique<LTMatchExpression>("c"sv, thirdOperand["$lt"]);
     BitsetTreeTransformResult::ExpressionList expressions{
         ExpressionBitInfo{firstExpr.get()},
         ExpressionBitInfo{secondExpr.get()},
@@ -255,10 +256,10 @@ TEST(RestoreSingleMatchExpressionTests, ElemMatch) {
     auto secondOperand = BSON("$eq" << 10);
     auto thirdOperand = BSON("$lt" << 10);
 
-    auto expr = std::make_unique<ElemMatchValueMatchExpression>("a"_sd);
-    expr->add(std::make_unique<GTMatchExpression>(""_sd, firstOperand["$gt"]));
-    expr->add(std::make_unique<EqualityMatchExpression>(""_sd, secondOperand["$eq"]));
-    expr->add(std::make_unique<LTMatchExpression>(""_sd, thirdOperand["$lt"]));
+    auto expr = std::make_unique<ElemMatchValueMatchExpression>("a"sv);
+    expr->add(std::make_unique<GTMatchExpression>(""sv, firstOperand["$gt"]));
+    expr->add(std::make_unique<EqualityMatchExpression>(""sv, secondOperand["$eq"]));
+    expr->add(std::make_unique<LTMatchExpression>(""sv, thirdOperand["$lt"]));
 
     BitsetTreeTransformResult::ExpressionList expressions{ExpressionBitInfo{expr.get()}};
 
@@ -277,11 +278,11 @@ TEST(RestoreSingleMatchExpressionTests, ElemMatchObject) {
     auto thirdOperand = BSON("$lt" << 10);
 
     auto child = std::make_unique<AndMatchExpression>();
-    child->add(std::make_unique<GTMatchExpression>("b"_sd, firstOperand["$gt"]));
-    child->add(std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"]));
-    child->add(std::make_unique<LTMatchExpression>("b"_sd, thirdOperand["$lt"]));
+    child->add(std::make_unique<GTMatchExpression>("b"sv, firstOperand["$gt"]));
+    child->add(std::make_unique<EqualityMatchExpression>("b"sv, secondOperand["$eq"]));
+    child->add(std::make_unique<LTMatchExpression>("b"sv, thirdOperand["$lt"]));
 
-    auto expr = std::make_unique<ElemMatchObjectMatchExpression>("a"_sd, std::move(child));
+    auto expr = std::make_unique<ElemMatchObjectMatchExpression>("a"sv, std::move(child));
 
     BitsetTreeTransformResult::ExpressionList expressions{ExpressionBitInfo{expr.get()}};
 

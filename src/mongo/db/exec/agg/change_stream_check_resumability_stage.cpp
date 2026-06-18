@@ -35,6 +35,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -61,7 +63,7 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamCheckResumability,
                            documentSourceChangeStreamCheckResumabilityToStageFn)
 
 ChangeStreamCheckResumabilityStage::ChangeStreamCheckResumabilityStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     ResumeTokenData tokenFromClient)
     : Stage(stageName, pExpCtx), _tokenFromClient(std::move(tokenFromClient)) {}

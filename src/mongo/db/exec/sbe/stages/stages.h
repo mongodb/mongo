@@ -47,6 +47,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo {
 
 namespace sbe {
@@ -322,7 +324,7 @@ public:
     // Bit mask to accumulate what stats are tracked when a TrialRunTracker is attached.
     using TrialRunTrackingTypeMask = uint32_t;
 
-    CanTrackStats(StringData stageType,
+    CanTrackStats(std::string_view stageType,
                   PlanNodeId nodeId,
                   bool participateInTrialRunTracking,
                   TrialRunTrackingType trackingType)
@@ -696,7 +698,7 @@ class PlanStage : public CanSwitchOperationContext<PlanStage>,
 public:
     using Vector = absl::InlinedVector<std::unique_ptr<PlanStage>, 2>;
 
-    PlanStage(StringData stageType,
+    PlanStage(std::string_view stageType,
               PlanYieldPolicySBE* yieldPolicy,
               PlanNodeId nodeId,
               bool participateInTrialRunTracking,

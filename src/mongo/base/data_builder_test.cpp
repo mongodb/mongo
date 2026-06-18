@@ -31,11 +31,11 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_terminated.h"
-#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -177,12 +177,12 @@ TEST(DataBuilder, Move) {
 
 TEST(DataBuilder, TerminatedStringDatas) {
     DataBuilder db{10};
-    StringData sample{"abcdefgh"};
+    std::string_view sample{"abcdefgh"};
 
-    auto status2 = db.writeAndAdvance<Terminated<'\0', StringData>>(sample);
+    auto status2 = db.writeAndAdvance<Terminated<'\0', std::string_view>>(sample);
     ASSERT_EQUALS(true, status2.isOK());
 
-    auto status3 = db.writeAndAdvance<Terminated<'\0', StringData>>(sample);
+    auto status3 = db.writeAndAdvance<Terminated<'\0', std::string_view>>(sample);
     ASSERT_EQUALS(true, status3.isOK());
 }
 

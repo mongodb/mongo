@@ -38,6 +38,8 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
 namespace mongo {
 LazyRecordStore::~LazyRecordStore() {
     invariant(!_hasPendingCreation,
@@ -45,7 +47,7 @@ LazyRecordStore::~LazyRecordStore() {
 }
 
 std::unique_ptr<RecordStore> LazyRecordStore::_createRecordStore(OperationContext* opCtx,
-                                                                 StringData ident,
+                                                                 std::string_view ident,
                                                                  LazyRecordStore* lrs) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     bool nested = ru.inUnitOfWork();
@@ -81,7 +83,9 @@ std::unique_ptr<RecordStore> LazyRecordStore::_createRecordStore(OperationContex
     return rs;
 }
 
-LazyRecordStore::LazyRecordStore(OperationContext* opCtx, StringData ident, CreateMode createMode)
+LazyRecordStore::LazyRecordStore(OperationContext* opCtx,
+                                 std::string_view ident,
+                                 CreateMode createMode)
     : _tableOrIdent([&]() -> decltype(_tableOrIdent) {
           auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
           switch (createMode) {
@@ -99,7 +103,7 @@ LazyRecordStore::LazyRecordStore(OperationContext* opCtx, StringData ident, Crea
           }
       }()) {}
 
-void LazyRecordStore::createTable(OperationContext* opCtx, StringData ident) {
+void LazyRecordStore::createTable(OperationContext* opCtx, std::string_view ident) {
     _createRecordStore(opCtx, ident, nullptr);
 }
 

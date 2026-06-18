@@ -43,6 +43,7 @@
 #include <array>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/metrics/meter.h>
@@ -213,8 +214,9 @@ ScalarMetricImpl<T, AttributeTs...>::ScalarMetricImpl(
     : _initialValue(initialValue),
       _attributeNames{defs.name...},
       _ownedValueLists(makeOwnedAttributeValueLists(defs...)) {
-    // The Attributes tuples produced by safeMakeAttributeTuples contain view values (StringData,
-    // span) that point into _ownedValueLists, so the keys inserted into _metrics remain valid.
+    // The Attributes tuples produced by safeMakeAttributeTuples contain view values
+    // (std::string_view, span) that point into _ownedValueLists, so the keys inserted into _metrics
+    // remain valid.
     for (Attributes t : safeMakeAttributeTuples(_ownedValueLists))
         _metrics[t] = std::make_unique<MetricData>(initialValue, globalReportingPolicy);
 

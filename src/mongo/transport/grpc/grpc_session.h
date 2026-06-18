@@ -50,6 +50,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -291,7 +292,7 @@ public:
                    ServerStream* stream,
                    boost::optional<UUID> clientId,
                    boost::optional<std::string> authToken,
-                   boost::optional<StringData> encodedClientMetadata);
+                   boost::optional<std::string_view> encodedClientMetadata);
 
     ~IngressSession() override;
 
@@ -370,7 +371,7 @@ private:
 
     boost::optional<std::string> _authToken;
     boost::optional<UUID> _remoteClientId;
-    boost::optional<StringData> _encodedClientMetadata;
+    boost::optional<std::string_view> _encodedClientMetadata;
     mutable synchronized_value<boost::optional<ClientMetadata>> _decodedClientMetadata;
 };
 

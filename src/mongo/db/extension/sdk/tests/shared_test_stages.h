@@ -44,9 +44,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::extension::sdk {
-inline StringData stringViewToStringData(std::string_view sv) {
-    return StringData{sv.data(), sv.size()};
+inline std::string_view stringViewToStringData(std::string_view sv) {
+    return std::string_view{sv.data(), sv.size()};
 }
 }  // namespace mongo::extension::sdk
 
@@ -117,8 +119,8 @@ private:
 
 class TestLogicalStageCompile : public sdk::TestLogicalStage<ValidExtensionExecAggStage> {
 public:
-    static constexpr StringData kStageName = "$testCompile";
-    static constexpr StringData kStageSpec = "mongodb";
+    static constexpr std::string_view kStageName = "$testCompile";
+    static constexpr std::string_view kStageSpec = "mongodb";
 
     TestLogicalStageCompile() : TestLogicalStage(kStageName, BSON(kStageSpec << "")) {}
 

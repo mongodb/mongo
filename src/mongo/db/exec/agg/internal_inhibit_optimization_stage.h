@@ -32,11 +32,13 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/util/modules.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 
 class InternalInhibitOptimizationStage final : public Stage {
 public:
-    InternalInhibitOptimizationStage(StringData stageName,
+    InternalInhibitOptimizationStage(std::string_view stageName,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     bool isEOF() const final {

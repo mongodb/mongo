@@ -46,6 +46,7 @@
 #include "mongo/util/str.h"
 
 #include <new>
+#include <string_view>
 #include <tuple>
 #include <utility>
 
@@ -338,7 +339,7 @@ std::string ObjectWrapper::Key::toString(JSContext* cx) {
     return std::string{toStringData(cx, &jsstr)};
 }
 
-StringData ObjectWrapper::Key::toStringData(JSContext* cx, JSStringWrapper* jsstr) {
+std::string_view ObjectWrapper::Key::toStringData(JSContext* cx, JSStringWrapper* jsstr) {
     if (_type == Type::Field) {
         return _field;
     }
@@ -464,7 +465,7 @@ void ObjectWrapper::setNumber(Key key, double val) {
     setValue(key, jsValue);
 }
 
-void ObjectWrapper::setString(Key key, StringData val) {
+void ObjectWrapper::setString(Key key, std::string_view val) {
     JS::RootedValue jsValue(_context);
     ValueReader(_context, &jsValue).fromStringData(val);
 
@@ -642,7 +643,7 @@ BSONObj ObjectWrapper::toBSON() {
         // exeption), then the frame dtors would write to freed
         // memory.
         WriteFieldRecursionFrames frames;
-        frames.emplace(_context, _object, nullptr, StringData{});
+        frames.emplace(_context, _object, nullptr, std::string_view{});
 
         // We special case the _id field in top-level objects and move it to the front.
         // This matches other drivers behavior and makes finding the _id field quicker in BSON.
@@ -699,7 +700,7 @@ BSONObj ObjectWrapper::toBSON() {
 ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
                                                                   JSObject* obj,
                                                                   BSONObjBuilder* parent,
-                                                                  StringData sd)
+                                                                  std::string_view sd)
     : thisv(cx, obj), ids(cx, JS::IdVector(cx)) {
     bool isArray = false;
     if (parent) {

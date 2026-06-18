@@ -32,7 +32,6 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -122,6 +121,7 @@
 #include <iterator>
 #include <list>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <absl/container/flat_hash_set.h>
@@ -146,6 +146,7 @@ using sharded_agg_helpers::PipelineDataSource;
 using sharded_agg_helpers::SplitPipeline;
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 Status appendCursorResponseToCommandResult(const ShardId& shardId,
                                            const BSONObj cursorResponse,
@@ -199,7 +200,7 @@ BSONObj getUntrackedCollectionCollation(OperationContext* opCtx, const Namespace
 
     sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
     const auto collectionsList = router.route(
-        "getUntrackedCollectionCollation"_sd,
+        "getUntrackedCollectionCollation"sv,
         [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
             generic_argument_util::setDbVersionIfPresent(listCollectionsCmd, cdb->getVersion());
 
