@@ -97,3 +97,6 @@ filters:
   - "cleanup.py":
     approvers:
       - 10gen/devprod-test-infrastructure
+  - "check_multikey_consistency_background.py":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

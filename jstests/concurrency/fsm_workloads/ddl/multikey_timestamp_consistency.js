@@ -72,6 +72,12 @@
  */
 
 import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {
+    findIndexForField,
+    IndexType,
+    readCatalogIndexesAtClusterTime,
+    readWildcardMultikeyPaths,
+} from "jstests/libs/multikey_consistency_check.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 export const $config = (function () {
@@ -116,8 +122,6 @@ export const $config = (function () {
         );
         return true;
     }
-    const IndexType = Object.freeze({REGULAR: "regular", WILDCARD: "wildcard"});
-
     // Number of pre-existing collections in the shared pool. Each pool collection has both a
     // wildcard {"$**": 1} index and one {field: 1} regular index per field in
     // REGULAR_INDEX_FIELDS. States pick a random pool collection on each invocation so threads
@@ -135,77 +139,6 @@ export const $config = (function () {
     const WILDCARD_FIELDS = ["d", "e", "f", "g", "h"];
 
     // --- Shared helpers ---
-
-    function getCatalogMetadata(node, dbName, collName, ts) {
-        try {
-            const catalog = node
-                .getDB("admin")
-                .aggregate([{$listCatalog: {}}, {$match: {db: dbName, name: collName}}], {
-                    readConcern: {level: "snapshot", atClusterTime: ts},
-                })
-                .toArray();
-            if (catalog.length === 0) return null;
-            return catalog[0]["md"]["indexes"];
-        } catch (e) {
-            return undefined;
-        }
-    }
-
-    // Locates the index entry that covers `fieldName` for the given index type.
-    // Wildcard: matches the unique index with keyPattern {"$**": 1}.
-    // Regular: matches a single-field index whose keyPattern is exactly {fieldName: 1}.
-    function findIndexForField(indexes, indexType, fieldName) {
-        if (indexType === IndexType.WILDCARD) {
-            return indexes.find((idx) => idx.spec && idx.spec.key && idx.spec.key["$**"] === 1);
-        }
-        return indexes.find((idx) => {
-            const key = idx.spec && idx.spec.key;
-            if (!key) return false;
-            const keys = Object.keys(key);
-            return keys.length === 1 && key[fieldName] === 1;
-        });
-    }
-
-    function getWildcardMultikeyPaths(node, dbName, collName, ts, hint, fieldName) {
-        try {
-            const filter = {};
-            filter[fieldName] = 1;
-            const explain = node.getDB(dbName).runCommand({
-                explain: {find: collName, filter: filter, hint: hint},
-                readConcern: {level: "snapshot", atClusterTime: ts},
-                verbosity: "queryPlanner",
-            });
-            if (!explain.ok) return undefined;
-            // Walks the explain tree to find the wildcard IXSCAN. Handles both engines:
-            //   - Classic: winningPlan.{stage:..., inputStage:{...}}
-            //   - SBE: winningPlan.queryPlan.{stage:..., inputStage:{...}}
-            // SBE wraps the QuerySolutionNode tree under a 'queryPlan' field; recurse into it.
-            function findWcIxscan(plan) {
-                if (!plan) return null;
-                if (plan.stage === "IXSCAN" && plan.keyPattern && plan.keyPattern["$_path"])
-                    return plan;
-                if (plan.queryPlan) {
-                    const r = findWcIxscan(plan.queryPlan);
-                    if (r) return r;
-                }
-                if (plan.inputStage) return findWcIxscan(plan.inputStage);
-                if (plan.inputStages) {
-                    for (const s of plan.inputStages) {
-                        const r = findWcIxscan(s);
-                        if (r) return r;
-                    }
-                }
-                return null;
-            }
-            const ixscan = findWcIxscan(explain.queryPlanner.winningPlan);
-            if (!ixscan) return [];
-            return ixscan.multiKeyPaths && ixscan.multiKeyPaths[fieldName]
-                ? ixscan.multiKeyPaths[fieldName]
-                : [];
-        } catch (e) {
-            return undefined;
-        }
-    }
 
     const OPLOG_SCAN_LOST_MSG =
         "Skipping multikey consistency check: oplog scan lost capped position (concurrent oplog rotation)";
@@ -280,8 +213,8 @@ export const $config = (function () {
         ts2,
     ) {
         for (const ts of [ts1, ts2]) {
-            const pIndexes = getCatalogMetadata(primary, dbName, collName, ts);
-            const sIndexes = getCatalogMetadata(secondary, dbName, collName, ts);
+            const pIndexes = readCatalogIndexesAtClusterTime(primary, dbName, collName, ts);
+            const sIndexes = readCatalogIndexesAtClusterTime(secondary, dbName, collName, ts);
             if (pIndexes === undefined || sIndexes === undefined) continue;
 
             // Both must agree on collection existence.
@@ -329,7 +262,7 @@ export const $config = (function () {
                             fieldName,
                     );
                 } else {
-                    const pPaths = getWildcardMultikeyPaths(
+                    const pPaths = readWildcardMultikeyPaths(
                         primary,
                         dbName,
                         collName,
@@ -337,7 +270,7 @@ export const $config = (function () {
                         wildcardHint,
                         fieldName,
                     );
-                    const sPaths = getWildcardMultikeyPaths(
+                    const sPaths = readWildcardMultikeyPaths(
                         secondary,
                         dbName,
                         collName,

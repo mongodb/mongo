@@ -23,6 +23,9 @@ Specify any of the following as the `hooks` in your
   same across chunks for the same collections.
 - [`CheckMetadataConsistencyInBackground`](./metadata_consistency) - Check the metadata consistency
   of a sharded cluster.
+- [`CheckMultikeyConsistencyInBackground`](./check_multikey_consistency_background.py) - A hook for
+  comparing per-index multikey catalog state across replica set members at random points in time,
+  while a test is running.
 - [`CheckOrphansDeleted`](./orphans.py) - Check if the range deleter failed to delete any orphan
   documents.
 - [`CheckReplDBHashInBackground`](./dbhash_background.py) - A hook for comparing the dbhashes of all

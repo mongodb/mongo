@@ -45,3 +45,6 @@ filters:
   - "run_check_list_catalog_operations_consistency.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "run_check_multikey_consistency.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

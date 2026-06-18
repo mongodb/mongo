@@ -102,6 +102,9 @@ filters:
   - "block_replica_set_writes_utils.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "multikey_consistency_check.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "hook_appname.js":
     approvers:
       - 10gen/server-jstest-infra
