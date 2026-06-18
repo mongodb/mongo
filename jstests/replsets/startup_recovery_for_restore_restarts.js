@@ -126,7 +126,7 @@ rst.start(
     {
         noReplSet: true,
         waitForConnect: false,
-        syncdelay: 1, // Take a lot of unstable checkpoints.
+        syncdelay: 1, // Take frequent checkpoints (every second)
         setParameter: Object.merge(startParams, {
             startupRecoveryForRestore: true,
             recoverFromOplogAsStandalone: true,
@@ -144,22 +144,14 @@ assert.soon(() => {
     // Can't use checklog because we can't connect to the mongo in startup mode.
     return rawMongoProgramOutput(subStr).search(subStr) !== -1;
 });
-// We need to make sure we get a checkpoint after the failpoint is hit, so we clear the output after
-// hitting it.  Occasionally we'll miss a checkpoint as a result of clearing the output, but we'll
-// get another one a second later.
-clearRawMongoProgramOutput();
-// Ensure the checkpoint starts after the insert.
+// Wait for a full checkpoint to complete after the freeze.
+// Checkpoints are serialized, so observing the "saving checkpoint snapshot min" line twice
+// means the first checkpoint has completed.
 subStr = "WT_VERB_CHECKPOINT.*saving checkpoint snapshot min";
-assert.soon(() => {
-    return rawMongoProgramOutput(subStr).search(subStr) !== -1;
-});
-// Ensure that we wait for a checkpoint completed log message that comes strictly after the above
-// checkpoint started message.
 clearRawMongoProgramOutput();
-subStr = "Completed unstable checkpoint.";
-assert.soon(() => {
-    return rawMongoProgramOutput(subStr).search(subStr) !== -1;
-});
+assert.soon(() => rawMongoProgramOutput(subStr).search(subStr) !== -1);
+clearRawMongoProgramOutput();
+assert.soon(() => rawMongoProgramOutput(subStr).search(subStr) !== -1);
 
 jsTestLog("Restarting restore node uncleanly");
 rst.stop(restoreNode, SIGKILL, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});

@@ -2460,12 +2460,17 @@ can use it. The calculation of this value in the replication layer occurs
 The replication layer will
 [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5048-L5062)
 if it is earlier than the `initialDataTimestamp`, since data earlier than that timestamp may be
-inconsistent. During restore, we may proactively set the stable timestamp as we apply oplog batches
-even before we set the `initialDataTimestamp`. This means that after startup recovery for restore
-(and for File Copy Based Initial Sync), we cannot guarantee that the stable timestamp is actually
-majority committed. However, this is safe because we do not allow rollbacks before the
-`initialDataTimestamp` and when both FCBIS and startup recovery for restore complete, the
-`initialDataTimestamp` will be equal to the stable timestamp.
+inconsistent. During restore and File Copy Based Initial Sync, we proactively advance the stable
+timestamp as we apply oplog batches, before we set the final `initialDataTimestamp`, so that it can
+be ahead of the majority commit point. This means that after startup recovery for restore (and for
+FCBIS), we cannot guarantee that the stable timestamp is actually majority committed. However, this
+is safe for two reasons: (1) we never roll back before the `initialDataTimestamp`, and (2) once
+FCBIS or startup recovery for restore completes, the `initialDataTimestamp` is advanced to equal the
+stable timestamp. Startup recovery for restore sets the `initialDataTimestamp` to the recovery
+checkpoint's stable timestamp so that the checkpoints it takes during recovery are stable, whereas
+FCBIS keeps the `kAllowUnstableCheckpointsSentinel` and takes unstable checkpoints until it
+completes. FCBIS does not need stable checkpoints during oplog application because a crash mid-FCBIS
+restarts initial sync from scratch rather than resuming from those checkpoints.
 
 #### Timestamps related to both prepared and non-prepared transactions:
 
