@@ -367,10 +367,10 @@ public:
                          MultikeyPaths* multikeyPaths,
                          int indexOffset) const final;
 
-    bool setIndexIsMultikey(OperationContext* opCtx,
-                            StringData indexName,
-                            const MultikeyPaths& multikeyPaths,
-                            int indexOffset) const final;
+    int64_t setIndexIsMultikey(OperationContext* opCtx,
+                               StringData indexName,
+                               const MultikeyPaths& multikeyPaths,
+                               int indexOffset) const final;
 
     void forceSetIndexIsMultikey(OperationContext* opCtx,
                                  const IndexDescriptor* desc,
@@ -412,9 +412,17 @@ private:
 
     int _getIndexOffsetForMultikeyUpdate(StringData indexName, int indexOffset) const;
 
-    bool _setIndexIsMultikeyInMetadata(const durable_catalog::CatalogEntryMetaData& metadata,
-                                       int offset,
-                                       const MultikeyPaths& multikeyPaths) const;
+    /**
+     * Updates multikey metadata for the index at 'offset' in 'metadata'.
+     *
+     * Returns the number of new multikey path components recorded. For indexes that do not track
+     * path-level multikey information, returns 1 if the index is becoming multikey for the first
+     * time and 0 if it was already multikey. That return value counts the metadata change even
+     * though no path components are tracked in the catalog for the index.
+     */
+    int64_t _setIndexIsMultikeyInMetadata(const durable_catalog::CatalogEntryMetaData& metadata,
+                                          int offset,
+                                          const MultikeyPaths& multikeyPaths) const;
 
     /**
      * Sets the index identified by 'indexName' to be multikey when the caller holds shared access
@@ -422,10 +430,10 @@ private:
      * through the usual copy-on-write path for metadata updates, using a dedicated concurrency
      * control mechanism for multikey metadata updates.
      */
-    bool _setIndexIsMultikeyWithSharedAccess(OperationContext* opCtx,
-                                             StringData indexName,
-                                             const MultikeyPaths& multikeyPaths,
-                                             int indexOffset) const;
+    int64_t _setIndexIsMultikeyWithSharedAccess(OperationContext* opCtx,
+                                                StringData indexName,
+                                                const MultikeyPaths& multikeyPaths,
+                                                int indexOffset) const;
 
     /**
      * Sets the index identified by 'indexName' to be multikey when the caller exclusively owns
@@ -433,10 +441,10 @@ private:
      * This bypasses the UncommittedMultikey decoration / onCommit deferral and persists the
      * metadata atomically as part of the transaction.
      */
-    bool _setIndexIsMultikeyWithExclusiveAccess(OperationContext* opCtx,
-                                                StringData indexName,
-                                                const MultikeyPaths& multikeyPaths,
-                                                int indexOffset);
+    int64_t _setIndexIsMultikeyWithExclusiveAccess(OperationContext* opCtx,
+                                                   StringData indexName,
+                                                   const MultikeyPaths& multikeyPaths,
+                                                   int indexOffset);
 
     /**
      * Creates a mutable copy of the current metadata, including uncommitted multikey changes if

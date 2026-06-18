@@ -413,10 +413,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool setIndexIsMultikey(OperationContext* opCtx,
-                            StringData indexName,
-                            const MultikeyPaths& multikeyPaths,
-                            int indexOffset) const override {
+    int64_t setIndexIsMultikey(OperationContext* opCtx,
+                               StringData indexName,
+                               const MultikeyPaths& multikeyPaths,
+                               int indexOffset) const override {
         MONGO_UNREACHABLE;
     }
 

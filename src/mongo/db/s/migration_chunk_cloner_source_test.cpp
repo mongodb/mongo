@@ -412,10 +412,10 @@ public:
         return _coll->isIndexMultikey(opCtx, indexName, multikeyPaths, indexOffset);
     }
 
-    bool setIndexIsMultikey(OperationContext* opCtx,
-                            StringData indexName,
-                            const MultikeyPaths& multikeyPaths,
-                            int indexOffset = -1) const override {
+    int64_t setIndexIsMultikey(OperationContext* opCtx,
+                               StringData indexName,
+                               const MultikeyPaths& multikeyPaths,
+                               int indexOffset = -1) const override {
         return _coll->setIndexIsMultikey(opCtx, indexName, multikeyPaths, indexOffset);
     }
 

@@ -620,12 +620,13 @@ public:
      * elements in the index key pattern. Additionally, at least one path component of the indexed
      * fields must cause this index to be multikey.
      *
-     * This function returns true if the index metadata has changed, and returns false otherwise.
+     * Returns the number of new multikey path components recorded. For indexes that do not track
+     * path-level multikey information, returns 1 if the index metadata changed and 0 otherwise.
      */
-    virtual bool setIndexIsMultikey(OperationContext* opCtx,
-                                    StringData indexName,
-                                    const MultikeyPaths& multikeyPaths,
-                                    int indexOffset = -1) const = 0;
+    virtual int64_t setIndexIsMultikey(OperationContext* opCtx,
+                                       StringData indexName,
+                                       const MultikeyPaths& multikeyPaths,
+                                       int indexOffset = -1) const = 0;
 
     /**
      * Sets the index to be multikey with the provided paths. This performs minimal validation of

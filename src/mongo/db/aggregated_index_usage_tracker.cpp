@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_catalog/multikey_path_metrics.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_updown_counter.h"
@@ -226,6 +227,8 @@ public:
 
         BSONObjBuilder builder;
         builder.append("count", globalFeatures->getCount());
+
+        catalog_metrics::appendMultikeyPathStatsToIndexStats(&builder);
 
         BSONObjBuilder featuresBuilder = builder.subobjStart("features");
         globalFeatures->forEachFeature(

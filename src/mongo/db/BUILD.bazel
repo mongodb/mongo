@@ -1518,6 +1518,7 @@ mongo_cc_library(
         ":server_base",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/shard_role/shard_catalog:multikey_path_metrics",
         "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )

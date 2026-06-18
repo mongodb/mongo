@@ -264,6 +264,13 @@ public:
         MetricNameMaker::make("serverStatus.metrics.ttl.invalidTTLIndexSkips");
     static constexpr MetricName kIndexCount =
         MetricNameMaker::make("serverStatus.indexStats.count");
+    static constexpr MetricName kIndexStatsMultikeyNewPathsOrdinaryInTransaction =
+        MetricNameMaker::make("serverStatus.indexStats.multikey.newPaths.ordinary.inTransaction");
+    static constexpr MetricName kIndexStatsMultikeyNewPathsOrdinaryOutsideTransaction =
+        MetricNameMaker::make(
+            "serverStatus.indexStats.multikey.newPaths.ordinary.outsideTransaction");
+    static constexpr MetricName kIndexStatsMultikeySideTransactions =
+        MetricNameMaker::make("serverStatus.indexStats.multikey.sideTransactions");
 
     static constexpr MetricName kIndexBuildsTotal =
         MetricNameMaker::make("serverStatus.indexBuilds.total");

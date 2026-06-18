@@ -62,6 +62,7 @@
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_catalog/multikey_path_metrics.h"
 #include "mongo/db/shard_role/shard_catalog/set_multikey_metadata_oplog_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/txn_wildcard_multikey_paths.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -555,6 +556,7 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
         _catalogSetMultikey(opCtx, collection, multikeyPaths);
 
         wuow.commit();
+        catalog_metrics::recordSideTransaction();
     });
 
     return Status::OK();
@@ -890,10 +892,13 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
     // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
     // multikey information in order to avoid unintentionally setting path-level multikey
     // information on an index created before 3.4.
-    auto indexMetadataHasChanged =
+    const auto newPathComponents =
         collection->setIndexIsMultikey(opCtx, _descriptor.indexName(), multikeyPaths, _indexOffset);
 
-    if (indexMetadataHasChanged) {
+    if (newPathComponents > 0) {
+        if (!multikeyPaths.empty()) {
+            catalog_metrics::recordOrdinaryMultikeyPathChanges(opCtx, newPathComponents);
+        }
         LOGV2_DEBUG(4718705,
                     1,
                     "Index set to multi key, clearing query plan cache",
