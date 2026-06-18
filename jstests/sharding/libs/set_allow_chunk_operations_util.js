@@ -46,6 +46,14 @@ export function setAllowChunkOperations(st, ns, allow, opts = {}) {
         assert.commandWorked(st.configRS.getPrimary().adminCommand(configCmd));
     }
 
+    // The per-shard command below reads this write back and checks the value matches. That read can
+    // go to any config node, so wait until every config node has the write before sending it.
+    //
+    // The server-side code does not need this wait: there the two commands run on the same
+    // operation, so the config write's time is carried over and the read waits for it. This test
+    // helper uses separate connections that do not carry that time over, so we wait here instead.
+    st.configRS.awaitLastOpCommitted();
+
     // Step 2: broadcast the command to every shard in the cluster. It must be a retryable write
     const shardConnsByName = buildShardConnsByName(st);
     const shardNames = opts.shards !== undefined ? opts.shards : Object.keys(shardConnsByName);
