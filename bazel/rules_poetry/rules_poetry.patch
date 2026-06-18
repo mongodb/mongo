@@ -10,3 +10,19 @@ index 0000000..c09945f
 +
 +bazel_dep(name = "bazel_skylib", version = "1.5.0")
 +bazel_dep(name = "platforms", version = "0.0.8")
+diff --git rules_poetry/defs.bzl rules_poetry/defs.bzl
+index 5e0df55..10aa491 100644
+--- rules_poetry/defs.bzl
++++ rules_poetry/defs.bzl
+@@ -5,8 +5,11 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+ # We no longer need to use this due to updates to rules_python, but we have not erased it for backward compatibility.
+ def deterministic_env():
+     return {
+         # lifted from https://github.com/bazelbuild/rules_python/issues/154
+         "CFLAGS": "-g0",  # debug symbols contain non-deterministic file paths
++        # Keep Rust-backed Python package builds in Bazel's writable sandbox.
++        "CARGO_HOME": ".cargo",
++        "HOME": ".",
+         "PATH": "/bin:/usr/bin:/usr/local/bin",
+         "PYTHONDONTWRITEBYTECODE": "1",
+         "PYTHONHASHSEED": "0",
