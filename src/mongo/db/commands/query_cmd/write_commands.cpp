@@ -895,6 +895,7 @@ public:
 
             write_ops_exec::explainDelete(opCtx,
                                           deleteRequest,
+                                          &request(),
                                           isTimeseriesLogicalRequest,
                                           request().getSerializationContext(),
                                           _commandObj,

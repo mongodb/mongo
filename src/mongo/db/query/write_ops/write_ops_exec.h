@@ -244,6 +244,7 @@ void explainUpdate(OperationContext* opCtx,
 
 void explainDelete(OperationContext* opCtx,
                    DeleteRequest& deleteRequest,
+                   const write_ops::DeleteCommandRequest* deleteOp,
                    bool isTimeseriesViewRequest,
                    const SerializationContext& serializationContext,
                    const BSONObj& command,

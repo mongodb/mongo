@@ -2762,7 +2762,7 @@ void explainUpdate(OperationContext* opCtx,
         &updateRequest,
         makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &updateRequest.getNsString())));
 
-    // Register query shape here once we obtain 'parsedUpdate', before executing the update
+    // Compute the query shape here once we obtain 'parsedUpdate', before executing the update
     // command. Inside 'parsedUpdate', the parsed preoptimized query and the update driver are
     // available for computing query shape.
 
@@ -2796,6 +2796,7 @@ void explainUpdate(OperationContext* opCtx,
 
 void explainDelete(OperationContext* opCtx,
                    DeleteRequest& deleteRequest,
+                   const write_ops::DeleteCommandRequest* deleteOp,
                    bool isTimeseriesViewRequest,
                    const SerializationContext& serializationContext,
                    const BSONObj& command,
@@ -2819,8 +2820,36 @@ void explainDelete(OperationContext* opCtx,
                                                              &deleteRequest);
     }
 
-    auto canonicalDelete = uassertStatusOK(CanonicalDelete::makeFromRequest(
-        opCtx, collection.getCollectionPtr(), deleteRequest, isTimeseriesViewRequest));
+    // TODO SERVER-120999 decide if we should add 'requiresTimeseriesExtendedRangeSupport'
+    auto [collatorToUse, collationMatchesDefault] =
+        resolveCollator(opCtx, deleteRequest.getCollation(), collection.getCollectionPtr());
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx, deleteRequest)
+                      .collator(std::move(collatorToUse))
+                      .collationMatchesDefault(collationMatchesDefault)
+                      .build();
+
+    auto parsedDelete = uassertStatusOK(parsed_delete_command::parse(
+        expCtx,
+        &deleteRequest,
+        makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &deleteRequest.getNsString())));
+
+    // Compute the query shape here once we obtain 'parsedDelete', before executing the delete
+    // command. Inside 'parsedDelete', the parsed pre-optimized query is available for computing
+    // query shape.
+
+    // TODO SERVER-120999: Compute the queryShapeHash for timeseries deletes after it is supported.
+    if (deleteOp && !isTimeseriesViewRequest) {
+        const boost::optional<query_shape::DeferredQueryShape>& maybeDeferredShape =
+            computeDeleteQueryShape(opCtx, expCtx, *deleteOp, parsedDelete);
+        if (maybeDeferredShape) {
+            storeDeleteQueryShapeHash(
+                opCtx, expCtx, *deleteOp, parsedDelete, maybeDeferredShape.get());
+        }
+    }
+
+    auto canonicalDelete = uassertStatusOK(CanonicalDelete::make(
+        expCtx, std::move(parsedDelete), collection.getCollectionPtr(), isTimeseriesViewRequest));
 
     // Explain the plan tree.
     auto exec = uassertStatusOK(

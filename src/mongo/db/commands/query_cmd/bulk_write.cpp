@@ -1266,14 +1266,16 @@ void explainDeleteOp(OperationContext* opCtx,
     deleteRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
     deleteRequest.setIsExplain(true);
 
-    write_ops_exec::explainDelete(opCtx,
-                                  deleteRequest,
-                                  isTimeseriesLogicalRequest,
-                                  req.getSerializationContext(),
-                                  command,
-                                  preConditions,
-                                  verbosity,
-                                  result);
+    write_ops_exec::explainDelete(
+        opCtx,
+        deleteRequest,
+        nullptr /* deleteOp */,  // null while bulkWrite query stats unsupported
+        isTimeseriesLogicalRequest,
+        req.getSerializationContext(),
+        command,
+        preConditions,
+        verbosity,
+        result);
 }
 
 class BulkWriteCmd : public BulkWriteCmdVersion1Gen<BulkWriteCmd> {

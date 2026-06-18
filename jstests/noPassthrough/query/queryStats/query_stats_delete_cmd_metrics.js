@@ -151,6 +151,21 @@ describeWriteCmdQueryStatsReplicaSetTests(
                 );
             });
 
+            it("should not have queryShapeHash in explain for findAndModify with remove", function () {
+                const {testDB, coll} = ctxFn();
+                const explainResult = assert.commandWorked(
+                    coll.explain().findAndModify({
+                        query: {v: 1},
+                        remove: true,
+                    }),
+                );
+                assert(
+                    !explainResult.hasOwnProperty("queryShapeHash"),
+                    "Expected no queryShapeHash in explain for findAndModify with remove",
+                    {explainResult},
+                );
+            });
+
             it("should not record delete stats for bulkWrite delete op", function () {
                 const {testDB, coll, collName, conn} = ctxFn();
                 assert.commandWorked(
@@ -164,6 +179,24 @@ describeWriteCmdQueryStatsReplicaSetTests(
                     0,
                     getQueryStatsDeleteCmd(conn, {collName}).length,
                     "Expected no delete stats for bulkWrite delete",
+                );
+            });
+
+            it("should not have queryShapeHash in explain for bulkWrite delete op", function () {
+                const {testDB, coll} = ctxFn();
+                const explainResult = assert.commandWorked(
+                    testDB.adminCommand({
+                        explain: {
+                            bulkWrite: 1,
+                            ops: [{delete: 0, filter: {v: 2}, multi: false}],
+                            nsInfo: [{ns: coll.getFullName()}],
+                        },
+                    }),
+                );
+                assert(
+                    !explainResult.hasOwnProperty("queryShapeHash"),
+                    "Expected no queryShapeHash in explain for bulkWrite delete",
+                    {explainResult},
                 );
             });
 

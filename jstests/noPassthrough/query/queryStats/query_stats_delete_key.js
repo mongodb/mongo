@@ -47,8 +47,6 @@ function runDeleteKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: deleteCommandObjSimple,
                 shapeFields: queryShapeDeleteFieldsRequired,
                 keyFields: deleteKeyFieldsRequired,
-                // TODO SERVER-122067 remove this field to validate explain.
-                checkExplain: false,
             });
         });
 
@@ -82,8 +80,6 @@ function runDeleteKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: deleteCommandObjComplex,
                 shapeFields: queryShapeDeleteFieldsComplex,
                 keyFields: deleteKeyFieldsComplex,
-                // TODO SERVER-122067 remove this field to validate explain.
-                checkExplain: false,
             });
         });
     });
