@@ -558,12 +558,6 @@ void sanitizeTimeseriesOptions(OperationContext* opCtx,
         metadata.timeseriesBucketsMayHaveMixedSchemaData =
             metadata._durableTimeseriesBucketsMayHaveMixedSchemaData;
     }
-
-    // If present, reuse storageEngine options to work around the issue described in SERVER-91193.
-    metadata._durableTimeseriesBucketingParametersHaveChanged =
-        storageEngine->getFlagFromStorageOptions(
-            metadata.options.storageEngine,
-            backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
 }
 
 }  // namespace mongo::durable_catalog

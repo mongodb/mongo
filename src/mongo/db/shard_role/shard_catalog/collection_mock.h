@@ -204,15 +204,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<bool> timeseriesBucketingParametersHaveChanged() const override {
-        MONGO_UNREACHABLE;
-    }
-
-    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
-                                                 boost::optional<bool> value) override {
-        MONGO_UNREACHABLE;
-    }
-
     bool shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged() const final {
         MONGO_UNREACHABLE;
     }

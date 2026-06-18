@@ -51,10 +51,9 @@ namespace collection_validation {
 
 class ValidateState;
 
-inline constexpr char kTimeseriesBucketingParametersChangedInconsistencyReason[] =
-    "A time series bucketing parameter was changed in this collection but "
-    "timeseriesBucketingParametersChanged is not true. For more info, see logs with log id "
-    "9175400.";
+inline constexpr char kTimeseriesFixedBucketingInconsistencyReason[] =
+    "A time series bucketing parameter was changed in this collection but fixedBucketing is true. "
+    "For more info, see logs with log id 9175400.";
 inline constexpr char kMalformedMinMaxTimeseriesBucket[] =
     "Detected a time-series bucket with malformed min/max values";
 inline constexpr char kExpectedMixedSchemaTimeseriesWarning[] =
@@ -129,16 +128,15 @@ TimeseriesValidationStatus validateTimeseriesDataFieldTypes(const BSONElement& d
                                                             int bucketVersion);
 
 /**
- * Checks that only buckets that have timeSeriesBucketingParameters flag set have changed
- * bucket parameters.
+ * Checks that the bucket's timestamps are consistent with the current bucketing parameters when
+ * the collection has fixedBucketing=true (i.e., no bucketing parameter change has ever occurred).
  */
-TimeseriesValidationStatus validateTimeseriesBucketingParametersChanged(
+TimeseriesValidationStatus validateTimeseriesFixedBucketingConsistency(
     const CollectionPtr& coll,
     timeseries::bucket_catalog::MinMax& minmax,
     const BSONElement& controlMin,
     StringData fieldName,
-    ValidateResults& results,
-    int version);
+    ValidateResults& results);
 
 /**
  * Checks whether the min and max values between 'control' and 'data' match, taking timestamp

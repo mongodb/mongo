@@ -4,7 +4,6 @@
  * the format introduced under SERVER-91195 (relying on storageEngine.wiredTiger.configString).
  */
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -41,12 +40,7 @@ assert.commandWorked(
 );
 
 // Double check that options have been correctly applied on the primary node
-const expectedAppMetadata = FeatureFlagUtil.isPresentAndEnabled(
-    primaryDb(),
-    "TSBucketingParametersUnchanged",
-)
-    ? "app_metadata=(timeseriesBucketingParametersHaveChanged=true,timeseriesBucketsMayHaveMixedSchemaData=true)"
-    : "app_metadata=(timeseriesBucketsMayHaveMixedSchemaData=true)";
+const expectedAppMetadata = "app_metadata=(timeseriesBucketsMayHaveMixedSchemaData=true)";
 
 const configStringAfterCollMod = primaryDb().runCommand({
     listCollections: 1,

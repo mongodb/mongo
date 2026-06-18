@@ -459,17 +459,6 @@ public:
     virtual void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                             boost::optional<bool> setting) = 0;
 
-    virtual boost::optional<bool> timeseriesBucketingParametersHaveChanged() const = 0;
-
-    /**
-     * Sets the 'timeseriesBucketingParametersHaveChanged' catalog entry flag to 'value' for this
-     * collection.
-     *
-     * Throws if this is not a time-series collection.
-     */
-    virtual void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
-                                                         boost::optional<bool> value) = 0;
-
     /**
      * Used to remove the legacy `md.timeseriesBucketingParametersHaveChanged` catalog field
      * during FCV upgrade.

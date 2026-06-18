@@ -66,6 +66,7 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/validate/validate_results.h"
+#include "mongo/db/validate/validate_timeseries.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1449,6 +1450,27 @@ TEST_F(TimeseriesCollectionValidationTest, ReportInvalidBSONColumnReason) {
     ASSERT_EQ(results.size(), 1U);
     ASSERT_THAT(*results.front().getErrors().begin(),
                 ::testing::HasSubstr("Invalid BSONColumn encoding"));
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationFixedBucketingInconsistency) {
+    unittest::ServerParameterGuard fixedBucketingCatalogController(
+        "featureFlagFixedBucketingCatalog", true);
+
+    // Collection has fixedBucketing=true and hours granularity. The sample doc has
+    // control.min.date=2021-12-18T15:55:00Z. Under hours granularity a bucket opened for
+    // this timestamp would have control.min=15:00:00, but 15:55:00 implies it was created
+    // under finer granularity, contradicting fixedBucketing=true.
+    _options.timeseries->setGranularity(BucketGranularityEnum::Hours);
+    _options.timeseries->setBucketRoundingSeconds(3600);
+    _options.timeseries->setBucketMaxSpanSeconds(3600);
+    _options.timeseries->setFixedBucketing(true);
+
+    insertDoc(getSampleDoc());
+
+    auto results = foregroundValidate(
+        _nss, _opCtx, {.valid = false, .numRecords = 1, .numErrors = 1}, {_validateMode});
+    ASSERT(results[0].getErrors().count(
+        std::string{collection_validation::kTimeseriesFixedBucketingInconsistencyReason}));
 }
 
 }  // namespace

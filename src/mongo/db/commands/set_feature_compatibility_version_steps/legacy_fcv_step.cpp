@@ -921,28 +921,6 @@ private:
                                            FCV requestedVersion) final {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         if (!role || role->has(ClusterRole::None) || role->has(ClusterRole::ShardServer)) {
-            if (feature_flags::gTSBucketingParametersUnchanged
-                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                  originalVersion)) {
-                catalog::modifyAllCollectionsMatching(
-                    opCtx,
-                    [&](const Collection* collection) {
-                        // To remove timeseries bucketing parameters from persistent
-                        // storage, issue the "collMod" command with none of the parameters
-                        // set.
-                        BSONObjBuilder responseBuilder;
-                        uassertStatusOK(processCollModCommandWithNestedCurOp(
-                            opCtx, collection->ns(), CollMod{collection->ns()}, &responseBuilder));
-                    },
-                    [&](const Collection* collection) {
-                        // Only remove the catalog entry flag if it exists. It could've been
-                        // removed if the downgrade process was interrupted and is being run
-                        // again. The downgrade process cannot be aborted at this point.
-                        return collection->getTimeseriesOptions() != boost::none &&
-                            collection->timeseriesBucketingParametersHaveChanged();
-                    });
-            }
-
             maybeModifyDataOnDowngradeForTest(opCtx, requestedVersion, originalVersion);
         }
 

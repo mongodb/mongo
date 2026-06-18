@@ -235,11 +235,6 @@ public:
     void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                     boost::optional<bool> setting) final;
 
-    boost::optional<bool> timeseriesBucketingParametersHaveChanged() const final;
-
-    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
-                                                 boost::optional<bool> value) final;
-
     bool shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged() const final;
     void removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) final;
 

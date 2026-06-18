@@ -262,20 +262,18 @@ TimeseriesValidationStatus validateTimeseriesDataFieldTypes(const BSONElement& d
     return {TimeseriesValidationResult::kValid, ""};
 }
 
-
 /*
- * Checks that only buckets that have timeSeriesBucketingParameters flag set have changed
- * bucket parameters.
+ * Checks that the bucket's timestamps are consistent with the current bucketing parameters when
+ * the collection has fixedBucketing=true (i.e., no bucketing parameter change has ever occurred).
  */
-TimeseriesValidationStatus validateTimeseriesBucketingParametersChanged(
+TimeseriesValidationStatus validateTimeseriesFixedBucketingConsistency(
     const CollectionPtr& coll,
     timeseries::bucket_catalog::MinMax& minmax,
     const BSONElement& controlMin,
     StringData fieldName,
-    ValidateResults& results,
-    int version) {
-    const bool timeseriesBucketingParametersHaveChanged =
-        coll->timeseriesBucketingParametersHaveChanged().value_or(true);
+    ValidateResults& results) {
+    const bool fixedBucketing =
+        coll->getTimeseriesOptions().value().getFixedBucketing().value_or(false);
 
     const auto min = minmax.min();
 
@@ -286,8 +284,8 @@ TimeseriesValidationStatus validateTimeseriesBucketingParametersChanged(
         return roundedDownTimeStamp < controlMin.Date();
     };
 
-    if (checkTimeSeriesBucketingParametersChanged() && !timeseriesBucketingParametersHaveChanged &&
-        results.addError(kTimeseriesBucketingParametersChangedInconsistencyReason)) {
+    if (fixedBucketing && checkTimeSeriesBucketingParametersChanged() &&
+        results.addError(kTimeseriesFixedBucketingInconsistencyReason)) {
         // Get the original timeseries bucketing parameters.
         auto originalTimeseriesOptions = coll->getTimeseriesOptions();
         invariant(originalTimeseriesOptions != boost::none);
@@ -467,8 +465,8 @@ TimeseriesValidationStatus validateTimeSeriesDataTimeField(const CollectionPtr& 
         status.result != TimeseriesValidationResult::kValid) {
         return status;
     }
-    if (auto status = validateTimeseriesBucketingParametersChanged(
-            coll, minmax, controlMin, fieldName, results, version);
+    if (auto status = validateTimeseriesFixedBucketingConsistency(
+            coll, minmax, controlMin, fieldName, results);
         status.result != TimeseriesValidationResult::kValid) {
         return status;
     }

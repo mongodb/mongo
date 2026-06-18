@@ -36,6 +36,11 @@ assert.commandWorked(
 
 // Upgrade the replica set to the latest FCV and verify that the flag is removed
 rst.stopSet(null /* signal */, true /* forRestart */);
+// featureFlagTSBucketingParametersUnchanged was removed from the latest binary; delete it from
+// fullOptions so ReplSetTest does not forward it to the restarted nodes.
+for (const node of rst.nodes) {
+    delete node.fullOptions.setParameter.featureFlagTSBucketingParametersUnchanged;
+}
 rst.startSet({binVersion: "latest"}, true /* restart */);
 
 const db = rst.getPrimary().getDB(dbName);

@@ -351,12 +351,9 @@ public:
     CollModTimestampedTest() : CollModTest(Options{}.forceDisableTableLogging()) {}
 };
 
-// Regression test for SERVER-104640. Test that the MixedSchema and BucketingParametersHaveChanged
-// timeseries flags can be read at a point-in-time from the collection catalog.
+// Regression test for SERVER-104640. Test that the MixedSchema timeseries flag can be read at a
+// point-in-time from the collection catalog.
 TEST_F(CollModTimestampedTest, CollModTimeseriesMixedSchemaFlagPointInTimeLookup) {
-    unittest::ServerParameterGuard featureFlagController(
-        "featureFlagTSBucketingParametersUnchanged", true);
-
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
 
     auto opCtx = makeOpCtx();
@@ -388,7 +385,6 @@ TEST_F(CollModTimestampedTest, CollModTimeseriesMixedSchemaFlagPointInTimeLookup
                         .mustConsiderMixedSchemaBucketsInReads());
         ASSERT_TRUE(
             collAfter->getTimeseriesMixedSchemaBucketsState().canStoreMixedSchemaBucketsSafely());
-        ASSERT_EQ(true, collAfter->timeseriesBucketingParametersHaveChanged());
     }
 
     // Check the collection at a timestamp before the collMod
@@ -400,7 +396,6 @@ TEST_F(CollModTimestampedTest, CollModTimeseriesMixedSchemaFlagPointInTimeLookup
                          .mustConsiderMixedSchemaBucketsInReads());
         ASSERT_FALSE(
             collBefore->getTimeseriesMixedSchemaBucketsState().canStoreMixedSchemaBucketsSafely());
-        ASSERT_NE(true, collBefore->timeseriesBucketingParametersHaveChanged());
     }
 }
 

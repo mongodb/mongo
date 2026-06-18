@@ -15,7 +15,6 @@
 - featureFlagAllMongodsAreSharded
 - featureFlagGRPC
 - featureFlagSearchInSbe
-- featureFlagTSBucketingParametersUnchanged
 # TODO SERVER-96993: re-enable 'featureFlagFixedBucketingOptimizations'.
 - featureFlagFixedBucketingOptimizations
 - featureFlagGaplessFTDC

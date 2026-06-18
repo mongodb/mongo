@@ -187,8 +187,8 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModViewTranslationInvalidMod) {
 
 // Check that timeseries options are correctly translated to a new CollMod.
 TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
-    unittest::ServerParameterGuard featureFlagController(
-        "featureFlagTSBucketingParametersUnchanged", true);
+    unittest::ServerParameterGuard fixedBucketingCatalogController(
+        "featureFlagFixedBucketingCatalog", true);
 
     auto collModTimeseries = CollModTimeseries();
     // Create a command that requires timeseries translation.
@@ -203,12 +203,27 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
     CreateCommand cmd = CreateCommand(testNss);
     cmd.getCreateCollectionRequest().setTimeseries(std::move(timeseriesOptions));
     uassertStatusOK(createCollection(_opCtx, cmd));
+    {
+        // Ensure the collection has fixedBucketing set to true.
+        const auto collectionAcquisition = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest(_resolveTimeseriesNss(testNss),
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        ASSERT_TRUE(collectionAcquisition.exists());
+        ASSERT_TRUE(
+            collectionAcquisition.getCollectionPtr()->getTimeseriesOptions()->getFixedBucketing());
+    }
 
     auto status = timeseries::processCollModCommandWithTimeSeriesTranslation(
         _opCtx, testNss, collModCmd, false, nullptr);
 
     ASSERT_OK(status);
-    // Editing timeseries options sets a flag in the collection that we can check.
+    // Verify the timeseries options were translated: a granularity of minutes yields a
+    // bucketMaxSpanSeconds of 86400, and fixedBucketing is forced to false because the bucketing
+    // parameters changed.
     auto resolvedNss = _resolveTimeseriesNss(testNss);
     {
         const auto collectionAcquisition = acquireCollection(
@@ -218,10 +233,13 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
-        // Assert the bucketing parameters have changed on the collection.
         ASSERT_TRUE(collectionAcquisition.exists());
-        EXPECT_TRUE(
-            *collectionAcquisition.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+        const auto& tsOpts = collectionAcquisition.getCollectionPtr()->getTimeseriesOptions();
+        ASSERT_TRUE(tsOpts.has_value());
+        EXPECT_EQ(BucketGranularityEnum::Minutes, *tsOpts->getGranularity());
+        EXPECT_EQ(86400, *tsOpts->getBucketMaxSpanSeconds());
+        // Bucketing parameters changed: fixedBucketing must be explicitly set to 'false'.
+        EXPECT_EQ(false, tsOpts->getFixedBucketing().value_or(true));
     }
     _addNsToValidate(testNss);
 }
@@ -229,8 +247,6 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
 // If timeseries translation and view translation are both required, both should be executed.
 // TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndView) {
-    unittest::ServerParameterGuard featureFlagController(
-        "featureFlagTSBucketingParametersUnchanged", true);
     unittest::ServerParameterGuard viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
@@ -268,7 +284,8 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndV
 
     // View translation is successful if this function returns OK.
     ASSERT_OK(status);
-    // Editing timeseries options sets a flag in the collection that we can check.
+    // Verify the timeseries options were translated: a granularity of minutes yields a
+    // bucketMaxSpanSeconds of 86400.
     auto bucketsColl =
         NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
     {
@@ -279,10 +296,12 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndV
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
-        // Assert the bucketing parameters have changed on the collection.
         ASSERT_TRUE(collectionAcquisition.exists());
-        EXPECT_TRUE(
-            *collectionAcquisition.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+        const auto& tsOpts = collectionAcquisition.getCollectionPtr()->getTimeseriesOptions();
+        ASSERT_TRUE(tsOpts.has_value());
+        EXPECT_EQ(BucketGranularityEnum::Minutes, *tsOpts->getGranularity());
+        EXPECT_EQ(86400, *tsOpts->getBucketMaxSpanSeconds());
+        EXPECT_FALSE(tsOpts->getFixedBucketing().has_value());
     }
     _addNsToValidate(testNss);
 }

@@ -276,62 +276,6 @@ public:
 
 MONGO_REGISTER_COMMAND(DurableHistoryReplicatedTestCmd).testOnly().forShard();
 
-// TODO SERVER-80003 remove this test command when 8.0 branches off.
-class TimeseriesCatalogBucketParamsChangedTestCmd : public BasicCommand {
-public:
-    TimeseriesCatalogBucketParamsChangedTestCmd()
-        : BasicCommand("timeseriesCatalogBucketParamsChanged") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    bool adminOnly() const override {
-        return false;
-    }
-
-    bool requiresAuth() const override {
-        return false;
-    }
-
-    // No auth needed because it only works when enabled via command line.
-    Status checkAuthForOperation(OperationContext*,
-                                 const DatabaseName&,
-                                 const BSONObj&) const override {
-        return Status::OK();
-    }
-
-    bool requiresAuthzChecks() const override {
-        return false;
-    }
-
-    std::string help() const override {
-        return "return the value of timeseriesCatalogBucketParamsChanged";
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
-        const auto coll = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, fullNs, AcquisitionPrerequisites::kRead),
-            MODE_IS);
-        uassert(7927100, "Could not find a collection with the requested namespace", coll.exists());
-        auto output = coll.getCollectionPtr()->timeseriesBucketingParametersHaveChanged();
-        if (output) {
-            result.append("changed", *output);
-        }
-        return true;
-    }
-};
-
-MONGO_REGISTER_COMMAND(TimeseriesCatalogBucketParamsChangedTestCmd).testOnly().forShard();
 
 // TODO SERVER-110189: Make testing this command resilient to releases or update the name of this
 // command.

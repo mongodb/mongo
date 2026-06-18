@@ -124,7 +124,6 @@ namespace {
 // This fail point allows collections to be given malformed validator. A malformed validator
 // will not (and cannot) be enforced but it will be persisted.
 MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
-MONGO_FAIL_POINT_DEFINE(timeseriesBucketingParametersChangedInputValue);
 MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 // Simulate the behavior of mixed-schema flag of MongoDB versions without SERVER-91195:
 // Only set the legacy time-series mixed-schema flag at the top level of the catalog,
@@ -851,43 +850,6 @@ timeseries::MixedSchemaBucketsState CollectionImpl::getTimeseriesMixedSchemaBuck
     invariant(!_metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData.value_or(true) ||
               !_metadata->timeseriesBucketsMayHaveMixedSchemaData.value_or(true));
     return timeseries::MixedSchemaBucketsState::NoMixedSchemaBuckets;
-}
-
-boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged() const {
-    if (!getTimeseriesOptions()) {
-        return boost::none;
-    }
-
-    if (auto sfp = timeseriesBucketingParametersChangedInputValue.scoped();
-        MONGO_unlikely(sfp.isActive())) {
-        const auto& data = sfp.getData();
-        return data["value"].Bool();
-    }
-
-    // Offline validation doesn't initialize FCV in order to validate older MongoDB instances
-    // TODO(SERVER-96993) Re-evaluate if true makes sense as default for older versions
-    if (storageGlobalParams.validate) {
-        return true;
-    }
-
-    return _metadata->_durableTimeseriesBucketingParametersHaveChanged;
-}
-
-void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
-                                                             boost::optional<bool> value) {
-    tassert(7625800, "This is not a time-series collection", _metadata->options.timeseries);
-
-    // TODO SERVER-92265 properly set this catalog option
-    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-
-        // Reuse storageEngine options to work around the issue described in SERVER-91193
-        md._durableTimeseriesBucketingParametersHaveChanged = value;
-        md.options.storageEngine = storageEngine->setFlagToStorageOptions(
-            md.options.storageEngine,
-            backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged,
-            value);
-    });
 }
 
 bool CollectionImpl::shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged() const {

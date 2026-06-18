@@ -470,7 +470,6 @@ const allCommands = {
     testReshardCloneCollection: {skip: isNotAUserDataRead},
     testVersions1And2: {skip: isNotAUserDataRead},
     testVersion2: {skip: isNotAUserDataRead},
-    timeseriesCatalogBucketParamsChanged: {skip: isAnInternalCommand},
     upgradeDowngradeViewlessTimeseries: {skip: isAnInternalCommand},
     top: {skip: isNotAUserDataRead},
     transitionToShardedCluster: {skip: isNotAUserDataRead},

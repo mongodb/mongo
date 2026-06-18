@@ -207,7 +207,7 @@ resmoke_suite_test(
         "//jstests/noPassthrough/timeseries/updates_deletes:timeseries_update_oplog.js",
         "//jstests/noPassthrough/timeseries/validate:validate_compressed_bucket_with_time_out_of_order.js",
         "//jstests/noPassthrough/timeseries/validate:validate_timeseries_bucket_max_span.js",
-        "//jstests/noPassthrough/timeseries/validate:validate_timeseries_bucketing_parameters_change.js",
+        "//jstests/noPassthrough/timeseries/validate:validate_timeseries_fixed_bucketing.js",
         "//jstests/noPassthrough/timeseries/validate:validate_timeseries_id_timestamp.js",
         "//jstests/noPassthrough/timeseries/validate:validate_timeseries_minmax.js",
         "//jstests/noPassthrough/timeseries/validate:validate_timeseries_version.js",

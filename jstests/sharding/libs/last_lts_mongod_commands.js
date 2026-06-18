@@ -40,6 +40,7 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "setChangeStreamState", // Removed in v8.3
     "_configsvrCleanupReshardCollection",
     "_shardsvrCleanupReshardCollection",
+    "timeseriesCatalogBucketParamsChanged", // Removed in 9.0
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the

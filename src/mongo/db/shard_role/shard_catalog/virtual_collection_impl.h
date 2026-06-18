@@ -287,16 +287,6 @@ public:
         return false;
     }
 
-    boost::optional<bool> timeseriesBucketingParametersHaveChanged() const final {
-        unimplementedTasserted();
-        return false;
-    }
-
-    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
-                                                 boost::optional<bool> value) final {
-        unimplementedTasserted();
-    }
-
     bool shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged() const final {
         unimplementedTasserted();
         return false;

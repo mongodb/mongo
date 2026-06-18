@@ -53,9 +53,6 @@ namespace MONGO_MOD_NEEDS_REPLACEMENT backwards_compatible_collection_options {
 
 constexpr inline auto kTimeseriesBucketsMayHaveMixedSchemaData =
     "timeseriesBucketsMayHaveMixedSchemaData"_sd;
-constexpr inline auto kTimeseriesBucketingParametersHaveChanged =
-    "timeseriesBucketingParametersHaveChanged"_sd;
-
 constexpr inline auto additionalCollModO2Field = "backwardsIncompatibleCollModParameters"_sd;
 
 /**

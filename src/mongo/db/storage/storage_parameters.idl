@@ -278,11 +278,6 @@ feature_flags:
         cpp_varname: feature_flags::gTimeseriesUpdatesSupport
         default: false
         fcv_gated: true
-    featureFlagTSBucketingParametersUnchanged:
-        description: "Enable storing the 'timeseriesBucketingParametersHaveChanged' parameter on disk"
-        cpp_varname: feature_flags::gTSBucketingParametersUnchanged
-        default: false
-        fcv_gated: true
     featureFlagReplicateLocalCatalogIdentifiers:
         description: >-
             Enable replication of local catalog identifiers across replica set nodes, ensuring the

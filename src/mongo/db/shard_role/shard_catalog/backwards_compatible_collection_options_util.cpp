@@ -45,7 +45,6 @@ namespace {
  */
 const StringDataSet kBackwardsCompatibleCollectionOptions{
     kTimeseriesBucketsMayHaveMixedSchemaData,
-    kTimeseriesBucketingParametersHaveChanged,
 };
 }  // namespace
 
