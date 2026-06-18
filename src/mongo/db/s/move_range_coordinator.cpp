@@ -142,6 +142,11 @@ ExecutorFuture<void> MoveRangeCoordinator::_acquireLocksAsync(
 }
 
 void MoveRangeCoordinator::_releaseLocks(OperationContext*) {
+    // Destroy the MigrationSourceManager before releasing the ActiveMigrationsRegistry gate.
+    // Otherwise a subsequent migration on the same namespace could acquire the gate and construct a
+    // second MigrationSourceManager while this one is still registered, tripping the invariant in
+    // MigrationSourceManager::ScopedRegisterer.
+    _migrationAttempt.reset();
     _scopedDonateChunk.reset();
 }
 
