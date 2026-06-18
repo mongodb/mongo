@@ -55,6 +55,13 @@ statistics. As one example, you can find the [`FindKey`](find_key.h) which will 
 things tracked in the `FindCmdQueryStatsStoreKeyComponents` (including `batchSize` shown in this
 example).
 
+Write commands have their own keys as well. The [`DeleteKey`](delete_key.h) wraps the base `Key`
+class and a [`DeleteCmdShape`](../query_shape/delete_cmd_shape.h), and adds the
+`DeleteCmdComponents` for delete-specific dimensions (`ordered` and `bypassDocumentValidation`).
+Similarly, the [`UpdateKey`](update_key.h) and [`InsertKey`](insert_key.h) capture the dimensions
+specific to update and insert commands. See [Write Commands](#write-commands) below for how these
+keys are registered.
+
 ### Query Stats Store Cache Size
 
 The size of the`QueryStatsStore` can be set by the server parameter
@@ -232,6 +239,37 @@ Window-based policy limits the number of recordings per second, whereas sample-b
 the fraction of queries to be recorded. If a query is run but the rate limiter decides not to record
 it, the query will still execute as expected but query stats will not be updated in the query stats
 store. See details [here](rate_limiting.h).
+
+### Write Commands
+
+Query stats are also collected for the write commands (`update`, `delete`, and `insert`). Unlike the
+read commands, which register through `registerRequest` during planning, write commands register
+through [`registerWriteRequest`][register write request] from the write execution path (see
+`write_ops_exec.cpp`).
+
+A few considerations are specific to write commands:
+
+- **No cursors / getMores.** Write commands do not return a cursor, so there is no accumulation
+  across `getMore`s. Metrics are captured once when the command completes. Consequently
+  `queryExec.docsReturned` is always zero for writes, and the write-specific counts are reported
+  under the [`writes`](#metrics-reference) section of the metrics (e.g. `nDeleted`, `nDeleteOps` for
+  deletes; `nModified`, `nMatched`, `nUpserted`, `nUpdateOps` for updates).
+- **Batches.** A single client write command may carry a batch of multiple statements. How those
+  statements map to query stats differs between `update`/`delete` and `insert`:
+
+  - **Update and delete** register and record _per statement_, not per command. Each op-entry in the
+    batch has its own `q` filter, which drives an independent query shape and query plan, so every
+    statement makes its own `registerWriteRequest` call and passes through the
+    [rate limiter](#rate-limiting) on its own — some statements in a batch may be sampled for query
+    stats while others in the same command are not. Each sampled statement then collects its metrics
+    separately and is recorded as its own execution observation. The `nDeleteOps`/`nUpdateOps` field
+    still records the size of the full client batch on each statement's observation.
+
+  - **Insert** registers and records _per command_. All documents in an insert batch share the same
+    command shape — there is no per-document filter — so `registerWriteRequest` is called once
+    before the batch loop and metrics are collected once after it. As a result either the entire
+    command is sampled or none of it is, and the `nInserted` metric reflects the total number of
+    documents written by the command.
 
 ### Explain
 
@@ -570,6 +608,8 @@ output one document per query stats key - output in the "key" field.
   https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.cpp#L173-179
 [register request]:
   https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L196-L199
+[register write request]:
+  https://github.com/mongodb/mongo/blob/d00dff4bd4e356d0d45fe672583fca3c8a01d823/src/mongo/db/query/query_stats/query_stats.h#L191-L208
 [write query stats]:
   https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L253-L258
 [write query stats comments]:

@@ -22,12 +22,19 @@ db.example.findOne({x: "string"});
 While different literal _values_ result in the same shape (matching `x` for 23 vs 53), different
 BSON _types_ of the literal are considered distinct shapes (matching `x` for 53 vs "string").
 
-The concept of a query shape exists not just for the find command, but for many of the CRUD commands
-(distinct, count, and aggregate). It also includes most (but not all) components of these commands,
-not just the query predicate (MatchExpression). In these ways, "query" is meant more generally.
-While some components included in the query shape are shared across the different types of commands
-(e.g., the "hint" field), some are unique. For example, a find command would include a `filter`
-while an aggregate command would have a `pipeline`.
+The concept of a query shape exists not just for the find command, but for many of the CRUD
+commands. This includes the read commands (distinct, count, and aggregate) as well as the write
+commands (update, delete, and insert). It also includes most (but not all) components of these
+commands, not just the query predicate (MatchExpression). In these ways, "query" is meant more
+generally. While some components included in the query shape are shared across the different types
+of commands (e.g., the "hint" field), some are unique. For example, a find command would include a
+`filter` while an aggregate command would have a `pipeline`. The update and delete commands shapify
+their filter like a read command does, but also include their own write-specific components. For
+example, a delete shape includes the `multi` flag (whether the delete may remove more than one
+document), and an update shape includes its update modification and `multi`/`upsert` flags. The
+insert command has no query predicate, so its shape is just the collection name plus the `documents`
+field, which is always shapified to a fixed placeholder (`?array<?object>`); all other insert fields
+are excluded.
 
 You can see which components are considered part of the query shape or not for each specific shape
 type in their respective "shape component" classes, whose purpose is to determine which components
@@ -42,16 +49,20 @@ The structure is as follows:
   - [`CountCmdShapeComponents`](count_cmd_shape.h)
   - [`DistinctCmdShapeComponents`](distinct_cmd_shape.h)
   - [`FindCmdShapeComponents`](find_cmd_shape.h)
+  - [`DeleteCmdShapeComponents`](delete_cmd_shape.h)
+  - [`InsertCmdShapeComponents`](insert_cmd_shape.h)
   - [`LetShapeComponent`](let_shape_component.h)
-  - [`UpdateShapeComponent`](update_cmd_shape.h)
+  - [`UpdateCmdShapeComponents`](update_cmd_shape.h)
 
 See more information for the different shapes in their respective classes, structured as follows:
 
 - [`Shape`](query_shape.h)
   - [`AggCmdShape`](agg_cmd_shape.h)
   - [`CountCmdShape`](count_cmd_shape.h)
+  - [`DeleteCmdShape`](delete_cmd_shape.h)
   - [`DistinctCmdShape`](distinct_cmd_shape.h)
   - [`FindCmdShape`](find_cmd_shape.h)
+  - [`InsertCmdShape`](insert_cmd_shape.h)
   - [`UpdateCmdShape`](update_cmd_shape.h)
 
 ## Serialization Options
