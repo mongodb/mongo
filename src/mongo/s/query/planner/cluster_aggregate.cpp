@@ -165,6 +165,14 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     req.setReadConcern(std::move(readConcern));
     req.setWriteConcern(std::move(writeConcern));
     req.setRawData(rawData);
+
+    // If the wire RC has no level, fall back to opCtx so the dispatcher's CWRC-merged RC
+    // reaches the shard. Otherwise keep the wire RC untouched (master semantics).
+    // TODO(SERVER-127620): unconditionally source RC from opCtx once every caller routes RC there.
+    if (!req.getReadConcern() || !req.getReadConcern()->hasLevel()) {
+        req.setReadConcern(repl::ReadConcernArgs::get(expCtx->getOperationContext()));
+    }
+
     aggregation_request_helper::addQuerySettingsToRequest(req, expCtx);
 
     // Pass the queryShapeHash to the shards. We must validate that all participating shards can
