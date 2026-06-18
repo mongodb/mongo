@@ -234,5 +234,35 @@ TEST_F(InsertCmdShapeTest, ShapeComponentsSizeDoesNotVaryWithDocumentSize) {
               static_cast<const InsertCmdShapeComponents&>(shape2.specificComponents()).size());
 }
 
+// Verifies that "insert" command shape hash value is stable (doesn't change between
+// the versions of the server).
+TEST_F(InsertCmdShapeTest, StableQueryShapeHashValue) {
+    auto hash = makeShapeHash(R"({
+        insert: "testcoll",
+        documents: [ { x: 1 } ],
+        "$db": "testdb"
+    })");
+
+    std::string expectedHash = "AC5B6ED44B30138504E115AEFAF6126598B912F96CE6F3AF75943205260DE0AC";
+    ASSERT_EQ(expectedHash, hash.toHexString());
+
+    // Changing the documents should not change the hash.
+    hash = makeShapeHash(R"({
+        insert: "testcoll",
+        documents: [ { x: 1 }, { y: 1 }, { z: 1 } ],
+        "$db": "testdb"
+    })");
+    ASSERT_EQ(expectedHash, hash.toHexString());
+
+    // Changing the collection should change the hash.
+    hash = makeShapeHash(R"({
+        insert: "testcoll2",
+        documents: [ { x: 1 } ],
+        "$db": "testdb"
+    })");
+    expectedHash = "7D1781C3B954CFED13EC6E3114688A2D7397FA5E6ED9F3EB083C97CB3BDC7B11";
+    ASSERT_EQ(expectedHash, hash.toHexString());
+}
+
 }  // namespace
 }  // namespace mongo::query_shape

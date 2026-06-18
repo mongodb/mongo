@@ -55,4 +55,24 @@ void InsertCmdShape::appendCmdSpecificShapeComponents(
     _components.appendTo(bob, opts);
 }
 
+QueryShapeHash InsertCmdShape::sha256Hash(OperationContext*, const SerializationContext&) const {
+    // Allocate a buffer on the stack for serialization of parts of the "insert" command shape.
+    constexpr std::size_t bufferSizeOnStack = 256;
+    StackBufBuilderBase<bufferSizeOnStack> insertCommandShapeBuffer;
+
+    tassert(12205900,
+            "nssOrUUID for an insert must be a namespace string",
+            nssOrUUID.isNamespaceString());
+    auto nssDataRange = nssOrUUID.asDataRange();
+
+    // Write the two relevant "insert" shape parts to the buffer ("insert" and namespace). The
+    // documents field is not included in the hash, as it is always shapified as the same
+    // placeholder array and thus, doesn't provide any value in differentiating insert query shapes.
+    insertCommandShapeBuffer.appendStrBytes(write_ops::InsertCommandRequest::kCommandName);
+    insertCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
+
+    return SHA256Block::computeHash({ConstDataRange{
+        insertCommandShapeBuffer.buf(), static_cast<std::size_t>(insertCommandShapeBuffer.len())}});
+}
+
 }  // namespace mongo::query_shape

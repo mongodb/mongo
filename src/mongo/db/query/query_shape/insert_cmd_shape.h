@@ -67,6 +67,9 @@ public:
         return _components;
     }
 
+    QueryShapeHash sha256Hash(OperationContext* opCtx,
+                              const SerializationContext& serializationContext) const override;
+
 protected:
     void appendCmdSpecificShapeComponents(
         BSONObjBuilder& bob,
