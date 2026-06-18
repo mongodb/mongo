@@ -179,7 +179,6 @@ function runShardLocalTests() {
         "CreateViewlessTimeseriesCollections",
     );
 
-    // TODO SERVER-128263: test collection filtering metadata recovery
     const authoritativeShardsCRUDEnabled = FeatureFlagUtil.isPresentAndEnabled(
         st.s.getDB("admin"),
         "AuthoritativeShardsCRUD",
@@ -223,13 +222,17 @@ function runShardLocalTests() {
                 continue;
             }
             // _flushDatabaseCacheUpdates is deprecated and rejected when AuthoritativeShardsCRUD
-            // is enabled, because shards no longer rely on config.cache.databases in that mode.
+            // is enabled, because shards no longer rely on config.cache.databases in that mode
+            // _flushRoutingTableCacheUpdates triggers legacy non-authoritative refresh behavior
+            // and should not be used in that mode.
             if (
                 authoritativeShardsCRUDEnabled &&
-                testCase.name === "SSCCL database cache refresh"
+                ["SSCCL database cache refresh", "SSCCL collection cache refresh"].includes(
+                    testCase.name,
+                )
             ) {
                 jsTest.log.info(
-                    "Skipping 'SSCCL database cache refresh' because AuthoritativeShardsCRUD is enabled",
+                    `Skipping '${testCase.name}' because AuthoritativeShardsCRUD is enabled`,
                 );
                 continue;
             }
