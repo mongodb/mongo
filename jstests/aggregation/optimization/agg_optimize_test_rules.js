@@ -11,10 +11,6 @@ import {isAggregationPlan} from "jstests/libs/query/analyze_plan.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {configureFailPointForAllShardsAndMongos} from "jstests/libs/fail_point_util.js";
 
-// The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
-// In case of multiple mongos, disable random dispatching of command by enforcing pinToSingleMongos and route against a single mongos.
-TestData.pinToSingleMongos = true;
-
 function setServerParameter(knob, value) {
     setParameterOnAllNonConfigNodes(db.getMongo(), knob, value);
 }

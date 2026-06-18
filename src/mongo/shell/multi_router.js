@@ -215,10 +215,11 @@ function assertIsSupportedCommand(cmd) {
         throwCommandNotSupportedError("getLog", "It targets a specific mongos instance", cmd);
     }
     if (cmd.configureFailPoint) {
-        throwCommandNotSupportedError(
-            "configureFailPoint",
-            "It targets a specific mongos instance",
-            cmd,
+        throw Error(
+            "Command configureFailPoint is not supported with random mongos dispatching given " +
+                "it targets a specific mongos instance. " +
+                "Please either disable mongos dispatching for this test via TestData.pinToSingleMongos = true or helpers from fail_point_util.js to broadcast the failpoint on every mongos. Command: " +
+                tojson(cmd),
         );
     }
 }

@@ -155,15 +155,14 @@ export function configureFailPointForAllShardsAndMongos({
 
     let rootConnections;
     if (isMultiShardedClusterFixture) {
-        const clusterDocs = db
-            .getMongo()
+        const clusterDocs = conn
             .getDB("config")
             .multiShardedClusterFixture.find()
             .sort({_id: 1})
             .toArray();
         rootConnections = clusterDocs.map((doc) => new Mongo(doc.connectionString, undefined));
     } else {
-        rootConnections = [db.getMongo()];
+        rootConnections = [conn];
     }
 
     const hosts = rootConnections.flatMap((rootConn) =>
