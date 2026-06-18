@@ -527,6 +527,11 @@ async def main():
         "Only collects fresh cost estimates via queryPlanner explains, skipping actual "
         "query execution and cold restarts.",
     )
+    parser.add_argument(
+        "--skip-data-generation",
+        action="store_true",
+        help="Reuse the existing join calibration collections instead of regenerating them.",
+    )
     args = parser.parse_args()
 
     cached_times = None
@@ -554,10 +559,26 @@ async def main():
             "internalQueryExplainJoinCostComponents=true",
             "--setParameter",
             "featureFlagPathArrayness=true",
+            "--setParameter",
+            "featureFlagPersistentStats=true",
         ],
     ) as manager:
-        generator = DataGenerator(manager.database, join_data_generator)
-        await generator.populate_collections()
+        if args.skip_data_generation:
+            print("\n=== Reusing existing calibration collections (--skip-data-generation) ===")
+        else:
+            generator = DataGenerator(manager.database, join_data_generator)
+            await generator.populate_collections()
+
+        existing_collections = set(await manager.database.database.list_collection_names())
+        missing_collections = [
+            template.name
+            for template in join_data_generator.collection_templates
+            if template.name not in existing_collections
+        ]
+        if missing_collections:
+            raise SystemExit(
+                f"Missing join calibration collections: {', '.join(missing_collections)}"
+            )
 
         if not args.join_only:
             warm_scan_tuple_ms = await measure_warm_scan_time(manager)

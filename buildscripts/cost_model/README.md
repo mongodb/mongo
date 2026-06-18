@@ -72,17 +72,28 @@ source cm/bin/activate
   (cm) python start.py
   ```
 - For JOO cost model calibration:
+
   ```sh
   (cm) python join_start.py
   ```
+
   To skip the constant calibration (warm scan, CPU, sequential I/O, random I/O) and only run the
   join algorithm comparison:
+
   ```sh
   (cm) python join_start.py --join-only
   ```
+
+  To reuse already generated calibration collections without regenerating them:
+
+  ```sh
+  (cm) python join_start.py --skip-data-generation
+  ```
+
   To iterate quickly on cost model changes, reuse pre-recorded execution times from a previous full
   run. This skips actual query execution, only running `queryPlanner` explains to collect fresh cost
   estimates:
+
   ```sh
   (cm) python join_start.py --execution-times join_output/join_times_in-cache.csv join_output/join_times_exceeds-cache.csv
   ```
