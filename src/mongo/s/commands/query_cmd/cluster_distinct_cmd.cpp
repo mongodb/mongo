@@ -535,13 +535,12 @@ public:
                 long long millisElapsed = timer.millis();
                 const char* mongosStageName =
                     ClusterExplain::getStageNameForReadOp(shardResponses.size(), distinctRequest);
-                uassertStatusOK(
-                    ClusterExplain::buildExplainResult(makeBlankExpressionContext(opCtx, nss),
-                                                       shardResponses,
-                                                       mongosStageName,
-                                                       millisElapsed,
-                                                       unparsedRequest().body,
-                                                       &outputBuilder));
+                uassertStatusOK(ClusterExplain::buildExplainResult(canonicalQuery->getExpCtx(),
+                                                                   shardResponses,
+                                                                   mongosStageName,
+                                                                   millisElapsed,
+                                                                   unparsedRequest().body,
+                                                                   &outputBuilder));
                 return;
             }
 

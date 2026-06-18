@@ -485,11 +485,9 @@ void Explain::explainPipeline(PlanExecutor* exec,
     explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
     explain_common::generateServerInfo(out);
 
-    auto* cq = pipelineExec->getCanonicalQuery();
-    const auto& expCtx = cq
-        ? cq->getExpCtx()
-        : makeBlankExpressionContext(pipelineExec->getOpCtx(), pipelineExec->nss());
+    const auto& expCtx = pipelineExec->getPipeline()->getContext();
     explain_common::generateServerParameters(expCtx, out);
+    explain_common::generateQueryKnobs(expCtx, out);
     explain_common::appendIfRoom(command, "command", out);
 }
 
@@ -537,6 +535,7 @@ void Explain::explainStages(PlanExecutor* exec,
     const auto& expCtx =
         cq ? cq->getExpCtx() : makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
     explain_common::generateServerParameters(expCtx, out);
+    explain_common::generateQueryKnobs(expCtx, out);
 }
 
 void Explain::explainStages(PlanExecutor* exec,

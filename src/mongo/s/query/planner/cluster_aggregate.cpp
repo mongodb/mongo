@@ -930,6 +930,7 @@ Status runAggregateImpl(OperationContext* opCtx,
     if (request.getExplain()) {
         explain_common::generateServerInfo(&result);
         explain_common::generateServerParameters(expCtx, &result);
+        explain_common::generateQueryKnobs(expCtx, &result);
     }
 
     // Here we modify the original 'request' object by copying the query settings from 'expCtx' into
@@ -1172,6 +1173,7 @@ void makeEOFExplainResult(OperationContext* opCtx,
     explain_common::generateQueryShapeHash(opCtx, result);
     explain_common::generateServerInfo(result);
     explain_common::generateServerParameters(expCtx, result);
+    explain_common::generateQueryKnobs(expCtx, result);
     explain_common::appendIfRoom(
         serializeForPassthrough(expCtx, request, namespaces.requestedNss).toBson(),
         "command",

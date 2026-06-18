@@ -56,6 +56,17 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
                               BSONObjBuilder* out);
 
 /**
+ * Adds the 'queryKnobs' explain section to the BSON object being built by 'out'.
+ *
+ * Contains every query knob with a non-default source, keyed by wire name with nested "value" and
+ * "source" fields. setParameter overrides appear with source "setParameter"; QuerySettings
+ * overrides appear with source "querySettings" (even when the value equals the compiled-in
+ * default). Knobs at their default source are omitted. The section is absent entirely when no knob
+ * has been overridden.
+ */
+void generateQueryKnobs(const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONObjBuilder* out);
+
+/**
  * Adds the 'queryShapeHash' value to the BSON object being built by 'out'.
  */
 void generateQueryShapeHash(OperationContext* opCtx, BSONObjBuilder* out);

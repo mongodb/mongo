@@ -96,8 +96,8 @@ const QueryKnobSnapshotCache& QueryKnobSnapshotCache::instance() {
     return **gQueryKnobSnapshotCache;
 }
 
-QueryKnobSnapshotCache::QueryKnobSnapshotCache(QueryKnobSnapshot snapshot)
-    : _snapshot(std::move(snapshot)) {}
+QueryKnobSnapshotCache::QueryKnobSnapshotCache(QueryKnobSnapshot defaults)
+    : _defaults(std::move(defaults)), _snapshot(_defaults) {}
 
 QueryKnobSnapshot QueryKnobSnapshotCache::getSnapshot() const {
     auto readLock = _rwLock.readLock();
@@ -131,12 +131,18 @@ void QueryKnobSnapshotCache::updateKnobValue(QueryKnobId id,
     _version.fetchAndAdd(1);
 }
 
+void QueryKnobSnapshotCache::updateKnobValue(const QueryKnobChange& change) {
+    auto&& [id, value] = change;
+    const bool isDefault = _defaults.getValue(id) == value;
+    updateKnobValue(id, value, isDefault ? KnobSource::kDefault : KnobSource::kSetParameter);
+}
+
 REGISTER_QUERY_KNOBS_LISTENER(QueryKnobSnapshotCacheUpdater, [](const QueryKnobChange& change) {
     static auto* cache = [] {
         invariant(*gQueryKnobSnapshotCache);
         return gQueryKnobSnapshotCache->get();
     }();
-    cache->updateKnobValue(change.id, change.newValue, KnobSource::kSetParameter);
+    cache->updateKnobValue(change);
     return Status::OK();
 })
 

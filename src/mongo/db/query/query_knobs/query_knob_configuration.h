@@ -58,6 +58,15 @@ public:
         return _snapshot.get<T>(knob.id);
     }
 
+    /**
+     * Returns a BSON object containing every registered query knob with a non-default source,
+     * keyed by wire name with nested "value" and "source" fields. Knobs overridden via
+     * setParameter appear with source "setParameter"; knobs applied via QuerySettings appear with
+     * source "querySettings" (even when their value equals the compiled-in default). Knobs at
+     * KnobSource::kDefault are omitted. Returns an empty BSONObj when no knob has been overridden.
+     */
+    BSONObj serializeForExplain() const;
+
     QueryFrameworkControlEnum getInternalQueryFrameworkControlForOp() const;
     QueryPlanRankerModeEnum getPlanRankerMode() const;
     QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum

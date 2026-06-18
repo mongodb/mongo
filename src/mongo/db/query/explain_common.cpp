@@ -32,12 +32,14 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
@@ -94,6 +96,20 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
     serverBob.appendNumber("internalQueryPlannerIgnoreIndexWithCollationForRegex",
                            internalQueryPlannerIgnoreIndexWithCollationForRegex.load());
     serverBob.doneFast();
+}
+
+void generateQueryKnobs(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        BSONObjBuilder* out) {
+    auto* opCtx = expCtx->getOperationContext();
+    if (!feature_flags::gFeatureFlagPqsQueryKnobs.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return;
+    }
+    auto serializedKnobs = expCtx->getQueryKnobConfiguration().serializeForExplain();
+    if (!serializedKnobs.isEmpty()) {
+        appendIfRoom(serializedKnobs, "queryKnobs", out);
+    }
 }
 
 void generateQueryShapeHash(OperationContext* opCtx, BSONObjBuilder* out) {

@@ -446,6 +446,7 @@ void ClusterExplain::buildEOFExplainResult(OperationContext* opCtx,
     explain_common::generateQueryShapeHash(opCtx, out);
     explain_common::generateServerInfo(out);
     explain_common::generateServerParameters(cq->getExpCtx(), out);
+    explain_common::generateQueryKnobs(cq->getExpCtx(), out);
     appendIfRoom(out, command, "command");
 }
 
@@ -471,6 +472,7 @@ Status ClusterExplain::buildExplainResult(
     explain_common::generateQueryShapeHash(expCtx->getOperationContext(), out);
     explain_common::generateServerInfo(out);
     explain_common::generateServerParameters(expCtx, out);
+    explain_common::generateQueryKnobs(expCtx, out);
     appendIfRoom(out, command, "command");
 
     return Status::OK();

@@ -29,8 +29,11 @@
 
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_knob_descriptors_optimization.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 
@@ -38,29 +41,62 @@ namespace mongo {
 
 namespace {
 
+// Source labels emitted for each knob in 'serializeForExplain'.
+constexpr StringData kSetParameterSource = "setParameter"_sd;
+constexpr StringData kQuerySettingsSource = "querySettings"_sd;
+
 /**
  * Returns a new snapshot initialized from the current global knob values, with any supported
  * per-query QuerySettings overrides applied on top.
  */
 QueryKnobSnapshot makeQueryKnobSnapshot(const query_settings::QuerySettings& querySettings) {
     auto snapshot = QueryKnobSnapshotCache::instance().getThreadLocalSnapshot();
-
-    // Apply query settings overrides if needed.
-    if (auto queryFramework = querySettings.getQueryFramework()) {
-        QueryKnobSnapshotBuilder builder(std::move(snapshot));
-        QueryKnobValue queryFrameworkValue(static_cast<int>(*queryFramework));
-        builder.set(query_knobs::kQueryFrameworkControl.id,
-                    std::move(queryFrameworkValue),
-                    KnobSource::kQuerySettings);
-        return std::move(builder).build();
+    const bool hasOverrides = querySettings.getQueryKnobs() || querySettings.getQueryFramework();
+    if (!hasOverrides) {
+        return snapshot;
     }
-
-    return snapshot;
+    QueryKnobSnapshotBuilder builder(std::move(snapshot));
+    if (auto&& knobs = querySettings.getQueryKnobs()) {
+        for (auto&& [id, value] : knobs->entries()) {
+            builder.set(id, value, KnobSource::kQuerySettings);
+        }
+    }
+    // TODO SERVER-129207 Migrate query framework control from QuerySettings to QueryKnobs and
+    // remove this special case.
+    if (auto&& framework = querySettings.getQueryFramework()) {
+        builder.set(query_knobs::kQueryFrameworkControl.id,
+                    QueryKnobValue(static_cast<int>(*framework)),
+                    KnobSource::kQuerySettings);
+    }
+    return std::move(builder).build();
 }
 }  // namespace
 
 QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettings& querySettings)
     : _snapshot(makeQueryKnobSnapshot(querySettings)) {}
+
+BSONObj QueryKnobConfiguration::serializeForExplain() const {
+    BSONObjBuilder bob;
+    auto append = [&](const auto& entry, StringData source) {
+        BSONObjBuilder sub(bob.subobjStart(entry.wireName));
+        entry.toBSON(sub, "value"_sd, _snapshot.getValue(entry.id));
+        sub.append("source"_sd, source);
+    };
+    for (const auto& entry : QueryKnobRegistry::instance().entries()) {
+        switch (_snapshot.getSource(entry.id)) {
+            case KnobSource::kSetParameter:
+                append(entry, kSetParameterSource);
+                break;
+            case KnobSource::kQuerySettings:
+                append(entry, kQuerySettingsSource);
+                break;
+            case KnobSource::kDefault:
+                // Don't include default-valued knobs in the explain output to reduce noise.
+                break;
+        }
+    }
+    return bob.obj();
+}
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
     return get(query_knobs::kQueryFrameworkControl);

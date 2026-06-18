@@ -35,12 +35,15 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_settings/query_knob_overrides.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
@@ -724,6 +727,69 @@ TEST_F(PlanExplainerTest, CBRSamplingMetadataSerializedInExplain) {
     ASSERT(nsMeta.hasField("sampleDocCount")) << nsMeta;
     ASSERT(nsMeta.hasField("sampleRequestedDocCount")) << nsMeta;
     ASSERT(nsMeta.hasField("sampleMemorySizeBytes")) << nsMeta;
+}
+
+TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsNothingWhenFeatureFlagOff) {
+    unittest::ServerParameterGuard flagGuard("featureFlagPqsQueryKnobs", false);
+
+    BSONObjBuilder bob;
+    explain_common::generateQueryKnobs(expCtx, &bob);
+
+    ASSERT_FALSE(bob.asTempObj().hasField("queryKnobs"));
+}
+
+TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsQuerySettingsKnobsWhenFeatureFlagOn) {
+    unittest::ServerParameterGuard flagGuard("featureFlagPqsQueryKnobs", true);
+
+    query_settings::QuerySettings qs;
+    qs.setQueryKnobs(
+        query_settings::QuerySettingsKnobOverrides::fromBSON(BSON("samplingMarginOfError" << 2.5)));
+    auto testExpCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kNss);
+    testExpCtx->setQuerySettings(qs);
+
+    BSONObjBuilder bob;
+    explain_common::generateQueryKnobs(testExpCtx, &bob);
+    auto result = bob.obj();
+
+    ASSERT_TRUE(result.hasField("queryKnobs"));
+    auto knobEntry = result["queryKnobs"]["samplingMarginOfError"].Obj();
+    ASSERT_EQ(knobEntry["source"].String(), "querySettings");
+    ASSERT_EQ(knobEntry["value"].Double(), 2.5);
+}
+
+TEST_F(PlanExplainerTest, GenerateQueryKnobsOmitsKnobsWhenOutputNearlyFull) {
+    unittest::ServerParameterGuard flagGuard("featureFlagPqsQueryKnobs", true);
+
+    query_settings::QuerySettings qs;
+    qs.setQueryKnobs(query_settings::QuerySettingsKnobOverrides::fromBSON(
+        BSON("samplingMarginOfError" << 2.5 << "planRankerMode"
+                                     << "samplingCE")));
+    auto testExpCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kNss);
+    testExpCtx->setQuerySettings(qs);
+
+    int knobsSize = 0;
+    {
+        BSONObjBuilder probe;
+        explain_common::generateQueryKnobs(testExpCtx, &probe);
+        knobsSize = probe.obj()["queryKnobs"].Obj().objsize();
+    }
+
+    // Mirror of the file-internal 'append_if_room::OutputObjectMaxSize' in explain_common.cpp.
+    const int kOutputObjectMaxSize = BSONObjMaxUserSize - 10 * 1024;
+
+    // Almost fill 'out' so the knobs blob no longer fits but the builder stays below the threshold,
+    // leaving room for the truncation warning. 'kFillerOverhead' is what append() adds beyond the
+    // string payload: element type, "filler\0", the string length prefix, and the NUL terminator.
+    BSONObjBuilder out;
+    constexpr int kFillerOverhead = 13;
+    out.append("filler",
+               std::string(kOutputObjectMaxSize - knobsSize - out.len() - kFillerOverhead, 'x'));
+
+    explain_common::generateQueryKnobs(testExpCtx, &out);
+
+    auto result = out.obj();
+    ASSERT_FALSE(result.hasField("queryKnobs"));
+    ASSERT_TRUE(result.hasField("warning"));
 }
 
 }  // namespace
