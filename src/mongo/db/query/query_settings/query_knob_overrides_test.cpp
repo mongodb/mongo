@@ -113,11 +113,87 @@ TEST(QuerySettingsKnobOverridesTest, UnknownKnobThrows) {
                        12194500);
 }
 
-DEATH_TEST_REGEX(QuerySettingsKnobOverridesDeathTest,
-                 ToBSONWithDeleteQueryKnobOverrideTasserts,
-                 "12194502.*DeleteQueryKnobOverride must not survive past simplification") {
+TEST(QuerySettingsKnobOverridesTest, ToBSONSerializesDeleteSentinelAsNull) {
     auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << BSONNULL));
-    overrides.toBSON();
+    ASSERT_BSONOBJ_EQ(overrides.toBSON(), BSON("testIntKnobWire" << BSONNULL));
+}
+
+TEST(QuerySettingsKnobOverridesTest, MergeEmptyWithEmpty) {
+    auto result = QuerySettingsKnobOverrides::merge({}, {});
+    ASSERT_TRUE(result.empty());
+}
+
+TEST(QuerySettingsKnobOverridesTest, MergeAddsNewKnob) {
+    auto lhs = QuerySettingsKnobOverrides::fromBSON(BSONObj{});
+    auto rhs = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 7));
+    auto result = QuerySettingsKnobOverrides::merge(lhs, rhs);
+    ASSERT_BSONOBJ_EQ(result.toBSON(), rhs.toBSON());
+}
+
+TEST(QuerySettingsKnobOverridesTest, MergeUpdatesExistingKnob) {
+    auto lhs = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 1));
+    auto rhs = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 2));
+    auto result = QuerySettingsKnobOverrides::merge(lhs, rhs);
+    ASSERT_BSONOBJ_EQ(result.toBSON(), rhs.toBSON());
+}
+
+TEST(QuerySettingsKnobOverridesTest, MergePreservesLhsKnobsNotInRhs) {
+    auto lhs = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 3 << "testBoolKnobWire" << false));
+    auto rhs = QuerySettingsKnobOverrides::fromBSON(BSON("testBoolKnobWire" << true));
+    auto result = QuerySettingsKnobOverrides::merge(lhs, rhs);
+    auto expected = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 3 << "testBoolKnobWire" << true));
+    ASSERT_BSONOBJ_EQ(result.toBSON(), expected.toBSON());
+}
+
+// merge() does not resolve removal sentinels; simplify() does. These tests exercise the combined
+// merge()+simplify() flow used on the write path.
+TEST(QuerySettingsKnobOverridesTest, MergeThenSimplifyRemovesKnob) {
+    auto lhs = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5));
+    auto rhs = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << BSONNULL));
+    auto result = QuerySettingsKnobOverrides::merge(lhs, rhs);
+    result.simplify();
+    ASSERT_TRUE(result.empty());
+}
+
+TEST(QuerySettingsKnobOverridesTest, MergeThenSimplifyNullOnAbsentKnobIsNoop) {
+    auto lhs = QuerySettingsKnobOverrides::fromBSON(BSON("testBoolKnobWire" << true));
+    auto rhs = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << BSONNULL));
+    auto result = QuerySettingsKnobOverrides::merge(lhs, rhs);
+    result.simplify();
+    ASSERT_BSONOBJ_EQ(result.toBSON(), lhs.toBSON());
+}
+
+TEST(QuerySettingsKnobOverridesTest, MergeThenSimplifyAllKnobsRemovedYieldsEmpty) {
+    auto lhs = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 1 << "testBoolKnobWire" << true));
+    auto rhs = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << BSONNULL << "testBoolKnobWire" << BSONNULL));
+    auto result = QuerySettingsKnobOverrides::merge(lhs, rhs);
+    result.simplify();
+    ASSERT_TRUE(result.empty());
+}
+
+TEST(QuerySettingsKnobOverridesTest, SimplifyStripsDeleteSentinels) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 7 << "testBoolKnobWire" << BSONNULL));
+    overrides.simplify();
+    ASSERT_BSONOBJ_EQ(overrides.toBSON(), BSON("testIntKnobWire" << 7));
+}
+
+TEST(QuerySettingsKnobOverridesTest, SimplifyOnlySentinelsYieldsEmpty) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << BSONNULL));
+    overrides.simplify();
+    ASSERT_TRUE(overrides.empty());
+}
+
+TEST(QuerySettingsKnobOverridesTest, SimplifyPreservesRealKnobs) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 7 << "testBoolKnobWire" << true));
+    overrides.simplify();
+    ASSERT_BSONOBJ_EQ(overrides.toBSON(),
+                      BSON("testIntKnobWire" << 7 << "testBoolKnobWire" << true));
 }
 
 }  // namespace

@@ -331,5 +331,30 @@ TEST_F(QuerySettingsValidationTestFixture, SimplifyQuerySettingsClearsEmptyKnobs
     ASSERT_FALSE(settings.getQueryKnobs().has_value());
 }
 
+TEST_F(QuerySettingsValidationTestFixture, SimplifyQuerySettingsStripsKnobDeletions) {
+    QuerySettings settings;
+    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 7 << "testBoolKnobWire" << BSONNULL)));
+    service().simplifyQuerySettings(settings);
+    // The removal sentinel is stripped; the real knob survives.
+    ASSERT_TRUE(settings.getQueryKnobs().has_value());
+    ASSERT_BSONOBJ_EQ(settings.getQueryKnobs()->toBSON(), BSON("testIntKnobWire" << 7));
+}
+
+TEST_F(QuerySettingsValidationTestFixture, SimplifyQuerySettingsClearsKnobsThatAreAllDeletions) {
+    QuerySettings settings;
+    settings.setQueryKnobs(
+        QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << BSONNULL)));
+    service().simplifyQuerySettings(settings);
+    ASSERT_FALSE(settings.getQueryKnobs().has_value());
+}
+
+TEST_F(QuerySettingsValidationTestFixture, ValidateRejectsDuplicateKnobs) {
+    QuerySettings settings;
+    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 5 << "testIntKnobWire" << 10)));
+    ASSERT_THROWS_CODE(service().validateQuerySettings(settings), DBException, 12366201);
+}
+
 }  // namespace
 }  // namespace mongo::query_settings

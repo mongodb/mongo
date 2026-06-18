@@ -339,9 +339,13 @@ export class QuerySettingsUtils {
             queryShapeHash = response.queryShapeHash;
             representativeQuery = response.representativeQuery;
 
-            // Assert that the 'expectedQueryShapeConfiguration' is present in the system.
+            // Assert that the 'expectedQueryShapeConfiguration' is present in the system. The
+            // returned configuration does not include 'representativeQuery' on updates, case in
+            // which we need to skip the representativeQuery comparison against the $querySettings
+            // output.
+            const hasRepresentativeQuery = representativeQuery !== undefined;
             const expectedQueryShapeConfiguration = {queryShapeHash, settings: response.settings};
-            if (representativeQuery) {
+            if (hasRepresentativeQuery) {
                 expectedQueryShapeConfiguration.representativeQuery = representativeQuery;
             }
             this.forceRefresh();
@@ -349,6 +353,7 @@ export class QuerySettingsUtils {
                 const settings = this.getQuerySettings({
                     filter: {queryShapeHash},
                     showQueryShapeHash: true,
+                    showRepresentativeQuery: hasRepresentativeQuery,
                 });
                 assert.sameMembers(settings, [expectedQueryShapeConfiguration]);
                 return true;

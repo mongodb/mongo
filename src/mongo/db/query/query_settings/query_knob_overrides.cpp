@@ -69,13 +69,35 @@ QuerySettingsKnobOverrides QuerySettingsKnobOverrides::fromBSON(const BSONObj& o
     return overrides;
 }
 
+QuerySettingsKnobOverrides QuerySettingsKnobOverrides::merge(
+    const QuerySettingsKnobOverrides& lhs, const QuerySettingsKnobOverrides& rhs) {
+    // Both _entries are sorted by (id, value).
+    QuerySettingsKnobOverrides result;
+    result._entries.reserve(lhs._entries.size() + rhs._entries.size());
+    std::set_union(rhs._entries.begin(),
+                   rhs._entries.end(),
+                   lhs._entries.begin(),
+                   lhs._entries.end(),
+                   std::back_inserter(result._entries),
+                   [](const Entry& a, const Entry& b) { return a.id < b.id; });
+    return result;
+}
+
+void QuerySettingsKnobOverrides::simplify() {
+    auto isDelete = [](const Entry& e) {
+        return std::holds_alternative<DeleteQueryKnobOverride>(e.value);
+    };
+    _entries.erase(std::remove_if(_entries.begin(), _entries.end(), isDelete), _entries.end());
+}
+
 BSONObj QuerySettingsKnobOverrides::toBSON() const {
     BSONObjBuilder bob;
     const auto& reg = QueryKnobRegistry::instance();
     for (const auto& [id, val] : _entries) {
-        tassert(12194502,
-                "DeleteQueryKnobOverride must not survive past simplification",
-                !std::holds_alternative<DeleteQueryKnobOverride>(val));
+        if (std::holds_alternative<DeleteQueryKnobOverride>(val)) {
+            bob.appendNull(reg.entry(id).wireName);
+            continue;
+        }
         const auto& entry = reg.entry(id);
         entry.toBSON(bob, entry.wireName, val);
     }

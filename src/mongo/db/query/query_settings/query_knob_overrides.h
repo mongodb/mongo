@@ -47,8 +47,8 @@ namespace mongo::query_settings {
  * An empty entries vector means no overrides are active.
  *
  * DeleteQueryKnobOverride is a write-path-only removal sentinel used to signal that a knob should
- * be removed during merge. It must not survive past merge simplification; toBSON() tasserts its
- * absence.
+ * be removed during merge. It must not survive into stored settings; validateQuerySettings()
+ * tasserts its absence after simplification.
  */
 class QuerySettingsKnobOverrides {
 public:
@@ -64,6 +64,21 @@ public:
     static QuerySettingsKnobOverrides fromBSON(const BSONElement& element) {
         return fromBSON(element.Obj());
     }
+
+    /**
+     * Applies 'rhs' as a per-knob patch onto 'lhs' (a sorted union where 'rhs' wins on equal ids).
+     * 'lhs' is expected to be sentinel-free (it is always already-stored or already-simplified
+     * settings); sentinels legitimately originate only in the 'rhs' wire patch. Callers must run
+     * simplify() on the result before passing it to validateQuerySettings().
+     */
+    static QuerySettingsKnobOverrides merge(const QuerySettingsKnobOverrides& lhs,
+                                            const QuerySettingsKnobOverrides& rhs);
+
+    /**
+     * Removes DeleteQueryKnobOverride removal sentinels from the entries. Run on merged settings
+     * before calling validateQuerySettings() to ensure no sentinel survives into stored settings.
+     */
+    void simplify();
 
     BSONObj toBSON() const;
     void toBSON(StringData fieldName, BSONObjBuilder* builder) const {

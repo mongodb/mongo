@@ -269,10 +269,13 @@ public:
     /**
      * Validates that 'querySettings' do not have:
      * - empty settings or settings with default values
+     * - duplicate query knob overrides
      * - index hints specified without namespace information
      * - index hints specified for the same namespace more than once
      *
      * Throws a uassert if compatibility checks fail, indicating that 'querySettings' cannot be set.
+     * Tasserts that simplifyQuerySettings() was called first (no DeleteQueryKnobOverride
+     * sentinels).
      */
     void validateQuerySettings(const QuerySettings& querySettings) const;
 
@@ -302,6 +305,7 @@ public:
      * - resetting the 'reject' field to boost::none if it contains a false value
      * - removing index hints that specify empty 'allowedIndexes', potentially resetting
      * 'indexHints' to boost::none if all 'allowedIndexes' are empty.
+     * - deleting remove sentinels and resetting to boost::none if it is empty.
      */
     void simplifyQuerySettings(QuerySettings& querySettings) const;
 

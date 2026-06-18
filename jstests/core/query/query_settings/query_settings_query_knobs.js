@@ -25,6 +25,19 @@ const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 const representativeQuery = qsutils.makeFindQueryInstance({filter: {x: 1}});
 
+function mergeQuerySettings(initialSettings, newSettings) {
+    return qsutils.withQuerySettings(representativeQuery, initialSettings, () =>
+        qsutils.withQuerySettings(representativeQuery, newSettings, () => {
+            const configuration = qsutils.getQuerySettings({filter: {representativeQuery}});
+            return configuration.at(0)?.settings;
+        }),
+    );
+}
+
+function assertEqWo(actual, expected, opts) {
+    return assert(bsonWoCompare(actual, expected) === 0, opts);
+}
+
 function assertQueryKnobsNotSettable(queryKnobs, errorCode) {
     const cmd = qsutils.makeSetQuerySettingsCommand({representativeQuery, settings: {queryKnobs}});
     assert.commandFailedWithCode(db.adminCommand(cmd), errorCode);
@@ -69,7 +82,7 @@ describe("setQuerySettings with queryKnobs", function () {
                 return qsutils.getQuerySettings({filter: {representativeQuery}});
             })
             .at(0)?.settings?.queryKnobs;
-        assert(bsonWoCompare(roundTrippedSettings, queryKnobs) === 0, {
+        assertEqWo(roundTrippedSettings, queryKnobs, {
             roundTrippedSettings,
             queryKnobs,
         });
@@ -85,9 +98,85 @@ describe("setQuerySettings with queryKnobs", function () {
                 return qsutils.getQuerySettings({filter: {representativeQuery}});
             })
             .at(0)?.settings;
-        assert(bsonWoCompare(roundTrippedSettings, settings) === 0, {
+        assertEqWo(roundTrippedSettings, settings, {
             roundTrippedSettings,
             settings,
         });
+    });
+
+    it("Should update an existing knob value without disturbing others", function () {
+        const initialSettings = {
+            queryKnobs: {samplingMarginOfError: 3.0, planRankerMode: "histogramCE"},
+        };
+        const updateSettings = {queryKnobs: {samplingMarginOfError: 5.0}};
+        const expectedKnobs = {samplingMarginOfError: 5.0, planRankerMode: "histogramCE"};
+        const actualKnobs = mergeQuerySettings(initialSettings, updateSettings)?.queryKnobs;
+        assertEqWo(actualKnobs, expectedKnobs, {actualKnobs, expectedKnobs});
+    });
+
+    it("Should remove a single knob by setting it to null, preserving the rest", function () {
+        const initialSettings = {
+            queryKnobs: {samplingMarginOfError: 3.0, samplingConfidenceInterval: "99"},
+        };
+        const removalSettings = {queryKnobs: {samplingMarginOfError: null}};
+        const expectedKnobs = {samplingConfidenceInterval: "99"};
+        const actualKnobs = mergeQuerySettings(initialSettings, removalSettings)?.queryKnobs;
+        assertEqWo(actualKnobs, expectedKnobs, {actualKnobs, expectedKnobs});
+    });
+
+    it("Should remove one knob while setting and updating others in the same command", function () {
+        const initialSettings = {
+            queryKnobs: {samplingMarginOfError: 3.0, samplingConfidenceInterval: "99"},
+        };
+        // Remove samplingMarginOfError, update samplingConfidenceInterval, add planRankerMode.
+        const updateSettings = {
+            queryKnobs: {
+                samplingMarginOfError: null,
+                samplingConfidenceInterval: "95",
+                planRankerMode: "histogramCE",
+            },
+        };
+        const expectedKnobs = {planRankerMode: "histogramCE", samplingConfidenceInterval: "95"};
+        const actualKnobs = mergeQuerySettings(initialSettings, updateSettings)?.queryKnobs;
+        assertEqWo(actualKnobs, expectedKnobs, {actualKnobs, expectedKnobs});
+    });
+
+    it("Should drop the queryKnobs field when all knobs are removed via null", function () {
+        const initialSettings = {
+            queryFramework: "classic",
+            queryKnobs: {samplingMarginOfError: 3.0, samplingConfidenceInterval: "99"},
+        };
+        // Null out every currently-set knob in a single command.
+        const removalSettings = {
+            queryKnobs: {samplingMarginOfError: null, samplingConfidenceInterval: null},
+        };
+        const actualSettings = mergeQuerySettings(initialSettings, removalSettings);
+        assertEqWo(actualSettings, {queryFramework: "classic"}, {actualSettings});
+    });
+
+    it("Should reject INSERT or UPDATE that would leave settings empty", function () {
+        // INSERT: null-only queryKnobs as the only setting fails.
+        assert.commandFailedWithCode(
+            db.adminCommand({
+                setQuerySettings: representativeQuery,
+                settings: {queryKnobs: {samplingMarginOfError: null}},
+            }),
+            7746604,
+        );
+
+        // Non-null INSERT works; UPDATE that nulls the only knob also fails.
+        qsutils.withQuerySettings(
+            representativeQuery,
+            {queryKnobs: {samplingMarginOfError: 3.0}},
+            () => {
+                assert.commandFailedWithCode(
+                    db.adminCommand({
+                        setQuerySettings: representativeQuery,
+                        settings: {queryKnobs: {samplingMarginOfError: null}},
+                    }),
+                    7746604,
+                );
+            },
+        );
     });
 });

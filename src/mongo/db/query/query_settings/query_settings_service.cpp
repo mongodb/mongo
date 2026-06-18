@@ -907,9 +907,11 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
         querySettings.setComment(comment);
     }
 
-    // TODO SERVER-123662: Merge the knobs.
-    if (const auto& knobs = rhs.getQueryKnobs()) {
-        querySettings.setQueryKnobs(knobs);
+    if (rhs.getQueryKnobs()) {
+        auto merged = QuerySettingsKnobOverrides::merge(
+            querySettings.getQueryKnobs().value_or(QuerySettingsKnobOverrides{}),
+            *rhs.getQueryKnobs());
+        querySettings.setQueryKnobs(std::move(merged));
     }
 
     return querySettings;
@@ -920,6 +922,21 @@ void QuerySettingsService::validateQuerySettings(const QuerySettings& querySetti
     uassert(7746604,
             "the resulting settings cannot be empty or contain only default values",
             !isDefault(querySettings));
+
+    // Validates that no query knob is overridden more than once. Entries are sorted by id, so
+    // duplicates are adjacent. Also tasserts that simplifyQuerySettings() was called first so that
+    // no DeleteQueryKnobOverride sentinels survive into stored settings.
+    if (const auto& knobs = querySettings.getQueryKnobs()) {
+        auto entries = knobs->entries();
+        for (size_t i = 0; i < entries.size(); ++i) {
+            tassert(12366200,
+                    "DeleteQueryKnobOverride must not survive past simplification",
+                    !std::holds_alternative<DeleteQueryKnobOverride>(entries[i].value));
+            uassert(12366201,
+                    "query knob overrides cannot contain duplicate knobs",
+                    i == 0 || entries[i].id != entries[i - 1].id);
+        }
+    }
 
     validateQuerySettingsIndexHints(querySettings.getIndexHints());
 }
@@ -970,8 +987,9 @@ void QuerySettingsService::simplifyQuerySettings(QuerySettings& settings) const 
     if (settings.getReject().has_value() && !settings.getReject()) {
         settings.setReject({});
     }
-    if (const auto& knobs = settings.getQueryKnobs(); knobs.has_value() && knobs->empty()) {
-        settings.setQueryKnobs(boost::none);
+    if (auto knobs = settings.getQueryKnobs()) {
+        knobs->simplify();
+        settings.setQueryKnobs(knobs->empty() ? boost::none : knobs);
     }
 
     const auto& indexes = settings.getIndexHints();

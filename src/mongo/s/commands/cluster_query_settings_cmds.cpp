@@ -106,7 +106,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                CommandHelpers::filterCommandRequestForPassthrough(request().toBSON()),
+                CommandHelpers::filterCommandRequestForPassthrough(unparsedRequest().body),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
             auto reply = SetQuerySettingsCommandReply::parse(cmdResponse.response,
