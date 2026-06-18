@@ -54,9 +54,6 @@ mongo_cc_library(
     srcs = [
         "replicated_fast_count_metrics.cpp",
     ],
-    hdrs = [
-        "replicated_fast_count_metrics.h",
-    ],
     deps = [
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/otel/metrics:otel_metrics_service",
@@ -155,9 +152,6 @@ mongo_cc_library(
     srcs = [
         "replicated_fast_count_streaming_oplog_delta_accumulator.cpp",
     ],
-    hdrs = [
-        "replicated_fast_count_streaming_oplog_delta_accumulator.h",
-    ],
     deps = [
         "replicated_fast_count_delta_utils",
         "replicated_fast_count_metrics",
@@ -242,9 +236,6 @@ mongo_cc_library(
     name = "replicated_fast_count_op_observer",
     srcs = [
         "replicated_fast_count_op_observer.cpp",
-    ],
-    hdrs = [
-        "replicated_fast_count_op_observer.h",
     ],
     deps = [
         "replicated_fast_count_delta_utils",
