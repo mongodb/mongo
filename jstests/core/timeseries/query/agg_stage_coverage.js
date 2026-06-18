@@ -68,6 +68,7 @@ for (let i = 0; i < 10; i++) {
  *    (b) tested elsewhere
  *    (c) stages that can only run in stream processors
  *    (d) internal only stages (cannot be made by user requests) that run on oplog data
+ *    (e) test-only internal stages used for validation
  *
  * Once you've determined which set your new aggregation stage belongs to add a test case to the appropriate set.
  * Each set has a slightly different test format.
@@ -149,6 +150,14 @@ const errorTests = [
         ],
         // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
         expectedErrorCodes: [40602, 10557302, 12093200, 40324, ErrorCodes.IllegalOperation],
+    },
+    {
+        stage: "$_internalAssertDataAssumptions",
+        pipeline: [{$_internalAssertDataAssumptions: {}}],
+        expectedErrorCodes: [
+            10557302, // check for 'canRunOnTimeseries' failed.
+            40324, // Unrecognized stage on older binaries in multiversion suites.
+        ],
     },
 ];
 

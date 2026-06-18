@@ -254,6 +254,8 @@ const skippedAuthTestingAggStages = [
     "$_analyzeShardKeyReadWriteDistribution", // Already covered. And it cannot not be tested in
     // commands_lib framework due to its requirement on
     // non-mongos node on a sharded cluster.
+    "$_internalAssertDataAssumptions", // Automatically inserted by pipeline rewrite pass for
+    // dependency graph validation. Not intended for direct use by users.
     "$merge", // Already covered in 'aggregate_merge_insert_documents' and
     // 'aggregate_merge_replace_documents'.
     "$set", // Alias for "$addFields" and already covered.

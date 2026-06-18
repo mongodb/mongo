@@ -1,0 +1,48 @@
+##
+# Runs aggregation tests with dependency graph validation enabled. This suite automatically
+# inserts $_internalAssertDataAssumptions stages before each pipeline stage to validate that the
+# dependency graph's canPathBeArray() analysis is correct. Fields that the dependency graph
+# reports as non-array must not contain arrays at runtime, or the stage will fail the test.
+#
+# This is a test-only feature for catching bugs in the dependency graph arrayness tracking.
+##
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/aggregation/**/*.js
+  exclude_files:
+    # Exclude helper and utility files that aren't actual tests
+    - jstests/aggregation/extras/**/*.js
+    # This test directly exercises $_internalAssertDataAssumptions with explicit pipelines,
+    # which conflicts with the suite's automatic stage injection and the stage's
+    # internal-only (non-user-request) gating.
+    - jstests/aggregation/sources/internal_assert_data_assumptions_test.js
+    # TODO SERVER-127290
+    - jstests/aggregation/sources/shred_documents.js
+    # TODO SERVER-23229: remove when the underlying issue is resolved.
+    - jstests/aggregation/sources/group/groupMissing.js
+    # TODO SERVER-127292
+    - jstests/aggregation/sbe/sbe_pushdown_replan_reason.js
+    # TODO SERVER-127302
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
+    # TODO SERVER-127304
+    - jstests/aggregation/sources/project/remove_redundant_projects.js
+    # TODO SERVER-128465
+    - jstests/aggregation/**/*pbt*.js
+    # This test deliberately constructs pipelines at the 1000-stage limit; injecting
+    # $_internalAssertDataAssumptions stages pushes them over the limit.
+    - jstests/aggregation/exec/query_limits_test.js
+
+executor:
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # The validation feature depends on these feature flags
+        featureFlagEnableTestingAggregateRewriteRules: true
+        featureFlagPathArrayness: true
+        # The knob is also set in the override, but setting it here ensures it's on from startup
+        internalEnableDependencyGraphValidation: true

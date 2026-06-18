@@ -321,7 +321,7 @@ function runSetFailpointCommand(adminDb, fpName, fpMode) {
  * It's important that each run of the property is independent from one another, so we'll always
  * reset the knobs to their original state even if the function throws an exception.
  */
-function runWithKnobs(db, fn, knobToVal = {}, failPointToMode = {}) {
+export function runWithKnobs(db, fn, knobToVal = {}, failPointToMode = {}) {
     const adminDb = db.getSiblingDB("admin");
     const knobNames = Object.keys(knobToVal);
     const failPointNames = Object.keys(failPointToMode);

@@ -15,6 +15,24 @@
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
+    name = "aggregation_dependency_graph_validation_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_dependency_graph_validation_passthrough.yml",
+    data = [
+        "//jstests/with_mongot/e2e_lib",
+    ],
+    shard_count = 4,
+    tags = [
+        "aggregation",
+        "ci-release-critical",
+        "common",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "aggregation_disabled_optimization",
     config = "//buildscripts/resmokeconfig:suites/aggregation_disabled_optimization.yml",
     data = [

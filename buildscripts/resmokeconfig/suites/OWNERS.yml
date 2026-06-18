@@ -9,6 +9,9 @@ filters:
   - "aggregation*":
     approvers:
       - 10gen/query
+  - "aggregation_dependency_graph_validation_passthrough.yml":
+    approvers:
+      - 10gen/query-optimization
   - "aggregation_disabled_optimization.yml":
     approvers:
       - 10gen/query-optimization
