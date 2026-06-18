@@ -583,7 +583,9 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/repl:local_oplog_info",
         "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/storage:storage_options",
     ],
 )
 
@@ -600,6 +602,7 @@ mongo_cc_unit_test(
         "replicated_fast_count_enabled",
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:storage_options",
     ],
 )
 

@@ -48,13 +48,18 @@ MONGO_MOD_PUBLIC bool isReplicatedFastCountEnabled(OperationContext* opCtx);
 MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(const NamespaceString& nss);
 
 /**
- * Returns true if we should read the oplog size and count from the size storer.
- */
-MONGO_MOD_PUBLIC bool shouldReadFromSizeStorerForOplog(OperationContext* opCtx);
-
-/**
  * Returns true if we should get the size and count for the specified 'nss' from the replicated fast
  * count system.
+ *
+ * Returns false for local collections and implicitly replicated collections.
+ *
+ * If the persistence provider uses replicated fast count, returns true for collections that are
+ * eligible to be tracked by replicated fast count.
+ *
+ * If the persistence provider does not use replicated fast count but the feature flag for
+ * replicated fast count is enabled, returns true for collections that are eligible to be tracked by
+ * replicated fast count, excluding the oplog collection, as long as the collection is a replica
+ * set.
  */
 MONGO_MOD_PUBLIC bool shouldReadFromReplicatedFastCount(OperationContext* opCtx,
                                                         const NamespaceString& nss);

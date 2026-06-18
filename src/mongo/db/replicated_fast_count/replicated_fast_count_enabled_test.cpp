@@ -30,8 +30,11 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -216,131 +219,169 @@ TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
     EXPECT_TRUE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
 }
 
-TEST_F(IsReplicatedFastCountEnabledTest, ShouldReadFromSizeStorerWhenProviderOff) {
-    EXPECT_TRUE(shouldReadFromSizeStorerForOplog(operationContext()));
-}
+// Tuple of dbName, collName, and whether shouldReadFromReplicatedFastCount is expected to return
+// true for this test case.
+using ShouldReadFromRFCTestCase = std::tuple<std::string, std::string, bool>;
 
-TEST_F(IsReplicatedFastCountEnabledWithProviderTest, ShouldNotReadFromSizeStorerWhenProviderOn) {
-    EXPECT_FALSE(shouldReadFromSizeStorerForOplog(operationContext()));
-}
+struct ShouldReadFromReplicatedFastCountParams {
+    std::string name;
+    bool featureFlagOn;
+    bool hasProvider;
+    std::vector<ShouldReadFromRFCTestCase> testCases;
+};
 
-TEST_F(IsReplicatedFastCountEnabledTest, ShouldReadFromReplicatedFastCountNoProviderFFOff) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", false);
-    std::vector<std::tuple<std::string, std::string>> disallowedCases{
-        {"test", "coll1"},    // Normal user collection
-        {"config", "coll1"},  // Internal non-local
-        {"admin", "coll1"},
-        {"local", "coll1"},          // Internal local
-        {"config", "transactions"},  // Implicitly replicated
-        {"config", "system.preimages"},
-        {"config", "image_collection"},
-        {"config", "system.profile"},
-        {"config",
-         std::string{NamespaceString::kReplicatedFastCountStore}},  // Fast count collections
-        {"config", std::string{NamespaceString::kReplicatedFastCountStoreTimestamps}},
-        {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
-         std::string{NamespaceString::kRsOplogNamespace.coll()}},  // Oplog collection
-    };
+class ShouldReadFromReplicatedFastCountTestWithParams
+    : public CatalogTestFixture,
+      public ::testing::WithParamInterface<ShouldReadFromReplicatedFastCountParams> {
+public:
+    ShouldReadFromReplicatedFastCountTestWithParams()
+        : CatalogTestFixture(
+              GetParam().hasProvider
+                  ? Options().setPersistenceProvider(
+                        std::make_unique<replicated_fast_count::test_helpers::
+                                             ReplicatedFastCountTestPersistenceProvider>())
+                  : Options()) {}
+};
 
-    for (auto&& [dbName, collName] : disallowedCases) {
-        EXPECT_FALSE(shouldReadFromReplicatedFastCount(
-            operationContext(), NamespaceString::createNamespaceString_forTest(dbName, collName)));
+TEST_P(ShouldReadFromReplicatedFastCountTestWithParams, ShouldReadFromReplicatedFastCount) {
+    const auto& p = GetParam();
+
+    unittest::ServerParameterGuard flag("featureFlagReplicatedFastCount", p.featureFlagOn);
+
+    for (const auto& [dbName, collName, expected] : p.testCases) {
+        const auto nss = NamespaceString::createNamespaceString_forTest(dbName, collName);
+        EXPECT_EQ(shouldReadFromReplicatedFastCount(operationContext(), nss), expected)
+            << "shouldReadFromReplicatedFastCount failed for " << nss.toStringForErrorMsg();
     }
 }
 
-TEST_F(IsReplicatedFastCountEnabledTest, ShouldReadFromReplicatedFastCountNoProviderFFOn) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-    std::vector<std::tuple<std::string, std::string>> allowedCases{
-        {"test", "coll1"},    // Normal user collection
-        {"config", "coll1"},  // Internal non-local
-        {"admin", "coll1"},
-    };
-    std::vector<std::tuple<std::string, std::string>> disallowedCases{
-        {"local", "coll1"},          // Internal local
-        {"config", "transactions"},  // Implicitly replicated
-        {"config", "system.preimages"},
-        {"config", "image_collection"},
-        {"config", "system.profile"},
-        {"config",
-         std::string{NamespaceString::kReplicatedFastCountStore}},  // Fast count collections
-        {"config", std::string{NamespaceString::kReplicatedFastCountStoreTimestamps}},
-        {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
-         std::string{NamespaceString::kRsOplogNamespace.coll()}},  // Oplog collection
-    };
+INSTANTIATE_TEST_SUITE_P(
+    ShouldReadFromReplicatedFastCount,
+    ShouldReadFromReplicatedFastCountTestWithParams,
+    ::testing::Values(
+        ShouldReadFromReplicatedFastCountParams{
+            "NoProviderFFOff",
+            /*featureFlagOn=*/false,
+            /*hasProvider=*/false,
+            {
+                // We do not read from the replicated fast count system if the provider does not use
+                // it and if the feature flag is off.
+                {"test", "coll1", false},
+                {"config", "coll1", false},
+                {"admin", "coll1", false},
+                {"local", "coll1", false},
+                {"config", "transactions", false},
+                {"config", "system.preimages", false},
+                {"config", "image_collection", false},
+                {"config", "system.profile", false},
+                {"config", std::string{NamespaceString::kReplicatedFastCountStore}, false},
+                {"config",
+                 std::string{NamespaceString::kReplicatedFastCountStoreTimestamps},
+                 false},
+                {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
+                 std::string{NamespaceString::kRsOplogNamespace.coll()},
+                 false},
+            },
+        },
+        ShouldReadFromReplicatedFastCountParams{
+            "NoProviderFFOn",
+            /*featureFlagOn=*/true,
+            /*hasProvider=*/false,
+            {
+                {"test", "coll1", true},
+                {"config", "coll1", true},
+                {"admin", "coll1", true},
+                // If the persistence provider does not support replicated fast count, the oplog's
+                // size and count should not be read from the replicated fast count system.
+                {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
+                 std::string{NamespaceString::kRsOplogNamespace.coll()},
+                 false},
+                // Collections with ineligible namespaces should not be read from the RFC system.
+                {"local", "coll1", false},
+                {"config", "transactions", false},
+                {"config", "system.preimages", false},
+                {"config", "image_collection", false},
+                {"config", "system.profile", false},
+                {"config", std::string{NamespaceString::kReplicatedFastCountStore}, false},
+                {"config",
+                 std::string{NamespaceString::kReplicatedFastCountStoreTimestamps},
+                 false},
+            },
+        },
+        ShouldReadFromReplicatedFastCountParams{
+            "WithProviderFFOff",
+            /*featureFlagOn=*/false,
+            /*hasProvider=*/true,
+            {
+                {"test", "coll1", true},
+                {"config", "coll1", true},
+                {"admin", "coll1", true},
+                {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
+                 std::string{NamespaceString::kRsOplogNamespace.coll()},
+                 true},
+                // Collections with ineligible namespaces should not be read from the RFC system.
+                {"local", "coll1", false},
+                {"config", "transactions", false},
+                {"config", "system.preimages", false},
+                {"config", "image_collection", false},
+                {"config", "system.profile", false},
+                {"config", std::string{NamespaceString::kReplicatedFastCountStore}, false},
+                {"config",
+                 std::string{NamespaceString::kReplicatedFastCountStoreTimestamps},
+                 false},
+            },
+        },
+        ShouldReadFromReplicatedFastCountParams{
+            "WithProviderFFOn",
+            /*featureFlagOn=*/true,
+            /*hasProvider=*/true,
+            {
+                // Results are the same as WithProviderFFOff.
+                {"test", "coll1", true},
+                {"config", "coll1", true},
+                {"admin", "coll1", true},
+                {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
+                 std::string{NamespaceString::kRsOplogNamespace.coll()},
+                 true},
+                {"local", "coll1", false},
+                {"config", "transactions", false},
+                {"config", "system.preimages", false},
+                {"config", "image_collection", false},
+                {"config", "system.profile", false},
+                {"config", std::string{NamespaceString::kReplicatedFastCountStore}, false},
+                {"config",
+                 std::string{NamespaceString::kReplicatedFastCountStoreTimestamps},
+                 false},
+            },
+        }),
+    [](const ::testing::TestParamInfo<ShouldReadFromReplicatedFastCountParams>& info) {
+        return info.param.name;
+    });
 
-    for (auto&& [dbName, collName] : allowedCases) {
-        EXPECT_TRUE(shouldReadFromReplicatedFastCount(
-            operationContext(), NamespaceString::createNamespaceString_forTest(dbName, collName)));
-    }
+class ShouldReadFromReplicatedFastCountOfflineValidateTest : public CatalogTestFixture {
+public:
+    ShouldReadFromReplicatedFastCountOfflineValidateTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<replicated_fast_count::test_helpers::
+                                   ReplicatedFastCountTestPersistenceProvider>())) {}
 
-    for (auto&& [dbName, collName] : disallowedCases) {
-        EXPECT_FALSE(shouldReadFromReplicatedFastCount(
-            operationContext(), NamespaceString::createNamespaceString_forTest(dbName, collName)));
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        // Mock the fixture being a standalone by resetting its repl settings.
+        repl::ReplicationCoordinator::set(getServiceContext(),
+                                          std::make_unique<repl::ReplicationCoordinatorMock>(
+                                              getServiceContext(), repl::ReplSettings{}));
     }
+};
+
+TEST_F(ShouldReadFromReplicatedFastCountOfflineValidateTest, ReturnsTrue) {
+    // Set the storageGlobalParams.validate flag to true to simulate modal validation.
+    storageGlobalParams.validate = true;
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll1");
+    EXPECT_TRUE(shouldReadFromReplicatedFastCount(operationContext(), nss));
+    // Reset state.
+    storageGlobalParams.validate = false;
 }
 
-TEST_F(IsReplicatedFastCountEnabledWithProviderTest,
-       ShouldReadFromReplicatedFastCountWithProviderFFOff) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", false);
-    std::vector<std::tuple<std::string, std::string>> allowedCases{
-        {"test", "coll1"},    // Normal user collection
-        {"config", "coll1"},  // Internal non-local
-        {"admin", "coll1"},
-        {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
-         std::string{NamespaceString::kRsOplogNamespace.coll()}},  // Oplog collection
-    };
-    std::vector<std::tuple<std::string, std::string>> disallowedCases{
-        {"local", "coll1"},          // Internal local
-        {"config", "transactions"},  // Implicitly replicated
-        {"config", "system.preimages"},
-        {"config", "image_collection"},
-        {"config", "system.profile"},
-        {"config",
-         std::string{NamespaceString::kReplicatedFastCountStore}},  // Fast count collections
-        {"config", std::string{NamespaceString::kReplicatedFastCountStoreTimestamps}},
-    };
-
-    for (auto&& [dbName, collName] : allowedCases) {
-        EXPECT_TRUE(shouldReadFromReplicatedFastCount(
-            operationContext(), NamespaceString::createNamespaceString_forTest(dbName, collName)));
-    }
-
-    for (auto&& [dbName, collName] : disallowedCases) {
-        EXPECT_FALSE(shouldReadFromReplicatedFastCount(
-            operationContext(), NamespaceString::createNamespaceString_forTest(dbName, collName)));
-    }
-}
-
-TEST_F(IsReplicatedFastCountEnabledWithProviderTest,
-       ShouldReadFromReplicatedFastCountWithProviderFFOn) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-    std::vector<std::tuple<std::string, std::string>> allowedCases{
-        {"test", "coll1"},    // Normal user collection
-        {"config", "coll1"},  // Internal non-local
-        {"admin", "coll1"},
-        {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
-         std::string{NamespaceString::kRsOplogNamespace.coll()}},  // Oplog collection
-    };
-    std::vector<std::tuple<std::string, std::string>> disallowedCases{
-        {"local", "coll1"},          // Internal local
-        {"config", "transactions"},  // Implicitly replicated
-        {"config", "system.preimages"},
-        {"config", "image_collection"},
-        {"config", "system.profile"},
-        {"config",
-         std::string{NamespaceString::kReplicatedFastCountStore}},  // Fast count collections
-        {"config", std::string{NamespaceString::kReplicatedFastCountStoreTimestamps}},
-    };
-
-    for (auto&& [dbName, collName] : allowedCases) {
-        EXPECT_TRUE(shouldReadFromReplicatedFastCount(
-            operationContext(), NamespaceString::createNamespaceString_forTest(dbName, collName)));
-    }
-
-    for (auto&& [dbName, collName] : disallowedCases) {
-        EXPECT_FALSE(shouldReadFromReplicatedFastCount(
-            operationContext(), NamespaceString::createNamespaceString_forTest(dbName, collName)));
-    }
-}
 }  // namespace
 }  // namespace mongo
