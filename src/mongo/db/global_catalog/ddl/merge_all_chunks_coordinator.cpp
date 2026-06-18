@@ -198,6 +198,23 @@ boost::optional<CollectionType> getCollection(OperationContext* opCtx, const Nam
     return coll;
 }
 
+// ConflictingOperationInProgress is raised by the config server before it modifies the global
+// catalog (re-checked under the chunk-op lock). Receiving it during the commit phase proves the
+// commit did not take effect, so the coordinator may safely abort and release the critical section.
+bool isSafeToAbortOnGlobalCatalogCommitError(const Status& status) {
+    return status == ErrorCodes::ConflictingOperationInProgress;
+}
+
+// NamespaceNotSharded and StaleEpoch indicate that the collection was dropped or its UUID changed
+// while this coordinator was running. This should be impossible: all DDL operations that modify
+// a collection's sharding state or UUID call setAllowChunkOperations(false) and drain in-flight
+// chunk coordinators before making any change, so this coordinator cannot be running at the same
+// time. If either error is seen at kGlobalCatalogCommit the DDL serialization invariant has been
+// violated.
+bool isNotExpectedOnGlobalCatalogCommitError(const Status& status) {
+    return status == ErrorCodes::NamespaceNotSharded || status == ErrorCodes::StaleEpoch;
+}
+
 }  // namespace
 
 MergeAllChunksCoordinator::MergeAllChunksCoordinator(ShardingCoordinatorService* service,
@@ -505,6 +522,25 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                 auto opCtxHolder = makeOperationContext();
                 triggerCleanup(opCtxHolder.get(), status);
                 MONGO_UNREACHABLE_TASSERT(12578610);
+            }
+
+            if (phase == Phase::kGlobalCatalogCommit) {
+                // These errors indicate the DDL serialization invariant was violated: all DDL
+                // operations drain in-flight chunk coordinators before modifying the collection,
+                // so they cannot be observed here under correct operation.
+                tassert(12925601,
+                        str::stream() << "Unexpected error during mergeAllChunksOnShard global "
+                                         "catalog commit: "
+                                      << status.toString(),
+                        !isNotExpectedOnGlobalCatalogCommitError(status));
+
+                // Abort only for errors that are raised before the commit is applied. For any
+                // other error keep retrying so the global and shard catalogs cannot diverge.
+                if (isSafeToAbortOnGlobalCatalogCommitError(status)) {
+                    auto opCtxHolder = makeOperationContext();
+                    triggerCleanup(opCtxHolder.get(), status);
+                    MONGO_UNREACHABLE_TASSERT(12925602);
+                }
             }
 
             // Retry the operation when kGlobalCatalogCommit or a greater phase fails.
