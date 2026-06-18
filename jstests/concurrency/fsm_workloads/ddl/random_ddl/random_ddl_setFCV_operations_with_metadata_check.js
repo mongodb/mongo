@@ -18,6 +18,10 @@
  *   # TODO (SERVER-104789): config shards cause setFCV to hang because resharding is not aborted.
  *   config_shard_incompatible,
  *   runs_set_fcv,
+ *   # TODO (SERVER-104789): when featureFlagSymmetricFCV is enabled, this test fails
+ *   # with "Authoritative shards requires no shard refreshes to be executed" error, which is
+ *   # exactly the same error being investigated in SERVER-104789.
+ *   featureFlagSymmetricFCV_incompatible,
  * ]
  */
 

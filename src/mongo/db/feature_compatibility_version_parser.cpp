@@ -40,6 +40,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
+#include <tuple>
+
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
@@ -191,6 +193,67 @@ StatusWith<FCV> FeatureCompatibilityVersionParser::parse(
         auto version = fcvDoc.getVersion();
         auto targetVersion = fcvDoc.getTargetVersion();
         auto previousVersion = fcvDoc.getPreviousVersion();
+        auto phase = fcvDoc.getPhase();
+
+        // The 'phase' field is only ever written under Symmetric FCV (see
+        // feature_compatibility_version.cpp's updateFeatureCompatibilityVersionDocument). Seeing it
+        // in the doc while the flag is disabled means the on-disk state was written by a different
+        // binary and this binary cannot safely interpret it — fail rather than silently mis-project
+        // the in-memory FCV.
+        if (phase.has_value() && !gFeatureFlagSymmetricFCV.isEnabled()) {
+            return Status(ErrorCodes::Error(11948500),
+                          str::stream()
+                              << "FCV document has 'phase' field but Symmetric FCV is disabled: "
+                              << featureCompatibilityVersionDoc);
+        }
+
+        // Under Symmetric FCV, kEnableTargetFeatures and kCommitAddedFeatures are the phases where
+        // target features are already active. However, only project the in-memory FCV to the
+        // target after confirming the document has a valid transitional shape; otherwise fall
+        // through to the existing validation below so malformed documents still fail to parse.
+        if (phase.has_value() && *phase >= SetFCVPhaseEnum::kEnableTargetFeatures) {
+
+            if (!targetVersion.has_value()) {
+                return Status(ErrorCodes::Error(11948501),
+                              str::stream() << "Missing 'targetVersion' field in FCV document with "
+                                            << "'phase' >= kEnableTargetFeatures: "
+                                            << featureCompatibilityVersionDoc);
+            }
+            if (!previousVersion.has_value()) {
+                return Status(ErrorCodes::Error(11948502),
+                              str::stream()
+                                  << "Missing 'previousVersion' field in FCV document with "
+                                  << "'phase' >= kEnableTargetFeatures: "
+                                  << featureCompatibilityVersionDoc);
+            }
+
+            auto upgradingOrDowngradingShapes = {
+                // version, targetVersion, previousVersion (upgrading)
+                // TODO: SERVER-128765: version and targetVersion should be the same in upgrade
+                // after the kEnableTargetFeatures phase
+                std::tuple{GenericFCV::kLastLTS, GenericFCV::kLatest, GenericFCV::kLastLTS},
+                std::tuple{
+                    GenericFCV::kLastContinuous, GenericFCV::kLatest, GenericFCV::kLastContinuous},
+                std::tuple{GenericFCV::kLastLTS, GenericFCV::kLastContinuous, GenericFCV::kLastLTS},
+                // (downgrading)
+                std::tuple{GenericFCV::kLastLTS, GenericFCV::kLastLTS, GenericFCV::kLatest},
+                std::tuple{
+                    GenericFCV::kLastContinuous, GenericFCV::kLastContinuous, GenericFCV::kLatest}};
+
+            const bool isUpgradingOrDowngradingShape =
+                std::any_of(upgradingOrDowngradingShapes.begin(),
+                            upgradingOrDowngradingShapes.end(),
+                            [&](const auto& t) {
+                                return t == std::tuple{version, *targetVersion, *previousVersion};
+                            });
+            if (!isUpgradingOrDowngradingShape) {
+                return Status(ErrorCodes::Error(11948503),
+                              str::stream() << "Invalid transitional shape for FCV document with "
+                                            << "'phase' >= kEnableTargetFeatures: "
+                                            << featureCompatibilityVersionDoc);
+            }
+            return *targetVersion;
+        }
 
         // Downgrading FCV.
         if ((version == GenericFCV::kLastLTS || version == GenericFCV::kLastContinuous) &&

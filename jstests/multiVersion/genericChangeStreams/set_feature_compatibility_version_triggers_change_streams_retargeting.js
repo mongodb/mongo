@@ -7,6 +7,7 @@
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1, configShard: true});
 
@@ -78,16 +79,25 @@ const clusterTimeAfterFCVUpgrade = assert.commandWorked(
 checkNotificationPresenceAcrossShards(1, clusterTimeBeforeFCVUpgrade, clusterTimeAfterFCVUpgrade);
 
 /*
- * The retargeting notification is generated as part of setFCV::_resetPlacementHistory(), which due to design constraints has to be called upon each command invocation.
+ * In non-symmetric FCV configurations, a no-op FCV upgrade generates a "retargeting" change
+ * stream event on each shard. With symmetric FCV upgrade and downgrade behaves in the same
+ * way, hence no "retargeting" change events when setFCV resolves into a no-op.
  */
+const expectedNumRetargetingNotificationsForNoopFCVUpgrade = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB("admin"),
+    "SymmetricFCV",
+)
+    ? 0
+    : 1;
+
 jsTest.log.info(
-    'setFCV upgrade generates one "retargeting" change stream events when resolves into a no-op.',
+    'non-symmetric setFCV upgrade generates a "retargeting" change stream event when resolves into a no-op, and none for a symmetric setFCV upgrade',
 );
 const clusterTimeAfterNoopFCVUpgrade = assert.commandWorked(
     st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
 ).$clusterTime.clusterTime;
 checkNotificationPresenceAcrossShards(
-    1,
+    expectedNumRetargetingNotificationsForNoopFCVUpgrade,
     clusterTimeAfterFCVUpgrade,
     clusterTimeAfterNoopFCVUpgrade,
 );

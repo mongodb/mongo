@@ -1247,6 +1247,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "mongod_fcv_test",
     srcs = [
+        "feature_compatibility_version_parser_test.cpp",
         "feature_compatibility_version_test.cpp",
     ],
     tags = ["mongo_unittest_seventh_group"],

@@ -192,67 +192,7 @@ public:
         const FeatureCompatibilityVersionDocument& fcvDoc,
         FCV requestedVersion,
         bool isFromConfigServer) const {
-        // Determine the direction and starting phase of the requested transition.
-        struct RequestedTransitionOrigin {
-            FCV originalVersion;
-            SetFCVPhaseEnum startPhase;
-            bool isNewTransition;
-        };
-
-        auto origin = [&]() -> boost::optional<RequestedTransitionOrigin> {
-            FCV actualVersion =
-                uassertStatusOK(FeatureCompatibilityVersionParser::parse(fcvDoc.toBSON()));
-
-            if (!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(actualVersion)) {
-                // Starting a new upgrade/downgrade.
-                return RequestedTransitionOrigin{.originalVersion = actualVersion,
-                                                 .startPhase = SetFCVPhaseEnum::kStart,
-                                                 .isNewTransition = true};
-            }
-
-            auto transitionInfo = getTransitionFCVInfo(actualVersion);
-            if (transitionInfo.to == requestedVersion) {
-                // Resuming an upgrade/downgrade after it was interrupted.
-                if (!gFeatureFlagSymmetricFCV.isEnabled()) {
-                    // Legacy behavior: Retrying an interrupted setFCV runs all phases again.
-                    return RequestedTransitionOrigin{.originalVersion = transitionInfo.from,
-                                                     .startPhase = SetFCVPhaseEnum::kStart,
-                                                     .isNewTransition = true};
-                }
-
-                // The start phase is now the one saved in the FCV document
-                auto fcvPhase = fcvDoc.getPhase();
-                // This should not fire. Nonetheless, we prefer to safe-guard it
-                tassert(11947901,
-                        "Empty phase reached while resolving transition",
-                        fcvPhase.is_initialized());
-                SetFCVPhaseEnum startPhase = fcvPhase.value();
-                return RequestedTransitionOrigin{
-                    .originalVersion = transitionInfo.from,
-                    .startPhase = startPhase,
-                    .isNewTransition = false,
-                };
-            }
-
-            if (transitionInfo.from == requestedVersion) {
-                // Returning back to the original FCV after a failed upgrade/downgrade. This is
-                // accomplished via a downgrade/upgrade towards the original FCV, going through all
-                // phases ("upgrading to downgrading" / "downgrading to upgrading" transition).
-                if (!repl::feature_flags::gFeatureFlagUpgradingToDowngrading.isEnabled() &&
-                    requestedVersion < actualVersion) {
-                    return boost::none;
-                }
-
-                return RequestedTransitionOrigin{
-                    .originalVersion = transitionInfo.to,
-                    .startPhase = SetFCVPhaseEnum::kStart,
-                    .isNewTransition = true,
-                };
-            }
-
-            // Impossible transition (requested FCV is "C", but we're a "A" -> "B" transition).
-            return boost::none;
-        }();
+        auto origin = _computeRequestedTransitionOrigin(fcvDoc, requestedVersion);
         if (!origin.has_value()) {
             return boost::none;
         }
@@ -293,6 +233,124 @@ public:
     }
 
 private:
+    // Result of identifying which transition the caller is requesting and from which phase it
+    // should start. Populated by _computeRequestedTransitionOrigin.
+    struct RequestedTransitionOrigin {
+        FCV originalVersion;
+        SetFCVPhaseEnum startPhase;
+        bool isNewTransition;
+    };
+
+    /**
+     * Determine the direction and starting phase of the requested setFCV transition by reading the
+     * on-disk FCV document. Three cases:
+     *
+     *   1. Doc records an in-progress phase (Symmetric FCV mid-transition): derive from/to from
+     *      the doc fields and either resume from the recorded phase, return-to-origin, or reject.
+     *   2. Doc has no phase and parses to a steady-state FCV: start a brand-new transition from
+     *      kStart.
+     *   3. Doc has no phase but parses to a transitional FCV (non-Symmetric FCV mid-transition):
+     *      legacy behavior — always restart from kStart.
+     *
+     * Returns boost::none for impossible transitions (e.g. an "upgrading to downgrading" request
+     * without the gFeatureFlagUpgradingToDowngrading flag enabled).
+     */
+    boost::optional<RequestedTransitionOrigin> _computeRequestedTransitionOrigin(
+        const FeatureCompatibilityVersionDocument& fcvDoc, FCV requestedVersion) const {
+        // Case 1: in-progress phase recorded in the doc (Symmetric FCV).
+        if (fcvDoc.getPhase().has_value()) {
+            // Phase is only ever written under Symmetric FCV (see
+            // updateFeatureCompatibilityVersionDocument). Seeing it here with the flag disabled
+            // means the on-disk state is inconsistent — refuse to act on it.
+            tassert(ErrorCodes::IllegalOperation,
+                    "FCV document has 'phase' field but Symmetric FCV is disabled",
+                    gFeatureFlagSymmetricFCV.isEnabled());
+
+            tassert(ErrorCodes::IllegalOperation,
+                    "FCV document has 'phase' field but targetVersion is missing",
+                    fcvDoc.getTargetVersion().has_value());
+
+            // After kEnableTargetFeatures the in-memory FCV is already the target (per the parser
+            // change), so we cannot use the in-memory FCV enum to determine protocol state — derive
+            // from/to directly from the doc fields.
+            //
+            // Direction-agnostic field reading:
+            //   - targetVersion is the destination FCV, set on every in-progress transition.
+            //   - previousVersion, when present, is the source FCV.
+            // The value_or fallback below makes this code correct for both schemas without
+            // depending on `previousVersion.has_value()` as a direction signal.
+            const FCV to = *fcvDoc.getTargetVersion();
+            const FCV from = fcvDoc.getPreviousVersion().value_or(fcvDoc.getVersion());
+
+            if (to == requestedVersion) {
+                // Resuming the in-progress transition.
+                return RequestedTransitionOrigin{
+                    .originalVersion = from,
+                    .startPhase = fcvDoc.getPhase().value(),
+                    .isNewTransition = false,
+                };
+            }
+
+            if (from == requestedVersion) {
+                // Returning back to the original FCV ("upgrading to downgrading" / "downgrading
+                // to upgrading"). Require the feature flag for returning from an in-progress
+                // upgrade (from < to means it was an upgrade).
+                if (!repl::feature_flags::gFeatureFlagUpgradingToDowngrading.isEnabled() &&
+                    from < to) {
+                    return boost::none;
+                }
+                return RequestedTransitionOrigin{
+                    .originalVersion = to,
+                    .startPhase = SetFCVPhaseEnum::kStart,
+                    .isNewTransition = true,
+                };
+            }
+
+            // Impossible transition (requested FCV is neither the destination nor the origin).
+            return boost::none;
+        }
+
+        // No in-progress phase in the doc: either a steady-state (Case 2) or a non-Symmetric FCV
+        // transitional state (Case 3) — phase is never written under non-Symmetric FCV.
+        FCV actualVersion =
+            uassertStatusOK(FeatureCompatibilityVersionParser::parse(fcvDoc.toBSON()));
+
+        if (!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(actualVersion)) {
+            // Case 2: starting a new upgrade/downgrade from steady-state.
+            return RequestedTransitionOrigin{.originalVersion = actualVersion,
+                                             .startPhase = SetFCVPhaseEnum::kStart,
+                                             .isNewTransition = true};
+        }
+
+        // Case 3: non-Symmetric FCV with a transitional FCV in the doc but no phase field.
+        // Legacy behavior — always restart from kStart with a new change timestamp.
+        // TODO (SERVER-127882): Once gFeatureFlagSymmetricFCV is permanently enabled
+        // (when 9.0 becomes lastLTS), this entire Case 3 block becomes dead code — under
+        // Symmetric, a transitional doc always carries the phase field and is handled by Case 1.
+        auto transitionInfo = getTransitionFCVInfo(actualVersion);
+        if (transitionInfo.to == requestedVersion) {
+            return RequestedTransitionOrigin{.originalVersion = transitionInfo.from,
+                                             .startPhase = SetFCVPhaseEnum::kStart,
+                                             .isNewTransition = true};
+        }
+
+        if (transitionInfo.from == requestedVersion) {
+            // Returning back to the original FCV after a failed upgrade/downgrade.
+            if (!repl::feature_flags::gFeatureFlagUpgradingToDowngrading.isEnabled() &&
+                requestedVersion < actualVersion) {
+                return boost::none;
+            }
+            return RequestedTransitionOrigin{
+                .originalVersion = transitionInfo.to,
+                .startPhase = SetFCVPhaseEnum::kStart,
+                .isNewTransition = true,
+            };
+        }
+
+        // Impossible transition.
+        return boost::none;
+    }
+
     stdx::unordered_map<FCV, FeatureCompatibilityVersionDocument> _fcvDocuments;
 
     // Map: (fromVersion, newVersion) -> (transitional version, only from config server).
@@ -415,20 +473,23 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
     auto isCleaningServerMetadata = fcvDoc.getIsCleaningServerMetadata();
 
     if (isCleaningServerMetadata.is_initialized() && *isCleaningServerMetadata) {
+
         bool downgradeInProgress =
             fcvDoc.getTargetVersion() < fcvDoc.getPreviousVersion().value_or(fcvDoc.getVersion());
-        uassert(
-            10778001,
-            "Cannot downgrade featureCompatibilityVersion if a previous FCV upgrade stopped in the "
-            "middle of cleaning up internal server metadata. Retry the FCV upgrade until it "
-            "succeeds before attempting to downgrade the FCV.",
-            newVersion > fromVersion || downgradeInProgress);
-        uassert(
-            7428200,
-            "Cannot upgrade featureCompatibilityVersion if a previous FCV downgrade stopped in the "
-            "middle of cleaning up internal server metadata. Retry the FCV downgrade until it "
-            "succeeds before attempting to upgrade the FCV.",
-            newVersion < fromVersion || !downgradeInProgress);
+
+        auto transitionInfo = getTransitionFCVInfo(resolvedTransition->transitionalVersion);
+        bool downgradeRequired = transitionInfo.to < transitionInfo.from;
+
+        uassert(10778001,
+                "Cannot downgrade featureCompatibilityVersion if a previous FCV upgrade "
+                "stopped in the middle of cleaning up internal server metadata. Retry the FCV "
+                "upgrade until it succeeds before attempting to downgrade the FCV.",
+                !downgradeRequired || downgradeInProgress);
+        uassert(7428200,
+                "Cannot upgrade featureCompatibilityVersion if a previous FCV downgrade stopped in "
+                "the middle of cleaning up internal server metadata. Retry the FCV downgrade until "
+                "it succeeds before attempting to upgrade the FCV.",
+                downgradeRequired || !downgradeInProgress);
     }
 
 
@@ -461,11 +522,15 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
             "command which, for example, was temporarily stuck on network.",
             !previousTimestamp || previousTimestamp <= changeTimestamp);
     } else {
+        // Under Symmetric FCV, after kEnableTargetFeatures the in-memory FCV is already the
+        // target while the protocol is still in progress. Accept both the legacy transitional
+        // state and the case where the doc records an in-progress phase.
         uassert(5563601,
                 "Cannot transition to fully upgraded or fully downgraded state if the shard is not "
                 "in kUpgrading or kDowngrading state",
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
-                    .isUpgradingOrDowngrading());
+                        .isUpgradingOrDowngrading() ||
+                    fcvDoc.getPhase().has_value());
 
         tassert(5563502,
                 "Shard received a request for phase 2 of the 'setFeatureCompatibilityVersion' "

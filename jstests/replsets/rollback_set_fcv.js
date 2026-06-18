@@ -165,7 +165,6 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     // set previousVersion = toFCV (the from-version) because phase > kComplete. For downgrades,
     // previousVersion is always toFCV (encoded in the downgrade document template). Without
     // symmetric FCV the phase writes are skipped, so previousVersion is not written for upgrades.
-    // TODO SERVER-127882 remove SymmetricFCV check once 9.0 becomes last LTS.
     const expectedPreviousVersion =
         fromFCV === lastLTSFCV || FeatureFlagUtil.isPresentAndEnabled(primary, "SymmetricFCV")
             ? toFCV
@@ -197,7 +196,13 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     // primary to rollback and transition from rollback to secondary. If the FCV change also
     // triggers a topology version change, then the topology version gap between before and after
     // rollback should be 4.
-    const topologyVersionDiff = 4;
+    // With SymmetricFCV, kCommitAddedFeatures on disk parses to lastLTSFCV (same as the
+    // in-memory value after the final write), so onReplicationRollback sees no FCV change
+    // and skips the topology bump. Without SymmetricFCV the disk has a transitional enum
+    // that differs from the fully-downgraded in-memory FCV, triggering the bump.
+    const topologyVersionDiff = FeatureFlagUtil.isPresentAndEnabled(primary, "SymmetricFCV")
+        ? 3
+        : 4;
     assert.eq(
         topologyVersionBeforeRollback.counter + topologyVersionDiff,
         topologyVersionAfterRollback.counter,
