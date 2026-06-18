@@ -188,12 +188,16 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradedOptionsConsistentWithNewV
     auto collPtr1 = catalog->lookupCollectionByNamespace(operationContext(), nss1);
     auto collPtr2 = catalog->lookupCollectionByNamespace(operationContext(), nss2);
 
-    auto options1 =
-        catalog->lookupCollectionByNamespace(operationContext(), nss1)->getCollectionOptions();
-    auto options2 =
-        catalog->lookupCollectionByNamespace(operationContext(), nss2)->getCollectionOptions();
-    ASSERT_BSONOBJ_EQ(collPtr1->getCollectionOptions().toBSON(false /* includeUUID */),
-                      collPtr2->getCollectionOptions().toBSON(false /* includeUUID */));
+    // Strip 'fixedBucketing' before comparing: upgraded collections and newly-created collections
+    // are expected to have different values; 'fixedBucketing' behavior is tested separately in
+    // DowngradeStripsFixedBucketing.
+    auto opts1 = collPtr1->getCollectionOptions();
+    auto opts2 = collPtr2->getCollectionOptions();
+    if (opts1.timeseries)
+        opts1.timeseries->setFixedBucketing(OptionalBool{});
+    if (opts2.timeseries)
+        opts2.timeseries->setFixedBucketing(OptionalBool{});
+    ASSERT_BSONOBJ_EQ(opts1.toBSON(false /* includeUUID */), opts2.toBSON(false /* includeUUID */));
 
     ASSERT_BSONOBJ_EQ(collPtr1->getValidatorDoc(), collPtr2->getValidatorDoc());
     ASSERT(!collPtr2->getValidatorDoc().isEmpty());

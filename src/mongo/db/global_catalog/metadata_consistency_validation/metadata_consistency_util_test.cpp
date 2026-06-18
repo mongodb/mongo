@@ -40,6 +40,7 @@
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/collation/collator_factory_icu.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
@@ -483,6 +484,14 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
         // The TimeseriesOptions sent to the create cmd are slightly different to the ones stored in
         // the Catalog.
         uassertStatusOK(timeseries::validateAndSetBucketingParameters(timeseriesOptions));
+        // Mirror what collection creation does: default 'fixedBucketing' to true for new viewless
+        // time-series collections when the FixedBucketingCatalog feature flag is on.
+        // (Ignore FCV check): the test runs at the latest FCV, so the feature flags' enabled state
+        // is all that matters here.
+        if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe()) {
+            timeseries::setFixedBucketingDefaultForNewCollection(
+                timeseriesOptions, gFeatureFlagFixedBucketingCatalog.isEnabledAndIgnoreFCVUnsafe());
+        }
         return timeseriesOptions;
     };
 

@@ -177,7 +177,8 @@ feature_flags:
         description: >-
             Enables catalog support for the fixedBucketing timeseries option.
         cpp_varname: gFeatureFlagFixedBucketingCatalog
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
         check_against_fcv: operation_fcv_only
     featureFlagMongodProxyProtocolSupport:

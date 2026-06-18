@@ -25,6 +25,7 @@
  * internal commands require ActionType::internal).
  *
  * @tags: [
+ *   requires_fcv_90,
  *   requires_replication,
  *   requires_timeseries,
  *   featureFlagFixedBucketingCatalog,
