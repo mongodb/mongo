@@ -73,7 +73,7 @@ class MultiversionConfigSubcommand(Subcommand):
         )
         last_patch_fcv = multiversion_service.get_last_patch_fcv() if include_last_patch else None
         return MultiversionConfig(
-            last_versions=multiversionconstants.OLD_VERSIONS,
+            last_versions=multiversion_service.get_last_versions(),
             requires_fcv_tag=version_constants.get_fcv_tag_list(),
             requires_fcv_tag_lts=version_constants.get_lts_fcv_tag_list(),
             requires_fcv_tag_continuous=version_constants.get_continuous_fcv_tag_list(),

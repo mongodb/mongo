@@ -11,6 +11,7 @@ import yaml
 from packaging.version import Version
 from pydantic import BaseModel, Field
 
+from buildscripts.resmokelib import config
 from buildscripts.resmokelib.multiversion.previous_release_tag import (
     find_previous_release_tag,
 )
@@ -86,26 +87,6 @@ class VersionConstantValues(NamedTuple):
     def get_fcv_tags_less_than_latest(self) -> list[str]:
         """Get the list of all fcv tags less than the latest."""
         return [tag_str(fcv) for fcv in self.fcvs_less_than_latest]
-
-    def build_last_lts_binary(self, base_name: str) -> str:
-        """
-        Build the name of the binary that the LTS version of the given tool will have.
-
-        :param base_name: Base name of binary (mongo, mongod, mongos).
-        :return: Name of LTS version of the given tool.
-        """
-        last_lts = self.get_last_lts_fcv()
-        return f"{base_name}-{last_lts}"
-
-    def build_last_continuous_binary(self, base_name: str) -> str:
-        """
-        Build the name of the binary that the continuous version of the given tool will have.
-
-        :param base_name: Base name of binary (mongo, mongod, mongos).
-        :return: Name of continuous version of the given tool.
-        """
-        last_continuous = self.get_last_continuous_fcv()
-        return f"{base_name}-{last_continuous}"
 
     def get_eols(self) -> list[str]:
         """Get EOL'd versions as list of strings."""
@@ -224,8 +205,15 @@ class MultiversionService:
             lambda tag_pattern: find_previous_release_tag("HEAD", tag_pattern=tag_pattern)
         )
         self._last_patch_cache: object = _UNRESOLVED
+        self._version_constants: Optional[VersionConstantValues] = None
 
-    def calculate_version_constants(self) -> VersionConstantValues:
+    def get_version_constants(self) -> VersionConstantValues:
+        """Get the multiversion constants, computing them once on first call."""
+        if self._version_constants is None:
+            self._version_constants = self._calculate_version_constants()
+        return self._version_constants
+
+    def _calculate_version_constants(self) -> VersionConstantValues:
         """Calculate multiversion constants from data files."""
         latest = self.mongo_version.get_version()
         fcvs = self.mongo_releases.get_fcv_versions()
@@ -293,12 +281,39 @@ class MultiversionService:
             return None
         return last_patch_tag[1:]
 
-    def get_last_patch_binary_name(self, base_name: str) -> str:
-        """
-        Return the name of the binary file corresponding to last-patch release of the given tool.
+    def get_binary_name_for_version(self, version: str, base_name: str) -> str:
+        """Return the old binary name (e.g. 'mongod-8.0') for a multiversion option.
 
-          :param base_name: Base name of binary (mongod, mongos, etc...).
-          :return: Name of last patch version of the given tool.
+        :param version: One of the config.MultiversionOptions constants (LAST_LTS,
+            LAST_CONTINUOUS, LAST_PATCH).
+        :param base_name: The binary base name, e.g. 'mongod' or 'mongos'.
         """
-        last_patch_fcv = self.get_last_patch_fcv()
-        return f"{base_name}-{last_patch_fcv}"
+        version_constants = self.get_version_constants()
+        fcv_for_option = {
+            config.MultiversionOptions.LAST_LTS: version_constants.get_last_lts_fcv,
+            config.MultiversionOptions.LAST_CONTINUOUS: version_constants.get_last_continuous_fcv,
+            config.MultiversionOptions.LAST_PATCH: self.get_last_patch_fcv,
+        }
+        if version not in fcv_for_option:
+            raise ValueError(f"Unknown multiversion option: {version}")
+        return f"{base_name}-{fcv_for_option[version]()}"
+
+    def get_last_versions(self) -> list[str]:
+        """Return the last release version names to use in multiversion testing.
+
+        These are the latest release versions from which an upgrade to the current release is
+        supported. Returns ``[LAST_LTS]`` when last-continuous equals last-LTS or is EOL'd,
+        otherwise ``[LAST_LTS, LAST_CONTINUOUS]``.
+        """
+        version_constants = self.get_version_constants()
+        last_lts_fcv = version_constants.get_last_lts_fcv()
+        last_continuous_fcv = version_constants.get_last_continuous_fcv()
+        if (
+            last_continuous_fcv == last_lts_fcv
+            or last_continuous_fcv in version_constants.get_eols()
+        ):
+            return [config.MultiversionOptions.LAST_LTS]
+        return [
+            config.MultiversionOptions.LAST_LTS,
+            config.MultiversionOptions.LAST_CONTINUOUS,
+        ]

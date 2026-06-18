@@ -38,12 +38,18 @@ MONGO_RUNNER_SUBDIR = "mongorunner"
 # The latter is set automatically as part of resmoke's option parsing on startup.
 ##
 
+# Plain binary base names. Unlike DEFAULT_MONGO*_EXECUTABLE (which may be resolved to an
+# absolute executable path), these always stay the bare names and are used when constructing
+# multiversion binary names such as "mongod-8.0".
+MONGOD_BIN_NAME = "mongod"
+MONGOS_BIN_NAME = "mongos"
+
 # We default to search for executables in the current working directory or in /data/multiversion
 # which are both part of the PATH.
 DEFAULT_DBTEST_EXECUTABLE = os.path.join(os.curdir, "dbtest")
 DEFAULT_MONGO_EXECUTABLE = "mongo"
-DEFAULT_MONGOD_EXECUTABLE = "mongod"
-DEFAULT_MONGOS_EXECUTABLE = "mongos"
+DEFAULT_MONGOD_EXECUTABLE = MONGOD_BIN_NAME
+DEFAULT_MONGOS_EXECUTABLE = MONGOS_BIN_NAME
 DEFAULT_MONGOT_EXECUTABLE = "mongot-localdev/mongot"
 DEFAULT_MONGOTEST_EXECUTABLE = "mongotest"
 

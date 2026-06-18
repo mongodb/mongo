@@ -310,10 +310,10 @@ class ReplSetBuilder(FixtureBuilder):
         binary_versions = [BinVersionEnum.NEW for _ in range(kwargs["num_nodes"])]
 
         if mixed_bin_versions is not None:
-            from buildscripts.resmokelib.multiversionconstants import get_binary_name_for_version
+            from buildscripts.resmokelib.multiversionconstants import multiversion_service
 
-            old_mongod_version = get_binary_name_for_version(
-                old_bin_version, config.DEFAULT_MONGOD_EXECUTABLE
+            old_mongod_version = multiversion_service.get_binary_name_for_version(
+                old_bin_version, config.MONGOD_BIN_NAME
             )
 
             executables[BinVersionEnum.OLD] = old_mongod_version
@@ -617,10 +617,10 @@ class ShardedClusterBuilder(FixtureBuilder):
         _class = cls.LATEST_MONGOS_CLASS
 
         if mixed_bin_versions is not None:
-            from buildscripts.resmokelib.multiversionconstants import get_binary_name_for_version
+            from buildscripts.resmokelib.multiversionconstants import multiversion_service
 
-            old_mongos_version = get_binary_name_for_version(
-                old_bin_version, config.DEFAULT_MONGOS_EXECUTABLE
+            old_mongos_version = multiversion_service.get_binary_name_for_version(
+                old_bin_version, config.MONGOS_BIN_NAME
             )
 
             executables[BinVersionEnum.OLD] = old_mongos_version

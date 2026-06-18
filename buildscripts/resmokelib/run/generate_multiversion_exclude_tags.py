@@ -110,8 +110,8 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
     # mongo shell executable.
     from buildscripts.resmokelib import multiversionconstants
 
-    old_mongod = multiversionconstants.get_binary_name_for_version(
-        old_bin_version, config.DEFAULT_MONGOD_EXECUTABLE
+    old_mongod = multiversionconstants.multiversion_service.get_binary_name_for_version(
+        old_bin_version, config.MONGOD_BIN_NAME
     )
 
     old_version_commit_hash = get_backports_required_hash(old_mongod)

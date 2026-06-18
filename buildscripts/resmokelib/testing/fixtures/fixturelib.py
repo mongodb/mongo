@@ -141,13 +141,6 @@ class _FixtureConfig(object):
 
     def __init__(self):
         """Initialize FixtureConfig, setting values."""
-        from buildscripts.resmokelib.multiversionconstants import (
-            LAST_CONTINUOUS_MONGOD_BINARY,
-            LAST_CONTINUOUS_MONGOS_BINARY,
-            LAST_LTS_MONGOD_BINARY,
-            LAST_LTS_MONGOS_BINARY,
-        )
-
         self.MONGOD_EXECUTABLE = config.MONGOD_EXECUTABLE
         self.DEFAULT_MONGOD_EXECUTABLE = config.DEFAULT_MONGOD_EXECUTABLE
         self.MONGOD_SET_PARAMETERS = config.MONGOD_SET_PARAMETERS
@@ -155,10 +148,6 @@ class _FixtureConfig(object):
         self.FIXTURE_SUBDIR = config.FIXTURE_SUBDIR
         self.AUTO_KILL = config.AUTO_KILL
         self.ALWAYS_USE_LOG_FILES = config.ALWAYS_USE_LOG_FILES
-        self.LAST_LTS_MONGOD_BINARY = LAST_LTS_MONGOD_BINARY
-        self.LAST_LTS_MONGOS_BINARY = LAST_LTS_MONGOS_BINARY
-        self.LAST_CONTINUOUS_MONGOD_BINARY = LAST_CONTINUOUS_MONGOD_BINARY
-        self.LAST_CONTINUOUS_MONGOS_BINARY = LAST_CONTINUOUS_MONGOS_BINARY
         self.USE_LEGACY_MULTIVERSION = config.USE_LEGACY_MULTIVERSION
         self.ENABLED_FEATURE_FLAGS = config.ENABLED_FEATURE_FLAGS
         self.IFR_FEATURE_FLAGS = config.IFR_FEATURE_FLAGS

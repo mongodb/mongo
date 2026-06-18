@@ -6,6 +6,7 @@ from unittest import TestCase
 from packaging.version import Version
 
 import buildscripts.resmokelib.multiversion.multiversion_service as under_test
+from buildscripts.resmokelib.config import MultiversionOptions
 
 
 class TestTagStr(TestCase):
@@ -69,7 +70,7 @@ class TestCalculateFcvConstants(TestCase):
             mongo_releases=mongo_releases,
         )
 
-        version_constants = multiversion_service.calculate_version_constants()
+        version_constants = multiversion_service.get_version_constants()
 
         self.assertEqual(version_constants.latest, Version("6.0"))
         self.assertEqual(version_constants.last_continuous, Version("5.3"))
@@ -128,7 +129,7 @@ class TestCalculateFcvConstants(TestCase):
             mongo_releases=mongo_releases,
         )
 
-        version_constants = multiversion_service.calculate_version_constants()
+        version_constants = multiversion_service.get_version_constants()
 
         self.assertEqual(version_constants.latest, Version("100.0"))
         self.assertEqual(version_constants.last_continuous, Version("6.1"))
@@ -229,12 +230,42 @@ class TestLastPatchOnMultiversionService(TestCase):
         self._make_service(resolver).get_last_patch_version()
         self.assertEqual(captured, ["r6.0.*"])
 
-    def test_calculate_version_constants_does_not_invoke_resolver(self):
+    def test_get_version_constants_does_not_invoke_resolver(self):
         def resolver(_pattern):
-            raise AssertionError("resolver should not be called from calculate_version_constants")
+            raise AssertionError("resolver should not be called from get_version_constants")
 
-        # If calculate_version_constants() touched the resolver this would raise.
-        self._make_service(resolver).calculate_version_constants()
+        # If get_version_constants() touched the resolver this would raise.
+        self._make_service(resolver).get_version_constants()
+
+    def test_get_version_constants_caches_result(self):
+        service = self._make_service(lambda _pattern: None)
+        self.assertIs(service.get_version_constants(), service.get_version_constants())
+
+    def test_get_binary_name_for_last_lts(self):
+        service = self._make_service(lambda _pattern: None)
+        self.assertEqual(
+            service.get_binary_name_for_version(MultiversionOptions.LAST_LTS, "mongod"),
+            "mongod-5.0",
+        )
+
+    def test_get_binary_name_for_last_continuous(self):
+        service = self._make_service(lambda _pattern: None)
+        self.assertEqual(
+            service.get_binary_name_for_version(MultiversionOptions.LAST_CONTINUOUS, "mongos"),
+            "mongos-5.0",
+        )
+
+    def test_get_binary_name_for_last_patch(self):
+        service = self._make_service(lambda _pattern: "r8.3.1")
+        self.assertEqual(
+            service.get_binary_name_for_version(MultiversionOptions.LAST_PATCH, "mongod"),
+            "mongod-8.3",
+        )
+
+    def test_get_binary_name_for_unknown_option_raises(self):
+        service = self._make_service(lambda _pattern: None)
+        with self.assertRaises(ValueError):
+            service.get_binary_name_for_version("not_a_real_option", "mongod")
 
     def test_resolver_called_at_most_once_across_repeated_calls(self):
         calls = []
@@ -263,6 +294,50 @@ class TestLastPatchOnMultiversionService(TestCase):
             service.get_last_patch_version()
             service.get_last_patch_fcv()
         self.assertEqual(calls, ["r6.0.*"])
+
+
+class TestGetOldVersions(TestCase):
+    def _make_service(self, fcvs, lts, eols):
+        return under_test.MultiversionService(
+            mongo_version=under_test.MongoVersion(mongo_version=fcvs[-1]),
+            mongo_releases=under_test.MongoReleases(
+                **{
+                    "featureCompatibilityVersions": fcvs,
+                    "longTermSupportReleases": lts,
+                    "eolVersions": eols,
+                }
+            ),
+        )
+
+    def test_last_continuous_distinct_and_not_eol_returns_both(self):
+        # latest=6.0, last_continuous=5.3, last_lts=5.0, 5.3 not EOL.
+        service = self._make_service(
+            fcvs=["4.0", "5.0", "5.1", "5.2", "5.3", "6.0"],
+            lts=["4.0", "5.0"],
+            eols=[],
+        )
+        self.assertEqual(
+            service.get_last_versions(),
+            [MultiversionOptions.LAST_LTS, MultiversionOptions.LAST_CONTINUOUS],
+        )
+
+    def test_last_continuous_eol_returns_only_lts(self):
+        # latest=6.0, last_continuous=5.3, last_lts=5.0, 5.3 is EOL.
+        service = self._make_service(
+            fcvs=["4.0", "5.0", "5.1", "5.2", "5.3", "6.0"],
+            lts=["4.0", "5.0"],
+            eols=["5.3"],
+        )
+        self.assertEqual(service.get_last_versions(), [MultiversionOptions.LAST_LTS])
+
+    def test_last_continuous_equals_last_lts_returns_only_lts(self):
+        # latest=6.0, last_continuous and last_lts both 5.0.
+        service = self._make_service(
+            fcvs=["4.0", "5.0", "6.0"],
+            lts=["4.0", "5.0"],
+            eols=[],
+        )
+        self.assertEqual(service.get_last_versions(), [MultiversionOptions.LAST_LTS])
 
 
 if __name__ == "__main__":

@@ -19,9 +19,6 @@ from buildscripts.resmokelib.multiversion.multiversion_service import (
 from buildscripts.resmokelib.multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
 from buildscripts.util.expansions import get_expansion
 
-LAST_LTS = "last_lts"
-LAST_CONTINUOUS = "last_continuous"
-
 RELEASES_LOCAL_FILE = os.path.join(
     _config.RESMOKE_ROOT, "src", "mongo", "util", "version", "releases.yml"
 )
@@ -160,17 +157,11 @@ multiversion_service = MultiversionService(
     mongo_releases=MongoReleases.from_yaml_file(_config.RELEASES_FILE),
 )
 
-version_constants = multiversion_service.calculate_version_constants()
+version_constants = multiversion_service.get_version_constants()
 
 LAST_LTS_FCV = version_constants.get_last_lts_fcv()
 LAST_CONTINUOUS_FCV = version_constants.get_last_continuous_fcv()
 LATEST_FCV = version_constants.get_latest_fcv()
-
-LAST_CONTINUOUS_MONGOD_BINARY = version_constants.build_last_continuous_binary("mongod")
-LAST_CONTINUOUS_MONGOS_BINARY = version_constants.build_last_continuous_binary("mongos")
-
-LAST_LTS_MONGOD_BINARY = version_constants.build_last_lts_binary("mongod")
-LAST_LTS_MONGOS_BINARY = version_constants.build_last_lts_binary("mongos")
 
 # Last patch release info (e.g. version '8.3.1', FCV '8.3') is derived from
 # git tag history. Resolution is on-demand and memoized: callers reach it via
@@ -188,29 +179,6 @@ REQUIRES_FCV_TAGS_LESS_THAN_LATEST = version_constants.get_fcv_tags_less_than_la
 # Generate evergreen project names for all FCVs less than latest.
 EVERGREEN_PROJECTS = ["mongodb-mongo-master"]
 EVERGREEN_PROJECTS.extend([evg_project_str(fcv) for fcv in version_constants.fcvs_less_than_latest])
-
-OLD_VERSIONS = (
-    [LAST_LTS]
-    if LAST_CONTINUOUS_FCV == LAST_LTS_FCV or LAST_CONTINUOUS_FCV in version_constants.get_eols()
-    else [LAST_LTS, LAST_CONTINUOUS]
-)
-
-
-def get_binary_name_for_version(version: str, base_name: str) -> str:
-    """Return the old binary name (e.g. 'mongod-8.0') for a multiversion option.
-
-    :param version: One of the _config.MultiversionOptions constants (LAST_LTS, LAST_CONTINUOUS,
-        LAST_PATCH).
-    :param base_name: The binary base name, e.g. 'mongod' or 'mongos'.
-    """
-    binary_builders = {
-        _config.MultiversionOptions.LAST_LTS: version_constants.build_last_lts_binary,
-        _config.MultiversionOptions.LAST_CONTINUOUS: version_constants.build_last_continuous_binary,
-        _config.MultiversionOptions.LAST_PATCH: multiversion_service.get_last_patch_binary_name,
-    }
-    if version not in binary_builders:
-        raise ValueError(f"Unknown multiversion option: {version}")
-    return binary_builders[version](base_name)
 
 
 def log_constants(exec_log):

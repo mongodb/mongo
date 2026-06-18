@@ -96,6 +96,17 @@ class TestBuildShardedCluster(unittest.TestCase):
 
         from buildscripts.resmokelib import multiversionconstants
 
+        last_lts_mongod_binary = (
+            multiversionconstants.multiversion_service.get_binary_name_for_version(
+                config.MultiversionOptions.LAST_LTS, config.MONGOD_BIN_NAME
+            )
+        )
+        last_lts_mongos_binary = (
+            multiversionconstants.multiversion_service.get_binary_name_for_version(
+                config.MultiversionOptions.LAST_LTS, config.MONGOS_BIN_NAME
+            )
+        )
+
         # configsvr nodes are always latest
         self.assertEqual(
             sharded_cluster.configsvr.nodes[0].mongod_executable, config.DEFAULT_MONGOD_EXECUTABLE
@@ -109,13 +120,13 @@ class TestBuildShardedCluster(unittest.TestCase):
         )
         self.assertEqual(
             sharded_cluster.shards[0].nodes[1].mongod_executable,
-            multiversionconstants.LAST_LTS_MONGOD_BINARY,
+            last_lts_mongod_binary,
         )
         self.assertEqual(sharded_cluster.shards[0].fcv, multiversionconstants.LAST_LTS_FCV)
         # 2st repl set nodes are last-lts and latest (old_new)
         self.assertEqual(
             sharded_cluster.shards[1].nodes[0].mongod_executable,
-            multiversionconstants.LAST_LTS_MONGOD_BINARY,
+            last_lts_mongod_binary,
         )
         self.assertEqual(
             sharded_cluster.shards[1].nodes[1].mongod_executable, config.DEFAULT_MONGOD_EXECUTABLE
@@ -124,7 +135,7 @@ class TestBuildShardedCluster(unittest.TestCase):
         # mongos is last-lts
         self.assertEqual(
             sharded_cluster.mongos[0].mongos_executable,
-            multiversionconstants.LAST_LTS_MONGOS_BINARY,
+            last_lts_mongos_binary,
         )
 
     def test_build_sharded_cluster_multiversion_with_feature_flags(self):
