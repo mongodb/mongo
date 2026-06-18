@@ -202,6 +202,45 @@ def write_list_to_text_file(str_list: list, file_path: str) -> None:
         logger.info("Text file saved to %s", file_path)
 
 
+def format_warnings_for_comment(warnings_text: str) -> str:
+    """Convert the flat warnings text into a structured markdown section."""
+    version_mismatch_rows: list[tuple[str, str, str, str]] = []
+    grouped: dict[str, list[str]] = {}
+
+    for raw_line in warnings_text.splitlines():
+        line = raw_line.lstrip("- ").strip()
+        if not line:
+            continue
+
+        m = re.match(
+            r"VERSION MISMATCH: (.+?): Endor (.+?); Import script (.+?)\. 'priority_version_source': (.+)",
+            line,
+        )
+        if m:
+            version_mismatch_rows.append((m.group(1), m.group(2), m.group(3), m.group(4)))
+            continue
+
+        prefix = line.split(":")[0].strip() if ":" in line else "OTHER"
+        body = line[len(prefix) + 1 :].strip() if line.startswith(prefix + ":") else line
+        grouped.setdefault(prefix, []).append(body)
+
+    parts: list[str] = []
+
+    if version_mismatch_rows:
+        parts.append("#### Version Mismatches\n")
+        parts.append("| Package | Endor Version | Import Script Version | Priority Source |")
+        parts.append("|---------|--------------|----------------------|-----------------|")
+        for purl, endor_ver, import_ver, source in sorted(version_mismatch_rows):
+            parts.append(f"| `{purl}` | {endor_ver} | {import_ver} | {source} |")
+
+    for prefix, messages in sorted(grouped.items()):
+        parts.append(f"\n#### {prefix}\n")
+        for msg in messages:
+            parts.append(f"- {msg}")
+
+    return "\n".join(parts) if parts else "_No warnings._"
+
+
 def get_subfolders_list(repo_root: str, base_folder_path: str = ".", subfolders=None) -> list:
     """Get list of all directories in the specified path and subfolders"""
 
@@ -318,6 +357,25 @@ def deduplicate_list_of_dicts(list_of_dicts):
     return unique_list
 
 
+def prune_orphaned_depends_on(bom: dict) -> int:
+    """Remove dependsOn entries whose target bom-ref has no matching component.
+
+    Returns the number of refs pruned.
+    """
+    component_refs = set()
+    meta_comp = bom.get("metadata", {}).get("component", {})
+    if "bom-ref" in meta_comp:
+        component_refs.add(meta_comp["bom-ref"])
+    component_refs |= {c["bom-ref"] for c in bom.get("components", []) if "bom-ref" in c}
+
+    pruned = 0
+    for dep in bom.get("dependencies", []):
+        before = len(dep.get("dependsOn", []))
+        dep["dependsOn"] = [r for r in dep.get("dependsOn", []) if r in component_refs]
+        pruned += before - len(dep["dependsOn"])
+    return pruned
+
+
 # endregion functions and classes
 
 
@@ -431,6 +489,12 @@ def main() -> None:
         default=None,
         type=str,
     )
+    parser.add_argument(
+        "--save-endor-sbom-path",
+        help="Save the raw Endor Labs SBOM (before any post-processing) to a specified file.",
+        default=None,
+        type=str,
+    )
     parser.add_argument("--debug", help="Set logging level to DEBUG", action="store_true")
 
     # endregion define args
@@ -489,6 +553,7 @@ def main() -> None:
     sbom_in_path = args.sbom_in
     sbom_metadata_path = args.sbom_metadata
     save_warnings = args.save_warnings
+    save_endor_sbom_path = args.save_endor_sbom_path
 
     # environment
     retry_limit = args.retry_limit
@@ -526,6 +591,10 @@ def main() -> None:
         else:
             logger.error(f"Check Endor Labs for status of the target {target} monitoring scan.")
         sys.exit(1)
+
+    if save_endor_sbom_path:
+        write_sbom_json_file(endor_bom, save_endor_sbom_path)
+        logger.info("Saved raw Endor Labs SBOM to '%s'", save_endor_sbom_path)
 
     # endregion export Endor Labs SBOM
 
@@ -620,6 +689,12 @@ def main() -> None:
 
     if os.path.exists(sbom_in_path):
         prev_bom = read_sbom_json_file(sbom_in_path)
+        pruned = prune_orphaned_depends_on(prev_bom)
+        if pruned:
+            logger.info(
+                "PREVIOUS SBOM: Pruned %d orphaned dependsOn reference(s) from previous SBOM before merging.",
+                pruned,
+            )
     else:
         logger.warning(
             "PREVIOUS SBOM: No previous SBOM file at `%s`. The new SBOM will be generated without any previous context. This is unexpected, but not fatal.",
@@ -659,9 +734,22 @@ def main() -> None:
 
     meta_bom_ref = meta_bom["metadata"]["component"]["bom-ref"]
 
-    # If this is a multi-package SBOM export, add the Endor SBOM metadata.component.components[] as dependencies to the parent component in the metadata SBOM, so they are included in the dependency graph.
+    # If this is a multi-package SBOM export, add the Endor SBOM metadata.component.components[]
+    # as dependencies to the parent component in the metadata SBOM so they appear in the graph.
+    # Resolve to canonical bom-refs (without Endor ?package-id=... suffixes) where possible.
+    meta_bom_refs_by_versionless = {
+        c["bom-ref"].split("@")[0]: c["bom-ref"] for c in meta_bom["components"]
+    }
     for component in endor_bom["metadata"]["component"].get("components", []):
-        add_component_dependsOn(meta_bom["dependencies"], meta_bom_ref, component["bom-ref"])
+        endor_ref = component["bom-ref"]
+        canonical = meta_bom_refs_by_versionless.get(endor_ref.split("@")[0])
+        if canonical is None:
+            logger.info(
+                "DEPENDENCIES: Skipping sub-component dependsOn link for '%s' — no matching canonical component in metadata SBOM.",
+                endor_ref,
+            )
+            continue
+        add_component_dependsOn(meta_bom["dependencies"], meta_bom_ref, canonical)
 
     # region MongoDB primary component
 
@@ -1052,18 +1140,25 @@ def main() -> None:
         ref = endor_dep.get("ref")
         if not ref or ref not in final_component_refs:
             continue
+        # Filter dependsOn targets to only those present in the final SBOM component set,
+        # preventing orphaned refs introduced when Endor reports multiple versions of the
+        # same package and sbom_components_to_dict deduplication drops all but one.
+        filtered_depends_on = [
+            r for r in endor_dep.get("dependsOn", []) if r in final_component_refs
+        ]
         if ref in meta_deps_by_ref:
             existing = meta_deps_by_ref[ref]
-            if set(existing.get("dependsOn", [])) != set(endor_dep.get("dependsOn", [])):
+            if set(existing.get("dependsOn", [])) != set(filtered_depends_on):
                 logger.warning(
                     "DEPENDENCIES: Collision on ref '%s': metadata dependsOn %s; Endor Labs dependsOn %s. Using Endor Labs data.",
                     ref,
                     existing.get("dependsOn", []),
-                    endor_dep.get("dependsOn", []),
+                    filtered_depends_on,
                 )
-                existing["dependsOn"] = endor_dep["dependsOn"]
+                existing["dependsOn"] = filtered_depends_on
                 merged_collisions += 1
         else:
+            endor_dep["dependsOn"] = filtered_depends_on
             meta_bom["dependencies"].append(endor_dep)
             meta_deps_by_ref[ref] = endor_dep
             merged_new += 1
@@ -1160,18 +1255,10 @@ def main() -> None:
                     )
                     license_entry["license"]["id"] = new
 
-    # Prune orphaned dependsOn refs before writing. These arise when the endorctl scan
-    # fails or is skipped: components are dropped from the SBOM but stale references to
-    # their BomRefs remain in other components' dependsOn lists, which causes silkbomb
-    # upload validation to reject the SBOM.
-    final_component_refs = {meta_bom["metadata"]["component"]["bom-ref"]} | {
-        c["bom-ref"] for c in meta_bom["components"]
-    }
-    pruned_depends_on_count = 0
-    for dep in meta_bom.get("dependencies", []):
-        before = len(dep.get("dependsOn", []))
-        dep["dependsOn"] = [r for r in dep.get("dependsOn", []) if r in final_component_refs]
-        pruned_depends_on_count += before - len(dep["dependsOn"])
+    # Prune any remaining orphaned dependsOn refs before writing. After pruning prev_bom
+    # at load time these should be zero; a non-zero count here indicates an endorctl scan
+    # failure or skip that dropped components from the current run.
+    pruned_depends_on_count = prune_orphaned_depends_on(meta_bom)
     if pruned_depends_on_count:
         logger.warning(
             "DEPENDENCIES: Pruned %d orphaned dependsOn reference(s) with no matching component. "
@@ -1234,10 +1321,17 @@ def main() -> None:
         warnings.append("- " + record.getMessage())
     warnings.sort()
 
-    print("\n".join(warnings))
+    raw_warnings = "\n".join(warnings)
+    formatted_warnings = format_warnings_for_comment(raw_warnings)
+    print(formatted_warnings)
 
     if save_warnings:
-        write_list_to_text_file(warnings, save_warnings)
+        try:
+            with open(os.path.abspath(save_warnings), "w", encoding="utf-8") as f:
+                f.write(formatted_warnings)
+            logger.info("Warnings file saved to %s", save_warnings)
+        except OSError as e:
+            logger.error("Error writing warnings file to %s: %s", save_warnings, e)
 
     print_banner("COMPLETED")
     if not os.getenv("CI"):

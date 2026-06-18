@@ -318,9 +318,11 @@ if __name__ == "__main__":
                 )
                 pr_comment += "\n\n"
             pr_comment += "---\n\n"
-            pr_comment += "### The following warnings were output by the SBOM generation script:\n"
+            pr_comment += "### Warnings from SBOM generation script\n\n"
             if os.path.isfile(args.saved_warnings):
                 pr_comment += read_text_file(args.saved_warnings)
+            else:
+                pr_comment += "_No warnings file found._"
 
             # Edit the bot's existing comment rather than adding a new one each run,
             # which would clutter long-lived PRs.
@@ -330,7 +332,7 @@ if __name__ == "__main__":
                     c
                     for c in pull_request.get_issue_comments()
                     if c.user.login == BOT_LOGIN
-                    and "The following warnings were output by the SBOM generation script" in c.body
+                    and "Warnings from SBOM generation script" in c.body
                 ),
                 None,
             )
