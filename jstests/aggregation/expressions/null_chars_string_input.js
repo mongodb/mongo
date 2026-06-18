@@ -420,6 +420,7 @@ const skips = new Set([
     "$_internalDensify",
     "$_internalDocumentResultsAndMetadata",
     "$_internalFindAndModifyImageLookup",
+    "$_internalHybridSearch",
     "$_internalInhibitOptimization",
     "$_internalListCollections",
     "$_internalJoinHint",

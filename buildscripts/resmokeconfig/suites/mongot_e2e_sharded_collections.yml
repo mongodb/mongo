@@ -23,6 +23,12 @@ selector:
     - jstests/with_mongot/e2e_lib/*_test.js
   exclude_files:
     - jstests/with_mongot/e2e/sharding_no_passthrough/**/*.js
+    # TODO SERVER-129249: $rankFusion/$scoreFusion inside a $unionWith/$lookup whose foreign target
+    # is a sharded view drops (or, for a search-defined view, over-rejects) the view because the
+    # feature-flag-on proactive view resolution does not propagate the foreign sub-pipeline view to
+    # the executing shard. Re-enable on the sharded suites once the trunk view-resolution fix lands.
+    - jstests/with_mongot/e2e/hybridSearch/rank_fusion_in_union_with_lookup_view.js
+    - jstests/with_mongot/e2e/hybridSearch/score_fusion_in_union_with_lookup_view.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_unsharded_collection

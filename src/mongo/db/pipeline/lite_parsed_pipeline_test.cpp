@@ -32,9 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_internal_hybrid_search.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/test_lite_parsed.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/scopeguard.h"
 
@@ -71,6 +73,19 @@ TEST(LiteParsedPipelineTest, HandleViewStitchesViewBeforeUserPipe) {
     ASSERT_EQ(stages[1]->getParseTimeName(), "$limit");
     ASSERT_EQ(stages[2]->getParseTimeName(), "$group");
     ASSERT_EQ(stages[3]->getParseTimeName(), "$sort");
+}
+
+DEATH_TEST_REGEX(LiteParsedInternalHybridSearchDeathTest,
+                 ViewApplicationPolicyIsUnreachable,
+                 "Tripwire assertion.*12109100") {
+    // The desugarer (SERVER-121970/121974) only ever appends the marker, never at position 0,
+    // so view application must never consult its policy.
+    LiteParsedInternalHybridSearch stage;
+    try {
+        stage.getFirstStageViewApplicationPolicy();
+    } catch (const DBException&) {
+        // Expected: the tassert throws and trips the tripwire; the process aborts at exit.
+    }
 }
 
 TEST(LiteParsedPipelineTest, HandleViewEmptyUserPipelineBecomesViewPipeline) {
@@ -238,6 +253,87 @@ TEST(LiteParsedPipelineTest, ClonedPipelineWithViewStagesPreservesOwnership) {
     ASSERT_EQ(clonedStages[1]->getParseTimeName(), "$limit");
     ASSERT_EQ(originalStages[2]->getParseTimeName(), "$sort");
     ASSERT_EQ(clonedStages[2]->getParseTimeName(), "$sort");
+}
+
+TEST(LiteParsedPipelineTest, ReplaceStageWithOwnsUnownedClonedSubpipelineStages) {
+    // The replacements are unowned clones of the $unionWith's sub-pipeline stages, which are
+    // backed by the stage's OwnedLiteParsedPipeline buffers (the hybrid-search desugar shape:
+    // the first input pipeline's stages are spliced inline as clones). Erasing the stage frees
+    // that backing, so without the makeOwned() pass in replaceStageWith() the replacements
+    // dangle — a use-after-free caught under ASAN.
+    BSONObj unionSpec =
+        BSON("$unionWith" << BSON(
+                 "coll" << "other"
+                        << "pipeline"
+                        << BSON_ARRAY(BSON("$match" << BSON("x" << 1)) << BSON("$limit" << 5))));
+    LiteParsedPipeline pipeline(kTestNss, std::vector<BSONObj>{unionSpec});
+
+    // Unowned clones backed by the $unionWith stage's OwnedLiteParsedPipeline.
+    const auto* subPipelines = pipeline.getStages()[0]->getSubPipelines();
+    ASSERT(subPipelines);
+    ASSERT_EQ(subPipelines->size(), 1U);
+    std::vector<std::unique_ptr<LiteParsedDocumentSource>> replacements;
+    for (const auto& subStage : (*subPipelines)[0]->getStages()) {
+        replacements.push_back(subStage->clone());
+    }
+
+    // Erases the sole owner of the replacements' backing BSON.
+    pipeline.replaceStageWith(0, std::move(replacements));
+
+    const auto& stages = pipeline.getStages();
+    ASSERT_EQ(stages.size(), 2U);
+    ASSERT_EQ(stages[0]->getParseTimeName(), "$match");
+    ASSERT_EQ(stages[1]->getParseTimeName(), "$limit");
+    ASSERT_BSONOBJ_EQ(stages[0]->getOriginalBson().wrap(), BSON("$match" << BSON("x" << 1)));
+    ASSERT_BSONOBJ_EQ(stages[1]->getOriginalBson().wrap(), BSON("$limit" << 5));
+}
+
+TEST(LiteParsedInternalHybridSearchTest, ParseRejectsInvalidSpecs) {
+    // The lite parser must validate the spec itself: the StageParams registry hands
+    // createFromBson this stage's _originalBson, so a parse() that discarded the user's spec
+    // would silently normalize garbage to {}.
+    ASSERT_THROWS_CODE(LiteParsedInternalHybridSearch::parse(
+                           kTestNss, BSON("$_internalHybridSearch" << 1).firstElement(), {}),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(
+        LiteParsedInternalHybridSearch::parse(
+            kTestNss, BSON("$_internalHybridSearch" << BSON("unexpected" << 1)).firstElement(), {}),
+        AssertionException,
+        ErrorCodes::FailedToParse);
+}
+
+TEST(LiteParsedPipelineTest, ReplaceStageWithNestedPipelineReplacementOwnsSubStages) {
+    // A replacement stage that itself holds sub-pipelines: the sub-stages must stay valid after
+    // the erased stage's buffer dies. OwnedLiteParsedPipeline guarantees this by giving every
+    // sub-pipeline stage self-owned BSON at construction/copy.
+    LiteParsedPipeline pipeline = [&] {
+        BSONObj unionSpec =
+            BSON("$unionWith" << BSON("coll" << "other"
+                                             << "pipeline"
+                                             << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))));
+        LiteParsedPipeline parsed(kTestNss, std::vector<BSONObj>{unionSpec});
+        auto cloned = parsed.clone();
+        // clone() copies parse state but does not take ownership of unowned stages; own them
+        // explicitly so the pipeline outlives 'unionSpec'.
+        cloned.makeOwned();
+        return cloned;
+    }();
+
+    // Clone the whole $unionWith (a nested-pipelines stage) as the replacement.
+    std::vector<std::unique_ptr<LiteParsedDocumentSource>> replacements;
+    replacements.push_back(pipeline.getStages()[0]->clone());
+
+    pipeline.replaceStageWith(0, std::move(replacements));
+
+    const auto& stages = pipeline.getStages();
+    ASSERT_EQ(stages.size(), 1U);
+    const auto* subPipelines = stages[0]->getSubPipelines();
+    ASSERT(subPipelines);
+    ASSERT_EQ(subPipelines->size(), 1U);
+    const auto& subStages = (*subPipelines)[0]->getStages();
+    ASSERT_EQ(subStages.size(), 1U);
+    ASSERT_BSONOBJ_EQ(subStages[0]->getOriginalBson().wrap(), BSON("$match" << BSON("x" << 1)));
 }
 
 TEST(LiteParsedPipelineTest, GetParseNssMatchesConstructorNss) {

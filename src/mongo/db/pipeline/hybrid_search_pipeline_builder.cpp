@@ -113,14 +113,10 @@ std::list<boost::intrusive_ptr<DocumentSource>>
 HybridSearchPipelineBuilder::constructDesugaredOutput(
     const std::map<std::string, std::unique_ptr<Pipeline>>& inputPipelines,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    // It is currently necessary to annotate on the ExpressionContext that this is a
-    // hybrid search ($rankFusion or $scoreFusion) query. Once desugaring happens, there's no
-    // way to identity from the (desugared) pipeline alone that it came from hybrid search. We
-    // need to know if it came from hybrid search so we can reject the query if it is run over a
-    // view.
-
-    // This flag's value is also used to gate an internal client error. See
-    // search_helper::validateViewNotSetByUser(...) for more details.
+    // Annotate on the ExpressionContext that this is a hybrid search ($rankFusion/$scoreFusion)
+    // query: once desugared, the pipeline alone no longer reveals its hybrid-search origin, which
+    // downstream view handling needs to know. The flag also gates an internal-client error; see
+    // search_helper::validateViewNotSetByUser(...).
     pExpCtx->setIsHybridSearch();
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
@@ -160,7 +156,7 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
             auto unionWithPipeline = Pipeline::create(initialStagesInInputPipeline, pExpCtx);
             std::vector<BSONObj> bsonPipeline = unionWithPipeline->serializeToBson();
 
-            // TODO SERVER-121091 This should have been moved into the LiteParsedDesugarer so the
+            // TODO SERVER-121094 This should have been moved into the LiteParsedDesugarer so the
             // check should be redundant.
             auto ifrCtx = pExpCtx->getIfrContext();
             auto hybridSearchFlagEnabled = ifrCtx &&
@@ -168,22 +164,12 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
             if (hybridSearchFlagEnabled) {
                 auto unionNss = pExpCtx->getUserNss();
 
-                // Build a pre-stitched StageParams vector for the internal $unionWith.
-                // This $unionWith is created at execution time from $rankFusion/$scoreFusion
-                // desugaring — the LP drain loop never ran on it — so we must stitch the view
-                // stages in here before collecting StageParams.
-                const auto& resolvedNamespaces = pExpCtx->getResolvedNamespaces();
-                auto viewIt = resolvedNamespaces.find(unionNss);
-                std::vector<BSONObj> stitchedPipeline;
-                if (viewIt != resolvedNamespaces.end() && viewIt->second.involvedNamespaceIsAView) {
-                    const auto& viewStages = viewIt->second.pipeline;
-                    stitchedPipeline.insert(
-                        stitchedPipeline.end(), viewStages.begin(), viewStages.end());
-                }
-                stitchedPipeline.insert(
-                    stitchedPipeline.end(), bsonPipeline.begin(), bsonPipeline.end());
+                // Build the internal $unionWith's LPP from the raw input pipeline, WITHOUT view
+                // stages: parsePipelineFromLPPWithMaybeViewDefinition applies the view exactly
+                // once, and pre-stitching here applied it twice, breaking position-sensitive
+                // first stages ($text, $search).
                 LiteParsedPipeline lpp(
-                    unionNss, stitchedPipeline, false, LiteParserOptions{.ifrContext = ifrCtx});
+                    unionNss, bsonPipeline, false, LiteParserOptions{.ifrContext = ifrCtx});
                 lpp.makeOwned();
                 auto subParams = lpp.getStageParams();
 

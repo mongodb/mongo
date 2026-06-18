@@ -30,6 +30,7 @@ import {
     kTestViewName,
     kTestViewPipeline,
     runHybridSearchTests,
+    runHybridSearchTestsWithExtensionsEnabled,
     runQueriesAndVerifyMetrics,
     setUpMongotMockForVectorSearch,
     setupMockVectorSearchResponsesForView,
@@ -247,6 +248,11 @@ function runTests(conn, mongotMock, shardingTest = null) {
     runHybridSearchTests(conn, mongotMock, true, shardingTest);
     runHybridSearchTests(conn, mongotMock, false, shardingTest);
     setParameterOnAllNonConfigNodes(conn, "featureFlagExtensionsInsideHybridSearch", true);
+
+    // With featureFlagExtensionsInsideHybridSearch ON the LP desugarer runs before validate(),
+    // so no kickback fires — with either extension or mongot $vectorSearch.
+    runHybridSearchTestsWithExtensionsEnabled(conn, mongotMock, true, shardingTest);
+    runHybridSearchTestsWithExtensionsEnabled(conn, mongotMock, false, shardingTest);
 }
 
 // featureFlagExtensionsInsideHybridSearch is enabled by default (required by the test tag).

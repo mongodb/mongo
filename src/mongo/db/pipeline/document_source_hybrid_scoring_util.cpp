@@ -169,6 +169,13 @@ void failWeightsValidationWithPipelineSuggestions(
         }
     }
 
+    failWeightsValidationWithPipelineSuggestions(unmatchedPipelines, invalidWeights, stageName);
+}
+
+void failWeightsValidationWithPipelineSuggestions(
+    const std::vector<std::string>& unmatchedPipelines,
+    const std::vector<std::string>& invalidWeights,
+    const StringData stageName) {
     // For each invalid weight, find the best possible suggested unmatched pipeline,
     // that is, the one with the shortest levenshtein distance.
     // The first entry in the pair is the name of the invalid weight,

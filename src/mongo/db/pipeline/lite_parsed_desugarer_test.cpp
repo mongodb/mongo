@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
@@ -701,4 +702,50 @@ TEST_F(LiteParsedDesugarerTest, DesugaringOrderInnermostFirst) {
     unregisterParser(extStageName);
     unregisterParser(std::string(kLiftSubpipelineStageName));
 }
+
+TEST_F(LiteParsedDesugarerTest, RankFusionExpandsWithFlagOn) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
+    BSONObj rankFusionSpec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    p: [ { $sort: { a: 1 } } ]
+                }
+            }
+        }
+    })");
+    LiteParsedPipeline lpp(
+        _nss, {rankFusionSpec}, false, LiteParserOptions{.ifrContext = _ifrContext});
+    ASSERT_EQ(lpp.getStages().size(), 1);
+
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
+
+    for (const auto& stage : lpp.getStages()) {
+        ASSERT_NE(stage->getParseTimeName(), "$rankFusion");
+    }
+}
+
+TEST_F(LiteParsedDesugarerTest, ScoreFusionExpandsWithFlagOn) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
+    BSONObj scoreFusionSpec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    p: [ { $score: { score: "$x", normalization: "none" } } ]
+                },
+                normalization: "none"
+            }
+        }
+    })");
+    LiteParsedPipeline lpp(
+        _nss, {scoreFusionSpec}, false, LiteParserOptions{.ifrContext = _ifrContext});
+    ASSERT_EQ(lpp.getStages().size(), 1);
+
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
+
+    for (const auto& stage : lpp.getStages()) {
+        ASSERT_NE(stage->getParseTimeName(), "$scoreFusion");
+    }
+}
+
 }  // namespace mongo

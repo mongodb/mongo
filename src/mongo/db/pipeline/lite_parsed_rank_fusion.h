@@ -126,14 +126,9 @@ public:
         return !_pipelines.empty() && _pipelines[0]->hasSearchStage();
     }
 
-    // Suppress recursive subpipeline view resolution. The desugar splices the first input
-    // pipeline directly into the outer pipeline and wraps the others in $unionWith, so applying
-    // the view to '_pipelines[]' here would produce duplicate view stages in the outer pipeline.
-    // Per-stage view application on the desugared $unionWith stages handles each input pipeline's
-    // view stitching once. See LiteParsedDocumentSource::shouldResolveSubpipelineViews() for the
-    // full rationale.
-    // TODO SERVER-125594 / SERVER-121091 Remove this override once $rankFusion desugars at
-    // LiteParsed time.
+    // Suppress recursive subpipeline view resolution: views are stitched once on the desugared
+    // $unionWith stages, and applying them to '_pipelines[]' too would duplicate view stages.
+    // TODO SERVER-121094 Remove once the flag is gone and desugaring is unconditional.
     bool shouldResolveSubpipelineViews() const final {
         return false;
     }
@@ -189,13 +184,16 @@ public:
         return _parsedSpec;
     }
 
+    bool extensionsInHybridSearchEnabled() const {
+        return _extensionsInHybridSearchEnabled;
+    }
+
 private:
     RankFusionSpec _parsedSpec;
-    // True when featureFlagExtensionsInsideHybridSearch is enabled at parse time. The IFR kickback
-    // throw is deferred to validate() so it fires inside the runAggregate retry loop where the
-    // IFRFlagRetry handler can catch it. Throwing during parse() would propagate before that loop.
-    // TODO SERVER-121091: Remove once $rankFusion is supported with
-    // featureFlagExtensionsInsideHybridSearch.
+    // True when, at parse time, the IFR context reports featureFlagExtensionsInsideHybridSearch is
+    // enabled. Used by rankFusionStageExpander to decide whether to desugar at lite-parse time.
+    // TODO SERVER-121094 Remove this field (and extensionsInHybridSearchEnabled()) once the flag is
+    // removed and lite-parse desugaring is unconditional.
     bool _extensionsInHybridSearchEnabled = false;
 };
 

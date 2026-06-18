@@ -96,6 +96,11 @@ public:
         return FirstStageViewApplicationPolicy::kDoNothing;
     }
 
+    // Fetches the full documents for mongot's _ids without reshaping them.
+    bool isSelectionStage() const override {
+        return true;
+    }
+
     void bindResolvedNamespace(const ResolvedNamespace& view,
                                const ResolvedNamespaceMap&) override {
         if (view.getNamespace().isEmpty()) {

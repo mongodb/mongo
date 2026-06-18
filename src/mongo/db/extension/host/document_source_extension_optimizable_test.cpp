@@ -65,6 +65,43 @@ namespace mongo::extension {
 
 auto nss = NamespaceString::createNamespaceString_forTest("document_source_extension_test"_sd);
 
+/**
+ * A parse node that expands into one CustomProperties AST node per BSON in `propertiesList`,
+ * giving tests precise control over the static properties of each individual expanded stage.
+ */
+class MultiCustomPropertiesParseNode : public sdk::AggStageParseNode {
+public:
+    static inline const std::string kStageName = "$multiCustomProperties";
+
+    explicit MultiCustomPropertiesParseNode(std::vector<BSONObj> propertiesList)
+        : sdk::AggStageParseNode(kStageName), _propertiesList(std::move(propertiesList)) {}
+
+    size_t getExpandedSize() const override {
+        return _propertiesList.size();
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
+        out.reserve(_propertiesList.size());
+        for (const auto& properties : _propertiesList) {
+            out.emplace_back(new sdk::ExtensionAggStageAstNodeAdapter(
+                std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(properties)));
+        }
+        return out;
+    }
+
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
+        return BSONObj();
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<MultiCustomPropertiesParseNode>(_propertiesList);
+    }
+
+private:
+    std::vector<BSONObj> _propertiesList;
+};
+
 class DocumentSourceExtensionOptimizableTest : public AggregationContextFixture {
 public:
     DocumentSourceExtensionOptimizableTest() : DocumentSourceExtensionOptimizableTest(nss) {}
@@ -100,6 +137,24 @@ public:
         auto handle = AggStageAstNodeHandle{astNode};
         return host::DocumentSourceExtensionOptimizable::LiteParsedExpanded(
             std::move(stageName), std::move(handle), _nss);
+    }
+
+    /**
+     * Builds a LiteParsedExpandable whose expansion is a list of CustomProperties AST nodes, one
+     * per entry in `propertiesList`. This lets a test control the per-stage static properties
+     * (providedMetadataFields, isSelectionStage) of every expanded stage independently, so the
+     * pipeline-level reductions in LiteParsedExpandable (isRankedStage/isScoredStage/
+     * isSelectionStage) can be exercised over multi-stage expansions.
+     */
+    host::DocumentSourceExtensionOptimizable::LiteParsedExpandable
+    makeLiteParsedExpandableFromPropertiesList(std::vector<BSONObj> propertiesList) {
+        auto parseNode = new sdk::ExtensionAggStageParseNodeAdapter(
+            std::make_unique<MultiCustomPropertiesParseNode>(std::move(propertiesList)));
+        AggStageParseNodeHandle handle{parseNode};
+        BSONObj stageBson =
+            createDummySpecFromStageName(MultiCustomPropertiesParseNode::kStageName);
+        return host::DocumentSourceExtensionOptimizable::LiteParsedExpandable(
+            stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
     }
 
 protected:
@@ -1123,6 +1178,51 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     auto lp = makeLiteParsedExpandedFromProperties(BSON("isSelectionStage" << false),
                                                    "$nonSelectionStage");
     ASSERT_FALSE(lp.isSelectionStage());
+}
+
+// LiteParsedExpandable's pipeline-level checks must reflect every expanded stage, not just the
+// first; that is what classifies $search/$vectorSearch ([<producer>, idLookup]) correctly.
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandableIsSelectionStageOnlyWhenAllExpandedStagesAreSelection) {
+    const BSONObj selection = BSON("isSelectionStage" << true);
+    const BSONObj nonSelection = BSON("isSelectionStage" << false);
+
+    // All expanded stages are selection -> the expandable is a selection stage.
+    ASSERT_TRUE(
+        makeLiteParsedExpandableFromPropertiesList({selection, selection}).isSelectionStage());
+
+    // A non-selection stage anywhere in the expansion disqualifies it, even when the first
+    // expanded stage is selection.
+    ASSERT_FALSE(
+        makeLiteParsedExpandableFromPropertiesList({selection, nonSelection}).isSelectionStage());
+    ASSERT_FALSE(
+        makeLiteParsedExpandableFromPropertiesList({nonSelection, selection}).isSelectionStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandableIsRankedStageWhenAnyExpandedStageIsRanked) {
+    const BSONObj ranked = BSON("providedMetadataFields" << BSON_ARRAY("sortKey"));
+    const BSONObj nonRanked = BSON("providedMetadataFields" << BSON_ARRAY("searchScore"));
+
+    ASSERT_FALSE(
+        makeLiteParsedExpandableFromPropertiesList({nonRanked, nonRanked}).isRankedStage());
+    // Ranked even when only a non-front expanded stage produces the sort key -- mirrors an
+    // extension that desugars to [<transform>, <$sort-like producer>].
+    ASSERT_TRUE(makeLiteParsedExpandableFromPropertiesList({nonRanked, ranked}).isRankedStage());
+    ASSERT_TRUE(makeLiteParsedExpandableFromPropertiesList({ranked, nonRanked}).isRankedStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandableIsScoredStageWhenAnyExpandedStageIsScored) {
+    const BSONObj scored = BSON("providedMetadataFields" << BSON_ARRAY("searchScore"));
+    const BSONObj nonScored = BSON("providedMetadataFields" << BSON_ARRAY("sortKey"));
+
+    ASSERT_FALSE(
+        makeLiteParsedExpandableFromPropertiesList({nonScored, nonScored}).isScoredStage());
+    // Scored even when only a non-front expanded stage produces the score metadata.
+    ASSERT_TRUE(makeLiteParsedExpandableFromPropertiesList({nonScored, scored}).isScoredStage());
+    ASSERT_TRUE(makeLiteParsedExpandableFromPropertiesList({scored, nonScored}).isScoredStage());
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,

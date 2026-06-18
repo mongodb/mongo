@@ -269,8 +269,11 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     {
         const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
         auto resolvedNamespaces = subPipelineExpCtx->getResolvedNamespaces();
-        PipelineResolver::insertTopLevelViewEntry(
-            resolvedNamespaces, originalNs, resolvedView, subPipelineExpCtx->getIfrContext());
+        PipelineResolver::insertTopLevelViewEntry(resolvedNamespaces,
+                                                  originalNs,
+                                                  resolvedView,
+                                                  subPipelineExpCtx->getIfrContext(),
+                                                  resolvedNs.uuid);
         PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
             &userLiteParsedPipeline, originalNs, resolvedNamespaces);
     }
