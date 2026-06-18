@@ -254,6 +254,19 @@ void Variables::setDefaultRuntimeConstants(OperationContext* opCtx) {
     setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
 }
 
+void Variables::validateRuntimeConstantsArePermitted(
+    OperationContext* opCtx, const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
+    if (!runtimeConstants || !runtimeConstants->getUserRoles()) {
+        return;
+    }
+
+    auto* client = opCtx->getClient();
+    const bool isTrustedSource =
+        !client->session() || client->isInternalClient() || client->isInDirectClient();
+    uassert(
+        12843300, "Manually setting 'runtimeConstants.userRoles' is not allowed.", isTrustedSource);
+}
+
 void Variables::appendSystemVariables(BSONObjBuilder& bob) const {
     for (auto&& [name, id] : kBuiltinVarNameToId) {
         if (hasValue(id)) {

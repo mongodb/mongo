@@ -1149,6 +1149,9 @@ private:
 
         assertInternalParamsAreSetByInternalClients(opCtx->getClient(), *findCommand);
 
+        Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                        findCommand->getLegacyRuntimeConstants());
+
         uassert(ErrorCodes::FailedToParse,
                 "Use of forcedPlanSolutionHash not permitted.",
                 !findCommand->getForcedPlanSolutionHash() ||

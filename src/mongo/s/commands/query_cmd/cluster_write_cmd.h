@@ -378,6 +378,11 @@ private:
         uassert(ErrorCodes::InvalidNamespace,
                 "Cannot specify delete without a real namespace",
                 !parsedRequest.getNS().isCollectionlessAggregateNS());
+        // Deletes forward client-supplied runtime constants instead of regenerating them, so only
+        // reject external attempts to set 'userRoles'. Internal redispatch paths are exempt and
+        // may set runtime constants.
+        Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                        parsedRequest.getLegacyRuntimeConstants());
 
         return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
     }

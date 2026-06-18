@@ -51,6 +51,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 class Expression;
 class ExpressionContext;
@@ -200,6 +202,17 @@ public:
      * Set the runtime constants using the current local and cluster times.
      */
     void setDefaultRuntimeConstants(OperationContext* opCtx);
+
+    /**
+     * Ensures external clients cannot directly set security-sensitive runtime constants like
+     * $$USER_ROLES. This check cannot live in a central place like setLegacyRuntimeConstants():
+     * server-generated paths such as $merge may pass propagated constants through that setter using
+     * an opCtx that still looks external. At command ingress we still know the constants came from
+     * the user command body, so non-aggregation commands validate them there while only rejecting
+     * userRoles to preserve stable API behavior.
+     */
+    static void validateRuntimeConstantsArePermitted(
+        OperationContext* opCtx, const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
     /**
      * Seed let parameters with the given BSONObj. The 'exprRequirementsValidator' is a callback

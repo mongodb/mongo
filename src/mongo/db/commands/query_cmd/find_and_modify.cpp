@@ -251,7 +251,13 @@ public:
 
     class Invocation final : public InvocationBaseGen {
     public:
-        using InvocationBaseGen::InvocationBaseGen;
+        Invocation(OperationContext* opCtx,
+                   const Command* command,
+                   const OpMsgRequest& opMsgRequest)
+            : InvocationBaseGen(opCtx, command, opMsgRequest) {
+            Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                            request().getLegacyRuntimeConstants());
+        }
 
         bool supportsWriteConcern() const final {
             return true;
