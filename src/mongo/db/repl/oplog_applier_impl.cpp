@@ -946,10 +946,15 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     const WorkerMultikeyPathInfo mergedMultikeyPathInfo =
         mergeAndSortWorkerMultikeyPathInfo(std::move(multikeyVector));
     for (const MultikeyPathInfo& info : mergedMultikeyPathInfo) {
-        // TODO SERVER-128354: Use the actual transaction commit timestamp for entries registered
-        // without a timestamp. Falling back to firstTimeInBatch preserves the old conservative
-        // behavior, but does not guarantee exact primary/secondary multikey timestamp consistency
-        // for prepared transaction cases where the commit timestamp is discovered later.
+        // TODO(SERVER-129361): Once featureFlagReplicateMultikeynessInTransactions is removed,
+        // remove this comment and the firstTimeInBatch fallback below; use info.earliestTimestamp
+        // directly.
+        // A null earliestTimestamp is only expected when
+        // featureFlagReplicateMultikeynessInTransactions was off when the oplog entry was emitted.
+        // That is acceptable: with the flag off we fall back to pre-9.0 behavior where any "early
+        // enough" timestamp suffices; with the flag on we require the exact timestamp. Null can
+        // only occur for prepared transactions, and when the flag is on those now emit a new
+        // setMultikeyMetadata entry, so this case cannot arise.
         const Timestamp ts =
             info.earliestTimestamp.isNull() ? firstTimeInBatch : info.earliestTimestamp;
         fassert(50686,
