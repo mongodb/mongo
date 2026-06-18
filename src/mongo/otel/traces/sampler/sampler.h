@@ -30,10 +30,18 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/otel/traces/sampler/sampling_config.h"
+#include "mongo/otel/traces/span/span_names.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/versioned_value.h"
 
 #include <memory>
+#include <mutex>
+#include <string>
 
 namespace mongo::otel::traces {
 
@@ -45,8 +53,60 @@ public:
 
     virtual ~TracingSampler() = default;
 
-    /** Returns whether this span should start a trace. */
-    virtual bool shouldSample(StringData spanName) const = 0;
+    /**
+     * Returns whether the span identified by `spanName` should start a trace, given a
+     * sampling roll in [0, 1].
+     */
+    virtual bool shouldSample(StringData spanName, double sampleValue) const = 0;
+
+    /** Applies a new sampling configuration. Production implementations should override this. */
+    virtual void updateConfig(const SamplingConfig& config) {}
+
+    /** Returns the current sampling configuration. */
+    virtual SamplingConfig getConfig() const {
+        return SamplingConfig{};
+    }
+
+    /**
+     * Registers a span name so that it is eligible for sampling if no config specifies otherwise.
+     */
+    virtual void sampleByDefault(SpanName name) {}
+};
+
+/**
+ * Production `TracingSampler` implementation. This is designed to be a thread-safe singleton, and
+ * having multiple instances at once may not work correctly.
+ */
+class MONGO_MOD_PUBLIC TracingSamplerImpl : public TracingSampler {
+public:
+    TracingSamplerImpl();
+
+    /**
+     * Determines if the span should start a trace given the combination of config, default sampled
+     * spans, and sampleValue.
+     */
+    bool shouldSample(StringData spanName, double sampleValue) const override;
+    void updateConfig(const SamplingConfig& config) override;
+    SamplingConfig getConfig() const override;
+    void sampleByDefault(SpanName name) override;
+
+private:
+    /** Maps span name to its sampling factor. Absence is equivalent to a factor of 0.0. */
+    using SamplingFactorMap = StringMap<double>;
+
+    /** Rebuilds _samplingFactors from _defaultSampledSpanNames and _samplingConfig. */
+    void _rebuild(WithLock);
+
+    mutable std::mutex _mutex;
+    /** Span names that are sampled when there is no overriding configuration. */
+    stdx::unordered_set<std::string> _defaultSampledSpanNames;
+    /** The sampling configuration. */
+    SamplingConfig _samplingConfig;
+    /**
+     * The current sampling factors used to make sampling decisions. Static as this is a singleton
+     * and allows for optimizing by creating thread-local snapshots.
+     */
+    inline static VersionedValue<const SamplingFactorMap> _samplingFactors;
 };
 
 /** Interface for overriding the global sampler, for use in tests. */
@@ -61,6 +121,6 @@ using ScopedSamplerOverride = std::unique_ptr<SamplerOverride>;
  * Returns a guard that restores the previous sampler on destruction. This is not thread-safe.
  */
 [[nodiscard]] MONGO_MOD_PUBLIC ScopedSamplerOverride
-setTraceSamplingFnForTest(unique_function<bool(StringData)> fn);
+setTraceSamplingFnForTest(unique_function<bool(StringData, double)> fn);
 
 }  // namespace mongo::otel::traces

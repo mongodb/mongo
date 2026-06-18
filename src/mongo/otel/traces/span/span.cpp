@@ -162,7 +162,7 @@ Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, StringData
         // (Ignore FCV check) — no VersionContext is available in this path.
         if (!feature_flags::gFeatureFlagTracing.isEnabledAndIgnoreFCVUnsafe() ||
             !feature_flags::gFeatureFlagOtelTraceSampling.isEnabledAndIgnoreFCVUnsafe() ||
-            !TracingSampler::get().shouldSample(name)) {
+            !TracingSampler::get().shouldSample(name, spanCtx->getSamplingValue())) {
             return Span{};
         }
     }

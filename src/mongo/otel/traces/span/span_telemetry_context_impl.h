@@ -54,7 +54,7 @@ using TextMapCarrier = opentelemetry::context::propagation::TextMapCarrier;
 class MONGO_MOD_NEEDS_REPLACEMENT SpanTelemetryContextImpl : public TelemetryContext {
 public:
     explicit SpanTelemetryContextImpl(OtelContext ctx, PseudoRandom* prng = nullptr);
-    SpanTelemetryContextImpl() = default;
+    SpanTelemetryContextImpl();
 
     /**
      * Returns this telemetry context's sampling roll: a value in [0, 1) used to make sampling

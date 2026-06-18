@@ -31,28 +31,60 @@
 
 #include "mongo/util/static_immortal.h"
 
-#include <memory>
-
 namespace mongo::otel::traces {
-namespace {
-/** Production implementation of the TracingSampler interface. */
-class TracingSamplerImpl : public TracingSampler {
-public:
-    bool shouldSample(StringData) const override {
-        // TODO(SERVER-127463): Use server parameters and default sampling to determine this.
-        return true;
+
+TracingSamplerImpl::TracingSamplerImpl() {
+    _samplingFactors.update(std::make_shared<const SamplingFactorMap>());
+}
+
+bool TracingSamplerImpl::shouldSample(StringData spanName, double sampleValue) const {
+    thread_local auto snapshot = _samplingFactors.makeSnapshot();
+    _samplingFactors.refreshSnapshot(snapshot);
+    auto it = snapshot->find(spanName);
+    if (it == snapshot->end()) {
+        return false;
     }
-};
+    return sampleValue < it->second;
+}
+
+void TracingSamplerImpl::updateConfig(const SamplingConfig& config) {
+    std::lock_guard lk(_mutex);
+    _samplingConfig = config;
+    _rebuild(lk);
+}
+
+SamplingConfig TracingSamplerImpl::getConfig() const {
+    std::lock_guard lk(_mutex);
+    return _samplingConfig;
+}
+
+void TracingSamplerImpl::sampleByDefault(SpanName name) {
+    std::lock_guard lk(_mutex);
+    if (_defaultSampledSpanNames.emplace(name.getName()).second) {
+        _rebuild(lk);
+    }
+}
+
+void TracingSamplerImpl::_rebuild(WithLock) {
+    auto newSamplingFactors = std::make_shared<SamplingFactorMap>();
+    for (const auto& name : _defaultSampledSpanNames) {
+        (*newSamplingFactors)[name] = _samplingConfig.defaultFactor;
+    }
+    _samplingFactors.update(std::move(newSamplingFactors));
+}
+
+namespace {
 
 class FunctionSampler : public TracingSampler {
 public:
-    explicit FunctionSampler(unique_function<bool(StringData)> fn) : _fn(std::move(fn)) {}
-    bool shouldSample(StringData spanName) const override {
-        return _fn(spanName);
+    explicit FunctionSampler(unique_function<bool(StringData, double)> fn) : _fn(std::move(fn)) {}
+
+    bool shouldSample(StringData spanName, double sampleValue) const override {
+        return _fn(spanName, sampleValue);
     }
 
 private:
-    unique_function<bool(StringData)> _fn;
+    unique_function<bool(StringData, double)> _fn;
 };
 
 std::unique_ptr<TracingSampler>& globalSampler() {
@@ -82,7 +114,7 @@ private:
     std::unique_ptr<TracingSampler> _previous;
 };
 
-ScopedSamplerOverride setTraceSamplingFnForTest(unique_function<bool(StringData)> fn) {
+ScopedSamplerOverride setTraceSamplingFnForTest(unique_function<bool(StringData, double)> fn) {
     return std::make_unique<SamplerOverrideImpl>(std::make_unique<FunctionSampler>(std::move(fn)));
 }
 

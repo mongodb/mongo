@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/traces/span/span_telemetry_context_impl.h"
+#pragma once
 
-#include "mongo/platform/random.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
-#include <opentelemetry/trace/span_context.h>
+namespace mongo::otel::traces {
 
-namespace mongo {
-namespace otel {
-namespace traces {
+/** Configuration for trace sampling. **/
+struct MONGO_MOD_PUBLIC SamplingConfig {
+    /**
+     * The sampling factor for spans that are sampled by default. 0.0 means never sampled, while
+     * 1.0 means always sampled.
+     */
+    double defaultFactor = 0.0;
+};
 
-namespace {
-PseudoRandom& defaultPrng() {
-    thread_local PseudoRandom prng{SecureRandom{}.nextInt64()};
-    return prng;
-}
-}  // namespace
-
-SpanTelemetryContextImpl::SpanTelemetryContextImpl() : _prng(&defaultPrng()) {}
-
-SpanTelemetryContextImpl::SpanTelemetryContextImpl(OtelContext ctx, PseudoRandom* prng)
-    : _ctx(std::move(ctx)), _prng(prng ? prng : &defaultPrng()) {}
-
-double SpanTelemetryContextImpl::getSamplingValue() {
-    if (!_samplingRoll) {
-        invariant(_prng != nullptr);
-        _samplingRoll = _prng->nextCanonicalDouble();
-    }
-    return *_samplingRoll;
-}
-
-void SpanTelemetryContextImpl::propagate(TextMapPropagator& propagator,
-                                         TextMapCarrier& carrier) const {
-    propagator.Inject(carrier, _ctx);
-}
-
-}  // namespace traces
-}  // namespace otel
-}  // namespace mongo
+}  // namespace mongo::otel::traces

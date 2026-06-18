@@ -27,6 +27,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "trace_sampling_parameters_gen",
+    src = "trace_sampling_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "trace_settings",
     srcs = [
@@ -34,6 +42,7 @@ mongo_cc_library(
         ":trace_settings_gen",
     ],
     deps = [
+        ":trace_sampling_parameters",
         "//src/mongo/db:server_base",
         "//src/mongo/otel/utils:bson_to_http_headers",
     ],
@@ -79,6 +88,35 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "trace_sampling_parameters",
+    srcs = [
+        "trace_sampling_parameters.cpp",
+        ":trace_sampling_parameters_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/otel/traces/sampler",
+        "//src/mongo/otel/traces/sampler:sampling_config",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "trace_sampling_parameters_test",
+    srcs = [
+        "trace_sampling_parameters_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "tracing_test",
+    ],
+    deps = [
+        ":trace_sampling_parameters",
+        "//src/mongo/otel/traces/sampler",
+        "//src/mongo/otel/traces/sampler:sampling_config",
     ],
 )
 
@@ -146,6 +184,7 @@ mongo_cc_library(
     deps = [
         ":tracer_provider_service",
         ":tracing_initialization_base",
+        "//src/mongo/otel/traces/sampler",
         "//src/third_party/opentelemetry-proto:resource_proto_cc",
         "//src/third_party/opentelemetry-proto:trace_proto_cc",
         "@com_google_protobuf//:protobuf",
@@ -265,6 +304,7 @@ mongo_cc_unit_test(
         ":tracing_utils",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/otel",
+        "//src/mongo/otel/traces/sampler",
         "//src/mongo/unittest:server_parameter_guard",
         "//src/third_party/opentelemetry-cpp/api",
     ],

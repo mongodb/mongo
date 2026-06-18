@@ -33,6 +33,7 @@
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/bson_text_map_carrier.h"
 #include "mongo/otel/traces/otel_test_fixture.h"
+#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
@@ -55,6 +56,8 @@ protected:
     unittest::ServerParameterGuard _featureFlagTracingController{"featureFlagTracing", true};
     unittest::ServerParameterGuard _featureFlagSamplingController{"featureFlagOtelTraceSampling",
                                                                   true};
+    ScopedSamplerOverride _samplerGuard =
+        setTraceSamplingFnForTest([](StringData, double) { return true; });
 };
 
 BSONObj serializeTraceContextOnly(const std::shared_ptr<TelemetryContext>& context) {
