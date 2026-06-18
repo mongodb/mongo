@@ -161,7 +161,8 @@ protected:
                                         originatorShardId},
                                        originatorShardHandle.uuid().value());
 
-            _shardVersion.emplace(ShardVersionFactory::make(chunkManager, originatorShardId));
+            _shardVersion.emplace(
+                ShardVersionFactory::make(opCtx, chunkManager, originatorShardId));
 
             OperationShardingState::setShardRole(
                 opCtx, kNss, _shardVersion, boost::none /* databaseVersion */);

@@ -33,6 +33,7 @@ mongo_cc_library(
         "//src/mongo/db/views",
         "//src/mongo/db/views:pipeline_resolver",
         "//src/mongo/db/views:view_catalog_helpers",
+        "//src/mongo/s:grid",
         "//src/mongo/s/query/exec:async_results_merger",
         "//src/mongo/s/query/exec:router_exec_stage",
         "//src/mongo/util/concurrency:spin_lock",

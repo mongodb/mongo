@@ -318,7 +318,7 @@ boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContex
     if (cri.hasRoutingTable()) {
         const auto& cm = cri.getChunkManager();
         if (cm.isUnsplittable()) {
-            return cm.getMinKeyShardIdWithSimpleCollation();
+            return cm.getMinKeyShardIdWithSimpleCollation(opCtx);
         } else {
             return boost::none;
         }

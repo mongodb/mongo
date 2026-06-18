@@ -557,7 +557,7 @@ void MigrationSourceManager::startClone() {
         // If the chunk migration will cause the collection placement to be extended to a new
         // shard, persist the state so that it can be reported to change stream readers once the
         // operation gets committed.
-        if (!cm.getVersion(_args.getToShard()).isSet()) {
+        if (!cm.getVersion(_opCtx, _args.getToShard()).isSet()) {
             _coordinator->setTransfersFirstCollectionChunkToRecipient(_opCtx, true);
         }
     }
@@ -790,7 +790,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     {
         // Emit an oplog entry about the completion of the migration
         const bool noMoreCollectionChunksOnDonor =
-            !refreshedMetadata.getChunkManager()->getVersion(_args.getFromShard()).isSet();
+            !refreshedMetadata.getChunkManager()->getVersion(_opCtx, _args.getFromShard()).isSet();
         notifyChangeStreamsOnChunkMigrated(
             _opCtx,
             nss(),

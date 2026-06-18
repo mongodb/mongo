@@ -274,8 +274,8 @@ bool CollectionRoutingInfoTargeter::createCollectionIfNeeded(OperationContext* o
     return true;
 }
 
-int CollectionRoutingInfoTargeter::getAproxNShardsOwningChunks() const {
-    return _cri.hasRoutingTable() ? _cri.getChunkManager().getAproxNShardsOwningChunks() : 0;
+int CollectionRoutingInfoTargeter::getAproxNShardsOwningChunks(OperationContext* opCtx) const {
+    return _cri.hasRoutingTable() ? _cri.getChunkManager().getAproxNShardsOwningChunks(opCtx) : 0;
 }
 
 bool CollectionRoutingInfoTargeter::isTargetedCollectionSharded() const {

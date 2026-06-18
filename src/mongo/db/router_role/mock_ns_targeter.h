@@ -150,7 +150,7 @@ public:
         return false;
     }
 
-    int getAproxNShardsOwningChunks() const override {
+    int getAproxNShardsOwningChunks(OperationContext*) const override {
         // No-op
         return 0;
     }

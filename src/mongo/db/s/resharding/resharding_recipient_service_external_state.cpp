@@ -191,7 +191,7 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
         return MigrationDestinationManager::getCollectionIndexes(
             opCtx,
             nss,
-            cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(),
+            cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(opCtx),
             cri,
             afterClusterTime,
             expandSimpleCollation);

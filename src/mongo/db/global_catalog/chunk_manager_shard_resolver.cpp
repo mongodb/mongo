@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,20 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
+
+// TODO (SERVER-126212): Remove this file once the chunk manager cannot contain a mix of shardId
+// and shard UUIDs.
 
 namespace mongo {
 
-bool ScopedCollectionFilter::isRangeEntirelyOwned(OperationContext* opCtx,
-                                                  const BSONObj& min,
-                                                  const BSONObj& max,
-                                                  bool includeMaxBound) const {
-    const auto cm = _impl->get().getChunkManager();
-    if (!cm->hasRoutingTable() || cm->isUnsplittable())
-        // Unsharded collection are always placed in only one shard
-        return true;
-    std::set<ShardId> shardIds;
-    cm->getShardIdsForRange(opCtx, min, max, &shardIds, nullptr, includeMaxBound);
-    return shardIds.size() == 1;
+ShardHandleMap resolveShardHandlesForChunkManager(OperationContext*) {
+    return {};
 }
+
 }  // namespace mongo

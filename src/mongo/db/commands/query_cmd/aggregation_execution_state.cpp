@@ -617,7 +617,7 @@ bool AggExState::canReadUnderlyingCollectionLocally(const CollectionRoutingInfo&
         if (cm.isSharded()) {
             return false;
         } else if (cm.isUnsplittable()) {
-            return cm.getMinKeyShardIdWithSimpleCollation() == myShardId;
+            return cm.getMinKeyShardIdWithSimpleCollation(_opCtx) == myShardId;
         } else {
             return cri.getDbPrimaryShardId() == myShardId;
         }
@@ -806,7 +806,7 @@ ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingI
     if (cri.hasRoutingTable()) {
         const auto myShardId = ShardingState::get(_opCtx)->shardId();
 
-        auto sv = cri.getShardVersion(myShardId);
+        auto sv = cri.getShardVersion(_opCtx, myShardId);
         if (optPlacementConflictTimestamp) {
             sv.setPlacementConflictTime_DEPRECATED(*optPlacementConflictTimestamp);
         }

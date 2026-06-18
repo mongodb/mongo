@@ -239,8 +239,10 @@ TEST_F(CurrentChunkManagerUpdateTest, MakeUpdatedForwardsDeltaAndCarriesAttribut
 
     // Delta was forwarded and applied.
     ASSERT_EQ(updated.numChunks(), 2);  // [5, 15) and the surviving [20, 30)
-    ASSERT_TRUE(updated.keyBelongsToShard(key(7), kThisShard));
-    ASSERT_FALSE(updated.keyBelongsToShard(key(2), kThisShard));
+    // TODO (SERVER-128349): Replace with operation context once keyBelongsToShard performs shard
+    // handle resolution.
+    ASSERT_TRUE(updated.keyBelongsToShard(nullptr /* opCtx */, key(7), kThisShard));
+    ASSERT_FALSE(updated.keyBelongsToShard(nullptr /* opCtx */, key(2), kThisShard));
 
     // Result is rewrapped at the delta's version.
     ASSERT_EQ(updated.getVersion(), chunkVersion(2, 0));

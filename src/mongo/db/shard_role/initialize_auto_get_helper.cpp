@@ -52,8 +52,8 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
         bool isTracked = nssCri->second.hasRoutingTable();
 
         auto shardVersion = [&] {
-            auto sv =
-                isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNTRACKED();
+            auto sv = isTracked ? nssCri->second.getShardVersion(opCtx, myShardId)
+                                : ShardVersion::UNTRACKED();
             if (placementConflictTime) {
                 sv.setPlacementConflictTime_DEPRECATED(*placementConflictTime);
             }

@@ -299,7 +299,7 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
             std::set<ShardId> shardIdsForNs;
             // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
             // result is only used to update stats.
-            cri->getChunkManager().getAllShardIds_UNSAFE_NotPointInTime(&shardIdsForNs);
+            cri->getChunkManager().getAllShardIds_UNSAFE_NotPointInTime(opCtx, &shardIdsForNs);
             for (const auto& shardId : shardIdsForNs) {
                 shardsIds.insert(shardId);
             }
@@ -321,7 +321,7 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
                 // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
                 // result is only used to update stats.
                 resolvedNsCri.getChunkManager().getAllShardIds_UNSAFE_NotPointInTime(
-                    &shardIdsForNs);
+                    opCtx, &shardIdsForNs);
                 for (const auto& shardId : shardIdsForNs) {
                     shardsIds.insert(shardId);
                 }

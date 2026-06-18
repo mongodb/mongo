@@ -69,13 +69,14 @@ TEST_F(InitializeAutoGetHelperTest, TrackedUnshardedSecondaryCollections) {
     getCatalogCacheMock()->setCollectionReturnValue(nssB, criNssB);
     getCatalogCacheMock()->setCollectionReturnValue(nssC, criNssC);
 
-    ScopedSetShardRole shardRoleA(opCtx, nssA, criNssA.getShardVersion(kMyShardName), boost::none);
+    ScopedSetShardRole shardRoleA(
+        opCtx, nssA, criNssA.getShardVersion(opCtx, kMyShardName), boost::none);
 
     // test with secondaryNss={nssB}.
     bool anySecondaryCollectionIsNotLocal = initializeAutoGet(opCtx, nssA, {nssB}, [&]() {
         auto& oss = OperationShardingState::get(opCtx);
-        ASSERT_EQ(criNssA.getShardVersion(kMyShardName), oss.getShardVersion(nssA));
-        ASSERT_EQ(criNssB.getShardVersion(kMyShardName), oss.getShardVersion(nssB));
+        ASSERT_EQ(criNssA.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssA));
+        ASSERT_EQ(criNssB.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssB));
         ASSERT_EQ(boost::none, oss.getDbVersion(dbName1));
     });
     ASSERT_EQ(true, anySecondaryCollectionIsNotLocal);
@@ -83,8 +84,8 @@ TEST_F(InitializeAutoGetHelperTest, TrackedUnshardedSecondaryCollections) {
     // test with secondaryNss={nssC}.
     anySecondaryCollectionIsNotLocal = initializeAutoGet(opCtx, nssA, {nssC}, [&]() {
         auto& oss = OperationShardingState::get(opCtx);
-        ASSERT_EQ(criNssA.getShardVersion(kMyShardName), oss.getShardVersion(nssA));
-        ASSERT_EQ(criNssC.getShardVersion(kMyShardName), oss.getShardVersion(nssC));
+        ASSERT_EQ(criNssA.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssA));
+        ASSERT_EQ(criNssC.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssC));
         ASSERT_EQ(boost::none, oss.getDbVersion(dbName1));
     });
     ASSERT_EQ(false, anySecondaryCollectionIsNotLocal);
@@ -92,9 +93,9 @@ TEST_F(InitializeAutoGetHelperTest, TrackedUnshardedSecondaryCollections) {
     // test with secondaryNss={nssB, nssC}.
     anySecondaryCollectionIsNotLocal = initializeAutoGet(opCtx, nssA, {nssB, nssC}, [&]() {
         auto& oss = OperationShardingState::get(opCtx);
-        ASSERT_EQ(criNssA.getShardVersion(kMyShardName), oss.getShardVersion(nssA));
-        ASSERT_EQ(criNssB.getShardVersion(kMyShardName), oss.getShardVersion(nssB));
-        ASSERT_EQ(criNssC.getShardVersion(kMyShardName), oss.getShardVersion(nssC));
+        ASSERT_EQ(criNssA.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssA));
+        ASSERT_EQ(criNssB.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssB));
+        ASSERT_EQ(criNssC.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssC));
         ASSERT_EQ(boost::none, oss.getDbVersion(dbName1));
     });
     ASSERT_EQ(true, anySecondaryCollectionIsNotLocal);
@@ -102,8 +103,8 @@ TEST_F(InitializeAutoGetHelperTest, TrackedUnshardedSecondaryCollections) {
     // test with secondaryNss={nssA, nssC}.
     anySecondaryCollectionIsNotLocal = initializeAutoGet(opCtx, nssA, {nssA, nssC}, [&]() {
         auto& oss = OperationShardingState::get(opCtx);
-        ASSERT_EQ(criNssA.getShardVersion(kMyShardName), oss.getShardVersion(nssA));
-        ASSERT_EQ(criNssC.getShardVersion(kMyShardName), oss.getShardVersion(nssC));
+        ASSERT_EQ(criNssA.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssA));
+        ASSERT_EQ(criNssC.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssC));
         ASSERT_EQ(boost::none, oss.getDbVersion(dbName1));
     });
     ASSERT_EQ(false, anySecondaryCollectionIsNotLocal);
@@ -203,7 +204,7 @@ TEST_F(InitializeAutoGetHelperTest, ShardedSecondaryCollections) {
         auto& oss = OperationShardingState::get(opCtx);
         ASSERT_EQ(db1Version, oss.getDbVersion(dbName1));
         ASSERT_EQ(ShardVersion::UNTRACKED(), oss.getShardVersion(nssA));
-        ASSERT_EQ(criNssB.getShardVersion(kMyShardName), oss.getShardVersion(nssB));
+        ASSERT_EQ(criNssB.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssB));
     });
     ASSERT_EQ(true, anySecondaryCollectionIsNotLocal);
 }
@@ -254,15 +255,16 @@ TEST_F(InitializeAutoGetHelperTest, MixedTypeSecondaryCollections) {
     getCatalogCacheMock()->setCollectionReturnValue(nssB, criNssB);
     getCatalogCacheMock()->setCollectionReturnValue(nssC, criNssC);
 
-    ScopedSetShardRole shardRoleA(opCtx, nssA, criNssA.getShardVersion(kMyShardName), boost::none);
+    ScopedSetShardRole shardRoleA(
+        opCtx, nssA, criNssA.getShardVersion(opCtx, kMyShardName), boost::none);
 
     // test with secondaryNss={nssB, nssC}.
     bool anySecondaryCollectionIsNotLocal = initializeAutoGet(opCtx, nssA, {nssB, nssC}, [&]() {
         auto& oss = OperationShardingState::get(opCtx);
 
-        ASSERT_EQ(criNssA.getShardVersion(kMyShardName), oss.getShardVersion(nssA));
+        ASSERT_EQ(criNssA.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssA));
 
-        ASSERT_EQ(criNssB.getShardVersion(kMyShardName), oss.getShardVersion(nssB));
+        ASSERT_EQ(criNssB.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssB));
 
         ASSERT_EQ(db1Version, oss.getDbVersion(dbName1));
         ASSERT_EQ(ShardVersion::UNTRACKED(), oss.getShardVersion(nssC));
@@ -308,7 +310,8 @@ TEST_F(InitializeAutoGetHelperTest, InTransactionRcLocal) {
     getCatalogCacheMock()->setCollectionReturnValue(nssB, criNssB);
     getCatalogCacheMock()->setCollectionReturnValue(nssC, criNssC);
 
-    ScopedSetShardRole shardRoleA(opCtx, nssA, criNssA.getShardVersion(kMyShardName), boost::none);
+    ScopedSetShardRole shardRoleA(
+        opCtx, nssA, criNssA.getShardVersion(opCtx, kMyShardName), boost::none);
 
     // test with secondaryNss={nssB, nssC}.
     bool anySecondaryCollectionIsNotLocal = initializeAutoGet(opCtx, nssA, {nssB, nssC}, [&]() {
@@ -317,9 +320,9 @@ TEST_F(InitializeAutoGetHelperTest, InTransactionRcLocal) {
 
         auto& oss = OperationShardingState::get(opCtx);
 
-        ASSERT_EQ(criNssA.getShardVersion(kMyShardName), oss.getShardVersion(nssA));
+        ASSERT_EQ(criNssA.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssA));
 
-        ASSERT_EQ(criNssB.getShardVersion(kMyShardName), oss.getShardVersion(nssB));
+        ASSERT_EQ(criNssB.getShardVersion(opCtx, kMyShardName), oss.getShardVersion(nssB));
         ASSERT_EQ(afterClusterTime, oss.getShardVersion(nssB)->placementConflictTime_DEPRECATED());
 
         ASSERT_EQ(db1Version, oss.getDbVersion(dbName1));

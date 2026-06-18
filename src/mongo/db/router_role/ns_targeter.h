@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/s/write_ops/write_command_ref.h"
 #include "mongo/util/modules.h"
@@ -196,7 +197,7 @@ public:
      * value may be incorrect when this targeter is at point-in-time (it will reflect the 'latest'
      * number of shards, rather than the one at the point-in-time).
      */
-    virtual int getAproxNShardsOwningChunks() const = 0;
+    virtual int getAproxNShardsOwningChunks(OperationContext* opCtx) const = 0;
 
     /**
      * Returns whether the targeted collection is sharded or not

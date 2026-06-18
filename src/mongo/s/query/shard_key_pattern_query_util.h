@@ -176,7 +176,8 @@ MONGO_MOD_PUBLIC void getShardIdsAndChunksForQuery(
  * 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was hashed and assumes
  * that any non-collatable shard key was not hashed from a collatable type.
  */
-MONGO_MOD_PUBLIC void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
+MONGO_MOD_PUBLIC void getShardIdsForCanonicalQuery(OperationContext* opCtx,
+                                                   const CanonicalQuery& query,
                                                    const ChunkManager& cm,
                                                    std::set<ShardId>* shardIds,
                                                    bool bypassIsFieldHashedCheck = false);
@@ -193,6 +194,7 @@ MONGO_MOD_PUBLIC void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
  * performance.
  */
 MONGO_MOD_PUBLIC void getShardIdsAndChunksForCanonicalQuery(
+    OperationContext* opCtx,
     const CanonicalQuery& query,
     const ChunkManager& cm,
     std::set<ShardId>* shardIds,

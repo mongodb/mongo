@@ -133,7 +133,7 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
 
     // Retrieve the shard id for the given shard key value.
     std::set<ShardId> shardIds;
-    cri.getChunkManager().getShardIdsForRange(shardKeyVal, shardKeyVal, &shardIds);
+    cri.getChunkManager().getShardIdsForRange(opCtx, shardKeyVal, shardKeyVal, &shardIds);
     uassert(6868601, "The value should belong to exactly one ShardId", shardIds.size() == 1);
     const auto shardId = *(shardIds.begin());
     return Value(shardId.toString());

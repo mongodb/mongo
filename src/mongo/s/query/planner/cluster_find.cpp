@@ -255,7 +255,7 @@ void updateNumHostsTargetedMetrics(OperationContext* opCtx,
     // Note: It is fine to use 'getAproxNShardsOwningChunks' here because the result is only used to
     // update stats.
     int nShardsOwningChunks =
-        cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks() : 0;
+        cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks(opCtx) : 0;
     auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
         opCtx, nTargetedShards, nShardsOwningChunks, cri.isSharded());
     NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(

@@ -40,6 +40,7 @@
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
@@ -959,7 +960,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToUnsplittableTi
         const auto expectedShardVersion =
             uassertStatusOK(getCatalogCacheMock()->getCollectionRoutingInfo(
                                 operationContext(), bucketsNss, false))
-                .getShardVersion(_shard1);
+                .getShardVersion(operationContext(), _shard1);
 
         ASSERT_EQ(_shard1, shardEndpoint.shardName);
         ASSERT_EQ(boost::none, shardEndpoint.databaseVersion);
@@ -967,7 +968,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToUnsplittableTi
     };
 
     CollectionRoutingInfoTargeter cri(operationContext(), nss);
-    ASSERT_EQ(1, cri.getAproxNShardsOwningChunks());
+    ASSERT_EQ(1, cri.getAproxNShardsOwningChunks(operationContext()));
 
     // Insert
     const auto endpointInsert = cri.targetInsert(operationContext(), BSON("x" << 1));
@@ -1003,14 +1004,14 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToShardedTimeser
             expectedTargetedShards.erase(it);
 
             const auto expectedShardVersion =
-                collectionRoutingInfo.getShardVersion(endpoint.shardName);
+                collectionRoutingInfo.getShardVersion(operationContext(), endpoint.shardName);
             ASSERT_EQ(boost::none, endpoint.databaseVersion);
             ASSERT_EQ(expectedShardVersion, endpoint.shardVersion);
         }
     };
 
     CollectionRoutingInfoTargeter cri(operationContext(), nss);
-    ASSERT_EQ(2, cri.getAproxNShardsOwningChunks());
+    ASSERT_EQ(2, cri.getAproxNShardsOwningChunks(operationContext()));
 
     // Insert
     {
@@ -1073,7 +1074,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, UntrackedAreNotTranslatedToB
     ASSERT_EQ(nss, cri.getNS());
     ASSERT_EQ(false, cri.isTrackedTimeSeriesBucketsNamespace());
     ASSERT_FALSE(cri.timeseriesNamespaceNeedsRewrite(nss));
-    ASSERT_EQ(0, cri.getAproxNShardsOwningChunks());
+    ASSERT_EQ(0, cri.getAproxNShardsOwningChunks(operationContext()));
 }
 
 TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TrackedAreTranslatedToBucketsNs) {

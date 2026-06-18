@@ -262,7 +262,7 @@ bool ReshardingCoordinatorExternalStateImpl::searchIndexExistsForCollection(
     // command more deterministic and easier to test.
     const auto cri =
         uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
-    const auto minKeyShardId = cri.getChunkManager().getMinKeyShardIdWithSimpleCollation();
+    const auto minKeyShardId = cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(opCtx);
 
     const auto shardPtr =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId));

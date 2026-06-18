@@ -149,7 +149,7 @@ public:
      * value may be incorrect when this targeter is at point-in-time (it will reflect the 'latest'
      * number of shards, rather than the one at the point-in-time).
      */
-    int getAproxNShardsOwningChunks() const override;
+    int getAproxNShardsOwningChunks(OperationContext* opCtx) const override;
 
     bool isTargetedCollectionSharded() const override;
 

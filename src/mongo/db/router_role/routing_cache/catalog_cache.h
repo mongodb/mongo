@@ -221,7 +221,7 @@ public:
     }
 
     ShardVersion getCollectionVersion() const;
-    ShardVersion getShardVersion(const ShardId& shardId) const;
+    ShardVersion getShardVersion(OperationContext* opCtx, const ShardId& shardId) const;
 
     const CachedDatabaseInfo& getDatabaseInfo() const {
         return _dbInfo;

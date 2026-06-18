@@ -194,7 +194,7 @@ public:
                         nss.toStringForErrorMsg()),
             !collection.getShardingDescription().isSharded() ||
                 collection.getShardingFilter()->isRangeEntirelyOwned(
-                    min, max, false /*includeMaxBound*/));
+                    opCtx, min, max, false /*includeMaxBound*/));
 
         auto splitKeys = splitVector(opCtx,
                                      collection,

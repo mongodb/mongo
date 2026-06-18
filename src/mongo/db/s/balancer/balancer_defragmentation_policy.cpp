@@ -115,7 +115,7 @@ ShardVersion getShardVersion(OperationContext* opCtx,
             str::stream() << "Expected collection " << nss.toStringForErrorMsg()
                           << " to be sharded",
             cri.isSharded());
-    return cri.getShardVersion(shardId);
+    return cri.getShardVersion(opCtx, shardId);
 }
 
 std::vector<ChunkType> getCollectionChunks(OperationContext* opCtx, const CollectionType& coll) {

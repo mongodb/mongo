@@ -239,7 +239,7 @@ std::vector<AsyncRequestsSender::Request> buildShardVersionedRequests(
 
     if (cm.hasRoutingTable()) {
         for (const auto& shardId : shardIds) {
-            BSONObj versionedCmd = appendShardVersion(cmdObj, cri.getShardVersion(shardId));
+            BSONObj versionedCmd = appendShardVersion(cmdObj, cri.getShardVersion(opCtx, shardId));
             versionedCmd = appendSampleId(versionedCmd, shardId);
             requests.emplace_back(shardId, std::move(versionedCmd));
         }
@@ -1076,10 +1076,11 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
                     // with chunks. For consistency with cluster listIndexes, load from the shard
                     // that owns the minKey chunk.
                     const auto& cm = cri.getChunkManager();
-                    const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
+                    const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation(opCtx);
                     return {uassertStatusOK(
                                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),
-                            appendShardVersion(cmdNoVersion, cri.getShardVersion(minKeyShardId))};
+                            appendShardVersion(cmdNoVersion,
+                                               cri.getShardVersion(opCtx, minKeyShardId))};
                 } else {
                     // For a collection without routing table, the primary shard will have correct
                     // indexes. Attach dbVersion + shardVersion: UNTRACKED.

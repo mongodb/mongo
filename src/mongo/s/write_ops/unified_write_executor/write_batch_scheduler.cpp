@@ -43,6 +43,7 @@ namespace {
 // in the previous round. Checks both StaleConfig (shard-specific ShardVersion per namespace) and
 // StaleDbVersion (DatabaseVersion per database) errors.
 bool checkMetadataRefreshed(
+    OperationContext* opCtx,
     const RoutingContext& routingCtx,
     const std::vector<NamespaceString>& nssList,
     const stdx::unordered_map<NamespaceString, std::pair<ShardRef, ShardVersion>>&
@@ -72,7 +73,7 @@ bool checkMetadataRefreshed(
             }
             // TODO (SERVER-128349) : remove this conversion once the collection routing info works
             // with shard refs.
-        } else if (cri.getShardVersion(shardRef.getShardId()) != prevVersion) {
+        } else if (cri.getShardVersion(opCtx, shardRef.getShardId()) != prevVersion) {
             return true;
         }
     }
@@ -168,7 +169,7 @@ WriteBatchScheduler::RoundResult WriteBatchScheduler::executeRound(OperationCont
     }
 
     bool metadataRefreshed = checkMetadataRefreshed(
-        *swRoutingCtx.getValue(), nssList, prevStaleVersions, prevStaleDbVersions);
+        opCtx, *swRoutingCtx.getValue(), nssList, prevStaleVersions, prevStaleDbVersions);
 
     // Capture how many OK responses there have been at the start of the round so we can compare
     // against it when the round has finished.

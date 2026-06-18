@@ -314,6 +314,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
     // to '_donorShardId' under the original shard key. If it does, apply rule #3 and run a
     // replacement update on the output collection.
     if (_sourceChunkMgr.keyBelongsToShard(
+            opCtx,
             _sourceChunkMgr.getShardKeyPattern().extractShardKeyFromDoc(outputCollDoc),
             _donorShardId)) {
         auto request = UpdateRequest();
@@ -399,6 +400,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
 
     if (!foundDoc ||
         !_sourceChunkMgr.keyBelongsToShard(
+            opCtx,
             _sourceChunkMgr.getShardKeyPattern().extractShardKeyFromDoc(outputCollDoc),
             _donorShardId)) {
         // Either a doc with _id == [op _id] does not exist in the output collection (rule
@@ -526,6 +528,7 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
 
         if (!foundDoc ||
             !_sourceChunkMgr.keyBelongsToShard(
+                opCtx,
                 _sourceChunkMgr.getShardKeyPattern().extractShardKeyFromDoc(outputCollDoc),
                 _donorShardId)) {
             // Either a doc with _id == [op _id] does not exist in the output collection (rule

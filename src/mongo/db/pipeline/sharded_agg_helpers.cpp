@@ -587,7 +587,7 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
         // TODO (SERVER-128786): Remove getShardId once getShardVersion uses ShardRef.
         ShardVersion shardVersion = std::invoke([&] {
             auto sv = targetingCri.hasRoutingTable()
-                ? targetingCri.getShardVersion(localShardRef.getShardId())
+                ? targetingCri.getShardVersion(opCtx, localShardRef.getShardId())
                 : ShardVersion::UNTRACKED();
             if (optOriginalPlacementConflictTime.has_value())
                 sv.setPlacementConflictTime_DEPRECATED(*optOriginalPlacementConflictTime);

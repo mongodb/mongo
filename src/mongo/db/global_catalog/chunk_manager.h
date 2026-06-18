@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -69,6 +70,20 @@
 namespace mongo {
 
 class CurrentChunkManager;
+
+using ShardHandleMap MONGO_MOD_NEEDS_REPLACEMENT =
+    stdx::unordered_map<ShardRef, ShardHandle, ShardRef::Hasher>;
+
+/**
+ * Provides a mapping of shard references to shard handles for every shard in the shard registry.
+ * Can trigger a shard registry lookup in the case that the topology time has been bumped and the
+ * registry has not yet been refreshed.
+ *
+ * TODO (SERVER-126212): Remove this function once the chunk manager cannot contain a mix of shardId
+ * and shard UUIDs.
+ */
+MONGO_MOD_NEEDS_REPLACEMENT ShardHandleMap
+resolveShardHandlesForChunkManager(OperationContext* opCtx);
 
 struct MONGO_MOD_NEEDS_REPLACEMENT PlacementVersionTargetingInfo {
     /**
@@ -857,17 +872,31 @@ public:
     }
 
     /**
-     * Retrieves the placement version for the given shard.
+     * Retrieves the placement version for the given shard. May be blocking if the shard registry
+     * is not up to date.
+     *
+     * Methods in the CollectionMetadata using the ShardingState's shardId may pass nullptr to avoid
+     * shard registry lookups. TODO (SERVER-128349): Remove this caveat.
+     *
+     * TODO (SERVER-126212): Remove the operation context argument once shard ref resolution is no
+     * longer needed.
      */
-    ChunkVersion getVersion(const ShardId& shardId) const {
+    ChunkVersion getVersion(OperationContext*, const ShardId& shardId) const {
         tassert(7626404, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getVersion(shardId);
     }
 
     /**
-     * Retrieves the maximum validAfter timestamp for the given shard.
+     * Retrieves the maximum validAfter timestamp for the given shard. May be blocking if the shard
+     * registry is not up to date.
+     *
+     * Methods in the CollectionMetadata using the ShardingState's shardId may pass nullptr to avoid
+     * shard registry lookups. TODO (SERVER-128349): Remove this caveat.
+     *
+     * TODO (SERVER-126212): Remove the operation context argument once shard ref resolution is no
+     * longer needed.
      */
-    Timestamp getMaxValidAfter(const ShardId& shardId) const {
+    Timestamp getMaxValidAfter(OperationContext*, const ShardId& shardId) const {
         tassert(7626405, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getMaxValidAfter(shardId);
     }
@@ -876,8 +905,16 @@ public:
      * Retrieves the placement version for the given shard.
      * Only use when logging the given chunk version -- if the caller must execute logic
      * based on the returned version, use getVersion() instead.
+     *
+     * May be blocking if the shard registry is not up to date.
+     *
+     * Methods in the CollectionMetadata using the ShardingState's shardId may pass nullptr to avoid
+     * shard registry lookups. TODO (SERVER-128349): Remove this caveat.
+     *
+     * TODO (SERVER-126212): Remove the operation context argument once shard ref resolution is no
+     * longer needed.
      */
-    ChunkVersion getVersionForLogging(const ShardId& shardId) const {
+    ChunkVersion getVersionForLogging(OperationContext*, const ShardId& shardId) const {
         tassert(7626406, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getVersionForLogging(shardId);
     }
@@ -917,7 +954,9 @@ public:
      * "shardId" in this routing table. If "shardKey" is empty returns false. If "shardKey" is not a
      * valid shard key, the behaviour is undefined.
      */
-    bool keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const;
+    bool keyBelongsToShard(OperationContext*,
+                           const BSONObj& shardKey,
+                           const ShardId& shardId) const;
 
     struct ChunkOwnership {
         bool containsShardKey;
@@ -930,14 +969,17 @@ public:
      * 'nearestOwnedChunk' = boost::none); it is also possible that the nearest chunk is the one
      * which includes 'shardKey'(in which case 'containsShardKey' = true).
      */
-    ChunkOwnership nearestOwnedChunk(const BSONObj& shardKey,
+    ChunkOwnership nearestOwnedChunk(OperationContext*,
+                                     const BSONObj& shardKey,
                                      const ShardId& shardId,
                                      ChunkMap::Direction direction) const;
 
     /**
      * Returns true if any chunk owned by the shard with the given "shardId" overlaps "range".
      */
-    bool rangeOverlapsShard(const ChunkRange& range, const ShardId& shardId) const;
+    bool rangeOverlapsShard(OperationContext*,
+                            const ChunkRange& range,
+                            const ShardId& shardId) const;
 
     /**
      * Given a shard key (or a prefix) that has been extracted from a document, returns the chunk
@@ -967,7 +1009,7 @@ public:
      * Finds the shard id of the shard that owns the chunk minKey belongs to, assuming the simple
      * collation because shard keys do not support non-simple collations.
      */
-    ShardId getMinKeyShardIdWithSimpleCollation() const;
+    ShardId getMinKeyShardIdWithSimpleCollation(OperationContext*) const;
 
     /**
      * Returns all shard ids which contain chunks overlapping the range [min, max]. Please note the
@@ -975,7 +1017,8 @@ public:
      * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
      * query.
      */
-    void getShardIdsForRange(const BSONObj& min,
+    void getShardIdsForRange(OperationContext*,
+                             const BSONObj& min,
                              const BSONObj& max,
                              std::set<ShardId>* shardIds,
                              std::set<ChunkRange>* chunkRanges = nullptr,
@@ -988,7 +1031,7 @@ public:
      *
      * TODO SERVER-114823: Remove all usages getAllShardIds_UNSAFE_NotPointInTime
      */
-    void getAllShardIds_UNSAFE_NotPointInTime(std::set<ShardId>* all) const {
+    void getAllShardIds_UNSAFE_NotPointInTime(OperationContext*, std::set<ShardId>* all) const {
         tassert(8719701, "Expected routing table to be initialized", _rt->optRt);
         _rt->optRt->getAllShardIds(all);
     }
@@ -1010,7 +1053,7 @@ public:
      *
      * TODO SERVER-114823: Remove all usages getAproxNShardsOwningChunks
      */
-    size_t getAproxNShardsOwningChunks() const {
+    size_t getAproxNShardsOwningChunks(OperationContext*) const {
         tassert(7626411, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getNShardsOwningChunks();
     }
@@ -1074,7 +1117,8 @@ public:
      *
      * Can only be used when this ChunkManager is not at point-in-time.
      */
-    boost::optional<Chunk> getNextChunkOnShard(const BSONObj& shardKey,
+    boost::optional<Chunk> getNextChunkOnShard(OperationContext*,
+                                               const BSONObj& shardKey,
                                                const ShardId& shardId) const;
 
     /**

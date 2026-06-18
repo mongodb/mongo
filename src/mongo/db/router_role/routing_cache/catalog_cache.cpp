@@ -198,8 +198,9 @@ ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
     return sv;
 }
 
-ShardVersion CollectionRoutingInfo::getShardVersion(const ShardId& shardId) const {
-    auto sv = ShardVersionFactory::make(getChunkManager(), shardId);
+ShardVersion CollectionRoutingInfo::getShardVersion(OperationContext* opCtx,
+                                                    const ShardId& shardId) const {
+    auto sv = ShardVersionFactory::make(opCtx, getChunkManager(), shardId);
     if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
         sv.setIgnoreShardingCatalogUuidMismatch();
     }

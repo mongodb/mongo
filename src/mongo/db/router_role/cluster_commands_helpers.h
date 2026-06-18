@@ -169,7 +169,7 @@ std::vector<std::pair<ShardId, CommandType>> buildVersionedCommandsByRoutingTabl
         getShardIdsForQuery(expCtx, query, collation, cri.getChunkManager(), &shardIds);
         for (const auto& shardId : shardIds) {
             CommandType versionedCmd = cmd;
-            versionedCmd.setShardVersion(cri.getShardVersion(shardId));
+            versionedCmd.setShardVersion(cri.getShardVersion(opCtx, shardId));
             requests.emplace_back(shardId, std::move(versionedCmd));
         }
     } else if (cri.getDbVersion().isFixed()) {

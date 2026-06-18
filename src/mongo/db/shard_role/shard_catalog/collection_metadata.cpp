@@ -202,10 +202,13 @@ RangeMap CollectionMetadata::getChunks() const {
     return chunksMap;
 }
 
+// TODO (SERVER-128349): Remove the nullptr argument once we have a shardHandle access to the chunk
+// manager.
 bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk) const {
     tassert(10016203, "Expected a routing table to be initialized", hasRoutingTable());
 
-    auto nextChunk = getCurrentChunkManager()->getNextChunkOnShard(lookupKey, _thisShardId);
+    auto nextChunk =
+        getCurrentChunkManager()->getNextChunkOnShard(nullptr /* opCtx */, lookupKey, _thisShardId);
     if (!nextChunk)
         return false;
 

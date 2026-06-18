@@ -56,9 +56,11 @@ ShardVersion ShardVersionFactory::make(const ChunkManager& chunkManager) {
     return ShardVersion(chunkManager.getVersion(), boost::none, extractNssIfTesting(chunkManager));
 }
 
-ShardVersion ShardVersionFactory::make(const ChunkManager& chunkManager, const ShardId& shardId) {
+ShardVersion ShardVersionFactory::make(OperationContext* opCtx,
+                                       const ChunkManager& chunkManager,
+                                       const ShardId& shardId) {
     return ShardVersion(
-        chunkManager.getVersion(shardId), boost::none, extractNssIfTesting(chunkManager));
+        chunkManager.getVersion(opCtx, shardId), boost::none, extractNssIfTesting(chunkManager));
 }
 
 ShardVersion ShardVersionFactory::make(const CollectionMetadata& cm,
