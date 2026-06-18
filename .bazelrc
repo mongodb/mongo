@@ -373,6 +373,7 @@ common:opt_profiled --//bazel/config:separate_debug=True
 common:opt_profiled --//bazel/config:compiler_type=clang
 common:opt_profiled --//bazel/config:dtlto=True
 common:opt_profiled --//bazel/config:pgo_profile_use=True
+common:opt_profiled --//bazel/config:bolt_profile_use=True
 common:opt_profiled --enable_platform_specific_config=true
 
 --config=evg
