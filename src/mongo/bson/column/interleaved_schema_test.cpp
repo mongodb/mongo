@@ -181,5 +181,27 @@ TEST(InterleavedSchemaTest, RootTypeArray) {
     EXPECT_EQ(e[0].type, BSONType::array);
 }
 
+TEST(InterleavedSchemaTest, ScalarCountAtBsonMaxElements) {
+    // 1 (type) + key digits + 1 (null) + 4 (int32)
+    auto estimateSize = [](int i) -> int {
+        return 6 + static_cast<int>(std::to_string(i).size());
+    };
+
+    // 4 (outer size) + 1 (type) + 5 ("data\0") + 4 (array size) + 1 (array null) + 1 (outer null)
+    constexpr int kOuterOverhead = 16;
+    size_t totalSize = kOuterOverhead;
+    BSONArrayBuilder bab;
+    for (int i = 0, size; totalSize + (size = estimateSize(i)) < BSONObjMaxUserSize; ++i) {
+        totalSize += size;
+        bab.append(i);
+    }
+    auto arr = bab.arr();
+    auto ref = BSON("data" << arr);
+    ASSERT_EQ(ref.objsize(), totalSize);
+
+    InterleavedSchema schema(ref, BSONType::object, true);
+    EXPECT_EQ(schema.scalarCount(), arr.nFields());
+}
+
 }  // namespace
 }  // namespace mongo
