@@ -21,6 +21,12 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
+    ticket: SERVER-129103
+  - test_file: jstests/aggregation/expressions/convert_bindata.js
+    ticket: SERVER-129103
+  - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
+    ticket: SERVER-129103
   - test_file: jstests/core/index/elemmatch_index.js
     ticket: SERVER-108945
   - test_file: jstests/core/filemd5.js
@@ -956,6 +962,12 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
+    ticket: SERVER-129103
+  - test_file: jstests/aggregation/expressions/convert_bindata.js
+    ticket: SERVER-129103
+  - test_file: jstests/aggregation/expressions/convert_bindata_bsoncolumn.js
+    ticket: SERVER-129103
   - test_file: jstests/core/index/elemmatch_index.js
     ticket: SERVER-108945
   - test_file: jstests/core/filemd5.js
