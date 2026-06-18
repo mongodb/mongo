@@ -18,6 +18,21 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "recordid_deduplicator",
+    srcs = [
+        "recordid_deduplicator.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands/server_status:server_status_metric",
+        "//src/mongo/db/memory_tracking",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline/spilling",
+        "//src/mongo/db/storage:spill_table",
+    ],
+)
+
+mongo_cc_library(
     name = "query_shard_server_test_fixture",
     srcs = [
         "query_shard_server_test_fixture.cpp",

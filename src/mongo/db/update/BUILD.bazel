@@ -133,6 +133,28 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "update_util",
+    srcs = [
+        "update_util.cpp",
+    ],
+    deps = [
+        ":update_driver",
+        "//src/mongo/db:internal_transactions_feature_flag",
+        "//src/mongo/db:write_stage_common",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/exec/classic:recordid_deduplicator",
+        "//src/mongo/db/matcher:expressions_mongod_only",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/query:plan_yield_policy",
+        "//src/mongo/db/query/write_ops:canonical_update_and_delete",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
+        "//src/mongo/db/s/resharding:resharding_destined_recipient_util",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/s:grid",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "db_update_test",
     srcs = [

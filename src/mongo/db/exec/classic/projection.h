@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -190,7 +191,30 @@ public:
     template <typename Container>
     static BSONObj transform(const BSONObj& doc,
                              const Container& fields,
-                             projection_ast::ProjectType projectType);
+                             projection_ast::ProjectType projectType) {
+        BSONObjBuilder bob;
+        auto nFieldsLeft = fields.size();
+
+        if (projectType == projection_ast::ProjectType::kInclusion) {
+            for (const auto& elt : doc) {
+                if (fields.count(elt.fieldNameStringData()) > 0) {
+                    bob.append(elt);
+                    if (--nFieldsLeft == 0) {
+                        break;
+                    }
+                }
+            }
+        } else {
+            for (const auto& elt : doc) {
+                if (nFieldsLeft == 0 || fields.count(elt.fieldNameStringData()) == 0) {
+                    bob.append(elt);
+                } else {
+                    --nFieldsLeft;
+                }
+            }
+        }
+        return bob.obj();
+    }
 
 private:
     void transform(WorkingSetMember* member) const final;

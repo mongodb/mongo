@@ -308,40 +308,6 @@ ProjectionStageSimple::ProjectionStageSimple(ExpressionContext* expCtx,
     }
 }
 
-template <typename Container>
-BSONObj ProjectionStageSimple::transform(const BSONObj& doc,
-                                         const Container& projFields,
-                                         projection_ast::ProjectType projectType) {
-    BSONObjBuilder bob;
-    auto nFieldsLeft = projFields.size();
-
-    if (projectType == projection_ast::ProjectType::kInclusion) {
-
-        for (const auto& elt : doc) {
-            if (projFields.count(elt.fieldNameStringData()) > 0) {
-                bob.append(elt);
-                if (--nFieldsLeft == 0) {
-                    break;
-                }
-            }
-        }
-    } else {
-
-        for (const auto& elt : doc) {
-            if (nFieldsLeft == 0 || projFields.count(elt.fieldNameStringData()) == 0) {
-                bob.append(elt);
-            } else {
-                --nFieldsLeft;
-            }
-        }
-    }
-    return bob.obj();
-}
-template BSONObj ProjectionStageSimple::transform<StringSet>(
-    const BSONObj& doc, const StringSet& fields, projection_ast::ProjectType projectType);
-template BSONObj ProjectionStageSimple::transform<OrderedPathSet>(
-    const BSONObj& doc, const OrderedPathSet& fields, projection_ast::ProjectType projectType);
-
 void ProjectionStageSimple::transform(WorkingSetMember* member) const {
     // SIMPLE_DOC implies that we expect an object so it's kind of redundant.
     // If we got here because of SIMPLE_DOC the planner shouldn't have messed up.

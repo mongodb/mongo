@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,6 +7,43 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+# Dedicated library for the Express plan executor and its factory functions
+# (makeExpressExecutorForFindById / ...ForFindByClusteredId). query_exec depends on this library
+# instead of compiling these sources directly, so other consumers such as single_doc_lookup can link.
+mongo_cc_library(
+    name = "express_executor",
+    srcs = [
+        "express_plan.cpp",
+        "plan_executor_express.cpp",
+        "//src/mongo/db/query:plan_explainer_express.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:write_stage_common",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/exec:scoped_timer",
+        "//src/mongo/db/exec:working_set",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/matcher:expression_algo",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/query:plan_executor",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query:query_planner_params",
+        "//src/mongo/db/query/client_cursor",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
+        "//src/mongo/db/query/write_ops:canonical_update_and_delete",
+        "//src/mongo/db/query/write_ops:delete_request_idl",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/storage:write_unit_of_work",
+        "//src/mongo/db/update:update_driver",
+        "//src/mongo/db/update:update_util",
+    ],
 )
 
 mongo_cc_unit_test(
