@@ -39,6 +39,8 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 
 /**
@@ -70,9 +72,22 @@ public:
 
 private:
     BSONObj _produceNewDocumentForInsert();
-    void _performInsert(BSONObj newDocument);
+
+    // Performs the insert for the no-match-found branch of the upsert. Returns NEED_TIME once the
+    // insert has committed, or NEED_YIELD if handlePlanStageYield caught a retryable storage
+    // conflict (a WriteConflictException or similar), in which case the PlanExecutor will yield
+    // (releasing the storage snapshot, locks, and ticket), back off, restore, and re-drive
+    // doWork().
+    PlanStage::StageState _performInsert(const BSONObj& newDocument, WorkingSetID* out);
+
     void _assertDocumentToBeInsertedIsValid(const mutablebson::Document& document,
                                             const FieldRefSet& shardKeyPaths);
+
+    // The document to insert, produced once on the first insert attempt and reused across any
+    // WriteConflictException retries so that the generated _id/OID remains stable. Its presence
+    // also marks that doWork() is in the insert phase and should skip re-running
+    // UpdateStage::doWork().
+    boost::optional<BSONObj> _newDocumentToInsert;
 };
 
 }  // namespace mongo
