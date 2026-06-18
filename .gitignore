@@ -18,6 +18,7 @@
 !/.tmp/_placeholder_
 venv
 /buildscripts/copybara/copybara_path_rules.bara.sky
+/mfp_resmoke_install
 
 *~
 *.test_iwyu.h

@@ -27,16 +27,35 @@
 """Library functions and utility methods used across user-facing IDL scripts."""
 
 import os
+import shutil
+import subprocess
 
 from buildscripts.idl.idl import parser, syntax
 from buildscripts.idl.idl.compiler import CompilerImportResolver
 
 
 def list_idls(directory: str) -> set[str]:
-    """Find all IDL files in the current directory."""
+    """Find all IDL files in directory, using git ls-files when inside a git repo."""
+    if shutil.which("git") is not None:
+        result = subprocess.run(
+            [
+                "git",
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "--",
+                ":(glob)**/*.idl",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=directory,
+        )
+        if result.returncode == 0:
+            return {os.path.join(directory, p) for p in result.stdout.splitlines()}
     return {
         os.path.join(dirpath, filename)
-        for dirpath, dirnames, filenames in os.walk(directory)
+        for dirpath, _, filenames in os.walk(directory)
         for filename in filenames
         if not filename.startswith(".") and filename.endswith(".idl")
     }
