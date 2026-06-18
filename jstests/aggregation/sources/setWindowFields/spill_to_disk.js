@@ -393,7 +393,11 @@ function testErrorsWhenCantSpill() {
     };
     runSingleErrorTest({spec: {percentile: percentileSpec}, errorCode: 5414201, diskUse: true});
     // Assert the pipeline fails when trying to spill, but 'allowDiskUse' is set to false.
-    runSingleErrorTest({spec: {percentile: percentileSpec}, errorCode: 5643011, diskUse: false});
+    runSingleErrorTest({
+        spec: {percentile: percentileSpec},
+        errorCode: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        diskUse: false,
+    });
     // Reset the memory limit for other tests.
     setParameterOnAllNonConfigNodes(
         db.getMongo(),

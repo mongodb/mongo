@@ -125,7 +125,7 @@ public:
     static void moveToOpCtxIfAvailable(OperationContext* opCtx,
                                        std::unique_ptr<OperationMemoryUsageTracker> tracker);
 
-    explicit OperationMemoryUsageTracker(OperationContext* opCtx) : _opCtx(opCtx) {}
+    explicit OperationMemoryUsageTracker(OperationContext* opCtx);
 
 private:
     friend class RunAggregateTest;

@@ -328,6 +328,61 @@ TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenSetReleasesCorrectAmountOnDestruc
     ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 80LL);
 }
 
+TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitChecksAncestorLimit) {
+    // Operation-wide tracker enforces a 100 byte cap; stage limit is much larger.
+    SimpleMemoryUsageTracker opTracker{100 /* maxAllowedMemoryUsageBytes */};
+    SimpleMemoryUsageTracker stageTracker{&opTracker, 10 * 1024 /* maxAllowedMemoryUsageBytes */};
+
+    stageTracker.add(50);
+    ASSERT_TRUE(stageTracker.withinMemoryLimit());
+
+    // Stage usage exceeds the op limit but not its own stage limit. The chain check still
+    // catches the breach at the ancestor level.
+    stageTracker.add(51);
+    ASSERT_FALSE(stageTracker.withinMemoryLimit());
+
+    stageTracker.add(-51);
+    ASSERT_TRUE(stageTracker.withinMemoryLimit());
+}
+
+TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitAlsoChecksLocalLimit) {
+    // Op limit is effectively unbounded, but the stage limit is tight. A local breach must
+    // still fail withinMemoryLimit().
+    SimpleMemoryUsageTracker opTracker{std::numeric_limits<int64_t>::max()};
+    SimpleMemoryUsageTracker stageTracker{&opTracker, 100 /* maxAllowedMemoryUsageBytes */};
+
+    stageTracker.add(50);
+    ASSERT_TRUE(stageTracker.withinMemoryLimit());
+
+    stageTracker.add(51);
+    ASSERT_FALSE(stageTracker.withinMemoryLimit());
+}
+
+TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitOnStandaloneTrackerIsLocalOnly) {
+    // No base: chain check collapses to the local check.
+    SimpleMemoryUsageTracker tracker{100 /* maxAllowedMemoryUsageBytes */};
+    tracker.add(50);
+    ASSERT_TRUE(tracker.withinMemoryLimit());
+    tracker.add(51);
+    ASSERT_FALSE(tracker.withinMemoryLimit());
+}
+
+TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitOnMemoryUsageTracker) {
+    // MemoryUsageTracker is the per-function variant whose internal _baseTracker is linked to
+    // the op-wide tracker. The forwarder should pick up the op-wide breach too.
+    SimpleMemoryUsageTracker opTracker{100 /* maxAllowedMemoryUsageBytes */};
+    MemoryUsageTracker stageTracker{
+        &opTracker, false /* allowDiskUse */, 10 * 1024 /* maxMemoryUsageBytes */};
+    SimpleMemoryUsageTracker& funcTracker = stageTracker["fn"];
+
+    funcTracker.add(50);
+    ASSERT_TRUE(stageTracker.withinMemoryLimit());
+
+    funcTracker.add(51);
+    // Stage's own roll-up is still within the stage limit; op tally exceeds the op limit.
+    ASSERT_FALSE(stageTracker.withinMemoryLimit());
+}
+
 TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenWith) {
     static const std::vector<std::string> kLines = {"a", "bb", "ccc", "dddd"};
 
@@ -465,6 +520,19 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitIncludesGlobalLimitWhe
         ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
         ASSERT_STRING_CONTAINS(ex.reason(), "100");   // local limit
         ASSERT_STRING_CONTAINS(ex.reason(), "5000");  // global limit from base
+    }
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitThrowsWhenOnlyGlobalLimitExceeded) {
+    SimpleMemoryUsageTracker base{100};
+    SimpleMemoryUsageTracker tracker{&base, 10 * 1024};
+    tracker.add(200);
+    try {
+        tracker.assertWithinMemoryLimit("$testExpr");
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "Global memory limit: 100");
     }
 }
 

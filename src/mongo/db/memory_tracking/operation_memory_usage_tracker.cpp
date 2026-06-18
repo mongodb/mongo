@@ -30,6 +30,7 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -41,6 +42,10 @@ const OperationContext::Decoration<std::unique_ptr<OperationMemoryUsageTracker>>
     OperationContext::declareDecoration<std::unique_ptr<OperationMemoryUsageTracker>>();
 
 }
+
+OperationMemoryUsageTracker::OperationMemoryUsageTracker(OperationContext* opCtx)
+    : SimpleMemoryUsageTracker(internalQueryMaxMemoryUsageBytesPerOperation.loadRelaxed()),
+      _opCtx(opCtx) {}
 
 /**
  * Return the OperationMemoryUsageTracker for this operation. If we haven't yet created one, do it

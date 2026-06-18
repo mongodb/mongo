@@ -99,7 +99,9 @@ TEST_F(SpillableDequeTest, CanReadAndWriteDocumentsInMem) {
 TEST_F(SpillableDequeTest, LoadingFailsIfCantSpillToDisk) {
     _expCtx->setAllowDiskUse(false);
     auto cache = createSpillableDeque(1);
-    ASSERT_THROWS_CODE(buildAndLoadDocumentSet(1, cache.get()), AssertionException, 5643011);
+    ASSERT_THROWS_CODE(buildAndLoadDocumentSet(1, cache.get()),
+                       AssertionException,
+                       ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
 TEST_F(SpillableDequeTest, CanReadAndWriteDocumentsToDisk) {

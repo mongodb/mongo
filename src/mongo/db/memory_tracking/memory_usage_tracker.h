@@ -73,8 +73,13 @@ public:
         return _peakTrackedMemoryBytes;
     }
 
+    /**
+     * Returns true only if this tracker and every ancestor in the base chain are within their
+     * respective limits.
+     */
     bool withinMemoryLimit() const {
-        return _inUseTrackedMemoryBytes <= _maxAllowedMemoryUsageBytes;
+        return _inUseTrackedMemoryBytes <= _maxAllowedMemoryUsageBytes &&
+            (!_base || _base->withinMemoryLimit());
     }
 
     int64_t maxAllowedMemoryUsageBytes() const {

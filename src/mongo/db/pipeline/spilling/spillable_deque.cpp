@@ -63,15 +63,13 @@ void SpillableDeque::verifyInCache(int id) const {
 void SpillableDeque::addDocument(Document input) {
     _memCache.emplace_back(MemoryUsageToken{input.getApproximateSize(), &_memTracker},
                            std::move(input));
-    if (!_memTracker.withinMemoryLimit() && _expCtx->getAllowDiskUse()) {
+    if (!_memTracker.withinMemoryLimit()) {
+        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+                "Exceeded memory limit and can't spill to disk. Set allowDiskUse: true to allow "
+                "spilling",
+                _expCtx->getAllowDiskUse());
         spillToDisk();
     }
-    uassert(5643011,
-            str::stream() << "Exceeded max memory. Current memory: "
-                          << _memTracker.inUseTrackedMemoryBytes() << " bytes. Max allowed memory: "
-                          << _memTracker.maxAllowedMemoryUsageBytes()
-                          << " bytes. Set 'allowDiskUse: true' to spill to disk",
-            _memTracker.withinMemoryLimit());
     ++_nextIndex;
 }
 Document SpillableDeque::getDocumentById(int id) const {

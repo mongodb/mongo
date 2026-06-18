@@ -410,7 +410,9 @@ TEST_F(DocumentSourceSetWindowFieldsSpillingTest,
             ASSERT_GTE(spillingStats.getSpilledRecords(), 90);
             ASSERT_GTE(spillingStats.getSpilledBytes(), 5000);
         } else {
-            ASSERT_THROWS_CODE(exhaustPipeline(), DBException, 5643011);
+            ASSERT_THROWS_CODE(exhaustPipeline(),
+                               DBException,
+                               ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
         }
     }
 }
