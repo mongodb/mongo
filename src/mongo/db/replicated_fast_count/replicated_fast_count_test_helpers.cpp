@@ -823,6 +823,7 @@ void insertSizeCountEntry(OperationContext* opCtx,
                           SizeCountStore& store,
                           UUID uuid,
                           const SizeCountStore::Entry& entry) {
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
     WriteUnitOfWork wuow(opCtx);
     store.write(opCtx, uuid, entry);
     wuow.commit();
@@ -831,6 +832,7 @@ void insertSizeCountEntry(OperationContext* opCtx,
 void insertSizeCountTimestamp(OperationContext* opCtx,
                               SizeCountTimestampStore& store,
                               Timestamp timestamp) {
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
     WriteUnitOfWork wuow(opCtx);
     store.write(opCtx, timestamp);
     wuow.commit();

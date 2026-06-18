@@ -46,6 +46,15 @@ namespace mongo::replicated_fast_count {
  *
  * Two implementations exist: `CollectionSizeCountTimestampStore` (collection-backed) and
  * `ContainerSizeCountTimestampStore` (container-backed).
+ *
+ * Locking: the container-backed implementation reads and writes the underlying container and does
+ * not acquire any locks of its own. Callers must therefore hold the global lock for the duration
+ * of the call:
+ *   MODE_IS - read()
+ *   MODE_IX - write()
+ *
+ * The collection-backed implementation acquires the collection (and its locks) internally, but
+ * callers should hold the same locks so the two implementations are interchangeable.
  */
 class SizeCountTimestampStore {
 public:

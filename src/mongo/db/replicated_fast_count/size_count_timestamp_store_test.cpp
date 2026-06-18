@@ -30,6 +30,7 @@
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -43,6 +44,10 @@ enum class Mode { kCollection, kContainer };
 class SizeCountTimestampStoreTest : public CatalogTestFixture,
                                     public ::testing::WithParamInterface<Mode> {
 protected:
+    int expectedReadLockCode() const {
+        return GetParam() == Mode::kCollection ? 12915206 : 12915200;
+    }
+
     void setUp() override {
         CatalogTestFixture::setUp();
         auto opCtx = operationContext();
@@ -76,9 +81,15 @@ protected:
     }
 
     void writeTs(Timestamp timestamp) {
+        Lock::GlobalLock writeLock(operationContext(), MODE_IX);
         WriteUnitOfWork wuow(operationContext());
         _store->write(operationContext(), timestamp);
         wuow.commit();
+    }
+
+    boost::optional<Timestamp> readTs() {
+        Lock::GlobalLock readLock(operationContext(), MODE_IS);
+        return _store->read(operationContext());
     }
 
     std::unique_ptr<unittest::ServerParameterGuard> _ffDurability;
@@ -86,18 +97,29 @@ protected:
     std::unique_ptr<SizeCountTimestampStore> _store;
 };
 
+TEST_P(SizeCountTimestampStoreTest, ReadMassertsWithoutGlobalReadLock) {
+    ASSERT_THROWS_CODE(_store->read(operationContext()), DBException, expectedReadLockCode());
+}
+
 TEST_P(SizeCountTimestampStoreTest, WriteMassertsWithoutWriteUnitOfWork) {
     ASSERT_THROWS_CODE(_store->write(operationContext(), Timestamp(10, 1)), DBException, 12280400);
 }
 
+TEST_P(SizeCountTimestampStoreTest, WriteMassertsWithoutGlobalWriteLock) {
+    auto opCtx = operationContext();
+    Lock::GlobalLock readLock(opCtx, MODE_IS);
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_THROWS_CODE(_store->write(opCtx, Timestamp(10, 1)), DBException, 12915201);
+}
+
 TEST_P(SizeCountTimestampStoreTest, ReadReturnsNoneWhenEmpty) {
-    EXPECT_FALSE(_store->read(operationContext()).has_value());
+    EXPECT_FALSE(readTs().has_value());
 }
 
 TEST_P(SizeCountTimestampStoreTest, ReadWriteRoundTripNewEntry) {
     writeTs(Timestamp(10, 1));
 
-    const auto result = _store->read(operationContext());
+    const auto result = readTs();
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(Timestamp(10, 1), *result);
 }
@@ -106,7 +128,7 @@ TEST_P(SizeCountTimestampStoreTest, WriteUpdatesExistingDocument) {
     writeTs(Timestamp(10, 1));
     writeTs(Timestamp(20, 2));
 
-    const auto result = _store->read(operationContext());
+    const auto result = readTs();
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(Timestamp(20, 2), *result);
 }
@@ -115,7 +137,7 @@ TEST_P(SizeCountTimestampStoreTest, WriteWithSameTimestampIsIdempotent) {
     writeTs(Timestamp(10, 1));
     writeTs(Timestamp(10, 1));
 
-    const auto result = _store->read(operationContext());
+    const auto result = readTs();
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(Timestamp(10, 1), *result);
 }
@@ -134,6 +156,7 @@ class SizeCountTimestampStoreCollectionModeTest : public CatalogTestFixture {};
 
 TEST_F(SizeCountTimestampStoreCollectionModeTest, ReadReturnsNoneWhenCollectionDoesNotExist) {
     const CollectionSizeCountTimestampStore store;
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
     EXPECT_FALSE(store.read(operationContext()).has_value());
 }
 

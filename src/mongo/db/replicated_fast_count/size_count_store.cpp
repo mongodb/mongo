@@ -38,6 +38,8 @@
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::replicated_fast_count {
@@ -52,6 +54,15 @@ std::span<const char> bsonToSpan(const BSONObj& obj) {
     return {obj.objdata(), static_cast<size_t>(obj.objsize())};
 }
 
+void assertInWriteUnitOfWorkAndLocked(OperationContext* opCtx, std::string_view op) {
+    massert(12915205,
+            fmt::format("SizeCountStore::{}() must be called within a WriteUnitOfWork", op),
+            shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    massert(12915204,
+            fmt::format(
+                "Must hold the GlobalLock in a write mode when calling SizeCountStore::{}()", op),
+            shard_role_details::getLocker(opCtx)->isWriteLocked());
+}
 }  // namespace
 
 boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
@@ -96,6 +107,10 @@ SizeCountStore::Entry SizeCountStore::parseContainerValue(std::span<const char> 
 
 boost::optional<SizeCountStore::Entry> CollectionSizeCountStore::read(OperationContext* opCtx,
                                                                       UUID uuid) const {
+    massert(12915208,
+            "Must hold the GlobalLock in a read mode when calling SizeCountStore::read()",
+            shard_role_details::getLocker(opCtx)->isReadLocked());
+
     const auto acquisition = acquireFastCountCollectionForRead(opCtx);
     if (!acquisition.has_value()) {
         // TODO(SERVER-123051): Revisit this.
@@ -121,6 +136,8 @@ boost::optional<SizeCountStore::Entry> CollectionSizeCountStore::read(OperationC
 }
 
 void CollectionSizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+    assertInWriteUnitOfWorkAndLocked(opCtx, "write");
+
     const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
     const CollectionPtr& coll = acquisition.getCollectionPtr();
     const RecordId rid =
@@ -154,6 +171,8 @@ void CollectionSizeCountStore::write(OperationContext* opCtx, UUID uuid, const E
 }
 
 void CollectionSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+    assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
+
     const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
     const CollectionPtr& coll = acquisition.getCollectionPtr();
 
@@ -165,6 +184,8 @@ void CollectionSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const 
 }
 
 size_t CollectionSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
+    assertInWriteUnitOfWorkAndLocked(opCtx, "remove");
+
     const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
     const RecordId rid =
         record_id_helpers::keyForDoc(BSON("_id" << uuid),
@@ -193,6 +214,11 @@ size_t CollectionSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
 
 void CollectionSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,
                                                           SizeCountDeltas& deltas) const {
+    massert(12915207,
+            "Must hold the GlobalLock in a read mode when calling "
+            "SizeCountStore::readAndIncrementSizeCounts()",
+            shard_role_details::getLocker(opCtx)->isReadLocked());
+
     const auto acquisition = acquireFastCountCollectionForRead(opCtx).value();
     const CollectionPtr& coll = acquisition.getCollectionPtr();
 
@@ -233,6 +259,10 @@ StringKeyedContainer& ContainerSizeCountStore::_getStringKeyedContainer() const 
 
 boost::optional<SizeCountStore::Entry> ContainerSizeCountStore::read(OperationContext* opCtx,
                                                                      UUID uuid) const {
+    massert(12915203,
+            "Must hold the GlobalLock in a read mode when calling SizeCountStore::read()",
+            shard_role_details::getLocker(opCtx)->isReadLocked());
+
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
     auto cursor = container.getCursor(ru);
@@ -244,6 +274,8 @@ boost::optional<SizeCountStore::Entry> ContainerSizeCountStore::read(OperationCo
 }
 
 void ContainerSizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+    assertInWriteUnitOfWorkAndLocked(opCtx, "write");
+
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
     auto val = entryToContainerValue(entry);
@@ -260,6 +292,8 @@ void ContainerSizeCountStore::write(OperationContext* opCtx, UUID uuid, const En
 }
 
 void ContainerSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+    assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
+
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
     auto val = entryToContainerValue(entry);
@@ -268,6 +302,8 @@ void ContainerSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const E
 }
 
 size_t ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
+    assertInWriteUnitOfWorkAndLocked(opCtx, "remove");
+
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
     auto status = container_write::remove(opCtx, ru, container, uuidToContainerKey(uuid));
@@ -284,6 +320,11 @@ size_t ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
 
 void ContainerSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,
                                                          SizeCountDeltas& deltas) const {
+    massert(12915202,
+            "Must hold the GlobalLock in a read mode when calling "
+            "SizeCountStore::readAndIncrementSizeCounts()",
+            shard_role_details::getLocker(opCtx)->isReadLocked());
+
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
     auto cursor = container.getCursor(ru);

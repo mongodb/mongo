@@ -43,6 +43,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
@@ -58,7 +59,13 @@ namespace mongo::replicated_fast_count {
 namespace {
 using namespace std::literals::string_view_literals;
 
-class ReadAndIncrementSizeCountsTest : public CatalogTestFixture {};
+class ReadAndIncrementSizeCountsTest : public CatalogTestFixture {
+protected:
+    void doReadAndIncrement(CollectionSizeCountStore& store, SizeCountDeltas& deltas) {
+        Lock::GlobalLock lk(operationContext(), MODE_IS);
+        store.readAndIncrementSizeCounts(operationContext(), deltas);
+    }
+};
 
 TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
     ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
@@ -69,7 +76,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
     deltas[uuid] = SizeCountDelta{.sizeCount = {0, 0}, .state = DDLState::kNone};
 
     // Read before the document exists.
-    store.readAndIncrementSizeCounts(operationContext(), deltas);
+    doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid));
@@ -83,7 +90,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 0, .count = 0});
 
     // Read after (0,0) document exists.
-    store.readAndIncrementSizeCounts(operationContext(), deltas);
+    doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid));
@@ -106,7 +113,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
     deltas[uuid] =
         SizeCountDelta{.sizeCount = {.size = -400, .count = -20}, .state = DDLState::kNone};
 
-    store.readAndIncrementSizeCounts(operationContext(), deltas);
+    doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid));
@@ -139,7 +146,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadEmptySet) {
 
     SizeCountDeltas deltas;
 
-    store.readAndIncrementSizeCounts(operationContext(), deltas);
+    doReadAndIncrement(store, deltas);
 
     EXPECT_TRUE(deltas.empty());
 }
@@ -171,7 +178,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
     deltas[uuid1] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
     deltas[uuid2] = SizeCountDelta{.sizeCount = {50, 10}, .state = DDLState::kNone};
 
-    store.readAndIncrementSizeCounts(operationContext(), deltas);
+    doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 2);
     ASSERT_TRUE(deltas.contains(uuid1));
@@ -208,7 +215,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
     SizeCountDeltas deltas;
     deltas[uuid1] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
 
-    store.readAndIncrementSizeCounts(operationContext(), deltas);
+    doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid1));
@@ -237,7 +244,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
     deltas[uuid1] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
     deltas[uuid2] = SizeCountDelta{.sizeCount = {50, 10}, .state = DDLState::kNone};
 
-    store.readAndIncrementSizeCounts(operationContext(), deltas);
+    doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 2);
     ASSERT_TRUE(deltas.contains(uuid1));
@@ -275,7 +282,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentsDisjointSet) {
     SizeCountDeltas deltas;
     deltas[uuid3] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
 
-    store.readAndIncrementSizeCounts(operationContext(), deltas);
+    doReadAndIncrement(store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid3));

@@ -37,6 +37,7 @@
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_oplog_tailer.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -73,6 +74,11 @@ protected:
             _coordinator->shutdown();
         }
         CatalogTestFixture::tearDown();
+    }
+
+    boost::optional<Timestamp> readTimestampStore() {
+        Lock::GlobalLock lk(_opCtx, MODE_IS);
+        return _timestampStore.read(_opCtx);
     }
 
     OperationContext* _opCtx = nullptr;
@@ -176,9 +182,9 @@ TEST_F(SizeCountCheckpointCoordinatorTest, MultipleRequestFlushCallsBeforeFlushA
 }
 
 TEST_F(SizeCountCheckpointCoordinatorTest, FlushSyncWithEmptyTimestampStoreIsNoOp) {
-    const auto initial = _timestampStore.read(_opCtx);
+    const auto initial = readTimestampStore();
     _coordinator->flushSync_ForTest(_opCtx);
-    ASSERT_EQ(_timestampStore.read(_opCtx), initial);
+    ASSERT_EQ(readTimestampStore(), initial);
 }
 
 class SizeCountCheckpointCoordinatorWithOplogTest : public SizeCountCheckpointCoordinatorTest {
@@ -206,6 +212,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
        FlushSyncWithNoNewDataPreservesPersistedTimestamp) {
     const Timestamp persistedTs(10, 5);
     {
+        Lock::GlobalLock writeLock(_opCtx, MODE_IX);
         WriteUnitOfWork wuow(_opCtx);
         _timestampStore.write(_opCtx, persistedTs);
         wuow.commit();
@@ -219,7 +226,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
         _sizeCountStore, _timestampStore, _metrics);
     coordinator->flushSync_ForTest(_opCtx);
 
-    ASSERT_EQ(_timestampStore.read(_opCtx), boost::optional<Timestamp>(persistedTs));
+    ASSERT_EQ(readTimestampStore(), boost::optional<Timestamp>(persistedTs));
 }
 
 TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushSyncAdvancesTimestampAfterTailCycle) {
@@ -228,7 +235,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushSyncAdvancesTimestampAf
 
     _coordinator->flushSync_ForTest(_opCtx);
 
-    ASSERT_EQ(_timestampStore.read(_opCtx), boost::optional<Timestamp>(ts));
+    ASSERT_EQ(readTimestampStore(), boost::optional<Timestamp>(ts));
 }
 
 TEST_F(SizeCountCheckpointCoordinatorTest, FlushFailureIncrementsFlushFailureCountMetric) {

@@ -71,6 +71,15 @@ boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
  * Abstract interface for read/write access to the persisted size and count metadata. Two
  * implementations exist: `CollectionSizeCountStore` (collection-backed) and
  * `ContainerSizeCountStore` (container-backed).
+ *
+ * Locking: the container-backed implementation reads and writes the underlying container and does
+ * not acquire any locks of its own. Callers must therefore hold the global lock for the duration
+ * of the call:
+ *   MODE_IS - read(), readAndIncrementSizeCounts()
+ *   MODE_IX - write(), insert(), remove()
+ *
+ * The collection-backed implementation acquires the collection (and its locks) internally, but
+ * callers should hold the same locks so the two implementations are interchangeable.
  */
 class SizeCountStore {
 public:

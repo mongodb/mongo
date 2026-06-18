@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -122,7 +123,12 @@ void SizeCountCheckpointCoordinator::requestFlush() {
 
 void SizeCountCheckpointCoordinator::flushSync_ForTest(OperationContext* opCtx) {
     if (!_tailerState_ForTest) {
-        const auto startAfterTS = _timestampStore.read(opCtx).value_or(Timestamp{});
+        // The timestamp store requires the caller to hold the global lock for the read; see
+        // SizeCountTimestampStore.
+        const auto startAfterTS = [&] {
+            Lock::GlobalLock readLock(opCtx, MODE_IS);
+            return _timestampStore.read(opCtx).value_or(Timestamp{});
+        }();
         _tailerState_ForTest = _oplogTailer->bootstrap_ForTest(opCtx, startAfterTS, *_buffer);
     }
     _oplogTailer->runOneIteration_ForTest(opCtx, _tailerState_ForTest, *_buffer);

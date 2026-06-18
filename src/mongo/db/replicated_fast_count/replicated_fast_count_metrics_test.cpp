@@ -36,6 +36,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -583,6 +584,7 @@ TEST_P(TimestampStoreMetricsTest, WriteAdvancesOplogLagSecsOnCommit) {
     recordAppliedOpTime(Timestamp(1000, 1));
 
     {
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         store->write(opCtx, Timestamp(400, 1));
         // Pre-commit the gauge must remain at its prior value; the on-commit hook hasn't fired.
@@ -597,6 +599,7 @@ TEST_P(TimestampStoreMetricsTest, RolledBackWriteDoesNotAdvanceOplogLagSecs) {
     recordAppliedOpTime(Timestamp(1000, 1));
 
     {
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         store->write(opCtx, Timestamp(400, 1));
         // No commit; WUOW destructor rolls back.
@@ -609,6 +612,7 @@ TEST_P(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
     recordAppliedOpTime(Timestamp(1000, 1));
 
     {
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         store->write(opCtx, Timestamp(200, 1));
         wuow.commit();
@@ -617,6 +621,7 @@ TEST_P(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
 
     // Second write should overwrite the existing record (update path) and update the gauge.
     {
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         store->write(opCtx, Timestamp(900, 1));
         wuow.commit();

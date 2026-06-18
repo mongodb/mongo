@@ -37,6 +37,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -81,6 +82,16 @@ protected:
     test_helpers::NsAndUUID collB = {
         .nss = NamespaceString::createNamespaceString_forTest("find_test", "collB"),
         .uuid = UUID::gen()};
+
+    boost::optional<std::pair<CollectionSizeCount, Timestamp>> findPersisted(UUID uuid) {
+        Lock::GlobalLock lk(operationContext(), MODE_IS);
+        return manager->findPersisted(operationContext(), uuid);
+    }
+
+    boost::optional<Timestamp> findPersistedTimestampStoreTs() {
+        Lock::GlobalLock lk(operationContext(), MODE_IS);
+        return manager->findPersistedTimestampStoreTs(operationContext());
+    }
 
     CollectionSizeCountStore sizeCountStore;
     CollectionSizeCountTimestampStore sizeCountTimestampStore;
@@ -337,7 +348,7 @@ TEST_F(ReplicatedFastCountManagerCommitTest, CommitUpdatesRecordStoreSizeCount) 
 using ReplicatedFastCountManagerFindPersistedTest = ReplicatedFastCountManagerTest;
 
 TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsNoneWhenNoEntryExists) {
-    EXPECT_FALSE(manager->findPersisted(operationContext(), collA.uuid).has_value());
+    EXPECT_FALSE(findPersisted(collA.uuid).has_value());
 }
 
 TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsPersistedSizeCountAndTimestamp) {
@@ -347,7 +358,7 @@ TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsPersistedSizeCountAnd
         collA.uuid,
         SizeCountStore::Entry{.timestamp = Timestamp(7, 7), .size = 5, .count = 1});
 
-    const auto result = manager->findPersisted(operationContext(), collA.uuid);
+    const auto result = findPersisted(collA.uuid);
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->first, (CollectionSizeCount{.size = 5, .count = 1}));
     EXPECT_EQ(result->second, Timestamp(7, 7));
@@ -361,20 +372,20 @@ TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsEntryForRequestedUuid
         SizeCountStore::Entry{.timestamp = Timestamp(7, 7), .size = 5, .count = 1});
 
     // A different, unpersisted UUID still returns none.
-    EXPECT_FALSE(manager->findPersisted(operationContext(), collB.uuid).has_value());
+    EXPECT_FALSE(findPersisted(collB.uuid).has_value());
 }
 
 using ReplicatedFastCountManagerFindPersistedTimestampStoreTsTest = ReplicatedFastCountManagerTest;
 
 TEST_F(ReplicatedFastCountManagerFindPersistedTimestampStoreTsTest, ReturnsNoneWhenStoreEmpty) {
-    EXPECT_FALSE(manager->findPersistedTimestampStoreTs(operationContext()).has_value());
+    EXPECT_FALSE(findPersistedTimestampStoreTs().has_value());
 }
 
 TEST_F(ReplicatedFastCountManagerFindPersistedTimestampStoreTsTest, ReturnsPersistedTimestamp) {
     test_helpers::insertSizeCountTimestamp(
         operationContext(), sizeCountTimestampStore, Timestamp(3, 3));
 
-    const auto result = manager->findPersistedTimestampStoreTs(operationContext());
+    const auto result = findPersistedTimestampStoreTs();
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(*result, Timestamp(3, 3));
 }

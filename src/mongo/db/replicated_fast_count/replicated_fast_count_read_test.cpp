@@ -31,6 +31,7 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 
 namespace mongo::replicated_fast_count {
@@ -51,8 +52,16 @@ protected:
         .uuid = UUID::gen()};
 };
 
+TEST_F(ReadPersistedTest, ReadPersistedMassertsWithoutGlobalReadLock) {
+    const CollectionSizeCountStore sizeCountStore;
+    ASSERT_THROWS_CODE(std::ignore = readPersisted(operationContext(), sizeCountStore, UUID::gen()),
+                       DBException,
+                       12915208);
+}
+
 TEST_F(ReadPersistedTest, UuidNotFoundInSizeCountStore) {
     const CollectionSizeCountStore sizeCountStore;
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
     EXPECT_THROW(std::ignore = readPersisted(operationContext(), sizeCountStore, UUID::gen()),
                  DBException);
 }
@@ -69,6 +78,7 @@ TEST_F(ReadPersistedTest, UuidFoundInSizeCountStore) {
         sizeCountStore,
         collB.uuid,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 10, .count = 2});
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
     EXPECT_EQ(readPersisted(operationContext(), sizeCountStore, collA.uuid),
               CollectionSizeCount({.size = 5, .count = 1}));
 }

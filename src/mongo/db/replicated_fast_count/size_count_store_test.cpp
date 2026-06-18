@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -44,6 +45,14 @@ enum class Mode { kCollection, kContainer };
 // Runs each test case in both collection-backed and container-backed modes.
 class SizeCountStoreTest : public CatalogTestFixture, public ::testing::WithParamInterface<Mode> {
 protected:
+    int expectedReadLockCode() const {
+        return GetParam() == Mode::kCollection ? 12915208 : 12915203;
+    }
+
+    int expectedReadAndIncrementLockCode() const {
+        return GetParam() == Mode::kCollection ? 12915207 : 12915202;
+    }
+
     void setUp() override {
         CatalogTestFixture::setUp();
         auto opCtx = operationContext();
@@ -88,12 +97,16 @@ protected:
 TEST_P(SizeCountStoreTest, ReadReturnsNoneWhenEmpty) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
     EXPECT_FALSE(store.read(operationContext(), UUID::gen()).has_value());
 }
 
 TEST_P(SizeCountStoreTest, ReadWriteRoundTripNewEntry) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
+    // Hold MODE_IX (not MODE_IS) for the whole test: the store reads require the global lock and
+    // insertSizeCountEntry reacquires it in MODE_IX, which cannot be upgraded from MODE_IS.
+    Lock::GlobalLock writeLock(operationContext(), MODE_IX);
     const UUID uuid = UUID::gen();
     const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
 
@@ -107,6 +120,7 @@ TEST_P(SizeCountStoreTest, ReadWriteRoundTripNewEntry) {
 TEST_P(SizeCountStoreTest, WriteUpdateExistingEntry) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
+    Lock::GlobalLock writeLock(operationContext(), MODE_IX);
     const UUID uuid = UUID::gen();
     const SizeCountStore::Entry initialEntry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid, initialEntry);
@@ -125,6 +139,7 @@ TEST_P(SizeCountStoreTest, WriteUpdateExistingEntry) {
 TEST_P(SizeCountStoreTest, ReadWriteTwoEntries) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
+    Lock::GlobalLock writeLock(operationContext(), MODE_IX);
     const UUID uuid0 = UUID::gen();
     const UUID uuid1 = UUID::gen();
     const SizeCountStore::Entry entry0{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
@@ -145,6 +160,7 @@ TEST_P(SizeCountStoreTest, ReadWriteTwoEntries) {
 TEST_P(SizeCountStoreTest, WriteUpdateToOneOfTwoEntries) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
+    Lock::GlobalLock writeLock(operationContext(), MODE_IX);
     const UUID uuid0 = UUID::gen();
     const UUID uuid1 = UUID::gen();
     const SizeCountStore::Entry entry0{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
@@ -173,6 +189,7 @@ TEST_P(SizeCountStoreTest, InsertAddsEntry) {
     const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
 
     auto opCtx = operationContext();
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
     WriteUnitOfWork wuow{opCtx};
     store.insert(opCtx, uuid, entry);
     wuow.commit();
@@ -189,6 +206,7 @@ TEST_P(SizeCountStoreTest, DoubleInsertFails) {
     const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
 
     auto opCtx = operationContext();
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
     {
         WriteUnitOfWork wuow{opCtx};
         store.insert(opCtx, uuid, entry);
@@ -212,6 +230,7 @@ TEST_P(SizeCountStoreTest, RemoveRemovesEntry) {
     const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
 
     auto opCtx = operationContext();
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
 
     {
         WriteUnitOfWork wuow{opCtx};
@@ -238,12 +257,76 @@ TEST_P(SizeCountStoreTest, RemoveNonExistentEntryIsNoOp) {
     const UUID uuid = UUID::gen();
 
     auto opCtx = operationContext();
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
     {
         WriteUnitOfWork wuow{opCtx};
         EXPECT_EQ(store.remove(opCtx, uuid), 0);
         wuow.commit();
     }
     EXPECT_FALSE(store.read(operationContext(), uuid).has_value());
+}
+
+TEST_P(SizeCountStoreTest, ReadMassertsWithoutGlobalReadLock) {
+    auto storePtr = makeStore();
+    ASSERT_THROWS_CODE(
+        storePtr->read(operationContext(), UUID::gen()), DBException, expectedReadLockCode());
+}
+
+TEST_P(SizeCountStoreTest, ReadAndIncrementSizeCountsMassertsWithoutGlobalReadLock) {
+    auto storePtr = makeStore();
+    SizeCountDeltas deltas;
+    ASSERT_THROWS_CODE(storePtr->readAndIncrementSizeCounts(operationContext(), deltas),
+                       DBException,
+                       expectedReadAndIncrementLockCode());
+}
+
+TEST_P(SizeCountStoreTest, WriteMassertsWithoutWriteUnitOfWork) {
+    auto storePtr = makeStore();
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+    ASSERT_THROWS_CODE(storePtr->write(operationContext(), uuid, entry), DBException, 12915205);
+}
+
+TEST_P(SizeCountStoreTest, WriteMassertsWithoutGlobalWriteLock) {
+    auto storePtr = makeStore();
+    auto opCtx = operationContext();
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+    Lock::GlobalLock readLock(opCtx, MODE_IS);
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_THROWS_CODE(storePtr->write(opCtx, uuid, entry), DBException, 12915204);
+}
+
+TEST_P(SizeCountStoreTest, InsertMassertsWithoutWriteUnitOfWork) {
+    auto storePtr = makeStore();
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+    ASSERT_THROWS_CODE(storePtr->insert(operationContext(), uuid, entry), DBException, 12915205);
+}
+
+TEST_P(SizeCountStoreTest, InsertMassertsWithoutGlobalWriteLock) {
+    auto storePtr = makeStore();
+    auto opCtx = operationContext();
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+    Lock::GlobalLock readLock(opCtx, MODE_IS);
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_THROWS_CODE(storePtr->insert(opCtx, uuid, entry), DBException, 12915204);
+}
+
+TEST_P(SizeCountStoreTest, RemoveMassertsWithoutWriteUnitOfWork) {
+    auto storePtr = makeStore();
+    const UUID uuid = UUID::gen();
+    ASSERT_THROWS_CODE(storePtr->remove(operationContext(), uuid), DBException, 12915205);
+}
+
+TEST_P(SizeCountStoreTest, RemoveMassertsWithoutGlobalWriteLock) {
+    auto storePtr = makeStore();
+    auto opCtx = operationContext();
+    const UUID uuid = UUID::gen();
+    Lock::GlobalLock readLock(opCtx, MODE_IS);
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_THROWS_CODE(storePtr->remove(opCtx, uuid), DBException, 12915204);
 }
 
 INSTANTIATE_TEST_SUITE_P(,
@@ -260,6 +343,7 @@ class SizeCountStoreCollectionModeTest : public CatalogTestFixture {};
 
 TEST_F(SizeCountStoreCollectionModeTest, ReadReturnsNoneWhenCollectionDoesNotExist) {
     const CollectionSizeCountStore store;
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
     EXPECT_FALSE(store.read(operationContext(), UUID::gen()).has_value());
 }
 

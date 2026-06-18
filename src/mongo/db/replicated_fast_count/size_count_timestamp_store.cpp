@@ -93,14 +93,22 @@ boost::optional<CollectionOrViewAcquisition> acquireTimestampCollectionForWrite(
     return boost::none;
 }
 
-void assertInWriteUnitOfWork(OperationContext* opCtx) {
+void assertInWriteUnitOfWorkAndLocked(OperationContext* opCtx) {
     massert(12280400,
             "SizeCountTimestampStore::write() must be called within a WriteUnitOfWork",
             shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    massert(
+        12915201,
+        "Must hold the GlobalLock in a write mode when calling SizeCountTimestampStore::write()",
+        shard_role_details::getLocker(opCtx)->isWriteLocked());
 }
 }  // namespace
 
 boost::optional<Timestamp> CollectionSizeCountTimestampStore::read(OperationContext* opCtx) const {
+    massert(12915206,
+            "Must hold the GlobalLock in a read mode when calling SizeCountTimestampStore::read()",
+            shard_role_details::getLocker(opCtx)->isReadLocked());
+
     const auto acquisition = acquireTimestampCollectionForRead(opCtx);
     if (!acquisition.has_value()) {
         return boost::none;
@@ -122,7 +130,7 @@ boost::optional<Timestamp> CollectionSizeCountTimestampStore::read(OperationCont
 }
 
 void CollectionSizeCountTimestampStore::write(OperationContext* opCtx, Timestamp timestamp) {
-    assertInWriteUnitOfWork(opCtx);
+    assertInWriteUnitOfWorkAndLocked(opCtx);
 
     const auto acquisition = acquireTimestampCollectionForWrite(opCtx).value();
     const CollectionPtr& coll = acquisition.getCollectionPtr();
@@ -155,6 +163,10 @@ void CollectionSizeCountTimestampStore::write(OperationContext* opCtx, Timestamp
 }
 
 boost::optional<Timestamp> ContainerSizeCountTimestampStore::read(OperationContext* opCtx) const {
+    massert(12915200,
+            "Must hold the GlobalLock in a read mode when calling SizeCountTimestampStore::read()",
+            shard_role_details::getLocker(opCtx)->isReadLocked());
+
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = getIntegerKeyedContainer(*_recordStore);
     auto cursor = container.getCursor(ru);
@@ -167,7 +179,7 @@ boost::optional<Timestamp> ContainerSizeCountTimestampStore::read(OperationConte
 }
 
 void ContainerSizeCountTimestampStore::write(OperationContext* opCtx, Timestamp timestamp) {
-    assertInWriteUnitOfWork(opCtx);
+    assertInWriteUnitOfWorkAndLocked(opCtx);
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = getIntegerKeyedContainer(*_recordStore);
