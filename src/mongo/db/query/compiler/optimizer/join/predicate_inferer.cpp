@@ -193,7 +193,7 @@ std::optional<SingleTablePredicate> combineChildren(
  * For the first EC, we want to only return {a: 4} and not include the filter on c.
  *
  * We have to be careful to preserve $eq vs $expr semantics. As such, this function returns either a
- * MatchExpression or PipelineExpression. Later on, modifyAndNormalizeSTP() will take care of
+ * MatchExpression or PipelineExpression. Later on, finalizeSTPForTargetNode() will take care of
  * converting PipelineExpressions to MatchExpressions.
  */
 std::optional<SingleTablePredicate> getSingleTablePredicateForField(
@@ -281,9 +281,8 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
  * PipelineExpression input is wrapped in $expr to produce an equivalent MatchExpression.
  * 2. Ensure the resulting MatchExpression's field paths match the target node's field paths and if
  * not, rewrite them to match.
- * 3. Finally, normalize this MatchExpression.
  */
-StatusWith<std::unique_ptr<MatchExpression>> modifyAndNormalizeSTP(
+StatusWith<std::unique_ptr<MatchExpression>> finalizeSTPForTargetNode(
     const SingleTablePredicate& pred,
     const std::vector<ResolvedPath>& resolvedPaths,
     MutableJoinGraph& graph,
@@ -317,7 +316,6 @@ StatusWith<std::unique_ptr<MatchExpression>> modifyAndNormalizeSTP(
             std::move(matchExpr), targetFieldName.fullPath(), targetNodeExpCtx);
     }
 
-    matchExpr = normalizeMatchExpression(std::move(matchExpr));
     return matchExpr;
 }
 
@@ -358,33 +356,25 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
             continue;
         }
         auto& targetNode = graph.getNode(resolvedPaths[pathId].nodeId);
-        auto swSTP =
-            modifyAndNormalizeSTP(singleTablePred, resolvedPaths, graph, pathId, sourceFieldName);
+        auto swSTP = finalizeSTPForTargetNode(
+            singleTablePred, resolvedPaths, graph, pathId, sourceFieldName);
         if (!swSTP.isOK()) {
             return swSTP.getStatus();
         }
         auto normalizedSTP = std::move(swSTP.getValue());
         auto* currentFilter = targetNode.accessPath->getPrimaryMatchExpression();
-        std::unique_ptr<MatchExpression> newFilter;
-        if (currentFilter->isTriviallyTrue()) {
-            // This branch represents the case where the targetNode doesn't have a filter - so we
-            // just replace it with the STP.
-            newFilter = std::move(normalizedSTP);
-        } else {
-            // This branch represents the case where the targetNode already has a filter.
-            // In this case, wrap the existing filter in an AND and add the STP we're currently
-            // propagating.
 
-            // Create the new AND wrapper.
-            auto andExpr = std::make_unique<AndMatchExpression>();
-            // Clone and add the existing filter.
-            auto rootClone = currentFilter->clone();
-            andExpr->add(std::move(rootClone));
-            // Add the to-be-propagated STP
-            andExpr->add(std::move(normalizedSTP));
-            // Set newFilter to the AND wrapper.
-            newFilter = std::unique_ptr<MatchExpression>(std::move(andExpr));
-        }
+        // We add STPs to an increasingly large AND, which gets flattened during normalization in
+        // normalizeAndOptimizeSingleTablePredicates() step.
+        auto andExpr = std::make_unique<AndMatchExpression>();
+        // Clone and add the existing filter.
+        auto rootClone = currentFilter->clone();
+        andExpr->add(std::move(rootClone));
+        // Add the to-be-propagated STP
+        andExpr->add(std::move(normalizedSTP));
+        // Set newFilter to the AND wrapper.
+        auto newFilter = std::unique_ptr<MatchExpression>(std::move(andExpr));
+
         // After construction, CanonicalQuery's MatchExpression is read-only. Since the propogation
         // logic above requires updating the root of the MatchExpression, updating the join node's
         // access path will require constructing an entirely new CQ with the newFilter.
@@ -393,6 +383,8 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
                           .opCtx(targetNode.accessPath->getExpCtx()->getOperationContext())
                           .ns(nss)
                           .build();
+        // This will normalize and optimize the Match Expression (eg flattening an unnecessary AND
+        // wrapper) before creating the new CQ.
         auto swCq =
             createCanonicalQueryFromSingleMatchExpression(expCtx, nss, std::move(newFilter));
         if (!swCq.isOK()) {
