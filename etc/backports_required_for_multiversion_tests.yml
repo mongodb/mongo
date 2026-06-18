@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
+    ticket: SERVER-129103
   - test_file: jstests/noPassthrough/timeseries_initial_sync_mixed_bucket_geo_index.js
     ticket: SERVER-121132
   - test_file: jstests/core/index/elemmatch_index.js
@@ -684,6 +686,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/aggregation/expressions/const_literal_bsoncolumn.js
+    ticket: SERVER-129103
   - test_file: jstests/noPassthrough/timeseries_initial_sync_mixed_bucket_geo_index.js
     ticket: SERVER-121132
   - test_file: jstests/core/index/elemmatch_index.js
