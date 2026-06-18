@@ -1,9 +1,14 @@
 /*
  *  Tests that migrations work correctly across shards with mixed FCV state.
+ *
+ * TODO (SERVER-98118): Re-enable once 9.0 is last-lts. During 8.x <-> 9.0 FCV
+ * transitions, migrations are blocked unconditionally on both upgrade and downgrade. This test
+ * asserts that migrations can succeed while shards are in mixed FCV states, which does not match
+ * server behavior until the mixed-version window no longer spans the 8.x/9.0 transition.
+ * @tags: [__TEMPORARILY_DISABLED__]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -19,18 +24,6 @@ const ns = dbName + "." + collName;
 function setup() {
     // Create 2 shards with 3 replicas each.
     let st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
-
-    // Migrations are stopped during setFCV across Authoritative Shards (SERVER-127654).
-    if (
-        lastLTSFCV === "8.0" &&
-        FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsDDL", true)
-    ) {
-        jsTestLog(
-            "Skipping test: migrations are stopped during setFCV with featureFlagAuthoritativeShardsDDL",
-        );
-        st.stop();
-        quit();
-    }
 
     // Create a sharded collection with two chunks: [-inf, 50), [50, inf)
     assert.commandWorked(
