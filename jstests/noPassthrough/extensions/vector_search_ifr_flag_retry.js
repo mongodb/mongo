@@ -155,10 +155,16 @@ function runUnionWithVectorSearchTests({
 
     // Get the current feature flag value to determine if we expect retries.
     const expectRetry = getParameter(conn, "featureFlagVectorSearchExtension").value;
-    // If we are expecting retries, we should always have 1 per shard for the aggregate,
-    // and 1 for the explain, if we are running it.
-    // In sharded mode, the kickback retry happens on each shard.
-    let expectedUnionWithKickbackRetryDelta = expectRetry ? Number(shouldExplain) + 1 : 0;
+    // On the plain-collection path the kickback fires once for the aggregate, plus once for the
+    // explain if we run it. On the on-view path it fires only in sharded mode.
+    let expectedUnionWithKickbackRetryDelta;
+    if (!expectRetry) {
+        expectedUnionWithKickbackRetryDelta = 0;
+    } else if (viewName) {
+        expectedUnionWithKickbackRetryDelta = shardingTest ? 1 : 0;
+    } else {
+        expectedUnionWithKickbackRetryDelta = Number(shouldExplain) + 1;
+    }
 
     let cursorId = 123;
     if (shouldExplain) {

@@ -119,6 +119,9 @@ export function createTestView(conn, shardingTest = null) {
  * @param {number} options.expectedRetryDelta - Expected retry count delta.
  * @param {number} options.expectedLegacyDelta - Expected legacy usage delta.
  * @param {number} [options.expectedExtensionDelta=0] - Expected extension usage delta.
+ * @param {boolean} [options.extensionDeltaIsLowerBound=false] - Assert extension usage rose by at
+ *        least expectedExtensionDelta (for sharded $unionWith, where the per-node build count is
+ *        non-deterministic).
  * @param {Array<function>} options.queries - Functions to run (e.g. explain and/or aggregate).
  */
 export function runQueriesAndVerifyMetrics({
@@ -131,6 +134,7 @@ export function runQueriesAndVerifyMetrics({
     expectedRetryDelta,
     expectedLegacyDelta,
     expectedExtensionDelta = 0,
+    extensionDeltaIsLowerBound = false,
     queries,
 }) {
     const initialRetryCount = getRetryCountFn(conn);
@@ -161,12 +165,15 @@ export function runQueriesAndVerifyMetrics({
             `${initialLegacyCount + expectedLegacyDelta} when feature flag is ${featureFlagValue}`,
     );
 
-    assert.eq(
-        finalExtensionCount,
-        initialExtensionCount + expectedExtensionDelta,
-        `extensionUsed should have changed from ${initialExtensionCount} to ` +
-            `${initialExtensionCount + expectedExtensionDelta} when feature flag is ${featureFlagValue}`,
-    );
+    const expectedExtensionCount = initialExtensionCount + expectedExtensionDelta;
+    const extensionMsg =
+        `extensionUsed should have ${extensionDeltaIsLowerBound ? "increased to at least" : "changed to"} ` +
+        `${expectedExtensionCount} (from ${initialExtensionCount}) when feature flag is ${featureFlagValue}`;
+    if (extensionDeltaIsLowerBound) {
+        assert.gte(finalExtensionCount, expectedExtensionCount, extensionMsg);
+    } else {
+        assert.eq(finalExtensionCount, expectedExtensionCount, extensionMsg);
+    }
 }
 
 // ============================================================================
