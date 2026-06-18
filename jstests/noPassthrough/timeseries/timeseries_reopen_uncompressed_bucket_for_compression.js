@@ -88,10 +88,23 @@ const runTest = function(isCorrupted = false) {
 
     if (isCorrupted) {
         jsTestLog("Corrupting the bucket by adding an extra data field.");
+        // Allow setting an inconsistent state to the bucket so we can test that validate can detect
+        // it
+        assert.commandWorked(
+            conn.getDB("admin").runCommand(
+                {setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+        );
+
         // Corrupt the uncompressed bucket by adding an extra data field to it. This
         // will make the bucket uncompressible.
         let res = assert.commandWorked(
             bucketsColl.updateOne({_id: uncompressedBucket._id}, {$set: {"data.a.3": 6}}));
+
+        // Disable allowing inconsistent state on buckets
+        assert.commandWorked(
+            conn.getDB("admin").runCommand(
+                {setParameter: 1, timeseriesDisableStrictBucketValidator: false}),
+        );
         jsTestLog(bucketsColl.find().toArray());
         assert.eq(res.modifiedCount, 1);
     }

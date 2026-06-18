@@ -61,10 +61,15 @@ assert.commandWorked(bucketsColl.insert(bogusBucket));
 
 jsTestLog("Testing update.");
 assert.commandWorked(bucketsColl.update({_id: bogusBucket._id}, {$set: {[metaFieldName]: 4}}));
-assert.commandWorked(
-    bucketsColl.update({[metaFieldName]: 65},
-                       {$set: {"control": bogusBucket.control, "data": bogusBucket.data}},
-                       {upsert: true}));
+assert.commandWorked(bucketsColl.update({[metaFieldName]: 65},
+                                        {
+                                            $set: {
+                                                _id: incrementOID(bogusBucket._id),
+                                                "control": bogusBucket.control,
+                                                "data": bogusBucket.data
+                                            }
+                                        },
+                                        {upsert: true}));
 
 jsTestLog("Testing remove.");
 assert.commandWorked(bucketsColl.remove({[metaFieldName]: 65}));

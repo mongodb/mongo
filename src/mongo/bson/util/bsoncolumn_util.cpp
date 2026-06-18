@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,22 +26,35 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
+#include "mongo/bson/util/bsoncolumn_util.h"
+
+#include "mongo/bson/util/bsoncolumn_helpers.h"
 
 namespace mongo::bsoncolumn {
 
-/**
- * Returns true if the binaries of the SBE values are equal. This function assumes the tags have
- * already been validated.
- */
-bool areSBEBinariesEqual(sbe::bsoncolumn::SBEColumnMaterializer::Element& actual,
-                         sbe::bsoncolumn::SBEColumnMaterializer::Element& expected);
+uint32_t numInterleavedStreams(const BSONObj& refObj, uint8_t control) {
+    BSONType rootType =
+        static_cast<char>(control) == bsoncolumn::kInterleavedStartArrayRootControlByte ? Array
+                                                                                        : Object;
 
-/**
- * Helper to return min and max elements from a vector of elements.
- */
-std::pair<BSONElement, BSONElement> expectedMinMax(std::vector<BSONElement>& elems);
+    bool traverseIntoArrays =
+        static_cast<char>(control) == bsoncolumn::kInterleavedStartControlByte ||
+        static_cast<char>(control) == bsoncolumn::kInterleavedStartArrayRootControlByte;
+
+    uint32_t num = 0;
+    BSONObjTraversal t(
+        traverseIntoArrays,
+        rootType,
+        [](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
+        [&num](const BSONElement& elem) {
+            ++num;
+            return true;
+        });
+    t.traverse(refObj);
+    uassert(11761702, "Invalid BSONColumn interleaved reference object for control byte", num != 0);
+
+    return num;
+}
 
 }  // namespace mongo::bsoncolumn

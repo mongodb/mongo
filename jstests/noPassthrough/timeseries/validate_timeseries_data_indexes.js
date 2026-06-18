@@ -61,6 +61,10 @@ function setUpCollection(data) {
     }
 }
 
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
 // Non-numerical index.
 setUpCollection(weatherData);
 jsTestLog("Running validate on bucket with non-numerical data field indexes on collection " +

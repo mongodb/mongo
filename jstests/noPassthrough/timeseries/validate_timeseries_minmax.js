@@ -148,6 +148,10 @@ function setUpCollection(data) {
     assert(result.nNonCompliantDocuments == 0, tojson(result));
 }
 
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
 // Updates 'control' min temperature with corresponding update in recorded temperature, testing
 // that valid updates do not return warnings.
 setUpCollection(weatherData);

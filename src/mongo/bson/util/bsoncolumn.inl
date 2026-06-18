@@ -45,6 +45,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
         if (control == EOO) {
             uassert(
                 8295703, "BSONColumn data ended without reaching end of buffer", ptr + 1 == end);
+            buffer.eof();
             return;
         } else if (isUncompressedLiteralControlByte(control)) {
             BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});

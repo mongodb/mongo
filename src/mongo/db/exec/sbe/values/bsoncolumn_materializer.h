@@ -120,6 +120,9 @@ struct SBEColumnMaterializer {
     template <typename T>
     static inline Element materialize(ElementStorage& allocator, BSONElement val);
 
+    template <typename T>
+    static T get(const Element& elem);
+
     static inline SBEColumnMaterializer::Element materializePreallocated(BSONElement val) {
         // Return an SBE value that is a view. It will reference memory that decompression has
         // pre-allocated in ElementStorage memory.
@@ -132,6 +135,16 @@ struct SBEColumnMaterializer {
 
     static bool isMissing(const Element& elem) {
         return elem.first == value::TypeTags::Nothing;
+    }
+
+    static int canonicalType(const Element& elem) {
+        return canonicalizeBSONType(value::tagToType(elem.first));
+    }
+
+    static int compare(const Element& lhs,
+                       const Element& rhs,
+                       const StringDataComparator* comparator) {
+        return value::compareValue(lhs.first, lhs.second, rhs.first, rhs.second, comparator).second;
     }
 
 private:
@@ -252,6 +265,47 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize(Element
     auto allocatedElem = allocator.allocate(val.type(), "", val.valuesize());
     memcpy(allocatedElem.value(), val.value(), val.valuesize());
     return bson::convertFrom<true /* view */>(allocatedElem.element());
+}
+
+template <typename T>
+T SBEColumnMaterializer::get(const Element& elem) {
+    if constexpr (std::is_same_v<T, double>) {
+        return value::bitcastTo<double>(elem.second);
+    } else if constexpr (std::is_same_v<T, StringData>) {
+        return value::getStringView(elem.first, elem.second);
+    } else if constexpr (std::is_same_v<T, BSONObj>) {
+        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Obj();
+    } else if constexpr (std::is_same_v<T, BSONArray>) {
+        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Array();
+    } else if constexpr (std::is_same_v<T, BSONBinData>) {
+        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).BinData();
+    } else if constexpr (std::is_same_v<T, OID>) {
+        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).ObjectID();
+    } else if constexpr (std::is_same_v<T, bool>) {
+        return value::bitcastTo<double>(elem.second);
+    } else if constexpr (std::is_same_v<T, Date_t>) {
+        return Date_t::fromMillisSinceEpoch(value::bitcastTo<long long>(elem.second));
+    } else if constexpr (std::is_same_v<T, BSONRegEx>) {
+        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Regex();
+    } else if constexpr (std::is_same_v<T, BSONDBRef>) {
+        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).DBRef();
+    } else if constexpr (std::is_same_v<T, BSONCode>) {
+        return BSONCode(value::getStringView(elem.first, elem.second));
+    } else if constexpr (std::is_same_v<T, BSONSymbol>) {
+        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Symbol();
+    } else if constexpr (std::is_same_v<T, BSONCodeWScope>) {
+        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).CodeWScope();
+    } else if constexpr (std::is_same_v<T, int32_t>) {
+        return value::bitcastTo<int32_t>(elem.second);
+    } else if constexpr (std::is_same_v<T, Timestamp>) {
+        return Timestamp(value::bitcastTo<unsigned long long>(elem.second));
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        return value::bitcastTo<int64_t>(elem.second);
+    } else if constexpr (std::is_same_v<T, Decimal128>) {
+        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Decimal();
+    }
+    invariant(false);
+    return T{};
 }
 
 /**

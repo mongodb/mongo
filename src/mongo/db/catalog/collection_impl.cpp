@@ -90,6 +90,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_bucket_validation.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -639,7 +640,16 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
     if (validationLevelOrDefault(_metadata->options.validationLevel) == ValidationLevelEnum::off)
         return {SchemaValidationResult::kPass, Status::OK()};
 
+    if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabledForInternalOp()) {
+        return {SchemaValidationResult::kPass, Status::OK()};
+    }
+
     if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {
+        if (getTimeseriesOptions()) {
+            return {SchemaValidationResult::kError,
+                    Status(ErrorCodes::BadValue,
+                           "bypassDocumentValidation is not permitted on timeseries collections")};
+        }
         return {SchemaValidationResult::kPass, Status::OK()};
     }
 
@@ -655,24 +665,40 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
         return {SchemaValidationResult::kError, status};
     }
 
-    try {
-        if (validatorMatchExpr->matchesBSON(document))
-            return {SchemaValidationResult::kPass, Status::OK()};
-    } catch (DBException&) {
-    };
+    // Regular schema validation for everything except timeseries collections which uses a stricter
+    // validation for bucket documents.
+    if (!getTimeseriesOptions() || gTimeseriesDisableStrictBucketValidator.load()) {
+        try {
+            if (validatorMatchExpr->matchesBSON(document)) {
+                return {SchemaValidationResult::kPass, Status::OK()};
+            }
+        } catch (DBException&) {
+        };
 
-    BSONObj generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
+        BSONObj generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
 
-    static constexpr auto kValidationFailureErrorStr = "Document failed validation"_sd;
-    status = Status(doc_validation_error::DocumentValidationFailureInfo(generatedError),
-                    kValidationFailureErrorStr);
+        static constexpr auto kValidationFailureErrorStr = "Document failed validation"_sd;
+        status = Status(doc_validation_error::DocumentValidationFailureInfo(generatedError),
+                        kValidationFailureErrorStr);
 
-    if (validationActionOrDefault(_metadata->options.validationAction) ==
-        ValidationActionEnum::warn) {
-        return {SchemaValidationResult::kWarn, status};
+        if (validationActionOrDefault(_metadata->options.validationAction) ==
+            ValidationActionEnum::warn) {
+            return {SchemaValidationResult::kWarn, status};
+        }
+
+        return {SchemaValidationResult::kError, status};
     }
 
-    return {SchemaValidationResult::kError, status};
+    // Strict validation for bucket documents in timeseries collections
+    try {
+        timeseries::validateBucketConsistency(this, document);
+        return {SchemaValidationResult::kPass, Status::OK()};
+    } catch (DBException& ex) {
+        // For strict timeseries validation we ensure that we only return kError or kErrorAndLog.
+        return {SchemaValidationResult::kError,
+                Status(doc_validation_error::DocumentValidationFailureInfo(document),
+                       ex.toStatus().toString())};
+    };
 }
 
 Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,

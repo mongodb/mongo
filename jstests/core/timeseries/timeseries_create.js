@@ -229,28 +229,28 @@ testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
     const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
-    const oid = ObjectId("65F9971847423af45aeafc67");
-    const timestamp = ISODate("2024-03-19T13:46:00Z");
+    const oid = ObjectId("65f98c500000000000000000");
+    const timestamp = ISODate("2024-03-19T13:46:08Z");
+    // Evaluate once to avoid a mixed-format bucket if FCV changes between calls.
+    const useCompressedBuckets = TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db);
     assert.commandWorked(bucketsColl.insert({
         _id: oid,
         control: {
-            version: TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? TimeseriesTest.BucketVersion.kCompressedSorted
-                : TimeseriesTest.BucketVersion.kUncompressed,
-            min: {time: timestamp, "_id": oid, "a": 1},
-            max: {time: timestamp, "_id": oid, "a": 1},
+            version: useCompressedBuckets ? TimeseriesTest.BucketVersion.kCompressedSorted
+                                          : TimeseriesTest.BucketVersion.kUncompressed,
+            min: {
+                time: ISODate("2024-03-19T13:00:00.000Z"),
+                "_id": ObjectId("65f9972047423af45aeafc67"),
+                "a": 1
+            },
+            max: {time: timestamp, "_id": ObjectId("65f9972047423af45aeafc67"), "a": 1},
             count: 1
         },
         data: {
-            "time": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? BinData(7, "CQAAVfZWjgEAAAA=")
-                : {"0": timestamp},
-            "_id": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? BinData(7, "BwBl+ZcgR0I69Frq/GcA")
-                : {"0": oid},
-            "a": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? BinData(7, "AQAAAAAAAADwPwA=")
-                : {"0": 1},
+            "time": useCompressedBuckets ? BinData(7, "CQAAVfZWjgEAAAA=") : {"0": timestamp},
+            "_id": useCompressedBuckets ? BinData(7, "BwBl+ZcgR0I69Frq/GcA")
+                                        : {"0": ObjectId("65f9972047423af45aeafc67")},
+            "a": useCompressedBuckets ? BinData(7, "AQAAAAAAAADwPwA=") : {"0": 1},
         }
     }));
 

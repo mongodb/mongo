@@ -67,6 +67,11 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
         data: {value: false}
     }));
 
+    // Disable strict bucket validation as it relies on timeseriesBucketingParametersChanged to be
+    // set accurately, which we are not doing with the above fail point.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
     // This collMod should lead to timeseriesBucketingParametersChanged to True because the original
     // bucketing parameters we set for our collections was different from the updated bucketing
     // parameters.
@@ -88,6 +93,9 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
         res.errors);
     assert.commandWorked(db.adminCommand(
         {'configureFailPoint': timeseriesBucketingParametersChangedInputValueName, 'mode': 'off'}));
+
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}));
 
     testCount += 1;
     collName = collNamePrefix + testCount;

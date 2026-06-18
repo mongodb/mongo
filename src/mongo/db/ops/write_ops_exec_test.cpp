@@ -390,7 +390,6 @@ TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
         write_ops::UpdateCommandRequest op(ns.makeTimeseriesBucketsNamespace(), {update});
 
         write_ops::WriteCommandRequestBase base;
-        base.setBypassDocumentValidation(true);
         base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
 
         op.setWriteCommandRequestBase(std::move(base));

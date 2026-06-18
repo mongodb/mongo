@@ -381,10 +381,6 @@ BucketDocument makeNewDocument(const OID& bucketId,
 write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<StmtId>&& stmtIds) {
     write_ops::WriteCommandRequestBase base;
 
-    // The schema validation configured in the bucket collection is intended for direct
-    // operations by end users and is not applicable here.
-    base.setBypassDocumentValidation(true);
-
     if (!stmtIds.empty()) {
         base.setStmtIds(std::move(stmtIds));
     }

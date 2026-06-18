@@ -41,6 +41,10 @@ assert.commandWorked(bucketsColl.insert({
 let res = assert.commandWorked(tsColl.validate({full: true}));
 assert(res.valid);
 
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
 // Compressed bucket with the compressed time field in-order and version set to 3. This should fail,
 // since this bucket's measurements are in-order on time field, meaning this bucket shouldn't have
 // been promoted to v3.

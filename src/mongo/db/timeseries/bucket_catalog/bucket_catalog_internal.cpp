@@ -406,19 +406,6 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                 str::stream() << kBucketIdFieldName << " is missing or not an ObjectId"};
     }
 
-    // Validate the bucket document against the schema.
-    auto result = validator(opCtx, bucketDoc);
-    if (result.first != Collection::SchemaValidationResult::kPass) {
-        return result.second;
-    }
-
-    auto controlField = bucketDoc.getObjectField(kBucketControlFieldName);
-    auto closedElem = controlField.getField(kBucketControlClosedFieldName);
-    if (closedElem.booleanSafe()) {
-        return {ErrorCodes::BadValue,
-                "Bucket has been marked closed and is not eligible for reopening"};
-    }
-
     BSONElement metadata;
     auto metaFieldName = options.getMetaField();
     if (metaFieldName) {
@@ -436,10 +423,27 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         return {ErrorCodes::BadValue, "Bucket metadata does not match (hash collision)"};
     }
 
+    BucketId bucketId{key.collectionUUID, bucketIdElem.OID(), key.signature()};
+
+    // Validate the bucket document against the schema.
+    auto result = validator(opCtx, bucketDoc);
+    if (result.first != Collection::SchemaValidationResult::kPass) {
+        timeseries::bucket_catalog::freeze(catalog, bucketId);
+        return result.second;
+    }
+
+    auto controlField = bucketDoc.getObjectField(kBucketControlFieldName);
+    auto closedElem = controlField.getField(kBucketControlClosedFieldName);
+    if (closedElem.booleanSafe()) {
+        timeseries::bucket_catalog::freeze(catalog, bucketId);
+        return {ErrorCodes::BadValue,
+                "Bucket has been marked closed and is not eligible for reopening"};
+    }
+
     auto minTime = controlField.getObjectField(kBucketControlMinFieldName)
                        .getField(options.getTimeField())
                        .Date();
-    BucketId bucketId{key.collectionUUID, bucketIdElem.OID(), key.signature()};
+
     unique_tracked_ptr<Bucket> bucket = make_unique_tracked<Bucket>(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
         catalog.trackingContexts,

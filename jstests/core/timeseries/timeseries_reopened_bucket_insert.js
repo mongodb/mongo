@@ -118,6 +118,7 @@ const checkIfBucketReopened = function(
         "_id": ObjectId("66ffbfe83d997f237a6b200b"),
         "control": {
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
+            "count": 1,
             "min": {
                 "_id": ObjectId("6700012b1561e0bf72d3880f"),
                 "time": ISODate("2024-10-04T10:14:00Z")

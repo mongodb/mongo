@@ -44,9 +44,16 @@ let stats = assert.commandWorked(coll.stats());
 assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats));
 
 jsTestLog("Add uncompressed data field to bucket, thus corrupting a compressed bucket.");
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
 let res = assert.commandWorked(bucketsColl.updateOne(
     {_id: bucketId}, {$set: {"data.c.1": 1, "control.min.c": 1, "control.max.c": 1}}));
 assert.eq(res.modifiedCount, 1);
+
+// Disable allowing inconsistent state on buckets
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: false}));
 
 jsTestLog(
     "Insert third measurement. This will attempt to re-open the corrupted bucket, but should then freeze it and insert into a new bucket.");
@@ -63,8 +70,14 @@ assert.eq(stats.timeseries.numBucketReopeningsFailed, 1, tojson(stats.timeseries
 jsTestLog(
     "Replace compressed data field with an uncompressed field, thus corrupting a compressed bucket.");
 bucketId = bucketsColl.find({"control.min.a": 2})[0]._id;
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
 res = assert.commandWorked(bucketsColl.updateOne({_id: bucketId}, {$set: {"data.b": {"0": 1}}}));
 assert.eq(res.modifiedCount, 1);
+// Disable allowing inconsistent state on buckets
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: false}));
 
 jsTestLog(
     "Insert fourth measurement. This will attempt to re-open the second corrupted bucket, but should then freeze it and insert into a new bucket.");

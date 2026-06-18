@@ -20,6 +20,12 @@ TimeseriesTest.run((insert) => {
     const coll = db.coll;
     const bucketsColl = db.system.buckets.coll;
 
+    // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+    assert.commandWorked(
+        conn.getDB("admin").runCommand(
+            {setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+    );
+
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 

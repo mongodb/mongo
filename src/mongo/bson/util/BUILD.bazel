@@ -38,6 +38,7 @@ mongo_cc_fuzzer_test(
     ],
     deps = [
         ":bson_column",
+        ":bsoncolumn_test_util",
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",
     ],
@@ -76,6 +77,7 @@ mongo_cc_fuzzer_test(
         "bsoncolumn_fuzzer_util.cpp",
     ],
     deps = [
+        ":bsoncolumn_test_util",
         "//src/mongo/bson/util:bson_column",
     ],
 )
@@ -94,7 +96,9 @@ mongo_cc_library(
     name = "bson_column",
     srcs = [
         "//src/mongo/bson/util:bsoncolumn.cpp",
+        "//src/mongo/bson/util:bsoncolumn_expressions.cpp",
         "//src/mongo/bson/util:bsoncolumn_interleaved.cpp",
+        "//src/mongo/bson/util:bsoncolumn_util.cpp",
         "//src/mongo/bson/util:bsoncolumnbuilder.cpp",
         "//src/mongo/bson/util:simple8b_type_util.cpp",
     ],

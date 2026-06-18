@@ -542,7 +542,6 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
         write_ops::DeleteCommandRequest op(ns.makeTimeseriesBucketsNamespace(), {deleteEntry});
 
         write_ops::WriteCommandRequestBase base;
-        base.setBypassDocumentValidation(true);
         base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
 
         op.setWriteCommandRequestBase(std::move(base));
@@ -612,7 +611,6 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
         write_ops::UpdateCommandRequest op(ns.makeTimeseriesBucketsNamespace(), {update});
 
         write_ops::WriteCommandRequestBase base;
-        base.setBypassDocumentValidation(true);
         base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
 
         op.setWriteCommandRequestBase(std::move(base));
@@ -691,7 +689,6 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
         write_ops::DeleteCommandRequest deleteOp(ns.makeTimeseriesBucketsNamespace(),
                                                  {deleteEntry});
         write_ops::WriteCommandRequestBase base;
-        base.setBypassDocumentValidation(true);
         base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
         deleteOp.setWriteCommandRequestBase(base);
 
@@ -797,7 +794,6 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
         write_ops::UpdateOpEntry update(BSON("_id" << bucketId1), std::move(u));
         write_ops::UpdateCommandRequest updateOp(ns.makeTimeseriesBucketsNamespace(), {update});
         write_ops::WriteCommandRequestBase base;
-        base.setBypassDocumentValidation(true);
         base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
         updateOp.setWriteCommandRequestBase(base);
 

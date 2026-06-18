@@ -130,4 +130,31 @@ bool areSBEBinariesEqual(sbe::bsoncolumn::SBEColumnMaterializer::Element& actual
     }
 }
 
+std::pair<BSONElement, BSONElement> expectedMinMax(std::vector<BSONElement>& elems) {
+    // Compute expected min/max from iterator elements.
+    BSONElement expectedMin;
+    BSONElement expectedMax;
+    for (auto&& elem : elems) {
+        // Nothing to do for skipped elements
+        if (elem.eoo())
+            continue;
+
+        // Initialize min & max to the first non-skipped element
+        if (expectedMin.eoo()) {
+            expectedMin = elem;
+            expectedMax = elem;
+            continue;
+        }
+
+        // Compare and set expected min/max as values change.
+        if (elem.woCompare(expectedMin) < 0) {
+            expectedMin = elem;
+        }
+        if (elem.woCompare(expectedMax) > 0) {
+            expectedMax = elem;
+        }
+    }
+    return std::make_pair(expectedMin, expectedMax);
+}
+
 }  // namespace mongo::bsoncolumn

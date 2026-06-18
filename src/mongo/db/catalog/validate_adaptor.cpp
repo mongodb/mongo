@@ -172,7 +172,12 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
     state->setCollectionSchemaViolated();
 
     if (result != Collection::SchemaValidationResult::kPass) {
-        results->warnings.push_back(kSchemaValidationFailedReason);
+        if (state->getCollection()->getTimeseriesOptions()) {
+            results->errors.push_back(kSchemaValidationFailedReason);
+            results->valid = false;
+        } else {
+            results->warnings.push_back(kSchemaValidationFailedReason);
+        }
     }
 }
 
