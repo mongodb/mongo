@@ -30,7 +30,6 @@ import os, wiredtiger, wttest
 from wtbackup import backup_base
 from wtscenario import make_scenarios
 
-# test_backup30.py
 # Test querying the checkpoint timestamp for a backup cursor.
 class test_backup30(backup_base):
     dir='backup.dir'                    # Backup directory name

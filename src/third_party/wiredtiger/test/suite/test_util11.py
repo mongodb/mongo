@@ -33,10 +33,10 @@
 from suite_subprocess import suite_subprocess
 import wttest
 
-# test_util11.py
-#    Utilities: wt list
+# Utilities: wt list
 class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
-    tablenamepfx = 'test_util11.'
+    test_name = __qualname__
+    tablenamepfx = f'{test_name}.'
     session_params = 'key_format=S,value_format=S'
 
     def populate(self, tablename):

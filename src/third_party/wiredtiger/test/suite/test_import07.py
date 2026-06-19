@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_import07.py
 # Check that importing unsupported data sources returns an error.
 
 import wiredtiger

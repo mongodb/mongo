@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_import04.py
 # Test success and failure scenarios for importing a table into a running database.
 # 1. Attempt to import a table into a destination database where a table object of
 #    that name already exists.

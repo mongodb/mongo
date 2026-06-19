@@ -29,7 +29,6 @@
 import os, wiredtiger, wttest
 from wtbackup import backup_base
 
-# test_backup24.py
 # Test recovering a selective backup with some logged tables, some not logged tables
 # and creating more of each during backup.
 class test_backup24(backup_base):

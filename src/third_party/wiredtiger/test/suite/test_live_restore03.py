@@ -31,7 +31,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtbackup import backup_base
 
-# test_live_restore03.py
 # Test that live_restore->fs_size can returns a valid size when the file only exists in the source
 # directory.
 # Note: The block_size statistic corresponds to underlying file size.

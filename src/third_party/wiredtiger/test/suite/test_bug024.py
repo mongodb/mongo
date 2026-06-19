@@ -34,17 +34,17 @@ import wttest
 from wtdataset import SimpleDataSet
 import os, shutil
 
-# test_bug024.py
 # WT-6526: test that we can successfully open a readonly connection after it was stopped while
 # the temporary turtle file existed. We simulate that by copying the turtle file to its temporary name
 # and then opening the connection readonly.
 @wttest.skip_for_hook("tiered", "Tiered causes python crash")
 @wttest.skip_for_hook("disagg", "Moving the turtle file makes no sense with disaggregated storage")
 class test_bug024(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = ('cache_size=50MB')
 
     # Create a table.
-    uri = "table:test_bug024"
+    uri = f"table:{test_name}"
 
     def test_bug024(self):
         nrows = 10

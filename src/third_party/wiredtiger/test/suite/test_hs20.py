@@ -29,11 +29,11 @@
 import wiredtiger, wttest, sys
 from wtscenario import make_scenarios
 
-# test_hs20.py
 # Ensure we never reconstruct a reverse modify update in the history store based on the onpage overflow value
 class test_hs20(wttest.WiredTigerTestCase):
     # This test purposely uses a small cache to force eviction to occur
     # at certain points in its execution.
+    test_name = __qualname__
     conn_config = 'cache_size=50MB,eviction=(threads_max=1)'
 
     # The small cache size of the test means that rollbacks will occur.
@@ -54,7 +54,7 @@ class test_hs20(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(key_format_values)
 
     def test_hs20(self):
-        uri = 'table:test_hs20'
+        uri = f'table:{self.test_name}'
         key_format = 'key_format=' + self.key_format
 
         # Set a very small maximum leaf value to trigger writing overflow values

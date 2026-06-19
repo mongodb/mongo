@@ -35,7 +35,6 @@ from test_cc01 import test_cc_base
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_cc02.py
 # Test that in-memory or on-disk obsolete content is removed from the HS.
 class test_cc02(test_cc_base):
     # Useful for debugging:

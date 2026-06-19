@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_compat02.py
 # Check compatibility API
 
 import wiredtiger, wttest
@@ -36,9 +35,10 @@ from wtscenario import make_scenarios
 class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
     # Add enough entries and use a small log size to generate more than
     # one log file.
+    test_name = __qualname__
     entries = 2000
     logmax = "100K"
-    tablename = 'test_compat02'
+    tablename = test_name
     uri = 'table:' + tablename
     # Declare the log versions that do and do not have prevlsn.
     # Log version 1 does not have the prevlsn record.

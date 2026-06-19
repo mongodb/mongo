@@ -32,7 +32,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable12.py
 # Test the rollback to stable operation skipping subtrees in during tree walk.
 class test_rollback_to_stable12(test_rollback_to_stable_base):
 

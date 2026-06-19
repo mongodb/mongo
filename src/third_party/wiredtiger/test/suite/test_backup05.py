@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_backup05.py
-#   Test that backups can be performed similar to MongoDB's fsyncLock.
-#   We assume writes are not being performed, a checkpoint is done and
-#   then we open a backup cursor to prevent log removal and other file
-#   manipulations.  Manually copy the directory and verify it.
+# Test that backups can be performed similar to MongoDB's fsyncLock.
+# We assume writes are not being performed, a checkpoint is done and
+# then we open a backup cursor to prevent log removal and other file
+# manipulations.  Manually copy the directory and verify it.
 #
 
 import os
@@ -39,7 +38,8 @@ from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 
 class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
-    uri = 'table:test_backup05'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
     emptyuri = 'table:test_empty05'
     newuri = 'table:test_new05'
     create_params = 'key_format=i,value_format=i'

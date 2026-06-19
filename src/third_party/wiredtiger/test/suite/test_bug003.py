@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_bug003.py
-#       Regression tests.
+# Regression tests.
 
 import wttest
 from wtscenario import make_scenarios

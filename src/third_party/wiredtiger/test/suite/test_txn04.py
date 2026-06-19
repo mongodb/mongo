@@ -31,8 +31,7 @@
 # recovery
 # [END_TAGS]
 #
-# test_txn04.py
-#   Transactions: hot backup and recovery
+# Transactions: hot backup and recovery
 #
 
 import shutil, os
@@ -41,8 +40,9 @@ from wtscenario import make_scenarios
 import wttest
 
 class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     logmax = "100K"
-    tablename = 'test_txn04'
+    tablename = test_name
     uri = 'table:' + tablename
     sync_list = [
         '(method=dsync,enabled)',

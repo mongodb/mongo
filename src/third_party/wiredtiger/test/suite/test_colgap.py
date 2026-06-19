@@ -30,8 +30,7 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet, simple_key, simple_value
 from wtscenario import make_scenarios
 
-# test_colgap.py
-#    Test variable-length column-store gap performance.
+# Test variable-length column-store gap performance.
 class test_column_store_gap(wttest.WiredTigerTestCase):
     nentries = 13
 
@@ -125,7 +124,8 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
 
 # Basic testing of variable-length column-store with big records.
 class test_colmax(wttest.WiredTigerTestCase):
-    name = 'test_colmax'
+    test_name = __qualname__
+    name = test_name
 
     types = [
         ('file', dict(type='file:')),

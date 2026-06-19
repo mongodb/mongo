@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn08.py
 # Printlog: test Unicode output
 #
 
@@ -36,8 +35,9 @@ import wttest
 from wtscenario import make_scenarios
 
 class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     logmax = "100K"
-    tablename = 'test_txn08'
+    tablename = test_name
     uri = 'table:' + tablename
 
     key_format_values = [

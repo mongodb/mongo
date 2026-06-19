@@ -32,7 +32,6 @@ from wtdataset import SimpleDataSet
 from wtbackup import backup_base
 
 
-# test_live_restore06.py
 # Ensure WiredTiger cleans all 'nbits=-1' strings from file metadata during backups.
 class test_live_restore06(backup_base):
 

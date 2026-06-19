@@ -29,9 +29,9 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_hs18.py
 # Test various older reader scenarios
 class test_hs18(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=5MB,eviction=(threads_max=1)'
     format_values = [
         ('column', dict(key_format='r')),
@@ -132,7 +132,7 @@ class test_hs18(wttest.WiredTigerTestCase):
 
     # Test that we don't get the wrong value if we read with a timestamp originally.
     def test_read_timestamp_weirdness(self):
-        uri = 'table:test_hs18'
+        uri = f'table:{self.test_name}'
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)

@@ -31,19 +31,19 @@ from helper_disagg import disagg_test_class, gen_disagg_storages
 from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 
-# test_layered_fast_truncate01.py
-#   Test basic fast truncate functionality.
+# Test basic fast truncate functionality.
 @disagg_test_class
 class test_layered_fast_truncate01(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     conn_config = 'disaggregated=(role="leader"),'
 
     uris = [
-        ('layered', dict(uri='layered:test_layered_fast_truncate01')),
-        ('table', dict(uri='table:test_layered_fast_truncate01')),
+        ('layered', dict(uri=f'layered:{test_name}')),
+        ('table', dict(uri=f'table:{test_name}')),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_fast_truncate01', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     scenarios = make_scenarios(disagg_storages, uris)
 

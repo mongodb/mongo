@@ -33,8 +33,7 @@
 import fnmatch, os, time
 import wiredtiger, wttest
 
-# test_reconfig02.py
-#    Smoke-test the connection reconfiguration operations.
+# Smoke-test the connection reconfiguration operations.
 class test_reconfig02(wttest.WiredTigerTestCase):
     init_config = 'log=(enabled,file_max=100K,prealloc=false,remove=false,zero_fill=false)'
     uri = "table:reconfig02"

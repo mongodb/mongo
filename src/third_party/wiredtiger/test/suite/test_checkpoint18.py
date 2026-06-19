@@ -33,7 +33,6 @@ from wtthread import checkpoint_thread
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint18.py
 #
 # Make sure that when we open a cursor we secure the proper matching
 # history store checkpoint, and don't bobble or lose it if the database

@@ -30,18 +30,18 @@ import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages, Oplog
 from wtscenario import make_scenarios
 
-# test_layered_follower09.py
 # Test pinning the content in the ingest table
 @disagg_test_class
 class test_layered_follower09(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_base_config = ',create,cache_size=10GB,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                  + 'disaggregated=(lose_all_my_data=true),'
 
-    disagg_storages = gen_disagg_storages('test_layered_follower09', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     scenarios = make_scenarios(disagg_storages)
 
-    uri = 'layered:test_layered_follower09'
+    uri = f'layered:{test_name}'
 
     nitems = 20000
 
@@ -105,7 +105,7 @@ class test_layered_follower09(wttest.WiredTigerTestCase):
         self.disagg_advance_checkpoint(conn_follow)
 
         # Trigger eviction on the ingest table
-        evict_cursor = session_follow.open_cursor("file:test_layered_follower09.wt_ingest", None, "debug=(release_evict)")
+        evict_cursor = session_follow.open_cursor(f"file:{self.test_name}.wt_ingest", None, "debug=(release_evict)")
         for i in range(1, self.nitems):
             session_follow.begin_transaction(f'read_timestamp={self.timestamp_str(ts)}')
             evict_cursor.set_key(str(i))

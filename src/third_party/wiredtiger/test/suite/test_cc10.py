@@ -31,7 +31,6 @@ from test_cc01 import test_cc_base
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_cc10.py
 # Test that the obsolete cleanup thread can be configured to run at different intervals.
 class test_cc10(test_cc_base):
     conn_config_common = 'statistics=(all),statistics_log=(json,wait=1,on_close=true),verbose=(checkpoint_cleanup:1)'

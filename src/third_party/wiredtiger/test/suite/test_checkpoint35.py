@@ -32,7 +32,6 @@ from wtscenario import make_scenarios
 from wiredtiger import stat
 from helper import simulate_crash_restart
 
-# test_checkpoint35.py
 #
 # Test precise checkpoint
 class test_checkpoint35(wttest.WiredTigerTestCase):

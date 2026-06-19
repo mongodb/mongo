@@ -30,17 +30,17 @@ import threading, time, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_delta14.py
-#    Test we skip write pages if reconciliation doesn't make progress.
+# Test we skip write pages if reconciliation doesn't make progress.
 @disagg_test_class
 class test_layered_delta14(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'disaggregated=(role="leader"),precise_checkpoint=true,page_delta=(leaf_page_delta=false),'
 
     create_session_config = 'key_format=i,value_format=S'
 
-    uri = "layered:test_layered_delta14"
+    uri = f"layered:{test_name}"
 
-    disagg_storages = gen_disagg_storages('test_layered_delta14', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
     def test_skip_write_full_page(self):

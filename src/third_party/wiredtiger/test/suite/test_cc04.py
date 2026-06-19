@@ -30,7 +30,6 @@ from test_cc01 import test_cc_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 
-# test_cc04.py
 # Test that checkpoint must not clean the pages that are not obsolete.
 class test_cc04(test_cc_base):
     conn_config = 'cache_size=50MB,statistics=(all)'

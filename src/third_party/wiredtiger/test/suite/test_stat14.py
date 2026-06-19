@@ -32,11 +32,11 @@ from wtdataset import SimpleDataSet, simple_key
 from wtscenario import make_scenarios
 from helper import WiredTigerCursor, statistic_uri
 
-# test_stat14.py
 # Check that eviction threshold stats are correctly updated.
 
 class test_stat14(wttest.WiredTigerTestCase):
-    uri = 'table:test_stat14'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
 
     conn_config = 'statistics=(all)'
 

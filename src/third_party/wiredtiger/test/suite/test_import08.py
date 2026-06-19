@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_import08.py
 # Check that transaction ids from imported files are ignored regardless of write generation.
 
 import os, re, shutil

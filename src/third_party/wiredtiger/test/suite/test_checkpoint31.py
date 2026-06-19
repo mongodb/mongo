@@ -29,7 +29,6 @@
 from wtscenario import make_scenarios
 import wiredtiger, wttest
 
-# test_checkpoint31.py
 #
 # Test opening a read-only checkpoint cursor.
 @wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")

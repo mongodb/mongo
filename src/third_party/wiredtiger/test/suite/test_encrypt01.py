@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_encrypt01.py
-#   Basic block encryption operations
+# Basic block encryption operations
 #
 
 import random
@@ -45,11 +44,12 @@ class test_encrypt01(wttest.WiredTigerTestCase):
     #
     # It expects secretkey= to provide a hex-encoded 256-bit chacha20 key.
     # This key will serve for testing purposes.
+    test_name = __qualname__
     sodium_testkey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 
     types = [
-        ('file', dict(uri='file:test_encrypt01')),
-        ('table', dict(uri='table:test_encrypt01')),
+        ('file', dict(uri=f'file:{test_name}')),
+        ('table', dict(uri=f'table:{test_name}')),
     ]
     encrypt = [
         ('none', dict( sys_encrypt='none', sys_encrypt_args='',

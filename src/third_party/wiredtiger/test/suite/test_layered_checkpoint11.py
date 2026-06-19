@@ -30,12 +30,12 @@ import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_checkpoint11.py
-#     Test that a follower correctly picks up multiple checkpoints for the same table.
-#     Includes a cursor_copy variant to catch use-after-free bugs in accessing metadata cursor values.
+# Test that a follower correctly picks up multiple checkpoints for the same table.
+# Includes a cursor_copy variant to catch use-after-free bugs in accessing metadata cursor values.
 
 @disagg_test_class
 class test_layered_checkpoint11(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     nitems = 100
 
     conn_base_config = 'statistics=(all),'
@@ -48,10 +48,10 @@ class test_layered_checkpoint11(wttest.WiredTigerTestCase):
         ('cursor_copy',    dict(cursor_copy=True)),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_checkpoint11', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, cursor_copy_values)
 
-    uri = 'layered:test_layered_checkpoint11'
+    uri = f'layered:{test_name}'
 
     def follower_conn_config(self):
         cfg = self.extensionsConfig() + ',create,' + self.conn_base_config

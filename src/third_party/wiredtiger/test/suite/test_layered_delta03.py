@@ -31,19 +31,19 @@ from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_layered_delta03.py
 # Test adjustable consecutive deltas
 
 @disagg_test_class
 class test_layered_delta03(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     uris = [
-        ('layered', dict(uri='layered:test_layered_delta03')),
-        ('btree', dict(uri='file:test_layered_delta03')),
+        ('layered', dict(uri=f'layered:{test_name}')),
+        ('btree', dict(uri=f'file:{test_name}')),
     ]
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'page_delta=(max_consecutive_delta=1),'
-    disagg_storages = gen_disagg_storages('test_layered_delta03', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     nitems = 1000
 

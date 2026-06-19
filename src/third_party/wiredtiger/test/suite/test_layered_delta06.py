@@ -31,11 +31,11 @@ from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_stora
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_layered_delta06.py
 # Simple read write testing for leaf page delta
 
 @disagg_test_class
 class test_layered_delta06(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     encrypt = [
         ('none', dict(encryptor='none', encrypt_args='')),
         ('rotn', dict(encryptor='rotn', encrypt_args='keyid=13')),
@@ -47,13 +47,13 @@ class test_layered_delta06(wttest.WiredTigerTestCase):
     ]
 
     uris = [
-        ('layered', dict(uri='layered:test_layered_delta06')),
-        ('btree', dict(uri='file:test_layered_delta06')),
+        ('layered', dict(uri=f'layered:{test_name}')),
+        ('btree', dict(uri=f'file:{test_name}')),
     ]
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'page_delta=(delta_pct=80),disaggregated=(lose_all_my_data=true),precise_checkpoint=true,'
-    disagg_storages = gen_disagg_storages('test_layered_delta06', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(encrypt, compress, disagg_storages, uris)

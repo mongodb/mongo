@@ -26,15 +26,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor21.py
-#   Test cursor reposition
+# Test cursor reposition
 
 import wttest
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
 class test_cursor21(wttest.WiredTigerTestCase):
-    uri = "table:test_cursor21"
+    test_name = __qualname__
+    uri = f"table:{test_name}"
 
     format_values = [
         ('column', dict(key_format='r', value_format='i')),

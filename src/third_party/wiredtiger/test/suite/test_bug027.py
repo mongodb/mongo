@@ -30,7 +30,6 @@ import wttest
 from helper import simulate_crash_restart
 from wtdataset import SimpleDataSet
 
-# test_bug027.py
 # Attempt to create a snapshot with more than 256 transactions in it.
 class test_bug(wttest.WiredTigerTestCase):
     conn_config = 'session_max=512'

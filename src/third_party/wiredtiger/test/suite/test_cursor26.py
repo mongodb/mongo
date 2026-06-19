@@ -26,13 +26,12 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor26.py
-#   Version cursor with show_prepared_rollback=true must emit every
-#   version of a key that a caller would need to reconstruct its
-#   history: both rolled-back prepared values and any underlying
-#   committed value that persists after the rollback. Regression for
-#   WT-17240, where an underlying committed value was dropped when it
-#   had been reconciled to disk before the prepared rollback.
+# Version cursor with show_prepared_rollback=true must emit every
+# version of a key that a caller would need to reconstruct its
+# history: both rolled-back prepared values and any underlying
+# committed value that persists after the rollback. Regression for
+# WT-17240, where an underlying committed value was dropped when it
+# had been reconciled to disk before the prepared rollback.
 #
 
 import wttest
@@ -40,7 +39,8 @@ import wttest
 WT_TXN_ABORTED = 2**64 - 1
 
 class test_cursor26(wttest.WiredTigerTestCase):
-    uri = 'file:test_cursor26.wt'
+    test_name = __qualname__
+    uri = f'file:{test_name}.wt'
 
     conn_config = (
         'cache_size=50MB,statistics=(all),'

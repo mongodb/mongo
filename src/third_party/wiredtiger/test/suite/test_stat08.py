@@ -30,10 +30,10 @@ import os
 from unittest import skip
 import wiredtiger, wttest
 
-# test_stat08.py
-#    Session statistics for bytes read into the cache.
+# Session statistics for bytes read into the cache.
 class test_stat08(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     nentries = 100000
     # Leave the cache size on the default setting to avoid filling up the cache
     # too much and triggering unnecessary rollbacks. But make the value fairly
@@ -78,8 +78,8 @@ class test_stat08(wttest.WiredTigerTestCase):
         # We want to configure for pages to be explicitly evicted when we are done with them so
         # that we can correctly verify the statistic measuring bytes read from cache.
         self.session = self.conn.open_session("debug=(release_evict_page=true)")
-        self.session.create("table:test_stat08", "key_format=i,value_format=S")
-        cursor =  self.session.open_cursor('table:test_stat08', None, None)
+        self.session.create(f"table:{self.test_name}", "key_format=i,value_format=S")
+        cursor =  self.session.open_cursor(f'table:{self.test_name}', None, None)
         self.session.begin_transaction()
         txn_dirty = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
         cache_dirty = self.get_cstat(wiredtiger.stat.conn.cache_bytes_dirty)

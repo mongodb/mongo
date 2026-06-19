@@ -26,12 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover16.py
-#   A prepared delete that is captured by a checkpoint and later rolled
-#   back via the follower discover/claim flow must not affect reads of the
-#   underlying committed value once the rollback timestamp is stable. A
-#   fresh follower that opens the post-rollback checkpoint must read the
-#   key's original committed value.
+# A prepared delete that is captured by a checkpoint and later rolled
+# back via the follower discover/claim flow must not affect reads of the
+# underlying committed value once the rollback timestamp is stable. A
+# fresh follower that opens the post-rollback checkpoint must read the
+# key's original committed value.
 
 import wiredtiger
 import wttest
@@ -41,11 +40,12 @@ from wtscenario import make_scenarios
 @wttest.skip_for_hook("tiered", "Layered tables are not supported with tiered storage")
 @disagg_test_class
 class test_prepare_discover16(wttest.WiredTigerTestCase):
-    tablename = 'test_prepare_discover16'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
     stable_uri = 'file:' + tablename + '.wt_stable'
 
-    disagg_storages = gen_disagg_storages('test_prepare_discover16', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_base_config = (

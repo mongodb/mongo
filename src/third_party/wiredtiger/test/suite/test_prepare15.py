@@ -30,7 +30,6 @@ import wttest
 from wiredtiger import WT_NOTFOUND
 from wtscenario import make_scenarios
 
-# test_prepare15.py
 # Test that the prepare transaction rollback removes the on-disk key or replace it with history
 # store and commit retains the changes when both insert and remove operations are from the same
 # prepared transaction.

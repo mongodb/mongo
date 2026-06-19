@@ -31,7 +31,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_hs07.py
 # Test history store sweep cleans the obsolete history store entries and gives expected results.
 class test_hs07(wttest.WiredTigerTestCase):
     # Force a small cache.

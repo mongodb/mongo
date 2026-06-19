@@ -32,7 +32,6 @@ from helper import copy_wiredtiger_home
 from wtscenario import make_scenarios
 from wiredtiger import WT_NOTFOUND
 
-# test_truncate21.py
 # Test truncate, logging and recovery when truncate has no work to do.
 class test_truncate21(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB,log=(enabled)'

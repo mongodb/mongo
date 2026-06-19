@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_dupc.py
-#       test cursor duplication
+# test cursor duplication
 #
 
 import wiredtiger, wttest

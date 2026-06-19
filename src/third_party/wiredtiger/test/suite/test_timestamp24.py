@@ -30,7 +30,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_timestamp24.py
 #
 # Make sure certain conflicting operations are rejected.
 

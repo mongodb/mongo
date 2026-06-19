@@ -26,12 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_follower15.py
-#   Test MODIFY dependent on a GC-eligible base value.
+# Test MODIFY dependent on a GC-eligible base value.
 #
-#   Covers reads via cursor.next and cursor.search, and the case where
-#   the on-disk base is not yet GC-eligible and must remain readable
-#   across its full visibility window.
+# Covers reads via cursor.next and cursor.search, and the case where
+# the on-disk base is not yet GC-eligible and must remain readable
+# across its full visibility window.
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -39,15 +38,16 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_follower15(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = base_config + 'disaggregated=(role="leader")'
     conn_config_follower = base_config + 'disaggregated=(role="follower")'
 
-    uri = 'layered:test_layered_follower15'
-    ingest_uri = 'file:test_layered_follower15.wt_ingest'
+    uri = f'layered:{test_name}'
+    ingest_uri = f'file:{test_name}.wt_ingest'
     create_config = 'key_format=i,value_format=S'
 
-    disagg_storages = gen_disagg_storages('test_layered_follower15', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_follow = None

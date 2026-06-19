@@ -63,12 +63,12 @@ class FakeCursor:
                     tup.append(row[name])
             return tup
 
-# test_jsondump.py
 #    Utilities: wt dump
 # Test the dump utility with the -j option.
 class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
-    name = 'test_jsondump01'
-    name2 = 'test_jsondump01b'
+    test_name = __qualname__
+    name = test_name
+    name2 = f'{test_name}b'
     nentries = 2500
 
     keyfmt = [

@@ -32,12 +32,12 @@ import wiredtiger, wttest
 from test_verbose01 import test_verbose_base
 import json
 
-# test_verbose03.py
 # Tests that when enabling JSON-encoded messages through the event handler interface, valid JSON
 # is produced. Valid messages are those that can be successfully parsed as JSON (meeting the JSON
 # standard) and subscribe to an expected schema (i.e. meet expected fields and types).
 class test_verbose03(test_verbose_base):
     # The maximum number of lines we will read from stdout/stderr in any given context.
+    test_name = __qualname__
     nlines = 50000
 
     @contextmanager
@@ -103,7 +103,7 @@ class test_verbose03(test_verbose_base):
         with self.expect_event_handler_json(self.create_verbose_configuration(['api']), expected_verbose_categories) as conn:
             # Perform a set of simple API operations (table creations and cursor operations) to generate verbose API
             # messages.
-            uri = 'table:test_verbose03_api'
+            uri = f'table:{self.test_name}_api'
             session = conn.open_session()
             session.create(uri, 'key_format=S,value_format=S')
             c = session.open_cursor(uri)
@@ -116,7 +116,7 @@ class test_verbose03(test_verbose_base):
             # Perform a set of simple API operations (table creations and cursor operations) to generate verbose API
             # messages. Beyond opening the connection resource, we shouldn't need to do anything special for the version
             # category.
-            uri = 'table:test_verbose03_multiple'
+            uri = f'table:{self.test_name}_multiple'
             session = conn.open_session()
             session.create(uri, 'key_format=S,value_format=S')
             c = session.open_cursor(uri)
@@ -135,7 +135,7 @@ class test_verbose03(test_verbose_base):
         # Test generating an error message, ensuring the JSON output is valid.
         with self.expect_event_handler_json('', expected_verbose_categories, stdErr=True) as conn:
             # Attempt to begin a read transaction with an invalid timestamp, inorder to produce an error message.
-            uri = 'table:test_verbose03_error'
+            uri = f'table:{self.test_name}_error'
             session = conn.open_session()
             session.create(uri, 'key_format=S,value_format=S')
             c = session.open_cursor(uri)

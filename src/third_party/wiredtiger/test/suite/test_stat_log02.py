@@ -33,8 +33,7 @@
 import glob, json
 import wttest
 
-# test_stat_log02.py
-#    Statistics log sources argument and JSON testing.
+# Statistics log sources argument and JSON testing.
 class test_stat_log02(wttest.WiredTigerTestCase):
 
     # Tests need to setup the connection in their own way.

@@ -35,7 +35,8 @@ from prepare_util import test_prepare_preserve_prepare_base
 # - Ensuring prepared updates can be written with stable timestamp validation
 
 class test_prepare35(test_prepare_preserve_prepare_base):
-    uri = 'table:test_prepare35'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
 
     def test_committed_prepare(self):
         # Setup: Initialize timestamps with stable < prepare timestamp

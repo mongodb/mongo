@@ -35,7 +35,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable38.py
 #
 # Test using fast truncate to delete the whole tree of records from the history store
 

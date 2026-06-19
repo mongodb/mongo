@@ -32,7 +32,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable13.py
 # Test the rollback to stable should retain/restore the tombstone from
 # the update list or from the history store for on-disk database.
 class test_rollback_to_stable13(test_rollback_to_stable_base):

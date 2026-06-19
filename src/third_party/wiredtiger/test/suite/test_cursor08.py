@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor08.py
 # Log cursors with compression
 #
 
@@ -35,8 +34,9 @@ from wtscenario import make_scenarios
 import wttest
 
 class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     logmax = "100K"
-    tablename = 'test_cursor08'
+    tablename = test_name
     uri = 'table:' + tablename
     nkeys = 500
 

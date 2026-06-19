@@ -32,11 +32,11 @@ from wtscenario import make_scenarios
 from wiredtiger import stat
 import time
 
-# test_layered_delta15.py
 # Test that we write internal page deltas to the page log extension.
 
 @disagg_test_class
 class test_layered_delta15(wttest.WiredTigerTestCase, DisaggConfigMixin):
+    test_name = __qualname__
     encrypt = [
         ('none', dict(encryptor='none', encrypt_args='')),
         ('rotn', dict(encryptor='rotn', encrypt_args='keyid=13')),
@@ -48,8 +48,8 @@ class test_layered_delta15(wttest.WiredTigerTestCase, DisaggConfigMixin):
     ]
 
     uris = [
-        ('layered', dict(uri='layered:test_layered_delta15')),
-        ('btree', dict(uri='file:test_layered_delta15')),
+        ('layered', dict(uri=f'layered:{test_name}')),
+        ('btree', dict(uri=f'file:{test_name}')),
     ]
 
     ts = [
@@ -65,7 +65,7 @@ class test_layered_delta15(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'disaggregated=(page_log=palite),'
-    disagg_storages = gen_disagg_storages('test_layered_delta15', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(encrypt, compress, disagg_storages, uris, ts, delta)

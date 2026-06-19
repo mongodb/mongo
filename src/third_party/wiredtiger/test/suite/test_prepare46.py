@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_prepare46.py
 # Regression test: a prepare rollback whose prepare timestamp is not yet stable
 # at the time of eviction should leave the prepared cell available for the next
 # checkpoint. Once the prepare timestamp becomes stable, the checkpoint must
@@ -55,8 +54,9 @@ import wttest
 
 class test_prepare46(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
-    uri = 'table:test_prepare46'
+    uri = f'table:{test_name}'
 
     def test_prepared_cell_preserved_after_eviction_at_unstable_prepare_ts(self):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))

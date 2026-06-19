@@ -33,7 +33,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtthread import checkpoint_thread
 
-# test_hs33.py
 # Test that we can run recovery after crashing before the metadata is synced during recovery.
 # This simulates the scenario seen in WT-14376, where the eviction subsystem opened the history
 # store file before metadata recovery had completed.

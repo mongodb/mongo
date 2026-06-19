@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn18.py
-#   Transactions: test recovery settings
+# Transactions: test recovery settings
 #
 
 from suite_subprocess import suite_subprocess
@@ -35,7 +34,8 @@ import helper, wiredtiger, wttest
 from wtscenario import make_scenarios
 
 class test_txn18(wttest.WiredTigerTestCase, suite_subprocess):
-    t1 = 'table:test_txn18'
+    test_name = __qualname__
+    t1 = f'table:{test_name}'
     conn_config = 'log=(enabled,file_max=100K,remove=false),' + \
                 'transaction_sync=(method=dsync,enabled)'
     conn_recerror = conn_config + ',log=(recover=error)'

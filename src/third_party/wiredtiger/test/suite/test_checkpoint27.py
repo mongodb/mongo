@@ -32,7 +32,6 @@ import wiredtiger
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint27.py
 #
 # Check that nothing bad happens if we read in metadata pages while in the
 # middle of reading a checkpoint.

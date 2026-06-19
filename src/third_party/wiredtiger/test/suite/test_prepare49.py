@@ -26,16 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare49.py
-#   Evicting a page after rolling back a prepared transaction that reserved
-#   and then deleted a key must succeed when preserve_prepared is configured.
+# Evicting a page after rolling back a prepared transaction that reserved
+# and then deleted a key must succeed when preserve_prepared is configured.
 
 import wttest
 
 class test_prepare49(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
-    uri = 'table:test_prepare49'
+    uri = f'table:{test_name}'
 
     def _force_evict(self, key, read_ts):
         session = self.conn.open_session()

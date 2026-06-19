@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_checkpoint09.py
 # Test that reconcile clears the time window of on-disk cell if it is obsolete.
 
 import wttest

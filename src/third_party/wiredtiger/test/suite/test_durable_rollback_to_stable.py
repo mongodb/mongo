@@ -31,11 +31,11 @@ from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_durable_rollback_to_stable.py
-#    Checking visibility and durability of updates with durable_timestamp and
-#    with rollback to stable.
+# Checking visibility and durability of updates with durable_timestamp and
+# with rollback to stable.
 class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subprocess):
 
+    test_name = __qualname__
     format_values = [
         ('row-string', dict(keyfmt='S', valfmt='S')),
         ('row-int', dict(keyfmt='i', valfmt='S')),
@@ -55,7 +55,7 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
     def test_durable_rollback_to_stable(self):
 
         # Build an object.
-        uri = self.uri + ':test_durable_rollback_to_stable'
+        uri = self.uri + f':{self.test_name}'
         ds = self.ds(self, uri, 50, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
 

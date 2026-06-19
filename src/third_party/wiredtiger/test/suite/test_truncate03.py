@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_truncate03.py
-#       session level operations on tables
+# session level operations on tables
 
 import wttest
 from wtdataset import SimpleDataSet

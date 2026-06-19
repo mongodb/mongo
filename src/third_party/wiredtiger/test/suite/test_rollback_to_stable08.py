@@ -31,7 +31,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from rollback_to_stable_util import test_rollback_to_stable_base
 
-# test_rollback_to_stable08.py
 # Test that rollback to stable does not abort updates when the stable timestamp is
 # set to the latest commit.
 class test_rollback_to_stable08(test_rollback_to_stable_base):

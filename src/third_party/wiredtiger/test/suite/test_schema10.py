@@ -29,8 +29,7 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_schema10.py
-#    Test that an empty name (e.g. "table:", "file:") is rejected by session.create().
+# Test that an empty name (e.g. "table:", "file:") is rejected by session.create().
 class test_schema10(wttest.WiredTigerTestCase):
 
     # URI types dispatched through session.create() that require a non-empty name.

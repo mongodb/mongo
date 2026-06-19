@@ -29,8 +29,7 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_metadata03.py
-#    Test atomic schema operations on create.
+# Test atomic schema operations on create.
 class test_metadata03(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled)'
     types = [

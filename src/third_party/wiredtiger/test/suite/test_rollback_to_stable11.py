@@ -32,7 +32,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable11.py
 # Test the rollback to stable is retrieving the proper history store update.
 class test_rollback_to_stable11(test_rollback_to_stable_base):
 

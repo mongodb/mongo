@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_truncate09.py
-#   Check for fast-truncate rollback-to-stable timestamps.
+# Check for fast-truncate rollback-to-stable timestamps.
 
 import wttest
 from helper import simulate_crash_restart
@@ -36,6 +35,7 @@ from wtscenario import make_scenarios
 
 @wttest.skip_for_hook("disagg", "Disagg does not support RTS")
 class test_truncate09(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     format_values = [
         ('column', dict(key_format='r')),
         ('row_integer', dict(key_format='i')),
@@ -44,7 +44,7 @@ class test_truncate09(wttest.WiredTigerTestCase):
 
     def test_truncate09(self):
         # Create a large table with lots of pages.
-        uri = "table:test_truncate09"
+        uri = f"table:{self.test_name}"
         format = 'key_format={},value_format=S'.format(self.key_format)
         self.session.create(uri, 'allocation_size=512,leaf_page_max=512,' + format)
 

@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_config11.py
-#   Test the debug configuration setting on the session which evicts pages as they are released.
+# Test the debug configuration setting on the session which evicts pages as they are released.
 #
 
 import wttest
@@ -37,6 +36,7 @@ from wtdataset import SimpleDataSet
 
 class test_config11(wttest.WiredTigerTestCase):
     # Set a high trigger for dirty content so we don't perform eviction on it.
+    test_name = __qualname__
     conn_config = 'eviction_dirty_trigger=99,statistics=(fast)'
     session_config = 'isolation=snapshot'
     key_format_values = [
@@ -47,7 +47,7 @@ class test_config11(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(key_format_values)
 
     def test_config11(self):
-        uri = 'table:test_config11'
+        uri = f'table:{self.test_name}'
 
         ds = SimpleDataSet(
             self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')

@@ -30,7 +30,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_truncate06.py
 #
 # Test timestamped truncate of timestamped data changes in the presence of older history.
 # Sixteen scenarios per table type cover:

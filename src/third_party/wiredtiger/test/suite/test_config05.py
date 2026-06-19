@@ -28,10 +28,10 @@
 
 import wiredtiger, wttest
 
-# test_config05.py
-#    Test multiple connection opens
+# Test multiple connection opens
 class test_config05(wttest.WiredTigerTestCase):
-    table_name1 = 'test_config05'
+    test_name = __qualname__
+    table_name1 = test_name
     nentries = 100
 
     # Each test needs to set up its connection in its own way,

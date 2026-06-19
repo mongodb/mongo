@@ -30,22 +30,22 @@ import os, os.path, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_cursor07.py
-#    Test layered table modify
+# Test layered table modify
 @disagg_test_class
 class test_layered_cursor07(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                 + 'disaggregated=(role="leader"),'
 
     create_session_config = 'key_format=S,value_format=S'
 
-    disagg_storages = gen_disagg_storages('test_layered_cursor07', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
     num_restarts = 0
 
     def test_modify(self):
-        uri = "layered:test_layered_cursor07"
+        uri = f"layered:{self.test_name}"
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri)
 

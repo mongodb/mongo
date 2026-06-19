@@ -34,11 +34,11 @@ import wttest
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 
-# test_dump03.py
-#     Test 'wt dump' window functionality.
+# Test 'wt dump' window functionality.
 class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     table_format = 'key_format=u,value_format=u'
-    uri = 'table:test_dump'
+    uri = f'table:{test_name}'
     output = 'dump.out'
     data_header = 'Data\n'
 

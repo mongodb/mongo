@@ -31,7 +31,6 @@ import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_prepare07.py
 # Test to ensure prepared updates older than oldest timestamp are not visible.
 # this test is mainly to ensure there is no gap in txn_visible_all when active
 # oldest transaction is a prepared transaction, and the oldest timestamp advanced

@@ -30,10 +30,10 @@ import threading, time, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_config05.py
-#    Test that address cookies in disaggregated storage can be upgraded/downgraded safely.
+# Test that address cookies in disaggregated storage can be upgraded/downgraded safely.
 @disagg_test_class
 class test_layered_config05(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'precise_checkpoint=true,'
@@ -43,7 +43,7 @@ class test_layered_config05(wttest.WiredTigerTestCase):
 
     num_items = 2000
     num_modify = 100
-    uri = "table:test_layered_config05"
+    uri = f"table:{test_name}"
 
     address_cookie_upgrade = [
         ('none', dict(address_cookie_upgrade='none', compatible=True)),
@@ -55,7 +55,7 @@ class test_layered_config05(wttest.WiredTigerTestCase):
         ('optional_field', dict(optional_field='true')),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_config05', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages, address_cookie_upgrade, optional_field)
 
     # Test stepping up concurrently with a checkpoint.

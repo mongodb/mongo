@@ -35,9 +35,8 @@ import queue, threading, wttest
 from wtthread import checkpoint_thread, op_thread
 from wtscenario import make_scenarios
 
-# test_checkpoint02.py
-#   Run background checkpoints repeatedly while doing inserts and other
-#   operations in another thread
+# Run background checkpoints repeatedly while doing inserts and other
+# operations in another thread
 class test_checkpoint02(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),

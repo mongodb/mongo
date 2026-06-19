@@ -30,7 +30,6 @@ import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_hs26.py
 # Test that changes overlapping variable-length column store RLE groups don't lose or corrupt data.
 # (The concern doesn't exist for row stores, so while this test could be run for row stores there's
 # little benefit to doing so; thus, no row-store scenarios are generated.)

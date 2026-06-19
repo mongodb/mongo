@@ -32,7 +32,6 @@ from wtscenario import make_scenarios
 from wtbackup import backup_base
 
 
-# test_live_restore04.py
 # Test using the wt utility with live restore.
 class test_live_restore04(backup_base):
     format_values = [

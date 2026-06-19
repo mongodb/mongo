@@ -29,10 +29,10 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-# test_util12.py
-#    Utilities: wt write
+# Utilities: wt write
 class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util12.a'
+    test_name = __qualname__
+    tablename = f'{test_name}.a'
     session_params = 'key_format=S,value_format=S'
     errfile = 'writeerr.txt'
 

@@ -26,12 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate10.py
-#   Data location semantics (stable vs ingest).
+# Data location semantics (stable vs ingest).
 #
-#   Verify that fast-truncate on a follower behaves as a single operation over
-#   the logical union of the stable and ingest tables, independent of which
-#   table any given key actually lives in.
+# Verify that fast-truncate on a follower behaves as a single operation over
+# the logical union of the stable and ingest tables, independent of which
+# table any given key actually lives in.
 
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from helper_layered_fast_truncate import (

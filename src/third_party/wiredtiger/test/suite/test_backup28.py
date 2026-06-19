@@ -31,7 +31,6 @@ import os, re
 from wtbackup import backup_base
 from wtscenario import make_scenarios
 
-# test_backup28.py
 # Test selective backup with different schema types. Recovering a partial backup with target uris
 # including colgroups or index formats should raise a message. The only supported types are
 # table formats in the uri list.

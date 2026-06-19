@@ -32,7 +32,6 @@ from compact_util import compact_util
 from wiredtiger import stat
 import errno
 
-# test_compact06.py
 # Test background compaction API usage.
 class test_compact06(compact_util):
     configuration_items = ['exclude=["table:a.wt"]', 'free_space_target=10MB', 'timeout=60']

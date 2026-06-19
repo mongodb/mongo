@@ -31,7 +31,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_cc06.py
 # Verify checkpoint cleanup ignores the empty or newly created files.
 
 class test_cc06(test_cc_base):

@@ -35,7 +35,8 @@ from prepare_util import test_prepare_preserve_prepare_base
 # FIXME: Verify that prepared modifies are reconstructed properly when loaded from disk
 
 class test_prepare34(test_prepare_preserve_prepare_base):
-    uri = 'table:test_prepare34'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
 
     def test_rollback_prepare_modify(self):
         """
@@ -47,7 +48,7 @@ class test_prepare34(test_prepare_preserve_prepare_base):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
 
-        uri = 'table:test_prepare34'
+        uri = f'table:{self.test_name}'
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)
 

@@ -31,11 +31,11 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet, simple_key
 from wtscenario import make_scenarios
 
-# test_stat13.py
 # Check that btree_maximum_depth is computed correctly.
 
 class test_stat13(wttest.WiredTigerTestCase):
-    uri = 'table:test_stat13'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
 
     keyfmt = [
         ('column', dict(keyfmt='r')),

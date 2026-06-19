@@ -30,15 +30,15 @@ import os, shutil
 import wttest
 from wiredtiger import stat
 
-# test_log03.py
-#    test configuration for log.dirty_max
+# test configuration for log.dirty_max
 class test_log03(wttest.WiredTigerTestCase):
     """
     Test log.dirty_max
     """
+    test_name = __qualname__
 
     homedir = 'HOME'
-    uri = 'table:test_log03'
+    uri = f'table:{test_name}'
     nentries = 20000
 
     # Tests need to setup the connection in their own way.

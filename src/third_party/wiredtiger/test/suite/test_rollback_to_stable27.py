@@ -30,7 +30,6 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable27.py
 #
 # Test mixing timestamped and non-timestamped updates on the same VLCS RLE cell.
 class test_rollback_to_stable27(test_rollback_to_stable_base):

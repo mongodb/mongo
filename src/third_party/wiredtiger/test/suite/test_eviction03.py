@@ -32,7 +32,6 @@ from statistics import mean
 from suite_subprocess import suite_subprocess
 import wiredtiger
 
-# test_eviction03.py
 # Verify the disk footprint is reduced after eviction has removed obsolete time window information.
 class test_eviction03(eviction_util, suite_subprocess):
 

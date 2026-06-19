@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_import11.py
-#    Tests import of tiered tables using backup:export cursor and metadata_file import option.
+# Tests import of tiered tables using backup:export cursor and metadata_file import option.
 #
 
 import glob, os, random, re, shutil, string

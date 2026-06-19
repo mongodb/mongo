@@ -30,8 +30,7 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 import os, re
 
-# test_txn28.py
-#   Test that checking the snapshot array is correctly outputted.
+# Test that checking the snapshot array is correctly outputted.
 class test_txn28(wttest.WiredTigerTestCase):
     # Get the number after a substring in the string.
     def get_number_after_substring(self, text, sub_str):

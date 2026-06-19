@@ -26,15 +26,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp25.py
-#   Timestamps: backward compatible oldest and stable names.
+# Timestamps: backward compatible oldest and stable names.
 #
 
 import wttest
 from suite_subprocess import suite_subprocess
 
 class test_timestamp25(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_timestamp25'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
 
     def test_short_names(self):

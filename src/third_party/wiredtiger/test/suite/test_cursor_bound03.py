@@ -30,11 +30,11 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wtbound import bound_base
 
-# test_cursor_bound03.py
 # Test the next() and prev() calls in the cursor bound API. Test general use cases of bound API,
 # including setting lower bounds and upper bounds.
 class test_cursor_bound03(bound_base):
-    file_name = 'test_cursor_bound03'
+    test_name = __qualname__
+    file_name = test_name
 
     types = [
         ('file', dict(uri='file:', use_colgroup=False)),

@@ -30,8 +30,7 @@ import re, wttest, wiredtiger
 from helper_disagg import disagg_test_class
 from helper import simulate_crash_restart
 
-# test_disagg_checkpoint_size02.py
-#    Test the database-level size stored in the checkpoint completion record.
+# Test the database-level size stored in the checkpoint completion record.
 @disagg_test_class
 class test_disagg_checkpoint_size02(wttest.WiredTigerTestCase):
     conn_config = 'disaggregated=(role="leader",lose_all_my_data=true)'

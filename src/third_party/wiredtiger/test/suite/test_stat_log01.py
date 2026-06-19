@@ -31,8 +31,7 @@ import os.path
 import time
 import wttest
 
-# test_stat_log01.py
-#    Statistics log
+# Statistics log
 class test_stat_log01(wttest.WiredTigerTestCase):
     # Tests need to setup the connection in their own way.
     def setUpConnectionOpen(self, dir):

@@ -33,14 +33,13 @@ from wtscenario import make_scenarios
 def encode_bytes(str):
     return bytes(str, 'utf-8')
 
-# test_layered_config07.py
 # Note that the APIs we are testing are not meant to be used directly
 # by any WiredTiger application, these APIs are used internally.
 # However, it is useful to do tests of this API independently.
 
 class test_layered_config07(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
-    disagg_storages = gen_disagg_storages('test_layered_config07', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(disagg_storages)

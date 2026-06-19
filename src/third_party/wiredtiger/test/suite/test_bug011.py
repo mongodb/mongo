@@ -29,16 +29,16 @@
 import random, wttest
 from wtdataset import SimpleDataSet
 
-# test_bug011.py
-#    Eviction working on more trees than the eviction server can walk
-#    simultaneously.  There is a builtin limit of 1000 trees, we open double
-#    that, which makes this a long-running test.
+# Eviction working on more trees than the eviction server can walk
+# simultaneously.  There is a builtin limit of 1000 trees, we open double
+# that, which makes this a long-running test.
 class test_bug011(wttest.WiredTigerTestCase):
     """
     Test having eviction working on more files than the number of
     allocated hazard pointers.
     """
-    table_name = 'test_bug011'
+    test_name = __qualname__
+    table_name = test_name
     ntables = 2000
     nrows = 10000
     nops = 10000

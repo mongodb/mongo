@@ -30,10 +30,10 @@ import os
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-# test_util04.py
-#    Utilities: wt drop
+# Utilities: wt drop
 class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util04.a'
+    test_name = __qualname__
+    tablename = f'{test_name}.a'
     nentries = 1000
 
     def test_drop_process(self):

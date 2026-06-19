@@ -29,8 +29,7 @@
 import re, wttest
 from helper_disagg import disagg_test_class
 
-# test_disagg_checkpoint_size04.py
-#    Test that dropping a table reduces the database size in disaggregated storage.
+# Test that dropping a table reduces the database size in disaggregated storage.
 @disagg_test_class
 class test_disagg_checkpoint_size04(wttest.WiredTigerTestCase):
     conn_config = 'disaggregated=(role="leader",lose_all_my_data=true)'

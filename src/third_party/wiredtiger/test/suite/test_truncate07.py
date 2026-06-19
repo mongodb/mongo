@@ -31,7 +31,6 @@ from wiredtiger import WiredTigerError, wiredtiger_strerror, WT_ROLLBACK, WT_PRE
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_truncate07.py
 #
 # Check what happens if you try to truncate prepared values.
 

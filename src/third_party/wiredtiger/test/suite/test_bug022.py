@@ -26,14 +26,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_bug022.py
-#       Testing that we don't allow modifies on top of tombstone updates.
+# Testing that we don't allow modifies on top of tombstone updates.
 
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 class test_bug022(wttest.WiredTigerTestCase):
-    uri = 'file:test_bug022'
+    test_name = __qualname__
+    uri = f'file:{test_name}'
     conn_config = 'cache_size=50MB'
 
     key_format_values = [

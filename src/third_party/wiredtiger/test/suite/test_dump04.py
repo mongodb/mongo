@@ -30,7 +30,6 @@ import json
 import wttest
 from suite_subprocess import suite_subprocess
 
-# test_dump04.py
 # Test dump utility with -j and -k options
 class test_dump04(wttest.WiredTigerTestCase, suite_subprocess):
     output = "dump.out"

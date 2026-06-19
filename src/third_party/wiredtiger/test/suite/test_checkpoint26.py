@@ -30,13 +30,13 @@ from wiredtiger import stat
 from wtscenario import make_scenarios
 import wttest
 
-# test_checkpoint26.py
 # Test the timing stress setting for checkpoint_evict_page.
 # The setting forces checkpoint to evict all pages that are reconciled. The debug mode is effective
 # in testing scenarios where checkpoint itself starts to evict pages. Have a big enough cache and
 # small data pages so that eviction activity is small, allowing checkpoint to reconcile and
 # evict pages.
 class test_checkpoint26(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     ckpt_precision = [
         ('fuzzy', dict(ckpt_config='precise_checkpoint=false')),
         ('precise', dict(ckpt_config='precise_checkpoint=true')),
@@ -44,7 +44,7 @@ class test_checkpoint26(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(ckpt_precision)
 
-    uri = "table:test_checkpoint26"
+    uri = f"table:{test_name}"
 
     def conn_config(self):
         return ('cache_size=1000MB,statistics=(all),eviction_dirty_target=80,' +

@@ -33,7 +33,6 @@ from wtbound import bound_base
 
 # Test prepare conflict correctness when positioning a cursor for next and prev.
 #
-# test_cursor_bound21.py
 class test_cursor_bound21(bound_base):
     key_formats = [
         ('string', dict(key_format='S')),

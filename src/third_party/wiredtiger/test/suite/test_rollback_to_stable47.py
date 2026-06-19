@@ -39,7 +39,6 @@ from wtscenario import make_scenarios
 from wtthread import checkpoint_thread
 
 
-# test_rollback_to_stable47.py
 #
 # Test that reconciliation handles correctly the chain shape produced when an
 # obsolete check has removed a globally visible tombstone that was previously

@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_schema11.py
-#   Test that checkpoint pickup on a follower does not recreate tables that
-#   have been locally dropped, even when those tables still appear in the
-#   shared metadata from an older checkpoint.
+# Test that checkpoint pickup on a follower does not recreate tables that
+# have been locally dropped, even when those tables still appear in the
+# shared metadata from an older checkpoint.
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -37,15 +36,16 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_schema11(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader",lose_all_my_data=true)'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower",lose_all_my_data=true)'
 
-    uri = 'layered:test_layered_schema11'
-    uri2 = 'layered:test_layered_schema11_b'
+    uri = f'layered:{test_name}'
+    uri2 = f'layered:{test_name}_b'
     table_config = 'key_format=i,value_format=S'
 
-    disagg_storages = gen_disagg_storages('test_layered_schema11', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     #

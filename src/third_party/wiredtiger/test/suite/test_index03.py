@@ -28,10 +28,10 @@
 
 import wiredtiger, wttest
 
-# test_index03.py
 # Make sure cursors cannot stay open while a new index is created.
 class test_index03(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     def key(self, i):
         return str('%015d' % i)
 
@@ -39,9 +39,9 @@ class test_index03(wttest.WiredTigerTestCase):
         return tuple([str(i+1), str(i+2), str(i+3), str(i+4)])
 
     def test_index_create(self):
-        uri = 'table:test_index03'
-        index1_uri = 'index:test_index03:indx1'
-        index2_uri = 'index:test_index03:indx2'
+        uri = f'table:{self.test_name}'
+        index1_uri = f'index:{self.test_name}:indx1'
+        index2_uri = f'index:{self.test_name}:indx2'
         config = ',key_format=S,value_format=SSSS'
 
         session = self.session

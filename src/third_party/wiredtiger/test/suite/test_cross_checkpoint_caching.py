@@ -26,8 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_cross_checkpoint_caching.py
-
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
@@ -38,16 +36,17 @@ from wtscenario import make_scenarios
 # every other page.
 @disagg_test_class
 class test_cross_checkpoint_caching(wttest.WiredTigerTestCase):
+    test_name = __qualname__
 
     conn_base_config = ',create,statistics=(all),'
 
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
 
-    uri = 'layered:test_cross_checkpoint_caching'
+    uri = f'layered:{test_name}'
     nrows = 5000
 
-    disagg_storages = gen_disagg_storages('test_cross_checkpoint_caching', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     def get_stat(self, stat_key, session):

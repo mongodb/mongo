@@ -30,10 +30,10 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wtbound import bound_base
 
-# test_cursor_bound07.py
 # Test column store related scenarios with the bounds API.
 class test_cursor_bound07(bound_base):
-    file_name = 'test_cursor_bound07'
+    test_name = __qualname__
+    file_name = test_name
 
     # The start and end key denotes the first and last key in the table. Since 10 is a key itself,
     # there are 100 entries between the start and end key.

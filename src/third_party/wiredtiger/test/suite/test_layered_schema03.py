@@ -31,11 +31,11 @@ from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_layered_schema03.py
-#    Test to ensure that dropping layered tables works and subsequent sweep doesn't crash
+# Test to ensure that dropping layered tables works and subsequent sweep doesn't crash
 @disagg_test_class
 class test_layered_schema03(wttest.WiredTigerTestCase):
-    uri_base = "test_layered_schema03"
+    test_name = __qualname__
+    uri_base = test_name
     conn_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),disaggregated=(role="leader"),' \
                 + 'file_manager=(close_scan_interval=1)'
 
@@ -44,7 +44,7 @@ class test_layered_schema03(wttest.WiredTigerTestCase):
         ('table-prefix', dict(prefix='table:', table_config=',block_manager=disagg,type=layered')),
     ]
 
-    disagg_storages = gen_disagg_storages('test_key_provider_disagg02', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(table_types, disagg_storages)
     def check_metadata_entry(self):
         meta_cursor = self.session.open_cursor('metadata:')

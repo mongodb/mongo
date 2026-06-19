@@ -28,12 +28,12 @@
 
 import wiredtiger, wttest
 
-# test_base04.py
-#    Test that tables are reconciled correctly when they are empty.
+# Test that tables are reconciled correctly when they are empty.
 class test_base04(wttest.WiredTigerTestCase):
     '''Test various tree types becoming empty'''
+    test_name = __qualname__
 
-    tablename = 'table:test_base04'
+    tablename = f'table:{test_name}'
 
     def __init__(self, *args, **kwargs):
         wttest.WiredTigerTestCase.__init__(self, *args, **kwargs)

@@ -30,8 +30,7 @@
 # reconciliation:overflow_keys
 # [END_TAGS]
 #
-# test_bug004.py
-#       Regression tests.
+# Regression tests.
 
 import wttest
 from wtdataset import simple_key, simple_value

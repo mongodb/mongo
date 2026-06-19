@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover11.py
-#   A prepared transaction claimed and committed by a follower must be
-#   readable at its commit timestamp after the follower steps up to leader,
-#   even when the stable timestamp has advanced past the durable timestamp
-#   and the affected pages have been evicted from memory.
+# A prepared transaction claimed and committed by a follower must be
+# readable at its commit timestamp after the follower steps up to leader,
+# even when the stable timestamp has advanced past the durable timestamp
+# and the affected pages have been evicted from memory.
 
 import wiredtiger
 import wttest
@@ -40,10 +39,11 @@ from wtscenario import make_scenarios
 @wttest.skip_for_hook("tiered", "Layered tables are not supported with tiered storage")
 @disagg_test_class
 class test_prepare_discover11(wttest.WiredTigerTestCase):
-    tablename = 'test_prepare_discover11'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
-    disagg_storages = gen_disagg_storages('test_prepare_discover11', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_base_config = (

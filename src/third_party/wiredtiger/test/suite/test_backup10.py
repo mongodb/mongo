@@ -31,7 +31,6 @@ import os
 from wtbackup import backup_base
 from wtscenario import make_scenarios
 
-# test_backup10.py
 # Test cursor backup with a duplicate backup cursor.
 class test_backup10(backup_base):
     dir='backup.dir'                    # Backup directory name

@@ -28,8 +28,7 @@
 
 import wttest
 
-# test_debug_info.py
-#    Test WT_CONNECTION::debug_info undocumented feature
+# Test WT_CONNECTION::debug_info undocumented feature
 class test_debug_info(wttest.WiredTigerTestCase):
     conn_config = 'create,log=(enabled),statistics=(fast)'
     uri = 'file:test_conndump'

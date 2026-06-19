@@ -29,12 +29,12 @@
 import wttest
 from helper_disagg import disagg_test_class
 
-# test_layered_checkpoint12.py
 # Verify that startup database-size verification waits until checkpoint pickup.
 
 @disagg_test_class
 class test_layered_checkpoint12(wttest.WiredTigerTestCase):
-    uri = 'layered:test_layered_checkpoint12'
+    test_name = __qualname__
+    uri = f'layered:{test_name}'
     create_session_config = 'key_format=i,value_format=S'
 
     def conn_config(self):

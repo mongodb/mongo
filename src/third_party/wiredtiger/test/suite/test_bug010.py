@@ -26,16 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_bug010.py
-#       check that checkpoints don't leave files marked clean when they
-#       did not write all updates out.
+# check that checkpoints don't leave files marked clean when they
+# did not write all updates out.
 #
 
 import wttest, wtthread
 import threading
 
 class test_bug010(wttest.WiredTigerTestCase):
-    name = 'test_bug010'
+    test_name = __qualname__
+    name = test_name
     uri = 'table:' + name
     num_tables = 2000 if wttest.islongtest() else 200
 

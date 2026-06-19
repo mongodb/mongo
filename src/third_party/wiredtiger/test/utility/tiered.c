@@ -148,7 +148,8 @@ testutil_tiered_storage_configuration(TEST_OPTS *opts, const char *home, char *t
           opts->local_retention, opts->tiered_storage_source, "");
         if (opts->make_bucket_dir) {
             testutil_snprintf(dir, sizeof(dir), "%s/%s", opts->home, DIR_STORE_BUCKET_NAME);
-            testutil_check(mkdir(dir, 0777));
+            if (!testutil_exists(NULL, dir))
+                testutil_check(mkdir(dir, 0777));
         }
 
     } else {

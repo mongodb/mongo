@@ -30,29 +30,29 @@ import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_checkpoint10.py
-#   Tests for mid-scan checkpoint advances on a follower cursor.
+# Tests for mid-scan checkpoint advances on a follower cursor.
 #
-#   A new leader checkpoint arrives while a follower cursor is actively
-#   iterating. The scan must complete without skipping or duplicating keys,
-#   and must remain monotonically ordered.
+# A new leader checkpoint arrives while a follower cursor is actively
+# iterating. The scan must complete without skipping or duplicating keys,
+# and must remain monotonically ordered.
 #
-#   Several tests assert that the layered_curs_reopen_stable statistic
-#   increments, confirming the checkpoint switch triggered during iteration.
+# Several tests assert that the layered_curs_reopen_stable statistic
+# increments, confirming the checkpoint switch triggered during iteration.
 #
-#   A mid-scan checkpoint switch requires ALL of the following:
-#     - A read timestamp is set on the active transaction.
-#     - The cursor is positioned and actively iterating.
-#     - A new checkpoint arrives after the cursor started iterating.
+# A mid-scan checkpoint switch requires ALL of the following:
+#   - A read timestamp is set on the active transaction.
+#   - The cursor is positioned and actively iterating.
+#   - A new checkpoint arrives after the cursor started iterating.
 
 @disagg_test_class
 class test_layered_checkpoint10(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
-    uri = 'layered:test_layered_checkpoint10'
+    uri = f'layered:{test_name}'
 
     nkeys = 1000
 
-    disagg_storages = gen_disagg_storages('test_layered_checkpoint10', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     def conn_config(self):

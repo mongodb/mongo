@@ -40,13 +40,13 @@ import wiredtiger
 from wtdataset import SimpleDataSet, ComplexDataSet
 from helper import compare_files
 
-# test_backup.py
-#    Utilities: wt backup
+# Utilities: wt backup
 # Test backup (both backup cursors and the wt backup command).
 class test_backup(backup_base):
+    test_name = __qualname__
     dir='backup.dir'            # Backup directory name
 
-    pfx = 'test_backup'
+    pfx = test_name
     objs = [
         ( 'file:' + pfx + '.1', SimpleDataSet, 0),
         ( 'file:' + pfx + '.2', SimpleDataSet, 0),

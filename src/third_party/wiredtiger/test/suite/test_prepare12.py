@@ -33,9 +33,9 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_prepare12.py
 # Test update restore of a page with prepared update.
 class test_prepare12(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=2MB'
 
     format_values = [
@@ -48,7 +48,7 @@ class test_prepare12(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values)
 
     def test_prepare_update_restore(self):
-        uri = "table:test_prepare12"
+        uri = f"table:{self.test_name}"
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
 

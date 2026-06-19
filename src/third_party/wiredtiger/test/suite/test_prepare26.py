@@ -29,9 +29,9 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_prepare26.py
 # Test prepare rollback and then delete the key.
 class test_prepare26(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     format_values = [
         ('column', dict(key_format='r')),
         ('row_integer', dict(key_format='i')),
@@ -42,7 +42,7 @@ class test_prepare26(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values)
 
     def test_prepare26(self):
-        uri = "table:test_prepare26"
+        uri = f"table:{self.test_name}"
         self.session.create(uri, 'key_format=' + self.key_format + ',value_format=' + self.value_format)
 
         value_a = "a"

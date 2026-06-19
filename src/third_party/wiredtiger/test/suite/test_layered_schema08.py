@@ -26,13 +26,12 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_schema08.py
-#   Test that shared metadata queue operations are deferred until a checkpoint runs.
+# Test that shared metadata queue operations are deferred until a checkpoint runs.
 #
-#   Schema operations (create, drop) on a leader enqueue metadata updates with deferred=true.
-#   The checkpoint prepare step undefers all existing entries, and they are applied at the end
-#   of that same checkpoint. Operations enqueued concurrently with a running checkpoint (after
-#   prepare) remain deferred until the next checkpoint.
+# Schema operations (create, drop) on a leader enqueue metadata updates with deferred=true.
+# The checkpoint prepare step undefers all existing entries, and they are applied at the end
+# of that same checkpoint. Operations enqueued concurrently with a running checkpoint (after
+# prepare) remain deferred until the next checkpoint.
 
 import time, wiredtiger, wttest, wtthread
 from checkpoint_util import checkpoint_util
@@ -41,7 +40,8 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_schema08(checkpoint_util):
-    uri_base = 'test_layered_schema08'
+    test_name = __qualname__
+    uri_base = test_name
     conn_config = 'statistics=(all),disaggregated=(role="leader",lose_all_my_data=true)'
 
     table_types = [
@@ -49,7 +49,7 @@ class test_layered_schema08(checkpoint_util):
         ('table-prefix', dict(prefix='table:', table_config=',block_manager=disagg,type=layered')),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_schema08', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(table_types, disagg_storages)
 
     def uri(self):

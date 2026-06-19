@@ -28,7 +28,8 @@
 import time, wiredtiger, wttest
 
 class test_rollback(wttest.WiredTigerTestCase):
-    uri = "table:test_rollback.wt"
+    test_name = __qualname__
+    uri = f"table:{test_name}.wt"
 
     @wttest.skip_for_hook("disagg", "disagg requires an additional condition to evict pages")
     def test_wt_rollback_cursor_next_no_retry(self):

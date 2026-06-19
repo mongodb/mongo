@@ -29,10 +29,10 @@
 import time, wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_hs14.py
 # Ensure that point in time reads with few visible history store records don't
 # damage performance.
 class test_hs14(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=500MB'
     format_values = [
         ('column', dict(key_format='r')),
@@ -47,7 +47,7 @@ class test_hs14(wttest.WiredTigerTestCase):
         return i
 
     def test_hs14(self):
-        uri = 'table:test_hs14'
+        uri = f'table:{self.test_name}'
         config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, config)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))

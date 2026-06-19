@@ -30,10 +30,10 @@ import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_prepare_hs01.py
 # test to ensure history store eviction is working for prepared transactions.
 class test_prepare_hs01(wttest.WiredTigerTestCase):
     # Force a small cache.
+    test_name = __qualname__
     conn_config = 'cache_size=50MB,eviction_updates_trigger=95,eviction_updates_target=80'
 
     format_values = [
@@ -121,7 +121,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
     @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
     def test_prepare_hs(self):
         # Create a small table.
-        uri = "table:test_prepare_hs01"
+        uri = f"table:{self.test_name}"
         nrows = 100
         ds = SimpleDataSet(
             self, uri, nrows, key_format=self.key_format, value_format=self.value_format)

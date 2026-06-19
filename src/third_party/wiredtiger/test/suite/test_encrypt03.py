@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_encrypt03.py
-#   Test some error conditions with encryption.
+# Test some error conditions with encryption.
 #
 
 import wiredtiger, wttest
@@ -36,8 +35,9 @@ from wtscenario import make_scenarios
 # Test basic encryption
 class test_encrypt03(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     types = [
-        ('table', dict(uri='table:test_encrypt03')),
+        ('table', dict(uri=f'table:{test_name}')),
     ]
     encrypt = [
         ('none', dict( sys_encrypt='none', sys_encrypt_args='',

@@ -13,6 +13,7 @@ stepback: true
 pre:
   - func: "cleanup"
   - func: "setup environment"
+  - func: "pin mongo toolchain"
 post:
   - func: "dump stacktraces"
   - func: "upload stacktraces"
@@ -122,6 +123,28 @@ functions:
 
             echo "Dump Environment"
             printenv | sort
+
+  "pin mongo toolchain":
+    - command: shell.exec
+      type: setup
+      params:
+        shell: bash
+        script: |
+          set -o errexit
+
+          if [ "${REQUIRE_MDB_TOOLCHAIN|}" != "1" ]; then
+              exit 0
+          fi
+
+          MDB_TOOLCHAIN_REV="93d85cc1a00ca1d53fcc7d4ca790f19a4e5dd542"
+          if readlink /opt/mongodbtoolchain/v5/bin/clang 2>/dev/null | grep -q "$MDB_TOOLCHAIN_REV"; then
+              echo "mongodbtoolchain $MDB_TOOLCHAIN_REV already installed, skipping download."
+              exit 0
+          fi
+
+          echo "mongodbtoolchain $MDB_TOOLCHAIN_REV not installed, downloading..."
+          curl -fsSL https://s3.amazonaws.com/mongodbtoolchain.build.10gen.cc/installer.sh \
+              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV"
 
   "dump stacktraces": &dump_stacktraces
     command: shell.exec
@@ -687,6 +710,7 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-large
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     disagg_run: true
@@ -699,6 +723,7 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-large
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     ENABLE_TCMALLOC: 0
     additional_env_vars: |

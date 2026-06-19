@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn21.py
-#   Transactions: smoke test the operation timeout API
+# Transactions: smoke test the operation timeout API
 #
 
 import wiredtiger, wttest

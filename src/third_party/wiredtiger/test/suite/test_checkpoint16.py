@@ -32,7 +32,6 @@ import wiredtiger
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint16.py
 #
 # Make sure a table that's clean when a checkpointed can still be read in
 # that checkpoint.

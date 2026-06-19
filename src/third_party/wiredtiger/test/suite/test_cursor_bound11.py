@@ -31,7 +31,6 @@ import wiredtiger, wttest, unittest
 from wiredtiger import stat
 from wtbound import set_prefix_bound
 
-# test_cursor_bound11.py
 # Test various cursor bound prefix search scenarios.
 # This test has been migrated to use the bounded cursor logic.
 class test_cursor_bound11(wttest.WiredTigerTestCase):

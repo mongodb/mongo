@@ -35,7 +35,6 @@ from wtscenario import make_scenarios
 def mod_val(value, char, location, nbytes=1):
     return value[0:location] + char + value[location+nbytes:]
 
-# test_rollback_to_stable23.py
 # Test to verify that search operation uses proper base update while returning modifies from
 # the history store after the on-disk update is removed by the rollback to stable.
 class test_rollback_to_stable23(test_rollback_to_stable_base):

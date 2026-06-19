@@ -30,11 +30,11 @@ import wttest
 from helper import simulate_crash_restart
 from wiredtiger import stat
 
-# test_truncate27.py
 # Test that unstable updates preceding a stable fast truncate operation are restored with the correct
 # transaction IDs.
 class test_truncate27(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     def evict_cursor(self, uri, nrows):
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -54,7 +54,7 @@ class test_truncate27(wttest.WiredTigerTestCase):
 
     def test_truncate27(self):
         nrows = 100000
-        uri = 'table:test_truncate27'
+        uri = f'table:{self.test_name}'
         self.session.create(uri, 'key_format=r,value_format=S')
 
         value = 'a' * 5

@@ -30,13 +30,13 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wtbound import bound_base
 
-# test_cursor_bound04.py
 # Test the next() and prev() calls in the cursor bound API. There are two scenarios that are
 # tested in this python test.
 #   1. Test combination scenarios of using next() and prev() together.
 #   2. Test clearing bounds and special scenarios of the cursor API usage.
 class test_cursor_bound04(bound_base):
-    file_name = 'test_cursor_bound04'
+    test_name = __qualname__
+    file_name = test_name
 
     types = [
         ('file', dict(uri='file:', use_colgroup=False)),

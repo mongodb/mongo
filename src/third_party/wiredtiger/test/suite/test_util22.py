@@ -31,7 +31,6 @@ from suite_subprocess import suite_subprocess
 from helper import compare_files
 
 
-# test_util22.py
 # Check that wt correctly processes the help option and that it handles invalid options correctly.
 class test_util22(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = ''

@@ -30,11 +30,11 @@ import platform, wttest
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_delta04.py
 # Test 32 consecutive deltas
 
 @disagg_test_class
 class test_layered_delta04(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     encrypt = [
         ('none', dict(encryptor='none', encrypt_args='')),
         ('rotn', dict(encryptor='rotn', encrypt_args='keyid=13')),
@@ -46,8 +46,8 @@ class test_layered_delta04(wttest.WiredTigerTestCase):
     ]
 
     uris = [
-        ('layered', dict(uri='layered:test_layered_delta04')),
-        ('btree', dict(uri='file:test_layered_delta04')),
+        ('layered', dict(uri=f'layered:{test_name}')),
+        ('btree', dict(uri=f'file:{test_name}')),
     ]
 
     ts = [
@@ -57,7 +57,7 @@ class test_layered_delta04(wttest.WiredTigerTestCase):
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'page_delta=(delta_pct=100),'
-    disagg_storages = gen_disagg_storages('test_layered_delta04', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(encrypt, compress, disagg_storages, uris, ts)

@@ -33,7 +33,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 import wttest
 
-# test_rollback_to_stable34.py
 # Test interaction between fast-delete and RTS.
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable34(test_rollback_to_stable_base):

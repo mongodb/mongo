@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_assert06.py
-#   Timestamps: verify ordered setting for durable timestamps
+# Timestamps: verify ordered setting for durable timestamps
 #
 
 from suite_subprocess import suite_subprocess

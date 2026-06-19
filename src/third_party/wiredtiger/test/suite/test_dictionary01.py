@@ -30,8 +30,7 @@
 # compression
 # [END_TAGS]
 #
-# test_dictionary01.py
-#       Smoke test dictionary compression.
+# Smoke test dictionary compression.
 
 from wtscenario import make_scenarios
 from wtdataset import simple_key
@@ -40,6 +39,7 @@ import wttest
 
 # Smoke test dictionary compression.
 class test_dictionary01(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'statistics=(all)'
     scenarios = make_scenarios([
         ('row', dict(key_format='S')),
@@ -49,7 +49,7 @@ class test_dictionary01(wttest.WiredTigerTestCase):
     # Smoke test dictionary compression.
     def test_dictionary01(self):
         nentries = 25000
-        uri = 'file:test_dictionary01'    # This is a btree layer test.
+        uri = f'file:{self.test_name}'    # This is a btree layer test.
 
         # Create the object, open the cursor, insert some records with identical values. Use
         # a reasonably large page size so most of the items fit on a page. Use alternating

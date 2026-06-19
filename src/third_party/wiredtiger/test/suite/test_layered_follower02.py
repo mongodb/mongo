@@ -31,18 +31,18 @@ from helper_disagg import disagg_test_class, gen_disagg_storages, Oplog
 from wiredtiger import stat
 from helper import WiredTigerCursor, statistic_uri
 
-# test_layered_follower02.py
-#    Test the basic ability to insert on a follower.
+# Test the basic ability to insert on a follower.
 
 @disagg_test_class
 class test_layered_follower02(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
 
-    scenarios = gen_disagg_storages('test_layered_follower02', disagg_only = True)
+    scenarios = gen_disagg_storages(disagg_only = True)
 
-    uri = "layered:test_layered_follower02"
+    uri = f"layered:{test_name}"
 
     # Make sure the stats agree that the leader has done each checkpoint.
     def check_checkpoint(self, expected):

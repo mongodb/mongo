@@ -26,14 +26,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_search_near01.py
-#       Search_near with a key past the end.
+# Search_near with a key past the end.
 
 import wttest
 from wtscenario import make_scenarios
 
 class test_search_near01(wttest.WiredTigerTestCase):
-    uri = 'file:test_search_near01'
+    test_name = __qualname__
+    uri = f'file:{test_name}'
 
     key_format_values = [
         ('var', dict(key_format='r')),

@@ -30,12 +30,12 @@ import os, time, wiredtiger, wttest
 from helper_disagg import disagg_test_class
 from wiredtiger import stat
 
-# test_layered_checkpoint01.py
-#    Add enough content to trigger a checkpoint in the stable table.
+# Add enough content to trigger a checkpoint in the stable table.
 @disagg_test_class
 class test_layered_checkpoint01(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     nitems = 50000
-    uri_base = "test_layered_checkpoint01"
+    uri_base = test_name
     conn_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),disaggregated=(role="leader"),' \
                 + 'disaggregated=(lose_all_my_data=true),'
 

@@ -31,19 +31,19 @@ import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_eviction01.py
 # Ensure that we don't evict pages ahead of the materialization frontier
 @disagg_test_class
 class test_layered_eviction01(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_base_config = 'cache_size=75MB,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),transaction_sync=(enabled,method=fsync),' \
                      + 'disaggregated=(lose_all_my_data=true),'
     conn_config = conn_base_config + 'disaggregated=(role="follower")'
 
-    disagg_storages = gen_disagg_storages('test_layered_eviction01', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
     nitems = 200_000
-    uri = 'layered:test_layered_eviction01'
+    uri = f'layered:{test_name}'
 
     def session_create_config(self):
         return 'key_format=S,value_format=S,'

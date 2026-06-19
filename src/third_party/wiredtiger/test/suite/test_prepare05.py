@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare05.py
-#   Prepare: Timestamps validation for prepare API's
+# Prepare: Timestamps validation for prepare API's
 #
 
 from suite_subprocess import suite_subprocess
@@ -35,7 +34,8 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_prepare05'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
 
     format_values = [

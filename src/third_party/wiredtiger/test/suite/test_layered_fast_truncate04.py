@@ -31,22 +31,22 @@ from helper_disagg import disagg_test_class, gen_disagg_storages
 from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 
-# test_layered_fast_truncate04.py
-#   Validate cursor read-path behavior over fast-truncated ranges on a
-#   standby (follower) node: next/prev scans, search_near positioning,
-#   open-ended truncation, multiple truncated ranges, and mixed
-#   update-then-truncate workloads.
+# Validate cursor read-path behavior over fast-truncated ranges on a
+# standby (follower) node: next/prev scans, search_near positioning,
+# open-ended truncation, multiple truncated ranges, and mixed
+# update-then-truncate workloads.
 @disagg_test_class
 class test_layered_fast_truncate04(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     conn_config = 'disaggregated=(role="leader"),'
 
     uris = [
-        ('layered', dict(uri='layered:test_layered_fast_truncate04')),
-        ('table', dict(uri='table:test_layered_fast_truncate04')),
+        ('layered', dict(uri=f'layered:{test_name}')),
+        ('table', dict(uri=f'table:{test_name}')),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_fast_truncate04', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
 
     scenarios = make_scenarios(disagg_storages, uris)
 

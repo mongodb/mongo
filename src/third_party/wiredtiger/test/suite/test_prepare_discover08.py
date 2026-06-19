@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover08.py
-#   After reopening the connection, "prepared_discover:" must discover and
-#   allow claims of the persisted prepared transaction even when no cursor
-#   has yet been opened on the layered table on the new connection. Exercised
-#   for both roles the connection can come back as.
+# After reopening the connection, "prepared_discover:" must discover and
+# allow claims of the persisted prepared transaction even when no cursor
+# has yet been opened on the layered table on the new connection. Exercised
+# for both roles the connection can come back as.
 
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -38,14 +37,15 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_prepare_discover08(wttest.WiredTigerTestCase):
-    tablename = 'test_prepare_discover08'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
     role_scenarios = [
         ('standby', dict(reopen_role='follower')),
         ('primary', dict(reopen_role='leader')),
     ]
-    disagg_storages = gen_disagg_storages('test_prepare_discover08', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, role_scenarios)
 
     conn_base_config = ('cache_size=10MB,statistics=(all),'

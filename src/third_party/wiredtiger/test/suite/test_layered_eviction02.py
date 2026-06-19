@@ -35,7 +35,8 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_eviction02(wttest.WiredTigerTestCase):
-    disagg_storages = gen_disagg_storages('test_layered_eviction02', disagg_only = True)
+    test_name = __qualname__
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_base_config = 'cache_size=10MB,,statistics=(all),'
@@ -53,7 +54,7 @@ class test_layered_eviction02(wttest.WiredTigerTestCase):
         self.session_follow = self.conn_follow.open_session('')
 
     def test_evict_on_standby(self):
-        uri = "layered:test_layered_eviction02"
+        uri = f"layered:{self.test_name}"
         # Setup
         self.session.create(uri, 'key_format=S,value_format=S')
         self.create_follower()

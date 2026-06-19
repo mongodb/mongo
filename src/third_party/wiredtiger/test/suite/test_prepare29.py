@@ -30,12 +30,12 @@ import wttest
 from helper import simulate_crash_restart
 from wtscenario import make_scenarios
 
-# test_prepare29.py
 # Test that updates preceding an unstable prepared tombstone are restored with the correct
 # transaction IDs.
 @wttest.skip_for_hook("disagg", "This test relies on RTS, which is not used in disagg.")
 class test_prepare29(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     format_values = [
         ('column', dict(key_format='r', key=1)),
         ('string-row', dict(key_format='S', key=str(1))),
@@ -56,7 +56,7 @@ class test_prepare29(wttest.WiredTigerTestCase):
         session_evict.rollback_transaction()
 
     def test_prepare29(self):
-        uri = 'table:test_prepare29'
+        uri = f'table:{self.test_name}'
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 

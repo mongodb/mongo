@@ -26,20 +26,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_layered_stepup04.py
-#   Verifies that a prepared transaction active on a follower at step-up time can be
-#   committed or rolled back after step-up completes.
+# Verifies that a prepared transaction active on a follower at step-up time can be
+# committed or rolled back after step-up completes.
 #
-#   Covered operations (each run as a cross-product of all scenario dimensions):
-#     - prepared INSERT on new keys
-#     - prepared UPDATE on existing keys
-#     - prepared DELETE on existing keys
+# Covered operations (each run as a cross-product of all scenario dimensions):
+#   - prepared INSERT on new keys
+#   - prepared UPDATE on existing keys
+#   - prepared DELETE on existing keys
 #
-#   Scenario dimensions:
-#     resolve:       commit | rollback
-#     in_checkpoint: True   prepare captured by the last checkpoint
-#                    False  prepare made after the last checkpoint
-#     multi_table:   True   the prepared transaction also covers a second layered table
+# Scenario dimensions:
+#   resolve:       commit | rollback
+#   in_checkpoint: True   prepare captured by the last checkpoint
+#                  False  prepare made after the last checkpoint
+#   multi_table:   True   the prepared transaction also covers a second layered table
 
 import wiredtiger
 import wttest
@@ -48,7 +47,8 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_stepup04(wttest.WiredTigerTestCase):
-    tablename = 'test_layered_stepup04'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
     resolve_scenarios = [
@@ -63,7 +63,7 @@ class test_layered_stepup04(wttest.WiredTigerTestCase):
         ('single_table', dict(multi_table=False)),
         ('multi_table',  dict(multi_table=True)),
     ]
-    disagg_storages = gen_disagg_storages('test_layered_stepup04', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(
         disagg_storages, resolve_scenarios, checkpoint_scenarios, multi_table_scenarios)
 

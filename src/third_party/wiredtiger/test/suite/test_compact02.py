@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_compact02.py
-#   Test that compact reduces the file size.
+# Test that compact reduces the file size.
 #
 
 import time, wiredtiger
@@ -37,8 +36,9 @@ from wtscenario import make_scenarios
 # Test basic compression
 class test_compact02(compact_util):
 
+    test_name = __qualname__
     types = [
-        ('table', dict(uri='table:test_compact02')),
+        ('table', dict(uri=f'table:{test_name}')),
     ]
     cacheSize = [
         ('default', dict(cacheSize='')),

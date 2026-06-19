@@ -30,14 +30,14 @@ from helper import copy_wiredtiger_home
 import wttest
 from wtdataset import SimpleDataSet
 
-# test_compress02.py
-#   This test checks that the compression level can be reconfigured after restart if
-#   we are using zstd as the block compressor. Tables created before reconfiguration
-#   will still use the previous compression level.
+# This test checks that the compression level can be reconfigured after restart if
+# we are using zstd as the block compressor. Tables created before reconfiguration
+# will still use the previous compression level.
 #
 class test_compress02(wttest.WiredTigerTestCase):
     # Create a table.
-    uri = "table:test_compress02"
+    test_name = __qualname__
+    uri = f"table:{test_name}"
     nrows = 1000
 
     def conn_config(self):

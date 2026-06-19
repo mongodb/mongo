@@ -30,10 +30,10 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wtbound import bound_base
 
-# test_cursor_bound18.py
 # Test the restoring of original primary bounds where setting bounds on some colgroup fails.
 class test_cursor_bound18(bound_base):
-    file_name = 'test_cursor_bound18'
+    test_name = __qualname__
+    file_name = test_name
     use_colgroup = True
     uri = 'table:'
 

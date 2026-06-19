@@ -30,10 +30,10 @@ import wttest
 from wtscenario import make_scenarios
 from wtdataset import SimpleDataSet
 
-# test_truncate22.py
 # Test that we can set the commit timestamp before performing fast truncate.
 class test_truncate22(wttest.WiredTigerTestCase):
-    uri = 'table:test_truncate22'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
     conn_config = 'statistics=(all)'
     key_format_values = (
         ('column', dict(key_format='r', value_format='S')),

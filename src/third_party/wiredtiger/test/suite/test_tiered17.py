@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_tiered17.py
-#    Test that opening a file in readonly mode does not create a new object in tier.
+# Test that opening a file in readonly mode does not create a new object in tier.
 
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources, get_conn_config
 from wtscenario import make_scenarios

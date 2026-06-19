@@ -29,8 +29,7 @@
 import wttest
 from wtdataset import SimpleDataSet
 
-# test_cursor_random03.py
-#    This python test reproduces the WT-12225 bug where the same stream of numbers are generated
+# This python test reproduces the WT-12225 bug where the same stream of numbers are generated
 # from the random cursor. In the presence of where all the values are the insert list, open up
 # two cursors close to each other in time, and both cursors will return back the exact same stream
 # of records again. The test makes sure that records returned in both cursors return at least

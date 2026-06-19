@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate07.py
-#   Follower-initiated truncate stores a bounded range in the truncate list.
-#   Verifies NULL start/stop from the session API are resolved to the table's
-#   first/last visible key, both via the verbose log line and by the row set
-#   visible on subsequent reads.
+# Follower-initiated truncate stores a bounded range in the truncate list.
+# Verifies NULL start/stop from the session API are resolved to the table's
+# first/last visible key, both via the verbose log line and by the row set
+# visible on subsequent reads.
 
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -40,14 +39,15 @@ from wtscenario import make_scenarios
 @disagg_test_class
 class test_layered_fast_truncate07(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     conn_config = 'verbose=[layered:3],disaggregated=(role="leader"),'
-    uri = 'layered:test_layered_fast_truncate07'
+    uri = f'layered:{test_name}'
 
     key_formats = [
         ('string', dict(key_format='S')),
         ('int', dict(key_format='i')),
     ]
-    disagg_storages = gen_disagg_storages('test_layered_fast_truncate07', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, key_formats)
 
     nitems = 100

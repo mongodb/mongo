@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate12.py
-#   Cursor iteration and searches over truncated ranges.
+# Cursor iteration and searches over truncated ranges.
 #
-#   Verify that forward scans, backward scans, next_random, search, and
-#   search_near all treat truncated keys as non-existent on a follower.
+# Verify that forward scans, backward scans, next_random, search, and
+# search_near all treat truncated keys as non-existent on a follower.
 
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from helper_layered_fast_truncate import (

@@ -33,18 +33,18 @@ from wiredtiger import stat
 import time
 
 
-# test_layered_delta08.py
 # Test that we write internal page deltas with deleted leaf page
 # to the page log extension.
 
 @disagg_test_class
 class test_layered_delta08(wttest.WiredTigerTestCase):
 
-    uri = 'file:test_layered_delta08'
+    test_name = __qualname__
+    uri = f'file:{test_name}'
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'page_delta=(delta_pct=100),'
-    disagg_storages = gen_disagg_storages('test_layered_delta08', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(disagg_storages)

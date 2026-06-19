@@ -32,8 +32,7 @@
 
 import wttest
 
-# test_reconfig04.py
-#    Test WT_SESSION::reconfigure
+# Test WT_SESSION::reconfigure
 class test_reconfig04(wttest.WiredTigerTestCase):
     def test_session_reconfigure(self):
         self.session.reconfigure('ignore_cache_size=false')

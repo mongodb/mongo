@@ -31,11 +31,11 @@ from wiredtiger import stat
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_cursor09.py
-#    Test cursor walk with delta.
+# Test cursor walk with delta.
 @disagg_test_class
 class test_layered_cursor09(wttest.WiredTigerTestCase):
-    disagg_storages = gen_disagg_storages('test_layered_cursor09', disagg_only = True)
+    test_name = __qualname__
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_config = 'cache_size=10MB,statistics=(all),disaggregated=(role="leader")'
@@ -43,7 +43,7 @@ class test_layered_cursor09(wttest.WiredTigerTestCase):
     nitems = 100
 
     def test_cursor_walk_with_delta(self):
-        uri = "layered:test_layered_cursor09"
+        uri = f"layered:{self.test_name}"
 
         # Setup.
         self.session.create(uri, 'key_format=S,value_format=S')

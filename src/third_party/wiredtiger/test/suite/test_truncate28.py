@@ -29,7 +29,6 @@
 import wiredtiger, wttest
 from helper import simulate_crash_restart
 
-# test_truncate28.py
 # Test that out of order commit timestamps aren't allowed when performing truncate operations.
 class test_truncate28(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all)'

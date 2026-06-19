@@ -40,7 +40,6 @@ def mod_val(value, char, location, nbytes=1):
 def append_val(value, char):
     return value + char
 
-# test_rollback_to_stable14.py
 # Test the rollback to stable operation uses proper base update while restoring modifies from
 # history store.
 class test_rollback_to_stable14(test_rollback_to_stable_base):

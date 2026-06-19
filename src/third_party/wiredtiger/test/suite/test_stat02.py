@@ -31,10 +31,10 @@ from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_stat02.py
-#    Statistics cursor configurations.
+# Statistics cursor configurations.
 class test_stat_cursor_config(wttest.WiredTigerTestCase):
-    pfx = 'test_stat_cursor_config'
+    test_name = __qualname__
+    pfx = test_name
     uri = [
         ('file',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
         ('table', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
@@ -75,7 +75,8 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
 
 # Test the connection "clear" configuration.
 class test_stat_cursor_conn_clear(wttest.WiredTigerTestCase):
-    pfx = 'test_stat_cursor_conn_clear'
+    test_name = __qualname__
+    pfx = test_name
     conn_config = 'statistics=(all)'
 
     def test_stat_cursor_conn_clear(self):
@@ -95,7 +96,8 @@ class test_stat_cursor_conn_clear(wttest.WiredTigerTestCase):
 
 # Test the data-source "clear" configuration.
 class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
-    pfx = 'test_stat_cursor_dsrc_clear'
+    test_name = __qualname__
+    pfx = test_name
 
     uri = [
         ('dsrc_clear_1',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
@@ -123,7 +125,8 @@ class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
 
 # Test the "fast" configuration.
 class test_stat_cursor_fast(wttest.WiredTigerTestCase):
-    pfx = 'test_stat_cursor_fast'
+    test_name = __qualname__
+    pfx = test_name
 
     uri = [
         ('fast_1',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
@@ -164,7 +167,8 @@ class test_stat_cursor_conn_error(wttest.WiredTigerTestCase):
 
 # Test data-source error combinations.
 class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
-    pfx = 'test_stat_cursor_dsrc_error'
+    test_name = __qualname__
+    pfx = test_name
 
     uri = [
         ('dsrc_error_1',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
@@ -187,7 +191,8 @@ class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
 
 # Test data-source cache walk statistics
 class test_stat_cursor_dsrc_cache_walk(wttest.WiredTigerTestCase):
-    uri = 'file:test_stat_cursor_dsrc_cache_walk'
+    test_name = __qualname__
+    uri = f'file:{test_name}'
 
     conn_config = 'statistics=(none)'
 

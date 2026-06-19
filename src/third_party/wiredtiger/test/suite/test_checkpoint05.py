@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_checkpoint05.py
 # Verify that we don't accumulate a lot of checkpoints while a backup
 # cursor is open. WiredTiger checkpoints created after the backup cursor
 # should get deleted as usual.

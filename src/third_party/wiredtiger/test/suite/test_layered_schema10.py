@@ -26,12 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_schema10.py
-#   Test the publish API on followers and step-up behavior.
+# Test the publish API on followers and step-up behavior.
 #
-#   Schema operations (create, drop) queued on a follower are replayed during
-#   step-up, which uses the metadata operation queue populated while the node
-#   was a follower.
+# Schema operations (create, drop) queued on a follower are replayed during
+# step-up, which uses the metadata operation queue populated while the node
+# was a follower.
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -40,16 +39,17 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     conn_base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader",lose_all_my_data=true)'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower",lose_all_my_data=true)'
 
-    uri = 'layered:test_layered_schema10'
-    uri2 = 'layered:test_layered_schema10_2'  # second follower-created table for multi-epoch tests
+    uri = f'layered:{test_name}'
+    uri2 = f'layered:{test_name}_2'  # second follower-created table for multi-epoch tests
 
     table_config = 'key_format=i,value_format=S'
 
-    disagg_storages = gen_disagg_storages('test_layered_schema10', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     #
@@ -397,7 +397,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         self.setup_leader_with_epoch()
         subdir = 'SUBPROCESS_create_drop_split_epochs'
         [returncode, _] = self.run_subprocess_function(subdir,
-            'test_layered_schema10.test_layered_schema10.subprocess_create_drop_split_epochs',
+            f'{self.test_name}.{self.test_name}.subprocess_create_drop_split_epochs',
             silent=True)
         self.assertNotEqual(returncode, 0)
 

@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_import05.py
 # Error conditions when trying to import files with timestamps past the configured global timestamp.
 
 import os, shutil

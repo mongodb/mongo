@@ -29,12 +29,12 @@
 import wiredtiger, wttest
 from wiredtiger import stat
 
-# test_eviction05.py
 #
 # Test that eviction max page size stats for clean, dirty, and updates are set properly and eviction max stats per database run are not reset after a checkpoint.
 @wttest.skip_for_hook("disagg", "Fails due to evict a page.")
 class test_eviction05(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     def conn_config(self):
         config = 'cache_size=10MB,statistics=(all),statistics_log=(json,on_close,wait=1)'
         return config
@@ -46,7 +46,7 @@ class test_eviction05(wttest.WiredTigerTestCase):
         return val
 
     def test_eviction_page_size_stats(self):
-        uri = 'table:test_eviction05'
+        uri = f'table:{self.test_name}'
 
         # Create a table.
         self.session.create(uri, 'key_format=i,value_format=S')

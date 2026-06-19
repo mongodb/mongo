@@ -30,8 +30,7 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
-# test_cursor09.py
-#    JIRA WT-2217: insert resets key/value "set".
+# JIRA WT-2217: insert resets key/value "set".
 class test_cursor09(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file-r', dict(type='file:', keyfmt='r', valfmt='S', dataset=SimpleDataSet)),

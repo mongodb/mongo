@@ -32,7 +32,6 @@ from wtbackup import backup_base
 from wtscenario import make_scenarios
 from wtdataset import SimpleDataSet
 
-# test_backup26.py
 # Test selective backup with large amount of tables. Recovering a partial backup should take
 # longer when there are more active tables. Also test recovery correctness with both file and
 # table schemas in a partial backup.

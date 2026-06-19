@@ -29,9 +29,9 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_prepare27.py
 # Test that a prepared update that has been aborted is not selected as the base value.
 class test_prepare27(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     format_values = [
         ('column', dict(key_format='r')),
         ('integer-row', dict(key_format='i')),
@@ -58,7 +58,7 @@ class test_prepare27(wttest.WiredTigerTestCase):
         evict_cursor.close()
 
     def test_prepare27(self):
-        uri = 'table:test_prepare27'
+        uri = f'table:{self.test_name}'
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 

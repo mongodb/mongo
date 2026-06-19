@@ -38,17 +38,17 @@ import os
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_prepare_hs03.py
 # test to ensure salvage, verify & simulating crash are working for prepared transactions.
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 @wttest.skip_for_hook("disagg", "Salvage on disagg tables not yet implemented") # FIXME-WT-14740: Re-enable salvage once implemented.
 class test_prepare_hs03(wttest.WiredTigerTestCase):
     # Force a small cache.
+    test_name = __qualname__
     conn_config = ('cache_size=50MB,statistics=(fast),'
                    'eviction_dirty_trigger=50,eviction_updates_trigger=50')
 
     # Create a small table.
-    uri = "table:test_prepare_hs03"
+    uri = f"table:{test_name}"
 
     corrupt_values = [
         ('corrupt_table', dict(corrupt=True)),
@@ -69,7 +69,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(corrupt_values, format_values)
 
     def corrupt_table(self, data_to_corrupt_with):
-        tablename="test_prepare_hs03.wt"
+        tablename=f"{self.test_name}.wt"
         self.assertEqual(os.path.exists(tablename), True)
 
         # This code will overwrite part of the table with 'bad' data, corrupting the table in the process.

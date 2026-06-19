@@ -30,8 +30,7 @@ import wiredtiger, time
 from error_info_util import error_info_util
 from wtdataset import SimpleDataSet
 
-# test_txn27.py
-#   Test that the API returning a rollback error sets the reason for the rollback.
+# Test that the API returning a rollback error sets the reason for the rollback.
 class test_txn27(error_info_util):
     conn_config = 'cache_size=1MB'
 

@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover10.py
-#   A prepared transaction reclaimed on a follower via claim_prepared_id must survive
-#   step-up. The reclaim session has no transaction id, so the ingest drain at step-up
-#   must match it by prepared id to patch its operations onto the stable btree.
+# A prepared transaction reclaimed on a follower via claim_prepared_id must survive
+# step-up. The reclaim session has no transaction id, so the ingest drain at step-up
+# must match it by prepared id to patch its operations onto the stable btree.
 
 import wiredtiger
 import wttest
@@ -39,7 +38,8 @@ from wtscenario import make_scenarios
 @wttest.skip_for_hook("tiered", "Layered tables are not supported with tiered storage")
 @disagg_test_class
 class test_prepare_discover10(wttest.WiredTigerTestCase):
-    tablename = 'test_prepare_discover10'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
     resolve_scenarios = [
@@ -50,7 +50,7 @@ class test_prepare_discover10(wttest.WiredTigerTestCase):
         ('single_table', dict(multi_table=False)),
         ('multi_table',  dict(multi_table=True)),
     ]
-    disagg_storages = gen_disagg_storages('test_prepare_discover10', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, resolve_scenarios, multi_table_scenarios)
 
     conn_base_config = (

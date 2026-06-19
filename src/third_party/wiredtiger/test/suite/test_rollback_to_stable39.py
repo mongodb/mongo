@@ -33,7 +33,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wtthread import checkpoint_thread
 
-# test_rollback_to_stable39.py
 # Test to delay checkpoint and perform eviction in parallel to ensure eviction moves the content from data store to history store
 # and then checkpoint history store to see the same content in data store and history store. Later use the checkpoint to restore
 # the database which will trigger eviction to insert the same record from data store to history store.

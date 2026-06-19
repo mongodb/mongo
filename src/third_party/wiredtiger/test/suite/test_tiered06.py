@@ -32,14 +32,14 @@ from wtscenario import make_scenarios
 
 FileSystem = wiredtiger.FileSystem  # easy access to constants
 
-# test_tiered06.py
 # Note that the APIs we are testing are not meant to be used directly
 # by any WiredTiger application, these APIs are used internally.
 # However, it is useful to do tests of this API independently.
 
 class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
 
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered06', tiered_only=True)
+    test_name = __qualname__
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), test_name, tiered_only=True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(storage_sources)

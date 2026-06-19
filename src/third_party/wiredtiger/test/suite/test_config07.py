@@ -30,8 +30,7 @@ import fnmatch, os, time
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_config07.py
-#    Test that log files extend as configured and as documented.
+# Test that log files extend as configured and as documented.
 class test_config07(wttest.WiredTigerTestCase):
     uri = "table:test"
     entries = 5000

@@ -35,7 +35,8 @@ class test_autoclose(wttest.WiredTigerTestCase):
     error thrown, and that when a handle is closed, any subordinate
     handles are also closed.
     """
-    uri = 'table:test_autoclose'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
     # Note: SWIG generates a TypeError instead of a RuntimeError for several cases.
     # The same error on all platforms would be better.
     expected_exception = TypeError if sys.platform.startswith('darwin') else RuntimeError

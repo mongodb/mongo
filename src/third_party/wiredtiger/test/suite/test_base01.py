@@ -29,14 +29,14 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_base01.py
-#    Basic operations
+# Basic operations
 class test_base01(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
-    table_name1 = 'test_base01a.wt'
-    table_name2 = 'test_base01b.wt'
+    test_name = __qualname__
+    table_name1 = f'{test_name}a.wt'
+    table_name2 = f'{test_name}b.wt'
 
     key_format_values = [
         ('column', dict(key_format='r')),

@@ -26,15 +26,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp09.py
-#   Timestamps: API
+# Timestamps: API
 #
 
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
 class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_timestamp09'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
 
     def test_timestamp_api(self):

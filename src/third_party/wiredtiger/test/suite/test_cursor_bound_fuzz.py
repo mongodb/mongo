@@ -94,7 +94,6 @@ class key():
         else:
             return False
 
-# test_cursor_bound_fuzz.py
 #    A python test fuzzer that generates a random key range and applies bounds to it, then runs
 #    randomized operations and validates them for correctness.
 class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):

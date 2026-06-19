@@ -28,7 +28,6 @@
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 
-# test_layered_schema04.py
 # Test we can create a large number of layered tables
 @disagg_test_class
 class test_layered_schema04(wttest.WiredTigerTestCase):
@@ -36,7 +35,7 @@ class test_layered_schema04(wttest.WiredTigerTestCase):
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
 
-    scenarios = gen_disagg_storages('test_layered_schema04', disagg_only = True)
+    scenarios = gen_disagg_storages(disagg_only = True)
 
     @wttest.longtest('lots of tables')
     def test_create_tables(self):

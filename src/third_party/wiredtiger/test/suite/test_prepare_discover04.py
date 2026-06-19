@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover04.py
-#   Test that prepare discover cursor can discover and commit a pending prepared delete
+# Test that prepare discover cursor can discover and commit a pending prepared delete
 
 import wiredtiger
 from suite_subprocess import suite_subprocess
@@ -35,7 +34,8 @@ import wttest
 from wtscenario import make_scenarios
 
 class test_prepare_discover04(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_prepare_discover04'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
     s_config = 'key_format=i,value_format=S'

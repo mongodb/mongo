@@ -30,9 +30,8 @@ import wttest
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
-# test_alter04.py
-#    Smoke-test the session alter operations.
-#    This test confirms os_cache_dirty_max and os_cache_max.
+# Smoke-test the session alter operations.
+# This test confirms os_cache_dirty_max and os_cache_max.
 class test_alter04(TieredConfigMixin, wttest.WiredTigerTestCase):
     name = "alter04"
     entries = 100

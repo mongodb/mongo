@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_backup09.py
-#   Verify opening a backup cursor forces a log file switch.
+# Verify opening a backup cursor forces a log file switch.
 #
 
 import os, shutil

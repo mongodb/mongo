@@ -29,9 +29,9 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_hs16.py
 # Ensure that we don't panic when inserting an update without timestamp to the history store.
 class test_hs16(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=5MB'
     format_values = (
         ('column', dict(key_format='r')),
@@ -46,7 +46,7 @@ class test_hs16(wttest.WiredTigerTestCase):
         return i
 
     def test_hs16(self):
-        uri = 'table:test_hs16'
+        uri = f'table:{self.test_name}'
         create_params = 'key_format={}, value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
         cursor = self.session.open_cursor(uri)

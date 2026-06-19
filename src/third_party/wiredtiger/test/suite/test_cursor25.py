@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor25.py
-#   Test version cursor show_prepared_rollback config across prepared insert,
-#   update, and delete rollback scenarios.
+# Test version cursor show_prepared_rollback config across prepared insert,
+# update, and delete rollback scenarios.
 #
 import wttest
 import wiredtiger
@@ -41,7 +40,8 @@ PREPARE_TS = 5
 ROLLBACK_TS = 15
 
 class test_cursor25(wttest.WiredTigerTestCase):
-    uri = 'file:test_cursor25.wt'
+    test_name = __qualname__
+    uri = f'file:{test_name}.wt'
 
     types = [
         ('row', dict(keyformat='i', valueformat='i')),
@@ -403,7 +403,7 @@ class test_cursor25(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
     def test_show_prepared_rollback_requires_in_memory(self):
-        uri = 'file:test_cursor25_non_in_memory.wt'
+        uri = f'file:{self.test_name}_non_in_memory.wt'
         self.session.create(uri,
             'key_format={},value_format={}'.format(self.keyformat, self.valueformat))
         msg = '/show_prepared_rollback is only supported for in-memory b-trees/'

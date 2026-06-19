@@ -31,15 +31,15 @@ from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources, get_con
 import wtscenario, wttest
 from wtdataset import SimpleDataSet
 
-# test_tiered03.py
-#    Test block-log-structured tree configuration options.
+# Test block-log-structured tree configuration options.
 class test_tiered03(wttest.WiredTigerTestCase, TieredConfigMixin):
+    test_name = __qualname__
     K = 1024
     M = 1024 * K
     G = 1024 * M
-    uri = 'file:test_tiered03'
+    uri = f'file:{test_name}'
 
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered03', tiered_only=True)
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), test_name, tiered_only=True)
 
     # Occasionally add a lot of records to vary the amount of work flush does.
     record_count_scenarios = wtscenario.quick_scenarios(

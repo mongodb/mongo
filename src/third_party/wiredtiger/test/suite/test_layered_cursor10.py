@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_layered_cursor10.py
-#   Test layered cursor prepare conflict handling
-#   - Verify cursor key state is preserved when WT_PREPARE_CONFLICT is returned
-#   - Ensure retry loops work correctly after prepare conflicts
-#   - Test search, search_near, next, and prev operations
+# Test layered cursor prepare conflict handling
+# - Verify cursor key state is preserved when WT_PREPARE_CONFLICT is returned
+# - Ensure retry loops work correctly after prepare conflicts
+# - Test search, search_near, next, and prev operations
 
 import wiredtiger
 import wttest
@@ -39,7 +38,8 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_cursor10(wttest.WiredTigerTestCase):
-    tablename = 'test_layered_cursor10'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
     resolve_scenarios = [
@@ -47,7 +47,7 @@ class test_layered_cursor10(wttest.WiredTigerTestCase):
         ('rollback', dict(commit = False)),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_cursor10', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, resolve_scenarios)
 
     conn_base_config = 'cache_size=10MB,statistics=(all),precise_checkpoint=true,preserve_prepared=true,'

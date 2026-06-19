@@ -30,11 +30,11 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wtdataset import SimpleDataSet
 
-# test_reconcile02.py
 #
 # Test removing existing deleted keys from the old disk image is
 # considered making progress in reconciliation.
 class test_reconcile02(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('integer-row', dict(key_format='i', value_format='S')),
@@ -43,7 +43,7 @@ class test_reconcile02(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values)
 
     def test_reconcile02(self):
-        uri = "table:test_reconcile02"
+        uri = f"table:{self.test_name}"
 
         # Create a table
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)

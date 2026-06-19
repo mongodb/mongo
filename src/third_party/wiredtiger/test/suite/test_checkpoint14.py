@@ -34,7 +34,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint14.py
 #
 # Make sure each checkpoint has its own snapshot by creating two successive
 # inconsistent checkpoints and reading both of them.

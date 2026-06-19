@@ -31,20 +31,20 @@ from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources, get_con
 from wtscenario import make_scenarios
 StorageSource = wiredtiger.StorageSource  # easy access to constants
 
-# test_tiered10.py
-#    Test tiered storage with simultaneous connections using different
+# Test tiered storage with simultaneous connections using different
 # prefixes to the same bucket directory but different local databases.
 class test_tiered10(wttest.WiredTigerTestCase, TieredConfigMixin):
 
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered10', tiered_only=True)
+    test_name = __qualname__
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), test_name, tiered_only=True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(storage_sources)
 
     # If the 'uri' changes all the other names must change with it.
-    base = 'test_tiered10-000000000'
+    base = f'{test_name}-000000000'
     obj1file = base + '1.wtobj'
-    uri = "table:test_tiered10"
+    uri = f"table:{test_name}"
 
     conn1_dir = "first_dir"
     conn2_dir = "second_dir"

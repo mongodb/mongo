@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp14.py
-#   Global timestamps: oldest reader, all durable, pinned
+# Global timestamps: oldest reader, all durable, pinned
 #
 
 from suite_subprocess import suite_subprocess
@@ -35,7 +34,8 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_timestamp14'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
 
     format_values = [

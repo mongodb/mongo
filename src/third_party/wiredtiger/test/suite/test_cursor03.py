@@ -29,8 +29,7 @@
 from test_cursor_tracker import TestCursorTracker
 from wtscenario import make_scenarios
 
-# test_cursor03.py
-#    Cursor operations on tables of various sizes, with key/values of various
+# Cursor operations on tables of various sizes, with key/values of various
 # sizes.
 class test_cursor03(TestCursorTracker):
     """

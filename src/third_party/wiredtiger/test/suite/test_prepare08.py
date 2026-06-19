@@ -30,11 +30,11 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_prepare08.py
 # Test to ensure prepared tombstones are properly aborted/committed even when they are written
 # to the data store.
 class test_prepare08(wttest.WiredTigerTestCase):
     # Force a small cache.
+    test_name = __qualname__
     conn_config = 'cache_size=10MB,eviction_dirty_trigger=80,eviction_updates_trigger=80'
 
     format_values = [
@@ -86,12 +86,12 @@ class test_prepare08(wttest.WiredTigerTestCase):
         nrows = 2000
 
         # Create a small table.
-        uri_1 = "table:test_prepare08_1"
+        uri_1 = f"table:{self.test_name}_1"
         ds_1 = SimpleDataSet(
             self, uri_1, 0, key_format=self.key_format, value_format=self.value_format)
         ds_1.populate()
 
-        uri_2 = "table:test_prepare08_2"
+        uri_2 = f"table:{self.test_name}_2"
         ds_2 = SimpleDataSet(
             self, uri_2, 0, key_format=self.key_format, value_format=self.value_format)
         ds_2.populate()

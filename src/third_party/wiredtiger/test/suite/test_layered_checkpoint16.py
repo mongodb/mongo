@@ -32,22 +32,22 @@ from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_layered_checkpoint16.py
-#     Test that picking up the same checkpoint a second time does not update file metadata.
-#     The disagg_pick_up_file_meta_updated stat tracks actual metadata writes.
-#     Re-applying an identical checkpoint must leave the stat unchanged.
+# Test that picking up the same checkpoint a second time does not update file metadata.
+# The disagg_pick_up_file_meta_updated stat tracks actual metadata writes.
+# Re-applying an identical checkpoint must leave the stat unchanged.
 
 @disagg_test_class
 class test_layered_checkpoint16(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     num_items = 100
 
     conn_base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
-    disagg_storages = gen_disagg_storages('test_layered_checkpoint16', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
-    uri = 'layered:test_layered_checkpoint16'
+    uri = f'layered:{test_name}'
 
     def insert_data(self, session, value_prefix, ts):
         session.begin_transaction()

@@ -29,11 +29,11 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_hs28.py
 # Test that we insert a full update instead of a reverse modify to the
 # history store if a modify follows a squashed on page value.
 
 class test_hs28(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = ''
 
     key_format_values = [
@@ -48,7 +48,7 @@ class test_hs28(wttest.WiredTigerTestCase):
         return config
 
     def test_insert_hs_full_update(self):
-        uri = 'table:test_hs28'
+        uri = f'table:{self.test_name}'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
 
         value1 = "a"

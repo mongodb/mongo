@@ -30,10 +30,10 @@ import os, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_checkpoint02.py
-#    Extra tests for follower picking up new checkpoints.
+# Extra tests for follower picking up new checkpoints.
 @disagg_test_class
 class test_layered_checkpoint02(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     nitems = 500
 
     # The keys in this test are integer values less than nitems that have been "stringized".
@@ -45,10 +45,10 @@ class test_layered_checkpoint02(wttest.WiredTigerTestCase):
 
     create_session_config = 'key_format=S,value_format=S'
 
-    layered_uris = ["layered:test_layered_checkpoint02a", "layered:test_layered_checkpoint02b"]
+    layered_uris = [f"layered:{test_name}a", f"layered:{test_name}b"]
     all_uris = list(layered_uris)
 
-    disagg_storages = gen_disagg_storages('test_layered_checkpoint02', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
     # Reset a cursor on the follower.  Generally, the test will open a layered: uri,

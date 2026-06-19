@@ -29,12 +29,12 @@
 import os, wiredtiger, wttest
 from helper_disagg import disagg_test_class
 
-# test_layered_cursor03.py
-#    Basic layered tree cursor creation
+# Basic layered tree cursor creation
 @disagg_test_class
 class test_layered_cursor03(wttest.WiredTigerTestCase):
 
-    uri_base = "test_layered_cursor03"
+    test_name = __qualname__
+    uri_base = test_name
     conn_config = 'verbose=[layered],disaggregated=(role="leader"),' \
                 + 'disaggregated=(lose_all_my_data=true),'
 

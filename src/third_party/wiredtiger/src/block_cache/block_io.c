@@ -792,7 +792,9 @@ __wt_blkcache_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *
     encrypted = false;
 
     /* Optionally compress the data. */
-    WT_ERR(__wt_blkcache_compress(session, buf, compressed, &ctmp, compressed_sizep, &compressed));
+    WT_ERR_MSG_CHK(session,
+      __wt_blkcache_compress(session, buf, compressed, &ctmp, compressed_sizep, &compressed),
+      "failed to compress block before writing");
     ip = (ctmp != NULL) ? ctmp : buf;
 
     /*

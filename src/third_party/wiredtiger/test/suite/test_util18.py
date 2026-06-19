@@ -31,10 +31,10 @@ from suite_subprocess import suite_subprocess
 import wttest
 from wtscenario import make_scenarios
 
-# test_util18.py
-#   Utilities: wt printlog
+# Utilities: wt printlog
 class test_util18(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util18.a'
+    test_name = __qualname__
+    tablename = f'{test_name}.a'
     uri = 'table:' + tablename
     logmax = 100
     nentries = 5

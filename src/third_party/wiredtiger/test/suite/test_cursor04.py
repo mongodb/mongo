@@ -29,13 +29,13 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_base04.py
-#     Cursor operations
+# Cursor operations
 class test_cursor04(wttest.WiredTigerTestCase):
     """
     Test cursor search and search_near
     """
-    table_name1 = 'test_cursor04'
+    test_name = __qualname__
+    table_name1 = test_name
     nentries = 20
 
     scenarios = make_scenarios([

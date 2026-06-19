@@ -39,12 +39,12 @@ from wtthread import flush_checkpoint_thread
 from wtscenario import make_scenarios
 
 
-# test_tiered08.py
-#   Run background checkpoints, sometimes with flush operations while inserting
-#   data into a table from another thread.
+# Run background checkpoints, sometimes with flush operations while inserting
+# data into a table from another thread.
 class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
 
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered08', tiered_only=True)
+    test_name = __qualname__
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), test_name, tiered_only=True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(storage_sources)
@@ -55,7 +55,7 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
     ckpt_target = 200
     flush_target = 50
 
-    uri = "table:test_tiered08"
+    uri = f"table:{test_name}"
 
     def conn_config(self):
         return get_conn_config(self) + '),statistics=(fast),timing_stress_for_test=(tiered_flush_finish)'

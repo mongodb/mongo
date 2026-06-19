@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp12.py
-#   Timestamps: Test the use_timestamp setting when closing the connection.
+# Timestamps: Test the use_timestamp setting when closing the connection.
 #
 
 import wttest

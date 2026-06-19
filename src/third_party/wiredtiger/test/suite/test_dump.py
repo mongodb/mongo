@@ -37,15 +37,15 @@ from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 from wtdataset import SimpleDataSet, SimpleIndexDataSet, ComplexDataSet
 
-# test_dump.py
-#    Utilities: wt dump
+# Utilities: wt dump
 # Test the dump utility (I'm not testing the dump cursors, that's what the
 # utility uses underneath).
 class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     dir = 'dump.dir'            # Backup directory name
 
-    name = 'test_dump'
-    name2 = 'test_dumpb'
+    name = test_name
+    name2 = f'{test_name}b'
     nentries = 2500
 
     dumpfmt = [

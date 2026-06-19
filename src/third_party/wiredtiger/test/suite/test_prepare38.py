@@ -33,7 +33,8 @@ from prepare_util import test_prepare_preserve_prepare_base
 # the database with the preserve prepared config.
 
 class test_prepare38(test_prepare_preserve_prepare_base):
-    uri = 'table:test_prepare38'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
 
     def test_open(self):
         create_params = 'key_format=i,value_format=S'

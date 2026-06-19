@@ -31,7 +31,6 @@ from wiredtiger import stat, WiredTigerError, wiredtiger_strerror, WT_ROLLBACK
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_truncate10.py
 #
 # Check that nothing comes unstuck if we commit a truncate with durable > commit.
 class test_truncate10(wttest.WiredTigerTestCase):

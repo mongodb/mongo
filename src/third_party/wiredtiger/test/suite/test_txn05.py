@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn05.py
 # Transactions: commits and rollbacks
 #
 
@@ -36,8 +35,9 @@ from wtscenario import make_scenarios
 import wttest
 
 class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     logmax = "100K"
-    tablename = 'test_txn05'
+    tablename = test_name
     uri = 'table:' + tablename
     remove_list = ['true', 'false']
     sync_list = [

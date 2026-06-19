@@ -31,10 +31,10 @@ from checkpoint_util import checkpoint_util
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_checkpoint05.py
-#    Test creating empty tables while a checkpoint is running.
+# Test creating empty tables while a checkpoint is running.
 @disagg_test_class
 class test_layered_checkpoint05(checkpoint_util):
+    test_name = __qualname__
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'precise_checkpoint=true,' \
@@ -43,9 +43,9 @@ class test_layered_checkpoint05(checkpoint_util):
 
     create_session_config = 'key_format=S,value_format=S,type=layered'
 
-    uri = "table:test_layered_checkpoint05"
+    uri = f"table:{test_name}"
 
-    disagg_storages = gen_disagg_storages('test_layered_checkpoint05', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
     # Test creating an empty table while a checkpoint is running.

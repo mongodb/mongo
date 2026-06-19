@@ -29,7 +29,6 @@
 import wiredtiger, wttest
 from wtbackup import backup_base
 
-# test_backup16.py
 # Ensure incremental backup doesn't copy unnecessary files.
 class test_backup16(backup_base):
 

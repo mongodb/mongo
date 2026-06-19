@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn13.py
 # Test very large log records.  Even with a small log file we should be
 # able to write them.  Expect an error over 4Gb.
 #
@@ -36,8 +35,9 @@ from wtscenario import make_scenarios
 import wiredtiger, wttest
 
 class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     logmax = "100K"
-    tablename = 'test_txn13'
+    tablename = test_name
     uri = 'table:' + tablename
     # We use 8 ops here to get around the 10 operation check done by WiredTiger to determine if
     # a transaction is blocking or not.

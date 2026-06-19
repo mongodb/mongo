@@ -32,7 +32,6 @@ from wtdataset import SimpleDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable01.py
 # Test that rollback to stable clears the remove operation.
 class test_rollback_to_stable01(test_rollback_to_stable_base):
     format_values = [

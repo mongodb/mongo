@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn06.py
-#   Transactions: test long-running snapshots
+# Transactions: test long-running snapshots
 
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
@@ -35,8 +34,9 @@ import wttest
 from wtscenario import make_scenarios
 
 class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     conn_config = 'verbose=[transaction]'
-    tablename = 'test_txn06'
+    tablename = test_name
     uri = 'table:' + tablename
     source_uri = 'table:' + tablename + "_src"
     nrows = 100000

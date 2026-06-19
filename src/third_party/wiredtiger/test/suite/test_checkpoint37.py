@@ -33,7 +33,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_checkpoint37.py
 #
 # Test that reconciliation removes obsolete updates on the page.
 class test_checkpoint37(wttest.WiredTigerTestCase):

@@ -32,7 +32,6 @@ from wtdataset import SimpleDataSet
 from wtbackup import backup_base
 
 
-# test_live_restore08.py
 # Test bulk cursor usage with live restore.
 class test_live_restore08(backup_base):
     nrows = 10000

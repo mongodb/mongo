@@ -26,18 +26,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_log06.py
-#   Reproduce a partial-log-record recovery scenario and verify it succeeds.
+# Reproduce a partial-log-record recovery scenario and verify it succeeds.
 #
-#   A pre-allocated log file can end up with a 128-byte-aligned block where
-#   len==0 but other bytes are non-zero, because a log write was still being
-#   flushed when the crash happened. __log_has_hole + __log_record_verify
-#   detect it, emit a message, truncate the log, and recovery
-#   continues. Committed data before the block must survive intact.
+# A pre-allocated log file can end up with a 128-byte-aligned block where
+# len==0 but other bytes are non-zero, because a log write was still being
+# flushed when the crash happened. __log_has_hole + __log_record_verify
+# detect it, emit a message, truncate the log, and recovery
+# continues. Committed data before the block must survive intact.
 #
-#   Two scenarios, per which header byte is non-zero:
-#       record_len: bytes 4-7   -> "record len corruption 0x0"
-#       flag:       bytes 8-9   -> "flag corruption 0x4"
+# Two scenarios, per which header byte is non-zero:
+#     record_len: bytes 4-7   -> "record len corruption 0x0"
+#     flag:       bytes 8-9   -> "flag corruption 0x4"
 
 import os
 import wttest

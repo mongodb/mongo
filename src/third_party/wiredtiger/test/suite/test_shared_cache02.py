@@ -31,12 +31,12 @@ import os
 import shutil
 import wiredtiger, wttest
 
-# test_shared_cache02.py
-#    Shared cache tests
+# Shared cache tests
 # Test shared cache shared among multiple connections.
 class test_shared_cache02(wttest.WiredTigerTestCase):
 
-    uri = 'table:test_shared_cache02'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
     # Setup fairly large items to use up cache
     data_str = 'abcdefghijklmnopqrstuvwxyz' * 20
 

@@ -38,9 +38,10 @@ class test_ovfl01(wttest.WiredTigerTestCase):
     #     - Use strings as the key format to allow for very large key sizes.
     #     - Set a very small leaf_key_max. Keys larger than this will be stored as overflow keys.
     #.    - Set a small leaf_page_max to create more leaf pages and page splits.
+    test_name = __qualname__
     table_config = 'key_format=S,value_format=S,leaf_key_max=10B,leaf_value_max=10B,leaf_page_max=4KB'
     conn_config = 'cache_size=100MB,statistics=(all),timing_stress_for_test=(failpoint_rec_split_write)'
-    uri = 'table:test_ovfl01'
+    uri = f'table:{test_name}'
 
     num_keys = 10 * 1000
 

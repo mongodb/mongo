@@ -30,7 +30,6 @@ import wttest
 from wiredtiger import WT_NOTFOUND
 from wtscenario import make_scenarios
 
-# test_prepare16.py
 # Test that the prepare transaction rollback/commit multiple keys and each key can occupy a leaf
 # page.
 class test_prepare16(wttest.WiredTigerTestCase):

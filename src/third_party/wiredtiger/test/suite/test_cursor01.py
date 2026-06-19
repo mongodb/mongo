@@ -29,8 +29,7 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_cursor01.py
-#    Cursor operations
+# Cursor operations
 # Basic smoke-test of file and table cursors: tests get/set key, insert
 # and forward/backward iteration, and mostly because we don't test them
 # anywhere else, cursor duplication and equality.
@@ -38,7 +37,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
-    table_name1 = 'test_cursor01'
+    test_name = __qualname__
+    table_name1 = test_name
     nentries = 10
 
     scenarios = make_scenarios([

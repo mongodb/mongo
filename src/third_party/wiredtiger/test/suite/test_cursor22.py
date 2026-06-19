@@ -26,13 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor22.py
-#   Test cursor get_raw_key_value
+# Test cursor get_raw_key_value
 
 import wttest
 
 class test_cursor22(wttest.WiredTigerTestCase):
-    uri = "table:test_cursor22"
+    test_name = __qualname__
+    uri = f"table:{test_name}"
 
     def check_get_key_and_value(self, cursor, expected_key, expected_value):
         key = cursor.get_key()

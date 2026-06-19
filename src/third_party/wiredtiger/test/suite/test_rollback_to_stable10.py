@@ -34,7 +34,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wtthread import checkpoint_thread
 
-# test_rollback_to_stable10.py
 # Test the rollback to stable operation performs sweeping history store.
 class test_rollback_to_stable10(test_rollback_to_stable_base):
 

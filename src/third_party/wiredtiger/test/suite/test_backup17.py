@@ -30,7 +30,6 @@ import wttest
 import os
 from wtbackup import backup_base
 
-# test_backup17.py
 # Test cursor backup with a block-based incremental cursor and consolidate.
 class test_backup17(backup_base):
     dir='backup.dir'                    # Backup directory name

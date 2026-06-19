@@ -29,7 +29,6 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_checkpoint06.py
 # Verify that we rollback the truncation that is committed after stable
 # timestamp in the checkpoint.
 class test_checkpoint06(wttest.WiredTigerTestCase):

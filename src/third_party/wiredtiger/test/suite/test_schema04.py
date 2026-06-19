@@ -30,8 +30,7 @@ import wttest
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
-# test_schema04.py
-#    Test indices with duplicates
+# Test indices with duplicates
 class test_schema04(TieredConfigMixin, wttest.WiredTigerTestCase):
     """
     Test indices with duplicates.

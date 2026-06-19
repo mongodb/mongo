@@ -33,7 +33,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint24.py
 #
 # Test reading a checkpoint that contains fast-delete pages.
 # This version does not use timestamps.

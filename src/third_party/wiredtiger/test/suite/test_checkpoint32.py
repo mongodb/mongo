@@ -33,7 +33,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_checkpoint32.py
 #
 # Test that skipping in-memory reconciled deleted pages as part of the tree walk.
 class test_checkpoint32(wttest.WiredTigerTestCase):

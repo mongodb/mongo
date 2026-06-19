@@ -29,15 +29,15 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_base05.py
-#    Cursor operations
+# Cursor operations
 class test_base05(wttest.WiredTigerTestCase):
     """
     Test that various types of content can be stored
     """
+    test_name = __qualname__
 
-    table_name1 = 'test_base05a'
-    table_name2 = 'test_base05b'
+    table_name1 = f'{test_name}a'
+    table_name2 = f'{test_name}b'
     nentries = 1000
 
     def session_create(self, name, args):

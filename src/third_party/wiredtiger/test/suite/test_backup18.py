@@ -31,7 +31,6 @@ from helper import simulate_crash_restart
 from wiredtiger import stat
 from wtbackup import backup_base
 
-# test_backup18.py
 # Test backup:query_id API.
 class test_backup18(backup_base):
     conn_config= 'cache_size=1G,log=(enabled,file_max=100K)'

@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate08.py
-#   On a follower, range truncate must represent each delete as a standard
-#   update carrying the layered tombstone sentinel (\x14\x14) into the ingest
-#   file, rather than using cursor->remove() to create a WT_UPDATE_TOMBSTONE.
+# On a follower, range truncate must represent each delete as a standard
+# update carrying the layered tombstone sentinel (\x14\x14) into the ingest
+# file, rather than using cursor->remove() to create a WT_UPDATE_TOMBSTONE.
 
 from contextlib import closing
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -42,7 +41,7 @@ import wttest
 class test_layered_fast_truncate08(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
     test_name = __qualname__
 
-    disagg_storages = gen_disagg_storages(test_name, disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
     conn_config = 'disaggregated=(role="leader"),'
 

@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 
-# test_prepare20.py
 # Check that we can use an application-level log to replay unstable transactions.
 
 import wttest

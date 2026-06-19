@@ -33,7 +33,6 @@ from wiredtiger import stat, WiredTigerError, wiredtiger_strerror, WT_ROLLBACK
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable36.py
 #
 # Check the behavior of a fast-truncated page where the truncation is not stable but
 # everything else on the page is.

@@ -30,9 +30,8 @@ import time
 import wttest
 from wtdataset import SimpleDataSet
 
-# test_reconfig03.py
-#    Test the connection reconfiguration operations used in the MongoDB
-#    test reconfigwt.js.
+# Test the connection reconfiguration operations used in the MongoDB
+# test reconfigwt.js.
 class test_reconfig03(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled,file_max=100K,prealloc=false,remove=false,zero_fill=false),checkpoint=(wait=1),cache_size=1G'
     uri = "table:reconfig03"

@@ -32,7 +32,6 @@ from wiredtiger import stat, WT_NOTFOUND
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable19.py
 # Test that rollback to stable aborts both insert and remove updates from a single prepared transaction
 class test_rollback_to_stable19(test_rollback_to_stable_base):
 

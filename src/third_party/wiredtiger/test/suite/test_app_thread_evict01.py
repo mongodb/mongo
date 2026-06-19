@@ -29,7 +29,6 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_app_thread_evict01.py
 # Test to trigger application threads to perform eviction.
 class test_app_thread_evict01(wttest.WiredTigerTestCase):
     uri = "table:test_app_thread_evict001"

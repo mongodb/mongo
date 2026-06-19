@@ -31,7 +31,6 @@ import wttest
 from wtscenario import make_scenarios
 from wtbound import set_prefix_bound
 
-# test_cursor_bound13.py
 # This test checks that a search_near call with the prefix key
 # configuration will correctly find a key even in cases where the key
 # range is split across multiple pages.

@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_encrypt09.py
-#   Test some error conditions with the libsodium encryption extension.
+# Test some error conditions with the libsodium encryption extension.
 #
 
 import wiredtiger, wttest
@@ -39,7 +38,8 @@ from wtscenario import make_scenarios
 # used for per-table encryption.
 #
 class test_encrypt09(wttest.WiredTigerTestCase):
-    uri = 'file:test_encrypt09'
+    test_name = __qualname__
+    uri = f'file:{test_name}'
 
     # To test the sodium encryptor, we use secretkey= rather than
     # setting a keyid, because for a "real" (vs. test-only) encryptor,

@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp02.py
-#   Timestamps: basic semantics
+# Timestamps: basic semantics
 #
 
 import random
@@ -37,7 +36,8 @@ from wiredtiger import stat
 from wtscenario import make_scenarios
 
 class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_timestamp02'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
 
     scenarios = make_scenarios([

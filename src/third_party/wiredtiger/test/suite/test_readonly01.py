@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_readonly01.py
-#   Readonly: Test readonly mode.
+# Readonly: Test readonly mode.
 #
 
 import os
@@ -36,7 +35,8 @@ from wtscenario import make_scenarios
 import wttest
 
 class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_readonly01'
+    test_name = __qualname__
+    tablename = test_name
     create = True
     entries = 10000
 

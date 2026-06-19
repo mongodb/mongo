@@ -30,7 +30,6 @@ import wttest
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 
-# test_backup20.py
 # Test cursor backup force stop without a checkpoint.
 # This reproduces the issue from WT-7027 where we hit an assertion
 # because the session was created with snapshot isolation.

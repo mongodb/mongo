@@ -29,10 +29,10 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_prepare22.py
 # Test prepare with rollback to stable without failed eviction.
 class test_prepare22(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     format_values = [
         ('column', dict(key_format='r')),
         ('row_integer', dict(key_format='i')),
@@ -48,7 +48,7 @@ class test_prepare22(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values, delete)
 
     def test_prepare22(self):
-        uri = "table:test_prepare22"
+        uri = f"table:{self.test_name}"
         self.session.create(uri, 'key_format=' + self.key_format + ',value_format=' + self.value_format)
 
         value_a = "a"

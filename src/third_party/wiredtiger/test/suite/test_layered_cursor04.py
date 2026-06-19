@@ -31,12 +31,12 @@ from helper_disagg import disagg_test_class
 
 StorageSource = wiredtiger.StorageSource  # easy access to constants
 
-# test_layered_cursor04.py
-#    Basic layered tree cursor insert and read
+# Basic layered tree cursor insert and read
 @disagg_test_class
 class test_layered_cursor04(wttest.WiredTigerTestCase):
 
-    uri_base = "test_layered_cursor04"
+    test_name = __qualname__
+    uri_base = test_name
     conn_config = 'verbose=[layered],disaggregated=(role="leader"),' \
                 + 'disaggregated=(lose_all_my_data=true),'
 

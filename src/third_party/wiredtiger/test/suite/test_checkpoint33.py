@@ -33,14 +33,14 @@ import os
 import time
 import wttest
 
-# test_checkpoint33.py
 #
 # Test that checkpoint will not skip tables that have available space at the end that can be
 # reclaimed through truncation.
 class test_checkpoint33(test_cc_base, suite_subprocess):
+    test_name = __qualname__
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB,'
     # conn_config = 'verbose=[checkpoint:2]'
-    uri = 'table:test_checkpoint33'
+    uri = f'table:{test_name}'
 
     table_numkv = 1000000
     value_size = 1024

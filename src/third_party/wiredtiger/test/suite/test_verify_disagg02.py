@@ -30,19 +30,19 @@ import re, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_verify_disagg02.py
-#    Verify that duplicate btree IDs among stable files are detected.
+# Verify that duplicate btree IDs among stable files are detected.
 
 @disagg_test_class
 class test_verify_disagg02(wttest.WiredTigerTestCase):
-    disagg_storages = gen_disagg_storages('test_verify_disagg02', disagg_only=True)
+    test_name = __qualname__
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_config = 'disaggregated=(role="leader")'
     conn_config_follower = 'disaggregated=(role="follower")'
 
     table_cfg = 'key_format=S,value_format=S,block_manager=disagg'
-    uri = 'layered:test_verify_disagg02'
+    uri = f'layered:{test_name}'
 
     def test_verify_duplicate_btree_ids(self):
         """
@@ -65,7 +65,7 @@ class test_verify_disagg02(wttest.WiredTigerTestCase):
 
         # Read the stable file's config from the follower's metadata to get its btree ID.
         md_cursor = session_follow.open_cursor('metadata:', None, None)
-        md_cursor.set_key('file:test_verify_disagg02.wt_stable')
+        md_cursor.set_key(f'file:{self.test_name}.wt_stable')
         self.assertEqual(md_cursor.search(), 0)
         victim_config = md_cursor.get_value()
         md_cursor.close()

@@ -513,7 +513,6 @@ wt_timestamp_t replay_read_ts(TINFO *);
 void replay_rollback(TINFO *);
 void replay_run_begin(WT_SESSION *);
 void replay_run_end(WT_SESSION *);
-bool replay_stale_read_ts(TINFO *);
 int timestamp_query(const char *, wt_timestamp_t *);
 void timestamp_teardown(WT_SESSION *);
 void trace_config(const char *);

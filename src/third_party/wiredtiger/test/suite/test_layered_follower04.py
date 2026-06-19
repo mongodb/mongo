@@ -30,11 +30,11 @@ import os, os.path, shutil, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_follower04.py
-#    Make sure a secondary picking up a checkpoint adds in the stable
-#    component of the table.
+# Make sure a secondary picking up a checkpoint adds in the stable
+# component of the table.
 @disagg_test_class
 class test_layered_follower04(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     nitems = 5000
 
     conn_base_config = 'precise_checkpoint=true,'
@@ -42,7 +42,7 @@ class test_layered_follower04(wttest.WiredTigerTestCase):
 
     session_create_config = 'key_format=S,value_format=S,'
 
-    disagg_storages = gen_disagg_storages('test_layered_follower04', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages, [
         ('layered-prefix', dict(prefix='layered:', table_config='')),
         ('layered-type', dict(prefix='table:', table_config='block_manager=disagg,type=layered,')),
@@ -52,7 +52,7 @@ class test_layered_follower04(wttest.WiredTigerTestCase):
         # Avoid checkpoint error with precise checkpoint
         self.conn.set_timestamp('stable_timestamp=1')
 
-        self.uri = self.prefix + 'test_layered_follower04'
+        self.uri = self.prefix + self.test_name
 
         # The node started as a follower, so step it up as the leader
         self.conn.reconfigure('disaggregated=(role="leader")')

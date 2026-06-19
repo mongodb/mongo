@@ -30,7 +30,6 @@ import wiredtiger, wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_hs06.py
 # Verify that triggering history store usage does not cause a spike in memory usage
 # to form an update chain from the history store contents.
 #
@@ -38,6 +37,7 @@ from wtscenario import make_scenarios
 # back to the user without putting together an update chain.
 class test_hs06(wttest.WiredTigerTestCase):
     # Force a small cache.
+    test_name = __qualname__
     conn_config = 'cache_size=50MB,statistics=(fast)'
     format_values = [
         ('column', dict(key_format='r')),
@@ -64,7 +64,7 @@ class test_hs06(wttest.WiredTigerTestCase):
 
     def test_hs_reads(self):
         # Create a small table.
-        uri = "table:test_hs06"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
@@ -146,7 +146,7 @@ class test_hs06(wttest.WiredTigerTestCase):
     def test_hs_modify_reads(self):
 
         # Create a small table.
-        uri = "table:test_hs06"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
@@ -222,7 +222,7 @@ class test_hs06(wttest.WiredTigerTestCase):
 
     def test_hs_prepare_reads(self):
         # Create a small table.
-        uri = "table:test_hs06"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
@@ -281,7 +281,7 @@ class test_hs06(wttest.WiredTigerTestCase):
 
     def test_hs_multiple_updates(self):
         # Create a small table.
-        uri = "table:test_hs06"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
@@ -321,7 +321,7 @@ class test_hs06(wttest.WiredTigerTestCase):
     def test_hs_multiple_modifies(self):
 
         # Create a small table.
-        uri = "table:test_hs06"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
@@ -367,7 +367,7 @@ class test_hs06(wttest.WiredTigerTestCase):
     def test_hs_instantiated_modify(self):
 
         # Create a small table.
-        uri = "table:test_hs06"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
@@ -406,7 +406,7 @@ class test_hs06(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Make a bunch of updates to another table to flush everything out of cache.
-        uri2 = 'table:test_hs06_extra'
+        uri2 = f'table:{self.test_name}_extra'
         self.session.create(uri2, create_params)
         cursor2 = self.session.open_cursor(uri2)
         for i in range(1, 10000):
@@ -428,7 +428,7 @@ class test_hs06(wttest.WiredTigerTestCase):
 
     def test_hs_modify_stable_is_base_update(self):
         # Create a small table.
-        uri = "table:test_hs06"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
@@ -469,7 +469,7 @@ class test_hs06(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Make a bunch of updates to another table to flush everything out of cache.
-        uri2 = 'table:test_hs06_extra'
+        uri2 = f'table:{self.test_name}_extra'
         self.session.create(uri2, create_params)
         cursor2 = self.session.open_cursor(uri2)
         for i in range(1, 10000):
@@ -492,7 +492,7 @@ class test_hs06(wttest.WiredTigerTestCase):
     def test_hs_rec_modify(self):
 
         # Create a small table.
-        uri = "table:test_hs06"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 

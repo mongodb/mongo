@@ -30,7 +30,6 @@ import wttest
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_stat10.py
 #
 # Check the per-table-type btree stats.
 #
@@ -45,7 +44,8 @@ from wiredtiger import stat
 # The other types' stats should remain zero.
 
 class test_stat10(wttest.WiredTigerTestCase):
-    uri = 'table:test_stat10'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
     conn_config = 'statistics=(all)'
 
     format_values = [

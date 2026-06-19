@@ -31,7 +31,6 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wtbound import set_prefix_bound
 
-# test_cursor_bound12.py
 # Check the search_near API returns the correct key according to visibility rules and its
 # configuration.
 # When cursor bounds aren't set, the search_near API should always return the closest key (in

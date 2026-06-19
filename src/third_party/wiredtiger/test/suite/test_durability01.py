@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_durability01.py
-#   Durability: make sure the metadata is stable after exclusive operations
-#   cause files to be closed.
+# Durability: make sure the metadata is stable after exclusive operations
+# cause files to be closed.
 #
 
 from helper import copy_wiredtiger_home
@@ -36,7 +35,8 @@ from suite_subprocess import suite_subprocess
 import wttest
 
 class test_durability01(wttest.WiredTigerTestCase, suite_subprocess):
-    uri = 'table:test_durability01'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
     create_params = 'key_format=i,value_format=i'
 
     def check_crash_restart(self, olddir, newdir):

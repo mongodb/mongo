@@ -30,7 +30,6 @@ from rollback_to_stable_util import verify_rts_logs
 import wttest
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable24.py
 # Exercise a recno-counting bug in column store.
 #
 # Prior to August 2021 a cell for which there's a pending stable update was counted (in the

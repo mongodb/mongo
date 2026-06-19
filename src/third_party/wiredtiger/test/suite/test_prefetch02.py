@@ -33,19 +33,19 @@ from helper import WiredTigerCursor, statistic_uri
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 
-# test_prefetch02.py
-#    Run multiple scenarios which are expected to benefit from pre-fetching and ensure that
-#    pre-fetching is running properly by checking various statistics. Additionally, run
-#    multiple scenarios which should not trigger pre-fetching and check that these pages are
-#    skipped when deciding whether to pre-fetch the pages.
+# Run multiple scenarios which are expected to benefit from pre-fetching and ensure that
+# pre-fetching is running properly by checking various statistics. Additionally, run
+# multiple scenarios which should not trigger pre-fetching and check that these pages are
+# skipped when deciding whether to pre-fetch the pages.
 
 PrefetchStats = namedtuple('PrefetchStats',
     ['pages_queued', 'prefetch_attempts', 'prefetch_attempts_succeeded', 'prefetch_pages_read'])
 
 class test_prefetch02(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     new_dir = 'new.dir'
     nrows = 100000
-    uri = 'file:test_prefetch02'
+    uri = f'file:{test_name}'
 
     format_values = [
         ('col_var', dict(key_format='r')),

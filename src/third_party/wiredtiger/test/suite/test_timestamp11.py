@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp11.py
-#   Timestamps: test that mixing transactions with and without timestamps behaves as expected.
+# Timestamps: test that mixing transactions with and without timestamps behaves as expected.
 #
 
 from suite_subprocess import suite_subprocess

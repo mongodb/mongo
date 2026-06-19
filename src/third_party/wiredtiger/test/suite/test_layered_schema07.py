@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_schema07.py
-#   Test WT_SESSION::publish for disaggregated storage.
+# Test WT_SESSION::publish for disaggregated storage.
 #
-#   Schema operations (create, drop) on a leader do not get included in the next checkpoint
-#   until they are published with a schema epoch.
+# Schema operations (create, drop) on a leader do not get included in the next checkpoint
+# until they are published with a schema epoch.
 
 import os, time
 import wiredtiger, wttest
@@ -39,16 +38,17 @@ from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-#   Test WT_SESSION::publish for disaggregated storage.
+# Test WT_SESSION::publish for disaggregated storage.
 @disagg_test_class
 class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     conn_base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader",lose_all_my_data=true)'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower",lose_all_my_data=true)'
 
-    uri = 'layered:test_layered_schema07'
+    uri = f'layered:{test_name}'
 
-    disagg_storages = gen_disagg_storages('test_layered_schema07', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     #
@@ -221,7 +221,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
         """
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.publish(
-                'file:test_layered_schema07_err_uri',
+                f'file:{self.test_name}_err_uri',
                 'disaggregated=(schema_epoch=1)'),
             '/only supported for table: and layered:/')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1) +
@@ -266,7 +266,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
         """
         subdir = 'SUBPROCESS'
         [returncode, _] = self.run_subprocess_function(subdir,
-            'test_layered_schema07.test_layered_schema07.subprocess_checkpoint_fails_without_publish',
+            f'{self.test_name}.{self.test_name}.subprocess_checkpoint_fails_without_publish',
             silent=True)
         self.assertNotEqual(returncode, 0,
             'Expected subprocess to panic on checkpoint of unpublished table')
@@ -321,7 +321,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess):
         """
         subdir = 'SUBPROCESS_LATER_EPOCH'
         [returncode, _] = self.run_subprocess_function(subdir,
-            'test_layered_schema07.test_layered_schema07.'
+            f'{self.test_name}.{self.test_name}.'
             'subprocess_checkpoint_fails_with_publish_at_later_epoch',
             silent=True)
         self.assertNotEqual(returncode, 0,

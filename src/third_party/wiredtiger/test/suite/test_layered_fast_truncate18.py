@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate18.py
-#   Write conflict detection for follower fast truncate (truncate-truncate
-#   conflicts only).
+# Write conflict detection for follower fast truncate (truncate-truncate
+# conflicts only).
 
 from contextlib import closing, nullcontext
 from helper_disagg import disagg_test_class, gen_disagg_storages

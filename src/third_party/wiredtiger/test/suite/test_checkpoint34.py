@@ -32,7 +32,6 @@ from wtscenario import make_scenarios
 from wiredtiger import stat
 from helper import simulate_crash_restart
 
-# test_checkpoint34.py
 #
 # Test precise checkpoint with fast truncate
 @wttest.skip_for_hook("tiered", "fast truncate is not supported for tiered yet")

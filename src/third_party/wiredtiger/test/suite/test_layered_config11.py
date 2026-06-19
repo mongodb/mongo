@@ -30,11 +30,11 @@ import wttest
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_config11.py
 # Simple read write testing with stepping down using the page log API
 
 @disagg_test_class
 class test_layered_config11(wttest.WiredTigerTestCase, DisaggConfigMixin):
+    test_name = __qualname__
     encrypt = [
         ('none', dict(encryptor='none', encrypt_args='')),
         ('rotn', dict(encryptor='rotn', encrypt_args='keyid=13')),
@@ -46,7 +46,7 @@ class test_layered_config11(wttest.WiredTigerTestCase, DisaggConfigMixin):
     ]
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
-    disagg_storages = gen_disagg_storages('test_layered_config11', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     scenarios = make_scenarios(encrypt, compress, disagg_storages)
 
@@ -66,7 +66,7 @@ class test_layered_config11(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # FIXME-WT-15763: Step-down is not supported yet.
         self.skipTest('Step-down is not supported yet.')
 
-        uri = "layered:test_layered_config11"
+        uri = f"layered:{self.test_name}"
         create_session_config = 'key_format=S,value_format=S,block_compressor={}'.format(self.block_compress)
         self.session.create(uri, create_session_config)
 

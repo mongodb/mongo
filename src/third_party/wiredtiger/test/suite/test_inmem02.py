@@ -29,8 +29,7 @@
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
-# test_inmem02.py
-#    Test in-memory with ignore-cache-size setting.
+# Test in-memory with ignore-cache-size setting.
 class test_inmem02(wttest.WiredTigerTestCase):
     uri = 'table:inmem02'
     conn_config = \

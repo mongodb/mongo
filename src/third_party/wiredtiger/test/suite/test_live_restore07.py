@@ -29,7 +29,6 @@
 import os, wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_live_restore07.py
 # Test that restoring from an empty database fails.
 class test_live_restore07(wttest.WiredTigerTestCase):
     format_values = [

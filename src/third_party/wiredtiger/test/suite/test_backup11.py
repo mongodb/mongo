@@ -34,7 +34,6 @@ import wiredtiger, wttest
 import os
 from wtbackup import backup_base
 
-# test_backup11.py
 # Test cursor backup with a duplicate backup cursor.
 class test_backup11(backup_base):
     conn_config= 'cache_size=1G,log=(enabled,file_max=100K)'

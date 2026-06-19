@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn17.py
-#   API: Test that API tagged requires_transaction errors out if called without
-#   a running transaction and the ones tagged requires_notransaction errors out
-#   if called with a running transaction.
+# API: Test that API tagged requires_transaction errors out if called without
+# a running transaction and the ones tagged requires_notransaction errors out
+# if called with a running transaction.
 #
 
 from suite_subprocess import suite_subprocess

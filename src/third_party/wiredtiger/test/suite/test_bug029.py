@@ -33,7 +33,6 @@
 import wttest
 import os, shutil
 
-# test_bug029.py
 #
 # Test that WT correctly propagates the most recent checkpoint time
 # across restarts. We validate this by reproducing the original bug
@@ -43,8 +42,9 @@ import os, shutil
 # read errors when restoring the backup.
 
 class test_bug029(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = ("cache_size=50MB")
-    uri = "table:test_bug029"
+    uri = f"table:{test_name}"
     bigvalue = "WiredTiger" * 100
     backup_dir = "backup_dir"
 

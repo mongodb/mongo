@@ -30,10 +30,10 @@ import os
 from unittest import skip
 import wiredtiger, wttest
 
-# test_txn_uncommitted.py
-#    Stats for uncommitted txn data.
+# Stats for uncommitted txn data.
 class test_txn_uncommitted(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     n_sessions = 20
     n_updates = 20
     conn_config = 'statistics=(all)'
@@ -53,7 +53,7 @@ class test_txn_uncommitted(wttest.WiredTigerTestCase):
 
     def txn_one(self):
         session = self.conn.open_session()
-        cursor = session.open_cursor('table:test_txn_uncommitted', None, None)
+        cursor = session.open_cursor(f'table:{self.test_name}', None, None)
 
         session.begin_transaction()
 
@@ -82,8 +82,8 @@ class test_txn_uncommitted(wttest.WiredTigerTestCase):
     def txn_two(self):
         session1 = self.conn.open_session()
         session2 = self.conn.open_session()
-        cursor1 = session1.open_cursor('table:test_txn_uncommitted', None, None)
-        cursor2 = session2.open_cursor('table:test_txn_uncommitted', None, None)
+        cursor1 = session1.open_cursor(f'table:{self.test_name}', None, None)
+        cursor2 = session2.open_cursor(f'table:{self.test_name}', None, None)
 
         session1.begin_transaction()
         session2.begin_transaction()
@@ -131,8 +131,8 @@ class test_txn_uncommitted(wttest.WiredTigerTestCase):
     def txn_two_seq(self):
         session1 = self.conn.open_session()
         session2 = self.conn.open_session()
-        cursor1 = session1.open_cursor('table:test_txn_uncommitted', None, None)
-        cursor2 = session2.open_cursor('table:test_txn_uncommitted', None, None)
+        cursor1 = session1.open_cursor(f'table:{self.test_name}', None, None)
+        cursor2 = session2.open_cursor(f'table:{self.test_name}', None, None)
 
         session1.begin_transaction()
         session2.begin_transaction()
@@ -173,7 +173,7 @@ class test_txn_uncommitted(wttest.WiredTigerTestCase):
 
     def txn_many(self):
         sessions = [self.conn.open_session() for _ in range(self.n_sessions)]
-        cursors = [session.open_cursor('table:test_txn_uncommitted', None, None) for session in sessions]
+        cursors = [session.open_cursor(f'table:{self.test_name}', None, None) for session in sessions]
         for session in sessions:
             session.begin_transaction()
 
@@ -199,7 +199,7 @@ class test_txn_uncommitted(wttest.WiredTigerTestCase):
 
     def txn_many_many(self):
         sessions = [self.conn.open_session() for _ in range(self.n_sessions)]
-        cursors = [session.open_cursor('table:test_txn_uncommitted', None, None) for session in sessions]
+        cursors = [session.open_cursor(f'table:{self.test_name}', None, None) for session in sessions]
         for session in sessions:
             session.begin_transaction()
 
@@ -226,7 +226,7 @@ class test_txn_uncommitted(wttest.WiredTigerTestCase):
 
     def test_session_stats(self):
         self.session = self.conn.open_session()
-        self.session.create("table:test_txn_uncommitted", "key_format=i,value_format=S")
+        self.session.create(f"table:{self.test_name}", "key_format=i,value_format=S")
 
         self.txn_one()
         self.txn_two()

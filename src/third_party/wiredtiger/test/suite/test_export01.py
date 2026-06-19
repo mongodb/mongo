@@ -26,12 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_export01.py
-#   Tests basic export functionality.
-#   - Test that the WiredTiger.export file is correctly created and removed.
-#   - Test that the WiredTiger.export file contains the correct contents
-#     after performing operations on the home directory, creating a backup
-#     directory, and then performing operation on the backup directory.
+# Tests basic export functionality.
+# - Test that the WiredTiger.export file is correctly created and removed.
+# - Test that the WiredTiger.export file contains the correct contents
+#   after performing operations on the home directory, creating a backup
+#   directory, and then performing operation on the backup directory.
 
 from helper import copy_wiredtiger_home
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources

@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_compress01.py
-#    Smoke-test compression
+# Smoke-test compression
 #
 
 import wttest
@@ -36,9 +35,10 @@ from wtscenario import make_scenarios
 # Smoke-test compression
 class test_compress01(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     types = [
-        ('file', dict(uri='file:test_compress01')),
-        ('table', dict(uri='table:test_compress01')),
+        ('file', dict(uri=f'file:{test_name}')),
+        ('table', dict(uri=f'table:{test_name}')),
     ]
     compress = [
         ('nop', dict(compress='nop')),

@@ -33,7 +33,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wtthread import checkpoint_thread
 
-# test_prepare21.py
 # Test prepare rollback doesn't crash because of triggering out of order fix.
 class test_prepare21(test_rollback_to_stable_base):
 

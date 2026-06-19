@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp13.py
-#   Timestamps: session query_timestamp
+# Timestamps: session query_timestamp
 #
 
 from suite_subprocess import suite_subprocess
@@ -35,7 +34,8 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_timestamp13'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
 
     scenarios = make_scenarios([

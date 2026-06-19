@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_cursor11.py
-#   Test remove returns not found when deleting an non-existent key
+# Test remove returns not found when deleting an non-existent key
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -35,12 +34,13 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_cursor11(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'statistics=(all),precise_checkpoint=true,' \
                   'disaggregated=(role="follower")'
 
-    uri = 'layered:test_layered_cursor11'
+    uri = f'layered:{test_name}'
 
-    disagg_storages = gen_disagg_storages('test_layered_cursor11', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     def test_delete_non_existent_key(self):

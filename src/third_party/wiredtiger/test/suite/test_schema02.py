@@ -30,8 +30,7 @@ import wiredtiger, wttest
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
-# test_schema02.py
-#    Columns, column groups, indexes
+# Columns, column groups, indexes
 class test_schema02(TieredConfigMixin, wttest.WiredTigerTestCase):
     """
     Test basic operations

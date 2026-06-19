@@ -32,7 +32,6 @@ from helper_disagg import disagg_test_class
 from run import wt_builddir
 from suite_subprocess import suite_subprocess
 
-# test_disagg_util01.py.py
 # Verify automatic pickup of the latest disaggregated checkpoint at open time:
 #  - test_leader_auto_pickup exercises the in-library leader-mode pickup.
 #  - test_follower_auto_pickup_via_wt exercises the util-driven follower
@@ -47,7 +46,8 @@ from suite_subprocess import suite_subprocess
 
 @disagg_test_class
 class test_disagg_util01(wttest.WiredTigerTestCase, suite_subprocess):
-    uri = 'layered:test_disagg_util01'
+    test_name = __qualname__
+    uri = f'layered:{test_name}'
     create_session_config = 'key_format=i,value_format=S'
     nrows = 100
 
@@ -132,8 +132,8 @@ class test_disagg_util01(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.checkpoint()
 
         out, _ = self._run_wt_as_follower('wt-follower', ['list'])
-        self.assertIn('layered:test_disagg_util01', out,
-            f"expected 'layered:test_disagg_util01' in wt list output, got:\n{out}")
+        self.assertIn(f'layered:{self.test_name}', out,
+            f"expected 'layered:{self.test_name}' in wt list output, got:\n{out}")
 
     def test_follower_no_checkpoint_via_wt(self):
         # Don't write or checkpoint anything as leader; wt must still open cleanly

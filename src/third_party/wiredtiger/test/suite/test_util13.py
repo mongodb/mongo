@@ -33,17 +33,17 @@ import wiredtiger, wttest
 
 from wtscenario import make_scenarios
 
-# test_util13.py
-#    Utilities: wt dump, as well as the dump cursor
-#    Test that dump and load retain table configuration information.
+# Utilities: wt dump, as well as the dump cursor
+# Test that dump and load retain table configuration information.
 #
 class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt dump.  We check for specific output and preservation of
     non-default table create parameters.
     """
+    test_name = __qualname__
 
-    pfx = 'test_util13'
+    pfx = test_name
     nentries = 100
     dir = "dump_dir"
     #

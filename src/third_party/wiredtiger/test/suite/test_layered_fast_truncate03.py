@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate03.py
-#   Tests that a follower correctly handles pages that were fast-truncated on the
-#   leader: stable pages must never be dirtied, and deleted state must survive
-#   eviction and reopen.
+# Tests that a follower correctly handles pages that were fast-truncated on the
+# leader: stable pages must never be dirtied, and deleted state must survive
+# eviction and reopen.
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -40,14 +39,15 @@ from wiredtiger import stat
 @disagg_test_class
 class test_layered_fast_truncate03(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
-    uri         = 'layered:test_layered_fast_truncate03'
+    test_name = __qualname__
+    uri         = f'layered:{test_name}'
     nrows       = 5000
     value       = 'a' * 500
     trunc_start = 1001
     trunc_stop  = 4000
 
     conn_config = 'cache_size=50MB,statistics=(all),disaggregated=(role="leader")'
-    disagg_storages = gen_disagg_storages('test_layered_fast_truncate03', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     def setup_leader(self, extra_cfg=''):

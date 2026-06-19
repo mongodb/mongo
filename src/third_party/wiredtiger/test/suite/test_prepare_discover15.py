@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover15.py
-#   Rolling back a follower-claimed prepared transaction is durable across
-#   checkpoints. After the rollback completes and a new checkpoint is taken,
-#   reopening prepared_discover against that checkpoint must not surface the
-#   already-rolled-back prepared id.
+# Rolling back a follower-claimed prepared transaction is durable across
+# checkpoints. After the rollback completes and a new checkpoint is taken,
+# reopening prepared_discover against that checkpoint must not surface the
+# already-rolled-back prepared id.
 
 import wiredtiger
 import wttest
@@ -40,10 +39,11 @@ from wtscenario import make_scenarios
 @wttest.skip_for_hook("tiered", "Layered tables are not supported with tiered storage")
 @disagg_test_class
 class test_prepare_discover15(wttest.WiredTigerTestCase):
-    tablename = 'test_prepare_discover15'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
-    disagg_storages = gen_disagg_storages('test_prepare_discover15', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_base_config = (

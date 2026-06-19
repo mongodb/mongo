@@ -28,8 +28,7 @@
 
 import wiredtiger, wttest
 
-# test_bug016.py
-#       WT-2757: WT_CURSOR.get_key() fails after WT_CURSOR.insert unless the
+# WT-2757: WT_CURSOR.get_key() fails after WT_CURSOR.insert unless the
 # cursor has a record number key with append configured.
 class test_bug016(wttest.WiredTigerTestCase):
 

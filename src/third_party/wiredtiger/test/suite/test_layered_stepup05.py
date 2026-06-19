@@ -30,22 +30,22 @@ import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_stepup05.py
-#    Test that cursor operations on a layered cursor after step-up work correctly
-#    when the cursor was reset on the follower before the step-up.
+# Test that cursor operations on a layered cursor after step-up work correctly
+# when the cursor was reset on the follower before the step-up.
 #
-#    Two checkpoints with distinct content are created on the leader:
-#      ckpt1 (TS=1): keys "1", "3", "5"
-#      ckpt2 (TS=2): adds "7", "9" and updates "1" to a new value
+# Two checkpoints with distinct content are created on the leader:
+#   ckpt1 (TS=1): keys "1", "3", "5"
+#   ckpt2 (TS=2): adds "7", "9" and updates "1" to a new value
 @disagg_test_class
 class test_layered_stepup05(wttest.WiredTigerTestCase):
-    uri = "layered:test_layered_stepup05"
+    test_name = __qualname__
+    uri = f"layered:{test_name}"
 
     conn_base_config = 'statistics=(all),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower")'
 
-    disagg_storages = gen_disagg_storages('test_layered_stepup05', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
 
     # Timestamps for the two checkpoints.
     ckpt1_ts = 1

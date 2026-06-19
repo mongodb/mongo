@@ -32,11 +32,11 @@ from wtscenario import make_scenarios
 
 StorageSource = wiredtiger.StorageSource  # easy access to constants
 
-# test_tiered07.py
-#    Basic tiered storage API for schema operations.
+# Basic tiered storage API for schema operations.
 class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
 
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered07', tiered_only=True)
+    test_name = __qualname__
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), test_name, tiered_only=True)
 
     flush_obj = [('ckpt', dict(first_ckpt=True)),
                  ('no_ckpt', dict(first_ckpt=False)),

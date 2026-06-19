@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_truncate02.py
-#       session level operations on tables
+# session level operations on tables
 #
 
 from test_truncate01 import test_truncate_base
@@ -36,7 +35,7 @@ from wtscenario import make_scenarios
 import wttest
 
 # test_truncate_fast_delete
-#       When deleting leaf pages that aren't in memory, we set transactional
+# When deleting leaf pages that aren't in memory, we set transactional
 # information in the page's WT_REF structure, which results in interesting
 # issues.
 class test_truncate_fast_delete(test_truncate_base):

@@ -29,9 +29,8 @@
 import time, wiredtiger, wttest
 from error_info_util import error_info_util
 
-# test_error_info02.py
-#   Test that the get_last_error() session API returns the last error for rollback error to
-#   occur in the session.
+# Test that the get_last_error() session API returns the last error for rollback error to
+# occur in the session.
 class test_error_info02(error_info_util):
     uri = "table:test_error_info.wt"
     # FIXME-WT-15058

@@ -31,7 +31,6 @@ from wiredtiger import stat, WiredTigerError, wiredtiger_strerror, WT_ROLLBACK
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_truncate18.py
 #
 # The optimization that replaces deleted pages full of obsolete values with physically
 # empty pages can cause problems, because for some purposes the empty page is not

@@ -31,7 +31,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable30.py
 # Test RTS fails with active transactions and the subsequent transaction resolution succeeds.
 class test_rollback_to_stable30(wttest.WiredTigerTestCase):
 

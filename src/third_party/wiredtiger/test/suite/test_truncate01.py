@@ -30,8 +30,7 @@
 # truncate
 # [END_TAGS]
 #
-# test_truncate01.py
-#       session level operations on tables
+# session level operations on tables
 #
 
 import wiredtiger, wttest
@@ -205,7 +204,8 @@ class test_truncate_cursor_end(test_truncate_base):
 
 # Test truncation of empty objects.
 class test_truncate_empty(test_truncate_base):
-    name = 'test_truncate_empty'
+    test_name = __qualname__
+    name = test_name
 
     types = [
         ('file', dict(type='file:')),

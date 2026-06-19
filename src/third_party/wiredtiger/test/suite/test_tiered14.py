@@ -31,14 +31,14 @@ from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtdataset import TrackedSimpleDataSet, TrackedComplexDataSet
 from wtscenario import make_scenarios
 
-# test_tiered14.py
-#    Test somewhat arbitrary combinations of flush_tier, checkpoint, restarts,
-#    data additions and updates.
+# Test somewhat arbitrary combinations of flush_tier, checkpoint, restarts,
+# data additions and updates.
 class test_tiered14(wttest.WiredTigerTestCase, TieredConfigMixin):
 
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered14', tiered_only=True)
+    test_name = __qualname__
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), test_name, tiered_only=True)
 
-    uri = "table:test_tiered14-{}"   # format for subtests
+    uri = f"table:{test_name}-{{}}"   # format for subtests
 
     # The multiplier makes the size of keys and values progressively larger.
     # A multiplier of 0 makes the keys and values a single length.

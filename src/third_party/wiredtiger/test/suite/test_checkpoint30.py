@@ -32,7 +32,6 @@ import wiredtiger
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint30.py
 #
 # Test reading a cursor when the aggregate time window is visible to the snapshot
 # but not all deleted keys on-disk version are not visible.

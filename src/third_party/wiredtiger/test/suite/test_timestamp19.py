@@ -26,13 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp19.py
 # Use the oldest timestamp in the metadata as the oldest timestamp on restart.
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 class test_timestamp19(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=50MB'
 
     format_values = [
@@ -51,7 +51,7 @@ class test_timestamp19(wttest.WiredTigerTestCase):
         cursor.close()
 
     def test_timestamp(self):
-        uri = "table:test_timestamp19"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, 'S')
         self.session.create(uri, create_params)
 

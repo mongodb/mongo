@@ -33,9 +33,9 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_prepare09.py
 # Validate scenarios involving inserting tombstones when rolling back prepares
 class test_prepare09(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=2MB'
 
     format_values = [
@@ -48,7 +48,7 @@ class test_prepare09(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values)
 
     def test_prepared_update_is_aborted_correctly_with_on_disk_value(self):
-        uri = "table:test_prepare09"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
 
         value1 = 'a' * 10000
@@ -91,7 +91,7 @@ class test_prepare09(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.get_value(), value1)
 
     def test_prepared_update_is_aborted_correctly(self):
-        uri = "table:test_prepare09"
+        uri = f"table:{self.test_name}"
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
 
         value1 = 'a' * 10000

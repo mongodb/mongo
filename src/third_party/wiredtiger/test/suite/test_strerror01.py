@@ -33,8 +33,7 @@
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 
-# test_strerror01.py
-#     Test generation of sub-level error codes when using calling strerror.
+# Test generation of sub-level error codes when using calling strerror.
 class test_strerror(wttest.WiredTigerTestCase, suite_subprocess):
     sub_errors = [
         (wiredtiger.WT_NONE, "WT_NONE: No additional context"),

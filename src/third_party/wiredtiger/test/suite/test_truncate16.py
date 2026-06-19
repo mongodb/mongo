@@ -31,7 +31,6 @@ from wiredtiger import stat, WiredTigerError, wiredtiger_strerror, WT_ROLLBACK
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_truncate16.py
 #
 # Make sure that no shenanigans occur if we try to read from a page that's been
 # fast-truncated by a prepared transaction.

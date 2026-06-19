@@ -30,24 +30,24 @@ import wttest, wiredtiger
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_cursor21.py
-#    Regression coverage for WT-15189: next_random on a layered table must
-#    return WT_NOTFOUND rather than spin when every reachable row is a
-#    tombstone. Covers the all-deleted-in-ingest case (stable empty) and the
-#    all-deleted-scattered case (tombstones in both ingest and stable).
+# Regression coverage for WT-15189: next_random on a layered table must
+# return WT_NOTFOUND rather than spin when every reachable row is a
+# tombstone. Covers the all-deleted-in-ingest case (stable empty) and the
+# all-deleted-scattered case (tombstones in both ingest and stable).
 
 @disagg_test_class
 @wttest.skip_for_hook("tiered", "Cannot run tiered storage in disagg mode")
 class test_layered_cursor21(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     conn_config = 'disaggregated=(role="leader"),'
 
     uris = [
-        ('layered', dict(uri='layered:test_layered_cursor21')),
-        ('table', dict(uri='table:test_layered_cursor21')),
+        ('layered', dict(uri=f'layered:{test_name}')),
+        ('table', dict(uri=f'table:{test_name}')),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_cursor21', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, uris)
 
     nitems = 1000

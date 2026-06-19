@@ -31,7 +31,6 @@ from helper import simulate_crash_restart
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable44.py
 # Check that RTS backs out prepared transactions on recover if the stable timestamp is not set.
 
 class test_rollback_to_stable44(test_rollback_to_stable_base):

@@ -32,7 +32,6 @@ import wiredtiger
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint17.py
 #
 # Make sure that if the history store is clean when a checkpoint is taken
 # that we can still access it via the checkpoint.

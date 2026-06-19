@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare40.py
 # Test that checkpoint after opening a backup with prepared updates (preserve prepared on) doesn't crash by:
 # - Checkpoint writes prepared update to disk
 # - Rollback the transaction with rollback timestamp > stable timestamp
@@ -37,7 +36,8 @@ from prepare_util import test_prepare_preserve_prepare_base
 from wtscenario import make_scenarios
 
 class test_prepare40(test_prepare_preserve_prepare_base):
-    tablename = 'test_prepare40'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
 

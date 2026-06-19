@@ -30,8 +30,7 @@ import fnmatch, os, time
 import wttest
 from wiredtiger import stat
 
-# test_bug019.py
-#    Test that pre-allocating log files only pre-allocates a small number.
+# Test that pre-allocating log files only pre-allocates a small number.
 class test_bug019(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled,file_max=100K),statistics=(fast)'
     uri = "table:bug019"

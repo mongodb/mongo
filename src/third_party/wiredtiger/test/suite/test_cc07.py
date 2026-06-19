@@ -30,7 +30,6 @@ from test_cc01 import test_cc_base
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_cc07.py
 # Verify checkpoint cleanup removes the obsolete time window from the pages.
 class test_cc07(test_cc_base):
     conn_config_common = 'cache_size=1GB,statistics=(all),statistics_log=(json,wait=1,on_close=true)'

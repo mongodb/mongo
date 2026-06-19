@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_stepup09.py
-#   Verify that the stable cursor lifecycle is correct when a cursor survives a
-#   step-up: the cursor was open on the follower and is reused after the same
-#   connection becomes the leader.
+# Verify that the stable cursor lifecycle is correct when a cursor survives a
+# step-up: the cursor was open on the follower and is reused after the same
+# connection becomes the leader.
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -98,12 +97,13 @@ _overwrite = [
 
 @disagg_test_class
 class test_layered_stepup09(wttest.WiredTigerTestCase):
+    test_name = __qualname__
 
-    uri = 'layered:test_layered_stepup09'
+    uri = f'layered:{test_name}'
     table_config = 'key_format=S,value_format=S'
     conn_base_config = ',create,statistics=(all),'
 
-    disagg_storages = gen_disagg_storages('test_layered_stepup09', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, _operations, _overwrite)
 
     def conn_config(self):

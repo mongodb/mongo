@@ -30,8 +30,7 @@ import wttest
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
-# test_schema06.py
-#    Repeatedly create and drop indices
+# Repeatedly create and drop indices
 class test_schema06(TieredConfigMixin, wttest.WiredTigerTestCase):
     """
     Test basic operations

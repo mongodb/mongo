@@ -29,7 +29,6 @@
 import os
 from wtbackup import backup_base
 
-# test_backup14.py
 # Test cursor backup with a block-based incremental cursor.
 class test_backup14(backup_base):
     conn_config='cache_size=1G,log=(enabled,file_max=100K)'

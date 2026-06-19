@@ -26,18 +26,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_prepare07.py
-#   Test that cursor.next(), cursor.prev(), and cursor.search() on a follower
-#   return committed values and do not raise WT_PREPARE_CONFLICT when the primary
-#   has checkpointed a prepared (uncommitted) transaction.
+# Test that cursor.next(), cursor.prev(), and cursor.search() on a follower
+# return committed values and do not raise WT_PREPARE_CONFLICT when the primary
+# has checkpointed a prepared (uncommitted) transaction.
 #
-#   Setup: the primary and follower both commit initial values, then prepare the same
-#   update (same prepared_id, simulating oplog replay). The primary checkpoints with
-#   preserve_prepared=true so the snapshot includes the pending update. The follower
-#   advances its checkpoint to pick up the primary's snapshot, then rolls back its
-#   own copy of the prepare.
+# Setup: the primary and follower both commit initial values, then prepare the same
+# update (same prepared_id, simulating oplog replay). The primary checkpoints with
+# preserve_prepared=true so the snapshot includes the pending update. The follower
+# advances its checkpoint to pick up the primary's snapshot, then rolls back its
+# own copy of the prepare.
 #
-#   Expected: all cursor operations return the committed values without error.
+# Expected: all cursor operations return the committed values without error.
 
 import wiredtiger
 import wttest
@@ -46,10 +45,11 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_prepare07(wttest.WiredTigerTestCase):
-    tablename = 'test_layered_prepare07'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
-    disagg_storages = gen_disagg_storages('test_layered_prepare07', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_base_config = ',create,statistics=(all),precise_checkpoint=true,preserve_prepared=true,'

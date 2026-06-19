@@ -34,7 +34,8 @@ from wtscenario import make_scenarios
 
 # Test that a modify can't be applied without a base value.
 class test_modify02(wttest.WiredTigerTestCase):
-    uri = 'table:test_modify02'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
 
     valuefmt = [
         ('item', dict(valuefmt='u')),

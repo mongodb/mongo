@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp07.py
-#   Timestamps: checkpoints.
+# Timestamps: checkpoints.
 #
 
 from helper import copy_wiredtiger_home

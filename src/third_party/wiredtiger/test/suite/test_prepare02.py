@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare02.py
-#   Prepare : Session API usage generates expected error in prepared state.
+# Prepare : Session API usage generates expected error in prepared state.
 #
 
 from suite_subprocess import suite_subprocess

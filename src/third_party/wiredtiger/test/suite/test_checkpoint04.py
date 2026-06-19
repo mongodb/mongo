@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_checkpoint04.py
 # Test that the checkpoints timing statistics are populated as expected.
 
 import wttest

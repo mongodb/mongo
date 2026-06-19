@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_compact03.py
-#   Test that compact doesn't reduce the file size when there are overflow values at the
-#   end of file.
+# Test that compact doesn't reduce the file size when there are overflow values at the
+# end of file.
 #
 
 from compact_util import compact_util
@@ -37,7 +36,8 @@ from wtscenario import make_scenarios
 # Test compact behavior with overflow values.
 class test_compact03(compact_util):
 
-    uri='table:test_compact03'
+    test_name = __qualname__
+    uri=f'table:{test_name}'
 
     fileConfig = [
         ('1KB', dict(fileConfig='allocation_size=1KB,leaf_page_max=1KB')),

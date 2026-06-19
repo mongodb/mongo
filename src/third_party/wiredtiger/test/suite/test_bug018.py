@@ -31,8 +31,7 @@ from suite_subprocess import suite_subprocess
 import os
 import wiredtiger, wttest
 
-# test_bug018.py
-#   JIRA WT-3590: if writing table data fails during close then tables
+# JIRA WT-3590: if writing table data fails during close then tables
 # that were updated within the same transaction could get out of sync with
 # each other.
 @wttest.skip_for_hook("nonstandalone", "fails for nonstandalone")
@@ -40,6 +39,7 @@ import wiredtiger, wttest
 class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
     '''Test closing/reopening/recovering tables when writes fail'''
 
+    test_name = __qualname__
     conn_config = 'log=(enabled)'
     basename = 'bug018.'
     baseuri = 'file:' + basename
@@ -123,7 +123,7 @@ class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
         self.close_conn()
         subdir = 'SUBPROCESS'
         [ignore_result, new_home_dir] = self.run_subprocess_function(subdir,
-            'test_bug018.test_bug018.subprocess_bug018')
+            f'{self.test_name}.{self.test_name}.subprocess_bug018')
 
         # Make a backup for forensics in case something goes wrong.
         backup_dir = 'BACKUP'

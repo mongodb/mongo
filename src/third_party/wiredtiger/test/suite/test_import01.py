@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_import01.py
 # Import a file into a running database for the following scenarios:
 # - The source database and destination database are different.
 # - The source database and destination database are the same.

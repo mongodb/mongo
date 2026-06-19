@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn10.py
-#   Transactions: commits and rollbacks
+# Transactions: commits and rollbacks
 #
 
 from helper import simulate_crash_restart
@@ -35,8 +34,9 @@ from suite_subprocess import suite_subprocess
 import wttest
 
 class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
-    t1 = 'table:test_txn10_1'
-    t2 = 'table:test_txn10_2'
+    test_name = __qualname__
+    t1 = f'table:{test_name}_1'
+    t2 = f'table:{test_name}_2'
     create_params = 'key_format=i,value_format=i'
     conn_config = 'log=(enabled,file_max=100K,remove=false),' + \
                 'transaction_sync=(method=dsync,enabled)'

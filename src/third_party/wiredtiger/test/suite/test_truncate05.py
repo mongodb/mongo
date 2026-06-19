@@ -30,9 +30,9 @@ import wttest
 from wiredtiger import WiredTigerError
 from wtscenario import make_scenarios
 
-# test_truncate05.py
 # Test various fast truncate visibility scenarios
 class test_truncate05(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=2MB'
 
     format_values = [
@@ -43,7 +43,7 @@ class test_truncate05(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values)
 
     def test_truncate_read_older_than_newest(self):
-        uri = 'table:test_truncate05'
+        uri = f'table:{self.test_name}'
         format = 'key_format={},value_format={}'.format(self.key_format, 'S')
         self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)

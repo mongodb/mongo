@@ -33,10 +33,10 @@ from wtdataset import SimpleDataSet, ComplexDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_compact.py
-#    session level compact operation
+# session level compact operation
 class test_compact(compact_util, suite_subprocess):
-    name = 'test_compact'
+    test_name = __qualname__
+    name = test_name
 
     # We don't want to set the page size too small as compaction doesn't work on tables with many
     # overflow items, furthermore eviction can get very slow with overflow items. We don't want the

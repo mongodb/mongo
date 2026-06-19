@@ -35,9 +35,10 @@ from wtscenario import make_scenarios
 # in the write after the prepared update is rolled back.
 @disagg_test_class
 class test_layered_prepare05(test_prepare_preserve_prepare_base):
+    test_name = __qualname__
     conn_config_base = test_prepare_preserve_prepare_base.conn_config + ',disaggregated=(role="leader")'
 
-    uri = "table:test_layered_prepare05"
+    uri = f"table:{test_name}"
 
     evict = [
         ('none', dict(evict=False)),
@@ -49,7 +50,7 @@ class test_layered_prepare05(test_prepare_preserve_prepare_base):
         ('enabled', dict(evict=True)),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_prepare05', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages, evict, delta)
 
     def conn_config(self):

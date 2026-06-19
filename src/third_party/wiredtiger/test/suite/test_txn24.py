@@ -30,10 +30,10 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_txn24.py
-#   Transactions and eviction: Test if using snapshot isolation for eviction threads helps with
-#   cache stuck issue.
+# Transactions and eviction: Test if using snapshot isolation for eviction threads helps with
+# cache stuck issue.
 class test_txn24(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     table_params_values = [
         ('integer-row', dict(key_format='i', extraconfig='')),
         ('column', dict(key_format='r', extraconfig='')),
@@ -60,7 +60,7 @@ class test_txn24(wttest.WiredTigerTestCase):
         self.ignoreStdoutPattern(r"oldest id .* pinned in session")
 
         # Create and populate a table.
-        uri = "table:test_txn24"
+        uri = f"table:{self.test_name}"
         table_params = 'key_format={},value_format={}'.format(self.key_format, 'S')
 
         default_val = 'ABCD' * 60
@@ -123,7 +123,7 @@ class test_txn24(wttest.WiredTigerTestCase):
 
     def test_oldest_id_log(self):
         # Create and populate a table.
-        uri = "table:test_txn24"
+        uri = f"table:{self.test_name}"
         table_params = 'key_format={},value_format=S'.format(self.key_format)
 
         default_val = 'ABCD' * 60

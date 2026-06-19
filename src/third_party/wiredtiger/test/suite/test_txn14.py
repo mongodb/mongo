@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn14.py
-#   Transactions: commits and rollbacks
+# Transactions: commits and rollbacks
 #
 
 from helper import simulate_crash_restart
@@ -36,7 +35,8 @@ from wtscenario import make_scenarios
 import wttest
 
 class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
-    t1 = 'table:test_txn14_1'
+    test_name = __qualname__
+    t1 = f'table:{test_name}_1'
     entries = 10000
     extra_entries = 5
     conn_config = 'log=(enabled,file_max=100K,remove=false)'

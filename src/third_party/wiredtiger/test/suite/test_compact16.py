@@ -35,9 +35,10 @@ from wtthread import checkpoint_thread
 # Test compact and checkpoint running concurrently, ensuring space is reclaimed after the compaction
 # call.
 class test_compact16(compact_util):
+    test_name = __qualname__
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB,leaf_value_max=16MB'
     conn_config = 'cache_size=100MB,statistics=(all),verbose=[compact:2]'
-    uri = 'table:test_compact16'
+    uri = f'table:{test_name}'
 
     table_numkv = 1000 * 1000
 

@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate06.py
-#   Regression test for WT-17267. Verify on a layered URI forces a close/reopen of the
-#   layered dhandle. The follower's in-memory truncate list must survive that cycle;
-#   before the fix it was discarded, causing truncated rows to reappear and the truncate
-#   to be torn down.
+# Regression test for WT-17267. Verify on a layered URI forces a close/reopen of the
+# layered dhandle. The follower's in-memory truncate list must survive that cycle;
+# before the fix it was discarded, causing truncated rows to reappear and the truncate
+# to be torn down.
 
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -39,16 +38,16 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_fast_truncate06(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'disaggregated=(role="leader"),'
     nrows = 100
 
     uris = [
-        ('layered', dict(uri='layered:test_layered_fast_truncate06')),
-        ('table', dict(uri='table:test_layered_fast_truncate06')),
+        ('layered', dict(uri=f'layered:{test_name}')),
+        ('table', dict(uri=f'table:{test_name}')),
     ]
 
-    disagg_storages = gen_disagg_storages(
-        'test_layered_fast_truncate06', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, uris)
 
     def session_create_config(self):

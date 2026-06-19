@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor17.py
-#   Test the largest_key interface under various scenarios.
+# Test the largest_key interface under various scenarios.
 #
 import wttest
 import wiredtiger
@@ -35,7 +34,8 @@ from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 class test_cursor17(wttest.WiredTigerTestCase):
-    tablename = 'test_cursor17'
+    test_name = __qualname__
+    tablename = test_name
 
     types = [
         ('file-row', dict(type='file:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),

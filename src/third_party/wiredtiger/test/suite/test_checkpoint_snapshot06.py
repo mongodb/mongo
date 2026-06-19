@@ -35,15 +35,15 @@ from helper import copy_wiredtiger_home
 from wiredtiger import stat
 from wtbackup import backup_base
 
-# test_checkpoint_snapshot06.py
-#   This test is to run checkpoint and truncate and insert followed by eviction
-#   for one table in parallel with timing stress for checkpoint and let eviction
-#   write more data than checkpoint.
+# This test is to run checkpoint and truncate and insert followed by eviction
+# for one table in parallel with timing stress for checkpoint and let eviction
+# write more data than checkpoint.
 class test_checkpoint_snapshot06(backup_base):
 
     # Create two tables.
-    uri_1 = "table:test_checkpoint_snapshot06_1"
-    uri_2 = "table:test_checkpoint_snapshot06_2"
+    test_name = __qualname__
+    uri_1 = f"table:{test_name}_1"
+    uri_2 = f"table:{test_name}_2"
     backup_dir = "BACKUP"
 
     format_values = [

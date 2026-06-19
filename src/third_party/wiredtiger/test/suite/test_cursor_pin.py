@@ -30,8 +30,7 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_cursor_pin.py
-#       Smoke-test fast-path searching for pinned pages before re-descending
+# Smoke-test fast-path searching for pinned pages before re-descending
 # the tree.
 class test_cursor_pin(wttest.WiredTigerTestCase):
     uri = 'file:cursor_pin'

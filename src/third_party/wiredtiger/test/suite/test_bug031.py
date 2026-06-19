@@ -28,7 +28,6 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_bug031.py
 # This tests for the scenario discovered in WT-10717 with WT-10522 reverted.
 # Without WT-10522, it is possible to miss an update when constructing the update list when there is
 # an existing aborted update with a WT_UPDATE_RESTORED_FROM_DS flag.

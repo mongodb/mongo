@@ -29,8 +29,7 @@
 import wiredtiger, wttest
 from helper import simulate_crash_restart
 
-# test_txn30.py
-#   Test schema operation failures should not block transaction commit.
+# Test schema operation failures should not block transaction commit.
 class test_txn30(wttest.WiredTigerTestCase):
 
     def test_txn30(self):

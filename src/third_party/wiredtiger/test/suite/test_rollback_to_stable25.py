@@ -30,7 +30,6 @@ from rollback_to_stable_util import verify_rts_logs
 import wiredtiger, wttest
 from wtscenario import make_scenarios, filter_scenarios
 
-# test_rollback_to_stable25.py
 # Check various scenarios relating to RLE cells in column-store.
 #
 # We write at three different timestamps:

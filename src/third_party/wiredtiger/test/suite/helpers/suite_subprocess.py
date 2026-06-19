@@ -215,6 +215,17 @@ class suite_subprocess:
             testparts[1] + '.0')
         return [ returncode, new_home_dir ]
 
+    # Merge a connection configuration string into a wt argument list, combining with an existing
+    # -C value when present.
+    def _add_wt_conn_config(self, args, conn_config):
+        args = list(args)
+        if '-C' in args:
+            value = args.index('-C') + 1
+            args[value] = '%s,%s' % (args[value], conn_config)
+        else:
+            args = ['-C', conn_config] + args
+        return args
+
     # Run the wt utility.
 
     # FIXME-WT-9808:
@@ -240,6 +251,11 @@ class suite_subprocess:
                        ''', r'layered:\1', a, flags=re.X)
                 for a in args
             ]
+
+        # Pass on any extensions a hook saved in hook_extensions.
+        ext_config = getattr(self, 'hook_extensions', None)
+        if ext_config is not None:
+            args = self._add_wt_conn_config(args, ext_config)
 
         # Close the connection to guarantee everything is flushed, and that
         # we can open it from another process.

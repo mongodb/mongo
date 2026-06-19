@@ -29,13 +29,13 @@
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class
 
-# test_layered_prepare03.py
-#   Forward iteration on a layered cursor after the very first next() returns
-#   WT_PREPARE_CONFLICT must resume correctly and return all visible keys.
+# Forward iteration on a layered cursor after the very first next() returns
+# WT_PREPARE_CONFLICT must resume correctly and return all visible keys.
 
 @disagg_test_class
 class test_layered_prepare03(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     conn_base_config = 'precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
@@ -53,7 +53,7 @@ class test_layered_prepare03(wttest.WiredTigerTestCase):
         next() call must resume from the beginning after the conflict is resolved
         and return all stable keys.
         '''
-        uri = 'table:test_layered_prepare03'
+        uri = f'table:{self.test_name}'
         stable_keys = ['1', '2', '3']
 
         # Write stable keys on the leader and checkpoint.

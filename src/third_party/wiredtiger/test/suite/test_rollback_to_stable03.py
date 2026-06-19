@@ -33,7 +33,6 @@ from wtscenario import make_scenarios
 from rollback_to_stable_util import test_rollback_to_stable_base
 from helper import WiredTigerCursor, statistic_uri
 
-# test_rollback_to_stable03.py
 # Test that rollback to stable clears the history store updates from reconciled pages.
 class test_rollback_to_stable03(test_rollback_to_stable_base):
 

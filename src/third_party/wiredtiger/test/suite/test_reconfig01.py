@@ -34,8 +34,7 @@ import time
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
-# test_reconfig01.py
-#    Smoke-test the connection reconfiguration operations.
+# Smoke-test the connection reconfiguration operations.
 class test_reconfig01(wttest.WiredTigerTestCase):
 
     def test_reconfig_shared_cache(self):

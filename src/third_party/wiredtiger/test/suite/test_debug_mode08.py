@@ -28,16 +28,16 @@
 
 import wttest, test_base03
 
-# test_debug_mode08.py
-#   Test the debug mode setting for cursor_copy.
+# Test the debug mode setting for cursor_copy.
 # There's no great way to detect that cursor_copy is really working, as
 # the extra malloc/free that WT does cannot easily be detected.  However,
 # it's useful to run some tests with the mode enabled. We make a subclass
 # of test_base03, so we'll inherit those tests to be run with the debug mode
 # configuration enabled.
 class test_debug_mode08(test_base03.test_base03):
+    test_name = __qualname__
     conn_config = 'debug_mode=(cursor_copy=true)'
-    uri = 'file:test_debug_mode08'
+    uri = f'file:{test_name}'
 
     def test_reconfig(self):
         ''' Test reconfigure with some minimal cursor activity. '''

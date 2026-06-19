@@ -30,16 +30,16 @@ import os
 from wtscenario import make_scenarios
 from wtbackup import backup_base
 
-# test_backup22.py
-#    Test interaction between import and incremental backup.
+# Test interaction between import and incremental backup.
 # Test the functionality of importing dropped tables in incremental backup.
 #
 class test_backup22(backup_base):
+    test_name = __qualname__
     create_config = 'allocation_size=512,key_format=i,value_format=i'
     # Backup directory name
     dir='backup.dir'
     incr_dir = 'incr_backup.dir'
-    uri = 'test_backup22'
+    uri = test_name
     scenarios = make_scenarios([
         ('import_with_metadata', dict(repair=False,checkpoint=False)),
         ('import_repair', dict(repair=True,checkpoint=False)),

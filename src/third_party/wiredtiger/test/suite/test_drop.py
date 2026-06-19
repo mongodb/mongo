@@ -32,11 +32,11 @@ from wtdataset import SimpleDataSet, ComplexDataSet
 from wtdataset import SimpleIndexDataSet
 from wtscenario import make_scenarios
 
-# test_drop.py
-#    session level drop operation
+# session level drop operation
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_drop(wttest.WiredTigerTestCase):
-    name = 'test_drop'
+    test_name = __qualname__
+    name = test_name
     extra_config = ''
 
     scenarios = make_scenarios([

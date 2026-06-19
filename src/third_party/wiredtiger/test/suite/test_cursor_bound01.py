@@ -31,12 +31,12 @@ from helper_disagg import DisaggConfigMixin, gen_disagg_storages
 from wtscenario import make_scenarios
 from wtbound import bound_base
 
-# test_cursor_bound01.py
-#    Basic cursor bound API validation.
+# Basic cursor bound API validation.
 class test_cursor_bound01(bound_base, DisaggConfigMixin):
+    test_name = __qualname__
     conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'disaggregated=(page_log=palite),'
-    file_name = 'test_cursor_bound01'
+    file_name = test_name
 
     types = [
         ('file', dict(uri='file:', use_index = False, use_colgroup = False)),
@@ -51,7 +51,7 @@ class test_cursor_bound01(bound_base, DisaggConfigMixin):
         ('var', dict(key_format='r',value_format='S')),
     ]
 
-    disagg_storages = gen_disagg_storages('test_cursor_bound01', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(types,format_values, disagg_storages)
 
     def __init__(self, *args, **kwargs):

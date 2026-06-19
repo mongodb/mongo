@@ -31,22 +31,22 @@ from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_layered_stepup02.py
-#    Test the basic ability to insert on a follower.
+# Test the basic ability to insert on a follower.
 @disagg_test_class
 class test_layered_stepup02(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
     def conn_config(self):
         return self.conn_base_config + f'disaggregated=(role="{self.initial_role}")'
 
-    uri = "layered:test_layered_stepup02"
+    uri = f"layered:{test_name}"
     nentries = 1000
 
     role_scenarios = [
         ('leader', dict(initial_role='leader')),
         ('follower', dict(initial_role='follower')),
     ]
-    disagg_storages = gen_disagg_storages('test_layered_stepup02', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages, role_scenarios)
 
     # Test simple inserts to a leader/follower

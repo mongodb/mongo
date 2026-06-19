@@ -30,9 +30,9 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_hs31.py
 # Ensure that removal without a timestamp clears the history store records.
 class test_hs31(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=5MB,statistics=(all)'
     format_values = [
         ('column', dict(key_format='r')),
@@ -62,7 +62,7 @@ class test_hs31(wttest.WiredTigerTestCase):
         return val
 
     def test_mm_tombstone_clear_hs(self):
-        uri = 'file:test_hs31'
+        uri = f'file:{self.test_name}'
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 

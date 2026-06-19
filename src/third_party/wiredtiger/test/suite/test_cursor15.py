@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor15.py
-#   Cursors: read_once configuration
+# Cursors: read_once configuration
 #
 
 import wttest

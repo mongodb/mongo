@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_encrypt04.py
-#   Test mismatches error conditions with encryption.
+# Test mismatches error conditions with encryption.
 #
 
 import random
@@ -38,7 +37,8 @@ from suite_subprocess import suite_subprocess
 # Test basic encryption with mismatched configuration
 class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
 
-    uri='table:test_encrypt04'
+    test_name = __qualname__
+    uri=f'table:{test_name}'
 
     # For tests that are mismatching, we use a secretkey. The 'rotn'
     # encryptor without a secretkey is too simple, and may leave

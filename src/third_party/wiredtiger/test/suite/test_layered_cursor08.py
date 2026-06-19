@@ -26,17 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_layered_cursor08.py
-#   Test duplicate key return values.
+# Test duplicate key return values.
 
 import wttest, wiredtiger
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_cursor08.py
-#    Test duplicate key.
+# Test duplicate key.
 @disagg_test_class
 class test_layered_cursor08(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_base_config = ','
 
     create_session_config = 'key_format=S,value_format=S'
@@ -46,14 +45,14 @@ class test_layered_cursor08(wttest.WiredTigerTestCase):
         ('follower', dict(role='follower')),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_cursor08', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages, role)
 
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + f'disaggregated=(role="{self.role}")'
 
     def test_dup_key(self):
-        uri = "layered:test_layered_cursor08"
+        uri = f"layered:{self.test_name}"
         self.session.create(uri, "key_format=S,value_format=S")
 
         c = self.session.open_cursor(uri, None, 'overwrite=false')

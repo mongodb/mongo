@@ -29,9 +29,8 @@
 import os
 import wiredtiger, wttest
 
-# test_priv01.py
-#    Test privileged operations.
-#    This is a variant of test_config02.py.  This test should be run as both
+# Test privileged operations.
+# This is a variant of test_config02.py.  This test should be run as both
 # normal and privileged (e.g. root) user, and should pass in both cases.
 @wttest.skip_for_hook("tiered", "using environment variable to set WT home")
 class test_priv01(wttest.WiredTigerTestCase):
@@ -44,7 +43,8 @@ class test_priv01(wttest.WiredTigerTestCase):
     not.  This test should be run as both normal and privileged
     (e.g. root) user to fully test both cases.
     """
-    table_name1 = 'test_priv01'
+    test_name = __qualname__
+    table_name1 = test_name
     nentries = 100
 
     def setUp(self):

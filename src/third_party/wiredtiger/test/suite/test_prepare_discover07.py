@@ -26,12 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover07.py
-#   Test layered cursor with prepared tombstone transaction discovery in disaggregated storage:
-#   - Setup layered cursor as leader, insert and commit data
-#   - Prepare transaction, advance stable timestamp, checkpoint
-#   - Reopen as follower and pickup checkpoint, verify committed data visibility
-#   - Step up as leader, discover and claim prepared transaction, commit and verify
+# Test layered cursor with prepared tombstone transaction discovery in disaggregated storage:
+# - Setup layered cursor as leader, insert and commit data
+# - Prepare transaction, advance stable timestamp, checkpoint
+# - Reopen as follower and pickup checkpoint, verify committed data visibility
+# - Step up as leader, discover and claim prepared transaction, commit and verify
 
 import wiredtiger
 import wttest
@@ -40,7 +39,8 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_prepare_discover07(wttest.WiredTigerTestCase):
-    tablename = 'test_prepare_discover07'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
     resolve_scenarios = [
@@ -48,7 +48,7 @@ class test_prepare_discover07(wttest.WiredTigerTestCase):
         ('rollback', dict(commit=False)),
     ]
     # Use disaggregated storage scenarios
-    disagg_storages = gen_disagg_storages('test_prepare_discover07', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, resolve_scenarios)
 
     # Base configuration for leader connection

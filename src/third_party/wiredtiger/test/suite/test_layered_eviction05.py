@@ -36,11 +36,12 @@ from wtscenario import make_scenarios
 # Test we don't review obsolete time window for readonly btree in follower.
 @disagg_test_class
 class test_layered_eviction05(eviction_util, wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_base_config = 'cache_size=10MB,'
 
-    disagg_storages = gen_disagg_storages('test_layered_eviction05', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
-    uri='layered:test_layered_eviction05'
+    uri=f'layered:{test_name}'
 
     def conn_config(self):
         return self.conn_base_config + 'disaggregated=(role="leader"),'

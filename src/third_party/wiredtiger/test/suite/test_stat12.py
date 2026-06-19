@@ -30,12 +30,12 @@ import wiredtiger
 import wttest
 import time
 
-# test_stat12.py
 # Check for the presence of eviction-related statistics.
 # Triggers the conditions and verifies the counters increment
 
 class test_stat12(wttest.WiredTigerTestCase):
-    uri = 'table:test_stat12'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
     create_params = 'key_format=i,value_format=S'
 
     def conn_config(self):

@@ -29,11 +29,11 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_hs25.py
 # Ensure updates structure is correct when processing each key.
 class test_hs25(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=50MB'
-    uri = 'table:test_hs25'
+    uri = f'table:{test_name}'
 
     format_values = [
         ('column', dict(key_format='r')),

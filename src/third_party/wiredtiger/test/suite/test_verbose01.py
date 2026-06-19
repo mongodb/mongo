@@ -142,13 +142,13 @@ class test_verbose_base(wttest.WiredTigerTestCase, suite_subprocess):
         conn.close()
         self.cleanStdout()
 
-# test_verbose01.py
 # Verify basic uses of the verbose configuration API work as intended i.e. passing
 # single & multiple valid and invalid verbose categories. These tests are mainly focused on uses
 # of the interface prior to the introduction of verbosity levels, ensuring 'legacy'-style
 # uses of the interface are still supported.
 class test_verbose01(test_verbose_base):
 
+    test_name = __qualname__
     format = [
         ('flat', dict(is_json=False)),
         ('json', dict(is_json=True)),
@@ -169,7 +169,7 @@ class test_verbose01(test_verbose_base):
         with self.expect_verbose(['api'], ['WT_VERB_API'], self.is_json) as conn:
             # Perform a set of simple API operations (table creations and cursor operations) to generate verbose API
             # messages.
-            uri = 'table:test_verbose01_api'
+            uri = f'table:{self.test_name}_api'
             session = conn.open_session()
             session.create(uri, self.collection_cfg)
             c = session.open_cursor(uri)
@@ -183,7 +183,7 @@ class test_verbose01(test_verbose_base):
             # Create a simple table to invoke compaction on. We aren't doing anything interesting with the table
             # such that the data source will be compacted. Rather we want to simply invoke a compaction pass to
             # generate verbose messages.
-            uri = 'table:test_verbose01_compact'
+            uri = f'table:{self.test_name}_compact'
             session = conn.open_session()
             session.create(uri, self.collection_cfg)
             session.compact(uri)
@@ -198,7 +198,7 @@ class test_verbose01(test_verbose_base):
             # Perform a set of simple API operations (table creations and cursor operations) to generate verbose API
             # messages. Beyond opening the connection resource, we shouldn't need to do anything special for the version
             # category.
-            uri = 'table:test_verbose01_multiple'
+            uri = f'table:{self.test_name}_multiple'
             session = conn.open_session()
             session.create(uri, self.collection_cfg)
             c = session.open_cursor(uri)
@@ -212,7 +212,7 @@ class test_verbose01(test_verbose_base):
         with self.expect_verbose([], [], self.is_json, False) as conn:
             # Perform a set of simple API operations (table creations and cursor operations). Ensuring no verbose messages
             # are generated.
-            uri = 'table:test_verbose01_none'
+            uri = f'table:{self.test_name}_none'
             session = conn.open_session()
             session.create(uri, self.collection_cfg)
             c = session.open_cursor(uri)

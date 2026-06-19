@@ -34,7 +34,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint11.py
 # Test what happens if we create an inconsistent checkpoint and then try to
 # open it for read. This version uses timestamps.
 

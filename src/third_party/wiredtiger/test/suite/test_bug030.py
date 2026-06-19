@@ -31,7 +31,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_bug030.py
 # This tests for the scenario in WT-10522 where we could return early when
 # appending a key's original value to its update list due to checking some
 # flags that must be ignored when looking at an aborted tombstone.

@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_follower13.py
-#   Test that when a key is garbage collected during eviction on an ingest
-#   btree, its associated on-disk value is also deleted.
+# Test that when a key is garbage collected during eviction on an ingest
+# btree, its associated on-disk value is also deleted.
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -37,15 +36,16 @@ from wiredtiger import stat
 
 @disagg_test_class
 class test_layered_follower13(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = base_config + 'disaggregated=(role="leader")'
     conn_config_follower = base_config + 'disaggregated=(role="follower")'
 
-    uri = 'layered:test_layered_follower13'
-    ingest_uri = 'file:test_layered_follower13.wt_ingest'
+    uri = f'layered:{test_name}'
+    ingest_uri = f'file:{test_name}.wt_ingest'
     create_config = 'key_format=i,value_format=S'
 
-    disagg_storages = gen_disagg_storages('test_layered_follower13', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_follow = None

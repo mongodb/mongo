@@ -31,7 +31,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_truncate20.py
 #
 # Test to mimic oplog workload in MongoDB. Ensure the deleted pages are
 # cleaned up on disk and we are not using excessive disk space.

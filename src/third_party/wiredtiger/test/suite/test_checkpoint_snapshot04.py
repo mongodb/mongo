@@ -32,14 +32,14 @@ from wtbackup import backup_base
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint_snapshot04.py
-#   Test utility dump of backup and original database when the transaction ids are
-#   written to disk.
+# Test utility dump of backup and original database when the transaction ids are
+# written to disk.
 class test_checkpoint_snapshot04(backup_base):
+    test_name = __qualname__
     dir = 'backup.dir'
 
     # Create a table.
-    uri = "table:test_checkpoint_snapshot04"
+    uri = f"table:{test_name}"
     nrows = 5000
 
     format_values = [
@@ -105,7 +105,7 @@ class test_checkpoint_snapshot04(backup_base):
 
         # Open up the backup cursor, and copy the files.
         if self.target:
-            config = 'target=("table:test_checkpoint_snapshot04")'
+            config = f'target=("table:{self.test_name}")'
         else:
             config = ""
         cursor = self.session.open_cursor('backup:', None, config)

@@ -26,15 +26,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_bug009.py
-#       check that reconciliation takes into account prefix compression
-#       when figuring out how to split pages
+# check that reconciliation takes into account prefix compression
+# when figuring out how to split pages
 #
 
 import wttest
 
 class test_bug009(wttest.WiredTigerTestCase):
-    name = 'test_bug009'
+    test_name = __qualname__
+    name = test_name
     uri = 'file:' + name
 
     def test_reconciliation_prefix_compression(self):

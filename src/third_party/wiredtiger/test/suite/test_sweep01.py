@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_sweep01.py
 # Test lots of tables, number of open files and sweeping.  Run both
 # with and without checkpoints.
 #
@@ -38,7 +37,8 @@ from wiredtiger import stat
 import wttest
 @wttest.skip_for_hook("disagg", "Disagg doesn't sweep layered dhandles")
 class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
-    tablebase = 'test_sweep01'
+    test_name = __qualname__
+    tablebase = test_name
     uri = 'table:' + tablebase
     numfiles = 30
     numkv = 1000

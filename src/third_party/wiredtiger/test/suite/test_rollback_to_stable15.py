@@ -31,7 +31,6 @@ from rollback_to_stable_util import verify_rts_logs
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable15.py
 # Test that roll back to stable handles updates present in the
 # update-list for variable length column store.
 # Eviction is set to false, so that everything persists in memory.

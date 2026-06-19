@@ -30,7 +30,6 @@ from eviction_util import eviction_util
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_eviction02.py
 # Verify evicting a clean page removes any obsolete time window information present on the page.
 class test_eviction02(eviction_util):
     conn_config_common = 'cache_size=10MB,statistics=(all),statistics_log=(json,wait=1,on_close=true)'

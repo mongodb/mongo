@@ -32,9 +32,8 @@ from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_layered_fast_truncate17.py
-#   Verify that step-up replay uses fast page truncation (WT_REF_DELETED) when
-#   replaying follower truncates.
+# Verify that step-up replay uses fast page truncation (WT_REF_DELETED) when
+# replaying follower truncates.
 @disagg_test_class
 class test_layered_fast_truncate17(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
@@ -43,7 +42,7 @@ class test_layered_fast_truncate17(LayeredFastTruncateConfigMixin, wttest.WiredT
     table_config = 'key_format=i,value_format=S,leaf_page_max=4096'
     nitems = 5000
 
-    disagg_storages = gen_disagg_storages('test_layered_ft_replay', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     def populate_on_leader(self, ts=10):

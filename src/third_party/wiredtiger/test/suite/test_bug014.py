@@ -31,9 +31,9 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from helper import copy_wiredtiger_home
 
-# test_bug014.py
-#    JIRA WT-2115: fast-delete pages can be incorrectly lost due to a crash.
+# JIRA WT-2115: fast-delete pages can be incorrectly lost due to a crash.
 class test_bug014(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     key_format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('row_string', dict(key_format='S', value_format='S')),
@@ -43,7 +43,7 @@ class test_bug014(wttest.WiredTigerTestCase):
 
     def test_bug014(self):
         # Populate a table with 1000 keys on small pages.
-        uri = 'table:test_bug014'
+        uri = f'table:{self.test_name}'
         ds = SimpleDataSet(self, uri, 1000,
             key_format=self.key_format, value_format=self.value_format,
             config='allocation_size=512,leaf_page_max=512')

@@ -28,7 +28,6 @@
 
 import wttest
 
-# test_hs29.py
 # It is possible to end up with 3 opened history store cursors at the same time when the following
 # occurs:
 # - The reconciliation process opens one history store cursor.

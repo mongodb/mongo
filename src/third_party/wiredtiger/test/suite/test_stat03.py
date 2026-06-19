@@ -35,10 +35,10 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
-# test_stat03.py
-#    Statistics reset test.
+# Statistics reset test.
 class test_stat_cursor_reset(wttest.WiredTigerTestCase):
-    pfx = 'test_stat_cursor_reset'
+    test_name = __qualname__
+    pfx = test_name
     uri = [
         ('file-simple-row', dict(uri='file:' + pfx, dataset=SimpleDataSet, kf='S', vf='S')),
         ('file-simple-var', dict(uri='file:' + pfx, dataset=SimpleDataSet, kf='r', vf='S')),

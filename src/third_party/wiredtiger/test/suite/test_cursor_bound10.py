@@ -30,10 +30,10 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wtbound import bound_base
 
-# test_cursor_bound10.py
 # Test next/prev history store scenarios with cursor bound API.
 class test_cursor_bound10(bound_base):
-    file_name = 'test_cursor_bound10'
+    test_name = __qualname__
+    file_name = test_name
     lower_inclusive = True
     upper_inclusive = True
 

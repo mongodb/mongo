@@ -26,13 +26,12 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate11.py
-#   Range specification (start / end / open-ended).
+# Range specification (start / end / open-ended).
 #
-#   Verify that follower fast-truncate handles all range-bound variations
-#   correctly: open ends, single keys, empty gaps, and invalid ordering.
-#   Open-ended truncates should not apply to keys written after the truncate
-#   commits.
+# Verify that follower fast-truncate handles all range-bound variations
+# correctly: open ends, single keys, empty gaps, and invalid ordering.
+# Open-ended truncates should not apply to keys written after the truncate
+# commits.
 
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from helper_layered_fast_truncate import (

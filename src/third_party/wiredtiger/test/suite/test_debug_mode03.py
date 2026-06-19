@@ -31,7 +31,6 @@ import struct, wttest
 def timestamp(kind, ts):
     return "{}_timestamp={:X}".format(kind, ts)
 
-# test_debug_mode03.py
 #    Test the debug mode settings. Test table_logging use.
 class test_debug_mode03(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled=true,file_max=100K),debug_mode=(table_logging=true)'

@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_bulk.py
-#       bulk-cursor test.
+# bulk-cursor test.
 #
 
 import wiredtiger, wttest

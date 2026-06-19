@@ -34,13 +34,14 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_config04(wttest.WiredTigerTestCase):
-    disagg_storages = gen_disagg_storages('test_layered_eviction02', disagg_only = True)
+    test_name = __qualname__
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_config = 'disaggregated=(role="leader")'
 
     def test_create_logged(self):
-        uri = "layered:test_layered_config04"
+        uri = f"layered:{self.test_name}"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create(uri, 'key_format=S,value_format=S,log=(enabled=true)'),
             '/Logging is not supported for layered/')

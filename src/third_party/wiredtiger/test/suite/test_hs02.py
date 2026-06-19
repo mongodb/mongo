@@ -30,7 +30,6 @@ import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_hs02.py
 # Test that truncate with history store entries and timestamps gives expected results.
 class test_hs02(wttest.WiredTigerTestCase):
     # Force a small cache.

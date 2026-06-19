@@ -28,16 +28,16 @@
 
 import wttest
 
-# test_base03.py
-#    Cursor operations
+# Cursor operations
 class test_base03(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
-    table_name1 = 'test_base03a'
-    table_name2 = 'test_base03b'
-    table_name3 = 'test_base03c'
-    table_name4 = 'test_base03d'
+    test_name = __qualname__
+    table_name1 = f'{test_name}a'
+    table_name2 = f'{test_name}b'
+    table_name3 = f'{test_name}c'
+    table_name4 = f'{test_name}d'
     nentries = 10
 
     def config_string(self):

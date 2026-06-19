@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_truncate24.py
-#   Test commit timestamp is not overwritten when the reinstantiated
-#   deletes are committed.
+# Test commit timestamp is not overwritten when the reinstantiated
+# deletes are committed.
 
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet

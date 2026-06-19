@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_readonly03.py
-#   Readonly: Test connection readonly mode with modifying methods.  Confirm
-#   all return ENOTSUP.
+# Readonly: Test connection readonly mode with modifying methods.  Confirm
+# all return ENOTSUP.
 #
 
 import wiredtiger, wttest
@@ -36,8 +35,9 @@ from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 
 class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
-    uri = 'table:test_readonly03'
-    uri2 = 'table:test_readonly03_2'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
+    uri2 = f'table:{test_name}_2'
     create = True
 
     conn_params = 'create,log=(enabled),operation_tracking=(enabled=false),'

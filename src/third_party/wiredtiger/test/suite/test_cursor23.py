@@ -26,14 +26,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor23.py
-#   Test cursor get_raw_key_value using complex schema
+# Test cursor get_raw_key_value using complex schema
 
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 class test_cursor23(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     scenarios = make_scenarios([
         ('file-S', dict(type='file:', keyfmt='S', valfmt='S', dataset=SimpleDataSet, complex=False)),
         ('table-S', dict(type='table:', keyfmt='S', valfmt='S', dataset=SimpleDataSet, complex=False)),
@@ -51,7 +51,7 @@ class test_cursor23(wttest.WiredTigerTestCase):
         self.assertEqual(value, expected_value)
 
     def test_cursor23(self):
-        uri = self.type + "test_cursor23"
+        uri = self.type + self.test_name
         ds = self.dataset(self, uri, 100, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
 

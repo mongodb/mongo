@@ -43,7 +43,7 @@ def get_conn_config(disagg_storage):
     return \
         f'statistics=(all),name={disagg_storage.ds_name},lose_all_my_data=true'
 
-def gen_disagg_storages(test_name='', disagg_only = False):
+def gen_disagg_storages(disagg_only = False):
     # Get the string of the configured page_log, e.g. 'palite'.
     page_log = wttest.WiredTigerTestCase.vars().page_log
     page_log_verbose = wttest.WiredTigerTestCase.vars().page_log_verbose

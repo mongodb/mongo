@@ -29,7 +29,6 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_prepare30.py
 # Test that validates that prepare transaction API raises correct errors with preserve_prepared config on
 
 class test_prepare30(wttest.WiredTigerTestCase):

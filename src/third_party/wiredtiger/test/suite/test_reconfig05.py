@@ -32,8 +32,7 @@
 
 import wttest
 
-# test_reconfig05.py
-#    Test WT_SESSION::reconfigure
+# Test WT_SESSION::reconfigure
 class test_reconfig05(wttest.WiredTigerTestCase):
 
     # Test whether the reconfiguration can handle structs without the "=" separator.

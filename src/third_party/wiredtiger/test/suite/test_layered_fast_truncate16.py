@@ -31,17 +31,17 @@ from helper_disagg import disagg_test_class, gen_disagg_storages
 from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 
-# test_layered_fast_truncate16.py
-#   Verify that pending follower truncates land on stable when the follower steps up,
-#   across the variety of per-key shapes and edge cases.
+# Verify that pending follower truncates land on stable when the follower steps up,
+# across the variety of per-key shapes and edge cases.
 @disagg_test_class
 class test_layered_fast_truncate_stepup(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     conn_config = 'disaggregated=(role="leader")'
-    uri = 'layered:test_layered_fast_truncate_stepup'
+    uri = f'layered:{test_name}'
     nitems = 1000
 
-    disagg_storages = gen_disagg_storages('test_layered_fast_truncate_stepup', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     def populate_on_leader(self, ts=10):

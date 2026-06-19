@@ -32,15 +32,15 @@ from wiredtiger import stat
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_delta07.py
 # Entries have been durable are not included in the new delta
 
 @disagg_test_class
 class test_layered_delta07(wttest.WiredTigerTestCase):
-    uri = "layered:test_layered_delta07"
+    test_name = __qualname__
+    uri = f"layered:{test_name}"
     conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),transaction_sync=(enabled,method=fsync),' \
                      + 'page_delta=(delta_pct=100),precise_checkpoint=true,preserve_prepared=true,'
-    disagg_storages = gen_disagg_storages('test_layered_delta07', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(disagg_storages)

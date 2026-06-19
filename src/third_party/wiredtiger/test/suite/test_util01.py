@@ -30,8 +30,7 @@ import string, random
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-# test_util01.py
-#    Utilities: wt dump, as well as the dump cursor
+# Utilities: wt dump, as well as the dump cursor
 class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt dump.  We check for specific output.
@@ -41,8 +40,9 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     is tested implicitly by test_util02 (which loads dumps created
     in various ways).
     """
+    test_name = __qualname__
 
-    tablename = 'test_util01.a'
+    tablename = f'{test_name}.a'
     nentries = 1000
     stringclass = ''.__class__
 

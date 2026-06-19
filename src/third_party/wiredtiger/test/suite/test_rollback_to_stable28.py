@@ -34,7 +34,6 @@ from helper import simulate_crash_restart
 from rollback_to_stable_util import test_rollback_to_stable_base
 import wttest
 
-# test_rollback_to_stable28.py
 # Test the debug mode setting for update_restore_evict during recovery.
 # Force update restore eviction, whenever we evict a page. We want to
 # perform this in recovery to ensure that all the in-memory images have

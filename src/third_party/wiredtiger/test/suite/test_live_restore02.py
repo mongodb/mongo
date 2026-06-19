@@ -32,7 +32,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wtbackup import backup_base
 
-# test_live_restore02.py
 # Enable background thread migration and loop until it completes
 class test_live_restore02(backup_base):
     format_values = [

@@ -30,7 +30,6 @@ import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_prepare_discover13.py
 # Regression tests for HS orphans surviving step-up drain due to two
 # independent issues with prepared update metadata on the ingest btree:
 #   Path 1: Version cursor truncation hides discovered prepared entries.
@@ -38,14 +37,15 @@ from wtscenario import make_scenarios
 @wttest.skip_for_hook("tiered", "Layered tables are not supported with tiered storage")
 @disagg_test_class
 class test_prepare_discover13(wttest.WiredTigerTestCase):
-    tablename = 'test_prepare_discover13'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
     conn_base_config = (
         'cache_size=50MB,statistics=(all),precise_checkpoint=true,'
         'preserve_prepared=true,')
 
-    disagg_storages = gen_disagg_storages('test_prepare_discover13', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     def conn_config(self):

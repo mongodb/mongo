@@ -30,8 +30,7 @@
 # config_api
 # [END_TAGS]
 #
-# test_base02.py
-#    Configuration
+# Configuration
 #
 
 import json
@@ -40,7 +39,8 @@ from wtscenario import make_scenarios
 
 # Test configuration strings.
 class test_base02(wttest.WiredTigerTestCase):
-    name = 'test_base02a'
+    test_name = __qualname__
+    name = f'{test_name}a'
     extra_config = ''
 
     scenarios = make_scenarios([

@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor20.py
-#   Test duplicate key return values.
+# Test duplicate key return values.
 
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet

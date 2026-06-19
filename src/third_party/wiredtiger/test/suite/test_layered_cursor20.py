@@ -32,17 +32,17 @@ from wiredtiger import stat
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_cursor20.py
 # Follower tests of cached cursors
 @disagg_test_class
 class test_layered_cursor20(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'disaggregated=(role="leader")'
     conn_config_follower = 'disaggregated=(role="follower")'
 
     nuri = 10
-    uri = "layered:test_layered_cursor20"
+    uri = f"layered:{test_name}"
 
-    disagg_storages = gen_disagg_storages('test_layered_cursor20', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
     _ts = 0

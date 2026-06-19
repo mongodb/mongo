@@ -34,7 +34,6 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 def mod_val(value, char, location, nbytes=1):
     return value[0:location] + char + value[location+nbytes:]
 
-# test_rollback_to_stable04.py
 # Test that rollback to stable always replaces the on-disk value with a full update
 # from the history store.
 class test_rollback_to_stable04(test_rollback_to_stable_base):

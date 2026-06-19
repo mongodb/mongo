@@ -32,7 +32,6 @@ import glob
 import shutil
 from wtbackup import backup_base
 
-# test_live_restore01.py
 # Test live restore compatibility with various other connection options.
 class test_live_restore01(backup_base):
 

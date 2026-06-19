@@ -30,16 +30,16 @@ import wiredtiger, wttest
 from helper_disagg import DisaggConfigMixin, gen_disagg_storages
 from wiredtiger import stat
 
-# test_layered_config10.py
 # Note that the APIs we are testing are not meant to be used directly
 # by any WiredTiger application, these APIs are used internally.
 # However, it is useful to do tests of this API independently.
 
 class test_layered_config10(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
-    disagg_storages = gen_disagg_storages('test_layered_config10', disagg_only = True)
+    test_name = __qualname__
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
-    uri = "layered:test_layered_config10_%02d"
+    uri = f"layered:{test_name}_%02d"
     cold_table_config = 'key_format=S,value_format=S,disaggregated=(storage_tier=cold),'
 
     # Load the storage store extension.

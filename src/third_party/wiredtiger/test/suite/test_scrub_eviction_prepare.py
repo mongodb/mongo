@@ -29,7 +29,6 @@
 import wiredtiger, wttest
 from wiredtiger import stat
 
-# test_scrub_eviction_prepare.py
 #
 # Test to do the following steps.
 # 1. Prepare an update with one key (key-2)
@@ -43,6 +42,7 @@ from wiredtiger import stat
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     def conn_config(self):
         config = 'cache_size=100MB,statistics=(all),statistics_log=(json,on_close,wait=1)'
         return config
@@ -60,7 +60,7 @@ class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
         cur2.close()
 
     def test_scrub_eviction_prepare(self):
-        uri = 'table:test_scrub_eviction_prepare'
+        uri = f'table:{self.test_name}'
 
         # Create a table.
         self.session.create(uri, 'key_format=i,value_format=S')

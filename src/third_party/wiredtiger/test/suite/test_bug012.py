@@ -29,7 +29,6 @@
 import wiredtiger, wttest
 from wtdataset import ComplexDataSet
 
-# test_bug012.py
 class test_bug012(wttest.WiredTigerTestCase):
 
     # Test that we detect illegal collators.

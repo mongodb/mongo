@@ -30,7 +30,6 @@ import wttest
 from wtdataset import ComplexDataSet
 import os
 
-# test_bug025.py
 # WT-7208: After a missing index is accessed, we return an error.
 # After a later access, we crash (null pointer access).
 #
@@ -41,7 +40,8 @@ import os
 # lines of code.
 
 class test_bug025(wttest.WiredTigerTestCase):
-    uri = "table:test_bug025"
+    test_name = __qualname__
+    uri = f"table:{test_name}"
     nrows = 10
 
     def test_bug025(self):
@@ -49,7 +49,7 @@ class test_bug025(wttest.WiredTigerTestCase):
         ds.populate()
         iname = ds.index_name(0)
         iname_suffix = iname[iname.rindex(':') + 1:]
-        filename = 'test_bug025_' + iname_suffix + '.wti'
+        filename = f'{self.test_name}_' + iname_suffix + '.wti'
         self.close_conn()
         pos = os.path.getsize(filename) - 1024
         os.remove(filename)

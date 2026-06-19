@@ -29,9 +29,9 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_timestamp20.py
 # Exercise fixing up of updates without timestamps in the history store.
 class test_timestamp20(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=50MB'
 
     format_values = [
@@ -58,7 +58,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         s.close()
 
     def test_timestamp20_standard(self):
-        uri = 'table:test_timestamp20'
+        uri = f'table:{self.test_name}'
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -118,7 +118,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
     # the conversion to a Python string.
     def test_timestamp20_modify(self):
 
-        uri = 'table:test_timestamp20'
+        uri = f'table:{self.test_name}'
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))

@@ -31,11 +31,11 @@ from wtdataset import SimpleDataSet, SimpleIndexDataSet
 from wtdataset import ComplexDataSet
 from wtscenario import make_scenarios
 
-# test_cursor11.py
-#    WT_CURSOR position tests: remove (if not already positioned), and insert
-#    leave the cursor without position or information.
+# WT_CURSOR position tests: remove (if not already positioned), and insert
+# leave the cursor without position or information.
 class test_cursor11(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     keyfmt = [
         ('integer', dict(keyfmt='i', valfmt='S')),
         ('recno', dict(keyfmt='r', valfmt='S')),
@@ -54,7 +54,7 @@ class test_cursor11(wttest.WiredTigerTestCase):
     # the key and position remain set but no value.
     def test_cursor_remove_with_position(self):
         # Build an object.
-        uri = self.uri + ':test_cursor11'
+        uri = self.uri + f':{self.test_name}'
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
         s = self.conn.open_session()
@@ -76,7 +76,7 @@ class test_cursor11(wttest.WiredTigerTestCase):
     # no key, value or position remains.
     def test_cursor_remove_without_position(self):
         # Build an object.
-        uri = self.uri + ':test_cursor11'
+        uri = self.uri + f':{self.test_name}'
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
         s = self.conn.open_session()
@@ -97,7 +97,7 @@ class test_cursor11(wttest.WiredTigerTestCase):
     # no key, value or position remains.
     def test_cursor_remove_with_key_and_position(self):
         # Build an object.
-        uri = self.uri + ':test_cursor11'
+        uri = self.uri + f':{self.test_name}'
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
         s = self.conn.open_session()
@@ -119,7 +119,7 @@ class test_cursor11(wttest.WiredTigerTestCase):
     # Do an insert and confirm no key, value or position remains.
     def test_cursor_insert(self):
         # Build an object.
-        uri = self.uri + ':test_cursor11'
+        uri = self.uri + f':{self.test_name}'
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
         s = self.conn.open_session()

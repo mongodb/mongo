@@ -29,15 +29,15 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_metadata_cursor01.py
-#    Metadata cursor operations
+# Metadata cursor operations
 # Basic smoke-test of metadata cursor: test backward and forward iteration
 # as well as search.
 class test_metadata_cursor01(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
-    table_name1 = 'test_metadata_cursor01'
+    test_name = __qualname__
+    table_name1 = test_name
 
     scenarios = make_scenarios([
         ('plain', {'metauri' : 'metadata:'}),

@@ -29,7 +29,6 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable32.py
 # Test that update restore eviction correctly removes an on-disk
 # tombstone. Previously it would trigger an assertion in reconciliation.
 class test_rollback_to_stable32(test_rollback_to_stable_base):

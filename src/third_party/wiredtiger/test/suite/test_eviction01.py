@@ -30,13 +30,13 @@ import wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 
-# test_eviction01.py
 '''
 This test inserts (then rolls back) a large number of updates per key in the update chain to a
 point where only aborted updates are present in the chain. We then test whether these chains,
 filled with aborted updates, get evicted successfully.
 '''
 class test_eviction01(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=1GB'
     nrows = 100
     iterations = 500
@@ -48,7 +48,7 @@ class test_eviction01(wttest.WiredTigerTestCase):
         return val
 
     def test_eviction(self):
-        uri = "table:test_eviction01"
+        uri = f"table:{self.test_name}"
         ds = SimpleDataSet(self, uri, self.nrows, key_format='S', value_format='u')
         ds.populate()
 

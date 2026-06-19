@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_config09.py
-#   Test the configuration that enables/disables dirty table flushing.
+# Test the configuration that enables/disables dirty table flushing.
 #
 
 import wiredtiger, wttest

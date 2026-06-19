@@ -30,12 +30,12 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from helper import WiredTigerCursor
 
-# test_debug_mode11.py
-#   Verify shutdown checkpoint behavior with close config debug.skip_checkpoint.
+# Verify shutdown checkpoint behavior with close config debug.skip_checkpoint.
 class test_debug_mode11(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'statistics=(all)'
     create_config = 'key_format=S,value_format=S'
-    uri = 'table:test_debug_mode11'
+    uri = f'table:{test_name}'
 
     scenarios = make_scenarios([
         ('with_shutdown_checkpoint', dict(skip_shutdown_checkpoint=False, close_cfg="")),

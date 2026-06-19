@@ -26,12 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_layered_prepare06.py
-#   Test layered cursor walks on a follower with an advanced checkpoint, exercising the
-#   two-cursor merge path. Verifies correct behavior when:
-#   - An overwrite update positions only the ingest cursor, then next() forces the stable
-#     cursor to open.
-#   - A prepared conflict occurs mid-walk and the cursor retries after the prepare resolves.
+# Test layered cursor walks on a follower with an advanced checkpoint, exercising the
+# two-cursor merge path. Verifies correct behavior when:
+# - An overwrite update positions only the ingest cursor, then next() forces the stable
+#   cursor to open.
+# - A prepared conflict occurs mid-walk and the cursor retries after the prepare resolves.
 
 import os
 import wiredtiger
@@ -42,10 +41,11 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_prepare06(wttest.WiredTigerTestCase):
-    tablename = 'test_layered_prepare06'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
-    disagg_storages = gen_disagg_storages('test_layered_prepare06', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_base_config = ',create,statistics=(all),precise_checkpoint=true,preserve_prepared=true,'

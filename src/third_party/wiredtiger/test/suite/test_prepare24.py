@@ -29,9 +29,9 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_prepare24.py
 # Test prepare commit after eviction failure.
 class test_prepare24(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'timing_stress_for_test=[failpoint_eviction_split]'
 
     format_values = [
@@ -49,7 +49,7 @@ class test_prepare24(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values, delete)
 
     def test_prepare24(self):
-        uri = "table:test_prepare24"
+        uri = f"table:{self.test_name}"
         self.session.create(uri, 'key_format=' + self.key_format + ',value_format=' + self.value_format)
 
         value_a = "a"

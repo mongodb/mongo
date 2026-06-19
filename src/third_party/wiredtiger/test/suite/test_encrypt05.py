@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_encrypt05.py
-#   Test some error conditions with quoted escaped characters.
+# Test some error conditions with quoted escaped characters.
 #
 
 import wiredtiger, wttest

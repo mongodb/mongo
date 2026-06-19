@@ -31,7 +31,6 @@ import os
 from helper import copy_wiredtiger_home
 from wtbackup import backup_base
 
-# test_backup25.py
 # Test commit-level durability, logging and later checkpoints when a backup
 # cursor is open. If a crash occurs on a source while a backup cursor is open
 # WiredTiger restarts and recovers from the checkpoint prior to the backup

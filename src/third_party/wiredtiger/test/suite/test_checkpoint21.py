@@ -32,7 +32,6 @@ import wiredtiger
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint21.py
 #
 # Test reading a checkpoint that contains data from a committed but not
 # durable transaction.

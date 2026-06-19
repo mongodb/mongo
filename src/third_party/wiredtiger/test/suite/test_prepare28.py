@@ -34,8 +34,9 @@ import wttest, wtthread
 # ignore prepare was provided. This test demonstrates that case.
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_prepare28(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config= 'timing_stress_for_test=[prepare_resolution_2]'
-    uri = 'table:test_prepare28'
+    uri = f'table:{test_name}'
     numrows = 1
     value1 = 'aaaaa'
     value2 = 'bbbbb'

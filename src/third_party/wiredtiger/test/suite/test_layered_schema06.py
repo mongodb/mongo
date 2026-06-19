@@ -42,7 +42,8 @@ TEST_NAMESPACE_BITS = 3
 # Test file IDs for tables that should have predefined IDs.
 @disagg_test_class
 class test_layered_schema06(wttest.WiredTigerTestCase):
-    disagg_storages = gen_disagg_storages('test_layered_schema06', disagg_only = True)
+    test_name = __qualname__
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     creation_formats = [
         ('layered-bare',       dict(prefix='layered:', extra_config='')),
         ('layered-disagg',     dict(prefix='layered:', extra_config='block_manager=disagg')),
@@ -165,10 +166,10 @@ class test_layered_schema06(wttest.WiredTigerTestCase):
         return base
 
     def test_populate_table_on_leader(self):
-        self.session.create(f"{self.prefix}test_layered_schema06", self.make_create_config())
+        self.session.create(f"{self.prefix}{self.test_name}", self.make_create_config())
         # Check the leader
-        expected_files = {"file:test_layered_schema06.wt_stable": TEST_NAMESPACE_SHARED,
-                          "file:test_layered_schema06.wt_ingest": TEST_NAMESPACE_LOCAL}
+        expected_files = {f"file:{self.test_name}.wt_stable": TEST_NAMESPACE_SHARED,
+                          f"file:{self.test_name}.wt_ingest": TEST_NAMESPACE_LOCAL}
         self.check_metadata_ids(self.session, expected_files)
 
         self.create_follower()
@@ -176,10 +177,10 @@ class test_layered_schema06(wttest.WiredTigerTestCase):
         self.check_metadata_ids(self.session_follow)
 
     def test_populate_table_on_leader_pick_up_on_follower(self):
-        expected_files = {"file:test_layered_schema06.wt_stable": TEST_NAMESPACE_SHARED,
-                          "file:test_layered_schema06.wt_ingest": TEST_NAMESPACE_LOCAL}
+        expected_files = {f"file:{self.test_name}.wt_stable": TEST_NAMESPACE_SHARED,
+                          f"file:{self.test_name}.wt_ingest": TEST_NAMESPACE_LOCAL}
 
-        self.session.create(f"{self.prefix}test_layered_schema06", self.make_create_config())
+        self.session.create(f"{self.prefix}{self.test_name}", self.make_create_config())
         # Check the leader
         self.check_metadata_ids(self.session, expected_files)
 
@@ -193,7 +194,7 @@ class test_layered_schema06(wttest.WiredTigerTestCase):
         expected_files = {}
 
         for i in range(10):
-            table_name = f"test_layered_schema06_{i}"
+            table_name = f"{self.test_name}_{i}"
             self.session.create(f"{self.prefix}{table_name}", self.make_create_config())
             expected_files[f"file:{table_name}.wt_stable"] = TEST_NAMESPACE_SHARED
             expected_files[f"file:{table_name}.wt_ingest"] = TEST_NAMESPACE_LOCAL
@@ -213,7 +214,7 @@ class test_layered_schema06(wttest.WiredTigerTestCase):
         expected_files = {}
 
         for i in range(10):
-            table_name = f"test_layered_schema06_{i}"
+            table_name = f"{self.test_name}_{i}"
             self.session.create(f"{self.prefix}{table_name}", self.make_create_config())
             expected_files[f"file:{table_name}.wt_stable"] = TEST_NAMESPACE_SHARED
             expected_files[f"file:{table_name}.wt_ingest"] = TEST_NAMESPACE_LOCAL
@@ -227,7 +228,7 @@ class test_layered_schema06(wttest.WiredTigerTestCase):
         # .wt_stable (shared namespace) and allocate a new .wt_ingest in the
         # local namespace.
         for i in range(10):
-            table_name = f"test_layered_schema06_{i}"
+            table_name = f"{self.test_name}_{i}"
             self.session.create(f"{self.prefix}{table_name}", self.make_create_config())
 
         # Confirm the follower's ingest table received a local namespace ID.

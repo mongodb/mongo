@@ -29,7 +29,6 @@ import wttest
 from wtscenario import make_scenarios
 from wtbound import set_prefix_bound, bound_base
 
-# test_cursor_bound15.py
 # This test checks the edge case that a search_near call with bounds and prefix key
 # will return the right value of exact.
 class test_cursor_bound15(bound_base):

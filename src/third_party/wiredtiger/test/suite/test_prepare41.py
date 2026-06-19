@@ -33,8 +33,9 @@ from prepare_util import test_prepare_preserve_prepare_base
 
 class test_prepare41(test_prepare_preserve_prepare_base):
 
+    test_name = __qualname__
     conn_config = 'precise_checkpoint=true,preserve_prepared=true,statistics=(all)'
-    uri = 'table:test_prepare41'
+    uri = f'table:{test_name}'
 
     def test_prepare_update(self):
         # Setup: Initialize timestamps with stable < prepare timestamp

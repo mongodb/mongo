@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_hazard.py
-#       Hazard pointer tests.
+# Hazard pointer tests.
 
 import wttest
 from wtdataset import SimpleDataSet

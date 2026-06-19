@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor18.py
-#   Test version cursor under various scenarios.
+# Test version cursor under various scenarios.
 #
 import wttest
 import wiredtiger
@@ -36,7 +35,8 @@ from wtscenario import make_scenarios
 WT_TS_MAX = 2**64-1
 
 class test_cursor18(wttest.WiredTigerTestCase):
-    uri = 'file:test_cursor18.wt'
+    test_name = __qualname__
+    uri = f'file:{test_name}.wt'
 
     types = [
         ('row', dict(keyformat='i', valueformat='i')),

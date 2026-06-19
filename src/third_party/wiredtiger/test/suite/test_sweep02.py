@@ -26,16 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_sweep02.py
 # Test configuring and reconfiguring sweep options.
 #
 
 import wttest
 
 class test_sweep02(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     base_config = 'create,'
     dir = 'WT_TEST'
-    tablebase = 'test_sweep02'
+    tablebase = test_name
     uri = 'table:' + tablebase
 
     # Disable default setup/shutdown steps - connections are managed manually.

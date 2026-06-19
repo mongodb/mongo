@@ -29,7 +29,6 @@
 import wttest
 import re
 
-# test_turtle.py
 # The following test is to validate the turtle file and to ensure it
 # contains the correct key-value pairs.
 

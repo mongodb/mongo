@@ -36,7 +36,6 @@ import wiredtiger, wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable16.py
 # Test that rollback to stable removes updates present on disk for column store.
 # (This test is now probably redundant with others, and could maybe be removed?)
 class test_rollback_to_stable16(wttest.WiredTigerTestCase):

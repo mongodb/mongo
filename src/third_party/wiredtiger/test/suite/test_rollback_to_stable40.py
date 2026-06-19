@@ -32,7 +32,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable40.py
 # Test the rollback to stable operation performs as expected following a server crash
 # and recovery. Verify that the on-disk value is replaced by the correct value from
 # the history store.

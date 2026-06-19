@@ -31,7 +31,6 @@ from wiredtiger import stat, WiredTigerError, wiredtiger_strerror, WT_ROLLBACK
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_truncate15.py
 #
 # Check that readonly database reading fast truncated pages doesn't lead to cache stuck.
 # FIXME-WT-14582: Re-enable once disagg supports readonly connections.

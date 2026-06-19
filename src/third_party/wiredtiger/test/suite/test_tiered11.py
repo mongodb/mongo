@@ -31,21 +31,21 @@ from helper_tiered import get_conn_config, gen_tiered_storage_sources, TieredCon
 from wtscenario import make_scenarios
 StorageSource = wiredtiger.StorageSource  # easy access to constants
 
-# test_tiered11.py
-#    Test flush time and flush timestamp in metadata.
+# Test flush time and flush timestamp in metadata.
 class test_tiered11(wttest.WiredTigerTestCase, TieredConfigMixin):
 
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered11', tiered_only=True)
+    test_name = __qualname__
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), test_name, tiered_only=True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(storage_sources)
 
     # If the 'uri' changes all the other names must change with it.
-    base = 'test_tiered11-000000000'
+    base = f'{test_name}-000000000'
     nentries = 10
     objuri = 'object:' + base + '1.wtobj'
-    tiereduri = "tiered:test_tiered11"
-    uri = "table:test_tiered11"
+    tiereduri = f"tiered:{test_name}"
+    uri = f"table:{test_name}"
 
     def conn_config(self):
         self.saved_conn = get_conn_config(self) + ')'

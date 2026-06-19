@@ -26,16 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_bug007.py
-#       Regression tests.
+# Regression tests.
 
 import wiredtiger, wttest
 
 # Check that forced salvage works correctly.
 class test_bug007(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     def test_bug007(self):
         # This is a btree layer test, test files only.
-        uri = 'file:test_bug007'
+        uri = f'file:{self.test_name}'
 
         # Create the object.
         self.session.create(uri, 'value_format=S,key_format=S')
@@ -44,7 +44,7 @@ class test_bug007(wttest.WiredTigerTestCase):
 
         # Force is required if a file doesn't have a reasonable header.
         # Overwrite the file with random data.
-        f = open('test_bug007', 'w')
+        f = open(self.test_name, 'w')
         f.write('random data' * 100)
         f.close()
 

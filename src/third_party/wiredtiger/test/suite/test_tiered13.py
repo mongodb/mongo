@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_tiered13.py
 # Check that importing tiered tables returns an error.
 
 import os, shutil, wiredtiger
@@ -36,19 +35,20 @@ from wtscenario import make_scenarios
 import wttest
 
 class test_tiered13(test_import_base, TieredConfigMixin):
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered13', tiered_only=True)
+    test_name = __qualname__
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), test_name, tiered_only=True)
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(storage_sources)
 
     # If the 'uri' changes all the other names must change with it.
-    base = 'test_tiered13-000000000'
+    base = f'{test_name}-000000000'
     fileuri_base = 'file:' + base
     file1uri = fileuri_base + '1.wtobj'
     file2 = base + '2.wtobj'
     file2uri = fileuri_base + '2.wtobj'
     otherfile = 'other.wt'
     otheruri = 'file:' + otherfile
-    uri = "table:test_tiered13"
+    uri = f"table:{test_name}"
 
     # Load the storage store extension.
     def conn_extensions(self, extlist):

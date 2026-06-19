@@ -32,7 +32,6 @@ from wtdataset import SimpleDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_recovery01.py
 # Test WiredTiger logs time spent during recovery and shutdown.
 class test_recovery01(wttest.WiredTigerTestCase):
 

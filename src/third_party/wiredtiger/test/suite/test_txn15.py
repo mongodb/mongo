@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn15.py
-#   Transactions: different sync modes
+# Transactions: different sync modes
 #
 
 from suite_subprocess import suite_subprocess
@@ -37,7 +36,8 @@ import wttest
 
 @wttest.skip_for_hook("disagg", "this test checks logging stats, which are not relevant for disagg tables")
 class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
-    uri = 'table:test_txn15_1'
+    test_name = __qualname__
+    uri = f'table:{test_name}_1'
     entries = 100
     # Turn on logging for this test.
     def conn_config(self):

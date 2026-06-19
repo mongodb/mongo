@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp03.py
-#   Timestamps: checkpoints
-#   Verify logging configurations of all the URI's and history store file
-#   in the metadata file.
+# Timestamps: checkpoints
+# Verify logging configurations of all the URI's and history store file
+# in the metadata file.
 #
 
 from helper import copy_wiredtiger_home

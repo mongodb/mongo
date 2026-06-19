@@ -30,7 +30,7 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint13.py: API restrictions on checkpoint cursors
+# API restrictions on checkpoint cursors
 #
 # - You may not read from a checkpoint cursor while in a transaction.
 # (The checkpoint cursor is its own private transaction.)

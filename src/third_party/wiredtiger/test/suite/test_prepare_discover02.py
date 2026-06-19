@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover02.py
-#   Test that pending prepared transaction artifacts can be discovered after recovery
-#   and committed
+# Test that pending prepared transaction artifacts can be discovered after recovery
+# and committed
 
 import wiredtiger
 from suite_subprocess import suite_subprocess
@@ -36,7 +35,8 @@ import wttest
 from wtscenario import make_scenarios
 
 class test_prepare_discover02(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_prepare_discover02'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
 

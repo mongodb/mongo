@@ -30,8 +30,7 @@ import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_cursor_random02.py
-#    Cursor next_random operations
+# Cursor next_random operations
 class test_cursor_random02(wttest.WiredTigerTestCase):
     types = [
         ('table', dict(type='table:random'))

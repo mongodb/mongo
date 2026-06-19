@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_split.py
-#       check that splits work as expected
+# check that splits work as expected
 #
 
 import wttest
@@ -35,7 +34,8 @@ from wiredtiger import stat
 
 # Test splits
 class test_split(wttest.WiredTigerTestCase):
-    name = 'test_split'
+    test_name = __qualname__
+    name = test_name
     conn_config = 'statistics=[all]'
     uri = 'file:' + name
 

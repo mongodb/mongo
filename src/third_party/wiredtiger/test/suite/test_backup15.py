@@ -28,7 +28,6 @@
 import os
 from wtbackup import backup_base
 
-# test_backup15.py
 # Test cursor backup with a block-based incremental cursor.
 class test_backup15(backup_base):
     bkp_home = "WT_BLOCK"

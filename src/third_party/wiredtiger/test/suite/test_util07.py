@@ -29,10 +29,10 @@
 from suite_subprocess import suite_subprocess
 import wttest
 
-# test_util07.py
-#    Utilities: wt read
+# Utilities: wt read
 class test_util07(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util07.a'
+    test_name = __qualname__
+    tablename = f'{test_name}.a'
     nentries = 1000
     session_params = 'key_format=S,value_format=S'
 

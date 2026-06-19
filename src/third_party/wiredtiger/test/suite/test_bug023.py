@@ -29,8 +29,7 @@
 import wiredtiger
 from wtbackup import backup_base
 
-# test_bug023.py
-#   JIRA WT-5930: starting up a backup database with an error in wiredtiger_open
+# JIRA WT-5930: starting up a backup database with an error in wiredtiger_open
 # then leaves the database in an incorrect state so that the next wiredtiger_open
 # without an error loses data.
 class test_bug023(backup_base):

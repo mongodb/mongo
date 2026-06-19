@@ -30,8 +30,7 @@
 # session_api:verify
 # [END_TAGS]
 #
-# test_bug005.py
-#       Regression tests.
+# Regression tests.
 
 import wttest
 from wtdataset import simple_key, simple_value
@@ -40,7 +39,8 @@ from wtdataset import simple_key, simple_value
 # checkpoint.
 class test_bug005(wttest.WiredTigerTestCase):
     # This is a btree layer test, test files, ignore tables.
-    uri = 'file:test_bug005'
+    test_name = __qualname__
+    uri = f'file:{test_name}'
 
     def test_bug005(self):
         # Create the object.
@@ -56,7 +56,7 @@ class test_bug005(wttest.WiredTigerTestCase):
         self.verifyUntilSuccess(self.session, self.uri)
 
         # Append random data to the end.
-        f = open('test_bug005', 'a')
+        f = open(self.test_name, 'a')
         f.write('random data')
         f.close()
 

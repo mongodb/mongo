@@ -26,11 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate21.py
-#   When an instantiated fast-truncate leaf has its deletion become globally visible, the
-#   parent reconciliation must rebuild a full base image rather than a delta, so that
-#   dropping the leaf's proxy cell and freeing its block happen together. This keeps the
-#   parent image free of any reference to the freed leaf block and verify passes.
+# When an instantiated fast-truncate leaf has its deletion become globally visible, the
+# parent reconciliation must rebuild a full base image rather than a delta, so that
+# dropping the leaf's proxy cell and freeing its block happen together. This keeps the
+# parent image free of any reference to the freed leaf block and verify passes.
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -39,7 +38,8 @@ from wiredtiger import stat
 
 @disagg_test_class
 class test_layered_fast_truncate21(wttest.WiredTigerTestCase):
-    uri         = 'layered:test_layered_fast_truncate21'
+    test_name = __qualname__
+    uri         = f'layered:{test_name}'
     nrows       = 200
     value       = 'a' * 50
     trunc_start = 50
@@ -55,7 +55,7 @@ class test_layered_fast_truncate21(wttest.WiredTigerTestCase):
     def conn_config(self):
         return self.conn_base_config + 'disaggregated=(role="leader"),'
 
-    disagg_storages = gen_disagg_storages('test_layered_fast_truncate21', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     def get_stat(self, conn, stat_key, uri=None):

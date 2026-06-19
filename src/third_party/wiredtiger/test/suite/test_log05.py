@@ -30,13 +30,12 @@ import os, re, struct
 import wttest
 from helper import WiredTigerCursor
 
-# test_log05.py
-#    This test simulates log file corruption by manually setting
-#    a log records length field to UINT32_MAX. The expected behavior is that
-#    the record-length validation fails, salvage is invoked, and recovery
-#    completes successfully. By repeating this recovery cycle,
-#    the test also verifies that recovery does not create additional log files
-#    and that disk space usage remains stable.
+# This test simulates log file corruption by manually setting
+# a log records length field to UINT32_MAX. The expected behavior is that
+# the record-length validation fails, salvage is invoked, and recovery
+# completes successfully. By repeating this recovery cycle,
+# the test also verifies that recovery does not create additional log files
+# and that disk space usage remains stable.
 class test_log05(wttest.WiredTigerTestCase):
 
     uri = 'table:log05'

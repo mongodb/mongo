@@ -26,14 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_stepup06.py
-#   When two prepared sessions share the same prepared_id, a follower
-#   stepping up to leader must resolve all of them.
+# When two prepared sessions share the same prepared_id, a follower
+# stepping up to leader must resolve all of them.
 #
-#   The follower holds two prepared sessions with prepared_id=42:
-#   top_session (no writes) and work_session (table writes). Without the
-#   fix, step-up fails to resolve work_session's writes, causing step-up
-#   to fail with a conflict.
+# The follower holds two prepared sessions with prepared_id=42:
+# top_session (no writes) and work_session (table writes). Without the
+# fix, step-up fails to resolve work_session's writes, causing step-up
+# to fail with a conflict.
 
 import wiredtiger
 import wttest
@@ -43,13 +42,14 @@ from wtscenario import make_scenarios
 @wttest.skip_for_hook("tiered", "Layered tables are not supported with tiered storage")
 @disagg_test_class
 class test_layered_stepup06(wttest.WiredTigerTestCase):
-    uri = 'layered:test_layered_stepup06'
+    test_name = __qualname__
+    uri = f'layered:{test_name}'
 
     resolve_scenarios = [
         ('commit',   dict(commit=True)),
         ('rollback', dict(commit=False)),
     ]
-    disagg_storages = gen_disagg_storages('test_layered_stepup06', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, resolve_scenarios)
 
     conn_base_config = (

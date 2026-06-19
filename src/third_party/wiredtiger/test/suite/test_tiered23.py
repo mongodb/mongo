@@ -31,15 +31,15 @@ from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
-# test_tiered23.py
-#    Test delays in tiered operations.
+# Test delays in tiered operations.
 class test_tiered23(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     # Make scenarios for different cloud service providers.
-    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered23', tiered_only=True)
+    test_name = __qualname__
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), test_name, tiered_only=True)
     scenarios = make_scenarios(storage_sources)
 
-    uri = "table:test_tiered23"
+    uri = f"table:{test_name}"
 
     def conn_config(self):
         return TieredConfigMixin.conn_config(self)

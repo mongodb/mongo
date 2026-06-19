@@ -30,8 +30,7 @@ import re, wttest
 from wiredtiger import stat
 from helper_disagg import DisaggConfigMixin, disagg_test_class
 
-# test_disagg_checkpoint_size06.py
-#   Tests for checkpoint size calculation with delta chain scenarios.
+# Tests for checkpoint size calculation with delta chain scenarios.
 #
 # Tests:
 #   test_size_stable_through_delta_full_image_cycles

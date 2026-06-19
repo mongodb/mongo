@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn16.py
-#   Recovery: Test that toggling between logging and not logging does not
-#   continue to generate more log files.
+# Recovery: Test that toggling between logging and not logging does not
+# continue to generate more log files.
 #
 
 import fnmatch, os
@@ -37,9 +36,10 @@ import helper, wttest
 
 @wttest.skip_for_hook("tiered", "Fails on tiered storage")
 class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
-    t1 = 'table:test_txn16_1'
-    t2 = 'table:test_txn16_2'
-    t3 = 'table:test_txn16_3'
+    test_name = __qualname__
+    t1 = f'table:{test_name}_1'
+    t2 = f'table:{test_name}_2'
+    t3 = f'table:{test_name}_3'
     nentries = 1000
     create_params = 'key_format=i,value_format=i'
     # Set the log file size small so we generate checkpoints

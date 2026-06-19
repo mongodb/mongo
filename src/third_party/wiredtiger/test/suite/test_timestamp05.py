@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp05.py
-#   Timestamps: make sure they don't end up in metadata
+# Timestamps: make sure they don't end up in metadata
 #
 
 from suite_subprocess import suite_subprocess

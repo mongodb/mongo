@@ -30,7 +30,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_timestamp23.py
 #
 # delete keys repeatedly at successive timestamps
 class test_timestamp23(wttest.WiredTigerTestCase):

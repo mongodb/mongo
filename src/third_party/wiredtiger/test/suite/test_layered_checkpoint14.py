@@ -30,18 +30,18 @@ import os, wiredtiger, wttest
 from helper_disagg import disagg_test_class
 from wiredtiger import stat
 
-# test_layered_checkpoint14.py
-#    Ensure that we do not read any freed pages.
+# Ensure that we do not read any freed pages.
 @disagg_test_class
 class test_layered_checkpoint14(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
     conn_config = conn_base_config + 'disaggregated=(role="leader"),' + \
                   'verbose=[read:0,block:1],'
 
     nitems = 10_000
 
-    table_name = 'test_layered_checkpoint14'
+    table_name = test_name
     uri = "layered:" + table_name
     stable_uri = "file:" + table_name + ".wt_stable"
 

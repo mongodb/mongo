@@ -30,7 +30,6 @@ import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_bug032.py
 # This tests for the scenario discovered in WT-11845.
 # Before WT-11845 fast truncate determined if a page could be fast truncated by
 # looking at the pages aggregated timestamp. This would lead to keys being incorrectly

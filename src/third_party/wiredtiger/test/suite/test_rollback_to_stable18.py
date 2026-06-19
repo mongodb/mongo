@@ -36,7 +36,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable18.py
 # Test the rollback to stable shouldn't skip any pages that don't have aggregated time window.
 class test_rollback_to_stable18(test_rollback_to_stable_base):
 

@@ -29,8 +29,7 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_cursor05.py
-#    Test cursors at the point where a cursor is first initialized, and when it
+# Test cursors at the point where a cursor is first initialized, and when it
 # hits an endpoint.  Mix that in with column groups.
 class test_cursor05(wttest.WiredTigerTestCase):
     """

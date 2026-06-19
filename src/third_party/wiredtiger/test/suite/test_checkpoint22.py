@@ -32,7 +32,6 @@ import wiredtiger
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint22.py
 #
 # Test that skipping trees in checkpoints doesn't cause us to use the wrong
 # write generation.

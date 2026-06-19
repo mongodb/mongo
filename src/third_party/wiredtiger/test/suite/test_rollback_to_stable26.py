@@ -34,7 +34,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wtthread import checkpoint_thread
 
-# test_rollback_to_stable26.py
 # Test the rollback to stable does properly restore the prepare rollback entry
 # from the history store.
 class test_rollback_to_stable26(test_rollback_to_stable_base):

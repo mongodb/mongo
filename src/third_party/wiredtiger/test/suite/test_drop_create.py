@@ -28,8 +28,7 @@
 
 import wttest
 
-# test_drop_create.py
-#    Test dropping and creating
+# Test dropping and creating
 class test_drop_create(wttest.WiredTigerTestCase):
     def test_drop_create(self):
         s, self.session = self.session, None

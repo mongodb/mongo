@@ -28,13 +28,13 @@
 
 import wttest
 
-# test_bug015.py
-#    JIRA WT-2162: index drop in a certain order triggers NULL pointer deref
+# JIRA WT-2162: index drop in a certain order triggers NULL pointer deref
 class test_bug015(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     def test_bug015(self):
-        table = 'table:test_bug015'
-        idx1 = 'index:test_bug015:aab'
-        idx2 = 'index:test_bug015:aaa'
+        table = f'table:{self.test_name}'
+        idx1 = f'index:{self.test_name}:aab'
+        idx2 = f'index:{self.test_name}:aaa'
         self.session.create(table, "columns=(k,v)")
         self.session.create(idx1, "columns=(v)")
         self.session.create(idx2, "columns=(v)")

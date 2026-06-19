@@ -32,7 +32,6 @@ from wiredtiger import stat, WiredTigerError, wiredtiger_strerror, WT_NOTFOUND, 
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_truncate12.py
 #
 # Make sure that transaction IDs on truncates are handled properly after recovery,
 # even if the truncate information is loaded during recovery and stays in cache.

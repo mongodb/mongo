@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn23.py
-#   Transactions: ensure read timestamp is not cleared under cache pressure
+# Transactions: ensure read timestamp is not cleared under cache pressure
 #
 
 import wttest

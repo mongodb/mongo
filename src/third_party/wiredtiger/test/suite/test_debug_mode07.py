@@ -28,11 +28,11 @@
 
 import wttest
 
-# test_debug_mode07.py
-#   Test the debug mode settings. Test realloc_exact use (from WT-4919).
+# Test the debug mode settings. Test realloc_exact use (from WT-4919).
 class test_debug_mode07(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'debug_mode=(realloc_exact=true)'
-    uri = 'file:test_debug_mode07'
+    uri = f'file:{test_name}'
 
     # Insert some data to ensure setting/unsetting the flag does not
     # break existing functionality. Also call checkpoint because it

@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_import12.py
 # Import a file into a running database using the dry-run method used
 # by the MongoDB server. Add in checkpoints in there too:
 # - Export the table.

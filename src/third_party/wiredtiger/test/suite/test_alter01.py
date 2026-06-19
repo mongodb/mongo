@@ -30,8 +30,7 @@ import wttest
 from wtscenario import make_scenarios
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 
-# test_alter01.py
-#    Smoke-test the session alter operations.
+# Smoke-test the session alter operations.
 class test_alter01(TieredConfigMixin, wttest.WiredTigerTestCase):
     name = "alter01"
     entries = 100

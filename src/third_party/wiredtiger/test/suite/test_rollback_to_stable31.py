@@ -31,7 +31,6 @@ from helper import simulate_crash_restart
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_rollback_to_stable31.py
 # Check what happens with RTS if you never set the stable timestamp.
 
 class test_rollback_to_stable31(test_rollback_to_stable_base):

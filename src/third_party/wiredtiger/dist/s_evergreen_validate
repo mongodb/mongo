@@ -24,6 +24,12 @@ if [ $(command -v evergreen) ] && [ -f ~/.evergreen.yml ]; then
             exit 0
         fi
     fi
+
+    if ! timeout 5 evergreen client get-oauth-token > /dev/null 2>&1; then
+        echo "$0 skipping evergreen validation due to no login. Run 'evergreen login' to fix."
+        exit 0
+    fi
+
     echo "Validating evergreen.yml " > dist/$t
     evergreen validate -p wiredtiger test/evergreen.yml >> dist/$t 2>&1
     exit1=$?

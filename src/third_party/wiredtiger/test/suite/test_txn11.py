@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn11.py
-#   Transactions: Empty checkpoints and log removal.
+# Transactions: Empty checkpoints and log removal.
 
 import fnmatch, os
 from suite_subprocess import suite_subprocess
@@ -35,11 +34,12 @@ from wtdataset import SimpleDataSet
 import wttest
 
 class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     remove = 'true'
     conn_config = 'verbose=[transaction]'
     logmax = "100K"
     nrows = 700
-    tablename = 'test_txn11'
+    tablename = test_name
     source_uri = 'table:' + tablename + "_src"
     uri = 'table:' + tablename
 

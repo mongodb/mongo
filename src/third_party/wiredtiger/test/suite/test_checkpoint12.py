@@ -30,7 +30,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint12.py
 # Make sure you can't read from a checkpoint while you have a prepared transaction.
 # (This is to make sure that any transaction shenanigans involved in reading from
 # checkpoints don't interfere with the blanket ban on doing other operations after

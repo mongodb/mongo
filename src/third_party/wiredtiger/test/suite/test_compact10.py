@@ -31,13 +31,13 @@ from compact_util import compact_util
 from wiredtiger import stat
 from wtbackup import backup_base
 
-# test_compact10.py
 # Verify compaction does not alter data by comparing full backups before/after compaction.
 class test_compact10(backup_base, compact_util):
 
+    test_name = __qualname__
     conn_config = 'cache_size=100MB,statistics=(all)'
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB'
-    uri_prefix = 'table:test_compact10'
+    uri_prefix = f'table:{test_name}'
 
     num_tables = 5
     table_numkv = 100 * 1000

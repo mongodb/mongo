@@ -31,14 +31,14 @@ from wiredtiger import stat
 
 import time
 
-# test_sweep07.py
 # Regression test for WT-15647
 class test_sweep07(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'file_manager=(close_scan_interval=1,close_idle_time=1,close_handle_minimum=1)'
     table_cfg = 'key_format=S,value_format=S'
 
     def test_sweep_with_cursor(self):
-        uri = 'table:test_sweep07'
+        uri = f'table:{self.test_name}'
 
         # Create a table
         self.session.create(uri, self.table_cfg)

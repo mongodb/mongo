@@ -30,12 +30,12 @@ import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_durable_ts01.py
-#    Checking visibility and durability of updates with durable_timestamp and
-#    with restart.
+# Checking visibility and durability of updates with durable_timestamp and
+# with restart.
 @wttest.skip_for_hook("disagg", "RTS does not run during recovery for disaggregated storage")
 class test_durable_ts01(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     format_values = [
         ('row-string', dict(keyfmt='S', valfmt='S')),
         ('row-int', dict(keyfmt='i', valfmt='S')),
@@ -61,7 +61,7 @@ class test_durable_ts01(wttest.WiredTigerTestCase):
     def test_durable_ts01(self):
 
         # Build an object.
-        uri = self.uri + ':test_durable_ts01'
+        uri = self.uri + f':{self.test_name}'
         ds = self.ds(self, uri, 50, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
 

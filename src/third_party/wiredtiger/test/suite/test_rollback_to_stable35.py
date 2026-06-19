@@ -34,7 +34,6 @@ from helper import copy_wiredtiger_home
 from wtscenario import make_scenarios
 from rollback_to_stable_util import test_rollback_to_stable_base
 
-# test_rollback_to_stable35.py
 # Test that log is flushed for all writes that occurred in the checkpoint.
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable35(test_rollback_to_stable_base):

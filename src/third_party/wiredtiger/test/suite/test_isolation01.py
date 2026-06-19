@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_isolation01.py
-#   Transactions isolation mode: This test is to test for different isolation modes.
-#   The API reset_snapshot should return error when called with read committed isolation mode
-#   or when the session has performed any write operations.
+# Transactions isolation mode: This test is to test for different isolation modes.
+# The API reset_snapshot should return error when called with read committed isolation mode
+# or when the session has performed any write operations.
 #
 
 import wiredtiger, wttest
@@ -37,7 +36,8 @@ from wtscenario import make_scenarios
 
 class test_isolation01(wttest.WiredTigerTestCase):
 
-    uri = 'table:test_isolation01'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
     iso_types = [
         ('isolation_read_uncommitted', dict(isolation='read-uncommitted')),
         ('isolation_read_committed', dict(isolation='read-committed')),

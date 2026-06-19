@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_readonly02.py
-#   Readonly: Test readonly mode with illegal config combinations
-#   and error checking during updates.
+# Readonly: Test readonly mode with illegal config combinations
+# and error checking during updates.
 #
 
 from helper import copy_wiredtiger_home
@@ -36,7 +35,8 @@ from suite_subprocess import suite_subprocess
 import os, wiredtiger, wttest
 
 class test_readonly02(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'table:test_readonly02'
+    test_name = __qualname__
+    tablename = f'table:{test_name}'
     create = True
     create_params = 'key_format=i,value_format=i'
     entries = 10

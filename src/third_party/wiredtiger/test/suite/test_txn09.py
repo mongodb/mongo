@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn09.py
-#   Transactions: recovery toggling logging
+# Transactions: recovery toggling logging
 #
 
 from suite_subprocess import suite_subprocess
@@ -35,7 +34,8 @@ from wtscenario import make_scenarios
 import wttest
 
 class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_txn09'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'table:' + tablename
     log_enabled = True
 

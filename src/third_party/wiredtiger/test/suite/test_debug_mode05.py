@@ -28,14 +28,14 @@
 
 import wttest
 
-# test_debug_mode05.py
-#     As per WT-5046, the debug table logging settings prevent rollback to
-#     stable in the presence of prepared transactions.
+# As per WT-5046, the debug table logging settings prevent rollback to
+# stable in the presence of prepared transactions.
 #
-#     This test is to confirm the fix and prevent similar regressions.
+# This test is to confirm the fix and prevent similar regressions.
 class test_debug_mode05(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'log=(enabled),debug_mode=(table_logging=true)'
-    uri = 'file:test_debug_mode05'
+    uri = f'file:{test_name}'
 
     def test_table_logging_rollback_to_stable(self):
         self.session.create(self.uri, 'key_format=i,value_format=u,log=(enabled=false)')

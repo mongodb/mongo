@@ -30,7 +30,6 @@ import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_hs27.py
 # Test that variable-length column store doesn't RLE-compact adjacent data with heterogeneous
 # timestamps.
 #

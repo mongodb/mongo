@@ -34,7 +34,8 @@ from wtscenario import make_scenarios
 # Verify that pages with prepared tombstones are not incorrectly skipped during walks when opening a cursor
 
 class test_prepare43(test_prepare_preserve_prepare_base):
-    uri = 'table:test_prepare43'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),

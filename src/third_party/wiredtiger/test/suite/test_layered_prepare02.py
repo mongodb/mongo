@@ -30,13 +30,13 @@ import wiredtiger, wttest
 from helper_disagg import disagg_test_class
 from wtscenario import make_scenarios
 
-# test_layered_prepare02.py
-#   Forward iteration after a search() or search_near() that returns
-#   WT_PREPARE_CONFLICT must yield correct results on a layered cursor.
+# Forward iteration after a search() or search_near() that returns
+# WT_PREPARE_CONFLICT must yield correct results on a layered cursor.
 
 @disagg_test_class
 class test_layered_prepare02(wttest.WiredTigerTestCase):
 
+    test_name = __qualname__
     scenarios = make_scenarios([
         ('search',      dict(use_search_near=False)),
         ('search_near', dict(use_search_near=True)),
@@ -84,7 +84,7 @@ class test_layered_prepare02(wttest.WiredTigerTestCase):
         prepared ingest update on prepared_key.  Return (stable_keys,
         conn_follow, prep_session, iter_session, iter_cursor).
         '''
-        uri = 'table:test_layered_prepare02'
+        uri = f'table:{self.test_name}'
         conn_follow = self.wiredtiger_open('follower', self.extensionsConfig() +
                 ',create,' + self.conn_base_config + 'disaggregated=(role="follower")')
 

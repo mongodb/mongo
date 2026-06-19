@@ -30,8 +30,7 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_checkpoint01.py
-#    Checkpoint tests
+# Checkpoint tests
 # General checkpoint test: create an object containing sets of data associated
 # with a set of checkpoints, then confirm the checkpoint's values are correct,
 # including after other checkpoints are dropped.

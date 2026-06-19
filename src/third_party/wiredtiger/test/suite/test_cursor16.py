@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor16.py
-#   Cursors: final close of cached cursors
+# Cursors: final close of cached cursors
 #
 
 import wttest
@@ -35,7 +34,8 @@ from wiredtiger import stat
 from wtscenario import make_scenarios
 
 class test_cursor16(wttest.WiredTigerTestCase):
-    tablename = 'test_cursor16'
+    test_name = __qualname__
+    tablename = test_name
     uri_prefix = 'table:' + tablename
     uri_count = 100
     session_count = 100

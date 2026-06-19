@@ -30,9 +30,9 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from rollback_to_stable_util import test_rollback_to_stable_base
 
-# test_rollback_to_stable41.py
 # Test that the dry-run config for RTS only applies to a single call.
 class test_rollback_to_stable41(test_rollback_to_stable_base):
+    test_name = __qualname__
     format_values = [
         ('column', dict(key_format='r')),
         ('row_integer', dict(key_format='i')),
@@ -52,7 +52,7 @@ class test_rollback_to_stable41(test_rollback_to_stable_base):
         return 'verbose=(rts:5)'
 
     def test_rollback_to_stable(self):
-        uri = 'table:test_rollback_to_stable41'
+        uri = f'table:{self.test_name}'
         nrows = 1000
 
         value_a = 'a' * 10

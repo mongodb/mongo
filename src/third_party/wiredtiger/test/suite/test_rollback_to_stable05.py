@@ -32,7 +32,6 @@ from wiredtiger import stat
 from wtscenario import make_scenarios
 from rollback_to_stable_util import test_rollback_to_stable_base
 
-# test_rollback_to_stable05.py
 # Test that rollback to stable cleans history store for non-timestamp tables.
 class test_rollback_to_stable05(test_rollback_to_stable_base):
 

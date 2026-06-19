@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp27.py
-#   Test rollback timestamp api
+# Test rollback timestamp api
 #
 
 import wiredtiger, wttest

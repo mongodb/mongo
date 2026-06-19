@@ -31,19 +31,18 @@ from wiredtiger import stat
 from helper import simulate_crash_restart
 from helper_disagg import disagg_test_class
 
-# test_disagg_checkpoint_size05.py
-#   Test that block_size statistic reflects the checkpoint size for disaggregated storage.
-#   For disaggregated tables there is no underlying file, so block_size is sourced from the
-#   most recent checkpoint size. The stat is updated via two code paths that are both exercised
-#   here:
+# Test that block_size statistic reflects the checkpoint size for disaggregated storage.
+# For disaggregated tables there is no underlying file, so block_size is sourced from the
+# most recent checkpoint size. The stat is updated via two code paths that are both exercised
+# here:
 #
 #     Slow path  -- statistics=(all) opens the dhandle and reads the checkpoint size from the
 #                   block manager handle, which is updated at every checkpoint.
 #     Fast path  -- statistics=(size) avoids opening the dhandle and reads the size directly
 #                   from the checkpoint entry in the file's metadata.
 #
-#   At startup, the block manager handle is initialized from the checkpoint metadata so the
-#   slow-path stat is also correct before the first new checkpoint is taken after a restart.
+# At startup, the block manager handle is initialized from the checkpoint metadata so the
+# slow-path stat is also correct before the first new checkpoint is taken after a restart.
 @disagg_test_class
 class test_disagg_checkpoint_size05(wttest.WiredTigerTestCase):
 

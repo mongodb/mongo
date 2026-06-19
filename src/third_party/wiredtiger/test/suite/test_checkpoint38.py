@@ -31,7 +31,6 @@ import wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_checkpoint38.py
 #
 # Insert ~1GB of data into a single table and checkpoint with parallel checkpoint threads enabled.
 # Verify that the parallel checkpoint worker threads actually reconciled pages.

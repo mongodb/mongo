@@ -30,10 +30,10 @@ import os
 from suite_subprocess import suite_subprocess
 import wttest
 
-# test_util14.py
-#    Utilities: wt truncate
+# Utilities: wt truncate
 class test_util14(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util14.a'
+    test_name = __qualname__
+    tablename = f'{test_name}.a'
     nentries = 1000
 
     def test_truncate_process(self):

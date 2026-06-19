@@ -26,20 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare47.py
-#   Prepared insert on top of an existing tombstone, rolled back with the rollback
-#   timestamp ahead of stable. The chain ends up with an unresolved aborted prepared
-#   update at the head and the committed tombstone behind it. Reconcile must keep the
-#   tombstone in the chain so a later reconcile that writes the prepared update has a
-#   rollback fallback.
+# Prepared insert on top of an existing tombstone, rolled back with the rollback
+# timestamp ahead of stable. The chain ends up with an unresolved aborted prepared
+# update at the head and the committed tombstone behind it. Reconcile must keep the
+# tombstone in the chain so a later reconcile that writes the prepared update has a
+# rollback fallback.
 
 import wttest
 from wtscenario import make_scenarios
 
 class test_prepare47(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
 
-    uri = 'table:test_prepare47'
+    uri = f'table:{test_name}'
 
     format_values = [
         ('row', dict(key_format='i')),

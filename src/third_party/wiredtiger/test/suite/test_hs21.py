@@ -32,7 +32,6 @@ from wtdataset import SimpleDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_hs21.py
 # Test we don't lose any data when idle files with an active history are closed/sweeped.
 # Files with active history, ie content newer than the oldest timestamp can be closed when idle.
 # We want to ensure that when an active history file is idle closed we can continue reading the
@@ -41,9 +40,10 @@ from wtscenario import make_scenarios
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_hs21(wttest.WiredTigerTestCase):
     # Configure handle sweeping to occur within a specific amount of time.
+    test_name = __qualname__
     conn_config = 'file_manager=(close_handle_minimum=0,close_idle_time=2,close_scan_interval=1),' + \
             'statistics=(all),operation_tracking=(enabled=false)'
-    file_name = 'test_hs21'
+    file_name = test_name
     numfiles = 10
     nrows = 1000
 

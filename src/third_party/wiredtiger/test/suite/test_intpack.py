@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_intpack.py
-#    Tests integer packing using public methods
+# Tests integer packing using public methods
 #
 
 import wttest
@@ -124,7 +123,8 @@ class PackTester:
 
 # Test integer packing with various formats
 class test_intpack(wttest.WiredTigerTestCase):
-    name = 'test_intpack'
+    test_name = __qualname__
+    name = test_name
 
     # It's useful to test a larger range but avoid the CPU overhead normally
     base_range = 66000 if wttest.islongtest() else 5000

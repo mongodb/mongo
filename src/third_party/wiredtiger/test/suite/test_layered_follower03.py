@@ -30,10 +30,10 @@ import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_follower03.py
-#    Start without local files and test historical reads.
+# Start without local files and test historical reads.
 @disagg_test_class
 class test_layered_follower03(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     nitems = 500
 
     conn_base_config = 'statistics=(all),' \
@@ -43,9 +43,9 @@ class test_layered_follower03(wttest.WiredTigerTestCase):
 
     create_session_config = 'key_format=S,value_format=S'
 
-    table_name = "test_layered_follower03"
+    table_name = test_name
 
-    disagg_storages = gen_disagg_storages('test_layered_follower03', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages, [
         ('layered-prefix', dict(prefix='layered:', table_config='')),
         ('layered-type', dict(prefix='table:', table_config='block_manager=disagg,type=layered')),

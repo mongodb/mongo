@@ -30,8 +30,7 @@ import wiredtiger, wttest, sys
 from wtdataset import SimpleDataSet, ComplexDataSet, simple_key, simple_value
 from wtscenario import make_scenarios
 
-# test_cursor_random.py
-#    Cursor next_random operations
+# Cursor next_random operations
 class test_cursor_random(wttest.WiredTigerTestCase):
     types = [
         ('file', dict(type='file:random', dataset=SimpleDataSet)),

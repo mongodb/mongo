@@ -45,15 +45,15 @@ expected_out = [
     r"['USA\x00\x00', 2009, 307006550]"
 ]
 
-# test_schema01.py
-#    Test that tables are reconciled correctly when they are empty.
+# Test that tables are reconciled correctly when they are empty.
 class test_schema01(TieredConfigMixin, wttest.WiredTigerTestCase):
+    test_name = __qualname__
     tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources)
 
     '''Test various tree types becoming empty'''
 
-    basename = 'test_schema01'
+    basename = test_name
     tablename = 'table:' + basename
     cgname = 'colgroup:' + basename
 

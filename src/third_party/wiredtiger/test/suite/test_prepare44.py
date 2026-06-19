@@ -29,7 +29,6 @@
 import wttest
 import wiredtiger
 
-# test_prepare44.py
 # Test to reproduce and validate the fix for a bug in in-memory page eviction with aborted prepared updates.
 # The bug occurred when an aborted prepared update at the tail of an update chain was incorrectly
 # causing has_newer_updates to be set in __rec_upd_select_inmem, which then triggered an assertion
@@ -38,9 +37,10 @@ import wiredtiger
 class test_prepare44(wttest.WiredTigerTestCase):
     """Test that eviction of in-memory pages with aborted prepared updates
     does not trigger an assertion failure when preserve_prepared is enabled."""
+    test_name = __qualname__
 
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
-    uri = 'table:test_prepare44'
+    uri = f'table:{test_name}'
 
     def test_evict_aborted_prepared_tail(self):
         create_config = 'key_format=i,value_format=S,in_memory=true,log=(enabled=false)'

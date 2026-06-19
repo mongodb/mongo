@@ -32,7 +32,6 @@ from wtscenario import make_scenarios
 from wtbackup import backup_base
 
 
-# test_live_restore05.py
 # Reproduce a live restore edge case that resulted in duplicate metadata entries.
 class test_live_restore05(backup_base):
     format_values = [

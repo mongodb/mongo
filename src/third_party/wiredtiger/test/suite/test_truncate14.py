@@ -32,7 +32,6 @@ from wiredtiger import stat, WT_NOTFOUND
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_truncate14.py
 # Generate very large namespace gaps with truncate.
 class test_truncate14(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'

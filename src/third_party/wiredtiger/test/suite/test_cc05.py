@@ -31,7 +31,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 import wttest
 
-# test_cc05.py
 # Verify a locked checkpoint is not removed during garbage collection.
 
 @wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")

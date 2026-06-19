@@ -33,15 +33,15 @@ from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_key_provider_disagg02.py
-#    Ensure that a crash during checkpoint will not corrupt key provider meta information.
+# Ensure that a crash during checkpoint will not corrupt key provider meta information.
 @disagg_test_class
 class test_key_provider_disagg02(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
 
-    disagg_storages = gen_disagg_storages('test_key_provider_disagg02', disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only = True)
 
     crash_points = [
         ('crash_before_key_rotation', dict(crash_point="before_key_rotation")),
@@ -51,7 +51,7 @@ class test_key_provider_disagg02(wttest.WiredTigerTestCase, suite_subprocess):
 
     scenarios = make_scenarios(disagg_storages, crash_points)
     nentries = 1000
-    uri = "layered:test_key_provider_disagg02"
+    uri = f"layered:{test_name}"
 
     WT_SPECIAL_PALI_TURTLE_FILE_ID = 2
     turtle_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_TURTLE_FILE_ID):02d}.db'
@@ -128,7 +128,7 @@ class test_key_provider_disagg02(wttest.WiredTigerTestCase, suite_subprocess):
         # Ensure that metadata file doesn't update key provider after crash.
         subdir = 'SUBPROCESS'
         [ignore_result, new_home_dir] = self.run_subprocess_function(subdir,
-            'test_key_provider_disagg02.test_key_provider_disagg02.subprocess_func', silent=True)
+            f'{self.test_name}.{self.test_name}.subprocess_func', silent=True)
 
         self.dir = new_home_dir
         self.validate_persist_meta_file()

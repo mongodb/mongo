@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor07.py
 # Log cursors
 #
 
@@ -35,10 +34,11 @@ from wtscenario import make_scenarios
 import wttest
 
 class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
+    test_name = __qualname__
     logmax = "100K"
-    tablename1 = 'test_cursor07_log'
-    tablename2 = 'test_cursor07_nolog'
-    tablename3 = 'test_cursor07_nologtxn'
+    tablename1 = f'{test_name}_log'
+    tablename2 = f'{test_name}_nolog'
+    tablename3 = f'{test_name}_nologtxn'
     uri1 = 'table:' + tablename1
     uri2 = 'table:' + tablename2
     uri3 = 'table:' + tablename3

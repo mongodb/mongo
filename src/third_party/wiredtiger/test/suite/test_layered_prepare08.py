@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_prepare08.py
-#   After a prepared key triggers a conflict mid-scan and the prepared transaction is
-#   later rolled back, the ingest cursor is left unpositioned. A subsequent scan must
-#   skip the key comparison rather than asserting on the missing key.
+# After a prepared key triggers a conflict mid-scan and the prepared transaction is
+# later rolled back, the ingest cursor is left unpositioned. A subsequent scan must
+# skip the key comparison rather than asserting on the missing key.
 
 import wiredtiger
 import wttest
@@ -39,10 +38,11 @@ from wtscenario import make_scenarios
 
 @disagg_test_class
 class test_layered_prepare08(wttest.WiredTigerTestCase):
-    tablename = 'test_layered_prepare08'
+    test_name = __qualname__
+    tablename = test_name
     uri = 'layered:' + tablename
 
-    disagg_storages = gen_disagg_storages('test_layered_prepare08', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     conn_base_config = (

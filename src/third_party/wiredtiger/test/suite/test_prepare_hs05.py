@@ -30,9 +30,9 @@ import wttest
 from wtscenario import make_scenarios
 from wiredtiger import WT_NOTFOUND
 
-# test_prepare_hs05.py
 # Test that after aborting prepare transaction, correct update from the history store is restored.
 class test_prepare_hs05(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=50MB'
 
     format_values = [
@@ -45,7 +45,7 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values)
 
     def test_check_prepare_abort_hs_restore(self):
-        uri = 'table:test_prepare_hs05'
+        uri = f'table:{self.test_name}'
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 

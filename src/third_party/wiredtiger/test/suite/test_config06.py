@@ -28,10 +28,10 @@
 
 import wiredtiger, wttest
 
-# test_config06.py
-#    Test session.create configurations.
+# Test session.create configurations.
 class test_config06(wttest.WiredTigerTestCase):
-    uri = 'table:test_config06'
+    test_name = __qualname__
+    uri = f'table:{test_name}'
     key = 'keyABCDEFGHIJKLMNOPQRSTUVWXYZ'
     value = 'valueABCDEFGHIJKLMNOPQRSTUVWXYZ'
 

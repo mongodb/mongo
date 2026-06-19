@@ -26,15 +26,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_pack.py
-#    Tests packing using public methods
+# Tests packing using public methods
 #
 
 import wttest
 import re
 
 class test_pack(wttest.WiredTigerTestCase):
-    name = 'test_pack'
+    test_name = __qualname__
+    name = test_name
 
     def dump_cursor(self, cursor, name):
         cursor.reset()

@@ -32,7 +32,6 @@ from helpers.helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-# test_leaf_delta_disagg02.py
 # Test that reconciliation writes a full page instead of a delta when too many keys have
 # been removed from the disk image. A removed key still occupies space as a tombstone in
 # the delta; the same key is simply absent from a full page. The threshold is controlled
@@ -40,7 +39,8 @@ from wiredtiger import stat
 @disagg_test_class
 class test_leaf_delta_disagg02(wttest.WiredTigerTestCase):
 
-    uri = 'layered:test_leaf_delta_disagg02'
+    test_name = __qualname__
+    uri = f'layered:{test_name}'
 
     # Use delta_pct=1000 so the size threshold never rejects a delta; only the delete
     # threshold should determine whether we write a delta or a full page.
@@ -54,7 +54,7 @@ class test_leaf_delta_disagg02(wttest.WiredTigerTestCase):
     )
     conn_delta_config = 'disaggregated=(role="leader"),page_delta=(leaf_page_delta=true,internal_page_delta=false),'
 
-    disagg_storages = gen_disagg_storages('test_leaf_delta_disagg02', disagg_only=True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
     # Small pages ensure all keys land on a single leaf page.

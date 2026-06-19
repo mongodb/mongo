@@ -29,9 +29,9 @@
 import wttest
 from wtscenario import make_scenarios
 
-# test_prepare11.py
 # Test prepare rollback with a reserved update between updates.
 class test_prepare11(wttest.WiredTigerTestCase):
+    test_name = __qualname__
     conn_config = 'cache_size=2MB'
 
     format_values = [
@@ -49,7 +49,7 @@ class test_prepare11(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values, commit_values)
 
     def test_prepare_update_rollback(self):
-        uri = "table:test_prepare11"
+        uri = f"table:{self.test_name}"
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
 

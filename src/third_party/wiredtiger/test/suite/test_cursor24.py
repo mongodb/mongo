@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor24.py
-#   Test version cursor prepare metadata fields and rollback visibility.
+# Test version cursor prepare metadata fields and rollback visibility.
 #
 import wttest
 import wiredtiger
@@ -36,7 +35,8 @@ from wtscenario import make_scenarios
 WT_TS_MAX = 2**64 - 1
 
 class test_cursor24(wttest.WiredTigerTestCase):
-    uri = 'file:test_cursor24.wt'
+    test_name = __qualname__
+    uri = f'file:{test_name}.wt'
 
     types = [
         ('row', dict(keyformat='i', valueformat='i')),
