@@ -68,7 +68,7 @@ public:
     };
 
     // Construct a new engine for the specified context.
-    ASIO_DECL explicit engine(SCHANNEL_CRED* context, const std::string& remoteHostName);
+    ASIO_DECL explicit engine(SCH_CREDENTIALS* context, const std::string& remoteHostName);
 
     // Destructor.
     ASIO_DECL ~engine();
@@ -120,7 +120,7 @@ private:
     CredHandle _hcred;
 
     // Credentials for TLS handshake
-    SCHANNEL_CRED* _pCred;
+    SCH_CREDENTIALS* _pCred;
 
     // TLS SNI server name
     std::wstring _remoteHostName;

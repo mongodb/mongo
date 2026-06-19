@@ -54,10 +54,12 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
-// SChannel implementation
+// SSL provider-specific headers
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+#include "mongo/platform/windows_basic.h"
 #endif
 #endif  // #ifdef MONGO_CONFIG_SSL
 
@@ -92,7 +94,7 @@ struct SSLConnectionContext;
 typedef SSL_CTX* SSLContextType;
 typedef SSL* SSLConnectionType;
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
-typedef SCHANNEL_CRED* SSLContextType;
+typedef SCH_CREDENTIALS* SSLContextType;
 typedef PCtxtHandle SSLConnectionType;
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
 typedef asio::ssl::apple::Context* SSLContextType;
