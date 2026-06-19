@@ -8,6 +8,7 @@ const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 
 const sbeNonLeadingMatchEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeNonLeadingMatch");
+const sbeTransformStagesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages");
 
 const MultiStageSBE = 0;
 const MultiStageClassic = 1;
@@ -145,7 +146,9 @@ assertPipelineOptimizationAndResult({
         {$match: {m: {$eq: 2}}},
     ],
     expectedStageSequence: {
-        [MultiStageSBE]: ["$cursor", "$project", "$match"],
+        [MultiStageSBE]: sbeTransformStagesEnabled
+            ? ["$cursor", "$match"]
+            : ["$cursor", "$project", "$match"],
         [MultiStageClassic]: ["$cursor", "$group", "$project", "$match"],
         [SingleStage]: ["MATCH", "PROJECTION_DEFAULT", "GROUP", "COLLSCAN"],
     },
