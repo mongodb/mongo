@@ -38,7 +38,6 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -339,28 +338,17 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
     const NamespaceString& nss,
     const Timestamp& cloneTimestamp,
     const std::map<ShardId, ShardVersion>& shardVersions) {
-    std::vector<BSONObj> pipeline;
-    pipeline.push_back(BSON("$count" << "count"));
-    AggregateCommandRequest aggRequest(nss, pipeline);
-    BSONObj hint = BSON("_id" << 1);
-    aggRequest.setHint(hint);
-
-    // TODO SERVER-107180 always set rawData once 9.0 becomes last LTS
-    if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        aggRequest.setRawData(true);
-    }
-
-    aggRequest.setWriteConcern(WriteConcernOptions());
-    aggRequest.setReadConcern(repl::ReadConcernArgs::snapshot(LogicalTime(cloneTimestamp)));
-
+    ShardsvrReshardingDonorGetCloneCount cmd(nss);
+    cmd.setReshardingUUID(reshardingUUID);
+    cmd.setCloneTimestamp(cloneTimestamp);
+    cmd.setDbName(DatabaseName::kAdmin);
+    cmd.setReadConcern(repl::ReadConcernArgs::snapshot(LogicalTime(cloneTimestamp)));
     auto readPref = ReadPreferenceSetting{ReadPreference::SecondaryPreferred};
-    aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
+    cmd.setReadPreference(readPref);
 
-    const auto opts = std::make_shared<async_rpc::AsyncRPCOptions<AggregateCommandRequest>>(
-        executor, token, aggRequest);
-    opts->cmd.setDbName(nss.dbName());
+    const auto opts =
+        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrReshardingDonorGetCloneCount>>(
+            executor, token, cmd);
     auto responses = resharding::sendCommandToShards(opCtx, opts, shardVersions, readPref);
 
     std::map<ShardId, int64_t> docsToCopy;
@@ -368,33 +356,12 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
     for (auto&& response : responses) {
         const auto& donorShardId = response.shardId;
 
+        // A retryable per-shard error propagates out of this function so the coordinator's
+        // automatic-retry wrapper can re-run the whole fetch.
         uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
-        auto cursorReply = CursorInitialReply::parse(
+        auto reply = ShardsvrReshardingDonorGetCloneCountResponse::parse(
             response.swResponse.getValue().data, IDLParserContext("getDocumentsToCopyFromDonors"));
-        auto firstBatch = cursorReply.getCursor()->getFirstBatch();
-
-        uassert(9858102,
-                str::stream() << "The aggregation result from fetching the number of "
-                                 "documents from the donor shard '"
-                              << donorShardId
-                              << "' should contain at most one document but it contains "
-                              << firstBatch.size() << " documents .",
-                firstBatch.size() <= 1);
-
-        int64_t count = [&] {
-            // If there are no documents in the collection, the count aggregation would not
-            // return any documents.
-            if (firstBatch.size() == 0) {
-                return 0LL;
-            }
-            auto doc = firstBatch[0];
-            uassert(9858103,
-                    str::stream() << "The aggregation result from fetching the number of "
-                                     "documents from the donor shard '"
-                                  << donorShardId << "' does not have the field 'count' set.",
-                    doc.hasField("count"));
-            return doc["count"].numberLong();
-        }();
+        int64_t count = reply.getDocumentsToCopy();
         docsToCopy.emplace(donorShardId, count);
 
         LOGV2(9858107,

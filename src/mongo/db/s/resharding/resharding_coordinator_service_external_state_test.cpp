@@ -262,13 +262,12 @@ public:
         return whenAllSucceed(std::move(expectations));
     }
 
-    auto mockDonorCloningMetricsResponses(
-        const std::map<ShardId, std::vector<BSONObj>>& responseDocs) {
+    auto mockDonorCloneCountResponses(const std::map<ShardId, int64_t>& counts) {
         std::vector<Future<void>> expectations;
 
-        for (auto donorIter = responseDocs.begin(); donorIter != responseDocs.end(); ++donorIter) {
+        for (auto donorIter = counts.begin(); donorIter != counts.end(); ++donorIter) {
             auto donorShardId = donorIter->first;
-            auto donorResponseDocs = donorIter->second;
+            auto donorCount = donorIter->second;
 
             auto asyncRPCRunner = dynamic_cast<async_rpc::AsyncMockAsyncRPCRunner*>(
                 async_rpc::detail::AsyncRPCRunner::get(operationContext()->getServiceContext()));
@@ -281,37 +280,48 @@ public:
                     return false;
                 }
 
-                auto aggRequest = AggregateCommandRequest::parse(
+                auto cmd = ShardsvrReshardingDonorGetCloneCount::parse(
                     req.cmdBSON.addFields(BSON("$db" << req.dbName)),
-                    IDLParserContext("mockRecipientCloningMetricsResponses"));
+                    IDLParserContext("mockDonorCloneCountResponses"));
 
-                ASSERT_EQUALS(aggRequest.getNamespace(), sourceNss);
-
-                ASSERT_EQ(aggRequest.getPipeline().size(), 1);
-                ASSERT_BSONOBJ_EQ(aggRequest.getPipeline()[0], BSON("$count" << "count"));
-                ASSERT_BSONOBJ_EQ(*aggRequest.getHint(), BSON("_id" << 1));
-
+                ASSERT_EQ(cmd.getCommandParameter(), sourceNss);
+                ASSERT_EQ(cmd.getReshardingUUID(), reshardingUUID);
+                ASSERT_EQ(cmd.getCloneTimestamp(), cloneTimestamp);
                 ASSERT_BSONOBJ_EQ(
-                    aggRequest.getReadConcern()->toBSON(),
+                    cmd.getReadConcern()->toBSON(),
                     BSON("readConcern" << BSON("level" << "snapshot"
                                                        << "atClusterTime" << cloneTimestamp)));
-                ASSERT_BSONOBJ_EQ(*aggRequest.getUnwrappedReadPref(),
-                                  BSON("$readPreference" << BSON("mode" << "secondaryPreferred")));
-                ASSERT_EQ(aggRequest.getShardVersion(), shardVersions.find(donorShardId)->second);
+                ASSERT(cmd.getReadPreference()->equals(
+                    ReadPreferenceSetting{ReadPreference::SecondaryPreferred}));
+                ASSERT_EQ(cmd.getShardVersion(), shardVersions.find(donorShardId)->second);
 
                 return true;
             };
 
-            CursorResponse cursorResponse(sourceNss, 0 /* cursorId */, donorResponseDocs);
-            auto response = cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
-
-            expectations.push_back(
-                asyncRPCRunner
-                    ->expect(matcher, std::move(response), "mockDonorCloningMetricsResponses")
-                    .unsafeToInlineFuture());
+            ShardsvrReshardingDonorGetCloneCountResponse response(donorCount);
+            expectations.push_back(asyncRPCRunner
+                                       ->expect(matcher,
+                                                response.toBSON().addFields(BSON("ok" << 1)),
+                                                "mockDonorCloneCountResponses")
+                                       .unsafeToInlineFuture());
         }
 
         return whenAllSucceed(std::move(expectations));
+    }
+
+    auto mockDonorCloneCountErrorResponse(const ShardId& donorShardId, ErrorCodes::Error code) {
+        auto asyncRPCRunner = dynamic_cast<async_rpc::AsyncMockAsyncRPCRunner*>(
+            async_rpc::detail::AsyncRPCRunner::get(operationContext()->getServiceContext()));
+
+        auto matcher = [donorShardId](const async_rpc::AsyncMockAsyncRPCRunner::Request& req) {
+            return ShardId{req.target.host()} == donorShardId;
+        };
+
+        auto response = BSON("ok" << 0 << "code" << code << "errmsg"
+                                  << "mock donor clone count error");
+        return asyncRPCRunner
+            ->expect(matcher, std::move(response), "mockDonorCloneCountErrorResponse")
+            .unsafeToInlineFuture();
     }
 
     template <typename CmdType, typename ResponseType>
@@ -858,10 +868,8 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest, GetDocumentsToCopyFromDono
     };
     auto count0 = 123;
     auto count1 = 456;
-    std::map<ShardId, std::vector<BSONObj>> donorResponseDocs{
-        {shardId0, {BSON("count" << count0)}}, {shardId1, {BSON("count" << count1)}}};
 
-    auto future = mockDonorCloningMetricsResponses(donorResponseDocs);
+    auto future = mockDonorCloneCountResponses({{shardId0, count0}, {shardId1, count1}});
 
     ReshardingCoordinatorExternalStateImpl externalState;
     auto docsToCopy =
@@ -883,9 +891,8 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
     std::map<ShardId, ShardVersion> shardVersions{
         {shardId0, shardVersion0},
     };
-    std::map<ShardId, std::vector<BSONObj>> donorResponseDocs{{shardId0, {}}};
 
-    auto future = mockDonorCloningMetricsResponses(donorResponseDocs);
+    auto future = mockDonorCloneCountResponses({{shardId0, 0}});
 
     ReshardingCoordinatorExternalStateImpl externalState;
     auto docsToCopy =
@@ -899,6 +906,29 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
 
     ASSERT_EQ(docsToCopy.size(), 1);
     ASSERT_EQ(docsToCopy[shardId0], 0);
+}
+
+TEST_F(ReshardingCoordinatorServiceExternalStateTest,
+       GetDocumentsToCopyFromDonors_PropagatesDonorError) {
+    std::map<ShardId, ShardVersion> shardVersions{
+        {shardId0, shardVersion0},
+    };
+
+    auto future = mockDonorCloneCountErrorResponse(shardId0, ErrorCodes::IllegalOperation);
+
+    ReshardingCoordinatorExternalStateImpl externalState;
+    ASSERT_THROWS_CODE(
+        externalState.getDocumentsToCopyFromDonors(operationContext(),
+                                                   **taskExecutor,
+                                                   operationContext()->getCancellationToken(),
+                                                   reshardingUUID,
+                                                   sourceNss,
+                                                   cloneTimestamp,
+                                                   shardVersions),
+        DBException,
+        ErrorCodes::IllegalOperation);
+
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest, GetDocumentsDeltaFromDonors_SuccessBasic) {

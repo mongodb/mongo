@@ -30,21 +30,25 @@
 
 #include "mongo/db/s/resharding/resharding_util.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -53,8 +57,14 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
@@ -978,6 +988,126 @@ TEST_F(MakeReshardingOperationContextTest,
     // Note: getOperationFCV can only be called with Passkey that is available to friend class
     // of VersionContext, so we can't assert the exact value of the FCV here.
     // Instead, we just assert that it is set to some value.
+}
+
+class ReshardingDonorCloneCountUtilTest : public CatalogTestFixture {
+public:
+    void createIndex(const BSONObj& spec) {
+        WriteUnitOfWork wuow(opCtx());
+        CollectionWriter writer{opCtx(), *_coll};
+
+        auto* indexCatalog = writer.getWritableCollection(opCtx())->getIndexCatalog();
+        uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(
+            opCtx(), writer.getWritableCollection(opCtx()), spec));
+        wuow.commit();
+    }
+
+    const NamespaceString& nss() const {
+        return _nss;
+    }
+
+    const CollectionPtr& coll() const {
+        return *_coll.get();
+    }
+
+    OperationContext* opCtx() {
+        return operationContext();
+    }
+
+protected:
+    const int kIndexVersion = 2;
+
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        _coll.emplace(opCtx(), _nss, MODE_X);
+        ASSERT_OK(storageInterface()->createCollection(opCtx(), _nss, {}));
+    }
+
+    void tearDown() override {
+        _coll.reset();
+        CatalogTestFixture::tearDown();
+    }
+
+private:
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.user");
+    boost::optional<AutoGetCollection> _coll;
+};
+
+TEST_F(ReshardingDonorCloneCountUtilTest, UnshardedSourceHintsId) {
+    auto hint = determineCloneCountHint(opCtx(), coll(), boost::none /* shardKeyPattern */);
+
+    ASSERT_TRUE(hint);
+    ASSERT_BSONOBJ_EQ(*hint, BSON("_id" << 1));
+}
+
+TEST_F(ReshardingDonorCloneCountUtilTest, ShardedRangedKeyWithCompatibleIndexHintsThatIndex) {
+    createIndex(BSON("key" << BSON("x" << 1) << "name" << "x" << "v" << kIndexVersion));
+
+    auto hint = determineCloneCountHint(opCtx(), coll(), BSON("x" << 1));
+
+    ASSERT_TRUE(hint);
+    ASSERT_BSONOBJ_EQ(*hint, BSON("x" << 1));
+}
+
+TEST_F(ReshardingDonorCloneCountUtilTest, ShardedCompoundShardKeyPrefixedByCompoundIndex) {
+    createIndex(
+        BSON("key" << BSON("x" << 1 << "y" << 1) << "name" << "xy" << "v" << kIndexVersion));
+
+    auto hint = determineCloneCountHint(opCtx(), coll(), BSON("x" << 1 << "y" << 1));
+
+    ASSERT_TRUE(hint);
+    ASSERT_BSONOBJ_EQ(*hint, BSON("x" << 1 << "y" << 1));
+}
+
+TEST_F(ReshardingDonorCloneCountUtilTest, ShardedKeyPrefixOfCompoundIndexHintsThatIndex) {
+    // The shard key '{x: 1}' is a strict prefix of the compound index '{x: 1, y: 1}'. The index
+    // still contains the full shard key, so it covers the shard-filtered count and is chosen.
+    createIndex(
+        BSON("key" << BSON("x" << 1 << "y" << 1) << "name" << "xy" << "v" << kIndexVersion));
+
+    auto hint = determineCloneCountHint(opCtx(), coll(), BSON("x" << 1));
+
+    ASSERT_TRUE(hint);
+    ASSERT_BSONOBJ_EQ(*hint, BSON("x" << 1 << "y" << 1));
+}
+
+TEST_F(ReshardingDonorCloneCountUtilTest, ShardedMultiKeyOnlyCandidateReturnsNoHint) {
+    // Shard key '{x: 1}' is a prefix of '{x: 1, y: 1}', so that compound index would normally cover
+    // the count. But 'y' is not a shard-key field, so an array value for 'y' is a legal write that
+    // makes the index multikey. A multikey index emits multiple keys per document and would
+    // over-count, so it is rejected and no hint is returned. (The shard-key fields themselves can
+    // never be arrays, so the shard-key prefix is always single-key.)
+    createIndex(
+        BSON("key" << BSON("x" << 1 << "y" << 1) << "name" << "xy" << "v" << kIndexVersion));
+
+    DBDirectClient client(opCtx());
+    client.insert(nss(), BSON("x" << 1 << "y" << BSON_ARRAY(1 << 2)));
+
+    auto hint = determineCloneCountHint(opCtx(), coll(), BSON("x" << 1));
+
+    ASSERT_FALSE(hint);
+}
+
+TEST_F(ReshardingDonorCloneCountUtilTest, ShardedHashedKeyWithHashedIndexHintsHashedIndex) {
+    createIndex(BSON("key" << BSON("x" << 1) << "name" << "x" << "v" << kIndexVersion));
+    createIndex(
+        BSON("key" << BSON("x" << "hashed") << "name" << "xhashed" << "v" << kIndexVersion));
+
+    auto hint = determineCloneCountHint(opCtx(), coll(), BSON("x" << "hashed"));
+
+    ASSERT_TRUE(hint);
+    ASSERT_BSONOBJ_EQ(*hint, BSON("x" << "hashed"));
+}
+
+TEST_F(ReshardingDonorCloneCountUtilTest, ShardedHashedKeyWithoutHashedIndexReturnsNoHint) {
+    // The hashed shard-key index was dropped; only a ranged '{x: 1}' index remains. Because the
+    // shard-key prefix test compares values, '{x: 1}' does not match a '{x: "hashed"}' shard key,
+    // so there is no covering index and no hint is returned.
+    createIndex(BSON("key" << BSON("x" << 1) << "name" << "x" << "v" << kIndexVersion));
+
+    auto hint = determineCloneCountHint(opCtx(), coll(), BSON("x" << "hashed"));
+
+    ASSERT_FALSE(hint);
 }
 
 }  // namespace

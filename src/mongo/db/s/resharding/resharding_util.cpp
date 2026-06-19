@@ -40,6 +40,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
@@ -898,6 +899,24 @@ VersionContext getVersionContextOrDefault(
         return fom->getVersionContext().value_or(kDefaultVersionContext);
     }
     return kDefaultVersionContext;
+}
+
+boost::optional<BSONObj> determineCloneCountHint(OperationContext* opCtx,
+                                                 const CollectionPtr& collection,
+                                                 const boost::optional<BSONObj>& shardKeyPattern) {
+    // Unsharded source: hint the '_id' index, which always exists, to keep the count covered.
+    if (!shardKeyPattern) {
+        return BSON("_id" << 1);
+    }
+
+    // Sharded source: orphans must be filtered out, which only stays covered with an index that
+    // contains the full shard key.
+    if (auto idx = findShardKeyPrefixedIndex(
+            opCtx, collection, *shardKeyPattern, true /* requireSingleKey */)) {
+        return idx->keyPattern();
+    }
+
+    return boost::none;
 }
 
 }  // namespace resharding

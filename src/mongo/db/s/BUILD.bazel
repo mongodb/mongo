@@ -1108,6 +1108,7 @@ mongo_cc_library(
     srcs = [],
     deps = [
         ":sharding_commands_d",
+        "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db/auth:authmocks",
@@ -1125,6 +1126,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:wait_for_majority_service",
         "//src/mongo/db/session:logical_session_cache_noop",
         "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/db/sharding_environment:config_server_test_fixture",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
