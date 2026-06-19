@@ -42,6 +42,8 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/single_doc_lookup/aggregation_single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -49,6 +51,7 @@
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -472,8 +475,33 @@ TEST_F(ChangeStreamAddPostImageStageFnWiringTest, UpdateLookupModeBuildsUpdateLo
     auto* updateLookupStage = dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get());
     ASSERT(updateLookupStage);
     ASSERT_FALSE(dynamic_cast<exec::agg::ChangeStreamAddPostImageStage*>(stage.get()));
+}
+
+// Flag off (default): the updateLookup stage routes through the Aggregation fallback alone.
+TEST_F(ChangeStreamAddPostImageStageFnWiringTest, UpdateLookupFlagOffWiresAggregationOnly) {
+    unittest::ServerParameterGuard flag{"featureFlagChangeStreamOptimizedUpdateLookup", false};
+    auto stage = buildStageForMode(FullDocumentModeEnum::kUpdateLookup);
+    auto* updateLookupStage = dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get());
+    ASSERT(updateLookupStage);
     ASSERT(dynamic_cast<const exec::agg::AggregationSingleDocumentLookupExecutor*>(
         updateLookupStage->getLookupExecutor_forTest()));
+}
+
+// Flag on: the updateLookup stage routes through PrimaryWithFallback(Express, Aggregation).
+TEST_F(ChangeStreamAddPostImageStageFnWiringTest,
+       UpdateLookupFlagOnWiresExpressWithAggregationFallback) {
+    unittest::ServerParameterGuard flag{"featureFlagChangeStreamOptimizedUpdateLookup", true};
+    auto stage = buildStageForMode(FullDocumentModeEnum::kUpdateLookup);
+    auto* updateLookupStage = dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get());
+    ASSERT(updateLookupStage);
+
+    auto* chain = dynamic_cast<const exec::agg::PrimaryWithFallbackSingleDocumentLookupExecutor*>(
+        updateLookupStage->getLookupExecutor_forTest());
+    ASSERT(chain);
+    ASSERT(dynamic_cast<const exec::agg::ExpressSingleDocumentLookupExecutor*>(
+        chain->primary_forTest()));
+    ASSERT(dynamic_cast<const exec::agg::AggregationSingleDocumentLookupExecutor*>(
+        chain->fallback_forTest()));
 }
 
 TEST_F(ChangeStreamAddPostImageStageFnWiringTest, RequiredModeBuildsAddPostImageStage) {

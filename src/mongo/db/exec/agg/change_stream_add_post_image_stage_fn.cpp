@@ -31,12 +31,42 @@
 #include "mongo/db/exec/agg/change_stream_update_lookup_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/single_doc_lookup/aggregation_single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
+#include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility_factory_impl.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>
 
 namespace mongo {
+namespace {
+/**
+ * Builds the SingleDocumentLookupExecutor for the updateLookup stage.
+ */
+std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecutor(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    using namespace exec::agg;
+    auto aggExecutor = std::make_unique<AggregationSingleDocumentLookupExecutor>();
+
+    const auto& ifrContext = expCtx->getIfrContext();
+    const bool optimizedLookupEnabled = ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagChangeStreamOptimizedUpdateLookup);
+    if (!optimizedLookupEnabled) {
+        return aggExecutor;
+    }
+
+    LocalLookupEligibilityFactoryImpl eligibilityFactory;
+    auto expressExecutor = std::make_unique<ExpressSingleDocumentLookupExecutor>(
+        std::make_unique<OnDemandCollectionAcquirer>(),
+        eligibilityFactory.makeLocalLookupEligibility(expCtx->getOperationContext()));
+    return std::make_unique<PrimaryWithFallbackSingleDocumentLookupExecutor>(
+        std::move(expressExecutor), std::move(aggExecutor));
+}
+}  // namespace
 
 /**
  * Builds the execution stage for DocumentSourceChangeStreamAddPostImage. The post-image work is
@@ -58,7 +88,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToS
         return make_intrusive<exec::agg::ChangeStreamUpdateLookupStage>(
             changeStreamAddPostImageDS->kStageName,
             changeStreamAddPostImageDS->getExpCtx(),
-            std::make_unique<exec::agg::AggregationSingleDocumentLookupExecutor>());
+            buildUpdateLookupExecutor(changeStreamAddPostImageDS->getExpCtx()));
     }
 
     return make_intrusive<exec::agg::ChangeStreamAddPostImageStage>(
