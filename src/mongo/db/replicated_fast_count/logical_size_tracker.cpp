@@ -1,0 +1,95 @@
+/**
+ *    Copyright (C) 2026-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/db/replicated_fast_count/logical_size_tracker.h"
+
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
+namespace mongo {
+namespace {
+
+bool isColdStorageTier(StorageEngine* storageEngine, const CollectionOptions& options) {
+    const auto storageTier = storageEngine->getStorageTierFromStorageOptions(options.storageEngine);
+    return storageTier == StorageTierLevelEnum::cold;
+}
+
+}  // namespace
+
+LogicalSizeTracker::Snapshot LogicalSizeTracker::getLatestSnapshot() const {
+    return _latestSnapshot;
+}
+
+void LogicalSizeTracker::_refreshLatestSnapshot(OperationContext* opCtx) {
+    AutoReadLockFree lockFreeRead(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
+    const auto dbNames = catalog->getAllConsistentDbNames(opCtx);
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    invariant(storageEngine);
+
+    Snapshot newSnapshot{};
+
+    for (const auto& dbName : dbNames) {
+        for (const auto& coll : catalog->range(dbName)) {
+            const auto collBytes = coll->dataSize(opCtx);
+            if (collBytes < 0) {
+                LOGV2_WARNING(12894101,
+                              "Collection reported negative data logical bytes for collection; "
+                              "treating as zero",
+                              "uuid"_attr = coll->uuid(),
+                              "dataSize"_attr = collBytes);
+                continue;
+            }
+
+            const bool isCold = isColdStorageTier(storageEngine, coll->getCollectionOptions());
+            auto& tierTotalBytes =
+                isCold ? newSnapshot.logicalBytesCold : newSnapshot.logicalBytesHot;
+
+            const auto tierPreviousTotal = tierTotalBytes;
+            if (MONGO_unlikely(overflow::add(tierPreviousTotal, collBytes, &tierTotalBytes))) {
+                LOGV2_FATAL(12894100,
+                            "Total logical size for storage tier overflows int64; corrupted "
+                            "logical size tracking",
+                            "storageTier"_attr = (isCold ? "cold" : "hot"),
+                            "previousTotalBytes"_attr = tierPreviousTotal,
+                            "collectionBytes"_attr = collBytes);
+            }
+        }
+    }
+
+    _latestSnapshot = newSnapshot;
+}
+
+}  // namespace mongo

@@ -567,6 +567,38 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "logical_size_tracker_test",
+    srcs = [
+        "logical_size_tracker_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "server-collection-write-path",
+    ],
+    deps = [
+        "logical_size_tracker",
+        "replicated_fast_count_test_helpers",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
+        "//src/mongo/db/shard_role/shard_catalog:collection_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "logical_size_tracker",
+    srcs = [
+        "logical_size_tracker.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/mongo/db/storage:storage_engine_impl",
+    ],
+)
+
 mongo_cc_library(
     name = "replicated_fast_count_enabled",
     srcs = ["replicated_fast_count_enabled.cpp"],
