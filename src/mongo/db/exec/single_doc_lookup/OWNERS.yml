@@ -8,3 +8,7 @@ filters:
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads
+  # Express-specific executor follows the ownership of src/mongo/db/exec/express.
+  - "express_*":
+    approvers:
+      - 10gen/query-execution-classic
