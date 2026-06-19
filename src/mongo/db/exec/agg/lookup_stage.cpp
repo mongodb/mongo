@@ -31,10 +31,12 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
@@ -160,7 +162,9 @@ LookUpStage::LookUpStage(std::string_view stageName,
       _unwindIndexPathField(std::move(unwindIndexPathField)),
       _unwindPreserveNullsAndEmptyArrays(unwindPreserveNullsAndEmptyArrays),
       _additionalFilter(additionalFilter.getOwned()),
-      _sharedState(std::move(sharedState)) {
+      _sharedState(std::move(sharedState)),
+      _memoryTracker(
+          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     if (!hasLocalFieldForeignFieldJoin()) {
         // When local/foreignFields are included, we cannot enable the cache because the $match
         // is a correlated prefix that will not be detected. Here, local/foreignFields are absent,
@@ -168,7 +172,9 @@ LookUpStage::LookUpStage(std::string_view stageName,
         _cache = std::make_shared<SequentialDocumentCache>(
             loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes));
     }
-};
+    _trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
+}
 
 void LookUpStage::detachFromOperationContext() {
     if (_sharedState->execPipeline) {
@@ -637,8 +643,11 @@ bool LookUpStage::foreignShardedLookupAllowed() const {
 void LookUpStage::resolveLetVariables(const Document& localDoc, Variables* variables) {
     invariant(variables);
 
+    const EvaluationContext evalCtx =
+        _trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{};
+
     for (auto& letVar : _letVariables) {
-        auto value = letVar.expression->evaluate(localDoc, &pExpCtx->variables);
+        auto value = letVar.expression->evaluate(localDoc, &pExpCtx->variables, evalCtx);
         variables->setConstantValue(letVar.id, value);
     }
 }

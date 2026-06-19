@@ -39,6 +39,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_lookup_test_util.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -365,6 +367,96 @@ TEST_F(LookupStageTest, AddingCacheStageWorksWithDisablePipelineRewrites) {
     auto subPipeline =
         lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 1));
     ASSERT(subPipeline);
+}
+
+// Test-only expression, registered as $_testMemoryTrackerObserver, used as a $lookup 'let' value.
+class MemoryTrackerObservingExpression final : public Expression {
+public:
+    static inline int gEvaluations = 0;
+    static inline int gEvaluationsWithTracker = 0;
+    static void resetObservations() {
+        gEvaluations = 0;
+        gEvaluationsWithTracker = 0;
+    }
+
+    explicit MemoryTrackerObservingExpression(ExpressionContext* expCtx) : Expression(expCtx) {}
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState&) {
+        return make_intrusive<MemoryTrackerObservingExpression>(expCtx);
+    }
+
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final {
+        ++gEvaluations;
+        if (ctx.tracker != nullptr) {
+            ++gEvaluationsWithTracker;
+        }
+        return Value(1);
+    }
+
+    Value serialize(const query_shape::SerializationOptions& options = {}) const final {
+        return Value(Document{});
+    }
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<MemoryTrackerObservingExpression>(&expCtx);
+    }
+    void acceptVisitor(ExpressionMutableVisitor*) final {
+        MONGO_UNREACHABLE;
+    }
+    void acceptVisitor(ExpressionConstVisitor*) const final {
+        MONGO_UNREACHABLE;
+    }
+};
+
+REGISTER_TEST_EXPRESSION(_testMemoryTrackerObserver,
+                         MemoryTrackerObservingExpression::parse,
+                         AllowedWithApiStrict::kAlways,
+                         AllowedWithClientType::kAny,
+                         nullptr /* featureFlag */);
+
+// Runs a $lookup over a single local document whose 'let' variable is the tracker-observing
+// expression, resetting the observation counters first.
+void runLookupWithObservingLetVariable(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    MemoryTrackerObservingExpression::resetObservations();
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{Document{{"x", 0}}}));
+
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {var1: {$_testMemoryTrackerObserver: {}}}, pipeline: [{$match: {x: {$gte: "
+        "0}}}], from: 'coll', as: 'as'}}",
+        expCtx);
+    auto mockLocalStage = exec::agg::MockStage::createForTest({Document{{"_id", 0}}}, expCtx);
+    auto lookupStage = buildLookUpStage(lookupDS);
+    exec::agg::MockStage::setSource_forTest(lookupStage, mockLocalStage.get());
+    while (lookupStage->getNext().isAdvanced()) {
+    }
+}
+
+TEST_F(LookupStageTest, ThreadsMemoryTrackerWhenEvaluatingLetVariables) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    runLookupWithObservingLetVariable(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluations, 1);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
+}
+
+TEST_F(LookupStageTest, DoesNotThreadMemoryTrackerWhenExpressionMemoryTrackingDisabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", false);
+
+    runLookupWithObservingLetVariable(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluations, 1);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
 }
 }  // namespace
 }  // namespace mongo
