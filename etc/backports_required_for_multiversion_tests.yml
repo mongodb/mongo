@@ -29,6 +29,8 @@ last-patch:
       ticket: SERVER-125858
     - test_file: jstests/core/query/group_sbe_accumulator_limit.js
       ticket: SERVER-118700
+    - test_file: jstests/fle2/implicit_ecoc_creation.js
+      ticket: SERVER-126384
   suites: null
 last-continuous:
   all:
