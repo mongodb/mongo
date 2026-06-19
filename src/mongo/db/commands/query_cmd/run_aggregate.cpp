@@ -1069,8 +1069,7 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
         PipelineResolver::insertTopLevelViewEntry(resolvedNamespaces,
                                                   aggExState.getOriginalNss(),
                                                   aggExState.getResolvedView(),
-                                                  aggCatalogState.getIfrContext(),
-                                                  aggCatalogState.getUUID());
+                                                  aggCatalogState.getIfrContext());
     }
 
     bool anyViewBound = PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(

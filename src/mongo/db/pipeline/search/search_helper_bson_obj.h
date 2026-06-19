@@ -93,7 +93,7 @@ inline bool isExtensionMongotPipeline(
 /**
  * Returns true if the pipeline's first stage is a hybrid search stage ($rankFusion or
  * $scoreFusion).
- * TODO SERVER-121094 Delete once $rankFusion/$scoreFusion desugar at LiteParsed time; the BSON
+ * TODO SERVER-121091 Delete once $rankFusion/$scoreFusion desugar at LiteParsed time; the BSON
  * pipeline will no longer start with those stages by the time this is consulted.
  */
 inline bool isHybridSearchBsonPipeline(const std::vector<BSONObj>& pipeline) {

@@ -159,7 +159,7 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
                                   bool performApiVersionChecks) const {
     for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
         const auto& stage = *stage_it;
-        // TODO SERVER-121094 This can be removed once hybrid search views are validated in
+        // TODO SERVER-121974 This can be removed once hybrid search views are validated in
         // LiteParsed using the LiteParsedConstraints.
         uassert(10170100,
                 "$rankFusion/$scoreFusion can only be the first stage of an aggregation pipeline.",
@@ -231,12 +231,6 @@ size_t LiteParsedPipeline::replaceStageWith(
             str::stream() << "replaceStageWith index " << index << " out of range "
                           << _stageSpecs.size(),
             index < _stageSpecs.size());
-
-    // Own each new stage's BSON before erasing the old stage: the old stage may own the backing
-    // of cloned subpipeline stages in newSources (e.g. a desugared $rankFusion/$scoreFusion).
-    for (auto& src : newSources) {
-        src->makeOwned();
-    }
 
     auto& stages = _stageSpecs;
     const auto numInserted = newSources.size();

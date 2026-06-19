@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/split_pipeline.h"
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_internal_hybrid_search.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 
 #include <deque>
@@ -79,33 +78,6 @@ public:
         return actualSplitPipeline;
     }
 };
-
-TEST_F(SplitPipelineTest, HybridSearchMarkerIsMovedToShardsHalf) {
-    // The trailing $_internalHybridSearch marker lands on the merge half ($sort splits first);
-    // the splitter must move it to the shards half, where collection acquisitions re-validate
-    // canRunOnTimeseries.
-    auto pipeline = pipeline_factory::makePipeline(
-        {BSON("$match" << BSON("x" << 1)), BSON("$sort" << BSON("x" << 1))},
-        getExpCtx(),
-        pipeline_factory::kOptionsMinimal);
-    pipeline->addFinalSource(make_intrusive<DocumentSourceInternalHybridSearch>(getExpCtx()));
-
-    auto splitPipeline = SplitPipeline::split(std::move(pipeline));
-    checkPipelineContents(splitPipeline.shardsPipeline.get(),
-                          {"$match", "$sort", "$_internalHybridSearch"});
-    checkPipelineContents(splitPipeline.mergePipeline.get(), {});
-}
-
-TEST_F(SplitPipelineTest, HybridSearchMarkerInShardsHalfIsNotDuplicated) {
-    // A marker that already pushed down whole (no split point) must not be added twice.
-    auto pipeline = pipeline_factory::makePipeline(
-        {BSON("$match" << BSON("x" << 1))}, getExpCtx(), pipeline_factory::kOptionsMinimal);
-    pipeline->addFinalSource(make_intrusive<DocumentSourceInternalHybridSearch>(getExpCtx()));
-
-    auto splitPipeline = SplitPipeline::split(std::move(pipeline));
-    checkPipelineContents(splitPipeline.shardsPipeline.get(), {"$match", "$_internalHybridSearch"});
-    checkPipelineContents(splitPipeline.mergePipeline.get(), {});
-}
 
 TEST_F(SplitPipelineTest, SimpleIdLookupPushdown) {
     // When IdLookup is the first stage in the merging pipeline it should be pushed down.

@@ -507,12 +507,6 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     letParameters(request.getLet());
     serializationContext(request.getSerializationContext());
     isFleQuery(request.getEncryptionInformation().has_value());
-    // Propagate $_isHybridSearch so every expCtx built from a hybrid-search request reports
-    // isHybridSearch; otherwise a desugared mongot stage with an injected 'view' field trips the
-    // internal-client check on reparse (notably explain).
-    // TODO SERVER-121094: remove once the $_internalHybridSearch marker is the single
-    // hybrid-search signal.
-    isHybridSearch(request.getIsHybridSearch().value_or(false));
     return *this;
 }
 

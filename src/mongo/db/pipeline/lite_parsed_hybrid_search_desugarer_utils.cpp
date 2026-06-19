@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/lite_parsed_union_with.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
+#include "mongo/db/query/util/string_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -48,8 +49,7 @@ using namespace std::literals::string_view_literals;
 
 namespace {
 
-// Throws the invalid-weight-name error via the shared helper so both parse paths throw
-// identically.
+// Builds and throws the "invalid weight name" error with typo suggestions.
 [[noreturn]] void failWeightsValidationWithPipelineSuggestions(
     const std::vector<std::string>& pipelineNames,
     const StringSet& matchedPipelines,
@@ -62,9 +62,33 @@ namespace {
         }
     }
 
-    hybrid_scoring_util::failWeightsValidationWithPipelineSuggestions(
-        unmatchedPipelines, invalidWeights, stageName);
-    MONGO_UNREACHABLE;
+    std::vector<std::pair<std::string, std::vector<std::string>>> suggestions =
+        query_string_util::computeTypoSuggestions(unmatchedPipelines, invalidWeights);
+
+    auto convertSingleSuggestionToString = [&](std::size_t i) -> std::string {
+        std::string s = fmt::format("(provided: '{}' -> ", suggestions[i].first);
+        if (suggestions[i].second.size() == 1) {
+            s += fmt::format("suggested: '{}')", suggestions[i].second.front());
+        } else {
+            s += fmt::format("suggestions: [{}])", fmt::join(suggestions[i].second, ", "));
+        }
+        if (i < suggestions.size() - 1) {
+            s += ", ";
+        }
+        return s;
+    };
+
+    std::string errorMsg = fmt::format(
+        "${} stage contained ({}) weight(s) in "
+        "'combination.weights' that did not reference valid pipeline names. "
+        "Suggestions for valid pipeline names: ",
+        stageName,
+        std::to_string(invalidWeights.size()));
+    for (std::size_t i = 0; i < suggestions.size(); ++i) {
+        errorMsg += convertSingleSuggestionToString(i);
+    }
+
+    uasserted(12559400, errorMsg);
 }
 
 }  // namespace

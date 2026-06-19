@@ -424,8 +424,7 @@ void PipelineResolver::insertTopLevelViewEntry(
     ResolvedNamespaceMap& resolvedNamespaces,
     const NamespaceString& requestedNss,
     const ResolvedView& resolvedView,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,
-    boost::optional<UUID> underlyingCollUUID) {
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     ResolvedNamespaceViewOptions viewOptions;
     viewOptions.involvedNamespaceIsAView = true;
     viewOptions.shouldParseLpp = true;
@@ -441,16 +440,6 @@ void PipelineResolver::insertTopLevelViewEntry(
     // view and targeted by a subpipeline stage.
     if (auto it = resolvedNamespaces.find(requestedNss); it != resolvedNamespaces.end()) {
         viewOptions.collUUID = it->second.uuid;
-    }
-    // The resolution loop does not add the top-level view's namespace, so fall back to the
-    // caller-supplied backing-collection UUID; without it, $search inside the desugared $unionWith
-    // on this view fails with "a uuid is required for a search query".
-    if (!viewOptions.collUUID) {
-        viewOptions.collUUID = underlyingCollUUID;
-    } else if (underlyingCollUUID) {
-        tassert(12828500,
-                "Conflicting backing-collection UUIDs for the top-level view entry",
-                *viewOptions.collUUID == *underlyingCollUUID);
     }
     resolvedNamespaces.insert_or_assign(requestedNss,
                                         ResolvedNamespace(requestedNss,

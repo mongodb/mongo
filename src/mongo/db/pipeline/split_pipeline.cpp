@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/split_pipeline.h"
 
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_internal_hybrid_search.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -141,7 +140,6 @@ public:
         _limitFieldsSentFromShardsToMerger();
 
         _abandonCacheIfSentToShards();
-        _moveHybridSearchMarkerToShards();
         _splitPipeline.shardsPipeline->setSplitState(PipelineSplitState::kSplitForShards);
         _splitPipeline.mergePipeline->setSplitState(PipelineSplitState::kSplitForMerge);
 
@@ -305,27 +303,6 @@ private:
         }
 
         _splitPipeline.shardCursorsSortSpec = boost::none;
-    }
-
-    /**
-     * The $_internalHybridSearch marker sits at the tail of a desugared hybrid-search pipeline,
-     * so the split always leaves it on the merge half. Move it onto the shards half instead: the
-     * marker's canRunOnTimeseries=false constraint fires at collection acquisitions, which only
-     * happen in the shard role (the mongos/mongod pipeline shape checks that also reject this
-     * are slated for removal), so it buys nothing on the merger.
-     */
-    void _moveHybridSearchMarkerToShards() {
-        auto& mergeSources = _splitPipeline.mergePipeline->getSources();
-        const auto it =
-            std::find_if(mergeSources.begin(), mergeSources.end(), [](const auto& stage) {
-                return stage->template isInstanceOf<DocumentSourceInternalHybridSearch>();
-            });
-        if (it != mergeSources.end()) {
-            mergeSources.erase(it);
-            _splitPipeline.shardsPipeline->addFinalSource(
-                make_intrusive<DocumentSourceInternalHybridSearch>(
-                    _splitPipeline.shardsPipeline->getContext()));
-        }
     }
 
     /**

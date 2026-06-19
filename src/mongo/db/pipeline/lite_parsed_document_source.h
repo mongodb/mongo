@@ -385,7 +385,7 @@ public:
      * are wrapped in $unionWith) should override to return false: their subpipeline view resolution
      * will happen once the desugar has produced concrete $unionWith stages, on the per-stage path
      * or on a subsequent recursive resolver pass after LP-level desugaring lands.
-     * TODO SERVER-121094 Remove this override once $rankFusion / $scoreFusion
+     * TODO SERVER-125594 / SERVER-121091 Remove this override once $rankFusion / $scoreFusion
      * desugar at LiteParsed time.
      */
     virtual bool shouldResolveSubpipelineViews() const {
@@ -515,7 +515,7 @@ public:
     /**
      * Returns true if this stage produces output sort key metadata ($sortKey) or is an explicit
      * $sort stage.
-     * TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
+     * TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
      * search stage.
      */
     virtual bool isRankedStage() const {
@@ -524,7 +524,7 @@ public:
 
     /**
      * Returns true if this stage produces score metadata.
-     * TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
+     * TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
      * search stage.
      */
     virtual bool isScoredStage() const {
@@ -533,7 +533,7 @@ public:
 
     /**
      * Returns true if this stage produces scoreDetails metadata.
-     * TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
+     * TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
      * search stage.
      */
     virtual bool isScoreDetailsStage() const {
@@ -543,7 +543,7 @@ public:
     /**
      * Returns true if this stage is a selection stage. A selection stage does not modify or
      * transform documents.
-     * TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
+     * TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
      * search stage.
      */
     virtual bool isSelectionStage() const {

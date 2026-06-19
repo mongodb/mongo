@@ -108,16 +108,10 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(
             BSON("$match" << Document({{"_id", Value("_id placeholder"sv)}}))};
 
         if (_spec.getViewPipeline()) {
-            // Append the view pipeline so explain shows the post-lookup transforms. For a
-            // search-defined view, skip just the leading mongot stage: it is already represented
-            // by the stage this idLookup follows, and '[$match, $search]' would not parse (40602).
+            // Append the view pipeline to subPipeline so it shows what transforms will be applied
+            // after the _id lookup.
             auto bsonViewPipeline = _spec.getViewPipeline().get();
-            auto viewBegin = bsonViewPipeline.begin();
-            if (search_helper_bson_obj::isMongotPipeline(getExpCtx()->getIfrContext(),
-                                                         bsonViewPipeline)) {
-                ++viewBegin;
-            }
-            pipeline.insert(pipeline.end(), viewBegin, bsonViewPipeline.end());
+            pipeline.insert(pipeline.end(), bsonViewPipeline.begin(), bsonViewPipeline.end());
         }
 
         outputSpec["subPipeline"] = Value(

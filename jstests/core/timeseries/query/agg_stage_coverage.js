@@ -442,9 +442,6 @@ const skippedStages = [
     "$_internalReshardingIterateTransaction",
     "$_internalReshardingOwnershipMatch",
     "$_addReshardingResumeId",
-
-    // Hybrid-search desugarer marker; rejected on timeseries at LP constraint-check time.
-    "$_internalHybridSearch",
 ];
 
 const testedStages = [...errorTests, ...noUnpackTests, ...unpackTests].map((test) => test.stage);

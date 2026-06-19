@@ -82,16 +82,6 @@ void failWeightsValidationWithPipelineSuggestions(
     std::string_view stageName);
 
 /**
- * Overload taking the unmatched pipeline names directly, for callers (such as the lite-parsed
- * desugarer) that operate on pipeline names rather than parsed Pipelines. Both overloads throw the
- * same error so the full-parse and lite-parse paths fail identically.
- */
-void failWeightsValidationWithPipelineSuggestions(
-    const std::vector<std::string>& unmatchedPipelines,
-    const std::vector<std::string>& invalidWeights,
-    StringData stageName);
-
-/**
  * Returns no error if the BSON pipeline is a selection pipeline. A selection pipeline only
  * retrieves a set of documents from a collection, without doing any modifications. For example it
  * cannot do a $project or $replaceRoot.

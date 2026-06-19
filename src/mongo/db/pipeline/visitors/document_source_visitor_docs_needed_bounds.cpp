@@ -257,11 +257,6 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalDensify& so
     ctx->applyPossibleIncreaseStage();
 }
 
-void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalHybridSearch& source) {
-    // No-op passthrough marker: stay transparent to the bounds analysis (like
-    // $_internalTeeConsumer) instead of overriding the desugared pipeline's bounds with unknown.
-}
-
 void visit(DocsNeededBoundsContext* ctx, const DocumentSourceTeeConsumer& source) {
     // DocumentSourceTeeConsumer is an internal proxy stage between a pipeline within a $facet stage
     // and the buffer of incoming documents. Because a DocumentSourceTeeConsumer stage is uniquely
