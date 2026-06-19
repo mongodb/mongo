@@ -47,8 +47,11 @@
 #include "mongo/util/shared_buffer.h"
 
 #include <cerrno>
+#include <filesystem>
 #include <limits>
+#include <mutex>
 
+#include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>
 
@@ -56,7 +59,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
-namespace mongo::transport::handoff_transport {
+namespace mongo::transport {
 
 namespace {
 
@@ -82,75 +85,28 @@ Status s2nCheck(int result, StringData op) {
                   fmt::format("{} failed: {}", op, s2n_strerror(s2n_errno, "EN")));
 }
 
-}  // namespace
-
-HandoffSession::HandoffSession(
-    TransportLayer* tl, int fd, HostAndPort remote, HostAndPort local, struct s2n_config* s2nConfig)
-    : Session(/* isIngress= */ true),
-      _tl(tl),
-      _fd(fd),
-      _state(HandoffSessionState::Cleartext),
-      _remote(std::move(remote)),
-      _local(std::move(local)),
-      _s2nConnection(nullptr),
-      _s2nConfig(s2nConfig) {
-    _isConnectedToProxyUnixSocket = true;
-}
-
-HandoffSession::~HandoffSession() {
-    end();
-    if (_s2nConnection) {
-        s2n_blocked_status blocked;
-        s2n_shutdown(_s2nConnection, &blocked);
-        s2n_connection_free(_s2nConnection);
-        _s2nConnection = nullptr;
+std::string toString(HandoffSession::State state) {
+    switch (state) {
+        case HandoffSession::State::Cleartext:
+            return "cleartext";
+        case HandoffSession::State::TLS:
+            return "tls";
     }
-}
-
-void HandoffSession::end() {
-    // swap(-1) atomically takes ownership of the fd, making end() idempotent: a second call
-    // gets -1 back and skips the shutdown/close entirely, preventing a double-close.
-    int fd = _fd.swap(-1);
-    if (fd >= 0) {
-        // shutdown() before close() unblocks any thread blocked in poll/recv/send/recvmsg on this
-        // fd.
-        ::shutdown(fd, SHUT_RDWR);
-        ::close(fd);
-    }
-}
-
-bool HandoffSession::isConnected() {
-    int fd = _fd.load();
-    if (fd < 0) {
-        return false;
-    }
-
-    struct pollfd pfd;
-    pfd.fd = fd;
-    pfd.events = POLLIN | POLLRDHUP;
-    pfd.revents = 0;
-
-    int ret;
-    do {
-        ret = ::poll(&pfd, 1, 0);
-    } while (ret < 0 && errno == EINTR);
-    if (ret < 0) {
-        return false;
-    }
-    if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL | POLLRDHUP)) {
-        return false;
-    }
-    return true;
-}
-
-void HandoffSession::setTimeout(boost::optional<Milliseconds>) {
     MONGO_UNREACHABLE;
 }
 
-Status HandoffSession::_pollForRead(int fd, int timeoutMs) {
-    // Uses poll() rather than recv() so callers are safe to invoke concurrently with end().
-    // TSAN recognizes poll(fd) + close(fd) as a safe concurrent pattern but not recv(fd) +
-    // close(fd).
+HostAndPort toHostAndPort(const SockAddr& sa) {
+    // For a unix domain socket, `SockAddr::getPort` will return zero, but the convention with
+    // `HostAndPort` is that unix domain sockets have port -1, which is interpreted as `HostAndPort`
+    // to mean "no port."
+    return HostAndPort(sa.getAddr(), sa.getType() == AF_UNIX ? -1 : sa.getPort());
+}
+
+/**
+ * Polls fd for readability. Returns OK if data is available, Returns NetworkTimeout on timeout, or
+ * SocketException on error or peer disconnect. timeoutMs of -1 blocks indefinitely.
+ */
+Status pollForRead(POSIXInterface& posix, int fd, int timeoutMs) {
     struct pollfd pfd;
     pfd.fd = fd;
     pfd.events = POLLIN | POLLRDHUP;
@@ -158,7 +114,7 @@ Status HandoffSession::_pollForRead(int fd, int timeoutMs) {
 
     int ret;
     do {
-        ret = ::poll(&pfd, 1, timeoutMs);
+        ret = posix.poll(&pfd, 1, timeoutMs);
     } while (ret < 0 && errno == EINTR);
 
     if (ret < 0) {
@@ -174,12 +130,102 @@ Status HandoffSession::_pollForRead(int fd, int timeoutMs) {
     return Status::OK();
 }
 
+Status setBlocking(POSIXInterface& posix, int fd, StringData nameForErrorDiagnostic) {
+    const int flags = posix.fcntl(fd, F_GETFL);
+    if (flags == -1) {
+        return Status(ErrorCodes::SocketException,
+                      fmt::format("HandoffSession: fcntl(F_GETFL) failed on {}: {}",
+                                  nameForErrorDiagnostic,
+                                  errorMessage(lastSystemError())));
+    }
+    if (posix.fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) == -1) {
+        return Status(ErrorCodes::SocketException,
+                      fmt::format("HandoffSession: set blocking mode failed on {}: {}",
+                                  nameForErrorDiagnostic,
+                                  errorMessage(lastSystemError())));
+    }
+    return Status::OK();
+}
+
+}  // namespace
+
+HandoffSession::HandoffSession(Params params)
+    : Session(/* isIngress= */ true),
+      _fd(params.fd),
+      _state(State::Cleartext),
+      _isShutDown(false),
+      _endpointsBeforeHandoff{.local = HostAndPort(params.localAddress.string()),
+                              .remote = HostAndPort("anonymous unix socket")},
+      _s2nConnection(nullptr),
+      _s2nConfig(params.s2nConfig),
+      _posix(params.posix),
+      _tl(params.transportLayer) {
+    _isConnectedToLoadBalancerPort = params.acceptedOnLoadBalancedSocket;
+    _isConnectedToPriorityPort = params.acceptedOnPrioritySocket;
+    _isConnectedToProxyUnixSocket = true;
+}
+
+HandoffSession::~HandoffSession() {
+    end();
+    if (_s2nConnection) {
+        s2n_blocked_status blocked;
+        s2n_shutdown(_s2nConnection, &blocked);
+        s2n_connection_free(_s2nConnection);
+        _s2nConnection = nullptr;
+    }
+    _posix.close(_fd);
+}
+
+void HandoffSession::end() {
+    // This function can be called from any thread. It must hold a lock on _mutex when it accesses
+    // or modifies any data members.
+    std::lock_guard lock{_mutex};
+    if (_isShutDown) {
+        return;
+    }
+    _posix.shutdown(_fd, SHUT_RDWR);
+    _isShutDown = true;
+}
+
+bool HandoffSession::isConnected() {
+    // This function can be called from any thread. It must hold a lock on _mutex when it accesses
+    // or modifies any data members.
+    std::lock_guard lock{_mutex};
+    if (_isShutDown) {
+        return false;
+    }
+    struct pollfd pfd;
+    pfd.fd = _fd;
+    pfd.events = POLLIN | POLLRDHUP;
+    pfd.revents = 0;
+
+    int ret;
+    do {
+        ret = _posix.poll(&pfd, 1, 0);
+    } while (ret < 0 && errno == EINTR);
+    if (ret < 0) {
+        return false;
+    }
+    if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL | POLLRDHUP)) {
+        return false;
+    }
+    return true;
+}
+
+void HandoffSession::setTimeout(boost::optional<Milliseconds>) {
+    // setTimeout is called from DBClientSession only, and thus shall not be called on an ingress
+    // session.
+    MONGO_UNREACHABLE;
+}
 
 StatusWith<size_t> HandoffSession::_syncRead(char* buf, size_t len) {
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
     size_t totalRead = 0;
     while (totalRead < len) {
-        switch (_state.load()) {
-            case HandoffSessionState::TLS: {
+        switch (_state) {
+            case HandoffSession::State::TLS: {
                 s2n_blocked_status blocked = S2N_NOT_BLOCKED;
                 ssize_t n = s2n_recv(_s2nConnection, buf + totalRead, len - totalRead, &blocked);
 
@@ -188,7 +234,8 @@ StatusWith<size_t> HandoffSession::_syncRead(char* buf, size_t len) {
                     continue;
                 }
                 if (n == 0) {
-                    return Status(ErrorCodes::SocketException, "Connection closed by peer");
+                    return Status(ErrorCodes::SocketException,
+                                  "Connection closed by peer, or session has been shut down");
                 }
                 if (s2n_error_get_type(s2n_errno) == S2N_ERR_T_BLOCKED) {
                     return Status(ErrorCodes::NetworkTimeout, "Timed out waiting for data");
@@ -196,10 +243,10 @@ StatusWith<size_t> HandoffSession::_syncRead(char* buf, size_t len) {
                 return Status(ErrorCodes::SocketException,
                               fmt::format("s2n_recv failed: {}", s2n_strerror(s2n_errno, "EN")));
             }
-            case HandoffSessionState::Cleartext: {
+            case HandoffSession::State::Cleartext: {
                 ssize_t n;
                 do {
-                    n = ::recv(_fd.load(), buf + totalRead, len - totalRead, 0);
+                    n = _posix.recv(_fd, buf + totalRead, len - totalRead, 0);
                 } while (n < 0 && errno == EINTR);
 
                 if (n > 0) {
@@ -207,7 +254,8 @@ StatusWith<size_t> HandoffSession::_syncRead(char* buf, size_t len) {
                     continue;
                 }
                 if (n == 0) {
-                    return Status(ErrorCodes::SocketException, "Connection closed by peer");
+                    return Status(ErrorCodes::SocketException,
+                                  "Connection closed by peer, or session has been shut down");
                 }
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                     return Status(ErrorCodes::NetworkTimeout, "Timed out waiting for data");
@@ -222,10 +270,13 @@ StatusWith<size_t> HandoffSession::_syncRead(char* buf, size_t len) {
 }
 
 Status HandoffSession::_syncWrite(const char* buf, size_t len) {
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
     size_t totalWritten = 0;
     while (totalWritten < len) {
-        switch (_state.load()) {
-            case HandoffSessionState::TLS: {
+        switch (_state) {
+            case HandoffSession::State::TLS: {
                 s2n_blocked_status blocked = S2N_NOT_BLOCKED;
                 ssize_t n =
                     s2n_send(_s2nConnection, buf + totalWritten, len - totalWritten, &blocked);
@@ -239,10 +290,10 @@ Status HandoffSession::_syncWrite(const char* buf, size_t len) {
                 return Status(ErrorCodes::SocketException,
                               fmt::format("s2n_send failed: {}", s2n_strerror(s2n_errno, "EN")));
             }
-            case HandoffSessionState::Cleartext: {
+            case HandoffSession::State::Cleartext: {
                 ssize_t n;
                 do {
-                    n = ::send(_fd.load(), buf + totalWritten, len - totalWritten, /* flags= */ 0);
+                    n = _posix.send(_fd, buf + totalWritten, len - totalWritten, /* flags= */ 0);
                 } while (n < 0 && errno == EINTR);
                 if (n > 0) {
                     totalWritten += n;
@@ -261,6 +312,9 @@ Status HandoffSession::_syncWrite(const char* buf, size_t len) {
 }
 
 StatusWith<size_t> HandoffSession::_recvWithFd(char* buf, size_t len, int* receivedFd) {
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
     *receivedFd = -1;
 
     struct iovec iov;
@@ -281,7 +335,7 @@ StatusWith<size_t> HandoffSession::_recvWithFd(char* buf, size_t len, int* recei
 
     ssize_t n;
     do {
-        n = ::recvmsg(_fd.load(), &msg, 0);
+        n = _posix.recvmsg(_fd, &msg, 0);
     } while (n < 0 && errno == EINTR);
 
     if (n < 0) {
@@ -292,7 +346,8 @@ StatusWith<size_t> HandoffSession::_recvWithFd(char* buf, size_t len, int* recei
                       fmt::format("recvmsg failed: {}", errorMessage(lastSocketError())));
     }
     if (n == 0) {
-        return Status(ErrorCodes::SocketException, "Connection closed by peer");
+        return Status(ErrorCodes::SocketException,
+                      "Connection closed by peer, or session has been shut down");
     }
 
     // Extract file descriptors from SCM_RIGHTS ancillary data. Keep the first one in
@@ -314,7 +369,7 @@ StatusWith<size_t> HandoffSession::_recvWithFd(char* buf, size_t len, int* recei
             if (fdCount == 0) {
                 *receivedFd = fd;
             } else {
-                ::close(fd);
+                _posix.close(fd);
             }
             ++fdCount;
         }
@@ -324,7 +379,7 @@ StatusWith<size_t> HandoffSession::_recvWithFd(char* buf, size_t len, int* recei
     // (fdCount > 1) or the buffer was too small to hold them all (MSG_CTRUNC).
     if (fdCount > 1 || (msg.msg_flags & MSG_CTRUNC)) {
         if (*receivedFd >= 0) {
-            ::close(*receivedFd);
+            _posix.close(*receivedFd);
             *receivedFd = -1;
         }
         return Status(ErrorCodes::ProtocolError,
@@ -335,19 +390,32 @@ StatusWith<size_t> HandoffSession::_recvWithFd(char* buf, size_t len, int* recei
 }
 
 Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
-    // On any failure, close both the received client TLS fd and the UDS fd.
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
+    // It additionally must hold a lock on _mutex when closing clientFd.
+
+    // before:
+    //     _fd = udsFd, _state = Cleartext
+    // on error:
+    //     _fd = udsFd (shut down), _state = Cleartext
+    //     clientFd is shut down and closed
+    // on success:
+    //     _fd = clientFd (blocking mode), _state = TLS
+    //     udsFd is shut down and closed
+
     ScopeGuard cleanupOnFailure([&] {
         if (clientFd >= 0) {
-            ::close(clientFd);
-        }
-        int fd = _fd.swap(-1);
-        if (fd >= 0) {
-            ::close(fd);
+            _posix.shutdown(clientFd, SHUT_RDWR);
+            _posix.close(clientFd);
         }
         if (_s2nConnection) {
             s2n_connection_free(_s2nConnection);
             _s2nConnection = nullptr;
         }
+        // Since we failed, _fd is still the udsFd. Shut it down to indicate to the pre-auth process
+        // that handoff is complete, albeit unsuccessful.
+        _posix.shutdown(_fd, SHUT_RDWR);
     });
 
     if (clientFd < 0) {
@@ -355,8 +423,15 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
                       "OP_HANDOFF did not include a client file descriptor via SCM_RIGHTS");
     }
 
+    // We use blocking IO on the handed-over socket, but the socket might have been set to
+    // nonblocking. Set it to blocking mode.
+    if (auto status = setBlocking(_posix, clientFd, "handed-off client socket"); !status.isOK()) {
+        return status;
+    }
+
     // The message body contains a BSON document with the serialized s2n state.
     int bodyDataLen = msg.singleData().dataLen();
+    // The minimum possible BSON object size is 5 bytes.
     if (bodyDataLen < 5) {
         return Status(ErrorCodes::ProtocolError, "OP_HANDOFF message body is empty");
     }
@@ -385,8 +460,11 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
                       fmt::format("s2n_connection_new failed: {}", s2n_strerror(s2n_errno, "EN")));
     }
 
-    auto status = s2nCheck(s2n_connection_set_config(_s2nConnection, _s2nConfig),
-                           "s2n_connection_set_config"_sd);
+    // s2n_connection_set_config takes its config parameter by pointer-to-non-const, but in fact it
+    // will not modify through it, it's just a C-style convention.
+    auto status =
+        s2nCheck(s2n_connection_set_config(_s2nConnection, const_cast<s2n_config*>(_s2nConfig)),
+                 "s2n_connection_set_config"_sd);
     if (!status.isOK()) {
         return status;
     }
@@ -407,60 +485,83 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
         return status;
     }
 
-    // Do all setup on clientFd before updating _fd so any failure still leaves us able to
-    // close both fds cleanly via the ScopeGuard.
-
     status = s2nCheck(s2n_connection_set_fd(_s2nConnection, clientFd), "s2n_connection_set_fd"_sd);
     if (!status.isOK()) {
         return status;
     }
 
-    // Complete all state updates before closing the UDS fd. Per the threading contract,
-    // closing the UDS fd is the memory barrier that publishes them.
     status = _updateEndpointsForClientFd(clientFd);
     if (!status.isOK()) {
         return status;
     }
-    _state.store(HandoffSessionState::TLS);
 
-    // Swap _fd to clientFd before closing the UDS fd so that any thread observing the
-    // resulting EOF already sees _fd == clientFd.
-    int udsFd = _fd.swap(clientFd);
-    clientFd = -1;  // Prevent double-close by the scope guard.
-    ::close(udsFd);
+    bool isShutDown;
+    {
+        std::lock_guard lock{_mutex};
+        const int udsFd = _fd;
+        // Do the shutdown here, instead of above, to aid synchronization with unit tests.
+        _posix.shutdown(udsFd, SHUT_RDWR);
+        _fd = clientFd;
+        _posix.close(udsFd);
+        isShutDown = _isShutDown;
+        _state = State::TLS;
+    }
+
+    // If another thread called `end()` before we entered the critical region above, we need to
+    // honor their request by shutting down the recently-changed _fd (now `clientFd`).
+    if (isShutDown) {
+        _posix.shutdown(_fd, SHUT_RDWR);
+    }
 
     cleanupOnFailure.dismiss();
 
     LOGV2(12823501,
           "S2N session handoff complete",
           "sessionId"_attr = id(),
-          "clientFd"_attr = _fd.load(),
-          "remote"_attr = _remote);
+          "clientFd"_attr = clientFd,
+          "remote"_attr = _endpointsAfterHandoff.remote);
 
     return Status::OK();
 }
 
 Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
+    ConnectionEndpoints newEndpoints;
+
     struct sockaddr_storage peerAddr;
     socklen_t peerLen = sizeof(peerAddr);
-    if (::getpeername(clientFd, reinterpret_cast<struct sockaddr*>(&peerAddr), &peerLen) != 0) {
+    if (_posix.getpeername(clientFd, reinterpret_cast<struct sockaddr*>(&peerAddr), &peerLen) !=
+        0) {
         return Status(ErrorCodes::SocketException,
                       fmt::format("getpeername failed after TLS handoff: {}",
                                   errorMessage(lastSocketError())));
     }
     SockAddr sa(reinterpret_cast<struct sockaddr*>(&peerAddr), peerLen);
-    _remote = HostAndPort(sa.getAddr(), sa.getPort());
+    newEndpoints.remote = toHostAndPort(sa);
 
     struct sockaddr_storage localAddr;
     socklen_t localLen = sizeof(localAddr);
     SockAddr localSa;
-    if (::getsockname(clientFd, reinterpret_cast<struct sockaddr*>(&localAddr), &localLen) == 0) {
-        localSa = SockAddr(reinterpret_cast<struct sockaddr*>(&localAddr), localLen);
-        _local = HostAndPort(localSa.getAddr(), localSa.getPort());
+    if (_posix.getsockname(clientFd, reinterpret_cast<struct sockaddr*>(&localAddr), &localLen) !=
+        0) {
+        return Status(ErrorCodes::SocketException,
+                      fmt::format("getsockname failed after TLS handoff: {}",
+                                  errorMessage(lastSocketError())));
+    }
+    localSa = SockAddr(reinterpret_cast<struct sockaddr*>(&localAddr), localLen);
+    newEndpoints.local = toHostAndPort(localSa);
+
+    {
+        std::lock_guard lock{_mutex};
+        _endpointsAfterHandoff = std::move(newEndpoints);
     }
 
-    if (_proxiedSrcAddr && clientSourceAuthenticationRestrictionMode == "origin"_sd) {
-        _restrictionEnvironment = RestrictionEnvironment(_proxiedSrcAddr.value(), localSa);
+    // Don't need to lock the mutex here, because _restrictionEnvironment is never accessed from
+    // another thread.
+    if (_proxiedSource && clientSourceAuthenticationRestrictionMode == "origin"_sd) {
+        _restrictionEnvironment = RestrictionEnvironment(_proxiedSource->address, localSa);
     } else {
         _restrictionEnvironment = RestrictionEnvironment(sa, localSa);
     }
@@ -468,15 +569,54 @@ Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
     return Status::OK();
 }
 
-const HostAndPort& HandoffSession::getSourceRemoteEndpoint() const {
-    if (_proxiedSrcEndpoint) {
-        return _proxiedSrcEndpoint.value();
+const HostAndPort& HandoffSession::_remote(WithLock) const {
+    switch (_state) {
+        case State::Cleartext:
+            return _endpointsBeforeHandoff.remote;
+        case State::TLS:
+            return _endpointsAfterHandoff.remote;
     }
-    return _remote;
+    MONGO_UNREACHABLE;
+}
+
+const HostAndPort& HandoffSession::remote() const {
+    // This function can be called from any thread. It must hold a lock on _mutex when it accesses
+    // any data members.
+    std::lock_guard lock{_mutex};
+    return _remote(lock);
+}
+
+const HostAndPort& HandoffSession::_local(WithLock) const {
+    switch (_state) {
+        case State::Cleartext:
+            return _endpointsBeforeHandoff.local;
+        case State::TLS:
+            return _endpointsAfterHandoff.local;
+    }
+    MONGO_UNREACHABLE;
+}
+
+const HostAndPort& HandoffSession::local() const {
+    // This function can be called from any thread. It must hold a lock on _mutex when it accesses
+    // any data members.
+    std::lock_guard lock{_mutex};
+    return _local(lock);
+}
+
+const HostAndPort& HandoffSession::getSourceRemoteEndpoint() const {
+    // This function can be called from any thread. It must hold a lock on _mutex when it accesses
+    // any data members.
+    std::lock_guard lock{_mutex};
+    if (_proxiedSource) {
+        return _proxiedSource->endpoint;
+    }
+    return _remote(lock);
 }
 
 transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
-    int fd = _fd.load();
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
 
     // Apply the proxy header read timeout for the duration of this call only.
     const int64_t proxyTimeoutSecs = gProxyProtocolTimeoutSecs.load();
@@ -492,23 +632,23 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
         uassert(ErrorCodes::SocketException,
                 fmt::format("Failed to set SO_RCVTIMEO on proxy UDS socket: {}",
                             errorMessage(lastSocketError())),
-                ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
+                _posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
     }
-    ON_BLOCK_EXIT([fd] {
+    ON_BLOCK_EXIT([this] {
         struct timeval tv = {0, 0};
-        ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        _posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     });
 
     int timeoutMs = static_cast<int>(
         std::min<int64_t>(proxyTimeoutSecs * 1000LL, std::numeric_limits<int>::max()));
-    uassertStatusOK(_pollForRead(fd, timeoutMs));
+    uassertStatusOK(pollForRead(_posix, _fd, timeoutMs));
 
     // Peek at the first bytes to distinguish PROXY v1 (unsupported) from v2, and reject
     // anything else. If v2, consume the full header below.
     char prefix[kProxyPeekSize];
     ssize_t peeked;
     do {
-        peeked = ::recv(fd, prefix, kProxyPeekSize, MSG_PEEK | MSG_WAITALL);
+        peeked = _posix.recv(_fd, prefix, kProxyPeekSize, MSG_PEEK | MSG_WAITALL);
     } while (peeked < 0 && errno == EINTR);
     if (peeked < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -579,16 +719,20 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
 void HandoffSession::prelude() {
     auto proxyHeader = _parseProxyProtocolHeader();
     if (proxyHeader.endpoints) {
-        _proxiedSrcAddr = proxyHeader.endpoints->sourceAddress;
-        _proxiedSrcEndpoint = HostAndPort(_proxiedSrcAddr->getAddr(), _proxiedSrcAddr->getPort());
+        const auto& sourceAddress = proxyHeader.endpoints->sourceAddress;
+        std::lock_guard lock{_mutex};
+        _proxiedSource = ProxiedSource{
+            .address = sourceAddress,
+            .endpoint = toHostAndPort(sourceAddress),
+        };
     }
     applyProxyProtocolTlvs(proxyHeader, shared_from_this());
 }
 
 StatusWith<Message> HandoffSession::sourceMessage() {
-    if (_fd.load() < 0) {
-        return Status(ErrorCodes::SocketException, "Session is not connected");
-    }
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
 
     // Read the message header. In Cleartext mode, use recvmsg to capture any
     // SCM_RIGHTS fd that accompanies an OP_HANDOFF.
@@ -596,17 +740,17 @@ StatusWith<Message> HandoffSession::sourceMessage() {
     int receivedFd = -1;
     ScopeGuard fdGuard([&] {
         if (receivedFd >= 0) {
-            ::close(receivedFd);
+            _posix.close(receivedFd);
         }
     });
 
-    switch (_state.load()) {
-        case HandoffSessionState::Cleartext: {
+    switch (_state) {
+        case State::Cleartext: {
             auto swRead = _recvWithFd(headerBuf, kHeaderSize, &receivedFd);
             if (!swRead.isOK()) {
                 return swRead.getStatus();
             }
-            // recvmsg may return less than requested; read the remainder.
+            // _recvWithFd (recvmsg) may return less than requested; read the remainder.
             if (size_t bytesRead = swRead.getValue(); bytesRead < kHeaderSize) {
                 auto swRemain = _syncRead(headerBuf + bytesRead, kHeaderSize - bytesRead);
                 if (!swRemain.isOK()) {
@@ -615,13 +759,14 @@ StatusWith<Message> HandoffSession::sourceMessage() {
             }
             break;
         }
-        case HandoffSessionState::TLS: {
+        case State::TLS: {
             auto swRead = _syncRead(headerBuf, kHeaderSize);
             if (!swRead.isOK()) {
                 return swRead.getStatus();
             }
             break;
         }
+            MONGO_UNREACHABLE;
     }
 
     // Validate message length and read the body.
@@ -644,7 +789,7 @@ StatusWith<Message> HandoffSession::sourceMessage() {
     Message msg(std::move(buffer));
 
     // Handle OP_HANDOFF. Complete the handoff inline, then recurse to read the first TLS message.
-    if (_state.load() == HandoffSessionState::Cleartext && msg.operation() == dbSessionHandoff) {
+    if (_state != State::TLS && msg.operation() == dbSessionHandoff) {
         int fd = std::exchange(receivedFd, -1);  // Disarm the guard; handoff takes ownership.
         auto status = _handleSessionHandoff(msg, fd);
         if (!status.isOK()) {
@@ -664,10 +809,9 @@ StatusWith<Message> HandoffSession::sourceMessage() {
 }
 
 Status HandoffSession::sinkMessage(Message message) {
-    if (_fd.load() < 0) {
-        return Status(ErrorCodes::SocketException, "Session is not connected");
-    }
-
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
     return _syncWrite(message.buf(), message.size());
 }
 
@@ -680,19 +824,43 @@ Future<void> HandoffSession::asyncSinkMessage(Message, const BatonHandle&) {
 }
 
 Status HandoffSession::waitForData() {
-    int fd = _fd.load();
-    if (fd < 0) {
-        return Status(ErrorCodes::SocketException, "Session is not connected");
-    }
-    return _pollForRead(fd, /*timeoutMs=*/-1);
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
+    const int noTimeout = -1;
+    return pollForRead(_posix, _fd, noTimeout);
 }
 
 Future<void> HandoffSession::asyncWaitForData() {
     MONGO_UNREACHABLE;
 }
 
-void HandoffSession::setIsLoadBalancerPeer(bool) {
+void HandoffSession::setIsLoadBalancerPeer(bool value) {
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
+    _isLoadBalancerPeer = value;
+}
+
+Status HandoffSession::validateProxyUnixSocketPeerPermissions() {
+    // This function is an implementation detail of AsioTransportLayer, and as such cannot be called
+    // on objects of this derived type.
     MONGO_UNREACHABLE;
+}
+
+bool HandoffSession::bindsToOperationState() const {
+    // This function is called from the service executor thread only. It may access any data members
+    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
+    // _isShutDown, it must hold a lock on _mutex.
+    return _isLoadBalancerPeer;
+}
+
+bool HandoffSession::isExemptedByCIDRList(const CIDRList&) const {
+    // Exemption from rate limiters and eligibility for the reserved service executor, i.e. being a
+    // privileged session, is determined by whether the secure frontend process connection was
+    // accepted on HandoffTransportLayer's "priority" unix domain socket.
+    // The configured CIDRList of exemptions by remote address is not used for handoff sessions.
+    return false;
 }
 
 void HandoffSession::cancelAsyncOperations(const BatonHandle&) {
@@ -700,10 +868,13 @@ void HandoffSession::cancelAsyncOperations(const BatonHandle&) {
 }
 
 void HandoffSession::appendToBSON(BSONObjBuilder& bb) const {
+    // This function can be called from any thread. It must hold a lock on _mutex when it accesses
+    // any data members.
     bb.append("id", static_cast<long long>(id()));
-    bb.append("remote", _remote.toString());
-    bb.append("local", _local.toString());
-    bb.append("state", _state.load() == HandoffSessionState::Cleartext ? "cleartext" : "tls");
+    std::lock_guard lock{_mutex};
+    bb.append("remote", _remote(lock).toString());
+    bb.append("local", _local(lock).toString());
+    bb.append("state", toString(_state));
 }
 
-}  // namespace mongo::transport::handoff_transport
+}  // namespace mongo::transport

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -9,9 +9,8 @@ exports_files(
     ]),
 )
 
-# S2N transport is only available on Linux where both the private aws-sdk
-# and Unix domain sockets are available.
-S2N_TARGET_COMPATIBLE_WITH = select({
+# s2n-tls, on which we depend, supports Linux and Darwin, but we are targeting Linux only.
+HANDOFF_TARGET_COMPATIBLE_WITH = select({
     "//bazel/config:linux_aarch64": [],
     "//bazel/config:linux_x86_64": [],
     "//conditions:default": ["@platforms//:incompatible"],
@@ -20,14 +19,14 @@ S2N_TARGET_COMPATIBLE_WITH = select({
 idl_generator(
     name = "session_handoff_message_gen",
     src = "session_handoff_message.idl",
-    target_compatible_with = S2N_TARGET_COMPATIBLE_WITH,
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
 )
 
 mongo_cc_library(
-    name = "handoff_transport_layer",
+    name = "handoff_session",
     srcs = [
         "handoff_session.cpp",
         ":session_handoff_message_gen",
@@ -35,11 +34,9 @@ mongo_cc_library(
     hdrs = [
         "handoff_session.h",
     ],
-    copts = [
-        "-Isrc/third_party/s2n/dist/s2n-tls/api",
-    ],
-    target_compatible_with = S2N_TARGET_COMPATIBLE_WITH,
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
     deps = [
+        ":handoff_posix_interface",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/transport:service_executor",
@@ -54,16 +51,35 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "handoff_session_test",
     srcs = ["handoff_session_test.cpp"],
-    copts = [
-        "-Isrc/third_party/s2n/dist/s2n-tls/api",
-    ],
     data = ["//jstests/libs:test_pem_files"],
     tags = ["mongo_unittest_first_group"],
-    target_compatible_with = S2N_TARGET_COMPATIBLE_WITH,
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
     deps = [
-        ":handoff_transport_layer",
+        ":handoff_s2n_init",
+        ":handoff_session",
         "//src/mongo/rpc:message",
         "//src/mongo/transport:transport_layer_common",
+        "//src/third_party/s2n:s2n-tls",
+    ],
+)
+
+mongo_cc_library(
+    name = "handoff_posix_interface",
+    srcs = ["handoff_posix_interface.cpp"],
+    hdrs = ["handoff_posix_interface.h"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+)
+
+mongo_cc_library(
+    name = "handoff_s2n_init",
+    srcs = [
+        "handoff_s2n_init.cpp",
+    ],
+    hdrs = [
+        "handoff_s2n_init.h",
+    ],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
         "//src/third_party/s2n:s2n-tls",
     ],
 )

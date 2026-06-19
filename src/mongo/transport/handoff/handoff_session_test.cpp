@@ -35,6 +35,7 @@
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/rpc/message.h"
+#include "mongo/transport/handoff/handoff_s2n_init.h"
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -66,7 +67,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-namespace mongo::transport::handoff_transport {
+namespace mongo::transport {
 namespace {
 
 /**
@@ -92,7 +93,7 @@ Message makeMessage(NetworkOp op, const BSONObj& body) {
 void writeAll(int fd, const char* buf, size_t len) {
     size_t written = 0;
     while (written < len) {
-        ssize_t n = ::send(fd, buf + written, len - written, MSG_NOSIGNAL);
+        ssize_t n = ::send(fd, buf + written, len - written, 0);
         ASSERT_GT(n, 0) << "send failed: " << errorMessage(lastSocketError());
         written += n;
     }
@@ -136,7 +137,7 @@ void sendMessageWithFds(int udsFd, const Message& msg, std::initializer_list<int
 
     ssize_t n;
     do {
-        n = ::sendmsg(udsFd, &hdr, MSG_NOSIGNAL);
+        n = ::sendmsg(udsFd, &hdr, 0);
     } while (n < 0 && errno == EINTR);
     ASSERT_GT(n, 0) << "sendmsg failed: " << errorMessage(lastSocketError());
 }
@@ -165,7 +166,7 @@ inline Message buildSessionHandoffMessage(const std::vector<uint8_t>& serialized
 }
 
 /**
- * Base fixture for tests that operate in Cleartext mode. setUp creates a UDS socketpair.
+ * Base fixture for tests that operate in Cleartext mode. setUp creates a unix domain socketpair.
  * Tests call makeSession() to construct a HandoffSession on one end and drive the other
  * end via proxyFd(). The null TransportLayer and null s2n_config suffice because no TLS
  * deserialization is needed.
@@ -176,7 +177,7 @@ public:
         int fds[2];
         ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0)
             << "socketpair failed: " << errorMessage(lastSocketError());
-        mongodFd = fds[0];
+        _mongodFd = fds[0];
         _proxyFd = fds[1];
     }
 
@@ -184,9 +185,21 @@ public:
         closeProxy();
     }
 
-    std::shared_ptr<HandoffSession> makeSession() {
-        return std::make_shared<HandoffSession>(
-            nullptr, mongodFd, HostAndPort("proxy", 0), HostAndPort("mongod", 0), nullptr);
+    enum class SessionType {
+        Standard,
+        LoadBalanced,
+        Priority,
+    };
+
+    std::shared_ptr<HandoffSession> makeSession(SessionType sessionType = SessionType::Standard) {
+        return std::make_shared<HandoffSession>(HandoffSession::Params{
+            .fd = _mongodFd,
+            .localAddress = std::filesystem::path("/dummy/mongod"),
+            .transportLayer = nullptr,
+            .acceptedOnLoadBalancedSocket = sessionType == SessionType::LoadBalanced,
+            .acceptedOnPrioritySocket = sessionType == SessionType::Priority,
+            .s2nConfig = nullptr,
+            .posix = _posix});
     }
 
     int proxyFd() const {
@@ -201,8 +214,9 @@ public:
     }
 
 private:
-    int mongodFd = -1;
+    int _mongodFd = -1;
     int _proxyFd = -1;
+    POSIXInterface _posix;
 };
 
 //
@@ -214,7 +228,7 @@ class HandoffSessionPropertiesTest : public HandoffSessionCleartextFixture {};
 /** A freshly constructed session begins in Cleartext mode. */
 TEST_F(HandoffSessionPropertiesTest, InitialStateIsCleartext) {
     auto session = makeSession();
-    ASSERT_EQ(session->getState(), HandoffSessionState::Cleartext);
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::Cleartext);
 }
 
 /** A freshly constructed session is connected. */
@@ -223,20 +237,35 @@ TEST_F(HandoffSessionPropertiesTest, InitialStateIsConnected) {
     ASSERT_TRUE(session->isConnected());
 }
 
-/** A handoff session is never a load balancer connection. */
-TEST_F(HandoffSessionPropertiesTest, NotALoadBalancerConnection) {
-    auto session = makeSession();
-    ASSERT_FALSE(session->isLoadBalancerPeer());
-    ASSERT_FALSE(session->isConnectedToLoadBalancerPort());
+/**
+ * A handoff session can be configured to be load balanced, priority, both, or neither.
+ * The cases we expect to encounter are load balanced, priority, and neither (standard).
+ */
+TEST_F(HandoffSessionPropertiesTest, SessionType) {
+    {
+        auto session = makeSession(SessionType::Standard);
+        ASSERT_FALSE(session->isConnectedToLoadBalancerPort());
+    }
+    {
+        auto session = makeSession(SessionType::LoadBalanced);
+        ASSERT_TRUE(session->isConnectedToLoadBalancerPort());
+        ASSERT_FALSE(session->isConnectedToPriorityPort());
+    }
+    {
+        auto session = makeSession(SessionType::Priority);
+        ASSERT_FALSE(session->isConnectedToLoadBalancerPort());
+        ASSERT_TRUE(session->isConnectedToPriorityPort());
+    }
 }
 
-/** A handoff session is never connected to a priority port. */
-TEST_F(HandoffSessionPropertiesTest, NotConnectedToPriorityPort) {
-    auto session = makeSession();
-    ASSERT_FALSE(session->isConnectedToPriorityPort());
-}
-
-/** A handoff session is always connected via a proxy unix socket. */
+/**
+ * A handoff session is always reports that it is connected via a proxy unix socket.
+ *
+ * Strictly speaking, after handoff the session is _not_ connected to a proxy unix domain socket (or
+ * at least that's very unlikely). This predicate, though, is interpreted as "the session was
+ * created in response to a connection that was accepted on a unix domain socket for use by the
+ * secure frontend process," and in that sense it is always true, even after handoff.
+ */
 TEST_F(HandoffSessionPropertiesTest, IsConnectedToProxyUnixSocket) {
     auto session = makeSession();
     ASSERT_TRUE(session->isConnectedToProxyUnixSocket());
@@ -246,21 +275,6 @@ TEST_F(HandoffSessionPropertiesTest, IsConnectedToProxyUnixSocket) {
 TEST_F(HandoffSessionPropertiesTest, NotExemptedByCIDRList) {
     auto session = makeSession();
     ASSERT_FALSE(session->isExemptedByCIDRList({}));
-}
-
-/** A handoff session binds to operation state. */
-TEST_F(HandoffSessionPropertiesTest, SupportsBindingToOperationState) {
-    auto session = makeSession();
-    ASSERT_TRUE(session->bindsToOperationState());
-}
-
-/**
- * validateProxyUnixSocketPeerPermissions() returns OK. The handoff transport layer validates the
- * peer at accept time. By the time a HandoffSession exists, the check has already passed.
- */
-TEST_F(HandoffSessionPropertiesTest, ValidateProxyUnixSocketPeerPermissionsReturnsOK) {
-    auto session = makeSession();
-    ASSERT_OK(session->validateProxyUnixSocketPeerPermissions());
 }
 
 /**
@@ -302,16 +316,33 @@ DEATH_TEST_F(HandoffSessionPropertiesDeathTest,
 }
 
 DEATH_TEST_F(HandoffSessionPropertiesDeathTest,
-             SetIsLoadBalancerPeerIsUnsupported,
+             ValidateProxyUnixSocketPeerPermissionsIsUnsupported,
              "Hit a MONGO_UNREACHABLE") {
-    auto session = makeSession();
-    session->setIsLoadBalancerPeer(false);
+    (void)makeSession()->validateProxyUnixSocketPeerPermissions();
 }
 
 DEATH_TEST_F(HandoffSessionPropertiesDeathTest,
              SetTimeoutIsUnsupported,
              "Hit a MONGO_UNREACHABLE") {
     makeSession()->setTimeout(Milliseconds{100});
+}
+
+/**
+ * setIsLoadBalancerPeer is called by `load_balancer_support.cpp`, but only if the session was
+ * accepted on the load balancer socket. Rather than enforce a redundant check in the session
+ * implementation, trust any value specified in setIsLoadBalancerPeer, and verify that the same
+ * value is returned by bindsToOperationState.
+ */
+TEST_F(HandoffSessionPropertiesTest, SetIsLoadBalancerPeerDeterminesBindsToOperationState) {
+    auto session = makeSession();
+    // initially false
+    ASSERT_FALSE(session->bindsToOperationState());
+    // true means true
+    session->setIsLoadBalancerPeer(true);
+    ASSERT_TRUE(session->bindsToOperationState());
+    // false means false
+    session->setIsLoadBalancerPeer(false);
+    ASSERT_FALSE(session->bindsToOperationState());
 }
 
 //
@@ -332,8 +363,8 @@ TEST_F(HandoffSessionPreHandoffMessageTest, AppendToBSONIncludesSessionInfo) {
     auto obj = bb.obj();
     ASSERT_TRUE(obj.hasField("id"));
     ASSERT_EQ(obj.getStringField("state"), "cleartext");
-    ASSERT_EQ(obj.getStringField("remote"), "proxy:0");
-    ASSERT_EQ(obj.getStringField("local"), "mongod:0");
+    ASSERT_EQ(obj.getStringField("remote"), "anonymous unix socket");
+    ASSERT_EQ(obj.getStringField("local"), "/dummy/mongod");
 }
 
 /** sourceMessage() returns the message. */
@@ -732,7 +763,7 @@ TEST_F(HandoffSessionHandoffMessageValidationTest, SourceMessageRejectsHandoffWi
 class HandoffSessionTLSFixture : public unittest::Test {
 public:
     void setUp() override {
-        S2NInitGuard::instance();
+        ASSERT_EQ(s2nInitOnce(), nullptr);
 
         // Build the server config with TLS 1.2, serialization enabled, and a server cert.
         _serverConfig = s2n_config_new_minimal();
@@ -763,17 +794,11 @@ public:
             S2N_SUCCESS);
         ASSERT_EQ(s2n_config_disable_x509_verification(_clientConfig), S2N_SUCCESS);
 
-        // Build the deserialization config for the HandoffSession with the same cert as the server.
+        // Build the deserialization config for the HandoffSession.
         _deserConfig = s2n_config_new_minimal();
         ASSERT_TRUE(_deserConfig);
         ASSERT_EQ(s2n_config_set_serialization_version(_deserConfig, S2N_SERIALIZED_CONN_V1),
                   S2N_SUCCESS);
-        ASSERT_EQ(
-            s2n_config_set_cipher_preferences(_deserConfig, "ELBSecurityPolicy-TLS-1-2-2017-01"),
-            S2N_SUCCESS);
-        ASSERT_EQ(s2n_config_add_cert_chain_and_key_to_store(_deserConfig, _certChainAndKey),
-                  S2N_SUCCESS);
-        ASSERT_EQ(s2n_config_disable_x509_verification(_deserConfig), S2N_SUCCESS);
 
         // Two socketpairs model the handoff protocol.
         //
@@ -833,7 +858,13 @@ public:
         proxyUdsFd = udsFds[1];       // proxy's end.
 
         session = std::make_shared<HandoffSession>(
-            nullptr, mongodUdsFd, HostAndPort("proxy", 0), HostAndPort("mongod", 0), _deserConfig);
+            HandoffSession::Params{.fd = mongodUdsFd,
+                                   .localAddress = std::filesystem::path("/dummy/mongod"),
+                                   .transportLayer = nullptr,
+                                   .acceptedOnLoadBalancedSocket = false,
+                                   .acceptedOnPrioritySocket = false,
+                                   .s2nConfig = _deserConfig,
+                                   .posix = _posix});
     }
 
     void tearDown() override {
@@ -930,6 +961,7 @@ protected:
     int proxyUdsFd = -1;
     int clientTlsFd = -1;
     struct s2n_connection* clientConn = nullptr;
+    POSIXInterface _posix;
 
 private:
     static constexpr auto kServerCertKeyFile = "jstests/libs/server.pem";
@@ -985,23 +1017,6 @@ private:
         return {certChain, privateKey};
     }
 
-    // Process-level RAII guard for s2n_init/s2n_cleanup. s2n_init must only be called once per
-    // process; use instance() to ensure it is initialized exactly once.
-    struct S2NInitGuard {
-        static S2NInitGuard& instance() {
-            static S2NInitGuard guard;
-            return guard;
-        }
-
-    private:
-        S2NInitGuard() {
-            ASSERT_EQ(s2n_init(), S2N_SUCCESS) << "s2n_init: " << s2n_strerror(s2n_errno, "EN");
-        }
-        ~S2NInitGuard() {
-            s2n_cleanup();
-        }
-    };
-
     static int _negotiateBlocking(struct s2n_connection* conn) {
         s2n_blocked_status blocked;
         while (true) {
@@ -1047,7 +1062,7 @@ TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoff) {
 
     waitForSessionHandoff();
 
-    ASSERT_EQ(session->getState(), HandoffSessionState::TLS);
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
     ASSERT_TRUE(session->isConnected());
 
     // Send a TLS message to unblock sourceMessage().
@@ -1057,17 +1072,18 @@ TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoff) {
     ASSERT_OK(result.getStatus());
     ASSERT_EQ(result.getValue().size(), msg.size());
     ASSERT_EQ(memcmp(result.getValue().buf(), msg.buf(), msg.size()), 0);
-    ASSERT_EQ(session->getState(), HandoffSessionState::TLS);
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
     ASSERT_TRUE(session->isConnected());
 }
 
 /**
- * After a successful handoff, remote() and local() reflect the actual addresses of the client TLS
- * fd, not the proxy UDS addresses passed to the constructor.
+ * After a successful handoff, remote() and local() reflect the addresses of the downstream client
+ * TLS connection, not the unix domain socket addresses from the connection accepted by the
+ * transport layer.
  */
 TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoffUpdatesEndpoints) {
-    ASSERT_EQ(session->remote(), HostAndPort("proxy", 0));
-    ASSERT_EQ(session->local(), HostAndPort("mongod", 0));
+    ASSERT_EQ(session->remote(), HostAndPort("anonymous unix socket"));
+    ASSERT_EQ(session->local(), HostAndPort("/dummy/mongod"));
 
     Message handoffMsg = buildSessionHandoffMessage(serializedState);
     sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
@@ -1090,8 +1106,8 @@ TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoffUpdatesEndpoints) {
 }
 
 /**
- * OP_HANDOFF with corrupt s2n state causes sourceMessage() to return InternalError. Both the
- * mongodUdsFd and the received client fd are closed. The session is left disconnected.
+ * OP_HANDOFF with corrupt s2n state causes sourceMessage() to return InternalError.
+ * The received client fd is closed. The session is left disconnected.
  */
 TEST_F(HandoffSessionHandoffTransitionTest, FailedHandoffWithCorruptState) {
     // Use a pipe instead of proxyTlsFd to verify the session closes its received client fd on
@@ -1409,7 +1425,7 @@ protected:
         clientSend(makeMessage(dbMsg, BSON("ping" << 1)));
         t.join();
         ASSERT_OK(result.getStatus());
-        ASSERT_EQ(session->getState(), HandoffSessionState::TLS);
+        ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
     }
 
 protected:
@@ -1435,7 +1451,8 @@ protected:
         struct sockaddr_storage addr{};
         auto* sin = reinterpret_cast<struct sockaddr_in*>(&addr);
         sin->sin_family = AF_INET;
-        sin->sin_addr.s_addr = htonl(0x7F000001);  // kTestClientAddr
+        const int rc = inet_pton(AF_INET, kTestClientAddr, &sin->sin_addr);
+        invariant(rc == 1);
         sin->sin_port = htons(kTestClientPort);
         return addr;
     }
@@ -1733,8 +1750,8 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyProtocolTimeoutDuringPeek) {
     unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 1};
 
     // Send only 3 bytes (fewer than kProxyPeekSize=5) then stall.
-    static constexpr char header[] = {'\x0D', '\x0A', '\x0D'};
-    writeAll(proxyUdsFd, header, sizeof(header));
+    static constexpr char kPartialHeader[] = {'\x0D', '\x0A', '\x0D'};
+    writeAll(proxyUdsFd, kPartialHeader, sizeof(kPartialHeader));
 
     ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::NetworkTimeout);
 }
@@ -1811,8 +1828,8 @@ TEST_F(HandoffSessionProxyHeaderTest, ZeroProxyProtocolTimeoutFailsIfHeaderNotAl
 TEST_F(HandoffSessionProxyHeaderTest, ZeroProxyProtocolTimeoutFailsIfSignaturePrefixIsPartial) {
     unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 0};
 
-    static constexpr char header[] = {'\x0D', '\x0A', '\x0D'};
-    writeAll(proxyUdsFd, header, sizeof(header));
+    static constexpr char kPartialHeader[] = {'\x0D', '\x0A', '\x0D'};
+    writeAll(proxyUdsFd, kPartialHeader, sizeof(kPartialHeader));
 
     ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::NetworkTimeout);
 }
@@ -1853,12 +1870,13 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyProtocolTimeoutNotLeftOnSocketAfterPr
 }
 
 /**
- * Before prelude(), getSourceRemoteEndpoint() returns the UDS proxy address from the constructor.
+ * Before prelude(), getSourceRemoteEndpoint() returns the unix domain socket "address" of the
+ * secure frontend process.
  * After prelude(), it returns the proxied client IP from the PROXY header, and handoff does not
  * change it.
  */
 TEST_F(HandoffSessionProxyHeaderTest, GetSourceRemoteEndpointReturnsProxiedAddress) {
-    ASSERT_EQ(session->getSourceRemoteEndpoint(), HostAndPort("proxy", 0));
+    ASSERT_EQ(session->getSourceRemoteEndpoint(), HostAndPort("anonymous unix socket"));
 
     auto header = buildProxyHeader(
         /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
@@ -1972,7 +1990,7 @@ TEST_F(HandoffSessionProxyHeaderTest, FullSessionLifecycle) {
     };
 
     ASSERT_NO_THROW(session->prelude());
-    ASSERT_EQ(session->getState(), HandoffSessionState::Cleartext);
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::Cleartext);
     ASSERT_EQ(session->getSourceRemoteEndpoint().host(), kTestClientAddr);
     validatePeerInfo();
 
@@ -1996,10 +2014,10 @@ TEST_F(HandoffSessionProxyHeaderTest, FullSessionLifecycle) {
 
     ASSERT_OK(result2.getStatus());
     ASSERT_BSONOBJ_EQ(BSONObj(result2.getValue().singleData().data()), body2);
-    ASSERT_EQ(session->getState(), HandoffSessionState::TLS);
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
     ASSERT_EQ(session->getSourceRemoteEndpoint().host(), kTestClientAddr);
     validatePeerInfo();
 }
 
 }  // namespace
-}  // namespace mongo::transport::handoff_transport
+}  // namespace mongo::transport

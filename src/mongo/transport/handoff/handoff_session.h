@@ -30,25 +30,19 @@
 #pragma once
 
 #include "mongo/db/auth/restriction_environment.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
+#include "mongo/transport/handoff/handoff_posix_interface.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 
+#include <cstdint>
+
 #include <s2n.h>
 
-namespace mongo::transport::handoff_transport {
-
-/**
- * The two operating modes for a HandoffSession. A session begins in Cleartext mode,
- * accepting unencrypted messages from the pre-auth process over a unix domain socket.
- * Upon receiving an OP_HANDOFF message, the session transitions to TLS mode where all
- * I/O is encrypted via s2n on the downstream client's file descriptor, which was sent as
- * ancillary data over the unix domain socket.
- */
-enum class HandoffSessionState { Cleartext, TLS };
+namespace mongo::transport {
 
 /**
  * HandoffSession implements the transport::Session interface using synchronous I/O.
@@ -59,37 +53,73 @@ enum class HandoffSessionState { Cleartext, TLS };
  *  2. The session accepts standard pre-auth messages via the UDS fd.
  *  3. When an OP_HANDOFF message arrives, the session extracts the downstream client TLS fd (passed
  *     via SCM_RIGHTS), parses the serialized s2n TLS state, deserializes it into an s2n_connection,
- *     closes the UDS fd, and transitions to TLS mode. On failure, both the downstream client fd
- *     and the UDS fd are closed, and the session is left disconnected. On success, only the UDS fd
- *     is closed. Closing the UDS fd causes EOF on the pre-auth process's end, which is the
- *     observable signal that the handoff completed.
+ *     closes the UDS fd, and transitions to TLS mode. On failure, both the downstream client fd and
+ *     the UDS fd are shut down, the downstream client fd is closed, and the session is left
+ *     disconnected. On success, only the UDS fd is closed. Closing the UDS fd causes EOF on the
+ *     pre-auth process's end, which is the observable signal that the handoff completed.
  *  4. All subsequent reads/writes go through s2n_recv/s2n_send on the downstream client fd.
  *
- * Invoking end() always closes the current fd, whether that is the pre-auth process UDS fd (before
- * handoff) or the downstream client fd (after handoff).
+ * Invoking end() always shuts down the current fd, whether that is the pre-auth process UDS fd
+ * (before handoff) or the downstream client fd (after handoff).
  *
- * Thread safety. I/O methods (sourceMessage, sinkMessage, waitForData) must be called from a single
- * thread. end(), isConnected(), and getState() may be called concurrently from any thread.
- * remote(), local(), and restrictionEnvironment() are not safe to read concurrently until the
- * handoff is complete, which can be observed via getState() == TLS.
+ * Thread safety:
+ * - sourceMessage(), sinkMessage(), waitForData(), getAuthEnvironment(), and
+ *   setIsLoadBalancerPeer() must be called sequentially from the session workflow thread.
+ * - end(), isConnected(), local(), remote(), getSourceRemoteEndpoint(), and appendToBSON()
+ *   (all other public methods) may be called concurrently from any thread, including concurrently
+ *   with the session workflow thread operations above.
  *
  * Async operations are not supported and will terminate the process.
  */
 class HandoffSession final : public Session {
 public:
-    /**
-     * Constructs a HandoffSession.
-     * @param tl        The owning TransportLayer.
-     * @param fd        The file descriptor for the UDS connection to the pre-auth process.
-     * @param remote    The remote endpoint (the pre-auth process's UDS address).
-     * @param local     The local endpoint (our UDS address).
-     * @param s2nConfig The s2n_config to use when deserializing TLS sessions.
-     */
-    HandoffSession(TransportLayer* tl,
-                   int fd,
-                   HostAndPort remote,
-                   HostAndPort local,
-                   struct s2n_config* s2nConfig);
+    enum class State : std::int8_t {
+        /**
+         * Cleartext is the initial state. When in this state, the session first reads a PROXY
+         * header from the accepted unix domain socket client, and then processes mongoRPC messages
+         * in the clear. The Cleartext stage continues until an OP_HANDOFF message is received.
+         */
+        Cleartext,
+        /**
+         * TLS is the state that follows the receipt of an OP_HANDOFF message.
+         * Upon receiving an OP_HANDOFF message, the session transitions to TLS mode where all I/O
+         * is encrypted via s2n on the downstream client's file descriptor, which was sent as
+         * ancillary data over the unix domain socket.
+         */
+        TLS,
+    };
+
+    struct Params {
+        /** The file descriptor for the unix domain socket connection to the pre-auth process. */
+        int fd;
+        /**
+         * The path of the unix domain socket that accepted the connection. It's the local socket
+         * address of `fd`.
+         */
+        std::filesystem::path localAddress;
+        /**
+         * The transport layer that accepted the connection.
+         * `transportLayer` must be non-null, except for in unit tests.
+         */
+        TransportLayer* transportLayer;
+        /** Whether this connection was accepted on a load balanced socket. */
+        bool acceptedOnLoadBalancedSocket;
+        /** Whether this connection was accepted on a priority socket. */
+        bool acceptedOnPrioritySocket;
+        /**
+         * The TLS configuration to use for the s2n_connection into which the handed-off TLS state
+         * will be deserialized.
+         * `s2nConfig` must be non-null, except for in unit tests.
+         */
+        const s2n_config* s2nConfig;
+        /**
+         * Dependency injection for libc functions used by `HandoffSession`.
+         * Unit tests supply a value for `posix` to simulate failures.
+         */
+        POSIXInterface& posix;
+    };
+
+    HandoffSession(Params params);
 
     ~HandoffSession() override;
 
@@ -98,20 +128,23 @@ public:
     }
 
     /**
-     * Returns the peer address of the current file descriptor. Before handoff, this is the
-     * pre-auth proxy's UDS address. After handoff, it is the client's TLS socket address.
+     * Returns the peer address of the current socket. Before handoff, this is the pre-auth
+     * process's unix domain "address" ("anonymous unix socket"). After handoff, it is the client's
+     * TLS socket address.
      */
-    const HostAndPort& remote() const override {
-        return _remote;
-    }
-
-    const HostAndPort& local() const override {
-        return _local;
-    }
+    const HostAndPort& remote() const override;
 
     /**
-     * Returns the true origin of the connection. After prelude(), this is the proxied client IP
-     * extracted from the PROXY v2 header. Before prelude(), or if the PROXY header carried no
+     * Returns the local address of the current socket. Before handoff, this is the address of the
+     * unix domain socket to which the secure pre-auth process connects. After handoff, it is the
+     * address on which the secure pre-auth process was listening.
+     */
+    const HostAndPort& local() const override;
+
+    /**
+     * Returns the address of the peer that is being proxied via a chain of PROXY protocol speaking
+     * peers, i.e. the "true" origin of the connection. After prelude(), this is the proxied client
+     * IP extracted from the PROXY v2 header. Before prelude(), or if the PROXY header carried no
      * address block, falls back to remote().
      */
     const HostAndPort& getSourceRemoteEndpoint() const override;
@@ -129,7 +162,7 @@ public:
 
     void end() override;
     bool isConnected() override;
-    void setTimeout(boost::optional<Milliseconds> timeout) override;
+    void setTimeout(boost::optional<Milliseconds>) override;
 
     /**
      * Parses the PROXY v2 header from the UDS connection, extracts the proxied source address if
@@ -139,17 +172,11 @@ public:
 
     void setIsLoadBalancerPeer(bool) override;
 
-    Status validateProxyUnixSocketPeerPermissions() override {
-        return Status::OK();
-    }
+    Status validateProxyUnixSocketPeerPermissions() override;
 
-    bool bindsToOperationState() const override {
-        return true;  // TODO(SERVER-128486): Use policy passed from transport layer
-    }
+    bool bindsToOperationState() const override;
 
-    bool isExemptedByCIDRList(const CIDRList& exemptions) const override {
-        return false;  // TODO(SERVER-128486): Document preference for the "priority" interface
-    }
+    bool isExemptedByCIDRList(const CIDRList& exemptions) const override;
 
     void appendToBSON(BSONObjBuilder& bb) const override;
 
@@ -163,16 +190,31 @@ public:
         return _restrictionEnvironment;
     }
 
-    HandoffSessionState getState() const {
-        return _state.load();
+    State getState_forTest() const {
+        std::lock_guard lock{_mutex};
+        return _state;
     }
 
 private:
-    /**
-     * Polls fd for readability. Returns OK if data is available, Returns NetworkTimeout on timeout,
-     * or SocketException on error or peer disconnect. timeoutMs of -1 blocks indefinitely.
-     */
-    static Status _pollForRead(int fd, int timeoutMs);
+    struct ConnectionEndpoints {
+        /** the server side (our side) of the connection */
+        HostAndPort local;
+        /** the client side (their side) of the connection */
+        HostAndPort remote;
+    };
+
+    struct ProxiedSource {
+        /**
+         * The downstream client's source address from the PROXY v2 header. Set in prelude(). Stored
+         * as SockAddr for RestrictionEnvironment construction in _updateEndpointsForClientFd().
+         */
+        SockAddr address;
+        /**
+         * Same as `address`, but stored as a HostAndPort so that getSourceRemoteEndpoint() can
+         * return a const reference (required by the base class).
+         */
+        HostAndPort endpoint;
+    };
 
     /**
      * Reads exactly `len` bytes into `buf` from the current fd using blocking I/O.
@@ -202,8 +244,9 @@ private:
     /**
      * Handles an OP_HANDOFF message. Parses the serialized s2n state from the message, deserializes
      * it into an s2n_connection, updates the remote and local addresses and restriction
-     * environment, transitions to TLS mode, then closes the UDS fd. On failure, closes both the
-     * received downstream client fd and the UDS fd. The session is left disconnected.
+     * environment, transitions to TLS mode, then closes the UDS fd. On failure, shuts down both the
+     * received downstream client fd and the UDS fd, and closes the received downstream client fd.
+     * The session is left disconnected.
      */
     Status _handleSessionHandoff(const Message& msg, int clientFd);
 
@@ -215,21 +258,48 @@ private:
      */
     Status _updateEndpointsForClientFd(int clientFd);
 
-    TransportLayer* const _tl;
-    AtomicWord<int> _fd;
-    AtomicWord<HandoffSessionState> _state;
-    HostAndPort _remote;
-    HostAndPort _local;
+    const HostAndPort& _remote(WithLock) const;
+    const HostAndPort& _local(WithLock) const;
+
+    /**
+     * Restricts access to _fd, _state, _isShutDown, _endpointsBeforeHandoff,
+     * _endpointsAfterHandoff, and _proxiedSource. Specifically:
+     * - _fd, _state, _endpointsBeforeHandoff, _endpointsAfterHandoff, and _proxiedSource can be
+     *   modified by the session workflow thread, and so must be locked when accessed from other
+     *   threads.
+     * - _isShutDown can be modified by any thread that calls end(), and so must be locked when
+     *   accessed from anywhere.
+     * - any operations performed using _fd on a thread other than the session workflow thread must
+     *   lock _mutex for the duration of the operation.
+     * - the session workflow thread must lock _mutex when calling close() on _fd.
+     */
+    mutable std::mutex _mutex;
+    /**
+     * The socket file descriptor with which we're communicating. This changes during
+     * OP_HANDOFF.
+     */
+    int _fd;
+    /** Indicates whether handoff has occurred. Cleartext before, TLS after. */
+    State _state;
+    /** Indicates whether end() has been called on this session. */
+    bool _isShutDown;
+    /**
+     * The remote and local addresses associated with the connection _fd. This changes during
+     * OP_HANDOFF.
+     */
+    ConnectionEndpoints _endpointsBeforeHandoff;
+    ConnectionEndpoints _endpointsAfterHandoff;
+    /**
+     * The remote address of the proxied client. This is parsed from the PROXY header sent at the
+     * beginning of the accepted unix domain socket connection, but might be absent.
+     */
+    boost::optional<ProxiedSource> _proxiedSource;
+
     RestrictionEnvironment _restrictionEnvironment;
-    struct s2n_connection* _s2nConnection;
-    struct s2n_config* _s2nConfig;
-    // The downstream client's source address from the PROXY v2 header. Set in prelude(). Stored as
-    // SockAddr for RestrictionEnvironment construction in _updateEndpointsForClientFd().
-    boost::optional<SockAddr> _proxiedSrcAddr;
-    // Same address as _proxiedSrcAddr, kept as a stable HostAndPort so that
-    // getSourceRemoteEndpoint() can return a const reference (required by the base class).
-    // Always set whenever _proxiedSrcAddr is set.
-    boost::optional<HostAndPort> _proxiedSrcEndpoint;
+    s2n_connection* _s2nConnection;
+    const s2n_config* const _s2nConfig;
+    POSIXInterface& _posix;
+    TransportLayer* const _tl;
 };
 
-}  // namespace mongo::transport::handoff_transport
+}  // namespace mongo::transport

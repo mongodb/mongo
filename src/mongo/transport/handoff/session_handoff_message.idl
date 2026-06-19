@@ -26,7 +26,7 @@
 # it in the license file.
 
 global:
-    cpp_namespace: "mongo::transport::handoff_transport"
+    cpp_namespace: "mongo::transport"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -35,8 +35,9 @@ structs:
     SessionHandoffMessage:
         description: >-
             The BSON body of an OP_HANDOFF wire protocol message. Carries the serialized s2n TLS
-            session state that the pre-auth proxy passes to mongod/s during a session handoff.
-        strict: true
+            connection state that the secure pre-auth process passes to mongod/s as part of session
+            handoff.
+        strict: false
         fields:
             s2nState:
                 type: bindata_generic
