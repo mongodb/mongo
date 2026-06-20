@@ -338,6 +338,7 @@ mongo_cc_library(
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/repl:local_oplog_info",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_uncommitted_changes",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/lock_manager",
@@ -701,6 +702,21 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:oplog_applier_impl_test_fixture",
         "//src/mongo/db/repl:replication_recovery",
         "//src/mongo/db/repl:storage_interface",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "compute_oplog_truncation_bound_test",
+    srcs = [
+        "compute_oplog_truncation_bound_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":oplog_truncation",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_init",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_test_helpers",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/util:fail_point",
     ],
 )
 
