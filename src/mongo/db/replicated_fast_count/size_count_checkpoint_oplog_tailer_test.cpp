@@ -154,7 +154,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest,
     assertNoBufferedWork(buffer);
 }
 
-// TODO SERVER-129451: Replace this with catching a `tassert` for illegal state.
+// TODO SERVER-128312: Replace this with catching a `tassert` for illegal state.
 TEST_F(SizeCountCheckpointOplogTailerTest,
        BootstrapFromConcreteTimestampWhenAllEntriesHaveRolledOff) {
     const Timestamp ts1{1, 1};
@@ -169,7 +169,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest,
     assertNoBufferedWork(buffer);
 }
 
-// TODO SERVER-129451: Replace this with catching a `tassert` for illegal state.
+// TODO SERVER-128312: Replace this with catching a `tassert` for illegal state.
 TEST_F(SizeCountCheckpointOplogTailerTest,
        BootstrapFromConcreteTimestampWhenEntryRolledOffButLaterEntriesExist) {
     const Timestamp ts1{1, 1};

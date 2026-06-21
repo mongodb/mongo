@@ -255,7 +255,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             return false;
         }
 
-        auto mayTruncateUpTo = oplog_truncation::computeTruncationBound(opCtx);
+        auto mayTruncateUpTo = opCtx->getServiceContext()->getStorageEngine()->getPinnedOplog();
 
         Timer timer;
 

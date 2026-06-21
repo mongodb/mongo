@@ -230,7 +230,7 @@ boost::optional<TailerState> SizeCountCheckpointOplogTailer::_bootstrap(
     } else {
         // Resume from the last oplog entry included in the most recent size/count checkpoint.
         //
-        // TODO SERVER-129451: Enforce that this entry is still present in the oplog before
+        // TODO SERVER-128312: Enforce that this entry is still present in the oplog before
         // resuming. Until then, we temporarily allow startup to proceed even if it has been
         // truncated, which can cause size and count to be inaccurate after oplog rollover.
         lastBufferedRid = makeStartRecordId(startAfter);
