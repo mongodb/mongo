@@ -43,7 +43,6 @@ rollout:
   featureFlagSbeEqLookupUnwindLocalIxscanFetch: {}
   featureFlagSbeEqLookupUnwindNestedLoopJoin: {}
   featureFlagSbeNonLeadingMatch: {}
-  featureFlagSbeTransformStages: {}
   featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagUnifiedWriteExecutor: {}
 

@@ -2,7 +2,11 @@ import {
     getPlanRankerMode,
     getAutomaticCEPlanRankingStrategy,
 } from "jstests/libs/query/cbr_utils.js";
-import {checkSbeStatus, checkJoinOptimizationStatus} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeStatus,
+    checkJoinOptimizationStatus,
+    checkSbeTransformStagesEnabled,
+} from "jstests/libs/query/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
 // definition, so that individual tests don't need to remember to call it.
@@ -37,6 +41,14 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     const joinOptimizationStatus = checkJoinOptimizationStatus(
         typeof db === "undefined" ? null : db,
     );
+    const sbeTransformStagesEnabled = checkSbeTransformStagesEnabled(
+        typeof db === "undefined" ? null : db,
+    );
+    const sbeIndividualFeaturesEnabled = sbeTransformStagesEnabled;
+
+    const sbeIndividualFeaturesExpectedExists = fileExists(
+        relativePathToExpectedOutput + "/sbeIndividualFeatures/" + outputName,
+    );
     const sbeExpectedExists = fileExists(
         relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName,
     );
@@ -53,6 +65,8 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
 
     if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
+    } else if (sbeIndividualFeaturesEnabled && sbeIndividualFeaturesExpectedExists) {
+        relativePathToExpectedOutput += "/sbeIndividualFeatures";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {
         // Both SBE and CBR expected outputs exist, bail.
         assert.fail(
