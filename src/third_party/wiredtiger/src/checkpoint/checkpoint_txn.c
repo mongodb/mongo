@@ -1387,6 +1387,7 @@ __wt_checkpoint_reset_stats(WT_CONNECTION_IMPL *conn)
     __wt_atomic_store_uint64_relaxed(&evict->evict_max_ms_per_checkpoint, 0);
     __wt_atomic_store_uint16_relaxed(&evict->evict_max_eviction_queue_attempts, 0);
     __wt_atomic_store_uint16_relaxed(&evict->evict_max_evict_page_attempts, 0);
+    __wt_atomic_store_uint64_relaxed(&evict->evict_max_victim_cache_put_us, 0);
     __wt_atomic_store_uint64_relaxed(&evict->reentry_hs_eviction_ms, 0);
 
     /* Heuristic controls. */

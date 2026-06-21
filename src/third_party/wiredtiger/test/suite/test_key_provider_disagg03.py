@@ -25,90 +25,32 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-import re, os, subprocess, json
-import wiredtiger, wttest
-from run import wt_builddir
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages, get_shard_id
+
+from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_key_provider import KeyProviderBase
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# Push-mode key provider smoke test: verify the pushed key is durably persisted
-# to the turtle key-provider page after a checkpoint.
+# Push-mode key provider smoke test: verify the pushed key is durably persisted to the turtle
+# key-provider page after a checkpoint, and that the on-disk crypt page is fully valid.
 @disagg_test_class
-class test_key_provider_disagg03(wttest.WiredTigerTestCase):
+class test_key_provider_disagg03(KeyProviderBase):
     test_name = __qualname__
-    conn_base_config = ',create,statistics=(all),'
-    def conn_config(self):
-        return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
-
-    disagg_storages = gen_disagg_storages(disagg_only = True)
+    disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
-
-    # The crypt key data.
-    DEFAULT_KEY_DATA = b'abcdefghijklmnopqrstuvwxyz'
-
-    MAIN_KEK_PAGE_ID = 1
-    EXPECTED_KEK_VERSION = 1
-
-    WT_SPECIAL_PALI_TURTLE_FILE_ID = 2
-    WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID = 26
-
-    turtle_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_TURTLE_FILE_ID):02d}.db'
-    key_provider_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID):02d}.db'
 
     uri = f"layered:{test_name}"
 
-    def conn_extensions(self, extlist):
-        config = '=(early_load=true,config=\"verbose=-1,version=1\")'
-        extlist.extension('test', "key_provider" + config)
-        DisaggConfigMixin.conn_extensions(self, extlist)
-
-    def sqlite_fetch_information(self, home, database, sql_query):
-        sqlite_exe = os.path.join(wt_builddir, 'sqlite3')
-        database_home = os.path.join(home, 'kv_home', database)
-        result = subprocess.run(
-            [sqlite_exe, '-json', database_home, sql_query],
-            capture_output=True, text=True, check=True)
-        return json.loads(result.stdout)[0]
-
-    def key_provider_page_count(self, home="."):
-        return self.sqlite_fetch_information(
-            home, self.key_provider_table,
-            f'SELECT COUNT(*) FROM pages WHERE table_id={self.WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID};'
-        )['COUNT(*)']
-
-    def validate_meta_file(self, home="."):
-        result = self.sqlite_fetch_information(
-            home, self.turtle_table,
-            f'''SELECT * FROM pages
-                WHERE table_id={self.WT_SPECIAL_PALI_TURTLE_FILE_ID}
-                ORDER BY lsn DESC LIMIT 1;'''
-        )
-        m = re.search(r".*page_id=(\d+),lsn=(\d+).*version=(\d+)", result['page_data'])
-        self.assertTrue(m)
-        page_id, version = int(m.group(1)), int(m.group(3))
-        self.assertEqual(page_id, self.MAIN_KEK_PAGE_ID)
-        self.assertEqual(version, self.EXPECTED_KEK_VERSION)
-
-    def push_key(self, timestamp):
-        # Push a key with the given timestamp via the exposed set_key API.
-        crypt = wiredtiger.CryptKeys()
-        crypt.keys = self.DEFAULT_KEY_DATA
-        crypt.timestamp = timestamp
-        self.assertEqual(self.conn.get_key_provider().set_key(self.session, crypt), 0)
-
     def test_set_key_persists(self):
-        if (self.ds_name != "palite"):
-            self.skipTest("Must use PALite to verify contents")
-
         ds = SimpleDataSet(self, self.uri, 10)
         ds.populate()
 
         # Push a key at timestamp 1, then advance stable to it so the checkpoint selects and
         # persists the pushed key to the key-provider page.
-        self.push_key(1)
+        self.push_crypt_key(1)
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
         self.assertGreaterEqual(self.key_provider_page_count(), 1)
-        self.validate_meta_file()
+        self.validate_turtle_page()
+        self.validate_latest_kek(1)

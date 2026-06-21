@@ -521,7 +521,8 @@ extern int __wti_rec_hs_delete_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *
 extern int __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI *multi)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_pack_delta_row_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r,
-  WT_SAVE_UPD *supd) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  WT_SAVE_UPD *supd, WT_ITEM *key, WT_ITEM *custom_value)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_row_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref,

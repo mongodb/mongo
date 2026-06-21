@@ -28,16 +28,19 @@
 
 # Toggle the key_provider API version across restarts and verify the database stays readable.
 
-import wiredtiger, wttest
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_key_provider import KeyProviderBase
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 @disagg_test_class
-class test_key_provider_disagg04(wttest.WiredTigerTestCase):
+class test_key_provider_disagg04(KeyProviderBase):
     test_name = __qualname__
+
     def conn_config(self):
-        return self.extensionsConfig() + ',disaggregated=(role="leader")'
+        # Raise disaggregated-storage verbosity to INFO so the crypt-key load message is emitted;
+        # restarts assert on it to confirm the persisted timestamp round-trips.
+        return super().conn_config() + ',verbose=[disaggregated_storage:0]'
 
     start_versions = [
         ('v0', dict(start_version=0)),
@@ -51,49 +54,51 @@ class test_key_provider_disagg04(wttest.WiredTigerTestCase):
     nentries = 200
 
     # Restart re-invokes conn_extensions, so flipping this field switches the loaded provider.
-    current_version = 0
-
-    DEFAULT_KEY_DATA = b'abcdefghijklmnopqrstuvwxyz'
+    key_provider_version = 0
 
     def conn_extensions(self, extlist):
-        config = f'=(early_load=true,config=\"verbose=-1,version={self.current_version}\")'
+        config = f'=(early_load=true,config=\"verbose=-1,version={self.key_provider_version}\")'
         extlist.extension('test', "key_provider" + config)
         DisaggConfigMixin.conn_extensions(self, extlist)
 
-    def checkpoint(self):
-        # Push mode: a checkpoint only persists a pushed key once stable reaches its timestamp, so
-        # push at a fresh timestamp then advance stable to it. Pull mode rotates keys through
-        # get_key, so no push is needed there.
-        if self.current_version == 1:
+    def write_and_checkpoint(self):
+        # Push mode persists a key only once stable reaches it; pull mode rotates via get_key.
+        if self.key_provider_version == 1:
             self.push_ts += 1
-            crypt = wiredtiger.CryptKeys()
-            crypt.keys = self.DEFAULT_KEY_DATA
-            crypt.timestamp = self.push_ts
-            self.assertEqual(self.conn.get_key_provider().set_key(self.session, crypt), 0)
+            self.push_crypt_key(self.push_ts)
             self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.push_ts))
+            self.persisted_ts = self.push_ts
         self.session.checkpoint()
 
+        # Only push mode has a known key to validate.
+        if self.key_provider_version == 1:
+            self.validate_latest_kek(self.push_ts)
+
     def restart_with_version(self, version):
-        self.current_version = version
-        self.restart_without_local_files()
+        self.key_provider_version = version
+        # On restart, the persisted crypt key must load back with the timestamp it was stored with. A
+        # version 1 key carries its push timestamp, a version 0 key carries none.
+        pattern = r'Loading persisted crypt key: lsn=\d+, timestamp=%d' % self.persisted_ts
+        with self.expectedStdoutPattern(pattern, maxchars=1000000):
+            self.restart_without_local_files()
 
     def test_key_provider_version_toggle(self):
-        if (self.ds_name != "palite"):
-            self.skipTest("Must use PALite for disagg key provider testing")
-
         # Monotonic push timestamp for this test; advances on each push-mode checkpoint.
         self.push_ts = 0
+
+        # Timestamp of the last persisted key; restarts assert it loads back unchanged.
+        self.persisted_ts = 0
 
         # The scenario runs start -> other -> start -> other, covering both directions.
         other_version = 1 - self.start_version
 
         # Part 1: start with the parameterized version, populate, checkpoint.
-        self.current_version = self.start_version
+        self.key_provider_version = self.start_version
         self.reopen_conn()
 
         ds1 = SimpleDataSet(self, self.uri, self.nentries)
         ds1.populate()
-        self.checkpoint()
+        self.write_and_checkpoint()
         ds1.check()
 
         # Part 2: restart on the other version, verify, add more.
@@ -102,7 +107,7 @@ class test_key_provider_disagg04(wttest.WiredTigerTestCase):
 
         ds2 = SimpleDataSet(self, self.uri, self.nentries * 2)
         ds2.populate(first_row=self.nentries + 1)
-        self.checkpoint()
+        self.write_and_checkpoint()
         ds2.check()
 
         # Part 3: restart back on the starting version.
@@ -111,7 +116,7 @@ class test_key_provider_disagg04(wttest.WiredTigerTestCase):
 
         ds3 = SimpleDataSet(self, self.uri, self.nentries * 3)
         ds3.populate(first_row=self.nentries * 2 + 1)
-        self.checkpoint()
+        self.write_and_checkpoint()
         ds3.check()
 
         # Part 4: final flip to the other version, verify all three batches.

@@ -2032,6 +2032,9 @@ __wti_rec_build_delta_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
 static int
 __rec_build_delta_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *full_image, WTI_RECONCILE *r)
 {
+    WT_DECL_ITEM(custom_value);
+    WT_DECL_ITEM(key);
+    WT_DECL_RET;
     WT_MULTI *multi;
     WT_PAGE_HEADER *header;
     WT_SAVE_UPD *supd;
@@ -2047,7 +2050,10 @@ __rec_build_delta_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *full_image, WTI
     multi = &r->multi[0];
     count = 0;
 
-    WT_RET(__wti_rec_build_delta_init(session, r));
+    WT_ERR(__wti_rec_build_delta_init(session, r));
+
+    WT_ERR(__wt_scr_alloc(session, 0, &key));
+    WT_ERR(__wt_scr_alloc(session, 0, &custom_value));
 
     /* Disable prefix compression until the first key is written. */
     r->key_pfx_compress = false;
@@ -2061,7 +2067,7 @@ __rec_build_delta_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *full_image, WTI
         if (!__rec_selected_key_changed(session, supd))
             continue;
 
-        WT_RET(__wti_rec_pack_delta_row_leaf(session, r, supd));
+        WT_ERR(__wti_rec_pack_delta_row_leaf(session, r, supd, key, custom_value));
         ++count;
     }
 
@@ -2078,7 +2084,10 @@ __rec_build_delta_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *full_image, WTI
       ", total time %" PRIu64 "us",
       full_image->mem_size, r->delta.size, WT_CLOCKDIFF_US(stop, start));
 
-    return (0);
+err:
+    __wt_scr_free(session, &key);
+    __wt_scr_free(session, &custom_value);
+    return (ret);
 }
 
 /*

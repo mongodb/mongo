@@ -1901,6 +1901,8 @@ static const char *const __stats_connection_desc[] = {
   "block-cache: evicted blocks",
   "block-cache: file size causing bypass",
   "block-cache: lookups",
+  "block-cache: maximum time spent adding a single page to the disaggregated victim cache, reset "
+  "per checkpoint (usecs)",
   "block-cache: number of blocks not evicted due to overhead",
   "block-cache: number of bypasses because no-write-allocate setting was on",
   "block-cache: number of bypasses due to overhead on put",
@@ -1910,8 +1912,13 @@ static const char *const __stats_connection_desc[] = {
   "block-cache: number of hits",
   "block-cache: number of misses",
   "block-cache: number of put bypasses on checkpoint I/O",
+  "block-cache: pages added to the disaggregated victim cache",
+  "block-cache: pages added to the disaggregated victim cache by application threads",
   "block-cache: removed blocks",
+  "block-cache: time application threads spent adding pages to the disaggregated victim cache "
+  "(usecs)",
   "block-cache: time sleeping to remove block (usecs)",
+  "block-cache: time spent adding pages to the disaggregated victim cache (usecs)",
   "block-cache: total blocks",
   "block-cache: total blocks inserted on read path",
   "block-cache: total blocks inserted on write path",
@@ -3016,6 +3023,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_cache_blocks_evicted = 0;
     stats->block_cache_bypass_filesize = 0;
     stats->block_cache_lookups = 0;
+    /* not clearing block_cache_put_time_max */
     stats->block_cache_not_evicted_overhead = 0;
     stats->block_cache_bypass_writealloc = 0;
     stats->block_cache_bypass_overhead_put = 0;
@@ -3025,8 +3033,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_cache_hits = 0;
     stats->block_cache_misses = 0;
     stats->block_cache_bypass_chkpt = 0;
+    stats->block_cache_puts = 0;
+    stats->block_cache_app_thread_puts = 0;
     stats->block_cache_blocks_removed = 0;
+    stats->block_cache_app_thread_put_time = 0;
     stats->block_cache_blocks_removed_blocked = 0;
+    stats->block_cache_put_time = 0;
     stats->block_cache_blocks = 0;
     stats->block_cache_blocks_insert_read = 0;
     stats->block_cache_blocks_insert_write = 0;
@@ -4060,6 +4072,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_cache_blocks_evicted += WT_STAT_CONN_READ(from, block_cache_blocks_evicted);
     to->block_cache_bypass_filesize += WT_STAT_CONN_READ(from, block_cache_bypass_filesize);
     to->block_cache_lookups += WT_STAT_CONN_READ(from, block_cache_lookups);
+    to->block_cache_put_time_max += WT_STAT_CONN_READ(from, block_cache_put_time_max);
     to->block_cache_not_evicted_overhead +=
       WT_STAT_CONN_READ(from, block_cache_not_evicted_overhead);
     to->block_cache_bypass_writealloc += WT_STAT_CONN_READ(from, block_cache_bypass_writealloc);
@@ -4070,9 +4083,13 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_cache_hits += WT_STAT_CONN_READ(from, block_cache_hits);
     to->block_cache_misses += WT_STAT_CONN_READ(from, block_cache_misses);
     to->block_cache_bypass_chkpt += WT_STAT_CONN_READ(from, block_cache_bypass_chkpt);
+    to->block_cache_puts += WT_STAT_CONN_READ(from, block_cache_puts);
+    to->block_cache_app_thread_puts += WT_STAT_CONN_READ(from, block_cache_app_thread_puts);
     to->block_cache_blocks_removed += WT_STAT_CONN_READ(from, block_cache_blocks_removed);
+    to->block_cache_app_thread_put_time += WT_STAT_CONN_READ(from, block_cache_app_thread_put_time);
     to->block_cache_blocks_removed_blocked +=
       WT_STAT_CONN_READ(from, block_cache_blocks_removed_blocked);
+    to->block_cache_put_time += WT_STAT_CONN_READ(from, block_cache_put_time);
     to->block_cache_blocks += WT_STAT_CONN_READ(from, block_cache_blocks);
     to->block_cache_blocks_insert_read += WT_STAT_CONN_READ(from, block_cache_blocks_insert_read);
     to->block_cache_blocks_insert_write += WT_STAT_CONN_READ(from, block_cache_blocks_insert_write);

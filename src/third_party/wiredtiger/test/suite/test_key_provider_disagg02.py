@@ -25,23 +25,22 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-import re, os, subprocess, json
-import wttest
-from run import wt_builddir
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages, get_shard_id
+from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_key_provider import KeyProviderBase
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # Ensure that a crash during checkpoint will not corrupt key provider meta information.
 @disagg_test_class
-class test_key_provider_disagg02(wttest.WiredTigerTestCase, suite_subprocess):
+class test_key_provider_disagg02(KeyProviderBase, suite_subprocess):
     test_name = __qualname__
-    conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
-    def conn_config(self):
-        return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
-
     disagg_storages = gen_disagg_storages(disagg_only = True)
+
+    key_provider_versions = [
+        ('pull', dict(key_provider_version=0)),
+        ('push', dict(key_provider_version=1)),
+    ]
 
     crash_points = [
         ('crash_before_key_rotation', dict(crash_point="before_key_rotation")),
@@ -49,86 +48,38 @@ class test_key_provider_disagg02(wttest.WiredTigerTestCase, suite_subprocess):
         ('crash_after_key_rotation', dict(crash_point="after_key_rotation")),
     ]
 
-    scenarios = make_scenarios(disagg_storages, crash_points)
+    scenarios = make_scenarios(disagg_storages, key_provider_versions, crash_points)
     nentries = 1000
     uri = f"layered:{test_name}"
 
-    WT_SPECIAL_PALI_TURTLE_FILE_ID = 2
-    turtle_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_TURTLE_FILE_ID):02d}.db'
-
-    # Load the storage store extension.
-    def conn_extensions(self, extlist):
-        config = f'=(early_load=true,config=\"verbose=-1,key_expires=0\")'
-        extlist.extension('test', "key_provider" + config)
-        DisaggConfigMixin.conn_extensions(self, extlist)
+    # In push mode a checkpoint only persists a key once stable reaches its timestamp, so push at a
+    # fresh timestamp and advance stable to it. Pull mode rotates through get_key, so it is a no-op.
+    def rotate_key(self, timestamp):
+        if self.key_provider_version != 1:
+            return
+        self.push_crypt_key(timestamp)
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(timestamp))
 
     def subprocess_func(self):
-        self.dir = self.home
         # Populate table.
         ds = SimpleDataSet(self, self.uri, self.nentries)
         ds.populate()
         ds.check()
 
-        # Initiate checkpoint to trigger key provider semantics.
+        # Establish a durable baseline checkpoint that persists a key provider page.
+        self.rotate_key(1)
         self.session.checkpoint()
-        self.sqlite_fetch_shared_meta(write=True)
 
-        # Trigger again and crash.
+        # Rotate again and crash mid-checkpoint.
+        self.rotate_key(2)
         self.session.checkpoint(f"debug=(checkpoint_crash_trigger_point={self.crash_point})") # Expected to fail
 
-    # Verify results of metadata file. After a crash, the key provider information should be the same.
-    def validate_persist_meta_file(self):
-        after_crash_meta = self.sqlite_fetch_shared_meta(write=False)
-        pattern = (
-            r"page_id=(?P<page_id>\d+),"
-            r"lsn=(?P<lsn>\d+).*"
-            r"version=(?P<version>\d+)"
-        )
-        after_crash_match = re.search(pattern, after_crash_meta)
-        self.assertTrue(after_crash_match)
-
-        result_file = os.path.join(self.dir, "key_provider.results")
-        with open(result_file, "r") as f:
-            before_crash_meta  = f.read()
-            before_crash_match = re.search(pattern, before_crash_meta)
-            self.assertEqual(before_crash_match.group("page_id"), after_crash_match.group("page_id"))
-            self.assertEqual(before_crash_match.group("lsn"), after_crash_match.group("lsn"))
-            self.assertEqual(before_crash_match.group("version"), after_crash_match.group("version"))
-
-    # Fetch the latest metadata and perform read/write validation. Use the builtin sqlite3 to
-    # match Palites SQLite version; some system SQLite builds are too old and may fail.
-    def sqlite_fetch_shared_meta(self, write):
-        sqlite_exe = os.path.join(wt_builddir, 'sqlite3')
-        database_home = os.path.join(self.dir, 'kv_home', self.turtle_table)
-        result = subprocess.run(
-            [sqlite_exe,
-             '-json',
-             database_home,
-             f'''SELECT * FROM pages
-                 WHERE table_id={self.WT_SPECIAL_PALI_TURTLE_FILE_ID}
-                 ORDER BY lsn DESC LIMIT 1;'''
-             ],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        result_data = json.loads(result.stdout)[0]
-        result_file = os.path.join(self.dir, "key_provider.results")
-        if (write):
-            with open(result_file, "w") as f:
-                f.write(result_data['page_data'])
-        return result_data['page_data']
-
     def test_key_provider_disagg02(self):
-        if (self.ds_name != "palite"):
-            self.skipTest("Must use PALite to verify contents")
-
         self.conn.close()
 
-        # Ensure that metadata file doesn't update key provider after crash.
         subdir = 'SUBPROCESS'
         [ignore_result, new_home_dir] = self.run_subprocess_function(subdir,
             f'{self.test_name}.{self.test_name}.subprocess_func', silent=True)
 
-        self.dir = new_home_dir
-        self.validate_persist_meta_file()
+        # The subprocess wrote to new_home_dir; its turtle reference survived the crash intact.
+        self.validate_turtle_page(home=new_home_dir)

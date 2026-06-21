@@ -131,8 +131,18 @@ functions:
           fi
 
           echo "mongodbtoolchain $MDB_TOOLCHAIN_REV not installed, downloading..."
+
+          # Work around installer.sh detecting the wrong platform on non-x86 architectures.
+          ARCH=$(uname -m)
+          EXTRA_ARGS=""
+          if [[ "$ARCH" == "ppc64le" ]]; then
+              EXTRA_ARGS="--os-id rhel81"
+          elif [[ "$ARCH" == "s390x" ]]; then
+              EXTRA_ARGS="--download-url https://mongodbtoolchain.build.10gen.cc/toolchain/rhel80-zseries/x86_64/mongodbtoolchain-${MDB_TOOLCHAIN_REV}.tar.gz"
+          fi
+
           curl -fsSL https://s3.amazonaws.com/mongodbtoolchain.build.10gen.cc/installer.sh \
-              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV"
+              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV" $EXTRA_ARGS
 
   # Since Bazel (currently used in SCons) uses EngFlow's remote execution system instead of icecream,
   # additional credentials need to be setup to maintain efficient compilation speed.
@@ -5153,6 +5163,8 @@ tasks:
       - func: "compile wiredtiger"
         vars:
           <<: *configure_flags_with_builtins
+          # FIXME-WT-13690: Enable ZSTD compression once failure has been resolved.
+          HAVE_BUILTIN_EXTENSION_ZSTD: -DHAVE_BUILTIN_EXTENSION_ZSTD=0
       - func: "format test script"
         vars:
           #run for 2 hours ( 2 * 60 = 120 minutes), use default config
@@ -7167,6 +7179,7 @@ buildvariants:
   run_on:
   - rhel80-test
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     ENABLE_TCMALLOC: 0
     cmake_generator: "Unix Makefiles"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -7241,6 +7254,7 @@ buildvariants:
   - rhel8-zseries-small
   batchtime: 4320 # 3 days
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     ENABLE_TCMALLOC: 0
     posix_configure_flags: -DENABLE_ZSTD=0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -7256,6 +7270,7 @@ buildvariants:
   - rhel8-power-small
   batchtime: 120 # 2 hours
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     format_test_setting: ulimit -c unlimited
     CMAKE_PRESET: linux-clang
     # Use quarter of the vCPUs to avoid OOM kill failure and disk issues on this variant.
@@ -7278,6 +7293,7 @@ buildvariants:
   - rhel8-zseries-small
   batchtime: 120 # 2 hours
   expansions:
+    REQUIRE_MDB_TOOLCHAIN: "1"
     ENABLE_TCMALLOC: 0
     # Use half number of vCPU to avoid OOM kill failure
     num_jobs: $(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)

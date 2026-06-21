@@ -25,21 +25,18 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-import re, os, wttest, subprocess, json
-from run import wt_builddir
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages, get_shard_id
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from helper import simulate_crash_restart
+from helper_key_provider import KeyProviderBase
 from wtdataset import SimpleDataSet
-
 from wtscenario import make_scenarios
 
-# Test basic key provider scenarios.
+# Test basic pull key provider scenarios.
 @disagg_test_class
-class test_key_provider_disagg01(wttest.WiredTigerTestCase):
+class test_key_provider_disagg01(KeyProviderBase):
     test_name = __qualname__
-    conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
-    def conn_config(self):
-        return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
+    # Pull (get_key) model.
+    key_provider_version = 0
 
     crash_value = [
         ('reopen', dict(crash=False)),
@@ -50,76 +47,25 @@ class test_key_provider_disagg01(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(disagg_storages, crash_value)
 
     nentries = 1000
-    key_expire = 0
-
-    MAIN_KEK_PAGE_ID = 1
-    EXPECTED_KEK_VERSION = 1
-
-    WT_SPECIAL_PALI_TURTLE_FILE_ID = 2
-    WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID = 26
-
-    turtle_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_TURTLE_FILE_ID):02d}.db'
-    key_provider_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID):02d}.db'
-
     uri = f"layered:{test_name}"
 
-    # Load the key provider store extension.
-    def conn_extensions(self, extlist):
-        config = f'=(early_load=true,config=\"verbose=-1,key_expires={self.key_expire}\")'
-        extlist.extension('test', "key_provider" + config)
-        DisaggConfigMixin.conn_extensions(self, extlist)
-
-    # Use sqlite to grab information for read/write validation. Use the builtin sqlite3 to
-    # match Palites SQLite version; some system SQLite builds are too old and may fail.
-    def sqlite_fetch_information(self, home, database, sql_query):
-        sqlite_exe = os.path.join(wt_builddir, 'sqlite3')
-        database_home = os.path.join(home, 'kv_home', database)
-        result = subprocess.run(
-            [sqlite_exe, '-json', database_home, sql_query],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        result_data = json.loads(result.stdout)
-        return result_data[0]
-
     def validate_number_elements(self, home="."):
-        shared_meta_count = self.sqlite_fetch_information(
-            home,
-            self.turtle_table,
-            f'SELECT COUNT(*) FROM pages WHERE table_id={self.WT_SPECIAL_PALI_TURTLE_FILE_ID};'
-        )
-        key_provider_count = self.sqlite_fetch_information(
-            home,
-            self.key_provider_table,
-            f'SELECT COUNT(*) FROM pages WHERE table_id={self.WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID};'
-        )
-
-        if (self.key_expire == 0):
-            self.assertEqual(key_provider_count['COUNT(*)'], shared_meta_count['COUNT(*)'])
+        kek = self.key_provider_page_count(home)
+        rows = self.sqlite_query(self.turtle_table,
+            f'SELECT COUNT(*) AS c FROM pages WHERE table_id={self.WT_SPECIAL_PALI_TURTLE_FILE_ID};',
+            home)
+        turtle = rows[0]['c']
+        if (self.key_expires == 0):
+            self.assertEqual(kek, turtle)
         else:
-            self.assertGreaterEqual(key_provider_count['COUNT(*)'], shared_meta_count['COUNT(*)'])
+            self.assertGreaterEqual(kek, turtle)
 
     def validate_meta_file(self, home="."):
-        result = self.sqlite_fetch_information(
-            home,
-            self.turtle_table,
-            f'''SELECT * FROM pages
-                WHERE table_id={self.WT_SPECIAL_PALI_TURTLE_FILE_ID}
-                ORDER BY lsn DESC LIMIT 1;'''
-        )
-        m = re.search(".*page_id=(\d+),lsn=(\d+).*version=(\d+)", result['page_data'])
-
-        self.assertTrue(m)
-        if (m):
-            page_id, version = int(m.group(1)), int(m.group(3))
-            self.assertEqual(page_id, self.MAIN_KEK_PAGE_ID)
-            self.assertEqual(version, self.EXPECTED_KEK_VERSION)
+        # The turtle references the main KEK page; the engine re-validates that page when it loads
+        # the checkpoint on reopen.
+        self.validate_turtle_page(home=home)
 
     def test_key_provider_disagg01(self):
-        if (self.ds_name != "palite"):
-            self.skipTest("Must use PALite to verify contents")
-
         # Populate table.
         ds = SimpleDataSet(self, self.uri, self.nentries)
         ds.populate()
@@ -138,7 +84,7 @@ class test_key_provider_disagg01(wttest.WiredTigerTestCase):
         ds.check()
 
         # Validate that key persists after crash/restart.
-        self.key_expire = 43200  # Keys expire after 12 hours.
+        self.key_expires = 43200  # Keys expire after 12 hours.
         if (self.crash):
             simulate_crash_restart(self, ".", "RESTART")
             self.validate_meta_file("RESTART")
