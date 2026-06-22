@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/get_executor_deferred_engine_choice_planning.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/query/get_executor_helpers.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_params_diagnostic_printer.h"
@@ -333,6 +335,10 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
         // Only one possible plan. Build the stages from the solution.
         solutions[0]->indexFilterApplied = plannerParams->indexFiltersApplied;
         return buildSingleSolutionPlanner(std::move(solutions[0]), cachedPlanHash);
+    }
+    // CBR is disabled; multiple candidate plans will be ranked by the classic multi-planner.
+    if (solutions.size() > 1) {
+        CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
     }
     return std::make_unique<MultiPlanner>(makePlannerData(cachedPlanHash), std::move(solutions));
 }

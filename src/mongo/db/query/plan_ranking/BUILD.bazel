@@ -10,6 +10,14 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "plan_ranker_method",
+    hdrs = [
+        "plan_ranker_method.h",
+    ],
+    deps = [],
+)
+
+mongo_cc_library(
     name = "plan_ranking_test_fixture",
     srcs = [
         "plan_ranking_test_fixture.cpp",

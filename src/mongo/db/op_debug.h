@@ -30,7 +30,9 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/operation_metrics_registry.h"
 #include "mongo/db/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"
@@ -38,6 +40,7 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
@@ -57,6 +60,7 @@
 namespace mongo {
 
 class CurOp;
+
 
 /* lifespan is different than CurOp because of recursives with DBDirectClient */
 class MONGO_MOD_PUB OpDebug {
@@ -655,6 +659,11 @@ public:
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
+
+    // The plan ranker (multi-planner or cost-based ranker) that selected the winning plan for this
+    // operation. Will be unknown when no ranking took place (single solution, plan cache hit, or a
+    // non-query operation).
+    PlanRankerMethod planRankerMethod{PlanRankerMethod::kNone};
 
     // Tracks the amount of dynamic indexed loop joins in a pushed down stage.
     int lookupDynamicIndexedLoopJoin{0};

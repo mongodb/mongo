@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/logv2/log.h"
@@ -70,6 +72,7 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiPlanStage.get()), yieldPolicy());
     uassertStatusOK(_multiPlanStage->runTrials(trialPeriodYieldPolicy.get()));
     uassertStatusOK(_multiPlanStage->pickBestPlan());
+    CurOp::get(opCtx())->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
 }
 
 const MultiPlanStats* MultiPlanner::getSpecificStats() const {

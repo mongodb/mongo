@@ -37,6 +37,7 @@
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
@@ -197,6 +198,10 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
     microsHistogram.increment(durationCount<Microseconds>(durationMicros));
     microsTotal.increment(durationMicros);
+
+    if (planRankingResult.isOK() && planRankingResult.getValue().needsWorksMeasuredForPlanCache) {
+        CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
+    }
 
     return planRankingResult;
 }

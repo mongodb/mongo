@@ -161,6 +161,19 @@ void addSpillingStats(const absl::flat_hash_map<PlanSummaryStats::SpillingStage,
         addSingleSpillingStats(stage, stats, sortTotalDataSizeBytes, appendCallback);
     }
 }
+
+StringData getPlanRankerMethodName(PlanRankerMethod method) {
+    switch (method) {
+        case PlanRankerMethod::kMultiPlanner:
+            return "mp"_sd;
+        case PlanRankerMethod::kCostBasedRanker:
+            return "cbr"_sd;
+        case PlanRankerMethod::kNone:
+            return "none"_sd;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 }  // namespace
 
 #define OPDEBUG_TOSTRING_HELP(x) \
@@ -414,6 +427,8 @@ void OpDebug::report(OperationContext* opCtx,
         case PlanExecutor::QueryFramework::kUnknown:
             break;
     }
+
+    pAttrs->add("planRanker", getPlanRankerMethodName(planRankerMethod));
 
     if (!errInfo.isOK()) {
         pAttrs->add("ok", 0);
@@ -714,6 +729,8 @@ void OpDebug::append(OperationContext* opCtx,
         case PlanExecutor::QueryFramework::kUnknown:
             break;
     }
+
+    b.append("planRanker", getPlanRankerMethodName(planRankerMethod));
 
     {
         BSONObjBuilder locks(b.subobjStart("locks"));
@@ -1124,6 +1141,10 @@ std::function<BSONObj(OpDebug::AppendArgs)> OpDebug::appendStaged(OperationConte
             case PlanExecutor::QueryFramework::kUnknown:
                 break;
         }
+    });
+
+    addIfNeeded("planRanker", [](auto field, auto args, auto& b) {
+        b.append("planRanker", getPlanRankerMethodName(args.op.planRankerMethod));
     });
 
     addIfNeeded("locks", [](auto field, auto args, auto& b) {

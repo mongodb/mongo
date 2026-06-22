@@ -30,12 +30,14 @@
 #include "mongo/db/query/plan_ranking/cost_based_plan_ranking.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -84,6 +86,7 @@ CostEstimate estimateCBRCost(const CanonicalQuery& query,
  * the best plan from the MultiPlanner.
  */
 StatusWith<PlanRankingResult> getBestMPPlan(
+    OperationContext* opCtx,
     classic_runtime_planner::MultiPlanner& mp,
     boost::optional<trial_period::TrialPhaseConfig> remainingTrialConfig = boost::none) {
     if (remainingTrialConfig) {
@@ -96,6 +99,10 @@ StatusWith<PlanRankingResult> getBestMPPlan(
     if (!status.isOK()) {
         return status;
     }
+
+    // MP selected the winning plan. Add it to the debug logs.
+    CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
+
     PlanRankingResult out;
     auto soln = mp.extractQuerySolution();
     // TODO SERVER-117118 Reenable this assertion once we can decouple from multiplanner.
@@ -206,7 +213,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
         LOGV2_INFO(11306807,
                    "AutomaticCE chooses MP (1)",
                    "Reason"_attr = " because of EOF or full batch");
-        return getBestMPPlan(mp);
+        return getBestMPPlan(opCtx, mp);
     }
 
     // Compare the cost of MP vs CBR and decide which strategy to use to estimate all plans.
@@ -220,7 +227,8 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
         LOGV2_INFO(12023300,
                    "AutomaticCE chooses MP (2)",
                    "Reason"_attr = " because plan contains inestimable node(s)");
-        return getBestMPPlan(mp,
+        return getBestMPPlan(opCtx,
+                             mp,
                              trial_period::TrialPhaseConfig{
                                  .maxNumWorksPerPlan = numWorksPerPlanMP - numWorksPerPlanEst,
                                  .targetNumResults = numResultsMP});
@@ -290,7 +298,8 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
                    "Reason"_attr = "the required improvement is not achievable",
                    "Condition"_attr =
                        "maxAchievableImprovementRatio < minRequiredImprovementRatio");
-        return getBestMPPlan(mp,
+        return getBestMPPlan(opCtx,
+                             mp,
                              trial_period::TrialPhaseConfig{
                                  .maxNumWorksPerPlan = numWorksPerPlanMP - numWorksPerPlanEst,
                                  .targetNumResults = numResultsMP});

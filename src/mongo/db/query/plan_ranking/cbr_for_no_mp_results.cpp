@@ -29,10 +29,12 @@
 
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -124,6 +126,7 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         // The best plan, once chosen by the multiplanner, will be inserted into the plan cache by
         // the multiplanner here.
         return resumeMultiPlannerAndPickBestPlan(
+            opCtx,
             {.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
              .targetNumResults = trialsConfig.targetNumResults},
             isExplain);
@@ -224,7 +227,8 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     // The best plan, once chosen by the multiplanner, will be inserted into the plan cache by the
     // multiplanner here.
     auto result =
-        resumeMultiPlannerAndPickBestPlan({.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
+        resumeMultiPlannerAndPickBestPlan(opCtx,
+                                          {.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
                                            .targetNumResults = trialsConfig.targetNumResults},
                                           isExplain);
     if (!result.isOK()) {
@@ -236,7 +240,7 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
 }
 
 StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPickBestPlan(
-    const trial_period::TrialPhaseConfig& trialsConfig, bool isExplain) {
+    OperationContext* opCtx, const trial_period::TrialPhaseConfig& trialsConfig, bool isExplain) {
     auto stats = _multiPlanner->getSpecificStats();
 
     if (!stats->earlyExit) {
@@ -249,6 +253,9 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPi
     if (!status.isOK()) {
         return status;
     }
+
+    // MP selected the winning plan. Add it to the debug logs.
+    CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
 
     PlanRankingResult result;
     result.solutions.push_back(_multiPlanner->extractQuerySolution());

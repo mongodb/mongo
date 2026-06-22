@@ -493,8 +493,10 @@ Status MultiPlanStage::pickBestPlan() {
 
     removeRejectedPlans();
 
-    // Increment relevant server status metric. Skip when CBR (not MP) made the selection, or
-    // when this MP is only planning a subquery and is not choosing the overall winning plan.
+    // Increment the server status metric when MP genuinely chose the winner. Skip for CBR-chosen
+    // plans (where MP is only used for plan-cache hydration) and for branch planners.
+    // Note: planRankerMethod is recorded by the plan ranking strategy or runtime planner at the
+    // point where it is known that MP selected the winner, not here.
     if (!_shouldNotCollectMetrics && !_isBranchPlanner) {
         multiPlannerChoseWinningPlan.increment();
     }

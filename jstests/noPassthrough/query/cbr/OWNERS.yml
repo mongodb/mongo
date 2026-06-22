@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-optimization-cost-based-ranker
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-optimization-staff-leads

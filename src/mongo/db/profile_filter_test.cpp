@@ -96,6 +96,7 @@ TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
                                                                   "planCacheKey",
                                                                   "queryShapeHash",
                                                                   "queryFramework",
+                                                                  "planRanker",
                                                                   "locks",
                                                                   "authorization",
                                                                   "flowControl",
