@@ -571,3 +571,10 @@ feature_flags:
         default: false
         fcv_gated: false
         incremental_rollout_phase: in_development
+
+    featureFlagIncludeMetricsObjectOption:
+        description: "Use includeMetrics.queryStats field instead of deprecated includeQueryStatsMetrics when forwarding to shards."
+        cpp_varname: gFeatureFlagIncludeMetricsObjectOption
+        default: true
+        version: 9.0
+        fcv_gated: true
