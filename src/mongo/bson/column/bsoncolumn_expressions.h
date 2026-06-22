@@ -29,9 +29,23 @@
 
 #pragma once
 
+#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumn_expressions_internal.h"
 
 namespace mongo::bsoncolumn {
+
+/**
+ * Return the total number of elements (including missing) stored in this BSONColumn.
+ */
+inline size_t count(const char* buffer, size_t size) {
+    return BSONColumn(buffer, size).size();
+}
+
+inline size_t count(BSONBinData bin) {
+    tassert(9706200, "Invalid BSON type for column", bin.type == BinDataType::Column);
+    return BSONColumn(reinterpret_cast<const char*>(bin.data), static_cast<size_t>(bin.length))
+        .size();
+}
 
 /**
  * Return first non-missing element stored in this BSONColumn

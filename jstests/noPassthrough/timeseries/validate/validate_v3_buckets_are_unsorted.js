@@ -46,31 +46,37 @@ assert(res.valid);
 // Compressed bucket with the compressed time field in-order and version set to 3. This should fail,
 // since this bucket's measurements are in-order on time field, meaning this bucket shouldn't have
 // been promoted to v3.
-assert.commandWorked(getTimeseriesCollForRawOps(testDB, tsColl)
-                         .insert({
-                             _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
-                             control: {
-                                 version: TimeseriesTest.BucketVersion.kCompressedUnsorted,
-                                 min: {
-                                     _id: ObjectId("65a6eba7e6d2e848e08c3750"),
-                                     t: ISODate("2024-01-16T20:48:00Z"),
-                                     a: 1,
-                                 },
-                                 max: {
-                                     _id: ObjectId("65a6eba7e6d2e848e08c3751"),
-                                     t: ISODate("2024-01-16T20:48:39.448Z"),
-                                     a: 1,
-                                 },
-                                 count: NumberInt(2),
-                             },
-                             meta: 0,
-                             data: {
-                                 t: BinData(7, "CQAYhggUjQEAAIAOAAAAAAAAAAA="),
-                                 a: BinData(7, "AQAAAAAAAAAAAJAuAAAAAAAAAAA="),
-                                 _id: BinData(7, "BwBlpuun5tLoSOCMN1CALgAAAAAAAAAA"),
-                             }
-                         },
-                                 getRawOperationSpec(testDB)));
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
+const invalidVersion3Doc = {
+    _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
+    control: {
+        version: TimeseriesTest.BucketVersion.kCompressedUnsorted,
+        min: {
+            _id: ObjectId("65a6eba7e6d2e848e08c3750"),
+            t: ISODate("2024-01-16T20:48:00Z"),
+            a: 1,
+        },
+        max: {
+            _id: ObjectId("65a6eba7e6d2e848e08c3751"),
+            t: ISODate("2024-01-16T20:48:39.448Z"),
+            a: 1,
+        },
+        count: NumberInt(2),
+    },
+    meta: 0,
+    data: {
+        t: BinData(7, "CQAYhggUjQEAAIAOAAAAAAAAAAA="),
+        a: BinData(7, "AQAAAAAAAAAAAJAuAAAAAAAAAAA="),
+        _id: BinData(7, "BwBlpuun5tLoSOCMN1CALgAAAAAAAAAA"),
+    },
+};
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, tsColl)
+        .insert(invalidVersion3Doc, getRawOperationSpec(testDB)),
+);
 res = assert.commandWorked(tsColl.validate({full: true}));
 assert(!res.valid);
 assert.eq(res.errors.length, 1);

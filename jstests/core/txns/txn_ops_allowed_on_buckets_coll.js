@@ -65,12 +65,23 @@ bogusBucket._id = incrementOID(id3);
 assert.commandWorked(getTimeseriesCollForRawOps(tsColl).insert(bogusBucket, kRawOperationSpec));
 
 jsTestLog("Testing update.");
-assert.commandWorked(getTimeseriesCollForRawOps(tsColl).update(
-    {_id: bogusBucket._id}, {$set: {[metaFieldName]: 4}}, kRawOperationSpec));
-assert.commandWorked(getTimeseriesCollForRawOps(tsColl).update(
-    {[metaFieldName]: 65},
-    {$set: {"control": bogusBucket.control, "data": bogusBucket.data}},
-    {upsert: true, ...kRawOperationSpec}));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(tsColl).update(
+        {_id: bogusBucket._id}, {$set: {[metaFieldName]: 4}}, kRawOperationSpec),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(tsColl).update(
+        {[metaFieldName]: 65},
+        {
+            $set: {
+                _id: incrementOID(bogusBucket._id),
+                "control": bogusBucket.control,
+                "data": bogusBucket.data
+            }
+        },
+        {upsert: true, ...kRawOperationSpec},
+        ),
+);
 
 jsTestLog("Testing remove.");
 assert.commandWorked(

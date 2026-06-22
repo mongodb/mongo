@@ -924,6 +924,62 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
                 nInvalid++;
             }
+        } else if (coll->getTimeseriesOptions()) {
+            // For timeseries collections, bypass checkValidation (which after SERVER-118985 runs
+            // validateBucketConsistency and may reject buckets that are otherwise valid) and rely
+            // solely on the dedicated _validateTimeSeriesBucketRecord checks below.
+            BSONObj recordBson = record->data.toBson();
+
+            // Checks for time-series collection consistency.
+            Status bucketStatus = _validateTimeSeriesBucketRecord(
+                opCtx, coll, recordBson, results, _validateState->isBSONConformanceValidation());
+            // This log id should be kept in sync with the associated warning messages that are
+            // returned to the client.
+            if (!bucketStatus.isOK()) {
+                LOGV2_WARNING_OPTIONS(6698300,
+                                      {logv2::LogTruncation::Disabled},
+                                      "Document is not compliant with time-series specifications",
+                                      logAttrs(coll->ns()),
+                                      "recordId"_attr = record->id,
+                                      "reason"_attr = bucketStatus);
+                nNonCompliantDocuments++;
+                results->addError(kTimeseriesValidationInconsistencyReason);
+            }
+            auto containsMixedSchemaDataResponse =
+                coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
+            if (!containsMixedSchemaDataResponse.isOK() &&
+                results->addError(kMalformedMinMaxTimeseriesBucket)) {
+                LOGV2_WARNING_OPTIONS(8469900,
+                                      {logv2::LogTruncation::Disabled},
+                                      kMalformedMinMaxTimeseriesBucket,
+                                      logAttrs(coll->ns()),
+                                      "recordId"_attr = record->id,
+                                      "error"_attr = containsMixedSchemaDataResponse.getStatus());
+            } else if (containsMixedSchemaDataResponse.isOK() &&
+                       containsMixedSchemaDataResponse.getValue()) {
+                bool mixedSchemaAllowed =
+                    coll->getTimeseriesMixedSchemaBucketsState().canStoreMixedSchemaBucketsSafely();
+                if (mixedSchemaAllowed &&
+                    results->addWarning(kExpectedMixedSchemaTimeseriesWarning)) {
+                    LOGV2_WARNING_OPTIONS(8469901,
+                                          {logv2::LogTruncation::Disabled},
+                                          kExpectedMixedSchemaTimeseriesWarning,
+                                          logAttrs(coll->ns()),
+                                          "recordId"_attr = record->id);
+                } else if (!mixedSchemaAllowed &&
+                           results->addError(kUnexpectedMixedSchemaTimeseriesError)) {
+                    const auto& controlField =
+                        recordBson.getField(timeseries::kBucketControlFieldName).Obj();
+                    int count = controlField.getIntField(timeseries::kBucketControlCountFieldName);
+                    LOGV2_WARNING_OPTIONS(8469902,
+                                          {logv2::LogTruncation::Disabled},
+                                          kUnexpectedMixedSchemaTimeseriesError,
+                                          logAttrs(coll->ns()),
+                                          "recordId"_attr = record->id,
+                                          "objSize"_attr = recordBson.objsize(),
+                                          "measurementCount"_attr = count);
+                }
+            }
         } else {
             // If the document is not corrupted, validate the document against this collection's
             // schema validator. Don't treat invalid documents as errors since documents can bypass
@@ -940,66 +996,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
                 nNonCompliantDocuments++;
                 results->addWarning(kSchemaValidationFailedReason);
-            } else if (coll->getTimeseriesOptions()) {
-                BSONObj recordBson = record->data.toBson();
-
-                // Checks for time-series collection consistency.
-                Status bucketStatus =
-                    _validateTimeSeriesBucketRecord(opCtx,
-                                                    coll,
-                                                    recordBson,
-                                                    results,
-                                                    _validateState->isBSONConformanceValidation());
-                // This log id should be kept in sync with the associated warning messages that are
-                // returned to the client.
-                if (!bucketStatus.isOK()) {
-                    LOGV2_WARNING_OPTIONS(
-                        6698300,
-                        {logv2::LogTruncation::Disabled},
-                        "Document is not compliant with time-series specifications",
-                        logAttrs(coll->ns()),
-                        "recordId"_attr = record->id,
-                        "reason"_attr = bucketStatus);
-                    nNonCompliantDocuments++;
-                    results->addError(kTimeseriesValidationInconsistencyReason);
-                }
-                auto containsMixedSchemaDataResponse =
-                    coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
-                if (!containsMixedSchemaDataResponse.isOK() &&
-                    results->addError(kMalformedMinMaxTimeseriesBucket)) {
-                    LOGV2_WARNING_OPTIONS(8469900,
-                                          {logv2::LogTruncation::Disabled},
-                                          kMalformedMinMaxTimeseriesBucket,
-                                          logAttrs(coll->ns()),
-                                          "recordId"_attr = record->id,
-                                          "error"_attr =
-                                              containsMixedSchemaDataResponse.getStatus());
-                } else if (containsMixedSchemaDataResponse.isOK() &&
-                           containsMixedSchemaDataResponse.getValue()) {
-                    bool mixedSchemaAllowed = coll->getTimeseriesMixedSchemaBucketsState()
-                                                  .canStoreMixedSchemaBucketsSafely();
-                    if (mixedSchemaAllowed &&
-                        results->addWarning(kExpectedMixedSchemaTimeseriesWarning)) {
-                        LOGV2_WARNING_OPTIONS(8469901,
-                                              {logv2::LogTruncation::Disabled},
-                                              kExpectedMixedSchemaTimeseriesWarning,
-                                              logAttrs(coll->ns()),
-                                              "recordId"_attr = record->id);
-                    } else if (!mixedSchemaAllowed &&
-                               results->addError(kUnexpectedMixedSchemaTimeseriesError)) {
-                        const auto& controlField =
-                            recordBson.getField(timeseries::kBucketControlFieldName).Obj();
-                        int count =
-                            controlField.getIntField(timeseries::kBucketControlCountFieldName);
-                        LOGV2_WARNING_OPTIONS(8469902,
-                                              {logv2::LogTruncation::Disabled},
-                                              kUnexpectedMixedSchemaTimeseriesError,
-                                              logAttrs(coll->ns()),
-                                              "recordId"_attr = record->id,
-                                              "objSize"_attr = recordBson.objsize(),
-                                              "measurementCount"_attr = count);
-                    }
-                }
             }
         }
 

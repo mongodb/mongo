@@ -25,6 +25,9 @@ mongo_cc_library(
         "unordered_map.h",
         "vector.h",
     ],
+    deps = [
+        "//src/mongo/util:processinfo",
+    ],
 )
 
 mongo_cc_unit_test(

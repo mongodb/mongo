@@ -6,6 +6,7 @@
  */
 
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
@@ -327,6 +328,11 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
     jsTest.log.info("Time series collection successfully sharded with key: " +
                     tojson(shardedCollections[0].key));
 
+    // Use a fixed base time so the test is deterministic.
+    const baseTime = new Date("2026-03-27T17:30:21.332Z");
+    const spuriousTimestamp = new Date(baseTime.getTime() + 3000);
+    const spuriousBucketMinTimestamp = new Date("2026-03-27T00:00:00.000Z");
+
     // Split the collection at {sensor_id: "sensor_100", timestamp: MinKey}.
     assert.commandWorked(
         admin.runCommand({
@@ -339,7 +345,7 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
     assert.commandWorked(
         admin.runCommand({
             moveChunk: tsCollDDLOpsFullName,
-            find: {meta: "sensor_200", "control.min.timestamp": new Date()},
+            find: {meta: "sensor_200", "control.min.timestamp": baseTime},
             to: st.shard1.shardName,
             _waitForDelete: true,
         }),
@@ -348,7 +354,6 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
     // Verify initial chunk distribution for time series collection.
 
     // Insert some legitimate time series data through mongos.
-    const baseTime = new Date();
     assert.commandWorked(
         tsColl.insert({
             sensor_id: "sensor_050",
@@ -372,31 +377,38 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
                     tsCollDDLOps.getName());
 
     const shard1TsBucketsColl = st.shard1.getDB("test").getCollection(tsCollDDLOps.getName());
+    const shard1DB = st.shard1.getDB("test");
+    const shard1TsColl = shard1DB.getCollection(tsColl.getName());
 
     // Create a proper bucket document that would map to sensor_025 (which should be in first chunk)
-    const spuriousTimestamp = new Date(baseTime.getTime() + 3000);
     assert.commandWorked(
-        shard1TsBucketsColl.insert({
-            _id: ObjectId(),
-            meta: "sensor_025",  // This corresponds to sensor_id metaField
-            control: {
-                version: 1,
-                min: {
-                    timestamp: spuriousTimestamp,
-                    temperature: 20.0,
+        getTimeseriesCollForRawOps(shard1DB, shard1TsColl)
+            .insert(
+                {
+                    _id: ObjectId("69c5c8800000000000000000"),
+                    meta: "sensor_025",  // This corresponds to sensor_id metaField
+                    control: {
+                        version: 1,
+                        min: {
+                            timestamp: spuriousBucketMinTimestamp,
+                            temperature: 20.0,
+                            data: "spurious_ts_document",
+                        },
+                        max: {
+                            timestamp: spuriousTimestamp,
+                            temperature: 20.0,
+                            data: "spurious_ts_document",
+                        },
+                        closed: false,
+                    },
+                    data: {
+                        timestamp: {"0": spuriousTimestamp},
+                        temperature: {"0": 20.0},
+                        data: {"0": "spurious_ts_document"},
+                    },
                 },
-                max: {
-                    timestamp: spuriousTimestamp,
-                    temperature: 20.0,
-                },
-                closed: false,
-            },
-            data: {
-                timestamp: {"0": spuriousTimestamp},
-                temperature: {"0": 20.0},
-                data: {"0": "spurious_ts_document"},
-            },
-        }),
+                getRawOperationSpec(shard1DB),
+                ),
     );
 
     // Verify the spurious document exists on shard1.
@@ -413,10 +425,8 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
 
     let tsMoveResult = admin.runCommand({
         moveChunk: tsCollDDLOpsFullName,
-        find: {
-            meta: "sensor_050",
-            "control.min.timestamp": new Date()
-        },  // This finds the first chunk
+        find:
+            {meta: "sensor_050", "control.min.timestamp": baseTime},  // This finds the first chunk
         to: st.shard1.shardName,
         _waitForDelete: true,
     });
@@ -447,7 +457,7 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
     // Now the migration should succeed.
     tsMoveResult = admin.runCommand({
         moveChunk: tsCollDDLOpsFullName,
-        find: {meta: "sensor_050", "control.min.timestamp": new Date()},
+        find: {meta: "sensor_050", "control.min.timestamp": baseTime},
         to: st.shard1.shardName,
         _waitForDelete: true,
     });

@@ -14,11 +14,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
 
-const dbName = 'testDB';
-const collName = 'testColl';
-const timeField = 'time';
-const metaField = 'hostid';
-const testTimestamp = ISODate();
+const dbName = "testDB";
+const collName = "testColl";
+const timeField = "time";
+const metaField = "hostid";
+const testTimestamp = ISODate("2023-08-09T17:05:42.238Z");
+const testRoundedMinTimestamp = ISODate("2023-08-09T17:00:00Z");
+const testBucketId = ObjectId("64d3c6104c83948224c45ddf");
 
 // Connections.
 const st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 2}});
@@ -157,11 +159,11 @@ runTest({
     cmdObj: {
         insert: getTimeseriesCollForRawOps(mongos0, collName),
         documents: [{
-            _id: ObjectId(),
+            _id: testBucketId,
             control: {
-                min: {time: testTimestamp},
+                min: {time: testRoundedMinTimestamp},
                 max: {time: testTimestamp},
-                version: TimeseriesTest.BucketVersion.kUncompressed
+                version: TimeseriesTest.BucketVersion.kUncompressed,
             },
             data: {[timeField]: {0: testTimestamp}},
         }],

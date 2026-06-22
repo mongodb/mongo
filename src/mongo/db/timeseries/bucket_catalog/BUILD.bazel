@@ -21,7 +21,6 @@ mongo_cc_library(
         "bucket_metadata.cpp",
         "bucket_state_registry.cpp",
         "execution_stats.cpp",
-        "flat_bson.cpp",
         "global_bucket_catalog.cpp",
         "measurement_map.cpp",
         "reopening.cpp",
@@ -37,7 +36,6 @@ mongo_cc_library(
         "bucket_metadata.h",
         "bucket_state_registry.h",
         "execution_stats.h",
-        "flat_bson.h",
         "global_bucket_catalog.h",
         "measurement_map.h",
         "reopening.h",
@@ -45,6 +43,7 @@ mongo_cc_library(
         "write_batch.h",
     ],
     deps = [
+        ":bucket_catalog_utils",
         "//src/mongo/bson/column",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:record_id_helpers",
@@ -56,6 +55,20 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:bucket_compression_failure",
         "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "bucket_catalog_utils",
+    srcs = [
+        "flat_bson.cpp",
+    ],
+    hdrs = [
+        "flat_bson.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/tracking",
     ],
 )
 

@@ -21,6 +21,10 @@ assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.errors.length, 0);
 
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
 // Sets the max timestamp to outside the bucket max span.
 getTimeseriesCollForRawOps(db, coll).updateOne(
     {meta: 1}, {$set: {"control.max.time": outOfRangeDate}}, getRawOperationSpec(db));

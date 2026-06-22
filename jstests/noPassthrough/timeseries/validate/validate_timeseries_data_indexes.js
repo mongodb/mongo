@@ -32,6 +32,10 @@ const weatherData = [
     },
 ];
 
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
 // Drops collection and creates it again with new data, checking that collection is valid before
 // faulty data is inserted.
 function setUpCollection(data) {

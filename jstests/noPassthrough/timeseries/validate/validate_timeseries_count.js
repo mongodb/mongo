@@ -47,17 +47,31 @@ coll = db.getCollection(collName);
 // number of documents inserted is less than maxWriteBatchSize. This will insert two buckets due to
 // the default timeseriesBucketMaxCount=1000 limit. We are always using compressed buckets to write
 // to time-series collections, so this insert will be compressed (i.e. land in a version-2 bucket).
-coll.insertMany([...Array(1002).keys()].map(i => ({
-                                                "metadata": {"sensorId": 2, "type": "temperature"},
-                                                "timestamp": ISODate(),
-                                                "temp": i
-                                            })),
-                {ordered: false});
+coll.insertMany(
+    [...Array(1002).keys()].map((i) => ({
+                                    "metadata": {"sensorId": 2, "type": "temperature"},
+                                    "timestamp": ISODate(),
+                                    "temp": i,
+                                })),
+    {ordered: false},
+);
+
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
+// Write the incorrect control.count
 getTimeseriesCollForRawOps(db, coll).updateOne(
     {"meta.sensorId": 2, 'control.version': TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.count": 10}},
-    getRawOperationSpec(db));
-res = coll.validate({checkBSONConformance: true});
+    getRawOperationSpec(db),
+);
+
+// Disable allowing inconsistent state on buckets
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: false}));
+
+res = coll.validate({full: true});
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.errors.length, 1);

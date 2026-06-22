@@ -19,6 +19,9 @@ let coll = null;
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
 
 jsTestLog("Running the validate command to check time-series bucket versions");
 testCount += 1;

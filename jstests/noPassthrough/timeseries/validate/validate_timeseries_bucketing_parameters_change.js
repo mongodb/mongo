@@ -55,11 +55,17 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
     jsTestLog(
         "Running the validate command with a timeseries collection where we have the timeseriesBucketingParametersChanged set to False, with the bucketing parameters being changed.");
     // Set the timeseriesBucketingParametersChanged to always return false.
-    assert.commandWorked(db.adminCommand({
-        'configureFailPoint': timeseriesBucketingParametersChangedInputValueName,
-        'mode': 'alwaysOn',
-        data: {value: false}
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            "configureFailPoint": timeseriesBucketingParametersChangedInputValueName,
+            "mode": "alwaysOn",
+            data: {value: false},
+        }),
+    );
+    // Disable strict bucket validation as it relies on timeseriesBucketingParametersChanged to be
+    // set accurately, which we are not doing with the above fail point.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
 
     // This collMod should lead to timeseriesBucketingParametersChanged to True because the original
     // bucketing parameters we set for our collections was different from the updated bucketing
@@ -77,9 +83,16 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
     assert.eq(res.errors.length, 1);
     assert.contains(
         "A time series bucketing parameter was changed in this collection but timeseriesBucketingParametersChanged is not true. For more info, see logs with log id 9175400.",
-        res.errors);
-    assert.commandWorked(db.adminCommand(
-        {'configureFailPoint': timeseriesBucketingParametersChangedInputValueName, 'mode': 'off'}));
+        res.errors,
+    );
+    assert.commandWorked(
+        db.adminCommand({
+            "configureFailPoint": timeseriesBucketingParametersChangedInputValueName,
+            "mode": "off"
+        }),
+    );
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}));
 
     testCount += 1;
     collName = collNamePrefix + testCount;

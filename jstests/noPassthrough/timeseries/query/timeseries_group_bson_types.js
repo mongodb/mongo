@@ -137,7 +137,9 @@ function runTestCases(allowDiskUse, forceSpilling) {
     let testcases = blockProcessingTestCases(
         timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound, false, false);
     // Filter out tests with known accepted differences between SBE and Classic.
-    for (const test of testcases) {
+    // Tests with expectedErrorCode may not throw in block processing mode (the vectorized
+    // $dateDiff path returns Nothing for non-coercible dates rather than throwing an error).
+    for (const test of testcases.filter(t => !t.expectedErrorCode)) {
         compareScalarAndBlockProcessing(test, allowDiskUse);
     }
 }

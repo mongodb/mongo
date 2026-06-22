@@ -45,11 +45,21 @@ let stats = assert.commandWorked(coll.stats());
 assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats));
 
 jsTestLog("Add uncompressed data field to bucket, thus corrupting a compressed bucket.");
-let res = assert.commandWorked(getTimeseriesCollForRawOps(db, coll).updateOne(
-    {_id: bucketId},
-    {$set: {"data.c.1": 1, "control.min.c": 1, "control.max.c": 1}},
-    getRawOperationSpec(db)));
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+let res = assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).updateOne(
+        {_id: bucketId},
+        {$set: {"data.c.1": 1, "control.min.c": 1, "control.max.c": 1}},
+        getRawOperationSpec(db),
+        ),
+);
 assert.eq(res.modifiedCount, 1);
+
+// Disable allowing inconsistent state on buckets
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: false}));
 
 jsTestLog(
     "Insert third measurement. This will attempt to re-open the corrupted bucket, but should then freeze it and insert into a new bucket.");
@@ -61,8 +71,9 @@ assert.eq(stats.timeseries.numCommits, 3, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsReopened, 0, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketQueriesFailed, 2, tojson(stats.timeseries));
-TimeseriesTest.checkBucketReopeningsFailedCounters(
-    stats.timeseries, {numBucketReopeningsFailedDueToCompressionFailure: 1});
+TimeseriesTest.checkBucketReopeningsFailedCounters(stats.timeseries, {
+    numBucketReopeningsFailedDueToValidator: 1,
+});
 
 jsTestLog("Remove the newly created bucket, so it will not be present for the next insert.");
 bucketId = getTimeseriesCollForRawOps(db, coll).find({"control.min.a": 2}).rawData()[0]._id;
@@ -81,8 +92,8 @@ assert.eq(stats.timeseries.numBucketsReopened, 0, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketQueriesFailed, 2, tojson(stats.timeseries));
 TimeseriesTest.checkBucketReopeningsFailedCounters(stats.timeseries, {
-    numBucketReopeningsFailedDueToCompressionFailure: 1,
-    numBucketReopeningsFailedDueToMarkedFrozen: 1
+    numBucketReopeningsFailedDueToValidator: 1,
+    numBucketReopeningsFailedDueToMarkedFrozen: 1,
 });
 
 // Skip validation due to the corrupt buckets.

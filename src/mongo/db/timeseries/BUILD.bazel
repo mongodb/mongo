@@ -72,6 +72,23 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "timeseries_bucket_validation",
+    srcs = [
+        "timeseries_bucket_validation.cpp",
+    ],
+    hdrs = [
+        "timeseries_bucket_validation.h",
+    ],
+    deps = [
+        ":timeseries_extended_range",
+        ":timeseries_options",
+        "//src/mongo/bson/column",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/timeseries/bucket_catalog:bucket_catalog_utils",
+    ],
+)
+
+mongo_cc_library(
     name = "timeseries_test_fixture",
     srcs = [
         "timeseries_test_fixture.cpp",

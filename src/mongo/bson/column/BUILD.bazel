@@ -21,6 +21,8 @@ mongo_cc_library(
         "binary_reopen.h",
         "bsoncolumn.h",
         "bsoncolumn.inl",
+        "bsoncolumn_expressions.h",
+        "bsoncolumn_expressions_internal.h",
         "bsoncolumn_helpers.h",
         "bsoncolumn_interleaved.h",
         "bsoncolumn_util.h",
