@@ -51,13 +51,6 @@ function setupTest({failPoint, extraFailPointData, secondaryStartupParams}) {
     // can check initialSyncStatus fields after initial sync is complete.
     secondaryStartupParams["failpoint.skipClearInitialSyncState"] = tojson({mode: "alwaysOn"});
     secondaryStartupParams["numInitialSyncAttempts"] = 1;
-    // We must disable this parameter because the primary may be able to advance the stable
-    // timestamp after initiate prior to this restart. As a result, the initial sync
-    // node may see that it is no longer initiating the set, and wait for stable
-    // to advance to beginApplying in initial sync. Since the majority of this
-    // set is 2, the primary will be unable to advance its stable, leaving this node
-    // stuck in initial sync. We must disable the wait to avoid this scenario.
-    secondaryStartupParams["initialSyncWaitForSyncSourceLastStableRecoveryTs"] = false;
     secondary = replTest.restart(secondary, {startClean: true, setParameter: secondaryStartupParams});
     secondaryDB = secondary.getDB(dbName);
     secondaryColl = secondaryDB[collName];

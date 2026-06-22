@@ -164,12 +164,6 @@ try {
     checkLogForGetTimestampMsg(secondary, "beginApplyingTimestamp", prepareTimestamp, true);
     checkLogForCollectionClonerMsg(secondary, "listDatabases", "admin", false);
 
-    // Disable the initiating-set optimization so that beginApplyingTimestamp stays at the
-    // prepare timestamp.
-    assert.commandWorked(
-        secondary.adminCommand({setParameter: 1, initialSyncWaitForSyncSourceLastStableRecoveryTs: false}),
-    );
-
     // This step call will resume initial sync and pause it again after the node gets the
     // listDatabases result from its sync source.
     assert(!initialSyncTest.step());
