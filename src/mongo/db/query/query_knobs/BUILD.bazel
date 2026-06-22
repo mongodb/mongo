@@ -69,7 +69,10 @@ mongo_cc_library(
         "query_knob_test_knobs.cpp",
         ":query_knob_test_gen",
     ],
-    hdrs = ["query_knob_test_knobs.h"],
+    hdrs = [
+        "query_knob_test_callbacks.h",
+        "query_knob_test_knobs.h",
+    ],
     deps = [
         ":query_knob",
     ],

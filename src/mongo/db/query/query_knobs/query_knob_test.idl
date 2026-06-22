@@ -28,6 +28,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
+        - "mongo/db/query/query_knobs/query_knob_test_callbacks.h"
         - "mongo/db/query/query_knobs/with_on_update_util.h"
         - "mongo/platform/atomic_word.h"
         - "mongo/util/synchronized_value.h"
@@ -47,6 +48,10 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gTestIntKnob
         default: 42
+        validator:
+            callback: validateTestIntKnobCallback
+            gt: 0
+            lt: 1000
         redact: false
         annotations:
             query_knob:
@@ -61,10 +66,16 @@ server_parameters:
         cpp_vartype: AtomicWord<double>
         cpp_varname: gTestDoubleKnob
         default: 3.14
+        validator:
+            gte: 1.0
+            lte: 10.0
         redact: false
         annotations:
             query_knob:
                 wire_name: testDoubleKnobWire
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     testBoolKnob:
         set_at: [startup, runtime]

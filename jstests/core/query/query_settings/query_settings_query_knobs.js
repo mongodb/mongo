@@ -65,6 +65,14 @@ describe("setQuerySettings with queryKnobs", function () {
         assertQueryKnobsNotSettable({samplingMarginOfError: NaN}, 12194501);
     });
 
+    it("Should reject samplingMarginOfError below minimum (< 1.0)", function () {
+        assertQueryKnobsNotSettable({samplingMarginOfError: 0.5}, 12194501);
+    });
+
+    it("Should reject samplingMarginOfError above maximum (> 10.0)", function () {
+        assertQueryKnobsNotSettable({samplingMarginOfError: 10.1}, 12194501);
+    });
+
     it("Should reject knobs not marked with pqs_settable: true", function () {
         assertQueryKnobsNotSettable({queryFrameworkControl: "trySbeEngine"}, 12194500);
     });

@@ -38,8 +38,10 @@
 namespace mongo::query_settings {
 namespace {
 
-// Uses the PQS-settable test knobs from query_knob_test.idl: testIntKnob (testIntKnobWire) and
-// testBoolKnob (testBoolKnobWire).
+// Uses the PQS-settable test knobs from query_knob_test.idl:
+//   testIntKnob (testIntKnobWire)       — validator: {callback: rejects 13, gt: 0, lt: 1000}
+//   testDoubleKnob (testDoubleKnobWire) — validator: {gte: 1.0, lte: 10.0}
+//   testBoolKnob (testBoolKnobWire)
 // TODO SERVER-125993: Cover enum knob.
 
 TEST(QuerySettingsKnobOverridesTest, EmptyBSONYieldsEmptyOverrides) {
@@ -97,6 +99,69 @@ TEST(QuerySettingsKnobOverridesTest, DuplicateKnob) {
 
 TEST(QuerySettingsKnobOverridesTest, WrongTypeThrows) {
     ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << "notAnInt")),
+                       DBException,
+                       12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, IntValidatorRejectsOutOfRangeValue) {
+    // testIntKnob has validator: {gt: 0}; 0 must be rejected.
+    ASSERT_THROWS_CODE(
+        QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 0)), DBException, 12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, IntValidatorAcceptsInRangeValue) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 1));
+    ASSERT_EQ(overrides.entries().size(), 1u);
+    ASSERT_EQ(std::get<int>(overrides.entries()[0].value), 1);
+}
+
+// testIntKnob has validator: {gt: 0, lt: 1000} — covers the exclusive upper bound (lt).
+TEST(QuerySettingsKnobOverridesTest, IntValidatorRejectsAtExclusiveUpperBound) {
+    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 1000)),
+                       DBException,
+                       12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, IntValidatorAcceptsBelowExclusiveUpperBound) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 999));
+    ASSERT_EQ(std::get<int>(overrides.entries()[0].value), 999);
+}
+
+// testIntKnob also has a callback validator that rejects the sentinel value 13.
+TEST(QuerySettingsKnobOverridesTest, IntCallbackValidatorRejectsForbiddenSentinel) {
+    ASSERT_THROWS_CODE(
+        QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 13)), DBException, 12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, IntCallbackValidatorAcceptsNonSentinel) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 14));
+    ASSERT_EQ(std::get<int>(overrides.entries()[0].value), 14);
+}
+
+// testDoubleKnob has validator: {gte: 1.0, lte: 10.0} — covers inclusive bounds (gte, lte).
+TEST(QuerySettingsKnobOverridesTest, DoubleValidatorRejectsBelowMin) {
+    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 0.5)),
+                       DBException,
+                       12194501);
+}
+
+TEST(QuerySettingsKnobOverridesTest, DoubleValidatorAcceptsAtMin) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 1.0));
+    ASSERT_EQ(std::get<double>(overrides.entries()[0].value), 1.0);
+}
+
+TEST(QuerySettingsKnobOverridesTest, DoubleValidatorAcceptsInRange) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 5.0));
+    ASSERT_EQ(std::get<double>(overrides.entries()[0].value), 5.0);
+}
+
+TEST(QuerySettingsKnobOverridesTest, DoubleValidatorAcceptsAtMax) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 10.0));
+    ASSERT_EQ(std::get<double>(overrides.entries()[0].value), 10.0);
+}
+
+TEST(QuerySettingsKnobOverridesTest, DoubleValidatorRejectsAboveMax) {
+    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testDoubleKnobWire" << 10.1)),
                        DBException,
                        12194501);
 }

@@ -100,9 +100,9 @@ TEST(QueryKnobRegistryTest, PqsKnobIsFindableByWireName) {
 }
 
 TEST(QueryKnobRegistryTest, NonPqsKnobInvisibleToLookupButCarriesWireName) {
-    ASSERT_EQ(registry().getKnobIdForName("testDoubleKnobWire"sv), boost::none);
-    const auto& entry = registry().entry(test_knobs::testDoubleKnob.id);
-    ASSERT_EQ(entry.wireName, "testDoubleKnobWire"sv);
+    ASSERT_EQ(registry().getKnobIdForName("testLLKnobWire"sv), boost::none);
+    const auto& entry = registry().entry(test_knobs::testLLKnob.id);
+    ASSERT_EQ(entry.wireName, "testLLKnobWire"sv);
     ASSERT_FALSE(entry.pqsSettable);
 }
 
@@ -142,7 +142,7 @@ TEST(QueryKnobRegistryTest, CountsReflectPqsSplitOverTestSubset) {
         }
     }
     ASSERT_EQ(testTotal, 5u);
-    ASSERT_EQ(testPqs, 2u);
+    ASSERT_EQ(testPqs, 3u);
 }
 
 // -----------------------------------------------------------------------------
