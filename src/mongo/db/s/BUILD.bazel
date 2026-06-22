@@ -1088,7 +1088,9 @@ mongo_cc_unit_test(
     deps = [
         ":db_s_shard_server_test_deps",
         ":local_resharding_operations_registry",
+        ":resharding_replica_set_aware_service",
         ":sharding_test_helpers",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

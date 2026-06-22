@@ -410,10 +410,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
 
-        const bool useRegistry =
-            resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
 
         if (useRegistry) {
             resharding::throwIfReshardingInProgress(nss);

@@ -370,10 +370,7 @@ void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(const BSONObj& newB
                                                              const BSONObj& oldMeasurement) {
     const auto& collDesc = collectionAcquisition().getShardingDescription();
 
-    const bool useRegistry =
-        resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
     auto destinedRecipients = useRegistry
         ? resharding::getDestinedRecipientsIfPossiblyDifferent(
               opCtx(), collectionAcquisition().nss(), oldBucket, newBucket)

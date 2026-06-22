@@ -2829,10 +2829,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     CollectionWriter collection(opCtx, autoColl);
 
     const auto& nss = collection.get()->ns();
-    const bool useRegistry =
-        resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
 
     {
         // This check is for optimization purposes only as since this lock is released after this,

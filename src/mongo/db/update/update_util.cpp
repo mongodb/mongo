@@ -279,10 +279,7 @@ void ShardingChecksForUpdate::checkUpdateChangesReshardingKey(OperationContext* 
                                                               const BSONObj& newObj,
                                                               const Snapshotted<BSONObj>& oldObj) {
 
-    const bool useRegistry =
-        resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
 
     auto destinedRecipients = useRegistry
         ? resharding::getDestinedRecipientsIfPossiblyDifferent(

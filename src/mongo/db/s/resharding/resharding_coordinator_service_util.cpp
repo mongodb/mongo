@@ -1270,10 +1270,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
 
 boost::optional<UUID> tryRetrieveReshardingUUID(OperationContext* opCtx,
                                                 const NamespaceString& ns) {
-    const bool useRegistry =
-        resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
 
     if (useRegistry) {
         if (auto op = LocalReshardingOperationsRegistry::get().getOperation(ns)) {

@@ -81,10 +81,8 @@ namespace mongo {
 
 namespace {
 
-bool shouldUseRegistry(OperationContext* opCtx) {
-    return resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+bool shouldUseRegistry() {
+    return resharding::gFeatureFlagReshardingRegistry.isEnabled();
 }
 
 std::shared_ptr<ReshardingCoordinatorObserver> getReshardingCoordinatorObserver(
@@ -235,7 +233,7 @@ void ReshardingOpObserver::onInserts(OperationContext* opCtx,
                                      OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
-    if (shouldUseRegistry(opCtx) && _nssToRoleMap.contains(nss)) {
+    if (shouldUseRegistry() && _nssToRoleMap.contains(nss)) {
         // We should only get a single document here as each resharding participant writes a single
         // state document per operation but we loop to be defensive.
         for (auto it = begin; it != end; ++it) {
@@ -274,7 +272,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx,
         _doPin(opCtx);
     }
 
-    const auto& useRegistry = shouldUseRegistry(opCtx);
+    const auto& useRegistry = shouldUseRegistry();
 
     if (useRegistry && nss == NamespaceString::kConfigReshardingOperationsNamespace) {
         auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
@@ -351,7 +349,7 @@ void ReshardingOpObserver::onDelete(OperationContext* opCtx,
                                     const OplogDeleteEntryArgs& args,
                                     OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
-    if (shouldUseRegistry(opCtx) && _nssToRoleMap.contains(nss)) {
+    if (shouldUseRegistry() && _nssToRoleMap.contains(nss)) {
         auto commonMetadata = CommonReshardingMetadata::parse(
             doc, IDLParserContext("ReshardingOpObserver::onDelete"));
         LocalReshardingOperationsRegistry::get().unregisterOperation(_nssToRoleMap.at(nss),

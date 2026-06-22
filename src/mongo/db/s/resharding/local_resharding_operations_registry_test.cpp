@@ -36,8 +36,11 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
+#include "mongo/db/s/resharding/resharding_replica_set_aware_service.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -271,6 +274,42 @@ TEST_F(LocalReshardingOperationsRegistryResyncFromDiskTest, ClearsExistingStateB
 
     ASSERT_TRUE(registry.getOperation(kNs1));
     ASSERT_FALSE(registry.getOperation(kNs2));
+}
+
+class ReshardingReplicaSetAwareServiceTest : public MockReplCoordServerFixture {};
+
+TEST_F(ReshardingReplicaSetAwareServiceTest,
+       OnConsistentDataAvailableResyncsGlobalRegistryFromDisk) {
+    auto reshardingUUID = UUID::gen();
+    auto sourceUUID = UUID::gen();
+    createCollectionAndInsert(opCtx(),
+                              NamespaceString::kDonorReshardingOperationsNamespace,
+                              {makeDonorStateDoc(kNs1, reshardingUUID, sourceUUID)});
+
+    // The global registry does not reflect the on-disk operation until data is made consistent.
+    ASSERT_FALSE(LocalReshardingOperationsRegistry::get().getOperation(kNs1));
+
+    ReshardingReplicaSetAwareService::get(getServiceContext())
+        ->onConsistentDataAvailable(opCtx(), /*isMajority=*/true, /*isRollback=*/false);
+
+    auto op = LocalReshardingOperationsRegistry::get().getOperation(kNs1);
+    ASSERT_TRUE(op);
+    ASSERT_EQ(op->metadata.getReshardingUUID(), reshardingUUID);
+    ASSERT_TRUE(op->roles.count(Role::kDonor));
+}
+
+TEST_F(ReshardingReplicaSetAwareServiceTest,
+       OnConsistentDataAvailableIsNoOpWhenFeatureFlagDisabled) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagReshardingRegistry", false};
+
+    createCollectionAndInsert(opCtx(),
+                              NamespaceString::kDonorReshardingOperationsNamespace,
+                              {makeDonorStateDoc(kNs1, UUID::gen(), UUID::gen())});
+
+    ReshardingReplicaSetAwareService::get(getServiceContext())
+        ->onConsistentDataAvailable(opCtx(), /*isMajority=*/true, /*isRollback=*/false);
+
+    ASSERT_FALSE(LocalReshardingOperationsRegistry::get().getOperation(kNs1));
 }
 
 TEST(LocalReshardingOperationsRegistryTest, GetUnknownNamespace) {

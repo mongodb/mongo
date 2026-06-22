@@ -193,11 +193,7 @@ RangeDeletionTask ReadyRangeDeletionsProcessor::_peekFront() const {
 // TODO: SERVER-123812 refactor connection between range deleter and resharding
 bool ReadyRangeDeletionsProcessor::_shouldDeferRangeDeletionForResharding(NamespaceString nss,
                                                                           OperationContext* opCtx) {
-    // the FCV could change after this snapshot is taken, but since deferring range deletions
-    // is a best-effort optimization and not a safety issue, we accept this limitation
-    auto ff = resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    auto ff = resharding::gFeatureFlagReshardingRegistry.isEnabled();
     auto rsOp = LocalReshardingOperationsRegistry::get().getOperation(nss).has_value();
 
     return ff && rsOp;

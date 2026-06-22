@@ -57,10 +57,7 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const Namespac
 
     auto css = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
     _collDesc = css->getCollectionDescription(opCtx);
-    const bool useRegistry =
-        resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
 
     if (!_collDesc->hasRoutingTable()) {
         if (!useRegistry) {
