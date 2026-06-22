@@ -107,9 +107,11 @@ HostAndPort toHostAndPort(const SockAddr& sa) {
  * SocketException on error or peer disconnect. timeoutMs of -1 blocks indefinitely.
  */
 Status pollForRead(POSIXInterface& posix, int fd, int timeoutMs) {
+    tassert(12938601, "Invalid file descriptor", fd >= 0);
+
     struct pollfd pfd;
     pfd.fd = fd;
-    pfd.events = POLLIN | POLLRDHUP;
+    pfd.events = POLLIN;
     pfd.revents = 0;
 
     int ret;
@@ -123,9 +125,6 @@ Status pollForRead(POSIXInterface& posix, int fd, int timeoutMs) {
     }
     if (ret == 0) {
         return Status(ErrorCodes::NetworkTimeout, "Timed out waiting for data");
-    }
-    if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL | POLLRDHUP)) {
-        return Status(ErrorCodes::SocketException, "Socket error or peer disconnect");
     }
     return Status::OK();
 }

@@ -594,24 +594,60 @@ TEST_F(HandoffSessionPreHandoffEndSessionTest, SinkMessageAfterEndFails) {
     ASSERT_EQ(status.code(), ErrorCodes::SocketException);
 }
 
-/** waitForData() after end() fails. */
-TEST_F(HandoffSessionPreHandoffEndSessionTest, WaitForDataAfterEndFails) {
+/** waitForData() after end() succeeds immediately instead of blocking. */
+TEST_F(HandoffSessionPreHandoffEndSessionTest, WaitForDataAfterEndSucceeds) {
     auto session = makeSession();
     session->end();
-
-    ASSERT_EQ(session->waitForData().code(), ErrorCodes::SocketException);
+    ASSERT_OK(session->waitForData());
 }
 
 /**
- * waitForData() fails when the peer half-closes its write direction via shutdown(SHUT_WR).
- * shutdown(SHUT_WR) sets POLLIN|POLLRDHUP in revents but not POLLHUP (which only appears once
- * both directions are closed). Without POLLRDHUP in the revents check, waitForData() would
- * block indefinitely rather than returning an error.
+ * waitForData() returns OK after shutdown(SHUT_WR) with no data — the EOF is readable.
+ * The subsequent sourceMessage() fails because there is no data.
  */
-TEST_F(HandoffSessionPreHandoffEndSessionTest, WaitForDataFailsOnPeerShutdownWrite) {
+TEST_F(HandoffSessionPreHandoffEndSessionTest,
+       WaitForDataSucceedsAfterPeerShutdownWriteWithNoData) {
     auto session = makeSession();
     ::shutdown(proxyFd(), SHUT_WR);
-    ASSERT_EQ(session->waitForData().code(), ErrorCodes::SocketException);
+    ASSERT_OK(session->waitForData());
+    ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::SocketException);
+}
+
+/**
+ * waitForData() returns OK after shutdown(SHUT_WR) with data — the data is readable.
+ * The subsequent sourceMessage() succeeds.
+ */
+TEST_F(HandoffSessionPreHandoffEndSessionTest, WaitForDataSucceedsAfterPeerShutdownWriteWithData) {
+    auto session = makeSession();
+    Message msg = makeMessage(dbMsg, BSON("ping" << 1));
+    writeAll(proxyFd(), msg.buf(), msg.size());
+    ::shutdown(proxyFd(), SHUT_WR);
+    ASSERT_OK(session->waitForData());
+    ASSERT_OK(session->sourceMessage());
+}
+
+/**
+ * waitForData() returns OK after close() with no data — the EOF is readable.
+ * The subsequent sourceMessage() fails because there is no data.
+ */
+TEST_F(HandoffSessionPreHandoffEndSessionTest, WaitForDataSucceedsAfterPeerCloseWithNoData) {
+    auto session = makeSession();
+    closeProxy();
+    ASSERT_OK(session->waitForData());
+    ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::SocketException);
+}
+
+/**
+ * waitForData() returns OK after close() with data — the data is readable.
+ * The subsequent sourceMessage() succeeds.
+ */
+TEST_F(HandoffSessionPreHandoffEndSessionTest, WaitForDataSucceedsAfterPeerCloseWithData) {
+    auto session = makeSession();
+    Message msg = makeMessage(dbMsg, BSON("ping" << 1));
+    writeAll(proxyFd(), msg.buf(), msg.size());
+    closeProxy();
+    ASSERT_OK(session->waitForData());
+    ASSERT_OK(session->sourceMessage());
 }
 
 /**
@@ -630,7 +666,7 @@ TEST_F(HandoffSessionPreHandoffEndSessionTest, EndUnblocksBlockedWaitForData) {
     session->end();
     ASSERT_EQ(fut.wait_for(std::chrono::seconds(5)), std::future_status::ready)
         << "end() failed to unblock waitForData()";
-    ASSERT_EQ(fut.get().code(), ErrorCodes::SocketException);
+    ASSERT_OK(fut.get());
 }
 
 //
@@ -1145,6 +1181,73 @@ TEST_F(HandoffSessionHandoffTransitionTest, FailedHandoffWithCorruptState) {
 }
 
 /**
+ * An OP_HANDOFF message whose header arrives in two fragments completes the handoff successfully.
+ * The SCM_RIGHTS fd is attached to the first fragment, which is smaller than the message header,
+ * so the fd arrives before the full header has been received.
+ */
+TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoffWithFragmentedHeader) {
+    Message handoffMsg = buildSessionHandoffMessage(serializedState);
+
+    StatusWith<Message> result = Status(ErrorCodes::InternalError, "not set");
+    std::thread t([&] { result = session->sourceMessage(); });
+
+    // Wait for sourceMessage() to block before any data arrives.
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    // Send the first 4 bytes of the header with the SCM_RIGHTS fd attached.
+    constexpr size_t kFirstChunk = 4;
+    {
+        struct iovec iov;
+        iov.iov_base = const_cast<char*>(handoffMsg.buf());
+        iov.iov_len = kFirstChunk;
+
+        char controlBuf[CMSG_SPACE(sizeof(int))];
+        memset(controlBuf, 0, sizeof(controlBuf));
+
+        struct msghdr hdr;
+        memset(&hdr, 0, sizeof(hdr));
+        hdr.msg_iov = &iov;
+        hdr.msg_iovlen = 1;
+        hdr.msg_control = controlBuf;
+        hdr.msg_controllen = sizeof(controlBuf);
+
+        struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SCM_RIGHTS;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+        memcpy(CMSG_DATA(cmsg), &proxyTlsFd, sizeof(int));
+
+        ssize_t n;
+        do {
+            n = ::sendmsg(proxyUdsFd, &hdr, MSG_NOSIGNAL);
+        } while (n < 0 && errno == EINTR);
+        ASSERT_GT(n, 0) << "sendmsg failed: " << errorMessage(lastSocketError());
+        ASSERT_EQ(n, static_cast<ssize_t>(kFirstChunk)) << "sendmsg sent less than expected";
+    }
+    ::close(proxyTlsFd);
+    proxyTlsFd = -1;
+
+    // Pause so the first fragment is consumed before the rest arrives.
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+    // Send the remaining header bytes and full body.
+    writeAll(proxyUdsFd,
+             handoffMsg.buf() + kFirstChunk,
+             static_cast<size_t>(handoffMsg.size()) - kFirstChunk);
+
+    waitForSessionHandoff();
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
+
+    Message msg = makeMessage(dbMsg, BSON("hello" << 1));
+    clientSend(msg);
+    t.join();
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue().size(), msg.size());
+    ASSERT_EQ(memcmp(result.getValue().buf(), msg.buf(), msg.size()), 0);
+}
+
+/**
  * Fixture for post-handoff tests. Inherits HandoffSessionTLSFixture and drives the handoff to
  * completion in setUp. Tests communicate with the session via clientConn.
  */
@@ -1383,10 +1486,57 @@ TEST_F(HandoffSessionPostHandoffEndSessionTest, SinkMessageAfterEndFails) {
               ErrorCodes::SocketException);
 }
 
-/** waitForData() after end() fails. */
-TEST_F(HandoffSessionPostHandoffEndSessionTest, WaitForDataAfterEndFails) {
+/** waitForData() after end() succeeds immediately instead of blocking. */
+TEST_F(HandoffSessionPostHandoffEndSessionTest, WaitForDataAfterEndSucceeds) {
     session->end();
-    ASSERT_EQ(session->waitForData().code(), ErrorCodes::SocketException);
+    ASSERT_OK(session->waitForData());
+}
+
+/**
+ * waitForData() returns OK after peer shutdown(SHUT_WR) with no data — the EOF is readable.
+ * The subsequent sourceMessage() fails because there is no data.
+ */
+TEST_F(HandoffSessionPostHandoffEndSessionTest,
+       WaitForDataSucceedsAfterPeerShutdownWriteWithNoData) {
+    ::shutdown(clientTlsFd, SHUT_WR);
+    ASSERT_OK(session->waitForData());
+    ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::SocketException);
+}
+
+/**
+ * waitForData() returns OK after peer shutdown(SHUT_WR) with data — the data is readable.
+ * The subsequent sourceMessage() succeeds.
+ */
+TEST_F(HandoffSessionPostHandoffEndSessionTest, WaitForDataSucceedsAfterPeerShutdownWriteWithData) {
+    Message msg = makeMessage(dbMsg, BSON("ping" << 1));
+    clientSend(msg);
+    ::shutdown(clientTlsFd, SHUT_WR);
+    ASSERT_OK(session->waitForData());
+    ASSERT_OK(session->sourceMessage());
+}
+
+/**
+ * waitForData() returns OK after peer close() with no data — the EOF is readable.
+ * The subsequent sourceMessage() fails because there is no data.
+ */
+TEST_F(HandoffSessionPostHandoffEndSessionTest, WaitForDataSucceedsAfterPeerCloseWithNoData) {
+    ::close(clientTlsFd);
+    clientTlsFd = -1;
+    ASSERT_OK(session->waitForData());
+    ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::SocketException);
+}
+
+/**
+ * waitForData() returns OK after peer close() with data — the data is readable.
+ * The subsequent sourceMessage() succeeds.
+ */
+TEST_F(HandoffSessionPostHandoffEndSessionTest, WaitForDataSucceedsAfterPeerCloseWithData) {
+    Message msg = makeMessage(dbMsg, BSON("ping" << 1));
+    clientSend(msg);
+    ::close(clientTlsFd);
+    clientTlsFd = -1;
+    ASSERT_OK(session->waitForData());
+    ASSERT_OK(session->sourceMessage());
 }
 
 /**
@@ -1403,7 +1553,7 @@ TEST_F(HandoffSessionPostHandoffEndSessionTest, EndUnblocksBlockedWaitForData) {
     session->end();
     ASSERT_EQ(fut.wait_for(std::chrono::seconds(5)), std::future_status::ready)
         << "end() failed to unblock waitForData()";
-    ASSERT_EQ(fut.get().code(), ErrorCodes::SocketException);
+    ASSERT_OK(fut.get());
 }
 
 //
