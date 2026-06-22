@@ -117,6 +117,8 @@ public:
 
     StageConstraints constraints(PipelineSplitState pipeState) const override;
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const override;
+
     Value serialize(const query_shape::SerializationOptions& opts =
                         query_shape::SerializationOptions{}) const final;
 

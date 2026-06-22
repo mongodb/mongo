@@ -243,3 +243,15 @@ tests.forEach((test) => {
         runTestcase(name, pipeline, [{}, {}, {}, {}, {score: {"scoreDetails": "foo"}}], false);
     }
 }
+
+{
+    const name = "8. $group does not preserve per-document metadata.";
+    const results = coll
+        .aggregate([
+            {$fruitAsDocuments: {}},
+            {$group: {_id: null, count: {$sum: 1}}},
+            {$project: {_id: 0, searchScore: {$meta: "searchScore"}}},
+        ])
+        .toArray();
+    assert.eq(results, [{}], {results, name});
+}

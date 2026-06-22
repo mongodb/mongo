@@ -61,6 +61,7 @@ constexpr StringData kSearchMetaName = "SEARCH_META"_sd;
 // Emitted document field names.
 constexpr StringData kScoreField = "score"_sd;
 constexpr StringData kSortKeyField = "$sortKey"_sd;
+constexpr StringData kSearchScoreField = "$searchScore"_sd;
 constexpr StringData kStreamTypeField = "_streamType"_sd;
 
 // True if 'field' is present at the top level or inside any per-shard override.
@@ -190,8 +191,11 @@ public:
         if (_docConfig.addStreamTypeField) {
             builder.append(kStreamTypeField, -1);
         }
+        // $sortKey drives merge-sort across shards. $searchScore is score * 0.125.
         return advanced(
-            builder.obj(), StreamType::kDocResult, BSON(kSortKeyField << BSON_ARRAY(score)));
+            builder.obj(),
+            StreamType::kDocResult,
+            BSON(kSortKeyField << BSON_ARRAY(score) << kSearchScoreField << score * 0.125));
     }
 
     void open() override {}
@@ -264,6 +268,7 @@ public:
         properties.setRequiresInputDocSource(false);
         properties.setPosition(extension::MongoExtensionPositionRequirementEnum::kFirst);
         properties.setHostType(extension::MongoExtensionHostTypeRequirementEnum::kRunOnceAnyNode);
+        properties.setProvidedMetadataFields(std::vector<std::string>{"searchScore"});
         BSONObjBuilder builder;
         properties.serialize(&builder);
         return builder.obj();

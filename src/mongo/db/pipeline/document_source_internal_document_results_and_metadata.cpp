@@ -224,6 +224,13 @@ DocumentSourceContainer DocumentSourceInternalDocumentResultsAndMetadata::create
     return {std::move(stage)};
 }
 
+DepsTracker::State DocumentSourceInternalDocumentResultsAndMetadata::getDependencies(
+    DepsTracker* deps) const {
+    // Forward to the inner source: this stage adds no dependency behavior of its own beyond
+    // exposing the source's metadata availability declarations to downstream stages.
+    return _sourceStage->getDependencies(deps);
+}
+
 StageConstraints DocumentSourceInternalDocumentResultsAndMetadata::constraints(
     PipelineSplitState pipeState) const {
     // Inherit most constraints from the source stage, override facet and transaction since this
