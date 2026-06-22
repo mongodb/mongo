@@ -5,20 +5,20 @@ load("//utils:platforms_normalize.bzl", "ARCH_NORMALIZE_MAP", "OS_NORMALIZE_MAP"
 
 URLS_MAP = {
     "linux_aarch64": {
-        "sha": "877d4599c08684398e9d79c20402c9fb2220e4fd656d1904eb1bfebb2312e337",
-        "url": "https://github.com/mongodb-forks/codeowners/releases/download/v1.2.2/codeowners_1.2.2_linux_arm64.tar.gz",
+        "sha": "9b4b4ba76182442201527d72d5a74cc47585b8186ccd7e9d3907577c15594edc",
+        "url": "https://github.com/mongodb-forks/codeowners/releases/download/v1.2.3/codeowners_1.2.3_linux_arm64.tar.gz",
     },
     "linux_x86_64": {
-        "sha": "4256303d68afed6e07c29da1cf06d554d3b085fab23c86132f5aeeb8b223f2bb",
-        "url": "https://github.com/mongodb-forks/codeowners/releases/download/v1.2.2/codeowners_1.2.2_linux_amd64.tar.gz",
+        "sha": "8e4456feb381013c447a887737bd0d97ea8b9691440466f1ac58486ea961f25b",
+        "url": "https://github.com/mongodb-forks/codeowners/releases/download/v1.2.3/codeowners_1.2.3_linux_amd64.tar.gz",
     },
     "macos_aarch64": {
-        "sha": "70ccac2da525b12ed52b450a7f7fe7db0f013862f8b1b056ed7935bad454bf78",
-        "url": "https://github.com/mongodb-forks/codeowners/releases/download/v1.2.2/codeowners_1.2.2_darwin_arm64.tar.gz",
+        "sha": "5b8b240626f0cd03fa93b5294fc3a5998df8bf17786e87e0b5ca244f7c718e39",
+        "url": "https://github.com/mongodb-forks/codeowners/releases/download/v1.2.3/codeowners_1.2.3_darwin_arm64.tar.gz",
     },
     "macos_x86_64": {
-        "sha": "10c700c18caf654817cff6d814195d315f1f53a31b4d4ecacffa0ad437fd2580",
-        "url": "https://github.com/mongodb-forks/codeowners/releases/download/v1.2.2/codeowners_1.2.2_darwin_amd64.tar.gz",
+        "sha": "fc8665f2d910de9d1d2ee46ac95df590070a426dbd8cbe15d0254691d8f3f37c",
+        "url": "https://github.com/mongodb-forks/codeowners/releases/download/v1.2.3/codeowners_1.2.3_darwin_amd64.tar.gz",
     },
 }
 
