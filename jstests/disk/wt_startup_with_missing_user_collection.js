@@ -74,6 +74,9 @@ assert.throws(() => {
 });
 assert.gte(rawMongoProgramOutput("Fatal assertion").search("50883"), 0);
 
+// Mongo should have crashed above, but we need to make sure the process has exited.
+MongoRunner.stopMongod(mongod, null, {skipValidation: true, skipValidatingExitCode: true});
+
 // Perform a startup, drop collection "a" and shutdown.
 mongod = startMongodOnExistingPath(dbpath);
 assert.neq(null, mongod, "Failed to start");
