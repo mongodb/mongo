@@ -33,6 +33,23 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
+    OpenTelemetryTracingTokenBucketRateLimit:
+        description: "Parameters for a rate limit for OpenTelemetry tracing."
+        strict: false
+        fields:
+            refillRate:
+                description: "The number tokens to refill per second."
+                type: double
+                default: 1.0
+                validator:
+                    gt: 0.0
+            maxTokens:
+                description: "The maximum number of tokens that can be held in the bucket."
+                type: int
+                default: 10
+                validator:
+                    gt: 0
+
     OpenTelemetryTracingSamplingStrategy:
         description: "Describes how a set of spans should be sampled, e.g., the sampling rate."
         strict: false
@@ -46,6 +63,11 @@ structs:
                 validator:
                     gte: 0.0
                     lte: 1.0
+            tokenBucketRateLimit:
+                description: >-
+                    The rate limit to apply to these samples.
+                type: OpenTelemetryTracingTokenBucketRateLimit
+                default: true
 
     OpenTelemetryTracingSamplingConfig:
         description: "Configuration for head-based sampling of spans to initiate traces."

@@ -29,25 +29,46 @@
 
 #include "mongo/otel/traces/sampler/sampler.h"
 
+#include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/tick_source.h"
 
 namespace mongo::otel::traces {
+namespace {
+VersionedValue<const SamplerState> samplerState;
+thread_local auto snapshot = samplerState.makeSnapshot();
+}  // namespace
 
-TracingSamplerImpl::TracingSamplerImpl() {
-    _samplingFactors.update(std::make_shared<const SamplingFactorMap>());
+
+using SamplingFactorMap = SamplerState::SamplingFactorMap;
+using RateLimiterMap = SamplerState::RateLimiterMap;
+
+TracingSamplerImpl::TracingSamplerImpl(TickSource* tickSource) : _tickSource(tickSource) {
+    samplerState.update(std::make_shared<const SamplerState>());
 }
 
-bool TracingSamplerImpl::shouldSample(StringData spanName, double sampleValue) const {
-    thread_local auto snapshot = _samplingFactors.makeSnapshot();
-    _samplingFactors.refreshSnapshot(snapshot);
-    auto it = snapshot->find(spanName);
-    if (it == snapshot->end()) {
+bool TracingSamplerImpl::shouldSample(StringData spanName, double sampleValue) {
+    samplerState.refreshSnapshot(snapshot);
+    auto samplingFactor = snapshot->samplingFactorMap.find(spanName);
+    if (samplingFactor == snapshot->samplingFactorMap.end()) {
         return false;
     }
-    return sampleValue < it->second;
+
+    if (sampleValue >= samplingFactor->second) {
+        return false;
+    }
+
+    auto rateLimiter = snapshot->rateLimiterMap.find(spanName);
+    if (rateLimiter == snapshot->rateLimiterMap.end()) {
+        return false;
+    }
+
+    return rateLimiter->second->tryAcquireToken(1);
 }
 
 void TracingSamplerImpl::updateConfig(const SamplingConfig& config) {
+    invariant(config.defaultRefillRate > 0);
+    invariant(config.defaultMaxTokens > 0);
     std::lock_guard lk(_mutex);
     _samplingConfig = config;
     _rebuild(lk);
@@ -66,11 +87,31 @@ void TracingSamplerImpl::sampleByDefault(SpanName name) {
 }
 
 void TracingSamplerImpl::_rebuild(WithLock) {
-    auto newSamplingFactors = std::make_shared<SamplingFactorMap>();
+    SamplingFactorMap newSamplingFactors;
+    RateLimiterMap newRateLimiters;
+    auto oldSnapshot = samplerState.makeSnapshot();
+    auto burstCapacitySecs = _samplingConfig.defaultMaxTokens / _samplingConfig.defaultRefillRate;
+
     for (const auto& name : _defaultSampledSpanNames) {
-        (*newSamplingFactors)[name] = _samplingConfig.defaultFactor;
+        newSamplingFactors[name] = _samplingConfig.defaultFactor;
+
+        if (auto it = oldSnapshot->rateLimiterMap.find(name);
+            it != oldSnapshot->rateLimiterMap.end()) {
+            // Update the existing rate limiter and copy it into the new map.
+            it->second->updateRateParameters(_samplingConfig.defaultRefillRate, burstCapacitySecs);
+            newRateLimiters[name] = it->second;
+        } else {
+            // Rate limiter didn't exist so create a new one with the correct parameters.
+            newRateLimiters[name] =
+                std::make_shared<admission::RateLimiter>(_samplingConfig.defaultRefillRate,
+                                                         burstCapacitySecs,
+                                                         0 /* maxQueueDepth */,
+                                                         name,
+                                                         _tickSource);
+        }
     }
-    _samplingFactors.update(std::move(newSamplingFactors));
+    samplerState.update(std::make_shared<const SamplerState>(std::move(newSamplingFactors),
+                                                             std::move(newRateLimiters)));
 }
 
 namespace {
@@ -79,7 +120,7 @@ class FunctionSampler : public TracingSampler {
 public:
     explicit FunctionSampler(unique_function<bool(StringData, double)> fn) : _fn(std::move(fn)) {}
 
-    bool shouldSample(StringData spanName, double sampleValue) const override {
+    bool shouldSample(StringData spanName, double sampleValue) override {
         return _fn(spanName, sampleValue);
     }
 

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/admission/rate_limiter.h"
 #include "mongo/otel/traces/sampler/sampling_config.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/stdx/unordered_set.h"
@@ -37,6 +38,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/system_tick_source.h"
 #include "mongo/util/versioned_value.h"
 
 #include <memory>
@@ -57,7 +59,7 @@ public:
      * Returns whether the span identified by `spanName` should start a trace, given a
      * sampling roll in [0, 1].
      */
-    virtual bool shouldSample(StringData spanName, double sampleValue) const = 0;
+    virtual bool shouldSample(StringData spanName, double sampleValue) = 0;
 
     /** Applies a new sampling configuration. Production implementations should override this. */
     virtual void updateConfig(const SamplingConfig& config) {}
@@ -73,40 +75,49 @@ public:
     virtual void sampleByDefault(SpanName name) {}
 };
 
+/** Stores the current state of a sampler. */
+struct MONGO_MOD_PUBLIC SamplerState {
+    /** Maps span name to its sampling factor. Absence is equivalent to a factor of 0.0. */
+    using SamplingFactorMap = StringMap<double>;
+
+    /**
+     * Maps span name to its rate limiter. Each limiter is a shared_ptr so that _rebuild can copy
+     * existing limiters into a fresh map without resetting their token buckets.
+     */
+    using RateLimiterMap = StringMap<std::shared_ptr<admission::RateLimiter>>;
+
+    SamplingFactorMap samplingFactorMap;
+    RateLimiterMap rateLimiterMap;
+};
+
 /**
  * Production `TracingSampler` implementation. This is designed to be a thread-safe singleton, and
  * having multiple instances at once may not work correctly.
  */
 class MONGO_MOD_PUBLIC TracingSamplerImpl : public TracingSampler {
 public:
-    TracingSamplerImpl();
+    explicit TracingSamplerImpl(TickSource* tickSource = globalSystemTickSource());
 
     /**
      * Determines if the span should start a trace given the combination of config, default sampled
      * spans, and sampleValue.
      */
-    bool shouldSample(StringData spanName, double sampleValue) const override;
+    bool shouldSample(StringData spanName, double sampleValue) override;
     void updateConfig(const SamplingConfig& config) override;
     SamplingConfig getConfig() const override;
     void sampleByDefault(SpanName name) override;
 
 private:
-    /** Maps span name to its sampling factor. Absence is equivalent to a factor of 0.0. */
-    using SamplingFactorMap = StringMap<double>;
-
     /** Rebuilds _samplingFactors from _defaultSampledSpanNames and _samplingConfig. */
     void _rebuild(WithLock);
+
+    TickSource* _tickSource;
 
     mutable std::mutex _mutex;
     /** Span names that are sampled when there is no overriding configuration. */
     stdx::unordered_set<std::string> _defaultSampledSpanNames;
-    /** The sampling configuration. */
+    /** The sampling configuration for spans that are default sampled. */
     SamplingConfig _samplingConfig;
-    /**
-     * The current sampling factors used to make sampling decisions. Static as this is a singleton
-     * and allows for optimizing by creating thread-local snapshots.
-     */
-    inline static VersionedValue<const SamplingFactorMap> _samplingFactors;
 };
 
 /** Interface for overriding the global sampler, for use in tests. */

@@ -39,12 +39,17 @@
 namespace mongo::otel::traces {
 namespace {
 
-Status applyConfig(const BSONObj& obj) {
+Status applySamplingConfig(const BSONObj& obj) {
     try {
         IDLParserContext ctx("openTelemetryTracingSampling");
         auto config = OpenTelemetryTracingSamplingConfig::parse(obj, ctx);
-        TracingSampler::get().updateConfig(
-            {.defaultFactor = config.getDefaultSampling().getSamplingFactor()});
+        const auto& defaultSampling = config.getDefaultSampling();
+        const auto& rateLimit = defaultSampling.getTokenBucketRateLimit();
+        TracingSampler::get().updateConfig({
+            .defaultFactor = defaultSampling.getSamplingFactor(),
+            .defaultRefillRate = rateLimit.getRefillRate(),
+            .defaultMaxTokens = rateLimit.getMaxTokens(),
+        });
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -58,13 +63,13 @@ Status OpenTelemetryTracingSamplingServerParameter::set(const BSONElement& newVa
     if (newValueElement.type() != BSONType::object) {
         return Status(ErrorCodes::BadValue, "openTelemetryTracingSampling must be a BSON document");
     }
-    return applyConfig(newValueElement.Obj());
+    return applySamplingConfig(newValueElement.Obj());
 }
 
 Status OpenTelemetryTracingSamplingServerParameter::setFromString(
     StringData str, const boost::optional<TenantId>&) {
     try {
-        return applyConfig(fromjson(str));
+        return applySamplingConfig(fromjson(str));
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -75,7 +80,11 @@ void OpenTelemetryTracingSamplingServerParameter::append(OperationContext*,
                                                          StringData name,
                                                          const boost::optional<TenantId>&) {
     OpenTelemetryTracingSamplingConfig config;
-    config.getDefaultSampling().setSamplingFactor(TracingSampler::get().getConfig().defaultFactor);
+    auto samplingConfig = TracingSampler::get().getConfig();
+    auto& defaultSampling = config.getDefaultSampling();
+    defaultSampling.setSamplingFactor(samplingConfig.defaultFactor);
+    defaultSampling.getTokenBucketRateLimit().setRefillRate(samplingConfig.defaultRefillRate);
+    defaultSampling.getTokenBucketRateLimit().setMaxTokens(samplingConfig.defaultMaxTokens);
     BSONObjBuilder sub(bob->subobjStart(name));
     config.serialize(&sub);
 }

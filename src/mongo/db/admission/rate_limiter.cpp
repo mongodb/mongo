@@ -119,8 +119,8 @@ public:
         WriteScopedTokenBucket(folly::TokenBucket& tb, WriteRarelyRWMutex& m)
             : _l(m.writeLock()), _tb(tb) {}
 
-        void reset(double rt, double b) {
-            _tb.reset(rt, b);
+        void reset(double rt, double b, double now) {
+            _tb.reset(rt, b, now);
         }
 
     private:
@@ -355,7 +355,7 @@ void RateLimiter::updateRateParameters(double refreshRatePerSec, double burstCap
                         _impl->name),
             burstCapacitySecs > 0.0);
     auto burstSize = calculateBurstSize(refreshRatePerSec, burstCapacitySecs);
-    _impl->writeScopedTokenBucket().reset(refreshRatePerSec, burstSize);
+    _impl->writeScopedTokenBucket().reset(refreshRatePerSec, burstSize, _impl->nowInSeconds());
 }
 
 void RateLimiter::setMaxQueueDepth(int64_t maxQueueDepth) {

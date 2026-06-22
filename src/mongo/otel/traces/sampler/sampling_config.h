@@ -40,6 +40,18 @@ struct MONGO_MOD_PUBLIC SamplingConfig {
      * 1.0 means always sampled.
      */
     double defaultFactor = 0.0;
+
+    /**
+     * The number of tokens to refill per second in the token bucket of each span that's sampled
+     * by default.
+     */
+    double defaultRefillRate = 1.0;
+
+    /**
+     * The maximum number of tokens that can be held in the token bucket of each span that's sampled
+     * by default.
+     */
+    int defaultMaxTokens = 10;
 };
 
 }  // namespace mongo::otel::traces
