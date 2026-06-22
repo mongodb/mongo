@@ -12,6 +12,7 @@ test_kind: js_test
 selector:
   roots:
     - jstests/aggregation/**/*.js
+    - jstests/product_limits/**/*.js
   exclude_files:
     # Exclude helper and utility files that aren't actual tests
     - jstests/aggregation/extras/**/*.js
@@ -34,6 +35,7 @@ selector:
     # This test deliberately constructs pipelines at the 1000-stage limit; injecting
     # $_internalAssertDataAssumptions stages pushes them over the limit.
     - jstests/aggregation/exec/query_limits_test.js
+    - jstests/product_limits/query_limits_test.js
 
 executor:
   fixture:
