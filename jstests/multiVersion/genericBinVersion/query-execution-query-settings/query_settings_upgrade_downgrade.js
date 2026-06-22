@@ -1,8 +1,6 @@
 /**
  * Tests that the 'representativeQueries' are migrated to the dedicated collection on FCV upgrade
  * and back to 'querySettings' cluster parameter on FCV downgrade.
- *
- * @tags: [requires_fcv_83]
  **/
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -43,6 +41,8 @@ describe("QuerySettings", function () {
 
         const assertQueryShapeConfigurations = function (isFullyUpgraded) {
             return function (conn) {
+                const db = getDB(conn);
+                qsutils = new QuerySettingsUtils(db, collName);
                 qsutils.assertQueryShapeConfiguration([
                     qsutils.makeQueryShapeConfiguration(exampleQuerySettings, queryA),
                     qsutils.makeQueryShapeConfiguration(exampleQuerySettings, queryB),
@@ -51,7 +51,7 @@ describe("QuerySettings", function () {
                 // Ensure that the 'representativeQueries' are migrated to the dedicated
                 // collection.
                 const isBackfillEnabled = FeatureFlagUtil.isPresentAndEnabled(
-                    getDB(conn).getMongo(),
+                    db.getMongo(),
                     "PQSBackfill",
                 );
                 const expectedRepresentativeQueries =
@@ -139,7 +139,11 @@ describe("QuerySettings", function () {
         }
 
         it("in replica set", function () {
-            const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: "latest"}});
+            const rst = new ReplSetTest({
+                name: "query_settings_ud_standalone_rs",
+                nodes: 2,
+                nodeOptions: {binVersion: "latest"},
+            });
             rst.startSet();
             rst.initiate();
 
@@ -152,7 +156,13 @@ describe("QuerySettings", function () {
         });
 
         it("in sharded cluster", function () {
-            const st = new ShardingTest({shards: 1, mongos: 1, config: 1, rs: {nodes: 2}});
+            const st = new ShardingTest({
+                name: "query_settings_ud_standalone_st",
+                shards: 1,
+                mongos: 1,
+                config: 1,
+                rs: {nodes: 2},
+            });
             const db = st.s.getDB(dbName);
             try {
                 runTest(db);
@@ -192,7 +202,7 @@ describe("QuerySettings", function () {
                 () => {
                     assert.commandFailedWithCode(
                         db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-                        ErrorCodes.TemporarilyUnavailable,
+                        ErrorCodes.ConflictingOperationInProgress,
                     );
                 },
             );
@@ -212,7 +222,7 @@ describe("QuerySettings", function () {
                             setFeatureCompatibilityVersion: lastLTSFCV,
                             confirm: true,
                         }),
-                        ErrorCodes.TemporarilyUnavailable,
+                        ErrorCodes.ConflictingOperationInProgress,
                     );
                 },
             );
@@ -227,7 +237,11 @@ describe("QuerySettings", function () {
         }
 
         it("in replica set", function () {
-            const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: "latest"}});
+            const rst = new ReplSetTest({
+                name: "query_settings_ud_standalone_rs",
+                nodes: 2,
+                nodeOptions: {binVersion: "latest"},
+            });
             rst.startSet();
             rst.initiate();
 
@@ -240,7 +254,13 @@ describe("QuerySettings", function () {
         });
 
         it("in sharded cluster", function () {
-            const st = new ShardingTest({shards: 1, mongos: 1, config: 1, rs: {nodes: 2}});
+            const st = new ShardingTest({
+                name: "query_settings_ud_standalone_st",
+                shards: 1,
+                mongos: 1,
+                config: 1,
+                rs: {nodes: 2},
+            });
             const db = st.s.getDB(dbName);
             try {
                 runTest(db);
