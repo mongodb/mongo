@@ -126,6 +126,9 @@
 		"rust-analyzer.linkedProjects": [
 			"monguard/Cargo.toml",
 			"src/mongo/db/modules/enterprise/src/mfp/plugin/Cargo.toml",
+		],
+		"rust-analyzer.rustfmt.extraArgs": [
+			"+nightly"
 		]
 	},
 	"extensions": {
