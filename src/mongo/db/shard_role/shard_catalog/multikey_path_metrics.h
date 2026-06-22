@@ -44,6 +44,8 @@ void appendMultikeyPathStatsToIndexStats(BSONObjBuilder* indexStatsBuilder);
 
 void recordOrdinaryMultikeyPathChanges(OperationContext* opCtx, int64_t count);
 
+void recordWildcardMultikeyPathChanges(OperationContext* opCtx, int64_t count);
+
 void recordSideTransaction();
 
 }  // namespace catalog_metrics

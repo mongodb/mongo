@@ -270,6 +270,11 @@ public:
     static constexpr MetricName kIndexStatsMultikeyNewPathsOrdinaryOutsideTransaction =
         MetricNameMaker::make(
             "serverStatus.indexStats.multikey.newPaths.ordinary.outsideTransaction");
+    static constexpr MetricName kIndexStatsMultikeyNewPathsWildcardInTransaction =
+        MetricNameMaker::make("serverStatus.indexStats.multikey.newPaths.wildcard.inTransaction");
+    static constexpr MetricName kIndexStatsMultikeyNewPathsWildcardOutsideTransaction =
+        MetricNameMaker::make(
+            "serverStatus.indexStats.multikey.newPaths.wildcard.outsideTransaction");
     static constexpr MetricName kIndexStatsMultikeySideTransactions =
         MetricNameMaker::make("serverStatus.indexStats.multikey.sideTransactions");
 

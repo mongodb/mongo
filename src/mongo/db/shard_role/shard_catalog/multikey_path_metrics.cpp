@@ -55,6 +55,16 @@ auto& ordinaryOutsideTransactionCounter = MetricsService::instance().createInt64
     "transactions.",
     MetricUnit::kCount);
 
+auto& wildcardInTransactionCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kIndexStatsMultikeyNewPathsWildcardInTransaction,
+    "New wildcard multikey metadata paths recorded inside multi-document transactions.",
+    MetricUnit::kCount);
+
+auto& wildcardOutsideTransactionCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kIndexStatsMultikeyNewPathsWildcardOutsideTransaction,
+    "New wildcard multikey metadata paths recorded outside multi-document transactions.",
+    MetricUnit::kCount);
+
 auto& sideTransactionsCounter = MetricsService::instance().createInt64Counter(
     MetricNames::kIndexStatsMultikeySideTransactions,
     "Multikey metadata side transactions committed inside multi-document transactions.",
@@ -70,6 +80,12 @@ void appendMultikeyPathStatsToIndexStats(BSONObjBuilder* indexStatsBuilder) {
         ordinaryBuilder.append("inTransaction", ordinaryInTransactionCounter.valueForLegacyUse());
         ordinaryBuilder.append("outsideTransaction",
                                ordinaryOutsideTransactionCounter.valueForLegacyUse());
+        ordinaryBuilder.done();
+        BSONObjBuilder wildcardBuilder(newPathsBuilder.subobjStart("wildcard"));
+        wildcardBuilder.append("inTransaction", wildcardInTransactionCounter.valueForLegacyUse());
+        wildcardBuilder.append("outsideTransaction",
+                               wildcardOutsideTransactionCounter.valueForLegacyUse());
+        wildcardBuilder.done();
     }
     multikeyBuilder.append("sideTransactions", sideTransactionsCounter.valueForLegacyUse());
 }
@@ -78,6 +94,13 @@ void recordOrdinaryMultikeyPathChanges(OperationContext* opCtx, int64_t count) {
     invariant(count >= 0);
     (opCtx->inMultiDocumentTransaction() ? ordinaryInTransactionCounter
                                          : ordinaryOutsideTransactionCounter)
+        .add(count);
+}
+
+void recordWildcardMultikeyPathChanges(OperationContext* opCtx, int64_t count) {
+    invariant(count >= 0);
+    (opCtx->inMultiDocumentTransaction() ? wildcardInTransactionCounter
+                                         : wildcardOutsideTransactionCounter)
         .add(count);
 }
 

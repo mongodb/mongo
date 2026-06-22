@@ -294,26 +294,8 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
                   _descriptor.getIndexType() == IndexType::INDEX_WILDCARD,
               "Non-empty multikeyMetadataKeys must come from a wildcard index");
 
-    const auto insertWildcardMultikeyMetadataKeysIfNotEmpty = [&]() {
-        if (!multikeyMetadataKeys.empty()) {
-            // If multikeyMetadataKeys is non-empty, we must insert these keys into the index
-            // itself. We do not have to account for potential dupes, since all metadata keys are
-            // indexed against a single RecordId. An attempt to write a duplicate key will therefore
-            // be ignored.
-            uassertStatusOK(accessMethod()->asSortedData()->insertKeys(
-                opCtx,
-                *shard_role_details::getRecoveryUnit(opCtx),
-                collection,
-                this,
-                multikeyMetadataKeys,
-                {},
-                {},
-                nullptr));
-        }
-    };
-
     if (!opCtx->inMultiDocumentTransaction()) {
-        insertWildcardMultikeyMetadataKeysIfNotEmpty();
+        _insertWildcardMultikeyMetadataKeysAndCountNew(opCtx, collection, multikeyMetadataKeys);
         _catalogSetMultikey(opCtx, collection, paths);
         return;
     }
@@ -321,11 +303,18 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     const bool replicateMultikeyness = gFeatureFlagReplicateMultikeynessInTransactions.isEnabled(
         VersionContext::getDecoration(opCtx));
+    const bool isWildcardMultikey = !multikeyMetadataKeys.empty();
 
     // Feature off, insert metadata keys in transaction itself. Otherwise the keys are written in
     // the side txn.
-    if (!replicateMultikeyness) {
-        insertWildcardMultikeyMetadataKeysIfNotEmpty();
+    if (!replicateMultikeyness && isWildcardMultikey) {
+        const auto newPathCount =
+            _insertWildcardMultikeyMetadataKeysAndCountNew(opCtx, collection, multikeyMetadataKeys);
+        if (newPathCount == 0) {
+            // Every metadata key was already present in the parent transaction, so these paths
+            // are already multikey. There is nothing to write in a side transaction.
+            return;
+        }
     }
 
     // replicateMultikeyness==false: writes catalog changes in a side txn, uses no-op entry.
@@ -355,10 +344,10 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
         // DDL commands (create, createIndexes) are always processed in their own oplog applier
         // batch, so firstTimeInBatch == T_commit for these transactions.
         if (replicateMultikeyness) {
-            insertWildcardMultikeyMetadataKeysIfNotEmpty();
+            _insertWildcardMultikeyMetadataKeysAndCountNew(opCtx, collection, multikeyMetadataKeys);
         }
         _catalogSetMultikey(opCtx, collection, paths);
-    } else if (replicateMultikeyness && !multikeyMetadataKeys.empty()) {
+    } else if (replicateMultikeyness && isWildcardMultikey) {
         // Side transaction succeeded. The metadata keys were committed on a side RU and are
         // invisible to the parent RU's snapshot, so populate the per-snapshot RYOW cache. The
         // fallback branch above writes directly to the parent RU and needs no cache entry.
@@ -381,17 +370,7 @@ void IndexCatalogEntryImpl::setMultikeyForApplyOps(OperationContext* opCtx,
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // Insert wildcard metadata keys into the index if provided.
-    if (!multikeyMetadataKeys.empty()) {
-        uassertStatusOK(
-            accessMethod()->asSortedData()->insertKeys(opCtx,
-                                                       *shard_role_details::getRecoveryUnit(opCtx),
-                                                       coll,
-                                                       this,
-                                                       multikeyMetadataKeys,
-                                                       {},
-                                                       {},
-                                                       nullptr));
-    }
+    _insertWildcardMultikeyMetadataKeysAndCountNew(opCtx, coll, multikeyMetadataKeys);
 
     opCtx->getClient()->getServiceContext()->getOpObserver()->onSetMultikeyMetadata(
         opCtx,
@@ -518,18 +497,8 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
                         set_multikey_metadata_oplog_helpers::extractFieldPathsFromMetadataKeys(
                             multikeyMetadataKeys, descriptor()->ordering());
                     pathsObj = set_multikey_metadata_oplog_helpers::fieldPathsToBSON(fieldPaths);
-                    int64_t numSkipped = 0;
-                    uassertStatusOK(accessMethod()->asSortedData()->insertKeys(
-                        opCtx,
-                        *shard_role_details::getRecoveryUnit(opCtx),
-                        collection,
-                        this,
-                        multikeyMetadataKeys,
-                        {},
-                        {},
-                        nullptr,
-                        &numSkipped));
-                    if (numSkipped == static_cast<int64_t>(multikeyMetadataKeys.size())) {
+                    if (_insertWildcardMultikeyMetadataKeysAndCountNew(
+                            opCtx, collection, multikeyMetadataKeys) == 0) {
                         // Every metadata key was already present, so these paths are already
                         // multikey and replicated. There is nothing to write or replicate, so roll
                         // back this empty side transaction rather than committing a no-op.
@@ -881,6 +850,36 @@ bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,
                                                const CollectionPtr& collection,
                                                MultikeyPaths* multikeyPaths) const {
     return collection->isIndexMultikey(opCtx, _descriptor.indexName(), multikeyPaths, _indexOffset);
+}
+
+int64_t IndexCatalogEntryImpl::_insertWildcardMultikeyMetadataKeysAndCountNew(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const KeyStringSet& multikeyMetadataKeys) const {
+    if (multikeyMetadataKeys.empty()) {
+        return 0;
+    }
+
+    // All metadata keys are indexed against a single RecordId. Duplicate keys are skipped as
+    // no-ops and reported via numSkipped.
+    int64_t numSkipped = 0;
+    uassertStatusOK(
+        accessMethod()->asSortedData()->insertKeys(opCtx,
+                                                   *shard_role_details::getRecoveryUnit(opCtx),
+                                                   collection,
+                                                   this,
+                                                   multikeyMetadataKeys,
+                                                   {},
+                                                   {},
+                                                   nullptr,
+                                                   &numSkipped));
+
+    const auto newPathCount = static_cast<int64_t>(multikeyMetadataKeys.size()) - numSkipped;
+    invariant(newPathCount >= 0);
+    if (newPathCount > 0) {
+        catalog_metrics::recordWildcardMultikeyPathChanges(opCtx, newPathCount);
+    }
+    return newPathCount;
 }
 
 void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,

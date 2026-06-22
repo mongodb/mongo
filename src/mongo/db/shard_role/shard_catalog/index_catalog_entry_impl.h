@@ -219,6 +219,16 @@ private:
                              const MultikeyPaths& multikeyPaths) const;
 
     /**
+     * Inserts wildcard multikey metadata keys into the index and returns the number of newly
+     * inserted keys. Also records wildcard multikey path metrics for any keys that were not
+     * already present.
+     */
+    int64_t _insertWildcardMultikeyMetadataKeysAndCountNew(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        const KeyStringSet& multikeyMetadataKeys) const;
+
+    /**
      * Holder of shared state between IndexCatalogEntryImpl clones
      */
     struct SharedState : public RefCountable {

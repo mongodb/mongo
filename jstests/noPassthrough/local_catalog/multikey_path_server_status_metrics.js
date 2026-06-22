@@ -1,5 +1,5 @@
 /**
- * Tests serverStatus counters for newly recorded ordinary multikey path changes.
+ * Tests serverStatus counters for newly recorded ordinary and wildcard multikey path changes.
  *
  * @tags: [
  *   requires_replication,
@@ -20,6 +20,8 @@ let testDB;
 const kMetricPaths = [
     {name: "ordinary.inTransaction", fields: ["newPaths", "ordinary", "inTransaction"]},
     {name: "ordinary.outsideTransaction", fields: ["newPaths", "ordinary", "outsideTransaction"]},
+    {name: "wildcard.inTransaction", fields: ["newPaths", "wildcard", "inTransaction"]},
+    {name: "wildcard.outsideTransaction", fields: ["newPaths", "wildcard", "outsideTransaction"]},
     {name: "sideTransactions", fields: ["sideTransactions"]},
 ];
 
@@ -223,6 +225,167 @@ describe("multikey path serverStatus metrics", function () {
                     assert.commandWorked(
                         sessionDB.getCollection(collName).insert({_id: 3, a: 1, b: 1, c: [4, 5]}),
                     );
+                });
+            },
+        );
+    });
+
+    it("counts wildcard multikey path changes outside transactions", function () {
+        const coll = createIndexedCollection(primary, "wildcard_outside_txn", {"$**": 1});
+
+        assertMetricDeltas(primary, {"wildcard.outsideTransaction": 1}, function () {
+            assert.commandWorked(coll.insert({_id: 1, a: [1, 2]}));
+            assert.commandWorked(coll.insert({_id: 2, a: [3, 4]}));
+        });
+    });
+
+    it("does not count already-multikey wildcard paths outside transactions", function () {
+        const coll = createIndexedCollection(primary, "wildcard_outside_txn_existing", {"$**": 1});
+        assert.commandWorked(coll.insert({_id: 1, a: [1, 2]}));
+
+        assertMetricDeltas(primary, {"wildcard.outsideTransaction": 0}, function () {
+            assert.commandWorked(coll.insert({_id: 2, a: [3, 4]}));
+        });
+    });
+
+    it("counts two wildcard path changes outside transactions", function () {
+        const coll = createIndexedCollection(primary, "wildcard_outside_txn_two_paths", {"$**": 1});
+
+        assertMetricDeltas(primary, {"wildcard.outsideTransaction": 2}, function () {
+            assert.commandWorked(coll.insert({_id: 1, a: [1, 2]}));
+            assert.commandWorked(coll.insert({_id: 2, c: [3, 4]}));
+        });
+    });
+
+    it("counts wildcard multikey path changes inside unprepared transactions", function () {
+        createIndexedCollection(primary, "wildcard_in_unprepared_txn", {"$**": 1});
+
+        assertMetricDeltas(
+            primary,
+            {
+                "wildcard.inTransaction": 1,
+                sideTransactions: 1,
+            },
+            function () {
+                runTransaction(primary, function (sessionDB) {
+                    assert.commandWorked(
+                        sessionDB
+                            .getCollection("wildcard_in_unprepared_txn")
+                            .insert({_id: 1, a: [1, 2]}),
+                    );
+                });
+            },
+        );
+    });
+
+    it("counts wildcard multikey path changes inside prepared transactions", function () {
+        createIndexedCollection(primary, "wildcard_in_prepared_txn", {"$**": 1});
+
+        assertMetricDeltas(
+            primary,
+            {
+                "wildcard.inTransaction": 1,
+                sideTransactions: 1,
+            },
+            function () {
+                runPreparedTransaction(primary, function (sessionDB) {
+                    assert.commandWorked(
+                        sessionDB
+                            .getCollection("wildcard_in_prepared_txn")
+                            .insert({_id: 1, a: [1, 2]}),
+                    );
+                });
+            },
+        );
+    });
+
+    it("counts two wildcard path changes and side transactions in one transaction", function () {
+        createIndexedCollection(primary, "wildcard_in_txn_two_paths", {"$**": 1});
+
+        assertMetricDeltas(
+            primary,
+            {
+                "wildcard.inTransaction": 2,
+                sideTransactions: 2,
+            },
+            function () {
+                runTransaction(primary, function (sessionDB) {
+                    const coll = sessionDB.getCollection("wildcard_in_txn_two_paths");
+                    assert.commandWorked(coll.insert({_id: 1, a: [1, 2]}));
+                    assert.commandWorked(coll.insert({_id: 2, c: [3, 4]}));
+                });
+            },
+        );
+    });
+
+    it("counts three wildcard side transactions across separate transactions", function () {
+        createIndexedCollection(primary, "wildcard_in_txn_three_txns", {"$**": 1});
+
+        assertMetricDeltas(
+            primary,
+            {
+                "wildcard.inTransaction": 3,
+                sideTransactions: 3,
+            },
+            function () {
+                const collName = "wildcard_in_txn_three_txns";
+                runTransaction(primary, function (sessionDB) {
+                    assert.commandWorked(
+                        sessionDB.getCollection(collName).insert({_id: 1, a: [1, 2]}),
+                    );
+                });
+                runTransaction(primary, function (sessionDB) {
+                    assert.commandWorked(
+                        sessionDB.getCollection(collName).insert({_id: 2, c: [3, 4]}),
+                    );
+                });
+                runTransaction(primary, function (sessionDB) {
+                    assert.commandWorked(
+                        sessionDB.getCollection(collName).insert({_id: 3, e: [5, 6]}),
+                    );
+                });
+            },
+        );
+    });
+
+    it("counts one wildcard path when the same path is made multikey twice in one transaction", function () {
+        createIndexedCollection(primary, "wildcard_in_txn_same_path", {"$**": 1});
+
+        assertMetricDeltas(
+            primary,
+            {
+                "wildcard.inTransaction": 1,
+                sideTransactions: 1,
+            },
+            function () {
+                runTransaction(primary, function (sessionDB) {
+                    const coll = sessionDB.getCollection("wildcard_in_txn_same_path");
+                    assert.commandWorked(coll.insert({_id: 1, a: [1, 2]}));
+                    assert.commandWorked(coll.insert({_id: 2, a: [3, 4]}));
+                });
+            },
+        );
+    });
+
+    it("counts one new wildcard path when an insert touches an existing and a new path", function () {
+        createIndexedCollection(primary, "wildcard_in_txn_mixed_paths", {"$**": 1});
+
+        runTransaction(primary, function (sessionDB) {
+            assert.commandWorked(
+                sessionDB.getCollection("wildcard_in_txn_mixed_paths").insert({_id: 1, a: [1, 2]}),
+            );
+        });
+
+        assertMetricDeltas(
+            primary,
+            {
+                "wildcard.inTransaction": 1,
+                sideTransactions: 1,
+            },
+            function () {
+                runTransaction(primary, function (sessionDB) {
+                    const coll = sessionDB.getCollection("wildcard_in_txn_mixed_paths");
+                    assert.commandWorked(coll.insert({_id: 2, a: [3, 4], c: [5, 6]}));
                 });
             },
         );
