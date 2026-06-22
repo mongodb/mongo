@@ -705,10 +705,10 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
             auto setCollectionMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, doc.getNss());
 
-                auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
-                invariant(!optMetadata);
-
                 if (!cancellationToken.isCanceled()) {
+                    auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
+                    invariant(!optMetadata);
+
                     scopedCsr->setCollectionMetadata(opCtx, std::move(currentMetadata));
                 }
             };
