@@ -38,6 +38,7 @@
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -66,7 +67,12 @@ protected:
         ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), _opCtx));
 
         _coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, _metrics);
+            _sizeCountStore, _timestampStore, _metrics, oplogUuid());
+    }
+
+    UUID oplogUuid() const {
+        AutoGetOplogFastPath oplogRead(_opCtx, OplogAccessMode::kRead);
+        return oplogRead.getCollection()->uuid();
     }
 
     void tearDown() override {
@@ -223,7 +229,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
     writeInsert(persistedTs);
 
     auto coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-        _sizeCountStore, _timestampStore, _metrics);
+        _sizeCountStore, _timestampStore, _metrics, oplogUuid());
     coordinator->flushSync_ForTest(_opCtx);
 
     ASSERT_EQ(readTimestampStore(), boost::optional<Timestamp>(persistedTs));
@@ -289,7 +295,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest,
        DestructorJoinsBackgroundThreadsWithoutExplicitShutdown) {
     {
         auto localCoord = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, _metrics);
+            _sizeCountStore, _timestampStore, _metrics, oplogUuid());
         localCoord->startup(getServiceContext(), Timestamp::min());
         // Destructor calls shutdown() and joins the worker threads.
     }
@@ -342,7 +348,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, RepeatedConcurrentStartupShutdownLeav
 TEST_F(SizeCountCheckpointCoordinatorTest, ConcurrentRequestFlushAndShutdownNeverDeadlocks) {
     for (int i = 0; i < 50; ++i) {
         auto coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, _metrics);
+            _sizeCountStore, _timestampStore, _metrics, oplogUuid());
         coordinator->startup(getServiceContext(), Timestamp::min());
 
         stdx::thread flusher([&] {

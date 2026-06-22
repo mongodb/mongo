@@ -48,11 +48,12 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeSizeCountCheckpointCoordinatorShutdownJoins);
 SizeCountCheckpointCoordinator::SizeCountCheckpointCoordinator(
     SizeCountStore& sizeCountStore,
     SizeCountTimestampStore& timestampStore,
-    ReplicatedFastCountMetrics& metrics)
+    ReplicatedFastCountMetrics& metrics,
+    UUID oplogUuid)
     : _oplogTailer(std::make_unique<SizeCountCheckpointOplogTailer>()),
       _flusher(
           std::make_unique<SizeCountCheckpointFlusher>(&sizeCountStore, &timestampStore, metrics)),
-      _buffer(std::make_unique<SizeCountCheckpointBuffer>()),
+      _buffer(std::make_unique<SizeCountCheckpointBuffer>(oplogUuid)),
       _sizeCountStore(sizeCountStore),
       _timestampStore(timestampStore) {}
 

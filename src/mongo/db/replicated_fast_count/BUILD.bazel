@@ -478,6 +478,7 @@ mongo_cc_unit_test(
         "server-collection-write-path",
     ],
     deps = [
+        "replicated_fast_count_test_helpers",
         "size_count_checkpoint_buffer",
     ],
 )

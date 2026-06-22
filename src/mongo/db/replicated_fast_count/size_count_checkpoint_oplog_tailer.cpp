@@ -46,31 +46,8 @@ namespace {
 
 using TailerState = SizeCountCheckpointOplogTailer::TailerState;
 
-struct ScanResultAndLastSeenRid {
-    OplogScanResult scanResult;
-    boost::optional<RecordId> lastSeenRid;
-};
-
 RecordId makeStartRecordId(Timestamp startAfter) {
     return massertStatusOK(record_id_helpers::keyForOptime(startAfter, KeyFormat::Long));
-}
-
-// A forward cursor on the oplog is guaranteed to only scan until the no holes point. This is
-// necessary to guarantee that all new oplog entries are parsed in order for correct size and count
-// accumulation.
-ScanResultAndLastSeenRid scanUntilEOF(SeekableRecordCursor& cursor, const UUID& oplogUuid) {
-    StreamingOplogDeltaAccumulator acc({
-        .isCheckpoint = true,
-        .oplogUuid = oplogUuid,
-    });
-
-    boost::optional<RecordId> lastSeenRecordId;
-    while (auto rec = cursor.next()) {
-        acc.consumeRecord(*rec);
-        lastSeenRecordId = rec->id;
-    }
-
-    return {acc.finish(), std::move(lastSeenRecordId)};
 }
 
 AutoGetCollection acquireOplogForRead(OperationContext* opCtx) {
@@ -126,12 +103,11 @@ bool runOneIteration(OperationContext* opCtx,
                           << ", lastBufferedRid: " << state.lastBufferedRid.toStringHumanReadable(),
             state.cursor->seekExact(state.lastBufferedRid));
 
-    auto out = scanUntilEOF(*state.cursor, coll->uuid());
+    const boost::optional<RecordId> lastSeenRid = buffer.scanToNoHolesEOF(*state.cursor);
 
-    const bool madeProgress = out.lastSeenRid.has_value();
+    const bool madeProgress = lastSeenRid.has_value();
     if (madeProgress) {
-        buffer.mergeVisibleScan(std::move(out.scanResult));
-        state.lastBufferedRid = *out.lastSeenRid;
+        state.lastBufferedRid = *lastSeenRid;
     }
 
     state.cursor->save();
@@ -218,13 +194,8 @@ boost::optional<TailerState> SizeCountCheckpointOplogTailer::_bootstrap(
         }
 
         // Since the tailer is starting at the beginning of the oplog, ensure the first record is
-        // accounted for in the buffer since there's no true Oplog entry to start after.
-        StreamingOplogDeltaAccumulator acc({
-            .isCheckpoint = true,
-            .oplogUuid = coll->uuid(),
-        });
-        acc.consumeRecord(*first);
-        buffer.mergeVisibleScan(acc.finish());
+        // accounted for in the buffer since there's no true oplog entry to start after.
+        buffer.accumulate(*first);
 
         lastBufferedRid = first->id;
     } else {

@@ -164,6 +164,15 @@ public:
      */
     OplogScanResult finish();
 
+    /**
+     * Returns true if at least one non-internal oplog entry has been consumed since construction
+     * (i.e. lastTimestamp has advanced), meaning a subsequent finish() would yield a flushable
+     * batch. Unlike finish(), this does not consume the accumulator.
+     */
+    bool hasPendingWork() const {
+        return _result.lastTimestamp.has_value();
+    }
+
 private:
     Options _options;
     OplogScanResult _result;

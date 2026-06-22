@@ -29,8 +29,10 @@
 
 #pragma once
 
-#include "mongo/bson/timestamp.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/uuid.h"
 
 #include <mutex>
 
@@ -39,14 +41,43 @@
 namespace mongo::replicated_fast_count {
 
 /**
- * Holds pending and in-flight checkpoint flush work produced by the oplog tailer and
- * consumed by the flusher. Thread-safe.
+ * The handoff channel between the oplog tailer (single producer) and the checkpoint flusher
+ * (single consumer). The producer accumulates size/count deltas across oplog scans into a
+ * long-lived accumulator. The consumer cuts that accumulation into an in-flight batch to flush.
+ * Thread-safe.
  */
 class SizeCountCheckpointBuffer {
 public:
-    SizeCountCheckpointBuffer() = default;
+    /**
+     * `oplogUuid` is the UUID of the oplog collection being tailed. We assume the oplog UUID does
+     * not change during the lifetime of the buffer.
+     */
+    explicit SizeCountCheckpointBuffer(UUID oplogUuid);
 
+    /**
+     * Consumer side. Cuts everything accumulated since the last successful flush into an in-flight
+     * batch and returns it, or returns the existing in-flight batch if a prior flush has not yet
+     * been acknowledged (retry). Returns boost::none when there is no real work to flush.
+     *
+     * Acquires the buffer mutex, so it blocks on any in-progress scans.
+     */
     boost::optional<OplogScanResult> checkoutForFlush();
+
+    /**
+     * Producer side. Scans `cursor` forward to the no-holes EOF, accumulating every record into the
+     * long-lived pending accumulator. Returns the RecordId of the last record seen, or boost::none
+     * if no records were scanned.
+     *
+     * Holds the buffer mutex for the duration of the scan so that a concurrent `checkoutForFlush()`
+     * cannot observe a partially-applied scan.
+     */
+    boost::optional<RecordId> scanToNoHolesEOF(SeekableRecordCursor& cursor);
+
+    /**
+     * Producer side. Accumulates a single, already-fetched record into the pending accumulator.
+     * Useful when a record must be consumed without a cursor.
+     */
+    void accumulate(const Record& rec);
 
     /**
      * Acknowledges that the _inFlight result has been persisted and is safe to clear.
@@ -57,13 +88,20 @@ public:
      * There is an outstanding result that hasn't been flushed yet.
      */
     bool hasInFlightWork() const;
+
+    /**
+     * Returns whether there are new scan results to be retrieved via checkoutForFlush().
+     */
     bool hasPendingWork() const;
 
-    void mergeVisibleScan(OplogScanResult scanResult);
-
 private:
+    // The options used to build every pending accumulator.
+    const StreamingOplogDeltaAccumulator::Options _accumulatorOptions;
+
     mutable std::mutex _mutex;
-    OplogScanResult _pending;
+    // Accumulated size/count deltas buffered but not checked out. See checkoutForFlush().
+    boost::optional<StreamingOplogDeltaAccumulator> _pending;
+    // Accumulated size/count deltas currently being flushed.
     boost::optional<OplogScanResult> _inFlight;
 };
 

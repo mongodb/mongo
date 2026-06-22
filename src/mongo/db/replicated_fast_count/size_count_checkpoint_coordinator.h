@@ -37,6 +37,7 @@
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_oplog_tailer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/uuid.h"
 
 #include <memory>
 #include <mutex>
@@ -55,8 +56,8 @@ class SizeCountCheckpointCoordinator {
 public:
     SizeCountCheckpointCoordinator(SizeCountStore& sizeCountStore,
                                    SizeCountTimestampStore& timestampStore,
-                                   ReplicatedFastCountMetrics& metrics);
-
+                                   ReplicatedFastCountMetrics& metrics,
+                                   UUID oplogUuid);
 
     ~SizeCountCheckpointCoordinator();
 

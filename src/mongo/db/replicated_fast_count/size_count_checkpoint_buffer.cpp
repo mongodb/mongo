@@ -29,22 +29,50 @@
 
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_buffer.h"
 
-#include "mongo/util/assert_util.h"
-
 namespace mongo::replicated_fast_count {
+
+SizeCountCheckpointBuffer::SizeCountCheckpointBuffer(UUID oplogUuid)
+    : _accumulatorOptions{.isCheckpoint = true, .oplogUuid = oplogUuid} {
+    _pending.emplace(_accumulatorOptions);
+}
 
 boost::optional<OplogScanResult> SizeCountCheckpointBuffer::checkoutForFlush() {
     std::lock_guard lk(_mutex);
 
     if (_inFlight) {
+        // A previous flush has not been acknowledged yet. Retry the same batch.
         return _inFlight;
     }
 
-    if (!_pending.lastTimestamp) {
+    // Cut the _pending accumulator into a flushable batch and reset _pending.
+    OplogScanResult result = _pending->finish();
+    _pending.emplace(_accumulatorOptions);
+
+    if (!result.lastTimestamp) {
+        // finish() leaves lastTimestamp unset when no size/count entries were accumulated. We
+        // return early so we do not advance the checkpoint for untracked entries.
         return boost::none;
     }
-    _inFlight = std::exchange(_pending, {});
+
+    _inFlight = std::move(result);
     return _inFlight;
+}
+
+boost::optional<RecordId> SizeCountCheckpointBuffer::scanToNoHolesEOF(
+    SeekableRecordCursor& cursor) {
+    std::lock_guard lk(_mutex);
+
+    boost::optional<RecordId> lastSeenRid;
+    while (const auto rec = cursor.next()) {
+        _pending->consumeRecord(*rec);
+        lastSeenRid = rec->id;
+    }
+    return lastSeenRid;
+}
+
+void SizeCountCheckpointBuffer::accumulate(const Record& rec) {
+    std::lock_guard lk(_mutex);
+    _pending->consumeRecord(rec);
 }
 
 void SizeCountCheckpointBuffer::acknowledgeFlushSuccess() {
@@ -59,63 +87,7 @@ bool SizeCountCheckpointBuffer::hasInFlightWork() const {
 
 bool SizeCountCheckpointBuffer::hasPendingWork() const {
     std::lock_guard lk(_mutex);
-    return _pending.lastTimestamp.has_value();
-}
-
-void SizeCountCheckpointBuffer::mergeVisibleScan(OplogScanResult scanResult) {
-    if (!scanResult.lastTimestamp) {
-        return;
-    }
-
-    std::lock_guard lk(_mutex);
-
-    if (!_pending.lastTimestamp || *_pending.lastTimestamp < *scanResult.lastTimestamp) {
-        _pending.lastTimestamp = *scanResult.lastTimestamp;
-    }
-
-    for (auto& [uuid, incoming] : scanResult.deltas) {
-        auto it = _pending.deltas.find(uuid);
-        if (it == _pending.deltas.end()) {
-            _pending.deltas.emplace(uuid, std::move(incoming));
-            continue;
-        }
-
-        auto& existing = it->second;
-        switch (incoming.state) {
-            case DDLState::kNone:
-                tassert(12650000,
-                        "Unexpected size/count delta merged after drop without recreate",
-                        existing.state != DDLState::kDropped);
-                existing.sizeCount = existing.sizeCount + incoming.sizeCount;
-                break;
-
-            case DDLState::kCreated:
-                if (existing.state == DDLState::kDropped) {
-                    existing = SizeCountDelta{
-                        .sizeCount = incoming.sizeCount,
-                        .state = DDLState::kDroppedAndRecreated,
-                    };
-                } else {
-                    existing = std::move(incoming);
-                }
-                break;
-
-            case DDLState::kDropped:
-                if (existing.state == DDLState::kCreated) {
-                    _pending.deltas.erase(it);
-                } else {
-                    existing = SizeCountDelta{
-                        .sizeCount = CollectionSizeCount{},
-                        .state = DDLState::kDropped,
-                    };
-                }
-                break;
-
-            case DDLState::kDroppedAndRecreated:
-                existing = std::move(incoming);
-                break;
-        }
-    }
+    return _pending->hasPendingWork();
 }
 
 }  // namespace mongo::replicated_fast_count

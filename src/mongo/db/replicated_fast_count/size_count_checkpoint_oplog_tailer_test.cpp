@@ -35,7 +35,6 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
-#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/stdx/thread.h"
@@ -62,11 +61,9 @@ protected:
         _opCtx = operationContext();
     }
 
-    UUID getOplogUuid() const {
-        const auto coll = CollectionCatalog::get(_opCtx)->lookupCollectionByNamespace(
-            _opCtx, NamespaceString::kRsOplogNamespace);
-        ASSERT_TRUE(coll);
-        return coll->uuid();
+    UUID oplogUuid() const {
+        AutoGetOplogFastPath oplogRead(_opCtx, OplogAccessMode::kRead);
+        return oplogRead.getCollection()->uuid();
     }
 
     RecordId ridFor(Timestamp ts) const {
@@ -110,7 +107,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest, BootstrapFromTimestampMinSeedsBufferW
     // durably persisted.
     writeToOplog(_opCtx, makeOplogEntry(Timestamp{1, 2}, _collA, repl::OpTypeEnum::kInsert, 20));
 
-    SizeCountCheckpointBuffer buffer;
+    SizeCountCheckpointBuffer buffer(oplogUuid());
     auto state = _tailer.bootstrap_ForTest(_opCtx, Timestamp::min(), buffer);
 
     ASSERT_TRUE(state);
@@ -123,7 +120,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest, BootstrapFromTimestampMinSeedsBufferW
     ASSERT_TRUE(flushed);
     EXPECT_EQ(flushed->lastTimestamp, ts1);
     assertContains(*flushed, _collA.uuid, CollectionSizeCount{10, 1});
-    assertContains(*flushed, getOplogUuid(), CollectionSizeCount{entry1Bytes, 1});
+    assertContains(*flushed, oplogUuid(), CollectionSizeCount{entry1Bytes, 1});
 
     EXPECT_FALSE(buffer.hasPendingWork());
     EXPECT_TRUE(buffer.hasInFlightWork());
@@ -134,7 +131,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest, BootstrapFromTimestampMinSeedsBufferW
 }
 
 TEST_F(SizeCountCheckpointOplogTailerTest, BootstrapFromTimestampMinOnEmptyOplogReturnsNone) {
-    SizeCountCheckpointBuffer buffer;
+    SizeCountCheckpointBuffer buffer(oplogUuid());
     auto state = _tailer.bootstrap_ForTest(_opCtx, Timestamp::min(), buffer);
 
     ASSERT_FALSE(state);
@@ -146,7 +143,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest,
     const Timestamp ts1{1, 1};
     writeToOplog(_opCtx, makeOplogEntry(ts1, _collA, repl::OpTypeEnum::kInsert, 10));
 
-    SizeCountCheckpointBuffer buffer;
+    SizeCountCheckpointBuffer buffer(oplogUuid());
     auto state = _tailer.bootstrap_ForTest(_opCtx, ts1, buffer);
 
     ASSERT_TRUE(state);
@@ -162,7 +159,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest,
 
     // Bootstrap with a timestamp beyond the last oplog entry - no record exists at or after ts2.
     const Timestamp ts2{1, 2};
-    SizeCountCheckpointBuffer buffer;
+    SizeCountCheckpointBuffer buffer(oplogUuid());
     auto state = _tailer.bootstrap_ForTest(_opCtx, ts2, buffer);
 
     ASSERT_FALSE(state);
@@ -188,7 +185,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest,
         wuow.commit();
     }
 
-    SizeCountCheckpointBuffer buffer;
+    SizeCountCheckpointBuffer buffer(oplogUuid());
     auto state = _tailer.bootstrap_ForTest(_opCtx, ts1, buffer);
 
     // The tailer recovers by pinning to the next available entry rather than returning none.
@@ -201,7 +198,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest, MultipleIterationsAccumulateCumulativ
     const Timestamp ts1{1, 1};
     writeToOplog(_opCtx, makeOplogEntry(ts1, _collA, repl::OpTypeEnum::kInsert, 10));
 
-    SizeCountCheckpointBuffer buffer;
+    SizeCountCheckpointBuffer buffer(oplogUuid());
     auto state = _tailer.bootstrap_ForTest(_opCtx, Timestamp::min(), buffer);
     ASSERT_TRUE(state);
 
@@ -231,7 +228,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest, MultipleIterationsAccumulateCumulativ
     assertContains(*flushed, _collB.uuid, CollectionSizeCount{7, 1});
     assertContains(
         *flushed,
-        getOplogUuid(),
+        oplogUuid(),
         test_helpers::scanForAccurateSizeCount(_opCtx, NamespaceString::kRsOplogNamespace));
 
     EXPECT_FALSE(buffer.hasPendingWork());
@@ -253,7 +250,7 @@ DEATH_TEST_F(SizeCountCheckpointOplogTailerDeathTest,
     const Timestamp ts1{1, 1};
     writeToOplog(_opCtx, makeOplogEntry(ts1, _collA, repl::OpTypeEnum::kInsert, 10));
 
-    SizeCountCheckpointBuffer buffer;
+    SizeCountCheckpointBuffer buffer(oplogUuid());
     auto state = _tailer.bootstrap_ForTest(_opCtx, Timestamp::min(), buffer);
     ASSERT_TRUE(state);
     ASSERT_EQ(state->lastBufferedRid, ridFor(ts1));
@@ -275,7 +272,7 @@ TEST_F(SizeCountCheckpointOplogTailerTest, RunInterruptedWhileWaitingExitsPrompt
     writeToOplog(_opCtx, makeOplogEntry(ts1, _collA, repl::OpTypeEnum::kInsert, 10));
 
     OperationContextGroup ocg;
-    SizeCountCheckpointBuffer threadBuffer;
+    SizeCountCheckpointBuffer threadBuffer(oplogUuid());
     Status threadStatus = Status::OK();
     auto [promise, future] = makePromiseFuture<void>();
 
