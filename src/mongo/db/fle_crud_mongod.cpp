@@ -78,6 +78,7 @@
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -95,6 +96,8 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -159,6 +162,11 @@ public:
                 try {
                     txnParticipant.unstashTransactionResources(opCtx, "aggregate");
                 } catch (ExceptionFor<ErrorCodes::NoSuchTransaction>&) {
+                    LOGV2_WARNING(
+                        12336502,
+                        "FLE unyield: unstashTransactionResources encountered NoSuchTransaction",
+                        "lsid"_attr = opCtx->getLogicalSessionId(),
+                        "txnNumber"_attr = opCtx->getTxnNumber());
                 }
             }
         }

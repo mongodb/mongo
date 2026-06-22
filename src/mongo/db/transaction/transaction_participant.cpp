@@ -1031,6 +1031,7 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
         {
             std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).transactionMetricsObserver.onUnstash(
+                opCtx,
                 ServerTransactionsMetrics::get(opCtx->getServiceContext()),
                 opCtx->getServiceContext()->getTickSource());
         }
@@ -1672,7 +1673,8 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
     ClientLock lk(opCtx->getClient());
     {
         auto tickSource = opCtx->getServiceContext()->getTickSource();
-        o(lk).transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx), tickSource);
+        o(lk).transactionMetricsObserver.onStash(
+            opCtx, ServerTransactionsMetrics::get(opCtx), tickSource);
 
         auto curop = CurOp::get(opCtx);
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
@@ -1846,7 +1848,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(
         _releaseTransactionResourcesToOpCtx(opCtx, maxLockTimeout);
 
         std::lock_guard<Client> lg(*opCtx->getClient());
-        o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
+        o(lg).transactionMetricsObserver.onUnstash(opCtx,
+                                                   ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
         return;
     }
@@ -1922,7 +1925,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(
 
     {
         std::lock_guard<Client> lg(*opCtx->getClient());
-        o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
+        o(lg).transactionMetricsObserver.onUnstash(opCtx,
+                                                   ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
     }
 }

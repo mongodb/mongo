@@ -37,12 +37,15 @@
 #include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
 #include <cstdint>
 #include <memory>
 #include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
 namespace mongo {
 
@@ -70,11 +73,19 @@ void TransactionMetricsObserver::onChooseReadTimestamp(Timestamp readTimestamp) 
     _singleTransactionStats.setReadTimestamp(readTimestamp);
 }
 
-void TransactionMetricsObserver::onStash(ServerTransactionsMetrics* serverTransactionsMetrics,
+void TransactionMetricsObserver::onStash(OperationContext* opCtx,
+                                         ServerTransactionsMetrics* serverTransactionsMetrics,
                                          TickSource* tickSource) {
     //
     // Per transaction metrics.
     //
+    if (!_singleTransactionStats.isActive()) {
+        // Dump transaction info before hitting invariant.
+        LOGV2(12336500,
+              "Attempting to stash transaction metrics which were never unstashed",
+              "lsid"_attr = opCtx->getLogicalSessionId(),
+              "txnNumber"_attr = opCtx->getTxnNumber());
+    }
     invariant(_singleTransactionStats.isActive());
     _singleTransactionStats.setInactive(tickSource, tickSource->getTicks());
 
@@ -86,11 +97,19 @@ void TransactionMetricsObserver::onStash(ServerTransactionsMetrics* serverTransa
     serverTransactionsMetrics->incrementCurrentInactive();
 }
 
-void TransactionMetricsObserver::onUnstash(ServerTransactionsMetrics* serverTransactionsMetrics,
+void TransactionMetricsObserver::onUnstash(OperationContext* opCtx,
+                                           ServerTransactionsMetrics* serverTransactionsMetrics,
                                            TickSource* tickSource) {
     //
     // Per transaction metrics.
     //
+    if (_singleTransactionStats.isActive()) {
+        // Dump transaction info before hitting invariant.
+        LOGV2(12336501,
+              "Attempting to unstash metrics which are already active",
+              "lsid"_attr = opCtx->getLogicalSessionId(),
+              "txnNumber"_attr = opCtx->getTxnNumber());
+    }
     invariant(!_singleTransactionStats.isActive());
     _singleTransactionStats.setActive(tickSource->getTicks());
 
@@ -168,6 +187,7 @@ void TransactionMetricsObserver::_onAbortInactive(
     OperationContext* opCtx,
     ServerTransactionsMetrics* serverTransactionsMetrics,
     TickSource* tickSource) {
+
     auto curTick = tickSource->getTicks();
     invariant(!_singleTransactionStats.isActive());
     _onAbort(opCtx, serverTransactionsMetrics, curTick, tickSource);
