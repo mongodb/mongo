@@ -73,6 +73,18 @@ HmacContext::~HmacContext() {
 HMAC_CTX* HmacContext::get() {
     return hmac_ctx;
 }
+
+HashContext::HashContext() {
+    _digestCtx = EVP_MD_CTX_new();
+}
+
+HashContext::~HashContext() {
+    EVP_MD_CTX_free(_digestCtx);
+}
+
+EVP_MD_CTX* HashContext::get() {
+    return _digestCtx;
+}
 #endif
 
 void HmacContext::resetCount() {

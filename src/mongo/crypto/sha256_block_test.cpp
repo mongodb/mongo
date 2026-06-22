@@ -259,6 +259,24 @@ TEST(SHA256Block, FromBufferShouldRejectWrongLength) {
     ASSERT_EQ(ErrorCodes::InvalidLength, newHashStatus.getStatus());
 }
 
+TEST(HashBlock, ComputeHashWithCtxMatchesComputeHash) {
+    ConstDataRange input("hello", sizeof("hello") - 1);
+    auto expected = SHA256Block::computeHash({input});
+    HashContext ctx;
+    auto actual = SHA256Block::computeHashWithCtx(&ctx, {input});
+    EXPECT_EQ(expected, actual);
+}
+
+TEST(HashBlock, ComputeHashWithCtxResetsStateAcrossCalls) {
+    HashContext ctx;
+    ConstDataRange a("foo", sizeof("foo") - 1);
+    ConstDataRange b("bar", sizeof("bar") - 1);
+    auto r1 = SHA256Block::computeHashWithCtx(&ctx, {a});
+    auto r2 = SHA256Block::computeHashWithCtx(&ctx, {b});
+    EXPECT_EQ(r1, SHA256Block::computeHash({a}));
+    EXPECT_EQ(r2, SHA256Block::computeHash({b}));
+    EXPECT_NE(r1, r2);
+}
 
 }  // namespace
 }  // namespace mongo

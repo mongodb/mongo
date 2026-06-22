@@ -74,6 +74,12 @@ void SHA512BlockTraits::computeHash(CDRinit input, HashType* const output) {
     CC_SHA512_Final(output->data(), &ctx);
 }
 
+void SHA256BlockTraits::computeHashWithCtx(HashContext*,
+                                           std::initializer_list<ConstDataRange> input,
+                                           HashType* const output) {
+    return SHA256BlockTraits::computeHash(input, output);
+}
+
 void SHA1BlockTraits::computeHmac(const uint8_t* key,
                                   size_t keyLen,
                                   CDRinit input,

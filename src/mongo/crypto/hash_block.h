@@ -96,6 +96,23 @@ private:
 };
 
 /**
+ * For an OpenSSL optimization where a plain hash needs to be computed many times in
+ * succession, we can re-use the EVP_MD_CTX object across calls. This is a no-op on
+ * non-OpenSSL providers since those platforms allocate context inside computeHash anyway.
+ */
+class HashContext {
+public:
+#if defined(MONGO_CONFIG_SSL) && (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL)
+    HashContext();
+    ~HashContext();
+    EVP_MD_CTX* get();
+
+private:
+    EVP_MD_CTX* _digestCtx;
+#endif
+};
+
+/**
  * Secure allocator wrapper for HashBlock Traits.
  *
  * Usage:
@@ -201,6 +218,25 @@ public:
      */
     static HashBlock computeHash(const uint8_t* input, size_t inputLen) {
         return computeHash({ConstDataRange(input, inputLen)});
+    }
+
+    /**
+     * This function is an alternative to computeHash. It provides an optimization - when
+     * a single thread needs to compute a hash repeatedly on the OpenSSL platform, it can
+     * provide a ctx object of its own (which is an empty object on non-OpenSSL providers)
+     * that will be re-used by being re-initialized when computing a hash.
+     */
+    static void computeHashWithCtx(HashContext* ctx,
+                                   std::initializer_list<ConstDataRange> input,
+                                   HashBlock* const output) {
+        Traits::computeHashWithCtx(ctx, input, &(output->_hash));
+    }
+
+    static HashBlock computeHashWithCtx(HashContext* ctx,
+                                        std::initializer_list<ConstDataRange> input) {
+        HashBlock ret;
+        computeHashWithCtx(ctx, input, &ret);
+        return ret;
     }
 
     /**

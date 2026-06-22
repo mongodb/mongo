@@ -52,6 +52,10 @@ struct SHA256BlockTraits {
 
     static void computeHash(std::initializer_list<ConstDataRange> input, HashType* output);
 
+    static void computeHashWithCtx(HashContext* ctx,
+                                   std::initializer_list<ConstDataRange> input,
+                                   HashType* output);
+
     static void computeHmac(const uint8_t* key,
                             size_t keyLen,
                             std::initializer_list<ConstDataRange> input,

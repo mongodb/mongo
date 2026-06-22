@@ -201,6 +201,22 @@ void computeHashImpl(const EVP_MD* md,
 }
 
 template <typename HashType>
+void computeHashImplWithCtx(HashContext* digestCtx,
+                            const EVP_MD* md,
+                            std::initializer_list<ConstDataRange> input,
+                            HashType* const output) {
+    auto ctx = digestCtx->get();
+    fassert(12926900,
+            EVP_DigestInit_ex(ctx, md, nullptr) == 1 &&
+                std::all_of(begin(input),
+                            end(input),
+                            [&](const auto& i) {
+                                return EVP_DigestUpdate(ctx, i.data(), i.length()) == 1;
+                            }) &&
+                EVP_DigestFinal_ex(ctx, output->data(), nullptr) == 1);
+}
+
+template <typename HashType>
 void computeHmacImplWithCtx(HmacContext* digestCtx,
                             const EVP_MD* md,
                             const uint8_t* key,
@@ -245,6 +261,13 @@ void SHA256BlockTraits::computeHash(std::initializer_list<ConstDataRange> input,
 void SHA512BlockTraits::computeHash(std::initializer_list<ConstDataRange> input,
                                     HashType* const output) {
     computeHashImpl<SHA512BlockTraits::HashType>(getOpenSSLHashLoader().getSHA512(), input, output);
+}
+
+void SHA256BlockTraits::computeHashWithCtx(HashContext* ctx,
+                                           std::initializer_list<ConstDataRange> input,
+                                           HashType* const output) {
+    return computeHashImplWithCtx<SHA256BlockTraits::HashType>(
+        ctx, getOpenSSLHashLoader().getSHA256(), input, output);
 }
 
 void SHA1BlockTraits::computeHmac(const uint8_t* key,

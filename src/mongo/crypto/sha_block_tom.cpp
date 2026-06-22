@@ -122,6 +122,12 @@ void SHA512BlockTraits::computeHash(std::initializer_list<ConstDataRange> input,
                                                                                            output);
 }
 
+void SHA256BlockTraits::computeHashWithCtx(HashContext*,
+                                           std::initializer_list<ConstDataRange> input,
+                                           HashType* const output) {
+    return SHA256BlockTraits::computeHash(input, output);
+}
+
 void SHA1BlockTraits::computeHmac(const uint8_t* key,
                                   size_t keyLen,
                                   std::initializer_list<ConstDataRange> input,
