@@ -470,6 +470,7 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
     // Load current control byte, it can be either a literal or Simple-8b deltas
     uint8_t control = *buffer;
     if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
+        bsoncolumn::assertNotCodeWScope(control);
         // Load BSONElement from the literal and set last encoded in case we need to calculate
         // deltas from this literal
         BSONElement literalElem(buffer, 1, BSONElement::TrustedInitTag{});

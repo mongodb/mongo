@@ -219,6 +219,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(ElementStorage& al
                                                               const char* buffer) {
     uint8_t control = *buffer;
     if (isUncompressedLiteralControlByte(control)) {
+        assertNotCodeWScope(control);
         BSONElement literalElem(buffer, 1, BSONElement::TrustedInitTag{});
         loadUncompressed(literalElem);
         return {literalElem, literalElem.size()};

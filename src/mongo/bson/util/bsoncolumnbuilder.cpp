@@ -1033,6 +1033,7 @@ BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(BSONElement e
     }
 
     _validateNoNestedBSONColumn(elem);
+    bsoncolumn::assertNotCodeWScope(static_cast<uint8_t>(type));
 
     if ((type != BSONType::Object && type != BSONType::Array) || elem.Obj().isEmpty()) {
         // Flush previous sub-object compression when non-object is appended

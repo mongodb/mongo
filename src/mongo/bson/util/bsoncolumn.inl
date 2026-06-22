@@ -48,6 +48,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
             buffer.eof();
             return;
         } else if (isUncompressedLiteralControlByte(control)) {
+            assertNotCodeWScope(control);
             BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
             type = literal.type();
             ptr += literal.size();
