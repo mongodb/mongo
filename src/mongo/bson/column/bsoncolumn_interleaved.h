@@ -275,6 +275,7 @@ const char* BlockBasedInterleavedDecompressor::decompress(
             _rootType,
             [](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
             [&scalarElems](const BSONElement& elem) {
+                assertNotCodeWScope(elem.type());
                 scalarElems.insert(elem.value());
                 // keep traversing to find every scalar field.
                 return true;
@@ -1091,6 +1092,7 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
         std::pop_heap(heap.begin(), heap.end(), std::greater<>());
         FastDecodingState<Buffer>& state = heap.back();
         if (isUncompressedLiteralControlByte(*control)) {
+            assertNotCodeWScope(static_cast<BSONType>(*control));
             state._refElem = BSONElement{control, 1, BSONElement::TrustedInitTag{}};
             for (auto&& b : state._buffers) {
                 b->template append<BSONElement>(state._refElem);

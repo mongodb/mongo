@@ -749,6 +749,7 @@ typename CMaterializer::Element first(const char* buffer,
             return CMaterializer{}.materializeMissing(*allocator);
         } else if (isUncompressedLiteralControlByte(control)) {
             // Uncompressed literal found, it cannot be skip so return as our first value.
+            assertNotCodeWScope(static_cast<BSONType>(control));
             BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
             return CMaterializer{}.template materialize<BSONElement>(*allocator, literal);
         } else if (isInterleavedStartControlByte(control)) {
@@ -799,6 +800,7 @@ typename CMaterializer::Element last(const char* buffer,
         } else if (isUncompressedLiteralControlByte(control)) {
             // Uncompressed literal found, calculate delta to last for this type then check if we
             // are at end of stream which means we can materialize our value and return.
+            assertNotCodeWScope(static_cast<BSONType>(control));
             BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
             ptr += literal.size();
             switch (literal.type()) {

@@ -911,6 +911,7 @@ public:
                         return Status::OK();
                     }
                 } else if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
+                    bsoncolumn::assertNotCodeWScope(static_cast<BSONType>(control));
                     int size;
 
                     if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))

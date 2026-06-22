@@ -50,6 +50,7 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
             buffer.eof();
             return;
         } else if (isUncompressedLiteralControlByte(control)) {
+            assertNotCodeWScope(static_cast<BSONType>(control));
             BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
             type = literal.type();
             ptr += literal.size();

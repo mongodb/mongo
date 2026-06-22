@@ -47,6 +47,7 @@ const char* countImpl(size_t& outCount, const char* pos, const char* e) {
         // Uncompressed element, increment count and skip over it.
         if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
             // Load BSONElement from the literal so we can determine its size.
+            bsoncolumn::assertNotCodeWScope(static_cast<BSONType>(control));
             BSONElement elem(pos, 1, BSONElement::TrustedInitTag{});
             // Uncompressed element is 1 count. Advance pointer past this element.
             ++outCount;

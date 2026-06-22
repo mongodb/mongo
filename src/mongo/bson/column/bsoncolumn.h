@@ -620,6 +620,7 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<BSONElementStorage> a
                     ptr + 1 == end);
             break;
         } else if (isUncompressedLiteralControlByte(control)) {
+            assertNotCodeWScope(static_cast<BSONType>(control));
             // The BSONColumn encoding guarantees that the field name is just a single null byte.
             BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
             dassert(BSONElement{ptr}.fieldNameSize() == 1,  // size includes null byte

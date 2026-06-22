@@ -27,9 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn_util.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::bsoncolumn {
@@ -1006,6 +1010,96 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPathWithMinKey) {
             ASSERT_EQ(paths[0].second[i].type(), BSONType::minKey);
         }
     }
+}
+
+// Builds a minimal BSONColumn binary containing one CodeWScope literal followed by EOO.
+BufBuilder makeCodeWScopeLiteralColumn() {
+    BSONObj wrapper = BSON("" << BSONCodeWScope("code", BSONObj()));
+    BSONElement elem = wrapper.firstElement();
+    BufBuilder buf;
+    buf.appendChar(stdx::to_underlying(BSONType::codeWScope));
+    buf.appendChar('\0');  // empty field name required for BSONColumn literals
+    buf.appendBuf(elem.value(), elem.valuesize());
+    buf.appendChar('\0');  // EOO
+    return buf;
+}
+
+TEST_F(BSONColumnBlockBasedTest, CodeWScopeBufferDecompressRejects) {
+    auto raw = makeCodeWScopeLiteralColumn();
+    BSONColumnBlockBased col(raw.buf(), raw.len());
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
+    std::vector<BSONElement> vec;
+    ASSERT_THROWS_CODE(col.decompress<BSONElementMaterializer>(vec, allocator),
+                       DBException,
+                       ErrorCodes::InvalidBSONColumn);
+}
+
+TEST_F(BSONColumnBlockBasedTest, CodeWScopePathDecompressRejects) {
+    auto raw = makeCodeWScopeLiteralColumn();
+    BSONColumnBlockBased col(raw.buf(), raw.len());
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
+    std::vector<BSONElement> vec;
+    std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"a"}}, vec}};
+    ASSERT_THROWS_CODE(col.decompress<BSONElementMaterializer>(allocator, std::span(paths)),
+                       DBException,
+                       ErrorCodes::InvalidBSONColumn);
+}
+
+TEST_F(BSONColumnBlockBasedTest, CodeWScopeInterleavedDecompressRejects) {
+    // Construct an interleaved BSONColumn where the stream for "a" contains a CodeWScope literal.
+    // Reference object: {a: 1} (int32 scalar, one stream)
+    BSONObj refObj = BSON("a" << 1);
+    BSONObj wrapper = BSON("" << BSONCodeWScope("code", BSONObj()));
+    BSONElement codeWScopeElem = wrapper.firstElement();
+
+    BufBuilder buf;
+    buf.appendChar(kInterleavedStartControlByte);       // 0xF1
+    buf.appendBuf(refObj.objdata(), refObj.objsize());  // reference object
+    // Stream for "a": one CodeWScope literal
+    buf.appendChar(stdx::to_underlying(BSONType::codeWScope));
+    buf.appendChar('\0');
+    buf.appendBuf(codeWScopeElem.value(), codeWScopeElem.valuesize());
+    buf.appendChar('\0');  // EOO terminating interleaved section
+    buf.appendChar('\0');  // EOO terminating outer column
+
+    BSONColumnBlockBased col(buf.buf(), buf.len());
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
+    std::vector<BSONElement> vec;
+    ASSERT_THROWS_CODE(col.decompress<BSONElementMaterializer>(vec, allocator),
+                       DBException,
+                       ErrorCodes::InvalidBSONColumn);
+}
+
+TEST_F(BSONColumnBlockBasedTest, CodeWScopeInInterleavedReferenceObjectRejects) {
+    // Adversarial: the reference object itself contains a CodeWScope field. All existing stream
+    // control byte checks are bypassed, but the reference object traversal must reject it.
+    BSONObj wrapper = BSON("" << BSONCodeWScope("code", BSONObj()));
+    BSONElement codeWScopeElem = wrapper.firstElement();
+
+    // Build a reference object {a: <codeWScope>} by hand (cannot use BSON() macro since
+    // BSONObjBuilder would store the value normally, but we need to embed it raw).
+    BufBuilder refObjBuf;
+    refObjBuf.appendChar(stdx::to_underlying(BSONType::codeWScope));  // type
+    refObjBuf.appendCStr("a");                                        // field name
+    refObjBuf.appendBuf(codeWScopeElem.value(), codeWScopeElem.valuesize());
+    refObjBuf.appendChar('\0');  // EOO
+    int32_t refObjSize = refObjBuf.len() + sizeof(int32_t);
+    BufBuilder refObjFinal;
+    refObjFinal.appendNum(refObjSize);
+    refObjFinal.appendBuf(refObjBuf.buf(), refObjBuf.len());
+
+    BufBuilder buf;
+    buf.appendChar(kInterleavedStartControlByte);         // 0xF1
+    buf.appendBuf(refObjFinal.buf(), refObjFinal.len());  // reference object
+    buf.appendChar('\0');                                 // EOO (empty stream)
+    buf.appendChar('\0');                                 // EOO outer column
+
+    BSONColumnBlockBased col(buf.buf(), buf.len());
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
+    std::vector<BSONElement> vec;
+    ASSERT_THROWS_CODE(col.decompress<BSONElementMaterializer>(vec, allocator),
+                       DBException,
+                       ErrorCodes::InvalidBSONColumn);
 }
 
 }  // namespace

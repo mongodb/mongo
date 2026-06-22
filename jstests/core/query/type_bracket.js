@@ -1,5 +1,8 @@
 // @tags: [
 //   requires_getmore,
+//   # type_bracket inserts heterogeneous BSON types including CodeWScope which produce inconsistent
+//   # queryShapeHash across config-server shards in the stability passthrough.
+//   known_query_shape_computation_problem,
 // ]
 
 import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -42,7 +45,13 @@ const docs = [
     {_id: 0xffffffffffffffffffffffff, a: MaxKey()},
 ];
 
-assert.commandWorked(t.insert(docs));
+// CodeWScope (docs[24], docs[25]) is not a valid BSONColumn element type and cannot be stored in
+// time-series collections. Exclude them from the insert when running as time-series so the rest
+// of the type-bracket tests can still exercise the types that are valid in that context.
+const isTimeseries = TestData.isTimeseriesTestSuite || false;
+const allDocs = isTimeseries ? docs.filter((d) => d._id !== 24 && d._id !== 25) : docs;
+
+assert.commandWorked(t.insert(allDocs));
 
 const runTest = (filter, expected) => {
     const result = t.aggregate({$match: filter}).toArray();
@@ -119,9 +128,13 @@ let tests = [
         expected: [docs[12], docs[16], docs[20], docs[22]],
     },
 
-    // CODEWSCOPE
-    {filter: {a: {$gte: new Code("function() {x++;}", {})}}, expected: [docs[24]]},
-    {filter: {a: {$lt: new Code("x", {})}}, expected: [docs[25]]},
+    // CODEWSCOPE (skipped in time-series: CodeWScope is not a valid BSONColumn type)
+    ...(!isTimeseries
+        ? [
+              {filter: {a: {$gte: new Code("function() {x++;}", {})}}, expected: [docs[24]]},
+              {filter: {a: {$lt: new Code("x", {})}}, expected: [docs[25]]},
+          ]
+        : []),
 
     // CODE
     {filter: {a: {$gte: new Code("")}}, expected: [docs[28]]},
@@ -132,10 +145,10 @@ let tests = [
     {filter: {a: {$lt: MinKey()}}, expected: []},
     {filter: {a: {$gte: MaxKey()}}, expected: [docs[32]]},
     {filter: {a: {$gt: MaxKey()}}, expected: []},
-    {filter: {a: {$gte: MinKey()}}, expected: docs},
-    {filter: {a: {$gt: MinKey()}}, expected: docs.slice(1)},
-    {filter: {a: {$lte: MaxKey()}}, expected: docs},
-    {filter: {a: {$lt: MaxKey()}}, expected: docs.slice(0, 32)},
+    {filter: {a: {$gte: MinKey()}}, expected: allDocs},
+    {filter: {a: {$gt: MinKey()}}, expected: allDocs.slice(1)},
+    {filter: {a: {$lte: MaxKey()}}, expected: allDocs},
+    {filter: {a: {$lt: MaxKey()}}, expected: allDocs.slice(0, -1)},
 ];
 
 for (const testData of tests) {

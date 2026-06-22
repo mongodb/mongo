@@ -3728,44 +3728,24 @@ TEST_F(BSONColumnTest, DBRefAfterChangeBack) {
     verifyDecompression(binData, {elemInt32, dbRef, dbRef});
 }
 
-TEST_F(BSONColumnTest, CodeWScopeBasic) {
-    auto first = createCodeWScope("code", BSONObj());
-    auto second = createCodeWScope("diffCode", BSONObj());
-    cb.append(first);
-    cb.append(second);
-    cb.append(second);
-
-    BufBuilder expected;
-    appendLiteral(expected, first);
-    appendLiteral(expected, second);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, {first, second, second});
+TEST_F(BSONColumnTest, CodeWScopeAppendRejects) {
+    // Creation: BSONColumnBuilder must reject CodeWScope elements.
+    auto codeWScope = createCodeWScope("code", BSONObj());
+    ASSERT_THROWS_CODE(cb.append(codeWScope), DBException, ErrorCodes::InvalidBSONColumn);
 }
 
-TEST_F(BSONColumnTest, CodeWScopeAfterChangeBack) {
+TEST_F(BSONColumnTest, CodeWScopeDecompressRejects) {
+    // Decompression: iterating a column that contains a CodeWScope literal must throw, even
+    // when the bytes were stored by bypassing BSONColumnBuilder.
     auto codeWScope = createCodeWScope("code", BSONObj());
-    auto elemInt32 = createElementInt32(0);
+    BufBuilder raw;
+    appendLiteral(raw, codeWScope);
+    appendEOO(raw);
 
-    cb.append(elemInt32);
-    cb.append(codeWScope);
-    cb.append(codeWScope);
-
-    BufBuilder expected;
-    appendLiteral(expected, elemInt32);
-    appendLiteral(expected, codeWScope);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
-
-    appendEOO(expected);
-
-    auto binData = cb.finalize();
-    verifyBinary(binData, expected);
-    verifyDecompression(binData, {elemInt32, codeWScope, codeWScope});
+    BSONColumn col(createBSONColumn(raw.buf(), raw.len()));
+    ASSERT_THROWS_CODE(std::for_each(col.begin(), col.end(), [](const auto&) {}),
+                       DBException,
+                       ErrorCodes::InvalidBSONColumn);
 }
 
 TEST_F(BSONColumnTest, SymbolBasic) {

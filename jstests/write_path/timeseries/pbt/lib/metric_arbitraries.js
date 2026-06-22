@@ -25,7 +25,7 @@ export const allBsonMetricTypes = Object.freeze([
     "binData",
     // code
     "javascript",
-    "javascriptWithScope",
+    // "javascriptWithScope" omitted: CodeWScope (BSONType 0x0F) is rejected by BSONColumn
     "dbPointer",
 ]);
 

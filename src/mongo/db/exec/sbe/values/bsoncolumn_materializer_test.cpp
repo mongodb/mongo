@@ -307,29 +307,27 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
     mongo::bsoncolumn::Collector<SBEColumnMaterializer, decltype(vec)> collector{vec, allocator};
 
     // Not all types are compressed in BSONColumn. Values of these types are just stored as
-    // uncompressed BSONElements. "Code with scope" is an example of this.
-    BSONCodeWScope codeWScope{"print(`${x}`)", BSON("x" << 10)};
-    auto obj = BSON("" << codeWScope);
+    // uncompressed BSONElements. Regex is an example of this.
+    BSONRegEx regex{"[a-z]+", "i"};
+    auto obj = BSON("" << regex);
     auto bsonElem = obj.firstElement();
     auto bytes = bsonElem.value();
 
     // Test with copy.
     collector.append<BSONElement>(bsonElem);
     assertSbeValueEquals(
-        vec.back(),
-        Element({value::TypeTags::bsonCodeWScope, value::bitcastFrom<const char*>(bytes)}));
-    assertSbeValueEquals(vec.back(), bson::convertFrom<true /* view */>(bsonElem));
+        vec.back(), Element({value::TypeTags::bsonRegex, value::bitcastFrom<const char*>(bytes)}));
+    assertSbeValueEquals(vec.back(), bson::convertToView(bsonElem));
     // Since we are making a copy and storing it in the BSONElementStorage, the address of the data
     // should not be the same.
     ASSERT_NOT_EQUALS(
-        vec.back(),
-        Element({value::TypeTags::bsonCodeWScope, value::bitcastFrom<const char*>(bytes)}));
+        vec.back(), Element({value::TypeTags::bsonRegex, value::bitcastFrom<const char*>(bytes)}));
 
     // Test without copy by ensuring the addresses are the same.
     collector.appendPreallocated(bsonElem);
     ASSERT_EQ(vec.back(),
-              Element({value::TypeTags::bsonCodeWScope, value::bitcastFrom<const char*>(bytes)}));
-    ASSERT_EQ(vec.back(), bson::convertFrom<true /* view */>(bsonElem));
+              Element({value::TypeTags::bsonRegex, value::bitcastFrom<const char*>(bytes)}));
+    ASSERT_EQ(vec.back(), Element(bson::convertToView(bsonElem)));
 }
 
 TEST_F(BSONColumnMaterializerTest, SBEMaterializerMissing) {
@@ -404,12 +402,12 @@ TEST_F(BSONColumnMaterializerTest, DecompressIterativeSimpleWithSBEMaterializer)
                                   value::bitcastFrom<const char*>(obj.firstElement().value())});
 
     // Not all types are compressed in BSONColumn. Since the decompression code is identical, we
-    // will test returning one of the uncompressed types.
-    BSONCodeWScope codeWScope{"print(`${x}`)", BSON("x" << 10)};
-    obj = BSON("" << codeWScope);
-    verifyDecompressionIterative(obj,
-                                 {value::TypeTags::bsonCodeWScope,
-                                  value::bitcastFrom<const char*>(obj.firstElement().value())});
+    // will test returning one of the uncompressed types (regex).
+    BSONRegEx regex{"[a-z]+", "i"};
+    obj = BSON("" << regex);
+    verifyDecompressionIterative(
+        obj,
+        {value::TypeTags::bsonRegex, value::bitcastFrom<const char*>(obj.firstElement().value())});
 
     // Test EOO.
     obj = {};

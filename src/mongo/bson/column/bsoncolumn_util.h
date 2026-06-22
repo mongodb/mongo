@@ -53,6 +53,12 @@ inline bool isUncompressedLiteralControlByte(uint8_t control) {
         control == (uint8_t)stdx::to_underlying(BSONType::maxKey);
 }
 
+inline void assertNotCodeWScope(BSONType type) {
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "CodeWScope is not a valid BSONColumn element type",
+            type != BSONType::codeWScope);
+}
+
 inline bool isInterleavedStartControlByte(char control) {
     return control == kInterleavedStartControlByteLegacy ||
         control == kInterleavedStartControlByte || control == kInterleavedStartArrayRootControlByte;

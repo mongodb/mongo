@@ -54,6 +54,10 @@ MONGO_MOD_NEEDS_REPLACEMENT std::pair<value::TypeTags, value::Value> convertFrom
         elem.rawdata(), elem.rawdata() + elem.size(), elem.fieldNameSize() - 1);
 }
 
+inline std::pair<value::TypeTags, value::Value> convertToView(const BSONElement& elem) {
+    return convertFrom<true>(elem);
+}
+
 /**
  * Advance table specifies how to change the pointer to skip current BSON value (so that pointer
  * points to the next byte after the BSON value):
