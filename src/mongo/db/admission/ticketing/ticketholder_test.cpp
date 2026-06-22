@@ -645,6 +645,48 @@ TEST_F(TicketHolderTest, QueuedWaiterGetsTicketWhenMadeAvailable) {
 
 using TicketHolderImmediateResizeTest = TicketHolderTest;
 
+TEST_F(TicketHolderImmediateResizeTest, QueuedAdmissionsGauge) {
+    constexpr int initialNumTickets = 0;
+    auto holder = makeImmediateResizeHolder(initialNumTickets);
+    Stats stats(holder.get());
+
+    auto queuedAdmissions = [&] {
+        return stats.getStats()
+            .getObjectField("normalPriority")
+            .getIntField("queuedOperationsTotalAdmissions");
+    };
+
+    // No operation is queued yet.
+    ASSERT_EQ(queuedAdmissions(), 0);
+
+    // Queue two operations that have each already yielded a known number of times. The gauge tracks
+    // the sum of their admission counts.
+    MockAdmission waiter1{getServiceContext(), AdmissionContext::Priority::kNormal};
+    MockAdmission waiter2{getServiceContext(), AdmissionContext::Priority::kNormal};
+    waiter1.admCtx.setAdmission_forTest(3);
+    waiter2.admCtx.setAdmission_forTest(5);
+
+    Future<Ticket> ticketFuture1 =
+        spawn([&]() { return holder->waitForTicket(waiter1.opCtx.get(), &waiter1.admCtx); });
+    ASSERT_TRUE(waiter1.waitUntilQueued(kDefaultTimeout));
+    ASSERT_EQ(queuedAdmissions(), 3);
+
+    Future<Ticket> ticketFuture2 =
+        spawn([&]() { return holder->waitForTicket(waiter2.opCtx.get(), &waiter2.admCtx); });
+    ASSERT_TRUE(waiter2.waitUntilQueued(kDefaultTimeout));
+    ASSERT_EQ(queuedAdmissions(), 8);
+
+    // Make enough tickets available for both waiters. Once they have both dequeued and acquired
+    // their tickets, the gauge drains back to zero.
+    ASSERT_TRUE(holder->resize(_opCtx.get(), 2));
+    boost::optional<Ticket> acquired1, acquired2;
+    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        acquired1 = std::move(ticketFuture1).get(_opCtx.get());
+        acquired2 = std::move(ticketFuture2).get(_opCtx.get());
+    });
+    ASSERT_EQ(queuedAdmissions(), 0);
+}
+
 TEST_F(TicketHolderImmediateResizeTest, CanResizePool) {
     constexpr int initialNumTickets = 1;
     auto holder = makeImmediateResizeHolder(initialNumTickets);

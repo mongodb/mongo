@@ -159,6 +159,8 @@ boost::optional<Ticket> TicketHolder::_waitForTicketUntilMaybeInterruptible(
 
     auto startWaitTime = _tickSource->getTicks();
     _holderStats.totalAddedQueue.fetchAndAddRelaxed(1);
+    auto queuedAdmissions = admCtx->getAdmissions();
+    _holderStats.queuedOperationsTotalAdmissions.fetchAndAddRelaxed(queuedAdmissions);
 
     ON_BLOCK_EXIT([&] {
         auto waitDelta =
@@ -166,6 +168,7 @@ boost::optional<Ticket> TicketHolder::_waitForTicketUntilMaybeInterruptible(
 
         _holderStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta.count());
         _holderStats.totalRemovedQueue.fetchAndAddRelaxed(1);
+        _holderStats.queuedOperationsTotalAdmissions.fetchAndSubtractRelaxed(queuedAdmissions);
 
         if (_reportWaitedAcquisitionOpCallback) {
             _reportWaitedAcquisitionOpCallback(admCtx, waitDelta);
@@ -243,6 +246,8 @@ void TicketHolder::_appendQueueStats(BSONObjBuilder& b, const QueueStats& stats)
     b.append("addedToQueue", added);
     b.append("removedFromQueue", removed);
     b.append("queueLength", std::max(added - removed, (int64_t)0));
+    b.append("queuedOperationsTotalAdmissions",
+             std::max(stats.queuedOperationsTotalAdmissions.loadRelaxed(), (int64_t)0));
 
     auto finished = stats.totalFinishedProcessing.loadRelaxed();
     auto started = stats.totalStartedProcessing.loadRelaxed();

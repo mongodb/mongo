@@ -235,6 +235,9 @@ private:
         AtomicWord<std::int64_t> totalStartedProcessing{0};
         AtomicWord<std::int64_t> totalCanceled{0};
         AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
+        // Instantaneous sum of the admission counts (i.e. number of yields) of all operations
+        // currently waiting in the queue.
+        AtomicWord<std::int64_t> queuedOperationsTotalAdmissions{0};
     };
 
     /**
