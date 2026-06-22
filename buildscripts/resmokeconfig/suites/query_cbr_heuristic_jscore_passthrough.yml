@@ -14,13 +14,8 @@ selector:
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
 
-    # CBR does not currently add plans to the plan cache. These tests examine the plan cache.
-    - jstests/core/query/plan_cache/*.js
-    - jstests/core/query/explain/explain_plan_cache.js
-    - jstests/core/query/partial_index_logical.js
-    - jstests/core/index/index_filter_commands.js
-    - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
-    - jstests/core/timeseries/pbt/timeseries_cache_usage_pbt.js
+    # TODO SERVER-116684: Enable this test, it asserts on the length of creationExecStats.
+    - jstests/core/query/plan_cache/plan_cache_list_plans.js
 
     # Asserting on specific plan, CBR pick different one
     - jstests/core/query/agg_hint.js

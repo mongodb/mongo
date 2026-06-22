@@ -14,9 +14,6 @@ selector:
     - jstests/aggregation/sources/facet/facet_stats.js
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
 
-    # CBR does not currently add plans to the plan cache. These tests examine the plan cache.
-    - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
-
     # TODO SERVER-92589: Fails in all feature flags variant because SBE explain not supported
     - jstests/aggregation/optimization/use_query_sort.js
 

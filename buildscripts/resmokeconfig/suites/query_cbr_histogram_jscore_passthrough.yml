@@ -12,12 +12,6 @@ selector:
     - jstests/core/query/queryable_encryption/**/*.js
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
-    # CBR does not currently add plans to the plan cache. These tests examine the plan cache.
-    - jstests/core/query/plan_cache/*.js
-    - jstests/core/query/explain/explain_plan_cache.js
-    - jstests/core/query/partial_index_logical.js
-    - jstests/core/index/index_filter_commands.js
-    - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
     # Tests that assert on op counters
     - jstests/core/diagnostics/operation_latency_histogram.js
     - jstests/core/query/top/top.js
