@@ -30,6 +30,7 @@
 
 #include <string>
 #include <map>
+#include <cstdint>
 
 class session_simulator {
     /* Methods */

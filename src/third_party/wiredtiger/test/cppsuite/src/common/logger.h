@@ -37,7 +37,9 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
+#include <string>
 #include <mutex>
+#include <cstdint>
 
 /* Define helpful functions related to debugging. */
 namespace test_harness {

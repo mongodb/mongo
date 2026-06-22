@@ -30,6 +30,7 @@
 #define EXECUTION_TIMER_H
 
 #include <string>
+#include <cstdint>
 
 namespace test_harness {
 
