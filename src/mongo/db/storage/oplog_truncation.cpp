@@ -31,9 +31,12 @@
 
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+
+#include <algorithm>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -170,4 +173,21 @@ RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayT
             return performUnreplicatedTruncate(opCtx, oplog, mayTruncateUpTo, marker);
         });
 }
+
+Timestamp computeTruncationBound(OperationContext* opCtx) {
+    const Timestamp ts = opCtx->getServiceContext()->getStorageEngine()->getPinnedOplog();
+    if (isReplicatedFastCountEnabled(opCtx)) {
+        Lock::GlobalLock readLock(opCtx, MODE_IS);
+        auto persistedTs = writeConflictRetry(
+            opCtx, "computeTruncationBound", NamespaceString::kRsOplogNamespace, [&] {
+                return replicated_fast_count::ReplicatedFastCountManager::get(
+                           opCtx->getServiceContext())
+                    .findPersistedTimestampStoreTs(opCtx)
+                    .value_or(Timestamp::max());
+            });
+        return std::min(persistedTs, ts);
+    }
+    return ts;
+}
+
 }  // namespace mongo::oplog_truncation

@@ -77,4 +77,13 @@ MONGO_MOD_PUBLIC RecordId truncateByMarkerQueue(OperationContext* opCtx,
  */
 RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayTruncateUpTo);
 
+/**
+ * Returns the upper bound, exclusive, of the timestamp that the oplog can be truncated to.
+ *
+ * If replicated fast count is enabled, this will be the minimum of the valid-as-of timestamp
+ * persisted in the timestamp store and the storage engine's pinned oplog timestamp. Otherwise, this
+ * will be the storage engine's pinned oplog timestamp.
+ */
+MONGO_MOD_PUBLIC Timestamp computeTruncationBound(OperationContext* opCtx);
+
 }  // namespace mongo::oplog_truncation
