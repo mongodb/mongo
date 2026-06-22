@@ -580,9 +580,11 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
         allowForeignSharded ? ShardTargetingPolicy::kAllowed : ShardTargetingPolicy::kNotAllowed;
 
     // Attempt pipeline construction. On retry due to a sharded view, _params.fromLpp and
-    // _fromExpCtx reflect the resolved definition. Note that this loop should only be called
-    // exactly one or two times.
-    for (int i = 0; i < 2; i++) {
+    // _fromExpCtx reflect the resolved definition. A collection may be remapped into a view while
+    // the query is executing, leading to subsequent CommandOnShardedViewNotSupportedOnMongod
+    // throws. Handle this race condition gracefully until we exhaust retries.
+    constexpr int kMaxAttempts = 5;
+    for (int attempt = 1; attempt <= kMaxAttempts; attempt++) {
         // Combine the view stages from _params.fromLpp (possibly empty for a plain collection)
         // with the per-iteration $match. _params.fromLpp is already desugared at its storage sites
         // (the DocumentSourceGraphLookUp constructor, and the sharded-view rebuild in the catch
@@ -599,6 +601,12 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                 tryOptimizeMatchOnlyPipelineDirectly,
                 shardTargetingPolicy);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
+            if (attempt == kMaxAttempts) {
+                // Still resolving to a sharded view after every retry (e.g. the view keeps being
+                // concurrently remapped). Propagate rather than falling through to the tassert.
+                throw;
+            }
+
             // This exception returns the information we need to resolve a sharded view. Rebuild
             // _params.fromLpp from the resolved view definition so subsequent iterations don't
             // re-throw.

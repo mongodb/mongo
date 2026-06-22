@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/views/resolved_view.h"
 
 #include <deque>
 
@@ -58,6 +59,13 @@ GraphLookUpMockMongoInterface::finalizeAndMaybePreparePipelineForExecution(
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
+    if (_shardedViewThrowCount > 0) {
+        --_shardedViewThrowCount;
+        uassertStatusOK(
+            Status(ResolvedView(expCtx->getNamespaceString(), std::vector<BSONObj>{}, BSONObj{}),
+                   "Mock $graphLookup sharded view kickback"));
+    }
+
     if (optimizePipeline) {
         optimizePipeline(pipeline.get());
     }

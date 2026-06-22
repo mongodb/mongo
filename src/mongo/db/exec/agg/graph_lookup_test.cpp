@@ -231,6 +231,77 @@ TEST_F(GraphLookUpTest, ShouldTraverseSubgraphIfIdOfDocumentsInFromCollectionAre
     }
 }
 
+// A single sharded-view resolution is the normal case: makePipeline catches the first
+// CommandOnShardedViewNotSupportedOnMongod, rebuilds from the resolved definition, and the retry
+// succeeds.
+TEST_F(GraphLookUpTest, ShouldResolveForeignShardedViewOnRetry) {
+    auto expCtx = getExpCtx();
+
+    std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
+
+    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"_sd}, {"to", 0}}};
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    auto mockInterface = std::make_shared<GraphLookUpMockMongoInterface>(std::move(fromContents));
+    mockInterface->setShardedViewResolutionThrowCount(1);
+    expCtx->setMongoProcessInterface(mockInterface);
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "_id", expCtx->variablesParseState),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
+
+    auto next = graphLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+}
+
+// If the foreign view's definition keeps getting concurrently remapped to a sharded view, every
+// build attempt throws CommandOnShardedViewNotSupportedOnMongod. Once the retries are exhausted
+// this must propagate as that (retryable) error.
+TEST_F(GraphLookUpTest, ShouldPropagateWhenForeignShardedViewResolutionRepeats) {
+    auto expCtx = getExpCtx();
+
+    std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
+
+    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"_sd}, {"to", 0}}};
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    auto mockInterface = std::make_shared<GraphLookUpMockMongoInterface>(std::move(fromContents));
+    // Throw on every attempt, exceeding makePipeline's retry cap, so the error must propagate.
+    mockInterface->setShardedViewResolutionThrowCount(100);
+    expCtx->setMongoProcessInterface(mockInterface);
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "_id", expCtx->variablesParseState),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
+
+    ASSERT_THROWS_CODE(graphLookupStage->getNext(),
+                       AssertionException,
+                       ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
+}
+
 TEST_F(GraphLookUpTest, ShouldPropagatePauses) {
     auto expCtx = getExpCtx();
 

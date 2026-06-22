@@ -96,8 +96,18 @@ public:
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) final;
 
+    /**
+     * Causes the next 'count' calls to finalizeAndMaybePreparePipelineForExecution to throw
+     * CommandOnShardedViewNotSupportedOnMongod, simulating a foreign view that resolves to a
+     * sharded view (possibly repeatedly, as under concurrent view remapping).
+     */
+    void setShardedViewResolutionThrowCount(int count) {
+        _shardedViewThrowCount = count;
+    }
+
 private:
     std::deque<DocumentSource::GetNextResult> _results;
+    int _shardedViewThrowCount = 0;
 };
 
 }  // namespace test

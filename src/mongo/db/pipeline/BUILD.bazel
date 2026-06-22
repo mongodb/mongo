@@ -1623,6 +1623,7 @@ mongo_cc_library(
         ":pipeline",
         "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
         "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
+        "//src/mongo/db/views:resolved_view",
     ],
 )
 
