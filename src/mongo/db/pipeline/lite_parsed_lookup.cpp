@@ -125,6 +125,10 @@ std::unique_ptr<LiteParsedLookUp> LiteParsedLookUp::parse(const NamespaceString&
 
     if (!lookupSpec.getPipeline().has_value()) {
         uassert(ErrorCodes::FailedToParse,
+                "$lookup requires either 'pipeline' or both 'localField' and 'foreignField' to be "
+                "specified",
+                lookupSpec.getLocalField() && lookupSpec.getForeignField());
+        uassert(ErrorCodes::FailedToParse,
                 "$lookup with a 'let' argument must also specify 'pipeline'",
                 !lookupSpec.getLetVars().has_value());
     }

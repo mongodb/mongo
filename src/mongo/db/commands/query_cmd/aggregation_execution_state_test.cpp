@@ -252,7 +252,9 @@ protected:
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", main);
         NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", secondary);
 
-        BSONObj lookup = BSON("$lookup" << BSON("from" << nss2.coll() << "as" << "out"));
+        BSONObj lookup =
+            BSON("$lookup" << BSON("from" << nss2.coll() << "as" << "out" << "localField" << "a"
+                                          << "foreignField" << "b"));
         BSONArray pipeline = BSON_ARRAY(lookup);
         _cmdObj = BSON("aggregate" << main << "pipeline" << pipeline << "cursor" << BSONObj{});
         _request =

@@ -1366,9 +1366,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
                                          pExpCtx);
         }
     } else {
-        // $lookup specified with only local/foreignField syntax.
+        // No pipeline specified, both localField and foreignField must be specified.
         uassert(ErrorCodes::FailedToParse,
-                "$lookup requires both or neither of 'localField' and 'foreignField' to be "
+                "$lookup requires either 'pipeline' or both 'localField' and 'foreignField' to be "
                 "specified",
                 !localField.empty() && !foreignField.empty());
         uassert(ErrorCodes::FailedToParse,

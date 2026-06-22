@@ -103,6 +103,18 @@ TEST_F(LiteParsedLookUpTest, RejectsCollectionlessWithoutDocuments) {
                        ErrorCodes::FailedToParse);
 }
 
+TEST_F(LiteParsedLookUpTest, RejectsMissingPipelineAndLocalForeignFields) {
+    ASSERT_THROWS_CODE(parse(R"({$lookup: {from: "foreign", as: "a"}})"),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+    ASSERT_THROWS_CODE(parse(R"({$lookup: {from: "foreign", as: "a", localField: "x"}})"),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+    ASSERT_THROWS_CODE(parse(R"({$lookup: {from: "foreign", as: "a", foreignField: "y"}})"),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
 TEST_F(LiteParsedLookUpTest, StageParamsCarriesDesugaredPipelineWhenPresent) {
     auto* typed =
         parseAndGetParams(R"({$lookup: {from: "foreign", as: "a", pipeline: [{$match: {}}]}})");
