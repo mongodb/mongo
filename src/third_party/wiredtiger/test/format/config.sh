@@ -4,7 +4,7 @@
 # modify this file and then run it as a script.
 
 fc="format_config_def.c"
-fh="config.h"
+fh="format_config.h"
 
 cat<<END_OF_HEADER_FILE_PREFIX>$fh
 /* DO NOT EDIT: automatically built by format/config.sh. */
