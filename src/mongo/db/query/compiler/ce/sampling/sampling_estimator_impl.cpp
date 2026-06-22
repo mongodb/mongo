@@ -245,16 +245,24 @@ boost::optional<bool> tryMatchesBSON(const MatchExpression* expr, const BSONObj&
 CardinalityEstimate makeScaledEstimate(double matchCount,
                                        size_t errorCount,
                                        size_t sampleSize,
-                                       CardinalityEstimate collCard) {
+                                       CardinalityEstimate collCard,
+                                       bool wasSamplePersisted) {
     size_t effectiveSampleSize = sampleSize - errorCount;
     double estimate =
         effectiveSampleSize > 0 ? (matchCount * collCard.toDouble()) / effectiveSampleSize : 0.0;
-    // The estimate is authoritative (tagged 'Code' rather than 'Sampling') when either:
-    // * the expression errored for every sampled document - the zero is not an approximation
+    // The estimate is authoritative (tagged 'Code' rather than 'Sampling') only when the
+    // sample was freshly collected on the fly and either:
+    // * the expression errored for every sample document - the zero is not an approximation
     // * the sample covers the entire collection - 'matchCount' is the true match count and
-    //   'estimate' is exact.
+    // 'estimate' is exact.
     // Tagging these as Code prevents CardinalityEstimator::clampZeroEstimates from inflating
     // the estimates.
+
+    // TODO SERVER-127501: Revisit for a persisted sample of size 0 should be
+    // treated as authoritative.
+    if (wasSamplePersisted) {
+        return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
+    }
     const bool isAuthoritative =
         effectiveSampleSize == 0 || static_cast<double>(effectiveSampleSize) >= collCard.toDouble();
     return CardinalityEstimate{CardinalityType{estimate},
@@ -864,7 +872,8 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
         }
     }
 
-    CardinalityEstimate estimate = makeScaledEstimate(cnt, errorCount, _sampleSize, getCollCard());
+    CardinalityEstimate estimate =
+        makeScaledEstimate(cnt, errorCount, _sampleSize, getCollCard(), _wasSamplePersisted);
 
     LOGV2_DEBUG(9756604,
                 5,
@@ -902,8 +911,8 @@ std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
     std::vector<CardinalityEstimate> estimates;
     estimates.reserve(counts.size());
     for (size_t i = 0; i < counts.size(); i++) {
-        estimates.push_back(
-            makeScaledEstimate(counts[i], errorCounts[i], _sampleSize, getCollCard()));
+        estimates.push_back(makeScaledEstimate(
+            counts[i], errorCounts[i], _sampleSize, getCollCard(), _wasSamplePersisted));
     }
 
     return estimates;
@@ -1012,7 +1021,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
         }
     });
     CardinalityEstimate estimate =
-        makeScaledEstimate(count, errorCount, _sampleSize, getCollCard());
+        makeScaledEstimate(count, errorCount, _sampleSize, getCollCard(), _wasSamplePersisted);
     LOGV2_DEBUG(9756606,
                 5,
                 "SamplingCE cardinality (# docs) for index bounds and MatchExpression",

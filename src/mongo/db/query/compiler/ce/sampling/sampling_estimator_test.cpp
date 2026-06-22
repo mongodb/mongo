@@ -2564,4 +2564,50 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     estimator.getSamplingMetadata();
 }
 
+TEST_F(SamplingEstimatorTest, OnTheFlyFullSampleIsAuthoritative) {
+    const int collectionSize = 50;
+    insertDocuments(kTestNss, createDocuments(collectionSize));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+
+    // Request a sample larger than the collection.
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          collectionSize * 2,
+                                          SamplingCEMethodEnum::kRandom,
+                                          boost::none,
+                                          makeCardinalityEstimate(collectionSize),
+                                          nullptr /*customerQueryExpCtx*/,
+                                          SamplingSourceEnum::kOnTheFlySample);
+    estimator.generateSample(ce::NoProjection{});
+    ASSERT_EQUALS(estimator.getSample().size(), static_cast<size_t>(collectionSize));
+
+    const auto filter = fromjson("{a: 1}");
+    const auto matchExpr = parse(filter);
+    CardinalityEstimate est = estimator.estimateCardinality(matchExpr.get());
+    ASSERT_EQUALS(est.source(), cost_based_ranker::EstimationSource::Code);
+}
+
+// When a persistent sample's size >= collCard the estimate must NOT be authoritative, because the
+// collection may have changed since the sample was collected.
+// Inject directly through setSampleForTesting.
+TEST_F(SamplingEstimatorTest, PersistentFullSampleIsNotAuthoritative) {
+    const int collCard = 3;
+    // collCard * 2 > collCard so createSamplingEstimatorForTesting takes the full collscan path
+    // and _wasSamplePersisted is left false — we then override both sample and persisted flag.
+    auto estimator = createSamplingEstimatorForTesting(collCard, collCard * 2, ce::NoProjection{});
+
+    // Inject 4 docs (> collCard) and mark as persistent.
+    std::vector<BSONObj> docs{BSON("a" << 1), BSON("a" << 1), BSON("a" << 1), BSON("a" << 1)};
+    estimator.setSampleForTesting(std::move(docs), /*wasPersisted=*/true);
+
+    const auto filter = fromjson("{a: 1}");
+    const auto matchExpr = parse(filter);
+    CardinalityEstimate est = estimator.estimateCardinality(matchExpr.get());
+    ASSERT_EQUALS(est.source(), cost_based_ranker::EstimationSource::Sampling);
+}
+
 }  // namespace mongo::ce

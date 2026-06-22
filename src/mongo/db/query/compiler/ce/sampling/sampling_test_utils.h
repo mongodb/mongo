@@ -69,11 +69,12 @@ public:
      * specific samples (including duplicate documents that simulate sampling with replacement)
      * without needing a real collection.
      */
-    void setSampleForTesting(std::vector<BSONObj> sample) {
+    void setSampleForTesting(std::vector<BSONObj> sample, bool wasPersisted = false) {
         _sample = std::move(sample);
         _sampleSize = _sample.size();
         _uniqueDocCount = boost::none;
         _isSampleGenerated = true;
+        _wasSamplePersisted = wasPersisted;
     }
 
     static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError) {

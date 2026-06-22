@@ -362,6 +362,8 @@ protected:
     // Lazily computed on the first estimateNDV() call. Counts the number of documents with
     // distinct _id values in the sample to detect duplicates from sampling with replacement.
     mutable boost::optional<size_t> _uniqueDocCount;
+    // Set to true when tryLoadPersistentSample() successfully loads sample from stats collection.
+    bool _wasSamplePersisted = false;
 
 private:
     /**
@@ -436,9 +438,6 @@ private:
     // (otherwise a refresh would just re-read the sample it's about to replace).
     SamplingSourceEnum _samplingSource;
 
-    // Set to true when tryLoadPersistentSample() successfully loads a sample from the stats
-    // collection. Used to populate SamplingMetadata for explain output.
-    bool _wasSamplePersisted = false;
     // The timestamp when the sample was created. For persisted samples this is read from the
     // stored document; for on-the-fly samples it is set to Date_t::now() at the end of
     // generateSample(). Always valid after generateSample() completes.
