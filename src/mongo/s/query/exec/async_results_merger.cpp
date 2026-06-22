@@ -932,10 +932,10 @@ BSONObj AsyncResultsMerger::_makeRequest(WithLock lk,
     auto& remoteMetricsToInclude = _params.getRequestRemoteMetrics();
     // Check requestQueryStatsFromRemotes as a fallback for older cluster nodes that set only the
     // legacy bool field when sending AsyncResultsMergerParams over the wire.
-    if ((remoteMetricsToInclude && remoteMetricsToInclude->getQueryStats()) ||
-        _params.getRequestQueryStatsFromRemotes()) {
-        getMoreRequest.setIncludeQueryStatsMetrics(true);
-    }
+    setRemoteMetricsToInclude(getMoreRequest,
+                              (remoteMetricsToInclude && remoteMetricsToInclude->getQueryStats()) ||
+                                  _params.getRequestQueryStatsFromRemotes(),
+                              _opCtx);
     BSONObjBuilder bob;
     getMoreRequest.serialize(&bob);
     if (_params.getSessionId()) {

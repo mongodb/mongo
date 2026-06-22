@@ -3579,6 +3579,9 @@ TEST_F(AsyncResultsMergerTest, ShouldNotScheduleGetMoresWithoutAnOperationContex
 }
 
 TEST_F(AsyncResultsMergerTest, IncludeQueryStatsMetricsIncludedInGetMore) {
+    // Test that the legacy option is set correctly when the feature flag is disabled.
+    // TODO (SERVER-123320): Remove this test completely when the feature flag is removed.
+    unittest::ServerParameterGuard controller("featureFlagIncludeMetricsObjectOption", false);
     auto runGetMore = [this](bool requestParams) {
         BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
         std::vector<RemoteCursor> cursors;
@@ -3623,22 +3626,54 @@ TEST_F(AsyncResultsMergerTest, IncludeQueryStatsMetricsIncludedInGetMore) {
     }
 }
 
-TEST_F(AsyncResultsMergerTest, RequestRemoteMetricsWillIncludeQueryStatsMetricsInGetMore) {
-    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
-    std::vector<RemoteCursor> cursors;
-    cursors.push_back(
-        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+TEST_F(AsyncResultsMergerTest, IncludeMetricsQueryStatsIncludedInGetMoreWithFeatureFlag) {
+    // Test that the new option is set correctly when the feature flag is enabled.
+    unittest::ServerParameterGuard controller("featureFlagIncludeMetricsObjectOption", true);
+    auto runGetMore = [this](bool requestParams) {
+        BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
+        std::vector<RemoteCursor> cursors;
+        cursors.push_back(makeRemoteCursor(
+            kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
 
-    auto params = makeARMParamsFromExistingCursors(std::move(cursors), findCmd);
-    IncludeMetrics metrics;
-    metrics.setQueryStats(true);
-    params.setRequestRemoteMetrics(metrics);
+        auto params = makeARMParamsFromExistingCursors(std::move(cursors), findCmd);
+        params.setRequestQueryStatsFromRemotes(requestParams);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+        auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
 
-    auto readyEvent = unittest::assertGet(arm->nextEvent());
-    auto cmd = getNthPendingRequest(0u).cmdObj;
-    ASSERT_TRUE(cmd["includeQueryStatsMetrics"].Bool());
+        // Schedule the request for the getMore.
+        auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+        // Stash the request so we can inspect it.
+        auto cmd = getNthPendingRequest(0u).cmdObj;
+
+        // Schedule a response.
+        std::vector<CursorResponse> responses;
+        std::vector<BSONObj> nonEmptyBatch = {fromjson("{_id: 1}")};
+        responses.emplace_back(kTestNss, CursorId(0), nonEmptyBatch);
+        scheduleNetworkResponses(std::move(responses));
+
+        ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+        // Kill the ARM.
+        arm->kill(operationContext()).wait();
+
+        return cmd;
+    };
+
+    {
+        // The original query was not selected for query stats - we don't expect to see the flag.
+        auto cmd = runGetMore(false);
+        ASSERT_TRUE(cmd["includeMetrics"].eoo() ||
+                    !cmd["includeMetrics"].Obj()["queryStats"].Bool());
+        ASSERT_TRUE(cmd["includeQueryStatsMetrics"].eoo());
+    }
+
+    {
+        // The original query was selected for query stats - we expect to see the flag true.
+        auto cmd = runGetMore(true);
+        ASSERT_TRUE(cmd["includeMetrics"].Obj()["queryStats"].Bool());
+        ASSERT_TRUE(cmd["includeQueryStatsMetrics"].eoo());
+    }
 }
 
 TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {

@@ -220,16 +220,15 @@ BSONObj makeFindCommandForShards(OperationContext* opCtx,
 
     // Request metrics if necessary.
     {
-        // We'll set includeQueryStatsMetrics if our configuration (e.g., feature flag, sample
-        // rate) dictates we should gather metrics, or the user sent the flag to us.
+        // Request query stats metrics if our configuration (e.g., feature flag, sample rate)
+        // dictates we should gather metrics, or the user sent the flag to us.
         const auto& origFindReq = query.getFindCommandRequest();
         const auto& includeMetricsOption = origFindReq.getIncludeMetrics();
         const bool origIncludeQueryStats =
             origFindReq.getIncludeQueryStatsMetrics().value_or(false) ||
             (includeMetricsOption && includeMetricsOption->getQueryStats());
-        if (origIncludeQueryStats || remoteMetricsToInclude.getQueryStats()) {
-            findCommand.setIncludeQueryStatsMetrics(true);
-        }
+        setRemoteMetricsToInclude(
+            findCommand, origIncludeQueryStats || remoteMetricsToInclude.getQueryStats(), opCtx);
     }
 
     // Only set lsid and txnNumber here. Other transaction-related arguments such as

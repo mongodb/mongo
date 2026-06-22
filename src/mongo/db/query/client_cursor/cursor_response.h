@@ -38,6 +38,8 @@
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -59,6 +61,35 @@ namespace MONGO_MOD_PUBLIC mongo {
  * Returns true if any metric collection flag in 'metrics' is enabled.
  */
 bool hasAnyMetricsRequested(const IncludeMetrics& metrics);
+
+template <typename Request>
+void setRemoteMetricsToInclude(Request& request, bool includeQueryStats, OperationContext* opCtx) {
+    if (!includeQueryStats) {
+        return;
+    }
+    // Use the new 'includeMetrics.queryStats' field only when the feature flag is enabled
+    // to avoid sending unknown fields to older nodes; fall back to the deprecated
+    // 'includeQueryStatsMetrics' otherwise.
+    // TODO (SERVER-126099): Remove the 'includeQueryStatsMetrics' field and always use
+    // 'includeMetrics.queryStats' once the feature flag is removed.
+    if (feature_flags::gFeatureFlagIncludeMetricsObjectOption
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                opCtx ? VersionContext::getDecoration(opCtx) : VersionContext{},
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (request.getIncludeMetrics()) {
+            request.getIncludeMetrics()->setQueryStats(true);
+        } else {
+            IncludeMetrics im;
+            im.setQueryStats(true);
+            request.setIncludeMetrics(std::move(im));
+        }
+        // Clear the deprecated field: its value has been migrated to 'includeMetrics.queryStats'
+        // above, so mongod only sees the new field.
+        request.setIncludeQueryStatsMetrics(OptionalBool());
+    } else {
+        request.setIncludeQueryStatsMetrics(true);
+    }
+}
 
 /**
  * Builds the cursor field for a reply to a cursor-generating command in-place.
