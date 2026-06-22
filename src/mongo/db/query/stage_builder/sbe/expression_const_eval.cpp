@@ -63,7 +63,6 @@ void ExpressionConstEval::optimize(abt::ABT& n) {
         algebra::transport<true>(n, *this);
     }
 
-    // TODO SERVER-95539: should we be clearing here?
     _singleRef.clear();
 
     _staleDefs.clear();
