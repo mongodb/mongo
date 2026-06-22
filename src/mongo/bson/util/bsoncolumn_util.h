@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/platform/int128.h"
 
@@ -53,6 +54,12 @@ inline bool isLiteralControlByte(char control) {
 inline uint8_t numSimple8bBlocksForControlByte(char control) {
     return (control & 0x0F) + 1;
 }
+
+/*
+ * Calculate number of interleaved streams for a reference object and interleaved control byte. Will
+ * throw if no scalar streams are found as that is an invalid reference object for the control byte.
+ */
+uint32_t numInterleavedStreams(const BSONObj& refObj, uint8_t control);
 
 bool usesDeltaOfDelta(BSONType type);
 bool uses128bit(BSONType type);

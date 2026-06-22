@@ -677,6 +677,8 @@ last-continuous:
     ticket: SERVER-106165
   - test_file: jstests/concurrency/fsm_workloads/update_and_batched_delete.js
     ticket: SERVER-95570
+  - test_file: jstests/core/timeseries/write/timeseries_bypass_document_validation_raw_buckets.js
+    ticket: SERVER-121714
   - test_file: jstests/aggregation/expressions/trim.js
     ticket: SERVER-120668
   - test_file: jstests/change_streams/events_containing_version_literals.js
@@ -1412,6 +1414,8 @@ last-lts:
     ticket: SERVER-106165
   - test_file: jstests/concurrency/fsm_workloads/update_and_batched_delete.js
     ticket: SERVER-95570
+  - test_file: jstests/core/timeseries/write/timeseries_bypass_document_validation_raw_buckets.js
+    ticket: SERVER-121714
   - test_file: jstests/aggregation/expressions/trim.js
     ticket: SERVER-120668
   - test_file: jstests/change_streams/events_containing_version_literals.js

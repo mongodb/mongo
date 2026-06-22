@@ -252,7 +252,7 @@ Status OplogApplicationChecks::checkAuthForOperation(OperationContext* opCtx,
     }
     fassert(40314, validity == OplogApplicationValidity::kOk);
 
-    boost::optional<DisableDocumentValidation> maybeDisableValidation;
+    boost::optional<DisableDocumentValidationForInternalOp> maybeDisableValidation;
     if (shouldBypassDocumentValidationForCommand(cmdObj))
         maybeDisableValidation.emplace(opCtx);
 

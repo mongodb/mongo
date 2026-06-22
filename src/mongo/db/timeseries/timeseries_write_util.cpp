@@ -155,7 +155,7 @@ Status performAtomicWrites(OperationContext* opCtx,
                            StmtId stmtId) try {
     NamespaceString ns = coll->ns();
 
-    DisableDocumentValidation disableDocumentValidation{opCtx};
+    DisableDocumentValidationForInternalOp disableDocumentValidation{opCtx};
 
     write_ops_exec::LastOpFixer lastOpFixer{opCtx};
     lastOpFixer.startingOp(ns);

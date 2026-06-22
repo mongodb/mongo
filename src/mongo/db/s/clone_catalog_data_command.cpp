@@ -60,7 +60,7 @@ void cloneDatabase(OperationContext* opCtx,
     auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
         opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
 
-    DisableDocumentValidation disableValidation(opCtx);
+    DisableDocumentValidationForInternalOp disableValidation(opCtx);
 
     // Clone the non-ignored collections.
     std::set<std::string> clonedColls;

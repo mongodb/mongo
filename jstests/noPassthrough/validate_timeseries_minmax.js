@@ -196,6 +196,10 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 setUpCollection(weatherData);
 jsTestLog("Running validate on bucket with incorrect 'min' timestamp, using collection " +
           collName + ".");
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
 coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
 assert.commandWorked(

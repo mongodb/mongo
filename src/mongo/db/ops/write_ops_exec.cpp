@@ -941,8 +941,8 @@ WriteResult performInserts(OperationContext* opCtx,
     const auto [disableDocumentValidation, fleCrudProcessed] =
         getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
-                                                                      disableDocumentValidation);
+    DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
+        opCtx, disableDocumentValidation);
 
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, disableDocumentValidation, fleCrudProcessed);
@@ -1328,8 +1328,8 @@ WriteResult performUpdates(OperationContext* opCtx,
     const auto [disableDocumentValidation, fleCrudProcessed] =
         getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
-                                                                      disableDocumentValidation);
+    DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
+        opCtx, disableDocumentValidation);
 
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, disableDocumentValidation, fleCrudProcessed);
@@ -1607,8 +1607,8 @@ WriteResult performDeletes(OperationContext* opCtx,
     const auto [disableDocumentValidation, fleCrudProcessed] =
         getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
-                                                                      disableDocumentValidation);
+    DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
+        opCtx, disableDocumentValidation);
 
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, disableDocumentValidation, fleCrudProcessed);
@@ -1730,7 +1730,7 @@ Status performAtomicTimeseriesWrites(
     auto ns =
         !insertOps.empty() ? insertOps.front().getNamespace() : updateOps.front().getNamespace();
 
-    DisableDocumentValidation disableDocumentValidation{opCtx};
+    DisableDocumentValidationForInternalOp disableDocumentValidation{opCtx};
 
     LastOpFixer lastOpFixer(opCtx);
     lastOpFixer.startingOp(ns);
@@ -2221,10 +2221,6 @@ TimeseriesSingleWriteResult getTimeseriesSingleWriteResult(
 write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<StmtId>&& stmtIds) {
     write_ops::WriteCommandRequestBase base;
 
-    // The schema validation configured in the bucket collection is intended for direct
-    // operations by end users and is not applicable here.
-    base.setBypassDocumentValidation(true);
-
     if (!stmtIds.empty()) {
         base.setStmtIds(std::move(stmtIds));
     }
@@ -2265,9 +2261,6 @@ write_ops::UpdateCommandRequest makeTimeseriesTransformationOp(
         {makeTimeseriesTransformationOpEntry(opCtx, bucketId, std::move(transformationFunc))});
 
     write_ops::WriteCommandRequestBase base;
-    // The schema validation configured in the bucket collection is intended for direct
-    // operations by end users and is not applicable here.
-    base.setBypassDocumentValidation(true);
 
     base.setBypassEmptyTsReplacement(request.getBypassEmptyTsReplacement());
 
@@ -2291,6 +2284,10 @@ TimeseriesSingleWriteResult performTimeseriesInsert(
     if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
         return {status->first, status->second};
     }
+
+    // The schema validation configured in the bucket collection is intended for direct
+    // operations by end users and is not applicable here.
+    DisableDocumentValidationForInternalOp disableDocumentValidation{opCtx};
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performInserts(
             opCtx,
@@ -2311,6 +2308,9 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
     if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
         return {status->first, status->second};
     }
+    // The schema validation configured in the bucket collection is intended for direct
+    // operations by end users and is not applicable here.
+    DisableDocumentValidationForInternalOp disableDocumentValidation{opCtx};
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performUpdates(opCtx, op, OperationSource::kTimeseriesInsert), request);
 }
@@ -2363,6 +2363,10 @@ void tryPerformTimeseriesBucketCompression(
 
     auto compressionOp = makeTimeseriesTransformationOp(
         opCtx, closedBucket.bucketId.oid, bucketCompressionFunc, request);
+
+    // The schema validation configured in the bucket collection is intended for direct
+    // operations by end users and is not applicable here.
+    DisableDocumentValidationForInternalOp disableDocumentValidation{opCtx};
     auto result = getTimeseriesSingleWriteResult(
         write_ops_exec::performUpdates(
             opCtx, compressionOp, OperationSource::kTimeseriesBucketCompression),

@@ -44,9 +44,12 @@
 #include <sys/resource.h>
 #endif  // _WIN32
 
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/startup_warnings_common.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/processinfo.h"
@@ -489,6 +492,19 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                               "is no longer a supported engine in version 7.0, and should not be "
                               "used in production environments. Please set "
                               "'internalQueryFrameworkControl' to 'forceClassicEngine'");
+    }
+
+    if (static_cast<long long>(gTimeseriesBucketMinCount + 1) * BSONObjMaxUserSize >
+        bsonMaxExpandedMemUsage.load()) {
+        LOGV2_OPTIONS(
+            11761701,
+            {logv2::LogTag::kStartupWarnings},
+            "Configuration of 'timeseriesBucketMinCount' combined with 'bsonMaxExpandedMemUsage' "
+            "risks timeseries collections not being restorable or migratable. Either decrease "
+            "'timeseriesBucketMinCount' or increase 'bsonMaxExpandedMemUsage' to ensure that "
+            "internal buckets do not exceed expanded memory usage.",
+            "timeseriesBucketMinCount"_attr = gTimeseriesBucketMinCount,
+            "bsonMaxExpandedMemUsage"_attr = bsonMaxExpandedMemUsage.load());
     }
 }
 }  // namespace mongo

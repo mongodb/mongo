@@ -842,7 +842,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
     // Apply the oplog entry.
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-        DisableDocumentValidation validationDisabler(_opCtx.get());
+        DisableDocumentValidationForInternalOp validationDisabler(_opCtx.get());
         ASSERT_THROWS(applyOplogEntryOrGroupedInserts(_opCtx.get(),
                                                       ApplierOperation{&invalidateOp},
                                                       OplogApplication::Mode::kInitialSync,
@@ -907,7 +907,7 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
     // Apply the first oplog entry which should lead us to write an invalidate entry.
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-        DisableDocumentValidation validationDisabler(_opCtx.get());
+        DisableDocumentValidationForInternalOp validationDisabler(_opCtx.get());
         ASSERT_THROWS(applyOplogEntryOrGroupedInserts(_opCtx.get(),
                                                       ApplierOperation{&invalidateOp},
                                                       OplogApplication::Mode::kInitialSync,
@@ -934,7 +934,7 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
 
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-        DisableDocumentValidation validationDisabler(_opCtx.get());
+        DisableDocumentValidationForInternalOp validationDisabler(_opCtx.get());
         ASSERT_THROWS(applyOplogEntryOrGroupedInserts(_opCtx.get(),
                                                       ApplierOperation{&earlierInvalidateOp},
                                                       OplogApplication::Mode::kInitialSync,

@@ -145,6 +145,18 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='timeseries_bucket_validation',
+    source=[
+        'timeseries_bucket_validation.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        'timeseries_extended_range',
+        'timeseries_options',
+    ],
+)
+
 env.CppUnitTest(
     target='db_timeseries_test',
     source=[

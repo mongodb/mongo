@@ -31,6 +31,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/bson/util/bson_column',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

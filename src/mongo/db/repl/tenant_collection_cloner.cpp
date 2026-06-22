@@ -541,7 +541,7 @@ void TenantCollectionCloner::insertDocuments(std::vector<BSONObj> docsToInsert) 
     // collection document insertion.
     DisableDocumentValidation documentValidationDisabler(
         opCtx,
-        DocumentValidationSettings::kDisableSchemaValidation |
+        DocumentValidationSettings::kDisableSchemaValidationForInternalOp |
             DocumentValidationSettings::kDisableInternalValidation);
 
     write_ops::InsertCommandRequest insertOp(_existingNss.value_or(_sourceNss));

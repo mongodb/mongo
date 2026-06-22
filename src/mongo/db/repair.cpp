@@ -140,7 +140,7 @@ Status repairCollections(OperationContext* opCtx,
 
 namespace repair {
 Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const DatabaseName& dbName) {
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     // We must hold some form of lock here
     invariant(opCtx->lockState()->isW());

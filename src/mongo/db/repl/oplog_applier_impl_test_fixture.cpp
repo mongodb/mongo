@@ -231,7 +231,7 @@ Status OplogApplierImplTest::_applyOplogEntryOrGroupedInsertsWrapper(
     const OplogEntryOrGroupedInserts& batch,
     OplogApplication::Mode oplogApplicationMode) {
     UnreplicatedWritesBlock uwb(opCtx);
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
     const bool dataIsConsistent = true;
     return applyOplogEntryOrGroupedInserts(opCtx, batch, oplogApplicationMode, dataIsConsistent);
 }
@@ -249,7 +249,8 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
         ASSERT_FALSE(opCtx->lockState()->isDbLockedForMode(targetNss.dbName(), MODE_X));
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(targetNss, MODE_IX));
         ASSERT_FALSE(opCtx->writesAreReplicated());
-        ASSERT_TRUE(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
+        ASSERT_TRUE(
+            DocumentValidationSettings::get(opCtx).isSchemaValidationDisabledForInternalOp());
     };
 
     _opObserver->onInsertsFn =

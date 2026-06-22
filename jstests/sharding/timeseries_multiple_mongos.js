@@ -20,6 +20,9 @@ const collName = 'testColl';
 const bucketsCollName = 'system.buckets.' + collName;
 const timeField = 'time';
 const metaField = 'hostid';
+const testTimestamp = ISODate("2023-08-09T17:05:42.238Z");
+const testRoundedMinTimestamp = ISODate("2023-08-09T17:00:00Z");
+const testBucketId = ObjectId("64d3c6104c83948224c45ddf");
 
 // Connections.
 const st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 2}});
@@ -281,9 +284,9 @@ runTest({
     cmdObj: {
         insert: bucketsCollName,
         documents: [{
-            _id: ObjectId(),
-            control: {min: {time: ISODate()}, max: {time: ISODate()}, version: 1},
-            data: {}
+            _id: testBucketId,
+            control: {min: {time: testRoundedMinTimestamp}, max: {time: testTimestamp}, version: 1},
+            data: {[timeField]: {0: testTimestamp}},
         }]
     },
     numProfilerEntries: {sharded: 1, unsharded: 1},

@@ -249,14 +249,23 @@ testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
     const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
-    const oid = ObjectId("65F9971847423af45aeafc67");
-    const timestamp = ISODate("2024-03-19T13:46:00Z");
+    const oid = ObjectId("65f98c500000000000000000");
+    const timestamp = ISODate("2024-03-19T13:46:08Z");
     assert.commandWorked(bucketsColl.insert({
         _id: oid,
-        control: {version: 1, min: {time: timestamp}, max: {time: timestamp}},
+        control: {
+            version: 1,
+            min: {
+                time: ISODate("2024-03-19T13:00:00.000Z"),
+                "_id": ObjectId("65f9972047423af45aeafc67"),
+                "a": 1
+            },
+            max: {time: timestamp, "_id": ObjectId("65f9972047423af45aeafc67"), "a": 1},
+            count: 1
+        },
         data: {
             "time": {"0": timestamp},
-            "_id": {"0": oid},
+            "_id": {"0": ObjectId("65f9972047423af45aeafc67")},
             "a": {"0": 1},
         }
     }));

@@ -59,6 +59,10 @@ coll.insertMany([...Array(10).keys()].map(i => ({
                                               "temp": i
                                           })),
                 {ordered: false});
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand(
+    {setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
 bucket.updateOne({"meta.sensorId": 2}, {"$set": {"control.version": 2}});
 res = bucket.validate();
 assert(!res.valid, tojson(res));

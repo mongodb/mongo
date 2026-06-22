@@ -804,8 +804,8 @@ std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
     const auto& ops = req.getOps();
     const auto& bypassDocumentValidation = req.getBypassDocumentValidation();
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
-                                                                      bypassDocumentValidation);
+    DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
+        opCtx, bypassDocumentValidation);
 
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, bypassDocumentValidation, false);

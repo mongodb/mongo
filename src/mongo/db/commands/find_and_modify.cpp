@@ -402,8 +402,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     auto disableDocumentValidation = req.getBypassDocumentValidation().value_or(false);
     auto fleCrudProcessed = write_ops_exec::getFleCrudProcessed(req.getEncryptionInformation());
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
-                                                                      disableDocumentValidation);
+    DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
+        opCtx, disableDocumentValidation);
 
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, disableDocumentValidation, fleCrudProcessed);

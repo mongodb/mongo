@@ -658,7 +658,7 @@ void _reconstructPreparedTransaction(OperationContext* opCtx,
                                      repl::OplogApplication::Mode mode) {
     repl::UnreplicatedWritesBlock uwb(opCtx);
     // The transaction may have been prepared originally with document validation bypassed.
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     // Snapshot transaction can never conflict with the PBWM lock.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);

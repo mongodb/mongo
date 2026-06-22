@@ -735,7 +735,7 @@ BSONColumn::BSONColumn(const char* buffer, size_t size)
 }
 
 BSONColumn::BSONColumn(BSONElement bin) {
-    tassert(5857700,
+    uassert(5857700,
             "Invalid BSON type for column",
             bin.type() == BSONType::BinData && bin.binDataType() == BinDataType::Column);
 
@@ -746,7 +746,7 @@ BSONColumn::BSONColumn(BSONElement bin) {
 
 BSONColumn::BSONColumn(BSONBinData bin)
     : BSONColumn(static_cast<const char*>(bin.data), bin.length) {
-    tassert(6179300, "Invalid BSON type for column", bin.type == BinDataType::Column);
+    uassert(6179300, "Invalid BSON type for column", bin.type == BinDataType::Column);
 }
 
 void BSONColumn::_initialValidate() {

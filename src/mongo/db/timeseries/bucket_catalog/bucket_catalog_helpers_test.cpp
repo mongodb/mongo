@@ -363,36 +363,40 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
 
     std::vector<BSONObj> bucketDocs = {mongo::fromjson(
                                            R"({
-            "_id":{"$oid":"62e7e6ec27c28d338ab29200"},
+            "_id":{"$oid":"61067eb0de4e031499bc4046"},
             "control":{"version":1,"min":{"_id":1,"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
-                                   "max":{"_id":3,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3},
+                                   "max":{"_id":3,"time":{"$date":"2021-08-01T11:00:00Z"},"a":3},
                        "closed":false},
             "meta":1,
             "data":{"time":{"0":{"$date":"2021-08-01T11:00:00Z"},
                             "1":{"$date":"2021-08-01T11:00:00Z"},
                             "2":{"$date":"2021-08-01T11:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})"),
+                    "a":{"0":1,"1":2,"2":3},
+                    "_id": {"0":1,"1":2,"2":3}}})"),
                                        mongo::fromjson(
                                            R"(
-            {"_id":{"$oid":"62e7eee4f33f295800073138"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2022-08-01T12:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2022-08-01T13:00:00Z"},"a":3}},
+            {"_id":{"$oid":"61068cc0de4e031499bc4047"},
+            "control":{"version":1,"min":{"_id":4,"time":{"$date":"2021-08-01T12:00:00Z"},"a":1},
+                                   "max":{"_id":6,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3}},
             "meta":2,
-            "data":{"time":{"0":{"$date":"2022-08-01T12:00:00Z"},
-                            "1":{"$date":"2022-08-01T12:00:00Z"},
-                            "2":{"$date":"2022-08-01T12:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})"),
+            "data":{"time":{"0":{"$date":"2021-08-01T12:00:00Z"},
+                            "1":{"$date":"2021-08-01T12:00:00Z"},
+                            "2":{"$date":"2021-08-01T12:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "_id": {"0":4,"1":5,"2":6}
+                    }})"),
                                        mongo::fromjson(
                                            R"({
-            "_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
+            "_id":{"$oid":"61069ad0de4e031499bc404b"},
+            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2021-08-01T13:00:00Z"},"a":1},
+                                   "max":{"_id":9,"time":{"$date":"2021-08-01T13:00:00Z"},"a":3},
                        "closed":false},
             "meta":3,
-            "data":{"time":{"0":{"$date":"2023-08-01T13:00:00Z"},
-                            "1":{"$date":"2023-08-01T13:00:00Z"},
-                            "2":{"$date":"2023-08-01T13:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})")};
+            "data":{"time":{"0":{"$date":"2021-08-01T13:00:00Z"},
+                            "1":{"$date":"2021-08-01T13:00:00Z"},
+                            "2":{"$date":"2021-08-01T13:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "_id": {"0":7,"1":8,"2":9}}})")};
 
     // Insert bucket documents into the system.buckets collection.
     for (const auto& doc : bucketDocs) {
@@ -400,8 +404,8 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
     }
 
     auto time1 = dateFromISOString("2021-08-01T11:30:00Z");
-    auto time2 = dateFromISOString("2022-08-01T12:30:00Z");
-    auto time3 = dateFromISOString("2023-08-01T13:30:00Z");
+    auto time2 = dateFromISOString("2021-08-01T12:30:00Z");
+    auto time3 = dateFromISOString("2021-08-01T13:30:00Z");
     std::vector<BSONObj> docsWithSuitableBuckets = {
         BSON("_id" << 1 << _timeField << time1.getValue() << _metaField << 1),
         BSON("_id" << 2 << _timeField << time2.getValue() << _metaField << 2),
@@ -437,14 +441,15 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
         auto metalessDoc = BSON("_id" << 4 << _timeField << time3.getValue());
         auto metalessBucket = mongo::fromjson(
             R"({
-            "_id":{"$oid":"629e1e680958e279dc29a518"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
+            "_id":{"$oid":"61069ad0de4e031499bc404c"},
+            "control":{"version":1,"min":{"_id":10,"time":{"$date":"2021-08-01T13:00:00Z"},"a":1},
+                                   "max":{"_id":12,"time":{"$date":"2021-08-01T13:00:00Z"},"a":3},
                        "closed":false},
-            "data":{"time":{"0":{"$date":"2023-08-01T13:00:00Z"},
-                            "1":{"$date":"2023-08-01T13:00:00Z"},
-                            "2":{"$date":"2023-08-01T13:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})");
+            "data":{"time":{"0":{"$date":"2021-08-01T13:00:00Z"},
+                            "1":{"$date":"2021-08-01T13:00:00Z"},
+                            "2":{"$date":"2021-08-01T13:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                     "_id": {"0":10,"1":11,"2":12}}})");
         _insertIntoBucketColl(metalessBucket);
 
         auto result = _findSuitableBucket(
@@ -484,20 +489,20 @@ TEST_F(BucketCatalogHelpersTest, IncompatibleBucketsForNewMeasurements) {
     std::vector<BSONObj> bucketDocs = {// control.version indicates bucket is compressed.
                                        mongo::fromjson(
                                            R"({
-            "_id":{"$oid":"62e7e6ec27c28d338ab29200"},
-            "control":{"version":2,"min":{"_id":1,"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
-                                   "max":{"_id":3,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3}},
+            "_id":{"$oid":"61067eb027c28d338ab29200"},
+            "control":{"version":2,
+                       "count":3,
+                       "min":{"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
+                       "max":{"time":{"$date":"2021-08-01T11:00:00Z"},"a":3}},
             "meta":1,
-            "data":{"time":{"0":{"$date":"2021-08-01T11:00:00Z"},
-                            "1":{"$date":"2021-08-01T11:00:00Z"},
-                            "2":{"$date":"2021-08-01T11:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})"),
+            "data":{"time":{"$binary":"CQCA314BewEAAIANAAAAAAAAAAA=","$type":"07"},
+                    "a":{"$binary":"EAABAAAAgC0AAAAIAAAAAA==","$type":"07"}}})"),
                                        // control.closed flag is true.
                                        mongo::fromjson(
                                            R"(
-            {"_id":{"$oid":"62e7eee4f33f295800073138"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2022-08-01T12:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2022-08-01T13:00:00Z"},"a":3},
+            {"_id":{"$oid":"62e7c040f33f295800073138"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-08-01T12:00:00Z"},"a":1},
+                                   "max":{"time":{"$date":"2022-08-01T12:00:00Z"},"a":3},
                        "closed":true},
             "meta":2,
             "data":{"time":{"0":{"$date":"2022-08-01T12:00:00Z"},
@@ -507,15 +512,15 @@ TEST_F(BucketCatalogHelpersTest, IncompatibleBucketsForNewMeasurements) {
                                        // Compressed bucket with closed flag set.
                                        mongo::fromjson(
                                            R"({
-            "_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":2,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
+            "_id":{"$oid":"64c901d00958e279dc29a517"},
+            "control":{"version":2,
+                       "count":3,
+                       "min":{"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
+                       "max":{"time":{"$date":"2023-08-01T13:00:00Z"},"a":3},
                        "closed":true},
             "meta":3,
-            "data":{"time":{"0":{"$date":"2023-08-01T13:00:00Z"},
-                            "1":{"$date":"2023-08-01T13:00:00Z"},
-                            "2":{"$date":"2023-08-01T13:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})")};
+            "data":{"time":{"$binary":"CQCAFC+xiQEAAIANAAAAAAAAAAA=","$type":"07"},
+                    "a":{"$binary":"EAABAAAAgC0AAAAIAAAAAA==","$type":"07"}}})")};
 
     // Insert bucket documents into the system.buckets collection.
     for (const auto& doc : bucketDocs) {
@@ -552,9 +557,9 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
 
     std::vector<BSONObj> bucketDocs = {mongo::fromjson(
                                            R"({
-            "_id":{"$oid":"62e7e6ec27c28d338ab29200"},
-            "control":{"version":1,"min":{"_id":1,"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
-                                   "max":{"_id":3,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3},
+            "_id":{"$oid":"61067eb027c28d338ab29200"},
+            "control":{"version":1,"min":{"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
+                                   "max":{"time":{"$date":"2021-08-01T11:00:00Z"},"a":3},
                        "closed":false},
             "meta":1,
             "data":{"time":{"0":{"$date":"2021-08-01T11:00:00Z"},
@@ -563,9 +568,9 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
                     "a":{"0":1,"1":2,"2":3}}})"),
                                        mongo::fromjson(
                                            R"(
-            {"_id":{"$oid":"62e7eee4f33f295800073138"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2022-08-01T12:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2022-08-01T13:00:00Z"},"a":3}},
+            {"_id":{"$oid":"62e7c040f33f295800073138"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-08-01T12:00:00Z"},"a":1},
+                                   "max":{"time":{"$date":"2022-08-01T12:00:00Z"},"a":3}},
             "meta":2,
             "data":{"time":{"0":{"$date":"2022-08-01T12:00:00Z"},
                             "1":{"$date":"2022-08-01T12:00:00Z"},
@@ -573,9 +578,9 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
                     "a":{"0":1,"1":2,"2":3}}})"),
                                        mongo::fromjson(
                                            R"({
-            "_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
+            "_id":{"$oid":"64c901d00958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
+                                   "max":{"time":{"$date":"2023-08-01T13:00:00Z"},"a":3},
                        "closed":false},
             "meta":3,
             "data":{"time":{"0":{"$date":"2023-08-01T13:00:00Z"},

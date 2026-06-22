@@ -412,6 +412,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
         '$BUILD_DIR/mongo/db/storage/storage_util',
         '$BUILD_DIR/mongo/db/system_index',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_bucket_validation',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_extended_range',
         '$BUILD_DIR/mongo/db/transaction/transaction',
