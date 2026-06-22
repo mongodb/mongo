@@ -683,6 +683,8 @@ private:
     Value _value;
 };
 
+static_assert(sizeof(TagValueOwned) <= 16ULL, "TagValueOwned should not be larger than 16 bytes");
+
 inline void swap(TagValueOwned& a, TagValueOwned& b) noexcept {
     a.swap(b);
 }
