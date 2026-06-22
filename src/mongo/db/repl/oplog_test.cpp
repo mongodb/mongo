@@ -146,6 +146,36 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
     ASSERT_EQUALS(ReplClientInfo::forClient(&cc()).getLastOp(), opTime);
 }
 
+TEST_F(OplogTest, HashSingleOpRoundTrip) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const int32_t hash = 0x5EAF9B27;
+
+    MutableOplogEntry op;
+    op.setOpType(repl::OpTypeEnum::kInsert);
+    op.setNss(nss);
+    op.setUuid(UUID::gen());
+    op.setObject(BSON("_id" << 0 << "x" << 10));
+    op.setWallClockTime(Date_t::now());
+    op.setDocHash(hash);
+
+    {
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        logOp(opCtx.get(), &op);
+        wunit.commit();
+    }
+
+    const auto entry = _getSingleOplogEntry(opCtx.get());
+    const auto parsedDocHash = entry.getDocHash();
+    ASSERT_TRUE(parsedDocHash.has_value());
+    EXPECT_EQ(hash, *parsedDocHash);
+}
+
 /**
  * Checks optime and namespace in oplog entry.
  */
