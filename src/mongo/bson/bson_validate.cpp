@@ -939,6 +939,8 @@ public:
                         return Status::OK();
                     }
                 } else if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
+                    bsoncolumn::assertNotCodeWScope(
+                        static_cast<BSONType>(static_cast<int8_t>(control)));
                     int size;
                     if (MONGO_likely(mode == BSONValidateMode::kDefault))
                         size = ValidateBuffer<precise, DefaultValidator>(
@@ -1003,6 +1005,8 @@ public:
                     ptr += 1 + size;
                 }
             }
+        } catch (const ExceptionFor<ErrorCodes::InvalidBSONType>& e) {
+            return Status(e.code(), str::stream() << e.what());
         } catch (const DBException& e) {
             return Status(e.code(), str::stream() << e.what());
         }
