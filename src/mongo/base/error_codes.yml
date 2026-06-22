@@ -600,6 +600,12 @@ error_codes:
         categories: [SystemOverloadedError],
       }
 
+    - {
+        code: 513,
+        name: InvalidBSONFromJavaScript,
+        categories: [ValidationError],
+      }
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
