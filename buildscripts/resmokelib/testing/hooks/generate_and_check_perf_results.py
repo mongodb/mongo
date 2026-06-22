@@ -734,13 +734,15 @@ class _BenchmarkThreadsReport(object):
         """
         Split the benchmark name into base_name, thread_count and statistic_type.
 
-        The base name is the benchmark name minus the thread count and any statistics.
-        Testcases of the same group will be shown on a single perf graph.
+        The base name is the benchmark name minus the thread count, any explicit iteration
+        count, and any statistics. Testcases of the same group will be shown on a single perf
+        graph.
 
         benchmark_res["name"] look like the following:
         "BM_SetInsert/arg name:1024/threads:10_mean"
         "BM_SetInsert/arg 1/arg 2"
         "BM_SetInsert_mean"
+        "BM_SetInsert/iterations:10000/threads:10"
         """
 
         name_str = benchmark_res["name"]
@@ -762,5 +764,10 @@ class _BenchmarkThreadsReport(object):
         else:  # There is no explicit thread count, so the thread count is 1.
             thread_count = "1"
             base_name = name_str
+
+        # Step 3: Remove any explicit iteration count from the base name.
+        iteration_section = base_name.rsplit("/", 1)[-1]
+        if iteration_section.startswith("iterations:"):
+            base_name = base_name.rsplit("/", 1)[0]
 
         return _BenchmarkName(base_name, thread_count, statistic_type)
