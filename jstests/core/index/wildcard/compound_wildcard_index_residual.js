@@ -32,6 +32,7 @@ import {
     isIndexOnly,
 } from "jstests/libs/query/analyze_plan.js";
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
 
 // Asserts that each plan contains exactly one IXSCAN matching the descriptor.
@@ -160,6 +161,11 @@ describe("predicates matching missing/null", function () {
         assertAllPlansIxScan(plans, kGenericScan_a1);
     });
     it("$ne:null excludes null and absent", function () {
+        if (!isFCVgte(db.getMongo(), "9.0")) {
+            // SERVER-95374 is not backported
+            jsTest.log.info("Skipping $ne:null test: requires FCV 9.0+");
+            return;
+        }
         // $ne:null on the wildcard field is compatible with the non-generic sparse entry: absent
         // fields are not indexed, so any index entry implies the field exists.
         const kNonGenericScan_bx = {
@@ -189,6 +195,11 @@ describe("predicates matching missing/null", function () {
         assertAllPlansIxScan([genericPlan], kGenericScan_a1);
     });
     it("$ne:null on non-wildcard suffix is covered when wildcard field is indexed (SERVER-95374)", function () {
+        if (!isFCVgte(db.getMongo(), "9.0")) {
+            // SERVER-95374 is not backported
+            jsTest.log.info("Skipping $ne:null test: requires FCV 9.0+");
+            return;
+        }
         // With a wildcard predicate on b.x AND $ne:null on the non-wildcard suffix c, the
         // planner should use the non-generic entry and produce a covered plan.
         const kNonGenericScan_bx1_cNeNull = {
