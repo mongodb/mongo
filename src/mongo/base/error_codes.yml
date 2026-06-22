@@ -527,6 +527,12 @@ error_codes:
 
     - {code: 408, name: CannotInsertTimeseriesBucketsWithMixedSchema}
 
+    - {
+        code: 513,
+        name: InvalidBSONFromJavaScript,
+        categories: [ValidationError],
+      }
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only
