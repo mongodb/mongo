@@ -2,7 +2,10 @@
  * Tests interactions between $_internalDocumentResultsAndMetadata (via $extensionMultiStream) and
  * a $searchMeta source stage.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [
+ *  featureFlagExtensionsAPI,
+ *  featureFlagExtensionsInsideHybridSearch,
+ * ]
  */
 import {
     checkPlatformCompatibleWithExtensions,
