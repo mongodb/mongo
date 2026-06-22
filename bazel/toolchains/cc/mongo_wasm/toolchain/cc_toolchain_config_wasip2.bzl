@@ -169,7 +169,7 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             actions = all_link_actions,
             flag_groups = [flag_group(flags = [
                 "-Wl,--gc-sections",
-                "-Wl,--strip-all",
+                "-Wl,--strip-debug",
                 # wasi-sdk 33 moved the exception-aware C++ runtime libs into eh/.
                 "-L" + wasi_sysroot + "/lib/wasm32-wasip2/eh",
                 "-lc++",
