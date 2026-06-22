@@ -70,7 +70,6 @@ mongo_cc_library(
         "replicated_fast_count_committer",
         "replicated_fast_count_delta_utils",
         "replicated_fast_count_metrics",
-        "replicated_fast_count_read",
         "replicated_fast_count_streaming_oplog_delta_accumulator",
         "size_count_checkpoint_coordinator",
         "size_count_store",
@@ -300,32 +299,6 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/update:update_common",
         "//src/mongo/db/update:update_document_diff",
-    ],
-)
-
-mongo_cc_library(
-    name = "replicated_fast_count_read",
-    srcs = [
-        "replicated_fast_count_read.cpp",
-    ],
-    deps = [
-        "size_count_store",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "replicated_fast_count_read_test",
-    srcs = [
-        "replicated_fast_count_read_test.cpp",
-    ],
-    tags = [
-        "mongo_unittest_sixth_group",
-        "server-collection-write-path",
-    ],
-    deps = [
-        "replicated_fast_count_read",
-        "replicated_fast_count_test_helpers",
-        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )
 
