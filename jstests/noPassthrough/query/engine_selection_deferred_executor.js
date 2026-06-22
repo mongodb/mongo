@@ -27,6 +27,22 @@ if (checkSbeCompletelyDisabled(db) || checkSbeFullyEnabled(db)) {
     quit();
 }
 
+// featureFlagSbeEqLookupUnwind is an IFR rollout flag that controls whether $lookup-$unwind runs
+// in SBE. disableUnreleasedIFRFlags disables it even though this test doesn't set it explicitly,
+// which would cause the query to fall back to classic despite featureFlagGetExecutorDeferredEngineChoice
+// being on.
+const lookupUnwindFlagEnabled = assert.commandWorked(
+    db.adminCommand({getParameter: 1, featureFlagSbeEqLookupUnwind: 1}),
+).featureFlagSbeEqLookupUnwind.value;
+if (!lookupUnwindFlagEnabled) {
+    jsTest.log(
+        "Exiting early because featureFlagSbeEqLookupUnwind is disabled " +
+            "(e.g. by disableUnreleasedIFRFlags).",
+    );
+    MongoRunner.stopMongod(conn);
+    quit();
+}
+
 // Set logLevel to 1 so that all queries will be logged.
 assert.commandWorked(db.setLogLevel(1));
 
