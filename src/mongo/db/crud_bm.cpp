@@ -320,6 +320,21 @@ BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT_MANY)
     runBenchmark(state, [=] { return cmd; });
 }
 
+BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_AGG_MATCH_ONE)
+(benchmark::State& state) {
+    _populateTestData(getGlobalServiceContext());
+    // clang-format off
+    BSONObj cmd = BSON(
+            "aggregate" << kCollection
+            << "$db" << kDatabase
+            << "pipeline" << BSON_ARRAY(
+                BSON("$match" << BSON("_id" << 1))
+                << BSON("$limit" << 1))
+            << "cursor" << BSONObj());
+    // clang-format on
+    runBenchmark(state, [=] { return cmd; });
+}
+
 BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_DELETE_ONE)
 (benchmark::State& state) {
     // Load one document per iteration (kDeleteOneIterations). The extra kDeleteOneCollectionFloor
@@ -362,6 +377,9 @@ BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_INSERT_MANY)
     ->Threads(kCommandBMMaxThreads);
 BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_DELETE_ONE)
     ->Iterations(CrudBenchmarkFixture::kDeleteOneIterations)
+    ->Threads(1)
+    ->Threads(kCommandBMMaxThreads);
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_AGG_MATCH_ONE)
     ->Threads(1)
     ->Threads(kCommandBMMaxThreads);
 
