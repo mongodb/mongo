@@ -250,7 +250,17 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
 
     const allColls = [];
     for (const d of userDbs) {
-        const collInfos = primary.getDB(d.name).getCollectionInfos({type: "collection"});
+        let collInfos;
+        try {
+            collInfos = primary.getDB(d.name).getCollectionInfos({type: "collection"});
+        } catch (e) {
+            // A test may transiently leave an invalid view in system.views. Listing collections
+            // throws InvalidViewDefinition, so we just skip this database.
+            if (e.code === ErrorCodes.InvalidViewDefinition) {
+                continue;
+            }
+            throw e;
+        }
         for (const c of collInfos) {
             if (c.name.startsWith("system.")) continue;
             allColls.push({dbName: d.name, collName: c.name});

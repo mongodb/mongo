@@ -230,4 +230,59 @@ describe("multikey consistency hook self-test", () => {
             rst.stopSet(undefined, false, {skipCheckDBHashes: true, skipValidation: true});
         }
     });
+
+    it("tolerates a transient invalid view left in system.views", () => {
+        const dbName = `${jsTestName()}_invalid_view`;
+
+        const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: kFeatureFlagParameter}});
+        rst.startSet();
+        rst.initiate();
+
+        const primary = rst.getPrimary();
+        const testDB = primary.getDB(dbName);
+        const viewName = "dbNameWithEmbedded\0Character.collectionName";
+
+        try {
+            assert.commandWorked(testDB.dropDatabase());
+
+            // Ensure this DB would otherwise have collections to check; the invalid view below
+            // should still break listCollections.
+            createIndexedCollections(testDB, "invalidview");
+
+            // Create an invalid view.
+            assert.commandWorked(testDB.createCollection("system.views"));
+            assert.commandWorked(
+                primary.adminCommand({
+                    applyOps: [
+                        {
+                            op: "i",
+                            ns: testDB.getName() + ".system.views",
+                            o: {_id: viewName, viewOn: "someColl", pipeline: []},
+                        },
+                    ],
+                }),
+            );
+            rst.awaitReplication();
+
+            // listCollections must actually be broken by the invalid view; otherwise the test would
+            // pass even without the hook's tolerance.
+            assert.throwsWithCode(
+                () => testDB.getCollectionInfos({type: "collection"}),
+                ErrorCodes.InvalidViewDefinition,
+            );
+
+            runMultikeyConsistencyHook(primary, "invalid view");
+        } finally {
+            // Remove the bogus view so fixture teardown (dbhash/validation) is clean.
+            assert.commandWorked(
+                primary.adminCommand({
+                    applyOps: [
+                        {op: "d", ns: testDB.getName() + ".system.views", o: {_id: viewName}},
+                    ],
+                }),
+            );
+            rst.awaitReplication();
+            rst.stopSet();
+        }
+    });
 });
