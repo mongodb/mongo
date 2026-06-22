@@ -69,14 +69,6 @@ configs:
         source: yaml
         validator:
             callback: validateSecurityAuthorizationSetting
-    "security.authSchemaVersion":
-        description: "TODO"
-        arg_vartype: String
-        source: yaml
-    "security.enableLocalhostAuthBypass":
-        description: "TODO"
-        arg_vartype: String
-        source: yaml
     profile:
         description: "0=off 1=slow, 2=all"
         arg_vartype: Int

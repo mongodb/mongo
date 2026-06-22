@@ -420,18 +420,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         return Status::OK();
     };
 
-    // TODO(SERVER-122702): Integrate these options with their setParameter counterparts
-    if (params.count("security.authSchemaVersion")) {
-        return Status(ErrorCodes::BadValue,
-                      "security.authSchemaVersion is currently not supported in config files");
-    }
-
-    if (params.count("security.enableLocalhostAuthBypass")) {
-        return Status(ErrorCodes::BadValue,
-                      "security.enableLocalhostAuthBypass is currently not supported in config "
-                      "files");
-    }
-
     if (params.count("storage.engine")) {
         storageGlobalParams.engine = params["storage.engine"].as<std::string>();
         storageGlobalParams.engineSetByUser = true;
