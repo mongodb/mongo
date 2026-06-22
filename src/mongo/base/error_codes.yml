@@ -1208,5 +1208,7 @@ error_codes:
 
   - {code: 509, name: TooManyOpenTransactions, categories: [Interruption]}
 
+  - {code: 513, name: InvalidBSONFromJavaScript, categories: [ValidationError]}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

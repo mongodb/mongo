@@ -30,6 +30,7 @@
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
@@ -693,7 +694,12 @@ BSONObj ObjectWrapper::toBSON() {
                           << BSONObjMaxInternalSize << " bytes.",
             sizeWithEOO <= BSONObjMaxInternalSize);
 
-    return b.obj();
+    BSONObj obj = b.obj();
+    if (auto status = validateBSON(obj); !status.isOK()) {
+        uasserted(ErrorCodes::InvalidBSONFromJavaScript,
+                  str::stream() << "Invalid BSON generated from JavaScript: " << status.toString());
+    }
+    return obj;
 }
 
 ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,

@@ -354,5 +354,27 @@ TEST_F(ExpressionJavascriptTest,
     ASSERT_VALUE_EQ(r2,
                     Value(BSON_ARRAY(BSON("k" << 2 << "v" << 1) << BSON("k" << 2 << "v" << 999))));
 }
+
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionRejectsMalformedBSONColumn) {
+    BSONArrayBuilder emptyArgs;
+    auto bsonExpr = BSON("expr" << BSON("body" << "function() { return new BinData(7, 'Ag=='); };"
+                                               << "args" << emptyArgs.arr() << "lang"
+                                               << ExpressionFunction::kJavaScript));
+    auto expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
+    ASSERT_THROWS_CODE(expr->evaluate({}, getVariables()),
+                       AssertionException,
+                       ErrorCodes::InvalidBSONFromJavaScript);
+}
+
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitRejectsMalformedBSONColumn) {
+    auto bsonExpr =
+        BSON("expr" << BSON("this" << "$$ROOT"
+                                   << "eval"
+                                   << "function() { emit(this._id, new BinData(7, 'Ag==')); }"));
+    auto expr = ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
+    ASSERT_THROWS_CODE(expr->evaluate(Document{BSON("_id" << 1)}, getVariables()),
+                       AssertionException,
+                       ErrorCodes::InvalidBSONFromJavaScript);
+}
 }  // namespace
 }  // namespace mongo
