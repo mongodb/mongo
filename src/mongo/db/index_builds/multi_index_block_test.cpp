@@ -35,6 +35,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
+#include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
@@ -1619,9 +1620,63 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupDoesNotDropTables) {
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 }
 
-TEST_F(MultiIndexBlockTest, BasicMetrics) {
-    // Test that an index build with two specs generates proper metrics. Shou
+class MultiIndexBlockMetricsTest : public MultiIndexBlockTest,
+                                   public ::testing::WithParamInterface<IndexBuildProtocol> {
+protected:
+    void setUp() override {
+        MultiIndexBlockTest::setUp();
+        switch (GetParam()) {
+            case IndexBuildProtocol::kPrimaryDriven:
+                _pdibEnabled.emplace("featureFlagPrimaryDrivenIndexBuilds", true);
+                // Primary-driven index builds replicate their work through container writes, which
+                // require this flag.
+                _containerWritesEnabled.emplace("featureFlagContainerWrites", true);
+                // Container writes refuse unless we're the primary; the fixture's mock returns
+                // false from canAcceptWritesFor by default, so allow writes explicitly.
+                static_cast<repl::ReplicationCoordinatorMock*>(
+                    repl::ReplicationCoordinator::get(getServiceContext()))
+                    ->alwaysAllowWrites(true);
+                break;
+            case IndexBuildProtocol::kSinglePhase:
+            case IndexBuildProtocol::kTwoPhase:
+                break;
+        }
+    }
+
+    void configureIndexerForProtocol(MultiIndexBlock* indexer) {
+        switch (GetParam()) {
+            case IndexBuildProtocol::kPrimaryDriven:
+                indexer->setBuildUUID(UUID::gen());
+                indexer->setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+                indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+                break;
+            case IndexBuildProtocol::kSinglePhase:
+            case IndexBuildProtocol::kTwoPhase:
+                break;
+        }
+    }
+
+private:
+    boost::optional<unittest::ServerParameterGuard> _pdibEnabled;
+    boost::optional<unittest::ServerParameterGuard> _containerWritesEnabled;
+};
+
+std::string protocolTestName(IndexBuildProtocol protocol) {
+    switch (protocol) {
+        case IndexBuildProtocol::kSinglePhase:
+            return "SinglePhase";
+        case IndexBuildProtocol::kTwoPhase:
+            return "TwoPhase";
+        case IndexBuildProtocol::kPrimaryDriven:
+            return "PrimaryDriven";
+    }
+    MONGO_UNREACHABLE;
+}
+
+TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
+    // Builds two indexes over the collection and checks the collection-scan metrics.
     auto indexer = getIndexer();
+    configureIndexerForProtocol(indexer);
 
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t scannedBefore = 0;
@@ -1716,6 +1771,15 @@ TEST_F(MultiIndexBlockTest, BasicMetrics) {
             keysInsertedBefore + (numDocsInColl * numIndexSpecs));
     }
 }
+
+INSTANTIATE_TEST_SUITE_P(,
+                         MultiIndexBlockMetricsTest,
+                         ::testing::Values(IndexBuildProtocol::kSinglePhase,
+                                           IndexBuildProtocol::kPrimaryDriven),
+                         [](const ::testing::TestParamInfo<IndexBuildProtocol>& info) {
+                             return protocolTestName(info.param);
+                         });
+
 TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
     auto indexer = getIndexer();
 
