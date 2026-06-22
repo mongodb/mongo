@@ -3479,4 +3479,29 @@ TEST(SERVER_36024, RegressionCheck) {
     ASSERT_OK(field.setValueInt(1));
 }
 
+DEATH_TEST_REGEX(MutableBsonSerialize, PoisonDocument, "Invariant failure") {
+    // Expect an invariant failure if element size exceeds the parent buffer.
+    BSONObj valid = BSON("_id" << "poison" << "events" << BSON_ARRAY(1 << 2) << "trailing" << "x");
+
+    auto buf = SharedBuffer::allocate(valid.objsize());
+    std::memcpy(buf.get(), valid.objdata(), valid.objsize());
+
+    // Corrupt the 4-byte length prefix of the "_id" string value so the element claims to extend
+    // a bit past the end of the buffer (a modest overshoot, not a max-int that would simply
+    // integer-overflow). Layout: [int32 objsize][0x02 type]['_','i','d',0x00][int32 strlen]...
+    // -> the string length starts at byte offset 4 + 1 + 4 = 9.
+    constexpr int kIdStrLenOffset = 4 /*objsize*/ + 1 /*type*/ + 4 /*"_id\0"*/;
+    DataView(buf.get()).write<LittleEndian<int32_t>>(valid.objsize(), kIdStrLenOffset);
+
+    BSONObj poison(std::move(buf));
+
+    mmb::Document doc(poison);
+    for (auto child = doc.root().leftChild(); child.ok(); child = child.rightSibling()) {
+        if (child.getType() == BSONType::array) {
+            child.pushBack(doc.makeElementInt("", 1)).ignore();
+        }
+    }
+    doc.getObject();
+}
+
 }  // namespace

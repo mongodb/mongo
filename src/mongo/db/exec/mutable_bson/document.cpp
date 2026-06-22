@@ -531,18 +531,17 @@ ElementRep ElementRep::makeDefaultRep() {
 // Returns the offset of 'elt' within 'object' as a uint32_t. The element must be part
 // of the object or the behavior is undefined.
 uint32_t getElementOffset(const BSONObj& object, const BSONElement& elt) {
-    dassert(!elt.eoo());
+    invariant(!elt.eoo());
     const char* const objRaw = object.objdata();
     const char* const eltRaw = elt.rawdata();
-    dassert(objRaw < eltRaw);
-    dassert(eltRaw < objRaw + object.objsize());
-    dassert(eltRaw + elt.size() <= objRaw + object.objsize());
+    invariant(eltRaw < objRaw + object.objsize());
     const ptrdiff_t offset = eltRaw - objRaw;
     // BSON documents express their size as an int32_t so we should always be able to
     // express the offset as a uint32_t.
     invariant(offset > 0);
     invariant(offset <= std::numeric_limits<int32_t>::max());
-    return offset;
+    invariant(offset + elt.size() <= object.objsize());
+    return static_cast<uint32_t>(offset);
 }
 
 // Returns true if this ElementRep is 'detached' from all other elements and can be
