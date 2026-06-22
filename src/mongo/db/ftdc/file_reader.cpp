@@ -35,6 +35,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/base/data_range.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/ftdc/util.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -227,7 +229,10 @@ StatusWith<BSONObj> FTDCFileReader::readDocument() {
 Status FTDCFileReader::open(const boost::filesystem::path& file) {
     _stream.open(file.c_str(), std::ios_base::in | std::ios_base::binary);
     if (!_stream.is_open()) {
-        return Status(ErrorCodes::FileStreamFailed, "Failed to open file " + file.generic_string());
+        auto ec = lastSystemError();
+        return Status(
+            ErrorCodes::FileStreamFailed,
+            fmt::format("Failed to open file '{}': {}", file.generic_string(), errorMessage(ec)));
     }
 
     boost::system::error_code ec;

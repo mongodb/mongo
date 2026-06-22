@@ -345,6 +345,43 @@ TEST_F(FTDCFileTest, TestLargeDocuments) {
     }
 }
 
+// Opening a writer to a path whose parent directory doesn't exist should fail with an OS error.
+TEST_F(FTDCFileTest, TestWriterOpenFailureIncludesErrno) {
+    unittest::TempDir tempdir("metrics_testpath");
+    // Nest under a subdirectory that doesn't exist so the open is guaranteed to fail with ENOENT.
+    boost::filesystem::path p(tempdir.path());
+    p /= "nonexistent_subdir";
+    p /= kTestFile;
+
+    FTDCConfig config;
+    FTDCFileWriter writer(&config);
+
+    auto s = writer.open(p);
+    ASSERT_NOT_OK(s);
+#ifdef _WIN32
+    ASSERT_STRING_CONTAINS(s.reason(), "The system cannot find the path specified.");
+#else
+    ASSERT_STRING_CONTAINS(s.reason(), "No such file or directory");
+#endif
+}
+
+// Opening a reader for a file that doesn't exist should fail with an OS error.
+TEST_F(FTDCFileTest, TestReaderOpenFailureIncludesErrno) {
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path p(tempdir.path());
+    p /= "nonexistent_metrics_file";
+
+    FTDCFileReader reader;
+
+    auto s = reader.open(p);
+    ASSERT_NOT_OK(s);
+#ifdef _WIN32
+    ASSERT_STRING_CONTAINS(s.reason(), "The system cannot find the file specified.");
+#else
+    ASSERT_STRING_CONTAINS(s.reason(), "No such file or directory");
+#endif
+}
+
 // Test a bad file
 TEST_F(FTDCFileTest, TestBadFile) {
     unittest::TempDir tempdir("metrics_testpath");

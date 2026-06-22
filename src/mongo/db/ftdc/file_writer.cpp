@@ -43,7 +43,10 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_writer.h"
 #include "mongo/db/ftdc/util.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -64,8 +67,11 @@ Status FTDCFileWriter::open(const boost::filesystem::path& file) {
                         std::ios_base::out | std::ios_base::binary | std::ios_base::app);
 
     if (!_archiveStream.is_open()) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::FileNotOpen,
-                      "Failed to open archive file " + file.generic_string());
+                      fmt::format("Failed to open archive file '{}': {}",
+                                  file.generic_string(),
+                                  errorMessage(ec)));
     }
 
     // Set internal size tracking to reflect the current file size
@@ -91,8 +97,11 @@ Status FTDCFileWriter::writeInterimFileBuffer(ConstDataRange buf) {
                        std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
 
     if (!interimStream.is_open()) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::FileNotOpen,
-                      "Failed to open interim file " + _interimTempFile.generic_string());
+                      fmt::format("Failed to open interim file '{}': {}",
+                                  _interimTempFile.generic_string(),
+                                  errorMessage(ec)));
     }
 
     interimStream.write(buf.data(), buf.length());
