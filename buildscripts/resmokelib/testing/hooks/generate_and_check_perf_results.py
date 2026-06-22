@@ -20,7 +20,6 @@ from buildscripts.util.cedar_report import CedarMetric, CedarTestReport
 from buildscripts.util.expansions import get_expansion
 
 THRESHOLD_LOCATION = "etc/performance_thresholds.yml"
-SEP_BENCHMARKS_PROJECT = "mongodb-mongo-master"
 SEP_BENCHMARKS_TASK_NAME = "benchmarks_sep"
 GET_TIMESERIES_URL = (
     "https://performance-monitoring-api.corp.mongodb.com/time_series/?summarized_executions=false"
@@ -130,6 +129,16 @@ class GenerateAndCheckPerfResults(interface.Hook):
             )
             return
 
+        if _config.EVERGREEN_PROJECT_NAME is None:
+            raise ServerFailure(
+                "Unable to determine the Evergreen project name. "
+                "Cannot check performance thresholds without a project to compare against."
+            )
+        project = _config.EVERGREEN_PROJECT_NAME
+        self.logger.info(
+            f"Checking performance thresholds for project {project}, variant {self.variant}"
+        )
+
         # For mainline builds, Evergreen does not make the base commit available in the expansions
         # we retrieve it by looking for the previous commit in the Git log
         self.logger.info(f"EVERGREEN_REQUESTER={_config.EVERGREEN_REQUESTER}")
@@ -169,11 +178,11 @@ class GenerateAndCheckPerfResults(interface.Hook):
                         measurement=metric["name"],
                         args={"thread_level": thread_level},
                         base_commit=base_commit_hash,
-                        project=SEP_BENCHMARKS_PROJECT,
+                        project=project,
                     )
                     if value is None:
                         self.logger.warning(
-                            f"Skipping threshold check because no time series data found for test {test_name}, measurement {metric['name']} on variant {self.variant} in project {SEP_BENCHMARKS_PROJECT}."
+                            f"Skipping threshold check because no time series data found for test {test_name}, measurement {metric['name']} on variant {self.variant} in project {project}."
                         )
                         continue
                     metrics_to_check.append(
