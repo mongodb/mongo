@@ -206,16 +206,19 @@ StatusWith<User> AuthorizationRouterImpl::getUserObject(
         return status;
     }
 
-    std::vector<RoleName> directRoles;
-    for (auto iter = user.getRoles(); iter.more();) {
-        directRoles.push_back(iter.next());
-    }
 
-    LOGV2_DEBUG(5517200,
-                3,
-                "Acquired new user object",
-                "userName"_attr = user.getName(),
-                "directRoles"_attr = directRoles);
+    if (logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3))) {
+        std::vector<RoleName> directRoles;
+        for (auto iter = user.getRoles(); iter.more();) {
+            directRoles.push_back(iter.next());
+        }
+
+        LOGV2_DEBUG(5517200,
+                    3,
+                    "Acquired new user object",
+                    "userName"_attr = user.getName(),
+                    "directRoles"_attr = directRoles);
+    }
 
     return std::move(user);
 }
