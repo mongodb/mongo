@@ -1682,8 +1682,29 @@ MongoRunner.awaitConnection = function (
             try {
                 conn = new Mongo("127.0.0.1:" + port);
                 conn.pid = pid;
+                // Verify we connected to the process we actually started, not a stale
+                // process that already occupied the port (e.g. from a previous test that
+                // didn't shut down cleanly). If the new process failed to bind it exits
+                // with EXIT_NET_ERROR (48) and the stale process accepts our connection
+                // instead, making the try succeed while the real process is already dead.
+                const status = conn.adminCommand({serverStatus: 1});
+                const serverPid = status.pid;
+                if (status.ok === 1 && +serverPid !== +pid) {
+                    const res = checkProgram(pid);
+                    const exitCode = res.alive ? "(still running)" : res.exitCode;
+                    print(
+                        `Connected to stale process on port ${port}: ` +
+                            `expected pid ${pid} (exit code ${exitCode}), got pid ${serverPid}. ` +
+                            `A previous test may not have shut down cleanly.`,
+                    );
+                    serverExitCodeMap[port] = MongoRunner.EXIT_NET_ERROR;
+                    throw new MongoRunner.StopError(MongoRunner.EXIT_NET_ERROR);
+                }
                 return true;
             } catch (e) {
+                if (e instanceof MongoRunner.StopError) {
+                    throw e;
+                }
                 let res = checkProgram(pid);
                 if (!res.alive) {
                     print(

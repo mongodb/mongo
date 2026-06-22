@@ -91,7 +91,9 @@ def _fetch_remote_sha256_hash(s3_path: str):
             try:
                 from buildscripts.util.download_utils import download_from_s3_with_requests
 
-                download_from_s3_with_requests(s3_path + ".sha256", temp_file.name)
+                download_from_s3_with_requests(
+                    s3_path + ".sha256", temp_file.name, raise_on_error=True
+                )
                 downloaded = True
             except Exception:
                 traceback.print_exc()
@@ -152,7 +154,7 @@ def validate_file(s3_path, output_path, remote_sha_allowed):
         raise ValueError(f"No SHA256 hash available for {s3_path}")
 
 
-def _download_and_verify(s3_path, output_path, remote_sha_allowed, ignore_file_not_exist):
+def _download_and_verify(s3_path, output_path, remote_sha_allowed, ignore_file_not_exist) -> bool:
     for i in range(5):
         try:
             print(f"Downloading {s3_path}...")
@@ -185,11 +187,11 @@ def _download_and_verify(s3_path, output_path, remote_sha_allowed, ignore_file_n
             if not ok:
                 if ignore_file_not_exist:
                     print("Failed to find remote file. Ignoring and skipping...")
-                    return
+                    return False
                 raise RuntimeError("All download methods failed")
 
             validate_file(s3_path, output_path, remote_sha_allowed)
-            break
+            return True
 
         except Exception:
             print("Download failed:")
@@ -222,7 +224,12 @@ def download_s3_binary(
     try:
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             tempfile_name = temp_file.name
-            _download_and_verify(s3_path, tempfile_name, remote_sha_allowed, ignore_file_not_exist)
+            downloaded = _download_and_verify(
+                s3_path, tempfile_name, remote_sha_allowed, ignore_file_not_exist
+            )
+
+        if not downloaded:
+            return True  # remote file absent, caller requested we ignore it
 
         try:
             os.replace(tempfile_name, local_path)
