@@ -329,8 +329,9 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
         return {ErrorCodes::Error(6627201), "Configuration 'type=lsm' is not supported."};
     }
 
-    if (gFeatureFlagBanEncryptionOptionsInCollectionCreation.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+    if (gFeatureFlagBanEncryptionOptionsInCollectionCreation
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         encryptionOptsRegex->matchView(config) &&
         MONGO_likely(!allowEncryptionOptionsInCreationString.shouldFail())) {
         return {ErrorCodes::IllegalOperation,
