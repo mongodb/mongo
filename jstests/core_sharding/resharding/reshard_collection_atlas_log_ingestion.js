@@ -54,7 +54,7 @@ const MetricAvailability = {
     recipientTotalFetched: TestMode.kFailInCloning,
     copyDurationMs: TestMode.kFailInCloning,
     totalBytesCloned: TestMode.kFailInCloning,
-    totalDocumentsCloned: TestMode.kFailInCloning,
+    totalDocumentsFinal: TestMode.kFailInCloning,
     totalOplogsFetched: TestMode.kFailInCloning,
     maxRecipientIndexes: TestMode.kFailInCloning,
     numberOfIndexesDelta: TestMode.kFailInCloning,
@@ -277,7 +277,7 @@ function verifyRecipientMetrics(stats, mode) {
     for (const recipient of Object.values(stats.recipients)) {
         assert(recipient.hasOwnProperty("shardName"), "Missing recipient shardName");
         recipientTotals.recipientTotalBytes += recipient.bytesCloned;
-        recipientTotals.recipientTotalDocs += recipient.documentsCloned;
+        recipientTotals.recipientTotalDocs += recipient.documentsFinal;
         recipientTotals.recipientTotalFetched += recipient.oplogsFetched;
         recipientTotals.recipientTotalApplied += recipient.oplogsApplied;
         assert(recipient.hasOwnProperty("phaseDurations"), "Missing recipient phaseDurations");
@@ -317,7 +317,7 @@ function verifyTotals(stats, mode) {
     assert.gt(totals.averageDocSize, 0, "averageDocSize");
 
     assertMetricGtZero("totalBytesCloned", totals, mode);
-    assertMetricGtZero("totalDocumentsCloned", totals, mode);
+    assertMetricGtZero("totalDocumentsFinal", totals, mode);
     assertMetricGtZero("totalOplogsFetched", totals, mode);
     assertMetricGtZero("totalOplogsApplied", totals, mode);
 

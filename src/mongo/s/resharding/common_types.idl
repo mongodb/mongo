@@ -360,6 +360,10 @@ structs:
                 type: long
                 description: "Number of oplog entries applied on this recipient shard."
                 optional: true
+            numDocumentsCloned:
+                type: long
+                description: "Number of documents cloned to this recipient shard during the cloning phase."
+                optional: true
             totalNumDocuments:
                 type: long
                 description: "Number of documents on this recipient shard for the resharded collection."

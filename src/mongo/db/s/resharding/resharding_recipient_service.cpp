@@ -206,8 +206,8 @@ void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob,
 
     bob.append(metricsPrefix +
                    std::string{ReshardingRecipientMetrics::kFinalDocumentsCopiedCountFieldName},
-               recipientCtx.getTotalNumDocuments() ? *recipientCtx.getTotalNumDocuments()
-                                                   : metrics->getDocumentsProcessedCount());
+               recipientCtx.getNumDocumentsCloned() ? *recipientCtx.getNumDocumentsCloned()
+                                                    : metrics->getDocumentsProcessedCount());
     bob.append(metricsPrefix +
                    std::string{ReshardingRecipientMetrics::kFinalBytesCopiedCountFieldName},
                recipientCtx.getTotalDocumentSize() ? *recipientCtx.getTotalDocumentSize()
@@ -1769,7 +1769,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
         auto opCtx = _makeOperationContext(factory);
         auto cloningMetrics = _tryFetchCloningMetrics(opCtx.get());
         if (cloningMetrics) {
-            newRecipientCtx.setTotalNumDocuments(cloningMetrics->getDocumentsCopied());
+            newRecipientCtx.setNumDocumentsCloned(cloningMetrics->getDocumentsCopied());
             newRecipientCtx.setTotalDocumentSize(cloningMetrics->getBytesCopied());
         }
     }
@@ -2241,20 +2241,16 @@ void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
         MODE_IS);
 
     if (coll.exists()) {
-        auto totalDocumentCount = [&]() -> long long {
-            if (_metadata.getPerformVerification()) {
-                std::lock_guard<std::mutex> lk(_mutex);
-                if (_changeStreamsMonitorCtx) {
-                    uassert(9858303,
-                            "Recipient failed to record total number of documents copied "
-                            "despite performVerification being enabled",
-                            _recipientCtx.getTotalNumDocuments() != boost::none);
-                    return *_recipientCtx.getTotalNumDocuments();
-                }
+        if (_metadata.getPerformVerification()) {
+            std::lock_guard<std::mutex> lk(_mutex);
+            if (_changeStreamsMonitorCtx) {
+                uassert(9858303,
+                        "Recipient failed to record number of documents cloned "
+                        "despite performVerification being enabled",
+                        _recipientCtx.getNumDocumentsCloned() != boost::none);
             }
-            return coll.getCollectionPtr()->numRecords(opCtx);
-        }();
-        _recipientCtx.setTotalNumDocuments(totalDocumentCount);
+        }
+        _recipientCtx.setTotalNumDocuments(coll.getCollectionPtr()->numRecords(opCtx));
         _recipientCtx.setTotalDocumentSize(coll.getCollectionPtr()->dataSize(opCtx));
     }
 

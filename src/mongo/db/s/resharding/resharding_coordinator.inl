@@ -1822,12 +1822,12 @@ void ReshardingCoordinator::_persistRecipientDocumentsDelta(
                 str::stream() << "Recipient shard " << recipientShard.getId()
                               << " not found in recipientDelta map",
                 it != recipientDelta.end());
-        auto totalNumDocuments = recipientShard.getMutableState().getTotalNumDocuments();
+        auto numDocumentsCloned = recipientShard.getMutableState().getNumDocumentsCloned();
         tassert(12723405,
-                str::stream() << "Expected the total number of documents on recipient shard '"
+                str::stream() << "Expected the number of documents cloned on recipient shard '"
                               << recipientShard.getId() << "' to have been set",
-                totalNumDocuments);
-        recipientDocumentsFinal.emplace(recipientShard.getId(), *totalNumDocuments + it->second);
+                numDocumentsCloned);
+        recipientDocumentsFinal.emplace(recipientShard.getId(), *numDocumentsCloned + it->second);
     }
 
     auto updatedCoordinatorDoc =
@@ -2628,6 +2628,7 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     int64_t maxRecipientIndexes = 0;
     int64_t totalBytesCloned = 0;
     int64_t totalDocumentsCloned = 0;
+    int64_t totalDocumentsFinal = 0;
     int64_t totalOplogsFetched = 0;
     int64_t totalOplogsApplied = 0;
     BSONArrayBuilder recipients;
@@ -2636,15 +2637,21 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
         auto& state = recipient.getMutableState();
         shardBuilder.append("shardName", recipient.getId());
         auto bytes = state.getBytesCopied().value_or(0);
-        auto docs = state.getTotalNumDocuments().value_or(0);
+        auto docsCloned = state.getNumDocumentsCloned().value_or(0);
+        // Prefer documentsFinal (cloned + delta, written after verification) and fall back to
+        // totalNumDocuments fast count.
+        auto docsFinal = recipient.getDocumentsFinal() ? *recipient.getDocumentsFinal()
+                                                       : state.getTotalNumDocuments().value_or(0);
         auto fetched = state.getOplogFetched().value_or(0);
         auto applied = state.getOplogApplied().value_or(0);
         shardBuilder.append("bytesCloned", bytes);
-        shardBuilder.append("documentsCloned", docs);
+        shardBuilder.append("documentsCloned", docsCloned);
+        shardBuilder.append("documentsFinal", docsFinal);
         shardBuilder.append("oplogsFetched", fetched);
         shardBuilder.append("oplogsApplied", applied);
         totalBytesCloned += bytes;
-        totalDocumentsCloned += docs;
+        totalDocumentsCloned += docsCloned;
+        totalDocumentsFinal += docsFinal;
         totalOplogsFetched += fetched;
         totalOplogsApplied += applied;
         auto indexes = state.getNumOfIndexes().value_or(0);
@@ -2658,6 +2665,7 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     statsBuilder.append("recipients", recipients.obj());
     totalsBuilder.append("totalBytesCloned", totalBytesCloned);
     totalsBuilder.append("totalDocumentsCloned", totalDocumentsCloned);
+    totalsBuilder.append("totalDocumentsFinal", totalDocumentsFinal);
     totalsBuilder.append("totalOplogsFetched", totalOplogsFetched);
     totalsBuilder.append("totalOplogsApplied", totalOplogsApplied);
     totalsBuilder.append("maxDonorIndexes", maxDonorIndexes);

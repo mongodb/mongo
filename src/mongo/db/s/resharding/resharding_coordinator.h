@@ -465,7 +465,7 @@ private:
                                      std::map<ShardId, int64_t> documentsDelta);
 
     /**
-     * Computes each recipient's documentsFinal = totalNumDocuments + delta, and persists the
+     * Computes each recipient's documentsFinal = numDocumentsCloned + delta, and persists the
      * result in the coordinator state document.
      */
     void _persistRecipientDocumentsDelta(OperationContext* opCtx,

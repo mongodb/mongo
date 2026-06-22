@@ -689,10 +689,16 @@ public:
         auto coordDoc = getCoordinatorDoc(opCtx);
         ASSERT_NE(coordDoc.getMetrics()->getDocumentCopy()->getStart(), Date_t::min());
 
+        auto recipientShards = coordDoc.getRecipientShards();
+        // Set numDocumentsCloned to mirror what the recipient sets in _transitionToApplying.
         BSONObj updates = BSON(
-            "$set" << BSON(std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
-                               ".$[].mutableState.state"
-                           << idl::serialize(RecipientStateEnum::kApplying)));
+            "$set" << BSON(
+                std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
+                    ".$[].mutableState.state"
+                << idl::serialize(RecipientStateEnum::kApplying)
+                << std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
+                    ".$[].mutableState.numDocumentsCloned"
+                << static_cast<long long>(totalApproxDocumentsToClone / recipientShards.size())));
         updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }
 

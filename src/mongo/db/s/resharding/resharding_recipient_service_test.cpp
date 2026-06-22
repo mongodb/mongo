@@ -1249,19 +1249,23 @@ protected:
         if (testOptions.performVerification &&
             (state == RecipientStateEnum::kApplying ||
              state == RecipientStateEnum::kStrictConsistency)) {
-            ASSERT_EQ(*mutableState.getTotalNumDocuments(), expectedDocsCopied);
+            ASSERT_EQ(*mutableState.getNumDocumentsCloned(), expectedDocsCopied);
             ASSERT_EQ(*mutableState.getTotalDocumentSize(), expectedBytesCopied);
         } else if (state == RecipientStateEnum::kDone) {
+            // Upon transitioning to the "done" state, 'totalDocumentSize' and 'totalNumDocuments'
+            // are set to the fast count size. This test deliberately leaves the temporary
+            // collection empty when testing verification so this is expected to be equal to the
+            // delta.
             ASSERT_EQ(*mutableState.getTotalNumDocuments(),
-                      expectedDocsCopied + getExpectedDocumentsDelta());
-            // Upon transitioning to the "done" state, 'totalDocumentSize' is set to the fast count
-            // size. This test deliberately leaves the temporary collection empty when testing
-            // verification so this is expected to be equal to the delta.
+                      testOptions.performVerification
+                          ? getExpectedDocumentsDelta()
+                          : expectedDocsCopied + getExpectedDocumentsDelta());
             ASSERT_EQ(*mutableState.getTotalDocumentSize(),
                       testOptions.performVerification
                           ? getExpectedDocumentsDeltaBytes()
                           : expectedBytesCopied + getExpectedDocumentsDeltaBytes());
         } else {
+            ASSERT_FALSE(mutableState.getNumDocumentsCloned());
             ASSERT_FALSE(mutableState.getTotalNumDocuments());
             ASSERT_FALSE(mutableState.getTotalDocumentSize());
         }
@@ -1341,23 +1345,32 @@ protected:
                 // to the "strict-consistency" state. If verification is disabled, they are
                 // populated upon transitioning to the "strict-consistency" state.
                 if (testOptions.performVerification && state == RecipientStateEnum::kApplying) {
-                    ASSERT_EQ(*mutableState.getTotalNumDocuments(), expectedDocsCopied);
+                    ASSERT_EQ(*mutableState.getNumDocumentsCloned(), expectedDocsCopied);
                     ASSERT_EQ(*mutableState.getTotalDocumentSize(), expectedBytesCopied);
                 } else if (state >= RecipientStateEnum::kStrictConsistency) {
-                    // The change streams monitor delta is not added to this field. The recipient
-                    // tracks only the count of documents it cloned; the post-delta final count
-                    // is the coordinator's responsibility on a separate field, written after
-                    // the coordinator fetches the delta from each participant.
-                    ASSERT_EQ(*mutableState.getTotalNumDocuments(), expectedDocsCopied);
-                    // 'totalDocumentSize' is set to the fast count byte size of the temporary
-                    // collection. This test deliberately leaves the temp collection empty when
-                    // testing verification (resume-data path), so the value equals the delta
-                    // bytes contributed by the in-test writes.
+                    if (testOptions.performVerification) {
+                        // numDocumentsCloned is only populated when verification is enabled
+                        // (set during _transitionToApplying). The delta from change streams is
+                        // not included; that is tracked in documentsFinal on the coordinator.
+                        ASSERT_EQ(*mutableState.getNumDocumentsCloned(), expectedDocsCopied);
+                    } else {
+                        ASSERT_FALSE(mutableState.getNumDocumentsCloned());
+                    }
+
+                    // 'totalNumDocuments' and 'totalDocumentSize' are fast counts set by
+                    // _updateContextMetrics. This test deliberately leaves the temp collection
+                    // empty when testing verification (resume-data path), so the value equals the
+                    // delta bytes contributed by the in-test writes.
+                    ASSERT_EQ(*mutableState.getTotalNumDocuments(),
+                              testOptions.performVerification
+                                  ? getExpectedDocumentsDelta()
+                                  : expectedDocsCopied + getExpectedDocumentsDelta());
                     ASSERT_EQ(*mutableState.getTotalDocumentSize(),
                               testOptions.performVerification
                                   ? getExpectedDocumentsDeltaBytes()
                                   : expectedBytesCopied + getExpectedDocumentsDeltaBytes());
                 } else {
+                    ASSERT_FALSE(mutableState.getNumDocumentsCloned());
                     ASSERT_FALSE(mutableState.getTotalNumDocuments());
                     ASSERT_FALSE(mutableState.getTotalDocumentSize());
                 }
@@ -2782,7 +2795,7 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgr
 
         auto mutableState = doc.getMutableState();
         mutableState.setState(RecipientStateEnum::kApplying);
-        mutableState.setTotalNumDocuments(0);  // Needed for performVerification.
+        mutableState.setNumDocumentsCloned(0);  // Needed for performVerification.
         doc.setMutableState(mutableState);
         doc.setCloneTimestamp(Timestamp{10, 0});
         doc.setStartConfigTxnCloneTime(Date_t::now());
