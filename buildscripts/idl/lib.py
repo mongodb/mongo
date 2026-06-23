@@ -52,7 +52,9 @@ def list_idls(directory: str) -> set[str]:
             cwd=directory,
         )
         if result.returncode == 0:
-            return {os.path.join(directory, p) for p in result.stdout.splitlines()}
+            idls = {os.path.join(directory, p) for p in result.stdout.splitlines()}
+            # git ls-files can report files that have been removed from the working tree. Omit those.
+            return {idl for idl in idls if os.path.isfile(idl)}
     return {
         os.path.join(dirpath, filename)
         for dirpath, _, filenames in os.walk(directory)
