@@ -284,6 +284,13 @@ public:
     }
 
     /**
+     * Returns true if the pipeline starts with a $currentOp stage.
+     */
+    bool startsWithCurrentOpStage() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->isCurrentOpStage();
+    }
+
+    /**
      * Returns true if any stage in the pipeline is a ranked stage (produces $sortKey metadata) or
      * if the pipeline contains an explicit $sort.
      */

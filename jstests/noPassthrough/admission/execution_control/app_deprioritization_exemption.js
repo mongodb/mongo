@@ -221,7 +221,7 @@ describe("Execution control deprioritization exemptions", function () {
                 });
                 assert.eq(
                     getTotalMarkedNonDeprioritizableCount(primary),
-                    initialMarkedNonDeprioritizable,
+                    initialMarkedNonDeprioritizable + 1, // The +1 comes from the aggregate with the $currentOp
                 );
 
                 // Add exemption mid-operation.
@@ -233,7 +233,7 @@ describe("Execution control deprioritization exemptions", function () {
                 if (waitForShell) waitForShell();
                 assert.gt(
                     getTotalMarkedNonDeprioritizableCount(primary),
-                    initialMarkedNonDeprioritizable,
+                    initialMarkedNonDeprioritizable + 1, // The +1 comes from the aggregate with the $currentOp
                 );
             }
         });
@@ -296,7 +296,7 @@ describe("Execution control deprioritization exemptions", function () {
             // Since we were exempt before, the operation will be considered marked non-deprioritizable.
             assert.gt(
                 getTotalMarkedNonDeprioritizableCount(primary),
-                initialMarkedNonDeprioritizable,
+                initialMarkedNonDeprioritizable + 1, // The +1 comes from the aggregate with the $currentOp
             );
         });
 
