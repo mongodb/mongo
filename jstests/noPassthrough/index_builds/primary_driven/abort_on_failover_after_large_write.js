@@ -14,8 +14,13 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {PrimaryDrivenResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_builds/primary_driven.js";
 
-const rst = new ReplSetTest({nodes: 2});
+const rst = new ReplSetTest({
+    nodes: TestData.doesNotSupportGracefulStepdown
+        ? [{rsConfig: {priority: 1}}, {rsConfig: {priority: 1}}]
+        : 2,
+});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
@@ -84,7 +89,7 @@ holdFp.off();
 loadFp.wait();
 
 jsTest.log.info("5. Step up the secondary");
-const newPrimary = rst.stepUp(rst.getSecondary());
+const newPrimary = PrimaryDrivenResumableIndexBuildTest.failover(rst);
 
 loadFp.off();
 awaitIndexBuild({checkExitSuccess: false});

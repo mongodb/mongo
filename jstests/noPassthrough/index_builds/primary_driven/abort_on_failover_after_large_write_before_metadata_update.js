@@ -14,8 +14,13 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {PrimaryDrivenResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_builds/primary_driven.js";
 
-const rst = new ReplSetTest({nodes: 2});
+const rst = new ReplSetTest({
+    nodes: TestData.doesNotSupportGracefulStepdown
+        ? [{rsConfig: {priority: 1}}, {rsConfig: {priority: 1}}]
+        : 2,
+});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
@@ -72,7 +77,7 @@ rst.awaitReplication();
 jsTest.log.info("4. Step up the secondary while the build is still paused before scanning");
 // The build has not written any resume state since the side write (it never reached the scan), so
 // the only thing that can make the new primary abort is the sentinel written with the side write.
-const newPrimary = rst.stepUp(rst.getSecondary());
+const newPrimary = PrimaryDrivenResumableIndexBuildTest.failover(rst);
 
 // Let the old primary's interrupted build unwind.
 holdFp.off();

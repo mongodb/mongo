@@ -250,12 +250,26 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     static setUp({testName, nodes = 2} = {}) {
         const name = testName || jsTestName();
         const {metricsDir, otelParams} = otelFileExportParams(name);
+
+        // When graceful stepdown is not supported, fail over by checkpointing on the primary,
+        // waiting for the secondary to install that checkpoint, then killing the primary. 2 nodes
+        // is sufficient for this case.
+        if (TestData.doesNotSupportGracefulStepdown) {
+            nodes = 2;
+        }
+
+        // Ensure every node is electable (priority 1) so the failover tests can always step up any
+        // secondary.
+        const nodeConfigs = Array.from({length: nodes}, () => ({rsConfig: {priority: 1}}));
+
         // Slow down OTel flushes so the per-node JSONL stays under the shell cat() 16 MiB cap on
         // long-running variants (e.g. TSAN); _readResumeMetrics only needs the latest snapshot.
-        const rst = new ReplSetTest({
-            nodes,
+        const rstOptions = {
+            nodes: nodeConfigs,
             nodeOptions: {setParameter: {...otelParams, openTelemetryExportIntervalMillis: 5000}},
-        });
+        };
+
+        const rst = new ReplSetTest(rstOptions);
         rst.startSet();
         rst.initiate();
         rst._pdibMetricsDir = metricsDir;
@@ -594,8 +608,12 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             // Release the current fail point (cleanup; the build thread on the old primary has
             // already exited due to the state change). For restart modes the old mongod was
             // recycled, so its in-memory fail point is already gone and the handle's connection
-            // is stale — skip.
-            if (failoverMode === PdibFailoverMode.NO_RESTART) {
+            // is stale — skip. When graceful stepdown isn't supported the failover always kills the
+            // old primary (see `_failOverWithCheckpointInstall`), so skip in that case too.
+            if (
+                failoverMode === PdibFailoverMode.NO_RESTART &&
+                !TestData.doesNotSupportGracefulStepdown
+            ) {
                 currentFp.off();
             }
 
@@ -696,8 +714,9 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         );
         assert.gte(
             rst.nodes.length,
-            3,
-            "runSorterOrphanCleanup requires a 3-node set; use setUp({nodes: 3})",
+            TestData.doesNotSupportGracefulStepdown ? 2 : 3,
+            "runSorterOrphanCleanup requires a 3-node set, or 2-node set when graceful stepdown " +
+                "is not supported)",
         );
 
         if (
@@ -991,8 +1010,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         const oldPrimary = primary;
         const secondary = rst.getSecondary();
         jsTest.log.info(
-            `PrimaryDrivenResumableIndexBuildTest: failover mode=${failoverMode}, stepping up ` +
-                `${secondary.host} to trigger resume on it`,
+            `PrimaryDrivenResumableIndexBuildTest: triggering resume via failover mode=${failoverMode}`,
         );
         const newPrimary = PrimaryDrivenResumableIndexBuildTest._failover(
             rst,
@@ -1003,8 +1021,13 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
 
         // Release the now-stepped-down primary's fail point (cleanup; the build thread has already
         // exited due to the state change). For restart modes the old mongod was recycled, so its
-        // in-memory fail point is already gone and the handle's connection is stale — skip.
-        if (failoverMode === PdibFailoverMode.NO_RESTART) {
+        // in-memory fail point is already gone and the handle's connection is stale — skip. When
+        // graceful stepdown is not supported the old primary is always stopped during failover (see
+        // `_failOverWithCheckpointInstall`), so its fail point is gone too — skip there as well.
+        if (
+            failoverMode === PdibFailoverMode.NO_RESTART &&
+            !TestData.doesNotSupportGracefulStepdown
+        ) {
             phaseFp.off();
         }
 
@@ -1122,6 +1145,156 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     }
 
     /**
+     * Forces a checkpoint on the primary, waits for the secondary to install it, then kills the
+     * primary so the secondary steps up. The build is paused at its phase fail point, so no writes
+     * accumulate after the checkpoint. The old primary is always SIGKILLed. Returns the new primary
+     * (the stepped-up secondary).
+     */
+    static _failOverWithCheckpointInstall(rst, {unclean = false} = {}) {
+        const oldPrimary = rst.getPrimary();
+        const secondary = rst.getSecondary();
+
+        // Force a checkpoint on the primary and block until the secondary installs it.
+        PrimaryDrivenResumableIndexBuildTest._awaitCheckpointInstalled(oldPrimary, secondary);
+
+        rst.stop(
+            oldPrimary,
+            9 /* SIGKILL */,
+            {allowedExitCode: MongoRunner.EXIT_SIGKILL},
+            {
+                forRestart: true,
+            },
+        );
+
+        jsTest.log.info(
+            "PrimaryDrivenResumableIndexBuildTest: killed primary; waiting for secondary to step up",
+            {secondary: secondary.host, requestedUnclean: unclean},
+        );
+        assert.soon(() => {
+            try {
+                return secondary.adminCommand({hello: 1}).isWritablePrimary;
+            } catch (e) {
+                return false;
+            }
+        }, `secondary ${secondary.host} did not step up after the primary was stopped`);
+
+        // Restart the old primary so it rejoins as a secondary (keeps the set at two live nodes).
+        const restartedNode = rst.start(oldPrimary, {}, /*restart=*/ true);
+        if (rst._pdibIndexBuildSettings) {
+            assert.commandWorked(
+                restartedNode.adminCommand({setParameter: 1, ...rst._pdibIndexBuildSettings}),
+            );
+        }
+        rst.awaitSecondaryNodes();
+        return secondary;
+    }
+
+    /**
+     * Forces a checkpoint on `primary`, then waits until `secondary` installs that checkpoint.
+     *
+     * "Drained" means the secondary has adopted a checkpoint at least as new as the primary's last
+     * stable checkpoint after the fsync. In the frozen case (a paused build's open transaction pins
+     * the stable timestamp) the fsync produces no newer checkpoint and the secondary is already
+     * there, so this returns immediately. We also accept the secondary installing any newer
+     * checkpoint than before the fsync (it's actively draining), and cap the wait so a missed
+     * signal proceeds rather than hangs.
+     */
+    static _awaitCheckpointInstalled(primary, secondary) {
+        const adoptedBefore = PrimaryDrivenResumableIndexBuildTest._checkpointTs(
+            secondary,
+            "standbyLastAdoptedCheckpointTimestamp",
+        );
+        assert.commandWorked(primary.adminCommand({fsync: 1}));
+        const target = PrimaryDrivenResumableIndexBuildTest._readPrimaryCheckpointTs(primary);
+        const haveTarget = timestampCmp(target, Timestamp(0, 0)) > 0;
+        jsTest.log.info(
+            "PrimaryDrivenResumableIndexBuildTest: forced checkpoint on primary; waiting for secondary " +
+                "to drain its ingest tables",
+            {secondary: secondary.host, adoptedBefore, primaryCheckpointTimestamp: target},
+        );
+        const deadline = Date.now() + 2 * 60 * 1000;
+        let lastLogged = Date.now();
+        for (;;) {
+            const adopted = PrimaryDrivenResumableIndexBuildTest._checkpointTs(
+                secondary,
+                "standbyLastAdoptedCheckpointTimestamp",
+            );
+            // Done if the secondary reached the primary's post-fsync checkpoint (instant in the
+            // frozen case -- the checkpoint didn't advance and the secondary is already there), or it
+            // installed any newer checkpoint than before the fsync.
+            if (
+                (haveTarget && timestampCmp(adopted, target) >= 0) ||
+                timestampCmp(adopted, adoptedBefore) > 0
+            ) {
+                jsTest.log.info(
+                    "PrimaryDrivenResumableIndexBuildTest: secondary adopted checkpoint",
+                    {secondary: secondary.host, adopted, primaryCheckpointTimestamp: target},
+                );
+                return;
+            }
+            if (Date.now() >= deadline) {
+                jsTest.log.info(
+                    "PrimaryDrivenResumableIndexBuildTest: secondary did not visibly advance within " +
+                        "the timeout; treating it as already drained and proceeding",
+                    {
+                        secondary: secondary.host,
+                        adopted,
+                        primaryCheckpointTimestamp: target,
+                        adoptedBefore,
+                    },
+                );
+                return;
+            }
+            if (Date.now() - lastLogged >= 30 * 1000) {
+                jsTest.log.info(
+                    "PrimaryDrivenResumableIndexBuildTest: still waiting for secondary to drain",
+                    {
+                        secondary: secondary.host,
+                        adopted,
+                        primaryCheckpointTimestamp: target,
+                        adoptedBefore,
+                    },
+                );
+                lastLogged = Date.now();
+            }
+            sleep(500);
+        }
+    }
+
+    /**
+     * Reads the primary's last stable checkpoint timestamp. That field is best-effort, so retries
+     * briefly; returns Timestamp(0, 0) if it never appears.
+     */
+    static _readPrimaryCheckpointTs(primary) {
+        for (let i = 0; i < 40; i++) {
+            const ts = PrimaryDrivenResumableIndexBuildTest._checkpointTs(
+                primary,
+                "primaryCheckpointTimestamp",
+            );
+            if (timestampCmp(ts, Timestamp(0, 0)) > 0) {
+                return ts;
+            }
+            sleep(50);
+        }
+        return Timestamp(0, 0);
+    }
+
+    static _checkpointTs(node, field) {
+        const standby = assert.commandWorked(node.adminCommand({serverStatus: 1})).standby;
+        return (standby && standby[field]) || Timestamp(0, 0);
+    }
+
+    /**
+     * Fails over to the replica set's secondary, returning the new primary.
+     */
+    static failover(rst) {
+        if (TestData.doesNotSupportGracefulStepdown) {
+            return PrimaryDrivenResumableIndexBuildTest._failOverWithCheckpointInstall(rst);
+        }
+        return rst.stepUp(rst.getSecondary());
+    }
+
+    /**
      * Triggers a failover according to `failoverMode`.
      *
      * The restart modes require a 3-node (or larger) replica set so the surviving secondary can win
@@ -1135,6 +1308,12 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      * @returns {Mongo} The new primary (may be a fresh connection if a restart was involved).
      */
     static _failover(rst, oldPrimary, nextPrimaryNode, failoverMode) {
+        if (TestData.doesNotSupportGracefulStepdown) {
+            return PrimaryDrivenResumableIndexBuildTest._failOverWithCheckpointInstall(rst, {
+                unclean: failoverMode === PdibFailoverMode.UNCLEAN_RESTART,
+            });
+        }
+
         if (failoverMode === PdibFailoverMode.NO_RESTART) {
             return rst.stepUp(nextPrimaryNode);
         }
