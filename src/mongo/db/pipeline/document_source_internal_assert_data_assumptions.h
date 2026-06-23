@@ -122,7 +122,7 @@ public:
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
-        constraints.canRunOnTimeseries = false;
+        constraints.canRunOnTimeseries = true;
         return constraints;
     }
 

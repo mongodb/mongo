@@ -151,14 +151,6 @@ const errorTests = [
         // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
         expectedErrorCodes: [40602, 10557302, 12093200, 40324, ErrorCodes.IllegalOperation],
     },
-    {
-        stage: "$_internalAssertDataAssumptions",
-        pipeline: [{$_internalAssertDataAssumptions: {}}],
-        expectedErrorCodes: [
-            10557302, // check for 'canRunOnTimeseries' failed.
-            40324, // Unrecognized stage on older binaries in multiversion suites.
-        ],
-    },
 ];
 
 // TODO SERVER-101599 remove 10170100 once 9.0 becomes lastLTS, and timeseries collections
@@ -369,6 +361,83 @@ const unpackTests = [
     }
 });
 
+// $_internalAssertDataAssumptions is a test-only internal stage that validates the dependency
+// graph's arrayness analysis by asserting that a given set of field paths never contain arrays. It
+// is a passthrough stage that can run directly in a pipeline against a timeseries collection (after
+// the buckets are unpacked). Because it requires custom assertions (scalar paths pass, array paths
+// fail), it is tested in this dedicated block rather than through the generic runners above.
+const internalAssertDataAssumptionsStage = "$_internalAssertDataAssumptions";
+(function testInternalAssertDataAssumptionsOnTimeseries() {
+    // Scalar field paths -- including measurement ('_id', 'time', 'value') and metaField ('m.tag')
+    // paths -- should pass validation and return the unpacked measurement documents.
+    let scalarResult;
+    try {
+        scalarResult = tsColl
+            .aggregate([
+                {$_internalAssertDataAssumptions: {paths: ["_id", "time", "value", "m.tag"]}},
+            ])
+            .toArray();
+    } catch (e) {
+        if (e.code === 40324) {
+            jsTest.log.info(
+                "Skipping " +
+                    internalAssertDataAssumptionsStage +
+                    " test because the stage is not supported in this configuration.",
+            );
+            return;
+        }
+        throw e;
+    }
+    assert(
+        scalarResult.length > 0,
+        internalAssertDataAssumptionsStage +
+            " expected to return documents for scalar field paths on timeseries collections.",
+    );
+    assert(
+        !scalarResult[0].hasOwnProperty("control"),
+        internalAssertDataAssumptionsStage +
+            " expected to return unpacked documents on timeseries collections.",
+    );
+
+    // Insert a measurement whose field is an array so we can verify validation fails for it.
+    assert.commandWorked(
+        tsColl.insert({
+            _id: 1000,
+            time: new Date(),
+            m: {tag: "A", loc: [40, 40]},
+            value: 0,
+            arr: [1, 2, 3], // Array-valued measurement.
+        }),
+    );
+
+    // A field that is known to be an array should cause the stage to fail with the expected code.
+    const error = assert.throws(() =>
+        tsColl
+            .aggregate([{$match: {_id: 1000}}, {$_internalAssertDataAssumptions: {paths: ["arr"]}}])
+            .toArray(),
+    );
+    assert.commandFailedWithCode(
+        error,
+        12508302,
+        internalAssertDataAssumptionsStage +
+            " expected to fail validation for an array-valued measurement.",
+    );
+
+    // The validation stage is not auto-injected, and an explicitly specified stage is not executed
+    // on the explain path. Therefore explain should succeed even for an array-valued field.
+    const explain = tsColl
+        .explain()
+        .aggregate([{$match: {_id: 1000}}, {$_internalAssertDataAssumptions: {paths: ["arr"]}}]);
+    assert(
+        explain,
+        internalAssertDataAssumptionsStage +
+            " explain should succeed even for an array-valued measurement.",
+    );
+
+    // Clean up the array-valued measurement so it doesn't interfere with later assertions.
+    assert.commandWorked(tsColl.deleteOne({_id: 1000}));
+})();
+
 // The following pipeline stages do not need to be tested for timeseries collections.
 // Stages that are skipped **must** be one of the following:
 // 1. Stages that only run on the admin database.
@@ -444,7 +513,9 @@ const skippedStages = [
     "$_addReshardingResumeId",
 ];
 
-const testedStages = [...errorTests, ...noUnpackTests, ...unpackTests].map((test) => test.stage);
+const testedStages = [...errorTests, ...noUnpackTests, ...unpackTests]
+    .map((test) => test.stage)
+    .concat(internalAssertDataAssumptionsStage);
 
 // Use $listMqlEntities to confirm that all aggregation stages have been tested with timeseries collection or skipped.
 const aggStages = db
