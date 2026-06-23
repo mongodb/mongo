@@ -32,7 +32,7 @@ def _aot_compile_wasm_impl(ctx):
             "-o",
             output_file.path,
             "-C",
-            "cache=no",
+            "cache=no,cranelift-opt-level=speed",
             # -W sets wasmtime runtime options.
             # These options must match the options we pass at
             # startup or else starting the module will throw.
