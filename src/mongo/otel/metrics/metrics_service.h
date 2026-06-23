@@ -67,6 +67,11 @@ namespace mongo::otel::metrics {
 
 struct ScalarMetricOptions {
     boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
+    // Overrides the default ScalarMetricImpl reporting policy.
+    // By default, uses kUnconditionally for metrics without attributes, and
+    // kIfCurrentlyNonZero for metrics with attributes.
+    // Set to kUnconditionally for metrics where 0 is significant, like ratios.
+    boost::optional<ReportingPolicy> reportingPolicy = boost::none;
 };
 using CounterOptions = ScalarMetricOptions;
 using UpDownCounterOptions = ScalarMetricOptions;
@@ -603,6 +608,10 @@ ScalarMetricImpl<T, AttributeTs...>& MetricsService::_createScalarMetric(
         std::move(identifier),
         /* makeInstrument= */
         [&](WithLock, const std::string&) {
+            if (options.reportingPolicy) {
+                return std::make_unique<ScalarMetricImpl<T, AttributeTs...>>(
+                    *options.reportingPolicy, defs...);
+            }
             return std::make_unique<ScalarMetricImpl<T, AttributeTs...>>(defs...);
         },
 #ifdef MONGO_CONFIG_OTEL

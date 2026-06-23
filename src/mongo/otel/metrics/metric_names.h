@@ -336,9 +336,8 @@ public:
     // Query Integration Team Metrics
 
     // System Health
-    static constexpr MetricName kCpuUserMs = MetricNameMaker::make("mongodb.cpu.user");
-    static constexpr MetricName kCpuSystemMs = MetricNameMaker::make("mongodb.cpu.system");
-    static constexpr MetricName kCpuIowaitMs = MetricNameMaker::make("mongodb.cpu.iowait");
+    static constexpr MetricName kCpuTime = MetricNameMaker::make("mongodb.cpu.time");
+    static constexpr MetricName kCpuUtilization = MetricNameMaker::make("mongodb.cpu.utilization");
     static constexpr MetricName kThreadActive = MetricNameMaker::make("mongodb.thread.active");
     static constexpr MetricName kThreadQueued = MetricNameMaker::make("mongodb.thread.queued");
     static constexpr MetricName kFdOpen = MetricNameMaker::make("mongodb.fd.open");

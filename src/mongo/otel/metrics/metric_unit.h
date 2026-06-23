@@ -45,6 +45,7 @@ enum class MetricUnit {
     kId,
     kState,
     kBoolean,
+    kRatio,
 
     // Time
     kMicroseconds,

@@ -46,6 +46,7 @@ extern void runSystemHealthCollectionCycle(SystemHealthMetrics&);
 namespace mongo {
 namespace {
 
+using otel::metrics::AttributeDefinition;
 using otel::metrics::MetricNames;
 using otel::metrics::OtelMetricsCapturer;
 
@@ -72,9 +73,9 @@ TEST_F(SystemHealthOtelMetricsTest, FirstUpdateSetsMetricsCorrectly) {
 
     _metrics.update(snap);
 
-    ASSERT_EQ(1000, _capturer.readInt64Counter(MetricNames::kCpuUserMs));
-    ASSERT_EQ(500, _capturer.readInt64Counter(MetricNames::kCpuSystemMs));
-    ASSERT_EQ(200, _capturer.readInt64Counter(MetricNames::kCpuIowaitMs));
+    ASSERT_EQ(1000, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"user"_sd}));
+    ASSERT_EQ(500, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"system"_sd}));
+    ASSERT_EQ(200, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"iowait"_sd}));
     ASSERT_EQ(4, _capturer.readInt64Gauge(MetricNames::kThreadActive));
     ASSERT_EQ(1, _capturer.readInt64Gauge(MetricNames::kThreadQueued));
     ASSERT_EQ(512, _capturer.readInt64Gauge(MetricNames::kFdOpen));
@@ -100,9 +101,9 @@ TEST_F(SystemHealthOtelMetricsTest, SecondUpdateUpdatesMetricsCorrectly) {
     _metrics.update(second);
 
     // Counters accumulate deltas: first=1000/500/200, delta=300/150/50.
-    ASSERT_EQ(1300, _capturer.readInt64Counter(MetricNames::kCpuUserMs));
-    ASSERT_EQ(650, _capturer.readInt64Counter(MetricNames::kCpuSystemMs));
-    ASSERT_EQ(250, _capturer.readInt64Counter(MetricNames::kCpuIowaitMs));
+    ASSERT_EQ(1300, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"user"_sd}));
+    ASSERT_EQ(650, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"system"_sd}));
+    ASSERT_EQ(250, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"iowait"_sd}));
 
     ASSERT_EQ(5, _capturer.readInt64Gauge(MetricNames::kThreadActive));
     ASSERT_EQ(3, _capturer.readInt64Gauge(MetricNames::kThreadQueued));
@@ -129,9 +130,87 @@ TEST_F(SystemHealthOtelMetricsTest, NegativeDeltaOnWrapIsSkipped) {
     _metrics.update(low);
 
     // Negative deltas are skipped; counters retain the value from before the reset.
-    ASSERT_EQ(5000, _capturer.readInt64Counter(MetricNames::kCpuUserMs));
-    ASSERT_EQ(2000, _capturer.readInt64Counter(MetricNames::kCpuSystemMs));
-    ASSERT_EQ(800, _capturer.readInt64Counter(MetricNames::kCpuIowaitMs));
+    ASSERT_EQ(5000, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"user"_sd}));
+    ASSERT_EQ(2000, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"system"_sd}));
+    ASSERT_EQ(800, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"iowait"_sd}));
+}
+
+struct CPUModeField {
+    StringData mode;
+    int64_t SystemHealthSnapshot::* field;
+};
+
+inline constexpr auto kCpuModeFields = std::to_array<CPUModeField>({
+    {"user"_sd, &SystemHealthSnapshot::cpuUserMs},
+    {"nice"_sd, &SystemHealthSnapshot::cpuNiceMs},
+    {"system"_sd, &SystemHealthSnapshot::cpuSystemMs},
+    {"idle"_sd, &SystemHealthSnapshot::cpuIdleMs},
+    {"iowait"_sd, &SystemHealthSnapshot::cpuIowaitMs},
+    {"irq"_sd, &SystemHealthSnapshot::cpuIrqMs},
+    {"softirq"_sd, &SystemHealthSnapshot::cpuSoftirqMs},
+    {"steal"_sd, &SystemHealthSnapshot::cpuStealMs},
+    {"guest"_sd, &SystemHealthSnapshot::cpuGuestMs},
+    {"guest_nice"_sd, &SystemHealthSnapshot::cpuGuestNiceMs},
+});
+
+TEST_F(SystemHealthOtelMetricsTest, CpuTimeDeltaAllFields) {
+    static constexpr int64_t kDelta = 50;
+
+    // Build a table of snapshots, all 10 CPU time metrics have a value that is
+    // a unique multiple of 100 to avoid confusion in different test cases. They
+    // all increase by `kDelta` for the second snapshot.
+    SystemHealthSnapshot first{}, second{};
+    for (size_t i = 0; i < kCpuModeFields.size(); ++i) {
+        first.*kCpuModeFields[i].field = 1000 - 100 * static_cast<int64_t>(i);
+        second.*kCpuModeFields[i].field = first.*kCpuModeFields[i].field + kDelta;
+    }
+    _metrics.update(first);
+    _metrics.update(second);
+
+    for (const auto& c : kCpuModeFields) {
+        SCOPED_TRACE(fmt::format("mode={}", c.mode));
+        EXPECT_EQ(second.*c.field,
+                  _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {c.mode}));
+    }
+}
+
+TEST_F(SystemHealthOtelMetricsTest, CpuUtilization) {
+    struct Case {
+        StringData name;
+        std::array<int64_t, 10> deltas;
+        std::array<double, 10> expectedRatios;
+    };
+    constexpr auto kCases = std::to_array<Case>({
+        {"uniform_deltas",
+         {50, 50, 50, 50, 50, 50, 50, 50, 50, 50},
+         {0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1}},
+        {"varied_deltas",
+         {50, 100, 150, 50, 100, 150, 50, 100, 150, 100},
+         {0.05, 0.1, 0.15, 0.05, 0.1, 0.15, 0.05, 0.1, 0.15, 0.1}},
+        {"single_mode",
+         {0, 0, 1000, 0, 0, 0, 0, 0, 0, 0},
+         {0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}},
+    });
+
+    for (const auto& c : kCases) {
+        SCOPED_TRACE(fmt::format("name={}", c.name));
+        // We're not using the `_metrics` member here on purpose; we don't want
+        // to accidentally carry forward state across cases.
+        SystemHealthMetrics metrics;
+        SystemHealthSnapshot first{}, second{};
+        for (size_t i = 0; i < kCpuModeFields.size(); ++i) {
+            first.*kCpuModeFields[i].field = 100;
+            second.*kCpuModeFields[i].field = first.*kCpuModeFields[i].field + c.deltas[i];
+        }
+        metrics.update(first);
+        metrics.update(second);
+
+        for (size_t i = 0; i < c.expectedRatios.size(); ++i) {
+            EXPECT_DOUBLE_EQ(c.expectedRatios[i],
+                             _capturer.readDoubleGauge<StringData>(MetricNames::kCpuUtilization,
+                                                                   {kCpuModeFields[i].mode}));
+        }
+    }
 }
 
 #ifdef __linux__

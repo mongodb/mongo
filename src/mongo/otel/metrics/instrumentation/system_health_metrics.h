@@ -45,8 +45,17 @@ class ServiceContext;
  */
 struct SystemHealthSnapshot {
     int64_t cpuUserMs{0};
+    int64_t cpuNiceMs{0};
     int64_t cpuSystemMs{0};
+    int64_t cpuIdleMs{0};
     int64_t cpuIowaitMs{0};
+    int64_t cpuIrqMs{0};
+    int64_t cpuSoftirqMs{0};
+    int64_t cpuStealMs{0};
+    int64_t cpuGuestMs{0};
+    int64_t cpuGuestNiceMs{0};
+
+    // non-CPU health metrics
     int64_t procsRunning{0};
     int64_t procsBlocked{0};
     int64_t fdOpen{0};

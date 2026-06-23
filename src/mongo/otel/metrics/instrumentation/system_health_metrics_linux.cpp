@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -53,11 +54,13 @@ namespace mongo {
 
 namespace {
 
+using otel::metrics::AttributeDefinition;
 using otel::metrics::Counter;
 using otel::metrics::Gauge;
 using otel::metrics::MetricNames;
 using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
+using otel::metrics::ReportingPolicy;
 
 constexpr StringData kProcStatPath = "/proc/stat"_sd;
 constexpr StringData kProcFileNrPath = "/proc/sys/fs/file-nr"_sd;
@@ -72,6 +75,20 @@ struct SystemHealthOtelMetricsState {
 const auto getSystemHealthOtelMetricsState =
     ServiceContext::declareDecoration<SystemHealthOtelMetricsState>();
 
+const AttributeDefinition<StringData> kCpuModeAttr{
+    .name = "mode",
+    .values = {"user"_sd,
+               "nice"_sd,
+               "system"_sd,
+               "idle"_sd,
+               "iowait"_sd,
+               "irq"_sd,
+               "softirq"_sd,
+               "steal"_sd,
+               "guest"_sd,
+               "guest_nice"_sd},
+};
+
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(failCollectSystemHealthSnapshot);
@@ -79,18 +96,18 @@ MONGO_FAIL_POINT_DEFINE(failCollectSystemHealthSnapshot);
 class SystemHealthMetrics::Impl {
 public:
     Impl()
-        : _cpuUser(MetricsService::instance().createInt64Counter(
-              MetricNames::kCpuUserMs,
-              "Total CPU time spent in user mode since boot",
-              MetricUnit::kMilliseconds)),
-          _cpuSystem(MetricsService::instance().createInt64Counter(
-              MetricNames::kCpuSystemMs,
-              "Total CPU time spent in kernel mode since boot",
-              MetricUnit::kMilliseconds)),
-          _cpuIowait(MetricsService::instance().createInt64Counter(
-              MetricNames::kCpuIowaitMs,
-              "Total CPU time spent waiting for I/O since boot",
-              MetricUnit::kMilliseconds)),
+        : _cpuTime(MetricsService::instance().createInt64Counter<StringData>(
+              MetricNames::kCpuTime,
+              "Total CPU time since boot, by mode",
+              MetricUnit::kMilliseconds,
+              kCpuModeAttr)),
+          _cpuUtilization(MetricsService::instance().createDoubleGauge<StringData>(
+              MetricNames::kCpuUtilization,
+              "Per-mode CPU utilization across all modes, summing to 1.0 when utilization is "
+              "positive",
+              MetricUnit::kRatio,
+              kCpuModeAttr,
+              otel::metrics::GaugeOptions{.reportingPolicy = ReportingPolicy::kUnconditionally})),
           _threadActive(MetricsService::instance().createInt64Gauge(
               MetricNames::kThreadActive,
               "Number of OS threads/processes currently in a runnable state",
@@ -112,32 +129,59 @@ public:
         _collectErrors.add(1);
     }
 
-    void update(const SystemHealthSnapshot& snap) {
-        auto addDelta = [](Counter<int64_t>& counter, int64_t& prev, int64_t current) {
-            int64_t delta = current - std::exchange(prev, current);
-            if (delta > 0)
-                counter.add(delta);
+    void updateCpuTime(const SystemHealthSnapshot& snap) {
+        struct ModeDelta {
+            StringData mode;
+            int64_t delta;
         };
-        addDelta(_cpuUser, _prevCpuUserMs, snap.cpuUserMs);
-        addDelta(_cpuSystem, _prevCpuSystemMs, snap.cpuSystemMs);
-        addDelta(_cpuIowait, _prevCpuIowaitMs, snap.cpuIowaitMs);
+        std::array<ModeDelta, 10> modes;
+        size_t n = 0;
+        int64_t totalDelta = 0;
+
+        auto record = [&](StringData mode, int64_t& prev, int64_t current) {
+            int64_t delta = std::max<int64_t>(current - std::exchange(prev, current), 0);
+            modes[n++] = {mode, delta};
+            totalDelta += delta;
+            if (delta > 0)
+                _cpuTime.add(delta, mode);
+        };
+
+        record("user"_sd, _prev.cpuUserMs, snap.cpuUserMs);
+        record("nice"_sd, _prev.cpuNiceMs, snap.cpuNiceMs);
+        record("system"_sd, _prev.cpuSystemMs, snap.cpuSystemMs);
+        record("idle"_sd, _prev.cpuIdleMs, snap.cpuIdleMs);
+        record("iowait"_sd, _prev.cpuIowaitMs, snap.cpuIowaitMs);
+        record("irq"_sd, _prev.cpuIrqMs, snap.cpuIrqMs);
+        record("softirq"_sd, _prev.cpuSoftirqMs, snap.cpuSoftirqMs);
+        record("steal"_sd, _prev.cpuStealMs, snap.cpuStealMs);
+        record("guest"_sd, _prev.cpuGuestMs, snap.cpuGuestMs);
+        record("guest_nice"_sd, _prev.cpuGuestNiceMs, snap.cpuGuestNiceMs);
+
+        // If nothing has changed, just skip updating the utilization.
+        // This prevents a potential divide by zero.
+        if (totalDelta == 0)
+            return;
+        for (const auto& [mode, delta] : modes)
+            _cpuUtilization.set(static_cast<double>(delta) / totalDelta, mode);
+    }
+
+    void update(const SystemHealthSnapshot& snap) {
+        updateCpuTime(snap);
+
         _threadActive.set(snap.procsRunning);
         _threadQueued.set(snap.procsBlocked);
         _fdOpen.set(snap.fdOpen);
     }
 
 private:
-    Counter<int64_t>& _cpuUser;
-    Counter<int64_t>& _cpuSystem;
-    Counter<int64_t>& _cpuIowait;
+    Counter<int64_t, StringData>& _cpuTime;
+    Gauge<double, StringData>& _cpuUtilization;
     Gauge<int64_t>& _threadActive;
     Gauge<int64_t>& _threadQueued;
     Gauge<int64_t>& _fdOpen;
     Counter<int64_t>& _collectErrors;
 
-    int64_t _prevCpuUserMs = 0;
-    int64_t _prevCpuSystemMs = 0;
-    int64_t _prevCpuIowaitMs = 0;
+    SystemHealthSnapshot _prev;
 };
 
 SystemHealthMetrics::SystemHealthMetrics() : _impl(std::make_unique<Impl>()) {}
@@ -185,8 +229,17 @@ boost::optional<SystemHealthSnapshot> collectSystemHealthSnapshot() {
 
     SystemHealthSnapshot snap;
     snap.cpuUserMs = stat["user_ms"].safeNumberLong();
+    snap.cpuNiceMs = stat["nice_ms"].safeNumberLong();
     snap.cpuSystemMs = stat["system_ms"].safeNumberLong();
+    snap.cpuIdleMs = stat["idle_ms"].safeNumberLong();
     snap.cpuIowaitMs = stat["iowait_ms"].safeNumberLong();
+    snap.cpuIrqMs = stat["irq_ms"].safeNumberLong();
+    snap.cpuSoftirqMs = stat["softirq_ms"].safeNumberLong();
+    snap.cpuStealMs = stat["steal_ms"].safeNumberLong();
+    // We support kernels old enough to not have guest/guest_nice,
+    // but safeNumberLong will just return 0 if they're not available.
+    snap.cpuGuestMs = stat["guest_ms"].safeNumberLong();
+    snap.cpuGuestNiceMs = stat["guest_nice_ms"].safeNumberLong();
     snap.procsRunning = stat["procs_running"].safeNumberLong();
     snap.procsBlocked = stat["procs_blocked"].safeNumberLong();
     snap.fdOpen = fileNr[procparser::kFileHandlesInUseKey].safeNumberLong();

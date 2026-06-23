@@ -50,6 +50,8 @@ std::string_view toString(MetricUnit unit) {
             return "state";
         case MetricUnit::kBoolean:
             return "bool";
+        case MetricUnit::kRatio:
+            return "ratio";
 
         // Time
         case MetricUnit::kMicroseconds:
