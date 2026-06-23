@@ -604,6 +604,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "query_solution_analyzer",
+    srcs = [
+        "query_solution_analyzer.cpp",
+    ],
+    hdrs = [
+        "query_solution_analyzer.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/query/compiler/physical_model/query_solution",
+    ],
+)
+
+mongo_cc_library(
     name = "engine_selection",
     srcs = [
         "engine_selection.cpp",
@@ -614,6 +628,7 @@ mongo_cc_library(
         "canonical_query_base",
         "query_planner",
         "query_planner_params",
+        "query_solution_analyzer",
         "//src/mongo/db/pipeline",
     ],
 )

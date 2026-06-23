@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query-integration-observability
+  - "plan_shape_counters*":
+    approvers:
+      - 10gen/query-execution
   - "OWNERS.yml":
     approvers:
       - 10gen/query-integration-staff-leads
