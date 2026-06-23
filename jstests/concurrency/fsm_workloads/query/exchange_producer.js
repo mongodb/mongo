@@ -94,9 +94,22 @@ export const $config = (function () {
     };
 
     function setup(db, collName, cluster) {
+        // Exchange requires an internal client connection. Create one by sending hello with
+        // internalClient.
+        const internalConn = (() => {
+            const conn = new Mongo(db.getMongo().host);
+            assert.commandWorked(
+                conn.getDB("admin").runCommand({
+                    hello: 1,
+                    internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+                }),
+            );
+            return conn;
+        })();
+
         // Start a session so we can pass the sessionId from when we retrieved the cursors to the
         // getMores where we want to iterate the cursors.
-        const session = db.getMongo().startSession();
+        const session = internalConn.startSession();
 
         // Load data.
         const bulk = db[collName].initializeUnorderedBulkOp();
@@ -119,12 +132,15 @@ export const $config = (function () {
                     bufferSize: NumberInt(this.bufferSize),
                 },
                 cursor: {batchSize: 0},
+                readConcern: {},
+                writeConcern: {},
             }),
         );
 
         // Save the cursor ids to $config.data so each of the worker threads has access to the
         // cursors, as well as the sessionId.
         assert.eq(this.numConsumers, res.cursors.length);
+        this.internalConn = internalConn;
         this.sessionId = tojson(session.getSessionId()["id"]);
         this.cursorIds = [];
         for (const cursor of res.cursors) {
