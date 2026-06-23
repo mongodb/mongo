@@ -64,13 +64,13 @@ assert(
 );
 
 // Check that all collection that were local to the mongod's are writable through the mongos
-assert.commandWorked(db1.foo.insertOne({a: 4}));
+let sdb1 = s.getDB("testDB");
+assert.commandWorked(sdb1.foo.insertOne({a: 4}));
 numObjsFoo++;
-assert.commandWorked(db1.testTsColl.insertOne({time: new Date(), temperature: 35.0}));
+assert.commandWorked(sdb1.testTsColl.insertOne({time: new Date(), temperature: 35.0}));
 numObjsTestTsColl++;
 
 // Check that all collection that were local to the mongod's are accessible through the mongos
-let sdb1 = s.getDB("testDB");
 assert.eq(numObjsFoo, sdb1.foo.count(), "wrong count collection foo that existed before addshard");
 assert.eq(
     numObjsTestTsColl,
