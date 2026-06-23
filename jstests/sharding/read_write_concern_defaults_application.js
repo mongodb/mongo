@@ -158,6 +158,7 @@ let testCases = {
     _shardsvrCloneCatalogData: {skip: "internal command"},
     _shardsvrCheckMetadataConsistency: {skip: "internal command"},
     _shardsvrCheckMetadataConsistencyParticipant: {skip: "internal command"},
+    _shardsvrCheckMetadataConsistencySecondaryParticipant: {skip: "internal command"},
     _shardsvrCleanupStructuredEncryptionData: {skip: "internal command"},
     _shardsvrCommitCreateDatabaseMetadata: {skip: "internal command"},
     _shardsvrCommitDropDatabaseMetadata: {skip: "internal command"},

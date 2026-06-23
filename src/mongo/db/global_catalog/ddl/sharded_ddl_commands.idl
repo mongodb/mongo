@@ -850,6 +850,26 @@ commands:
                 description: "The shard id of the db primary shard"
                 type: shard_id
 
+    _shardsvrCheckMetadataConsistencySecondaryParticipant:
+        description: "Internal command sent to RS secondaries of participants shards to check metadata consistency."
+        command_name: _shardsvrCheckMetadataConsistencySecondaryParticipant
+        cpp_name: ShardsvrCheckMetadataConsistencySecondaryParticipant
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        api_version: ""
+        reply_type: CursorInitialReply
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            CommonCheckMetadataRequestFields: commonFields
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
+            primaryShardId:
+                description: "The shard id of the db primary shard"
+                type: shard_id
+
     _configsvrCheckClusterMetadataConsistency:
         description:
             "Internal command sent to the config server to check cluster metadata

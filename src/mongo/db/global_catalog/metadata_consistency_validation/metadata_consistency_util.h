@@ -84,10 +84,17 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
 /**
  * Construct a initial cursor reply from the given client cursor.
  * The returned reply is populated with the first batch result.
+ * If `planExecutor` is not null, it uses it, and the `inconsistencies` vector is ignored.
+ * If null, it builds a queued plan executor with the contents of the `inconsistencies` vector.
  */
-CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
-                                                  ClientCursorParams&& cursorParams,
-                                                  long long batchSize);
+CursorInitialReply createInitialCursorReplyMongod(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    std::vector<MetadataInconsistencyItem>&& inconsistencies,
+    const boost::optional<mongo::SimpleCursorOptions>& requestCursorOpts,
+    const BSONObj& request,
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor = nullptr);
+
 /**
  * Returns a list of inconsistencies between the collections' metadata on the shard and the
  * collections' metadata in the config server. Setting the parameter checkRangeDeletionIndexes

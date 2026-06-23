@@ -496,29 +496,12 @@ public:
             auto pipeline = Pipeline::create({std::move(docSourceMergeStage)}, expCtx);
             auto exec = plan_executor_factory::make(expCtx, std::move(pipeline));
 
-            const auto batchSize = [&]() -> long long {
-                const auto& cursorOpts = request().getCursor();
-                if (cursorOpts && cursorOpts->getBatchSize()) {
-                    return *cursorOpts->getBatchSize();
-                } else {
-                    return query_request_helper::getDefaultBatchSize();
-                }
-            }();
-
-            ClientCursorParams cursorParams{
-                std::move(exec),
-                nss,
-                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
-                APIParameters::get(opCtx),
-                opCtx->getWriteConcern(),
-                repl::ReadConcernArgs::get(opCtx),
-                ReadPreferenceSetting::get(opCtx),
-                request().toBSON(),
-                {Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
-                           ActionType::internal)}};
-
-            return metadata_consistency_util::createInitialCursorReplyMongod(
-                opCtx, std::move(cursorParams), batchSize);
+            return metadata_consistency_util::createInitialCursorReplyMongod(opCtx,
+                                                                             nss,
+                                                                             {} /*inconsistencies*/,
+                                                                             request().getCursor(),
+                                                                             request().toBSON(),
+                                                                             std::move(exec));
         }
 
         NamespaceString ns() const override {

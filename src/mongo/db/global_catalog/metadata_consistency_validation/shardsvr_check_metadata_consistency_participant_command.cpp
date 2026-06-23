@@ -185,32 +185,8 @@ public:
                                        std::make_move_iterator(collMetadataInconsistencies.end()));
             }
 
-            auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
-                opCtx, std::move(inconsistencies), nss);
-
-            ClientCursorParams cursorParams{
-                std::move(exec),
-                nss,
-                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
-                APIParameters::get(opCtx),
-                opCtx->getWriteConcern(),
-                repl::ReadConcernArgs::get(opCtx),
-                ReadPreferenceSetting::get(opCtx),
-                request().toBSON(),
-                {Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
-                           ActionType::internal)}};
-
-            const auto batchSize = [&]() -> long long {
-                const auto& cursorOpts = request().getCursor();
-                if (cursorOpts && cursorOpts->getBatchSize()) {
-                    return *cursorOpts->getBatchSize();
-                } else {
-                    return query_request_helper::getDefaultBatchSize();
-                }
-            }();
-
             return metadata_consistency_util::createInitialCursorReplyMongod(
-                opCtx, std::move(cursorParams), batchSize);
+                opCtx, nss, std::move(inconsistencies), request().getCursor(), request().toBSON());
         }
 
     private:

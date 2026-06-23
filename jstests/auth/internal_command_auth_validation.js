@@ -975,6 +975,14 @@ const internalCommandsMap = {
             primaryShardId: shard0name,
         },
     },
+    _shardsvrCheckMetadataConsistencySecondaryParticipant: {
+        skip: true, // This command doesn't accept to be run in the 'admin' database.
+        testname: "_shardsvrCheckMetadataConsistencySecondaryParticipant",
+        command: {
+            _shardsvrCheckMetadataConsistencySecondaryParticipant: 1,
+            primaryShardId: shard0name,
+        },
+    },
     _transferMods: {
         testname: "_transferMods",
         command: {

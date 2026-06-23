@@ -1485,11 +1485,39 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
                                        nss);
 }
 
-CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
-                                                  ClientCursorParams&& cursorParams,
-                                                  long long batchSize) {
-    auto& exec = cursorParams.exec;
-    auto& nss = cursorParams.nss;
+CursorInitialReply createInitialCursorReplyMongod(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    std::vector<MetadataInconsistencyItem>&& inconsistencies,
+    const boost::optional<mongo::SimpleCursorOptions>& requestCursorOpts,
+    const BSONObj& request,
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor) {
+
+    const auto batchSize = [&]() -> int64_t {
+        if (requestCursorOpts && requestCursorOpts->getBatchSize()) {
+            return *requestCursorOpts->getBatchSize();
+        } else {
+            return query_request_helper::getDefaultBatchSize();
+        }
+    }();
+
+    if (!planExecutor) {
+        planExecutor = metadata_consistency_util::makeQueuedPlanExecutor(
+            opCtx, std::move(inconsistencies), nss);
+    }
+
+    auto* const exec = planExecutor.get();
+
+    ClientCursorParams cursorParams{
+        std::move(planExecutor),
+        nss,
+        AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
+        APIParameters::get(opCtx),
+        opCtx->getWriteConcern(),
+        repl::ReadConcernArgs::get(opCtx),
+        ReadPreferenceSetting::get(opCtx),
+        request,
+        {Privilege(ResourcePattern::forClusterResource(nss.tenantId()), ActionType::internal)}};
 
     std::vector<BSONObj> firstBatch;
     FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;

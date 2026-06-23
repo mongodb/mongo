@@ -31,13 +31,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
@@ -50,23 +46,16 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
-#include <cstdint>
 #include <iterator>
-#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -174,33 +163,8 @@ public:
                                    std::make_move_iterator(hiddenCollectionsIncon.begin()),
                                    std::make_move_iterator(hiddenCollectionsIncon.end()));
 
-            const auto nss = ns();
-            auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
-                opCtx, std::move(inconsistencies), nss);
-
-            ClientCursorParams cursorParams{
-                std::move(exec),
-                nss,
-                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
-                APIParameters::get(opCtx),
-                opCtx->getWriteConcern(),
-                repl::ReadConcernArgs::get(opCtx),
-                ReadPreferenceSetting::get(opCtx),
-                request().toBSON(),
-                {Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
-                           ActionType::internal)}};
-
-            const auto batchSize = [&]() -> long long {
-                const auto& cursorOpts = request().getCursor();
-                if (cursorOpts && cursorOpts->getBatchSize()) {
-                    return *cursorOpts->getBatchSize();
-                } else {
-                    return query_request_helper::getDefaultBatchSize();
-                }
-            }();
-
             return metadata_consistency_util::createInitialCursorReplyMongod(
-                opCtx, std::move(cursorParams), batchSize);
+                opCtx, ns(), std::move(inconsistencies), request().getCursor(), request().toBSON());
         }
 
     private:

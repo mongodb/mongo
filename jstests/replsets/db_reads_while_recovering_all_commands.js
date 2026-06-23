@@ -158,6 +158,7 @@ const allCommands = {
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistencyParticipant: {skip: isAnInternalCommand},
+    _shardsvrCheckMetadataConsistencySecondaryParticipant: {skip: isAnInternalCommand},
     _shardsvrBeginMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrEndMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrReshardingDonorGetCloneCount: {skip: isAnInternalCommand},

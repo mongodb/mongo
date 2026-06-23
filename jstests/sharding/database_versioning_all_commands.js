@@ -1147,6 +1147,7 @@ const allTestCases = {
             },
         },
         _shardsvrCheckMetadataConsistencyParticipant: {skip: "TODO"},
+        _shardsvrCheckMetadataConsistencySecondaryParticipant: {skip: "TODO"},
         _shardsvrCleanupStructuredEncryptionData: {skip: "TODO"},
         _shardsvrCloneAuthoritativeMetadata: {skip: "TODO"},
         _shardsvrCloneCatalogData: {skip: "TODO"},
