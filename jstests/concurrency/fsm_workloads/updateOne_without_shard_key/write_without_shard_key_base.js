@@ -15,6 +15,7 @@
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/crud_base_partitioned.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 10;
@@ -176,6 +177,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
+        // TODO SERVER-54019 Avoid over-counting 'n' and 'nModified' values when retrying updates by _id
+        // or deletes by _id after chunk migration.
+        const uweEnabled = this.uweEnabled;
 
         // Only test sort when there are matching documents in the collection. We do not test sort
         // for replacement updates as replaceOne does not support a sort parameter.
@@ -253,7 +257,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         assert.commandWorked(res);
 
         if (containsMatchedDocs) {
-            assert.eq(res.matchedCount, 1, query);
+            assert.contains(res.matchedCount, uweEnabled ? [1, 2] : [1], query);
         } else {
             assert.eq(res.matchedCount, 0, res);
 
@@ -266,7 +270,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             }
         }
 
-        assert.contains(res.modifiedCount, [0, 1], res);
+        assert.contains(res.modifiedCount, uweEnabled ? [0, 1, 2] : [0, 1], res);
 
         // In case the modification results in no change to the document, matched may be higher
         // than modified.
@@ -299,6 +303,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
+        // TODO SERVER-54019 Avoid over-counting 'n' and 'nModified' values when retrying updates by _id
+        // or deletes by _id after chunk migration.
+        const uweEnabled = this.uweEnabled;
 
         jsTestLog(
             "updateOneWithId state running with the following parameters: \n" +
@@ -338,12 +345,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         assert.commandWorked(res);
 
         if (containsMatchedDocs) {
-            assert.eq(res.matchedCount, 1, query);
+            assert.contains(res.matchedCount, uweEnabled ? [1, 2] : [1], query);
         } else {
             assert.eq(res.matchedCount, 0, res);
         }
 
-        assert.contains(res.modifiedCount, [0, 1], res);
+        assert.contains(res.modifiedCount, uweEnabled ? [0, 1, 2] : [0, 1], res);
 
         // In case the modification results in no change to the document, matched may be higher
         // than modified.
@@ -610,6 +617,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.apply(this, arguments);
+        this.uweEnabled = isUweEnabled(db);
     };
 
     $config.states.updateOne = function updateOne(db, collName, connCache) {
