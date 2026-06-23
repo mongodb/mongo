@@ -495,13 +495,9 @@ private:
 
         // TODO SERVER-94927: Remove once 9.0 becomes last lts.
         const bool isReplSet = !role.has_value();
-        if ((isReplSet || isConfigsvr) &&
-            feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(requestedVersion)) {
-            auto& service = query_settings::QuerySettingsService::get(opCtx);
-            service.createQueryShapeRepresentativeQueriesCollection(opCtx);
-            service
-                .migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
-                    opCtx);
+        if (isReplSet || isConfigsvr) {
+            query_settings::QuerySettingsService::get(opCtx).upgradeQuerySettings(opCtx,
+                                                                                  requestedVersion);
         }
     }
 
@@ -1104,13 +1100,9 @@ private:
 
         // TODO SERVER-94927: Remove once 9.0 becomes last lts.
         const bool isReplSet = !role.has_value();
-        if ((isReplSet || isConfigsvr) &&
-            !feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(requestedVersion)) {
-            auto& service = query_settings::QuerySettingsService::get(opCtx);
-            service
-                .migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
-                    opCtx);
-            service.dropQueryShapeRepresentativeQueriesCollection(opCtx);
+        if (isReplSet || isConfigsvr) {
+            query_settings::QuerySettingsService::get(opCtx).downgradeQuerySettings(
+                opCtx, requestedVersion);
         }
     }
 };

@@ -37,6 +37,7 @@
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/stdx/trusted_hasher.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/version/releases.h"
 
 #include <string_view>
 
@@ -235,20 +236,18 @@ public:
     virtual void dropQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const = 0;
 
     /**
-     * Clears the 'representativeQuery' field from each QueryShapeConfiguration in 'querySettings'
-     * cluster parameter and upserts these entries into 'queryShapeRepresentativeQueries'
-     * collection.
+     * Performs any query settings data migrations needed when upgrading to 'targetFCV'. The
+     * required actions are derived from which feature flags are enabled on 'targetFCV'.
      */
-    virtual void migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
-        OperationContext* opCtx) const = 0;
+    virtual void upgradeQuerySettings(
+        OperationContext* opCtx, multiversion::FeatureCompatibilityVersion targetFCV) const = 0;
 
     /**
-     * Populates the 'representativeQuery' field for each QueryShapeConfiguration from the
-     * 'queryShapeRepresentativeQueries' collection. In case of BSONObjectTooLarge exception,
-     * catches it, without performing any further migration.
+     * Performs any query settings data migrations needed when downgrading to 'targetFCV'. The
+     * required actions are derived from which feature flags are enabled on 'targetFCV'.
      */
-    virtual void migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
-        OperationContext* opCtx) const = 0;
+    virtual void downgradeQuerySettings(
+        OperationContext* opCtx, multiversion::FeatureCompatibilityVersion targetFCV) const = 0;
 
     /**
      * Upserts the 'representativeQueries' into the 'queryShapeRepresentativeQueries' collection

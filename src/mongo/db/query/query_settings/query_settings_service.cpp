@@ -33,11 +33,15 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/index_key_validate.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
@@ -426,6 +430,181 @@ SetClusterParameter makeQuerySettingsClusterParameter(
     return request;
 }
 
+class QuerySettingsMigration {
+public:
+    // The set of operations a migration may perform, as a bitmask. A migration plan is an OR of
+    // these flags; 'run()' executes the present operations in a fixed, safe order.
+    enum class Op : uint8_t {
+        kNone = 0,
+        kRemoveQueryKnobs = 1 << 0,
+        kCreateCollection = 1 << 1,
+        kMoveQueriesToCollection = 1 << 2,
+        kMoveQueriesToParameter = 1 << 3,
+        kDropCollection = 1 << 4,
+    };
+
+    friend constexpr Op operator|(Op a, Op b) {
+        return static_cast<Op>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+    }
+    friend constexpr Op& operator|=(Op& a, Op b) {
+        return a = a | b;
+    }
+    static constexpr bool contains(Op plan, Op op) {
+        return (static_cast<uint8_t>(plan) & static_cast<uint8_t>(op)) != 0;
+    }
+
+    QuerySettingsMigration(const QuerySettingsService* service) : _service(service) {}
+
+    void run(OperationContext* opCtx, Op plan) {
+        // Create the collection up front, before the retry loop populates it. The create is
+        // idempotent and unrelated to the cluster parameter conflict being retried below.
+        if (contains(plan, Op::kCreateCollection)) {
+            _service->createQueryShapeRepresentativeQueriesCollection(opCtx);
+        }
+
+        conflictingOperationInProgressRetry([&] {
+            _dirty = false;
+            _config = _service->getAllQueryShapeConfigurations(boost::none /* tenantId */);
+            LOGV2_DEBUG(12826800,
+                        2,
+                        "Running query settings migration pass",
+                        "numQueryShapeConfigurations"_attr =
+                            _config.queryShapeConfigurations.size());
+            if (contains(plan, Op::kRemoveQueryKnobs)) {
+                removeQueryKnobs();
+            }
+            if (contains(plan, Op::kMoveQueriesToCollection)) {
+                moveQueriesToCollection(opCtx);
+            }
+            if (contains(plan, Op::kMoveQueriesToParameter)) {
+                moveQueriesToParameter(opCtx);
+            }
+            if (_dirty) {
+                LOGV2_DEBUG(12826801,
+                            2,
+                            "Persisting migrated query settings cluster parameter",
+                            "numQueryShapeConfigurations"_attr =
+                                _config.queryShapeConfigurations.size());
+                _service->setQuerySettingsClusterParameter(opCtx, _config);
+            }
+        });
+
+        // Drop the dedicated collection only after the representative queries have been persisted
+        // back to the cluster parameter, so a failed write cannot lose them.
+        if (contains(plan, Op::kDropCollection)) {
+            _service->dropQueryShapeRepresentativeQueriesCollection(opCtx);
+        }
+    }
+
+private:
+    void removeQueryKnobs() {
+        auto& configs = _config.queryShapeConfigurations;
+        configs.erase(std::remove_if(configs.begin(),
+                                     configs.end(),
+                                     [&](auto&& entry) -> bool {
+                                         auto&& settings = entry.getSettings();
+                                         if (auto&& knobs = settings.getQueryKnobs()) {
+                                             _dirty = true;
+                                             // TODO SERVER-129571: Scope down query knob downgrades
+                                             // only to knobs below the minimum FCV
+                                             settings.setQueryKnobs(boost::none);
+                                             const bool becameDefault = isDefault(settings);
+                                             LOGV2_DEBUG(
+                                                 12826802,
+                                                 3,
+                                                 "Stripping query knobs from query settings",
+                                                 "queryShapeHash"_attr =
+                                                     entry.getQueryShapeHash().toHexString(),
+                                                 "removedEntry"_attr = becameDefault);
+                                             if (becameDefault) {
+                                                 return true;
+                                             }
+                                             entry.setSettings(settings);
+                                         }
+                                         return false;
+                                     }),
+                      configs.end());
+    }
+
+    void moveQueriesToCollection(OperationContext* opCtx) {
+        const auto& clusterParameterTime = _config.clusterParameterTime;
+        std::vector<QueryShapeRepresentativeQuery> representativeQueries;
+        for (auto&& shapeConfig : _config.queryShapeConfigurations) {
+            auto&& representativeQuery = shapeConfig.getRepresentativeQuery();
+            if (!representativeQuery) {
+                continue;
+            }
+            representativeQueries.emplace_back(
+                shapeConfig.getQueryShapeHash(), *representativeQuery, clusterParameterTime);
+            // Clear the 'representativeQuery' information as it will be stored in a separate
+            // collection.
+            shapeConfig.setRepresentativeQuery(boost::none);
+            _dirty = true;
+        }
+        if (!representativeQueries.empty()) {
+            _service->upsertRepresentativeQueries(opCtx, representativeQueries);
+        }
+    }
+
+    void moveQueriesToParameter(OperationContext* opCtx) {
+        auto& configs = _config.queryShapeConfigurations;
+        auto setRepresentativeQuery = [&](auto representativeQuery) -> bool {
+            auto it = std::find_if(configs.begin(), configs.end(), [&](const auto& shapeConfig) {
+                return shapeConfig.getQueryShapeHash() == representativeQuery.get_id();
+            });
+            if (it != configs.end()) {
+                it->setRepresentativeQuery(representativeQuery.getRepresentativeQuery());
+                return true;
+            }
+            return false;
+        };
+
+        // Migrate representative queries from smallest to largest, stopping once approaching
+        // BSONObjMaxUserSize limit.
+        DBDirectClient client(opCtx);
+        auto cursor = client.find([] {
+            FindCommandRequest request{NamespaceString::kQueryShapeRepresentativeQueriesNamespace};
+            BSONObjBuilder projection;
+            projection.append(QueryShapeRepresentativeQuery::k_idFieldName, 1);
+            projection.append(QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName, 1);
+            projection.append(QueryShapeRepresentativeQuery::kLastModifiedTimeFieldName, 1);
+            std::string dollarRepresentativeQuery = str::stream()
+                << "$" << QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName;
+            projection.append("bsonSize", BSON("$bsonSize" << dollarRepresentativeQuery));
+            request.setProjection(projection.obj().getOwned());
+
+            // Prioritize by 'representativeQuery' size, so that we can migrate as many
+            // representative queries as possible.
+            // TODO SERVER-107307: Introduce additional representative query size limits test
+            // coverage.
+            request.setSort(BSON("bsonSize" << 1));
+            return request;
+        }());
+        IDLParserContext ctx{"QueryShapeRepresentativeQuery"};
+        int budget =
+            BSONObjMaxUserSize - makeQuerySettingsClusterParameter(_config).toBSON().objsize();
+        while (cursor->more()) {
+            BSONObj doc = cursor->next();
+            int cost =
+                doc.getField(QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName).size();
+            if (cost > budget) {
+                break;
+            }
+            if (setRepresentativeQuery(QueryShapeRepresentativeQuery::parse(doc, ctx))) {
+                budget -= cost;
+                _dirty = true;
+            }
+        }
+        if (!cursor->isDead()) {
+            cursor->kill();
+        }
+    }
+
+    const QuerySettingsService* _service;
+    QueryShapeConfigurationsWithTimestamp _config;
+    bool _dirty = false;
+};
+
 }  // namespace
 
 class QuerySettingsRouterService : public QuerySettingsService {
@@ -491,13 +670,14 @@ public:
         MONGO_UNIMPLEMENTED_TASSERT(10445101);
     }
 
-    void migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
-        OperationContext* opCtx) const override {
+    void upgradeQuerySettings(OperationContext* opCtx,
+                              multiversion::FeatureCompatibilityVersion targetFCV) const override {
         MONGO_UNIMPLEMENTED_TASSERT(10445102);
     }
 
-    void migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
-        OperationContext* opCtx) const override {
+    void downgradeQuerySettings(
+        OperationContext* opCtx,
+        multiversion::FeatureCompatibilityVersion targetFCV) const override {
         MONGO_UNIMPLEMENTED_TASSERT(10445103);
     }
 
@@ -629,117 +809,55 @@ public:
         std::ignore = client.dropCollection(nss);
     }
 
-    void migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
-        OperationContext* opCtx) const override {
-        conflictingOperationInProgressRetry([&]() {
-            std::vector<QueryShapeRepresentativeQuery> queryShapeRepresentativeQueries;
-            auto config = getAllQueryShapeConfigurations(boost::none /* tenantId */);
-            for (auto& queryShapeConfig : config.queryShapeConfigurations) {
-                if (auto&& representativeQuery = queryShapeConfig.getRepresentativeQuery()) {
-                    queryShapeRepresentativeQueries.emplace_back(
-                        queryShapeConfig.getQueryShapeHash(),
-                        *representativeQuery,
-                        config.clusterParameterTime);
 
-                    // Clear the representativeQuery information as it will be stored in a separate
-                    // collection.
-                    queryShapeConfig.setRepresentativeQuery(boost::none);
-                }
-            }
+    void upgradeQuerySettings(OperationContext* opCtx,
+                              multiversion::FeatureCompatibilityVersion targetFCV) const override {
+        using Op = QuerySettingsMigration::Op;
 
-            // Early exit if there are no representative queries to migrate.
-            if (queryShapeRepresentativeQueries.empty()) {
-                return;
-            }
+        // Move representative queries into the dedicated collection once backfill is enabled.
+        auto plan = Op::kNone;
+        if (feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(targetFCV)) {
+            plan |= Op::kCreateCollection | Op::kMoveQueriesToCollection;
+        }
 
-            // Upsert all representative queries into the dedicated collection.
-            upsertRepresentativeQueries(opCtx, queryShapeRepresentativeQueries);
-
-            // Clear 'representativeQuery' info from QueryShapeConfiguration entries in
-            // 'querySettings' cluster parameter.
-            setQuerySettingsClusterParameter(opCtx, config);
-        });
+        LOGV2_DEBUG(12826803,
+                    2,
+                    "Planning query settings FCV upgrade",
+                    "targetFCV"_attr = multiversion::toString(targetFCV),
+                    "migrateRepresentativeQueriesToCollection"_attr =
+                        QuerySettingsMigration::contains(plan, Op::kMoveQueriesToCollection));
+        if (plan != Op::kNone) {
+            QuerySettingsMigration(this).run(opCtx, plan);
+        }
     }
 
-    void migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
-        OperationContext* opCtx) const override {
-        conflictingOperationInProgressRetry([&]() {
-            // Read the QueryShapeConfigurations snapshot here as opposed to after opening the find
-            // cursor to ensure that we detect the case of 'querySettings' cluster parameter
-            // changes while having the cursor opened.
-            auto config = getAllQueryShapeConfigurations(boost::none /* tenantId */);
-            stdx::unordered_map<query_shape::QueryShapeHash, QueryInstance, QueryShapeHashHasher>
-                representativeQueryMapping;
+    void downgradeQuerySettings(
+        OperationContext* opCtx,
+        multiversion::FeatureCompatibilityVersion targetFCV) const override {
+        using Op = QuerySettingsMigration::Op;
 
-            int newQuerySettingsClusterParameterEstimatedBsonSize = [&]() {
-                BSONObjBuilder bob;
-                QuerySettingsClusterParameter p("querySettings"sv,
-                                                ServerParameterType::kClusterWide);
-                p.append(opCtx, &bob, "", boost::none /* tenantId */);
-                return bob.obj().objsize();
-            }();
+        auto plan = Op::kNone;
+        // Move representative queries back to the cluster parameter once backfill is disabled.
+        if (!feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(targetFCV)) {
+            plan |= Op::kMoveQueriesToParameter | Op::kDropCollection;
+        }
+        // Strip query knobs once the target FCV no longer supports them.
+        if (!feature_flags::gFeatureFlagPqsQueryKnobs.isEnabledOnVersion(targetFCV)) {
+            plan |= Op::kRemoveQueryKnobs;
+        }
 
-            // Issue a find request over queryShapeRepresentativeQueries collection, while sorting
-            // over representativeQuery size in ascending order. We will try to migrate as many
-            // representativeQueries back to the 'querySettings' cluster parameter as possible by
-            // performing final 'querySettings' parameter size estimation.
-            FindCommandRequest findRepresentativeQueries{
-                NamespaceString::kQueryShapeRepresentativeQueriesNamespace};
-            std::string dollarRepresentativeQuery = str::stream()
-                << "$" << QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName;
-            findRepresentativeQueries.setProjection(
-                BSON("_id" << 1 << QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName << 1
-                           << QueryShapeRepresentativeQuery::kLastModifiedTimeFieldName << 1
-                           << "bsonSize" << BSON("$bsonSize" << dollarRepresentativeQuery)));
-            findRepresentativeQueries.setSort(BSON("bsonSize" << -1));
-            DBDirectClient client(opCtx);
-            auto cursor = client.find(std::move(findRepresentativeQueries));
-            while (cursor->more()) {
-                BSONObj obj = cursor->next();
-                auto representativeQueryBsonSize =
-                    obj.getField(QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName)
-                        .objsize();
+        LOGV2_DEBUG(12826804,
+                    2,
+                    "Planning query settings FCV downgrade",
+                    "targetFCV"_attr = multiversion::toString(targetFCV),
+                    "removeQueryKnobs"_attr =
+                        QuerySettingsMigration::contains(plan, Op::kRemoveQueryKnobs),
+                    "migrateRepresentativeQueriesToClusterParameter"_attr =
+                        QuerySettingsMigration::contains(plan, Op::kMoveQueriesToParameter));
 
-                // Do not read further from the cursor if total BSONObj size surpasses 16MB.
-                if (newQuerySettingsClusterParameterEstimatedBsonSize +
-                        representativeQueryBsonSize >
-                    BSONObj::DefaultSizeTrait::MaxSize) {
-                    cursor->kill();
-                    break;
-                }
-
-                auto representativeQuery = QueryShapeRepresentativeQuery::parse(
-                    obj, IDLParserContext{"QueryShapeRepresentativeQuery"});
-                representativeQueryMapping.insert(
-                    {representativeQuery.get_id(), representativeQuery.getRepresentativeQuery()});
-                newQuerySettingsClusterParameterEstimatedBsonSize += representativeQueryBsonSize;
-            }
-
-            // Early exit if there are no representative queries to migrate.
-            if (representativeQueryMapping.empty()) {
-                return;
-            }
-
-            // Repopulate representative query information for the QueryShapeConfigurations.
-            for (auto& queryShapeConfig : config.queryShapeConfigurations) {
-                if (auto it = representativeQueryMapping.find(queryShapeConfig.getQueryShapeHash());
-                    it != representativeQueryMapping.end()) {
-                    queryShapeConfig.setRepresentativeQuery(std::move(it->second));
-                }
-            }
-
-            // Try updating 'querySettings' cluster parameter. As we do accurate querySettings
-            // cluster parameter size estimation, we do not expect BSONObjectTooLarge exception to
-            // be thrown. But in case our estimation was incorrect, we do not retry and users will
-            // lose representative queries, however, they will be backfilled, once users upgrade
-            // their FCV.
-            try {
-                setQuerySettingsClusterParameter(opCtx, config);
-            } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
-                LOGV2_WARNING(10445109,
-                              "Failed migrating representative queries to query settings storage");
-            }
-        });
+        if (plan != Op::kNone) {
+            QuerySettingsMigration(this).run(opCtx, plan);
+        }
     }
 
     void upsertRepresentativeQueries(
