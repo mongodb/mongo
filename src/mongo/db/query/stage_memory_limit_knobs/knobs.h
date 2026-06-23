@@ -57,6 +57,10 @@ enum class StageMemoryLimit {
     QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill,
     UpdateStageMaxMemoryBytes,
     CountScanStageMaxMemoryBytes,
+    SingleDocumentTransformationStageMaxExpressionEvaluationBytes,
+    MatchStageMaxExpressionEvaluationBytes,
+    LookupStageMaxExpressionEvaluationBytes,
+    RedactStageMaxExpressionEvaluationBytes,
 };
 
 /**

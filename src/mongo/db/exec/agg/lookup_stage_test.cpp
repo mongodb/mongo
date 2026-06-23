@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source_lookup_test_util.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -374,9 +375,11 @@ class MemoryTrackerObservingExpression final : public Expression {
 public:
     static inline int gEvaluations = 0;
     static inline int gEvaluationsWithTracker = 0;
+    static inline int64_t gLastTrackerMaxBytes = -1;
     static void resetObservations() {
         gEvaluations = 0;
         gEvaluationsWithTracker = 0;
+        gLastTrackerMaxBytes = -1;
     }
 
     explicit MemoryTrackerObservingExpression(ExpressionContext* expCtx) : Expression(expCtx) {}
@@ -393,6 +396,7 @@ public:
         ++gEvaluations;
         if (ctx.tracker != nullptr) {
             ++gEvaluationsWithTracker;
+            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
         }
         return Value(1);
     }
@@ -457,6 +461,19 @@ TEST_F(LookupStageTest, DoesNotThreadMemoryTrackerWhenExpressionMemoryTrackingDi
 
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluations, 1);
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
+}
+
+TEST_F(LookupStageTest, MemoryTrackerLimitReflectsKnob) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+    const long long customLimit = 1024;
+    unittest::ServerParameterGuard knobGuard("internalLookupStageMaxExpressionEvaluationBytes",
+                                             customLimit);
+
+    runLookupWithObservingLetVariable(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
 }
 }  // namespace
 }  // namespace mongo

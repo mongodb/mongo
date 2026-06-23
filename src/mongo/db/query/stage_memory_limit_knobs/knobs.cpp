@@ -77,6 +77,14 @@ AtomicWord<long long>& getMemoryLimitKnob(StageMemoryLimit stage) {
             return internalUpdateStageMaxMemoryBytes;
         case StageMemoryLimit::CountScanStageMaxMemoryBytes:
             return internalCountScanStageMaxMemoryBytes;
+        case StageMemoryLimit::SingleDocumentTransformationStageMaxExpressionEvaluationBytes:
+            return internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes;
+        case StageMemoryLimit::MatchStageMaxExpressionEvaluationBytes:
+            return internalMatchStageMaxExpressionEvaluationBytes;
+        case StageMemoryLimit::LookupStageMaxExpressionEvaluationBytes:
+            return internalLookupStageMaxExpressionEvaluationBytes;
+        case StageMemoryLimit::RedactStageMaxExpressionEvaluationBytes:
+            return internalRedactStageMaxExpressionEvaluationBytes;
         case StageMemoryLimit::SBEMergeJoinStageMaxMemoryBytes:
             return internalSBEMergeJoinStageMaxMemoryBytes;
         case StageMemoryLimit::SBEAndHashStageMaxMemoryBytes:
@@ -101,6 +109,16 @@ void appendStageMemoryLimitsToExplain(BSONObjBuilder& bob) {
     bob.appendNumber(
         "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
         loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes));
+    bob.appendNumber(
+        "internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes",
+        loadMemoryLimit(
+            StageMemoryLimit::SingleDocumentTransformationStageMaxExpressionEvaluationBytes));
+    bob.appendNumber("internalMatchStageMaxExpressionEvaluationBytes",
+                     loadMemoryLimit(StageMemoryLimit::MatchStageMaxExpressionEvaluationBytes));
+    bob.appendNumber("internalLookupStageMaxExpressionEvaluationBytes",
+                     loadMemoryLimit(StageMemoryLimit::LookupStageMaxExpressionEvaluationBytes));
+    bob.appendNumber("internalRedactStageMaxExpressionEvaluationBytes",
+                     loadMemoryLimit(StageMemoryLimit::RedactStageMaxExpressionEvaluationBytes));
 }
 
 }  // namespace mongo

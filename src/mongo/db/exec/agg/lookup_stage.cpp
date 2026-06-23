@@ -163,8 +163,8 @@ LookUpStage::LookUpStage(std::string_view stageName,
       _unwindPreserveNullsAndEmptyArrays(unwindPreserveNullsAndEmptyArrays),
       _additionalFilter(additionalFilter.getOwned()),
       _sharedState(std::move(sharedState)),
-      _memoryTracker(
-          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
+      _memoryTracker(OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
+          *pExpCtx, loadMemoryLimit(StageMemoryLimit::LookupStageMaxExpressionEvaluationBytes))) {
     if (!hasLocalFieldForeignFieldJoin()) {
         // When local/foreignFields are included, we cannot enable the cache because the $match
         // is a correlated prefix that will not be detected. Here, local/foreignFields are absent,

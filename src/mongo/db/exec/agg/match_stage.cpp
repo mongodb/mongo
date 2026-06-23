@@ -33,6 +33,7 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <string_view>
 
@@ -59,8 +60,8 @@ MatchStage::MatchStage(std::string_view stageName,
                        bool isTextQuery)
     : Stage(stageName, pExpCtx),
       _matchProcessor(matchProcessor),
-      _memoryTracker(
-          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
+      _memoryTracker(OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
+          *pExpCtx, loadMemoryLimit(StageMemoryLimit::MatchStageMaxExpressionEvaluationBytes))) {
     // The user facing error should have been generated earlier.
     massert(17309, "Should never call getNext on a $match stage with $text clause", !isTextQuery);
     _trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
