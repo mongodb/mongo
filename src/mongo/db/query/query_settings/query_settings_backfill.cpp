@@ -32,6 +32,7 @@
 #include "mongo/client/retry_strategy.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/query/query_settings/query_settings_usage_tracker.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/util/assert_util.h"
@@ -225,6 +226,7 @@ public:
     using BackfillCoordinator::BackfillCoordinator;
 
 private:
+    std::shared_ptr<executor::TaskExecutor> makeExecutor(OperationContext* opCtx) final;
     std::unique_ptr<async_rpc::Targeter> makeTargeter(OperationContext* opCtx) final;
 };
 
@@ -237,6 +239,7 @@ public:
     using BackfillCoordinator::BackfillCoordinator;
 
 private:
+    std::shared_ptr<executor::TaskExecutor> makeExecutor(OperationContext* opCtx) final;
     std::unique_ptr<async_rpc::Targeter> makeTargeter(OperationContext* opCtx) final;
 };
 
@@ -474,8 +477,18 @@ std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume_inlock(
     return std::exchange(_state, std::make_unique<BackfillCoordinator::State>());
 }
 
-std::shared_ptr<executor::TaskExecutor> BackfillCoordinator::makeExecutor(OperationContext* opCtx) {
+std::shared_ptr<executor::TaskExecutor> ReplicaSetBackfillCoordinator::makeExecutor(
+    OperationContext* opCtx) {
     return MongoProcessInterface::create(opCtx)->getTaskExecutor();
+}
+
+std::shared_ptr<executor::TaskExecutor> ShardedClusterBackfillCoordinator::makeExecutor(
+    OperationContext* opCtx) {
+    // Use the fixed sharding executor to avoid deadlocks when failpoints are enabled: it runs
+    // continuations on dedicated worker threads (unlike the arbitrary executor, whose
+    // NetworkInterfaceThreadPool runs them on the network reactor thread) while still supporting
+    // the async insert RPC.
+    return Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 }
 
 std::unique_ptr<async_rpc::Targeter> ShardedClusterBackfillCoordinator::makeTargeter(

@@ -134,7 +134,7 @@ private:
     std::unique_ptr<State> consume();
     std::unique_ptr<State> consume_inlock();
 
-    virtual std::shared_ptr<executor::TaskExecutor> makeExecutor(OperationContext* opCtx);
+    virtual std::shared_ptr<executor::TaskExecutor> makeExecutor(OperationContext* opCtx) = 0;
     virtual std::unique_ptr<async_rpc::Targeter> makeTargeter(OperationContext* opCtx) = 0;
 
     OnCompletionHook _onCompletionHook;
