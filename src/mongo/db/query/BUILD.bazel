@@ -9,6 +9,22 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "write_conflict_storm",
+    srcs = [
+        "write_conflict_storm.cpp",
+    ],
+    hdrs = [
+        "write_conflict_storm.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands/server_status:server_status_metric",
+        "//src/mongo/db/query:query_knobs",
+    ],
+)
+
 # Shared mongod/mongos query code.
 mongo_cc_library(
     name = "query_common",

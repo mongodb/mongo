@@ -74,8 +74,8 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-
 namespace mongo {
+
 namespace express {
 
 /**

@@ -1033,9 +1033,7 @@ server_parameters:
             Maximum consecutive WriteConflictException retries per plan execution. 0 disables
             the limit. limitMax = N means "shed on retry N+1". Recommended floor when enabled:
             limitMax >= 5. Clients must retry the resulting WriteConflictRetryLimitExceeded
-            with backoff -- zero-delay retry re-enters the limit. Only covers the
-            classic PlanExecutorImpl path; PlanExecutorExpress fast paths are not subject to
-            this limit.
+            with backoff -- zero-delay retry re-enters the limit.
         set_at: [startup, runtime]
         cpp_varname: internalQueryWriteConflictRetryLimitMax
         cpp_vartype: AtomicWord<int>

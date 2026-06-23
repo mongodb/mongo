@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/plan_executor_impl.h"
 
+#include "mongo/db/query/write_conflict_storm.h"
 #include "mongo/unittest/unittest.h"
 
 #include <stdexcept>
@@ -101,76 +102,76 @@ TEST(AdaptiveWriteConflictRetryLimit, MinGreaterThanMaxClampedToMax) {
 }
 
 //
-// WriteConflictStreakGuard RAII contract tests.
+// WCStormWaiterGuard RAII contract tests.
 //
 
-TEST(WriteConflictStreakGuard, StaticInvariants) {
+TEST(WCStormWaiterGuard, StaticInvariants) {
     // Defends the RAII contract against future refactors that would otherwise silently
     // re-enable copy / move and break double-decrement-on-destruction.
-    static_assert(!std::is_copy_constructible_v<PlanExecutorImpl::WriteConflictStreakGuard>);
-    static_assert(!std::is_copy_assignable_v<PlanExecutorImpl::WriteConflictStreakGuard>);
-    static_assert(!std::is_move_constructible_v<PlanExecutorImpl::WriteConflictStreakGuard>);
-    static_assert(!std::is_move_assignable_v<PlanExecutorImpl::WriteConflictStreakGuard>);
+    static_assert(!std::is_copy_constructible_v<WCStormWaiterGuard>);
+    static_assert(!std::is_copy_assignable_v<WCStormWaiterGuard>);
+    static_assert(!std::is_move_constructible_v<WCStormWaiterGuard>);
+    static_assert(!std::is_move_assignable_v<WCStormWaiterGuard>);
 }
 
-TEST(WriteConflictStreakGuard, ConstructDoesNotTouchGauge) {
+TEST(WCStormWaiterGuard, ConstructDoesNotTouchGauge) {
     const int32_t before = PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest();
     {
-        PlanExecutorImpl::WriteConflictStreakGuard guard;
-        ASSERT_FALSE(guard.held());
+        WCStormWaiterGuard guard;
+        ASSERT_FALSE(guard.active());
         ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before);
     }
     ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before);
 }
 
-TEST(WriteConflictStreakGuard, AcquireIncrementsAndDestructorReleases) {
+TEST(WCStormWaiterGuard, ActivateIncrementsAndDestructorReleases) {
     const int32_t before = PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest();
     {
-        PlanExecutorImpl::WriteConflictStreakGuard guard;
-        guard.acquire();
-        ASSERT_TRUE(guard.held());
+        WCStormWaiterGuard guard;
+        guard.activate();
+        ASSERT_TRUE(guard.active());
         ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before + 1);
     }
     ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before);
 }
 
-TEST(WriteConflictStreakGuard, ExplicitReleaseDecrements) {
+TEST(WCStormWaiterGuard, ExplicitReleaseDecrements) {
     const int32_t before = PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest();
-    PlanExecutorImpl::WriteConflictStreakGuard guard;
-    guard.acquire();
+    WCStormWaiterGuard guard;
+    guard.activate();
     ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before + 1);
     guard.release();
-    ASSERT_FALSE(guard.held());
+    ASSERT_FALSE(guard.active());
     ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before);
     // Destructor must be a no-op after explicit release (no double-decrement).
 }
 
-TEST(WriteConflictStreakGuard, AcquireIsIdempotent) {
+TEST(WCStormWaiterGuard, ActivateIsIdempotent) {
     const int32_t before = PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest();
-    PlanExecutorImpl::WriteConflictStreakGuard guard;
-    guard.acquire();
-    guard.acquire();
-    guard.acquire();
-    ASSERT_TRUE(guard.held());
+    WCStormWaiterGuard guard;
+    guard.activate();
+    guard.activate();
+    guard.activate();
+    ASSERT_TRUE(guard.active());
     ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before + 1);
     guard.release();
     ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before);
 }
 
-TEST(WriteConflictStreakGuard, ReleaseWithoutAcquireIsNoOp) {
+TEST(WCStormWaiterGuard, ReleaseWithoutActivateIsNoOp) {
     const int32_t before = PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest();
-    PlanExecutorImpl::WriteConflictStreakGuard guard;
+    WCStormWaiterGuard guard;
     guard.release();
     guard.release();
-    ASSERT_FALSE(guard.held());
+    ASSERT_FALSE(guard.active());
     ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before);
 }
 
-TEST(WriteConflictStreakGuard, ExceptionUnwindReleasesGauge) {
+TEST(WCStormWaiterGuard, ExceptionUnwindReleasesGauge) {
     const int32_t before = PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest();
     try {
-        PlanExecutorImpl::WriteConflictStreakGuard guard;
-        guard.acquire();
+        WCStormWaiterGuard guard;
+        guard.activate();
         ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before + 1);
         throw std::runtime_error("simulated WCE-limit throw");
     } catch (const std::runtime_error&) {
@@ -179,15 +180,15 @@ TEST(WriteConflictStreakGuard, ExceptionUnwindReleasesGauge) {
     ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before);
 }
 
-TEST(WriteConflictStreakGuard, MultipleConcurrentInstancesEachOwnSlot) {
+TEST(WCStormWaiterGuard, MultipleConcurrentInstancesEachOwnSlot) {
     const int32_t before = PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest();
     {
-        PlanExecutorImpl::WriteConflictStreakGuard a;
-        PlanExecutorImpl::WriteConflictStreakGuard b;
-        PlanExecutorImpl::WriteConflictStreakGuard c;
-        a.acquire();
-        b.acquire();
-        c.acquire();
+        WCStormWaiterGuard a;
+        WCStormWaiterGuard b;
+        WCStormWaiterGuard c;
+        a.activate();
+        b.activate();
+        c.activate();
         ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before + 3);
         b.release();
         ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before + 2);

@@ -9,6 +9,7 @@
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {isExpress} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -298,6 +299,109 @@ describe("WriteConflictRetryLimitExceeded -- sharded", function () {
         );
         const res = coll.update({n: {$gte: 0}}, {$inc: {n: 1}});
         assert.commandWorked(res);
+    });
+});
+
+describe("WriteConflictRetryLimitExceeded -- express executor", function () {
+    function setLimitKnobs(limitMax) {
+        assert.commandWorked(
+            conn.adminCommand({
+                setParameter: 1,
+                internalQueryWriteConflictRetryLimitMax: limitMax,
+                internalQueryWriteConflictRetryLimitMin: kLimitMin,
+                internalQueryWriteConflictRetryLimitWaitersThreshold: kWaitersThreshold,
+            }),
+        );
+    }
+
+    function enableWceStorm() {
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "throwWriteConflictExceptionInExpressWrite",
+                mode: "alwaysOn",
+            }),
+        );
+    }
+
+    function disableWceStorm() {
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "throwWriteConflictExceptionInExpressWrite",
+                mode: "off",
+            }),
+        );
+    }
+
+    let conn, db, coll;
+
+    before(function () {
+        conn = MongoRunner.runMongod({});
+        db = conn.getDB(jsTestName());
+        coll = db.getCollection("c_express");
+        assert.commandWorked(coll.insertOne({_id: 1, x: 0}));
+    });
+
+    after(function () {
+        MongoRunner.stopMongod(conn);
+    });
+
+    it("findAndModify by _id uses the express executor", function () {
+        const explain = assert.commandWorked(
+            db.runCommand({
+                explain: {
+                    findAndModify: coll.getName(),
+                    query: {_id: 1},
+                    update: {$inc: {x: 1}},
+                },
+                verbosity: "queryPlanner",
+            }),
+        );
+        assert(isExpress(db, explain), "findAndModify by _id should use the express executor", {
+            explain,
+        });
+    });
+
+    it("off by default: limitMax=0 does not surface WriteConflictRetryLimitExceeded", function () {
+        setLimitKnobs(0);
+        enableWceStorm();
+        const res = db.runCommand({
+            findAndModify: coll.getName(),
+            query: {_id: 1},
+            update: {$inc: {x: 1}},
+            maxTimeMS: 5000,
+        });
+        disableWceStorm();
+        if (!res.ok && res.code) {
+            assert.neq(
+                res.code,
+                ErrorCodes.WriteConflictRetryLimitExceeded,
+                "limit fired despite limitMax=0",
+                {res},
+            );
+        }
+    });
+
+    it("findAndModify surfaces WriteConflictRetryLimitExceeded when retry limit is exceeded", function () {
+        setLimitKnobs(kLimitMax);
+        const before = db.serverStatus().metrics.operation.writeConflictRetryLimitHit || 0;
+        enableWceStorm();
+        const res = db.runCommand({
+            findAndModify: coll.getName(),
+            query: {_id: 1},
+            update: {$inc: {x: 1}},
+        });
+        disableWceStorm();
+        assert.commandFailedWithCode(res, ErrorCodes.WriteConflictRetryLimitExceeded);
+        const after = db.serverStatus().metrics.operation.writeConflictRetryLimitHit || 0;
+        assert.gt(
+            after,
+            before,
+            "writeConflictRetryLimitHit counter should increment after limit hit",
+            {
+                before,
+                after,
+            },
+        );
     });
 });
 

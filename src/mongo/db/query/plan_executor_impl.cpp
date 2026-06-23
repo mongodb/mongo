@@ -52,6 +52,7 @@
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/write_conflict_storm.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_util.h"
@@ -59,7 +60,6 @@
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/util/aligned.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -84,20 +84,6 @@ namespace {
 const BSONObj kEmptyPBRT;
 const std::vector<NamespaceStringOrUUID> kEmptyNssVector;
 
-// Count of user-connection plan executors currently in a WCE retry streak while the adaptive
-// retry limit is enabled. Internal-client streaks and limit-disabled paths do not acquire the
-// guard, so they are not counted. int32_t is enough (bounded by active user connections).
-// CacheExclusive puts the gauge on its own cache line.
-CacheExclusive<AtomicWord<int32_t>> gWriteConflictRetryWaiters{};
-
-// serverStatus / FTDC mirror. Updated alongside the source gauge by WriteConflictStreakGuard.
-auto& writeConflictRetryWaitersGauge =
-    *MetricBuilder<Atomic64Metric>("operation.writeConflictRetryWaiters");
-
-// Monotonic counter incremented once per op that exceeds its adaptive retry limit.
-auto& writeConflictRetryLimitHitMetric =
-    *MetricBuilder<Counter64>("operation.writeConflictRetryLimitHit");
-
 // Avoid logging the same message about long-running collection scans from different queries too
 // frequently.
 logv2::SeveritySuppressor longCollectionScanLogSeveritySuppressor{
@@ -105,43 +91,11 @@ logv2::SeveritySuppressor longCollectionScanLogSeveritySuppressor{
 
 }  // namespace
 
-// Exposed in the header so unit tests can call the formula without a live PlanExecutor.
-int adaptiveWriteConflictRetryLimit(int limitMax, int limitMin, int threshold, int waiters) {
-    if (limitMax <= 0) {
-        return 0;
-    }
-    if (limitMin < 0) {
-        limitMin = 0;
-    }
-    if (limitMin > limitMax) {
-        limitMin = limitMax;
-    }
-    if (threshold <= 0) {
-        return limitMax;
-    }
-    // Saturate at limitMin once waiters reaches threshold.
-    const int clampedWaiters = waiters > threshold ? threshold : waiters;
-    return limitMax - (limitMax - limitMin) * clampedWaiters / threshold;
-}
 
 int32_t PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest() {
-    return gWriteConflictRetryWaiters->loadRelaxed();
+    return wceWaitersCount();
 }
 
-// Slow-path helpers for the guard. The inline acquire() / release() in the header gate on _held
-// before calling these.
-void PlanExecutorImpl::WriteConflictStreakGuard::acquireSlow() {
-    // Pass `old + 1` to set() instead of reloading the gauge.
-    const int32_t newVal = gWriteConflictRetryWaiters->fetchAndAddRelaxed(1) + 1;
-    writeConflictRetryWaitersGauge.set(newVal);
-    _held = true;
-}
-
-void PlanExecutorImpl::WriteConflictStreakGuard::releaseSlow() noexcept {
-    const int32_t newVal = gWriteConflictRetryWaiters->fetchAndSubtractRelaxed(1) - 1;
-    writeConflictRetryWaitersGauge.set(newVal);
-    _held = false;
-}
 
 const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKnownCommittedOpTime =
     OperationContext::declareDecoration<boost::optional<repl::OpTime>>();
@@ -711,36 +665,7 @@ void PlanExecutorImpl::_handleNeedYield(WriteConflictRetryState& retryState) {
 
         retryState.writeConflictsInARow++;
 
-        // Adaptive per-op retry limit. Only applies to user-connection ops while the feature
-        // is on; internal clients (mongos -> mongod, cross-shard, __system peers) and
-        // sessionless threads are exempt.
-        const int limitMax = internalQueryWriteConflictRetryLimitMax.loadRelaxed();
-        auto* const client = _opCtx->getClient();
-        if (limitMax > 0 && client && client->isFromUserConnection() &&
-            !client->isInternalClient()) {
-            retryState.streakGuard.acquire();
-            const int limitMin = internalQueryWriteConflictRetryLimitMin.loadRelaxed();
-            const int threshold =
-                internalQueryWriteConflictRetryLimitWaitersThreshold.loadRelaxed();
-            const int waiters = gWriteConflictRetryWaiters->loadRelaxed();
-            const int effectiveLimit =
-                adaptiveWriteConflictRetryLimit(limitMax, limitMin, threshold, waiters);
-            // We use > instead of >= because writeConflictsInARow is already increased above.
-            if (effectiveLimit > 0 &&
-                retryState.writeConflictsInARow > static_cast<size_t>(effectiveLimit)) {
-                std::string msg = fmt::format(
-                    "Aborting after {} consecutive WriteConflictExceptions; adaptive limit "
-                    "was {} (limitMax={}, limitMin={}, threshold={}, waiters={}).",
-                    retryState.writeConflictsInARow,
-                    effectiveLimit,
-                    limitMax,
-                    limitMin,
-                    threshold,
-                    waiters);
-                writeConflictRetryLimitHitMetric.increment();
-                throwWriteConflictRetryLimitExceededException(std::move(msg));
-            }
-        }
+        checkWriteConflictStorm(_opCtx, retryState.streakGuard, retryState.writeConflictsInARow);
 
         // Fall back to the legacy hold-ticket sleep path once the op has hit the threshold.
         // Holding the ticket during the sleep throttles concurrent ops entering the conflict
