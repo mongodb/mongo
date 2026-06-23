@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/feature_flag.h"
@@ -142,6 +143,22 @@ repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDel
     SingleOpSizeMetadata m;
     m.setSz(replicatedSizeDelta);
     return m;
+}
+
+bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const auto& vCtx = VersionContext::getDecoration(opCtx);
+    return gFeatureFlagContinuousInternodeValidationPerDocument
+               .isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot) &&
+        gFeatureFlagRecordIdsReplicated.isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot);
+}
+
+// Computes a per-document hash to be stored on the oplog entry for continuous internode
+// validation.
+int32_t computeDocValidationHash(HashContext& ctx, const BSONObj& doc) {
+    auto sha =
+        SHA256Block::computeHashWithCtx(&ctx, {ConstDataRange(doc.objdata(), doc.objsize())});
+    return ConstDataView(reinterpret_cast<const char*>(sha.data())).read<LittleEndian<int32_t>>();
 }
 
 repl::OpTime logOperation(OperationContext* opCtx,
@@ -736,10 +753,13 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
 
     WriteUnitOfWork wuow(opCtx);
 
+    const bool useValidationHash = isContinuousInternodeValidationPerDocumentEnabled(opCtx);
+
     std::vector<repl::OpTime> opTimes(count);
     std::vector<Timestamp> timestamps(count);
     std::vector<BSONObj> bsonOplogEntries(count);
     std::vector<Record> records(count);
+    HashContext hashCtx;
     for (size_t i = 0; i < count; i++) {
         // Make a copy from the template for each insert oplog entry.
         MutableOplogEntry oplogEntry = *oplogEntryTemplate;
@@ -762,6 +782,11 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
 
         const auto docKey = getDocumentKey(collectionPtr, insertedDoc).getShardKeyAndId();
         oplogEntry.setObject2(docKey);
+
+        if (useValidationHash) {
+            oplogEntry.setDocHash(computeDocValidationHash(hashCtx, insertedDoc));
+        }
+
         if (isReplicatedFastCountEnabled(opCtx)) {
             oplogEntry.setSizeMetadata(makeOperationSizeMetadata(insertedDoc.objsize()));
         }
@@ -864,8 +889,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
     const bool useReplicatedSizeCount = isReplicatedFastCountEnabled(opCtx);
-
     if (inBatchedWrite) {
+        const bool useValidationHash = isContinuousInternodeValidationPerDocumentEnabled(opCtx);
+        HashContext hashCtx;
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
@@ -875,6 +901,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                 shouldSetIsTimeseriesField(VersionContext::getDecoration(opCtx))) {
                 operation.setIsTimeseries(true);
             }
+            if (useValidationHash) {
+                operation.setDocHash(computeDocValidationHash(hashCtx, iter->doc));
+            }
+
             if (useReplicatedSizeCount) {
                 operation.setSizeMetadata(makeOperationSizeMetadata(iter->doc.objsize()));
             }
@@ -904,6 +934,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
+        const bool useValidationHash = isContinuousInternodeValidationPerDocumentEnabled(opCtx);
+        HashContext hashCtx;
 
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
@@ -912,6 +944,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             operation.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
             if (!recordIds.empty()) {
                 operation.setRecordId(recordIds[i++]);
+            }
+            if (useValidationHash) {
+                operation.setDocHash(computeDocValidationHash(hashCtx, iter->doc));
             }
             if (useReplicatedSizeCount) {
                 operation.setSizeMetadata(makeOperationSizeMetadata(iter->doc.objsize()));
