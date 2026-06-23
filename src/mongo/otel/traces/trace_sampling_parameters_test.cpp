@@ -52,7 +52,7 @@ public:
         TracingSampler::get().updateConfig(SamplingConfig{});
     }
 
-    Status setFactor(double factor) {
+    Status setDefaultFactor(double factor) {
         // Wrap in a parent object to obtain a BSONElement of object type.
         auto storage = BSON("v" << BSON("defaultSampling" << BSON("samplingFactor" << factor)));
         return param.set(storage.firstElement(), /*tenantId=*/boost::none);
@@ -66,7 +66,7 @@ public:
         return param.set(storage.firstElement(), /*tenantId=*/boost::none);
     }
 
-    double readFactor(const BSONObj& result) {
+    double readDefaultFactor(const BSONObj& result) {
         return result["openTelemetryTracingSampling"]["defaultSampling"]["samplingFactor"].Double();
     }
 
@@ -84,27 +84,27 @@ public:
 };
 
 TEST_F(TraceSamplingParametersTest, SetUpdatesGlobalSampler) {
-    ASSERT_OK(setFactor(0.5));
+    ASSERT_OK(setDefaultFactor(0.5));
     EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultFactor, 0.5);
 }
 
 TEST_F(TraceSamplingParametersTest, AppendReflectsCurrentSamplerState) {
-    ASSERT_OK(setFactor(0.75));
+    ASSERT_OK(setDefaultFactor(0.75));
 
     BSONObjBuilder bob;
     param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
 
-    EXPECT_DOUBLE_EQ(readFactor(bob.obj()), 0.75);
+    EXPECT_DOUBLE_EQ(readDefaultFactor(bob.obj()), 0.75);
 }
 
 TEST_F(TraceSamplingParametersTest, AppendAfterMultipleSetsReflectsLastValue) {
-    ASSERT_OK(setFactor(0.3));
-    ASSERT_OK(setFactor(0.9));
+    ASSERT_OK(setDefaultFactor(0.3));
+    ASSERT_OK(setDefaultFactor(0.9));
 
     BSONObjBuilder bob;
     param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
 
-    EXPECT_DOUBLE_EQ(readFactor(bob.obj()), 0.9);
+    EXPECT_DOUBLE_EQ(readDefaultFactor(bob.obj()), 0.9);
     EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultFactor, 0.9);
 }
 
@@ -126,7 +126,7 @@ TEST_F(TraceSamplingParametersTest, SetFromStringWithEmptyJsonUsesDefaults) {
 }
 
 TEST_F(TraceSamplingParametersTest, SetWithOutOfRangeFactorFails) {
-    EXPECT_THAT(setFactor(2.0), Not(StatusIsOK()));
+    EXPECT_THAT(setDefaultFactor(2.0), Not(StatusIsOK()));
 }
 
 TEST_F(TraceSamplingParametersTest, SetFromStringWithOutOfRangeFactorFails) {
@@ -197,6 +197,64 @@ TEST_F(TraceSamplingParametersTest, SetWithZeroRefillRateFails) {
 
 TEST_F(TraceSamplingParametersTest, SetWithZeroMaxTokensFails) {
     EXPECT_THAT(setRateLimit(1.0, 0), Not(StatusIsOK()));
+}
+
+TEST_F(TraceSamplingParametersTest, SetWithSamplesArrayUpdatesPerSpanFactors) {
+    auto storage =
+        BSON("v" << BSON("defaultSampling"
+                         << BSON("samplingFactor" << 0.5) << "samples"
+                         << BSON_ARRAY(BSON("spanSelection" << BSON("name" << "test_only.span1")
+                                                            << "samplingStrategy"
+                                                            << BSON("samplingFactor" << 0.8)))));
+    ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().perSpanFactors.at("test_only.span1"), 0.8);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultFactor, 0.5);
+}
+
+TEST_F(TraceSamplingParametersTest, AppendRoundTripsSamples) {
+    auto storage =
+        BSON("v" << BSON("defaultSampling"
+                         << BSON("samplingFactor" << 0.3) << "samples"
+                         << BSON_ARRAY(BSON("spanSelection" << BSON("name" << "test_only.span1")
+                                                            << "samplingStrategy"
+                                                            << BSON("samplingFactor" << 0.9)))));
+    ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
+
+    BSONObjBuilder bob;
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    auto result = bob.obj();
+
+    EXPECT_DOUBLE_EQ(readDefaultFactor(result), 0.3);
+    auto samples = result["openTelemetryTracingSampling"]["samples"].Array();
+    ASSERT_EQ(samples.size(), 1u);
+    EXPECT_EQ(samples[0]["spanSelection"]["name"].String(), "test_only.span1");
+    EXPECT_DOUBLE_EQ(samples[0]["samplingStrategy"]["samplingFactor"].Double(), 0.9);
+}
+
+TEST_F(TraceSamplingParametersTest, SamplesOnlyConfigIsApplied) {
+    // No defaultSampling field — only a samples array.
+    auto storage = BSON(
+        "v" << BSON("samples" << BSON_ARRAY(BSON(
+                        "spanSelection" << BSON("name" << "test_only.span1") << "samplingStrategy"
+                                        << BSON("samplingFactor" << 0.7)))));
+    ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().perSpanFactors.at("test_only.span1"), 0.7);
+}
+
+TEST_F(TraceSamplingParametersTest, SamplesDefaultToDefaultFactorWhenNoSamplingStrategyIsProvided) {
+    auto storage = BSON(
+        "v" << BSON("defaultSampling"
+                    << BSON("samplingFactor" << 0.3) << "samples"
+                    << BSON_ARRAY(BSON("spanSelection" << BSON("name" << "test_only.span1")))));
+    ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().perSpanFactors.at("test_only.span1"), 0.3);
+}
+
+TEST_F(TraceSamplingParametersTest, ErrorWhenSpanSelectionIsMissing) {
+    auto storage =
+        BSON("v" << BSON("samples"
+                         << BSON_ARRAY(BSON("samplingStrategy" << BSON("samplingFactor" << 0.3)))));
+    EXPECT_THAT(param.set(storage.firstElement(), /*tenantId=*/boost::none), Not(StatusIsOK()));
 }
 
 }  // namespace

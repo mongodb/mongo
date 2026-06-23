@@ -43,13 +43,25 @@ Status applySamplingConfig(const BSONObj& obj) {
     try {
         IDLParserContext ctx("openTelemetryTracingSampling");
         auto config = OpenTelemetryTracingSamplingConfig::parse(obj, ctx);
+
         const auto& defaultSampling = config.getDefaultSampling();
         const auto& rateLimit = defaultSampling.getTokenBucketRateLimit();
-        TracingSampler::get().updateConfig({
+        SamplingConfig samplingConfig{
             .defaultFactor = defaultSampling.getSamplingFactor(),
             .defaultRefillRate = rateLimit.getRefillRate(),
             .defaultMaxTokens = rateLimit.getMaxTokens(),
-        });
+        };
+        if (const auto& samples = config.getSamples()) {
+            for (const auto& sample : *samples) {
+                // TODO(SERVER-127464): Incorporate span-specific rate limit parameters.
+                samplingConfig.perSpanFactors[sample.getSpanSelection().getName()] =
+                    sample.getSamplingStrategy()
+                        .value_or(config.getDefaultSampling())
+                        .getSamplingFactor();
+            }
+        }
+
+        TracingSampler::get().updateConfig(std::move(samplingConfig));
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -79,14 +91,36 @@ void OpenTelemetryTracingSamplingServerParameter::append(OperationContext*,
                                                          BSONObjBuilder* bob,
                                                          StringData name,
                                                          const boost::optional<TenantId>&) {
-    OpenTelemetryTracingSamplingConfig config;
-    auto samplingConfig = TracingSampler::get().getConfig();
-    auto& defaultSampling = config.getDefaultSampling();
-    defaultSampling.setSamplingFactor(samplingConfig.defaultFactor);
-    defaultSampling.getTokenBucketRateLimit().setRefillRate(samplingConfig.defaultRefillRate);
-    defaultSampling.getTokenBucketRateLimit().setMaxTokens(samplingConfig.defaultMaxTokens);
+    auto config = TracingSampler::get().getConfig();
+
+    OpenTelemetryTracingSamplingStrategy defaultStrategy;
+    defaultStrategy.setSamplingFactor(config.defaultFactor);
+    defaultStrategy.getTokenBucketRateLimit().setRefillRate(config.defaultRefillRate);
+    defaultStrategy.getTokenBucketRateLimit().setMaxTokens(config.defaultMaxTokens);
+
+    OpenTelemetryTracingSamplingConfig idlConfig;
+    idlConfig.setDefaultSampling(std::move(defaultStrategy));
+
+    if (!config.perSpanFactors.empty()) {
+        std::vector<OpenTelemetryTracingSample> samples;
+        samples.reserve(config.perSpanFactors.size());
+        for (const auto& [spanName, factor] : config.perSpanFactors) {
+            OpenTelemetryTracingSpanSelection selection;
+            selection.setName(spanName);
+
+            OpenTelemetryTracingSamplingStrategy strategy;
+            strategy.setSamplingFactor(factor);
+
+            OpenTelemetryTracingSample sample;
+            sample.setSpanSelection(std::move(selection));
+            sample.setSamplingStrategy(std::move(strategy));
+            samples.push_back(std::move(sample));
+        }
+        idlConfig.setSamples(std::move(samples));
+    }
+
     BSONObjBuilder sub(bob->subobjStart(name));
-    config.serialize(&sub);
+    idlConfig.serialize(&sub);
 }
 
 }  // namespace mongo::otel::traces

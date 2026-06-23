@@ -90,25 +90,41 @@ void TracingSamplerImpl::_rebuild(WithLock) {
     SamplingFactorMap newSamplingFactors;
     RateLimiterMap newRateLimiters;
     auto oldSnapshot = samplerState.makeSnapshot();
-    auto burstCapacitySecs = _samplingConfig.defaultMaxTokens / _samplingConfig.defaultRefillRate;
+
+    auto setSamplingFactorAndRateLimits =
+        [&](std::string_view name, double factor, double refillRate, int maxTokens) {
+            newSamplingFactors[name] = factor;
+
+            double burstCapacitySecs = maxTokens / refillRate;
+            if (auto it = oldSnapshot->rateLimiterMap.find(name);
+                it != oldSnapshot->rateLimiterMap.end()) {
+                // Update the existing rate limiter and copy it into the new map.
+                it->second->updateRateParameters(refillRate, burstCapacitySecs);
+                newRateLimiters[name] = it->second;
+            } else {
+                // Rate limiter didn't exist so create a new one with the correct parameters.
+                newRateLimiters[name] =
+                    std::make_shared<admission::RateLimiter>(refillRate,
+                                                             burstCapacitySecs,
+                                                             0 /* maxQueueDepth */,
+                                                             std::string(name),
+                                                             _tickSource);
+            }
+        };
 
     for (const auto& name : _defaultSampledSpanNames) {
-        newSamplingFactors[name] = _samplingConfig.defaultFactor;
+        setSamplingFactorAndRateLimits(name,
+                                       _samplingConfig.defaultFactor,
+                                       _samplingConfig.defaultRefillRate,
+                                       _samplingConfig.defaultMaxTokens);
+    }
 
-        if (auto it = oldSnapshot->rateLimiterMap.find(name);
-            it != oldSnapshot->rateLimiterMap.end()) {
-            // Update the existing rate limiter and copy it into the new map.
-            it->second->updateRateParameters(_samplingConfig.defaultRefillRate, burstCapacitySecs);
-            newRateLimiters[name] = it->second;
-        } else {
-            // Rate limiter didn't exist so create a new one with the correct parameters.
-            newRateLimiters[name] =
-                std::make_shared<admission::RateLimiter>(_samplingConfig.defaultRefillRate,
-                                                         burstCapacitySecs,
-                                                         0 /* maxQueueDepth */,
-                                                         name,
-                                                         _tickSource);
-        }
+    // Per-span overrides intentionally overwrite the default-seeded entries above, and also
+    // apply to spans that were never registered via sampleByDefault.
+    for (const auto& [name, factor] : _samplingConfig.perSpanFactors) {
+        // TODO(SERVER-127464): Override default rates based on the span-specific configuration.
+        setSamplingFactorAndRateLimits(
+            name, factor, _samplingConfig.defaultRefillRate, _samplingConfig.defaultMaxTokens);
     }
     samplerState.update(std::make_shared<const SamplerState>(std::move(newSamplingFactors),
                                                              std::move(newRateLimiters)));

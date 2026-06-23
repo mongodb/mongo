@@ -183,6 +183,49 @@ TEST(SamplerTest, RateLimiterWithLargerBurstSize) {
     }
 }
 
+TEST(SamplerTest, PerSpanOverrideBeatsDefault) {
+    TracingSamplerImpl sampler;
+    sampler.sampleByDefault(span_names::kTest1);
+    // Default is 0.0 (would never sample), but override for kTest1 is 1.0.
+    sampler.updateConfig(
+        SamplingConfig{.defaultFactor = 0.0,
+                       .perSpanFactors = {{std::string(span_names::kTest1.getName()), 1.0}}});
+    EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.5));
+}
+
+TEST(SamplerTest, PerSpanOverrideOnlyAffectsNamedSpan) {
+    TracingSamplerImpl sampler;
+    sampler.sampleByDefault(span_names::kTest1);
+    sampler.sampleByDefault(span_names::kTest2);
+    // Override only kTest1; kTest2 stays at default=0.0.
+    sampler.updateConfig(
+        SamplingConfig{.defaultFactor = 0.0,
+                       .perSpanFactors = {{std::string(span_names::kTest1.getName()), 1.0}}});
+    EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.5));
+    EXPECT_FALSE(sampler.shouldSample(span_names::kTest2.getName(), 0.5));
+}
+
+TEST(SamplerTest, UpdateConfigWithNewOverrideTakesEffectImmediately) {
+    TracingSamplerImpl sampler;
+    sampler.sampleByDefault(span_names::kTest1);
+    sampler.updateConfig(SamplingConfig{.defaultFactor = 1.0});
+    EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.5));
+
+    // Add a per-span override that suppresses kTest1.
+    sampler.updateConfig(
+        SamplingConfig{.defaultFactor = 1.0,
+                       .perSpanFactors = {{std::string(span_names::kTest1.getName()), 0.0}}});
+    EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
+}
+
+TEST(SamplerTest, OverrideOnUnregisteredSpanIsApplied) {
+    TracingSamplerImpl sampler;
+    // kTest1 is never registered via sampleByDefault.
+    sampler.updateConfig(
+        SamplingConfig{.defaultFactor = 0.0,
+                       .perSpanFactors = {{std::string(span_names::kTest1.getName()), 1.0}}});
+    EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.5));
+}
 
 }  // namespace
 }  // namespace mongo::otel::traces
