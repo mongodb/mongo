@@ -1,6 +1,6 @@
 /**
- * Tests that `optimizationTimeMillis` (and its micro/nanosecond variants when enabled) is
- * correctly measured and reported in explain output when join optimization (JOO) is used.
+ * Tests that `optimizationTimeMillis` and `optimizationTimeMicros` are correctly measured and
+ * reported in explain output when join optimization (JOO) is used.
  *
  * This test injects a delay via the `sleepWhileJoinOptimizing` failpoint and asserts the
  * reported time reflects the delay.
@@ -114,39 +114,6 @@ describe("optimizationTimeMillis with join optimization", function () {
                 queryPlanner,
             },
         );
-    });
-
-    it("reports optimizationTimeNanos >= injected delay when nanos knob is enabled", function () {
-        assert.commandWorked(
-            conn.adminCommand({
-                setParameter: 1,
-                internalMeasureQueryExecutionTimeInNanoseconds: true,
-            }),
-        );
-        const fp = configureFailPoint(conn, "sleepWhileJoinOptimizing", {ms: kSleepMs});
-        try {
-            const explain = coll.explain().aggregate(pipeline);
-            const queryPlanner = getQueryPlanner(explain);
-            assert(
-                queryPlanner.hasOwnProperty("optimizationTimeNanos"),
-                "optimizationTimeNanos missing from queryPlanner",
-                {queryPlanner},
-            );
-            assert.gte(
-                queryPlanner.optimizationTimeNanos,
-                kSleepMs * 1000 * 1000,
-                "optimizationTimeNanos should be >= injected sleep delay in nanos",
-                {queryPlanner},
-            );
-        } finally {
-            fp.off();
-            assert.commandWorked(
-                conn.adminCommand({
-                    setParameter: 1,
-                    internalMeasureQueryExecutionTimeInNanoseconds: false,
-                }),
-            );
-        }
     });
 
     it("reports usedJoinOptimization:true so the timer is actually exercised", function () {

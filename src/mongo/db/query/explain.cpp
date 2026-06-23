@@ -50,7 +50,6 @@
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/util/assert_util.h"
@@ -137,47 +136,13 @@ void generatePlannerInfo(PlanExecutor* exec,
         const auto planningTimeOpt =
             CurOp::get(exec->getOpCtx())->debug().getAdditiveMetrics().planningTime;
 
-        // Determine the precision we should be reporting. Default to millis if we have no
-        // canonical query available.
-        QueryExecTimerPrecision precision = QueryExecTimerPrecision::kMillis;
-        if (auto query = exec->getCanonicalQuery()) {
-            precision = query->getExpCtx()
-                            ->getQueryKnobConfiguration()
-                            .getMeasureQueryExecutionTimeInNanoseconds()
-                ? QueryExecTimerPrecision::kNanos
-                : QueryExecTimerPrecision::kMillis;
-        } else {
-            // TODO (SERVER-127904): Remove else branch once this module can directly access ExpCtx
-            // without requiring a CanonicalQuery.
+        const Microseconds planningTime =
+            planningTimeOpt ? planningTimeOpt.value() : Microseconds{0};
 
-            // For executors without a single canonical query
-            // (e.g. JOO), read the global value of the
-            // 'internalMeasureQueryExecutionTimeInNanoseconds' knob directly. Note that in this
-            // branch, the value of the knob can change during a query. In the worst case, the query
-            // may start with the server having one value of the knob but by the time this code
-            // executes for that query, it may see a different value if the knob was concurrently
-            // modified.
-            precision = internalMeasureQueryExecutionTimeInNanoseconds.load()
-                ? QueryExecTimerPrecision::kNanos
-                : QueryExecTimerPrecision::kMillis;
-        }
-
-        // Convert to Nanoseconds first to support all precisions, defaulting to zero if
-        // unavailable.
-        const Nanoseconds planningTime =
-            planningTimeOpt ? duration_cast<Nanoseconds>(planningTimeOpt.value()) : Nanoseconds{0};
-
-        // Always provide the millisecond and microsecond values.
         plannerBob.appendNumber("optimizationTimeMillis",
                                 durationCount<Milliseconds>(planningTime));
         plannerBob.appendNumber("optimizationTimeMicros",
                                 durationCount<Microseconds>(planningTime));
-
-        if (precision == QueryExecTimerPrecision::kNanos) {
-            // When the precise timer is enabled, also expose the nanosecond count.
-            plannerBob.appendNumber("optimizationTimeNanos",
-                                    durationCount<Nanoseconds>(planningTime));
-        }
     }
 
     if (!extraInfo.isEmpty()) {

@@ -20,7 +20,6 @@ function runTest(db) {
         if (explain === null || typeof explain !== "object") {
             return [];
         }
-
         if (Array.isArray(explain)) {
             return explain.flatMap((subExplain) => collectOptimizationTimes(subExplain, fieldName));
         } else {
@@ -51,16 +50,18 @@ function runTest(db) {
                 explain,
                 "optimizationTimeMicros",
             );
-            const optimizationTimeNanos = collectOptimizationTimes(
-                explain,
-                "optimizationTimeNanos",
-            );
 
             assert.gt(optimizationTimeMicros.length, 0, explain);
             optimizationTimeMicros.forEach((time) =>
                 assert.gte(time, waitTimeMillis * 1000, explain),
             );
-            assert.eq(optimizationTimeNanos.length, 0, explain);
+
+            // Regression test - ensure we never have optimizationTimeNanos.
+            assert.eq(
+                collectOptimizationTimes(explain, "optimizationTimeNanos").length,
+                0,
+                explain,
+            );
         });
     }
 }
