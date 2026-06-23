@@ -188,6 +188,204 @@ function runTestAllNodesFail(commandName, command, readPref, mongos, shard, over
     }
 }
 
+function runTestZeroRetries(commandName, command, mongos, shard) {
+    jsTestLog("Running zero-retries test with command '" + commandName + "'");
+
+    const shardPrimary = shard.getPrimary();
+    const initialShardStats = getShardingStats(mongos);
+
+    const origMaxRetryAttempts = assert.commandWorked(
+        mongos.adminCommand({getParameter: 1, defaultClientMaxRetryAttempts: 1}),
+    ).defaultClientMaxRetryAttempts;
+
+    assert.commandWorked(mongos.adminCommand({setParameter: 1, defaultClientMaxRetryAttempts: 0}));
+    enableFailCommand(shardPrimary, commandName, 1);
+
+    try {
+        const result = mongos.getDB(kDbName).runCommand(command);
+        assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
+
+        // TODO SERVER-128710 Revisit if RetryableError should be reapplied by mongos
+        for (const label of ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"]) {
+            assert(result.errorLabels?.includes(label), `Expected error label '${label}'`, {
+                result,
+            });
+        }
+    } finally {
+        disableFailCommand(shardPrimary);
+        assert.commandWorked(
+            mongos.adminCommand({
+                setParameter: 1,
+                defaultClientMaxRetryAttempts: origMaxRetryAttempts,
+            }),
+        );
+    }
+
+    const finalShardStats = getShardingStats(mongos);
+    const shardStatsDiff = shardingStatisticsDifference(finalShardStats, initialShardStats);
+
+    assert.eq(shardStatsDiff.numOperationsAttempted, 1);
+    assert.eq(shardStatsDiff.numOverloadErrorsReceived, 1);
+    assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, 0);
+    // The counter is incremented on the first overload error for an operation, even when no
+    // retry is performed (budget = 0).
+    // TODO SERVER-129657 Investigate numOperationsRetriedAtLeastOnceDueToOverload logic
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 1);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 0);
+    assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
+}
+
+function runTestRetryCapExhausted(commandName, command, mongos, shard) {
+    jsTestLog("Running retry-cap-exhausted test with command '" + commandName + "'");
+
+    // Call primary, then retry twice on primary
+    const retryAttempts = 2;
+    const shardPrimary = shard.getPrimary();
+    const initialShardStats = getShardingStats(mongos);
+
+    const {
+        defaultClientMaxRetryAttempts: origMaxRetryAttempts,
+        defaultClientBaseBackoffMillis: origBaseBackoffMillis,
+        defaultClientMaxBackoffMillis: origMaxBackoffMillis,
+    } = assert.commandWorked(
+        mongos.adminCommand({
+            getParameter: 1,
+            defaultClientMaxRetryAttempts: 1,
+            defaultClientBaseBackoffMillis: 1,
+            defaultClientMaxBackoffMillis: 1,
+        }),
+    );
+
+    assert.commandWorked(
+        mongos.adminCommand({
+            setParameter: 1,
+            defaultClientMaxRetryAttempts: retryAttempts,
+            defaultClientBaseBackoffMillis: 0,
+            defaultClientMaxBackoffMillis: 0,
+        }),
+    );
+    enableFailCommand(shardPrimary, commandName, retryAttempts + 1);
+
+    try {
+        const result = mongos.getDB(kDbName).runCommand(command);
+        assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
+
+        // TODO SERVER-128710 Revisit if RetryableError should be reapplied by mongos
+        for (const label of ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"]) {
+            assert(result.errorLabels?.includes(label), `Expected error label '${label}'`, {
+                result,
+            });
+        }
+    } finally {
+        disableFailCommand(shardPrimary);
+        assert.commandWorked(
+            mongos.adminCommand({
+                setParameter: 1,
+                defaultClientMaxRetryAttempts: origMaxRetryAttempts,
+                defaultClientBaseBackoffMillis: origBaseBackoffMillis,
+                defaultClientMaxBackoffMillis: origMaxBackoffMillis,
+            }),
+        );
+    }
+
+    const finalShardStats = getShardingStats(mongos);
+    const shardStatsDiff = shardingStatisticsDifference(finalShardStats, initialShardStats);
+
+    assert.eq(shardStatsDiff.numOperationsAttempted, 1);
+    assert.eq(shardStatsDiff.numOverloadErrorsReceived, retryAttempts + 1);
+    assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, retryAttempts);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 1);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 0);
+    assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
+}
+
+function runTestRetryCapExhaustedWithRetargeting(commandName, command, readPref, mongos, shard) {
+    jsTestLog(
+        "Running retry-cap-exhausted with retargeting test with command '" +
+            commandName +
+            "', read preference '" +
+            readPref +
+            "'",
+    );
+
+    // Call primary, and then retry on each secondary
+    const retryAttempts = shard.nodes.length - 1;
+    const initialShardStats = getShardingStats(mongos);
+
+    const {
+        defaultClientMaxRetryAttempts: origMaxRetryAttempts,
+        defaultClientBaseBackoffMillis: origBaseBackoffMillis,
+        defaultClientMaxBackoffMillis: origMaxBackoffMillis,
+        overloadAwareServerSelectionEnabled: origRetargeting,
+    } = assert.commandWorked(
+        mongos.adminCommand({
+            getParameter: 1,
+            defaultClientMaxRetryAttempts: 1,
+            defaultClientBaseBackoffMillis: 1,
+            defaultClientMaxBackoffMillis: 1,
+            overloadAwareServerSelectionEnabled: 1,
+        }),
+    );
+
+    assert.commandWorked(
+        mongos.adminCommand({
+            setParameter: 1,
+            defaultClientMaxRetryAttempts: retryAttempts,
+            defaultClientBaseBackoffMillis: 0,
+            defaultClientMaxBackoffMillis: 0,
+            overloadAwareServerSelectionEnabled: true,
+        }),
+    );
+
+    // Fail each node once. retryAttempts == shard.nodes.length - 1, so each retry targets a
+    // fresh node until the cap is hit with no node revisited.
+    for (let node of shard.nodes) {
+        enableFailCommand(node, commandName, 1);
+    }
+
+    const cmd = {
+        ...command,
+        "$readPreference": {mode: readPref},
+    };
+    jsTestLog("Executing command: ", cmd);
+
+    try {
+        const result = mongos.getDB(kDbName).runCommand(cmd);
+        assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
+
+        // TODO SERVER-128710 Revisit if RetryableError should be reapplied by mongos
+        for (const label of ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"]) {
+            assert(result.errorLabels?.includes(label), `Expected error label '${label}'`, {
+                result,
+            });
+        }
+    } finally {
+        for (let node of shard.nodes) {
+            disableFailCommand(node);
+        }
+        assert.commandWorked(
+            mongos.adminCommand({
+                setParameter: 1,
+                defaultClientMaxRetryAttempts: origMaxRetryAttempts,
+                defaultClientBaseBackoffMillis: origBaseBackoffMillis,
+                defaultClientMaxBackoffMillis: origMaxBackoffMillis,
+                overloadAwareServerSelectionEnabled: origRetargeting,
+            }),
+        );
+    }
+
+    const finalShardStats = getShardingStats(mongos);
+    const shardStatsDiff = shardingStatisticsDifference(finalShardStats, initialShardStats);
+
+    assert.eq(shardStatsDiff.numOperationsAttempted, 1);
+    assert.eq(shardStatsDiff.numOverloadErrorsReceived, retryAttempts + 1);
+    assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, retryAttempts);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 1);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 0);
+    // Every retry reaches a fresh node since retryAttempts == shard.nodes.length - 1.
+    assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, retryAttempts);
+}
+
 const kStartupParams = {
     "failpoint.failCommand": tojson({
         mode: "off",
@@ -325,6 +523,12 @@ function runTestSharded() {
             );
         }
     }
+
+    jsTestLog("Testing retry budget exhaustion scenarios");
+    const findCommand = readCommands[0];
+    runTestZeroRetries(findCommand[0], findCommand[1], st.s, shard);
+    runTestRetryCapExhausted(findCommand[0], findCommand[1], st.s, shard);
+    runTestRetryCapExhaustedWithRetargeting(findCommand[0], findCommand[1], "nearest", st.s, shard);
 
     st.stop();
 }
