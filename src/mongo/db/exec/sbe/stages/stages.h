@@ -819,6 +819,19 @@ public:
     friend class CanTrackStats<PlanStage>;
     friend class CanInterrupt<PlanStage>;
 
+    /**
+     * Returns this stage's children.
+     *
+     * This accessor is intended for plan construction / rewrites prior to execution. Callers must
+     * not add/remove children or move ownership out of the returned container.
+     */
+    const Vector& children() const {
+        return _children;
+    }
+    Vector& children() {
+        return _children;
+    }
+
 private:
     /**
      * Spills the stage's data to disk. Stages that can spill their own data need to override this

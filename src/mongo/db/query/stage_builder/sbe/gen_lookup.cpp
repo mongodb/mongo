@@ -33,11 +33,11 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/bson_typemask.h"
-#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -963,7 +963,6 @@ SbStage buildIndexJoinLookupForeignSideStage(
     const FieldPath& localFieldName,
     const FieldPath& foreignFieldName,
     SbStage indexStage,
-    const PlanStageSlots& indexSlots,
     const CollectionPtr& foreignColl,
     const IndexBoundsEvaluationInfo& indexBoundsEvaluationInfo,
     const PlanNodeId nodeId) {
@@ -1074,31 +1073,45 @@ SbStage buildIndexJoinLookupForeignSideStage(
         std::make_pair(makeNewKeyStringCall(key_string::Discriminator::kExclusiveAfter),
                        highKeySlot));
 
-    // Loop join the low key and high key generation with the index seek stage to produce the
-    // foreign record id to seek.
-    auto ixScanNljStage =
-        b.makeLoopJoin(std::move(indexBoundKeyStage),
-                       std::move(indexStage),
-                       SbSlotVector{} /* outerProjects */,
-                       SbExpr::makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */);
-
     // It is possible for the same record to be returned multiple times when the index is multikey
     // (contains arrays). Consider an example where local values set is '(1, 2)' and we have a
     // document with foreign field value '[1, 2]'. The same document will be returned twice:
     //  - On the first index seek, where we are looking for value '1'
     //  - On the second index seek, where we are looking for value '2'
-    // To avoid such situation, we are placing 'unique' stage to prevent repeating records from
-    // appearing in the result.
+    // For such indexes, the stage builder already inserts a deduplication node (either a
+    // UniqueStage or a UniqueRoaringStage) on top of the ixscan node; we just have to make sure
+    // that the deduplication works across all the searched local keys, rather than just on top of
+    // multiple matches of a single local key in the same indexed array value.
     if (index.multikey) {
-        auto foreignRecordIdSlot = indexSlots.get(PlanStageSlots::kRecordId);
-        if (foreignColl->isClustered()) {
-            ixScanNljStage = b.makeUnique(std::move(ixScanNljStage), foreignRecordIdSlot);
-        } else {
-            ixScanNljStage = b.makeUniqueRoaring(std::move(ixScanNljStage), foreignRecordIdSlot);
+        std::vector<sbe::PlanStage*> toVisit;
+        toVisit.emplace_back(indexStage.get());
+        while (!toVisit.empty()) {
+            sbe::PlanStage* cursor = toVisit.back();
+            toVisit.pop_back();
+            if (dynamic_cast<sbe::UniqueStage*>(cursor) ||
+                dynamic_cast<sbe::UniqueRoaringStage*>(cursor)) {
+                // Loop join the low key and high key generation with the index seek stage to
+                // produce the foreign record id to fetch.
+                cursor->children()[0] =
+                    b.makeLoopJoin(std::move(indexBoundKeyStage),
+                                   std::move(cursor->children()[0]),
+                                   SbSlotVector{} /* outerProjects */,
+                                   SbExpr::makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */);
+                return indexStage;
+            }
+            for (auto& child : cursor->children()) {
+                toVisit.emplace_back(child.get());
+            }
         }
+        tasserted(12775200, "Unable to find UniqueStage in INLJ stream");
+    } else {
+        // Loop join the low key and high key generation with the index seek stage to produce the
+        // foreign document.
+        return b.makeLoopJoin(std::move(indexBoundKeyStage),
+                              std::move(indexStage),
+                              SbSlotVector{} /* outerProjects */,
+                              SbExpr::makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */);
     }
-
-    return ixScanNljStage;
 }  // buildIndexJoinLookupForeignSideStage
 
 /*
@@ -1150,7 +1163,6 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
                                                              localFieldName,
                                                              foreignFieldName,
                                                              std::move(indexStage),
-                                                             indexSlots,
                                                              foreignColl,
                                                              indexBoundsEvaluationInfo,
                                                              nodeId);
@@ -1254,7 +1266,6 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
                                                                        localFieldName,
                                                                        foreignFieldName,
                                                                        std::move(indexStage),
-                                                                       indexSlots,
                                                                        foreignColl,
                                                                        indexBoundsEvaluationInfo,
                                                                        nodeId);
@@ -1564,13 +1575,11 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
 
                 // Keep track of the indexBoundsInfo created until now.
                 size_t numIndexBoundsInfo = _state.data->indexBoundsEvaluationInfos.size();
-                // Process the index scan requesting the top level field of the foreign field and
-                // the recordId in case we need to deduplicate matching documents.
+                // Process the index scan requesting the top level field of the foreign field.
                 auto [indexStage, indexSlots] =
                     build(eqLookupNode->children[1].get(),
-                          reqs.copyForChild().setResultObj().set(kRecordId).setFields(
-                              std::vector<std::string>{
-                                  std::string(eqLookupNode->joinFieldForeign.front())}));
+                          reqs.copyForChild().setResultObj().setFields(std::vector<std::string>{
+                              std::string(eqLookupNode->joinFieldForeign.front())}));
                 tassert(12173000,
                         "Expected StageBuilder to generate one extra IndexBoundsEvaluationInfo",
                         _state.data->indexBoundsEvaluationInfos.size() == numIndexBoundsInfo + 1);

@@ -1925,11 +1925,6 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                 strategy == EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin) {
                 auto ixScan =
                     std::make_unique<IndexScanNode>(lookupStage->getFromNs(), std::move(*idxEntry));
-                // If there is a risk of multiple matches for the same local document, the
-                // deduplication will occur after all the keys related to the local document will be
-                // tested; any deduplication done right after the index scan would be just wasted
-                // time, so instruct the IndexScanNode to skip them.
-                ixScan->shouldDedup = false;
                 BSONObjIterator it(ixScan->index.keyPattern);
                 // For each field in the key add an entry to the interval evaluation tree using a
                 // new input parameter (when the index field is the foreign field) or a full range
