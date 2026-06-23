@@ -80,6 +80,11 @@ public:
 
     bool operator()(const Value& lhs, const Value& rhs) const;
 
+    // Extracts the BSON sort key for a single Value under this pattern. Returns a null-padded
+    // key for non-object values. Use this to pre-compute keys before sorting to avoid the
+    // O(N log N) extraction cost of calling operator() directly in a sort comparator.
+    BSONObj extractSortKey(const Value& val) const;
+
     // Returns the original element passed into the PatternValueCmp constructor.
     BSONElement getOriginalElement() const;
 

@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/expression/evaluate_test_helpers.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
@@ -169,6 +170,117 @@ TEST(ExpressionSortArrayTest, ReturnsNullWithUndefinedInput) {
     Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
 
     ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionSortArrayTest, SortsObjectsByFieldAscending) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $sortArray: { input: { $literal: [ {x: 3}, {x: 1}, {x: 2} ] }, sortBy: { x: 1 } } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(BSON("x" << 1) << BSON("x" << 2) << BSON("x" << 3))));
+}
+
+TEST(ExpressionSortArrayTest, SortsObjectsByFieldDescending) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $sortArray: { input: { $literal: [ {x: 1}, {x: 3}, {x: 2} ] }, sortBy: { x: -1 } } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(BSON("x" << 3) << BSON("x" << 2) << BSON("x" << 1))));
+}
+
+TEST(ExpressionSortArrayTest, SortsObjectsByDottedPath) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $sortArray: { input: { $literal: [ {a: {b: 3}}, {a: {b: 1}}, {a: {b: 2}} ] },"
+        "  sortBy: { 'a.b': 1 } } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val,
+                    Value(BSON_ARRAY(BSON("a" << BSON("b" << 1)) << BSON("a" << BSON("b" << 2))
+                                                                 << BSON("a" << BSON("b" << 3)))));
+}
+
+TEST(ExpressionSortArrayTest, NonObjectElementsSortAsNullKeyByPattern) {
+    auto expCtx = ExpressionContextForTest{};
+    // Non-object elements get a null sort key and sort before objects with a defined key.
+    BSONObj expr = fromjson(
+        "{ $sortArray: { input: { $literal: [ {x: 2}, 42, {x: 1} ] }, sortBy: { x: 1 } } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    const auto& arr = val.getArray();
+    ASSERT_EQ(arr.size(), 3U);
+    // Non-object (42) gets null key; null sorts before 1 and 2.
+    ASSERT_VALUE_EQ(arr[0], Value(42));
+    ASSERT_VALUE_EQ(arr[1], Value(BSON("x" << 1)));
+    ASSERT_VALUE_EQ(arr[2], Value(BSON("x" << 2)));
+}
+
+TEST(ExpressionSortArrayTest, TrackerIsDeductedAfterPatternSort) {
+    // After a successful sort, the tracker should return to 5 — the ScopeGuard
+    // must have fired and deducted the key bytes.
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $sortArray: { input: { $literal: [ {x: 3}, {x: 1}, {x: 2} ] }, sortBy: { x: 1 } } }");
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+
+    SimpleMemoryUsageTracker tracker{1024 * 1024};
+    tracker.set(5);
+    EvaluationContext ctx{&tracker};
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx);
+
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(BSON("x" << 1) << BSON("x" << 2) << BSON("x" << 3))));
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 5);
+}
+
+TEST(ExpressionSortArrayTest, TrackerDeductedAfterMemoryLimitException) {
+    // When the limit is exceeded, assertWithinMemoryLimit throws. The ScopeGuard must still
+    // fire and deduct the bytes so the tracker is not left in an inflated state.
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $sortArray: { input: { $literal: [ {x: 3}, {x: 1}, {x: 2} ] }, sortBy: { x: 1 } } }");
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+
+    SimpleMemoryUsageTracker tracker{6};  // 6-byte limit; always exceeded by any key
+    tracker.set(5);
+    EvaluationContext ctx{&tracker};
+
+    ASSERT_THROWS(expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx),
+                  AssertionException);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 5);
+}
+
+TEST(ExpressionSortArrayTest, NoMemoryTrackerNoProblems) {
+    // Memory tracker in eval ctx is optional, so make sure the code tolerates it missing.
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $sortArray: { input: { $literal: [ {x: 3}, {x: 1}, {x: 2} ] }, sortBy: { x: 1 } } }");
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+
+    EvaluationContext ctx{nullptr};
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx);
+
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(BSON("x" << 1) << BSON("x" << 2) << BSON("x" << 3))));
 }
 
 /* ------------------------ ExpressionTopN -------------------- */

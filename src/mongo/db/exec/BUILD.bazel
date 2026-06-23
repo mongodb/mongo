@@ -204,6 +204,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/index_builds:index_build_test_helpers",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline:document_source_lookup_test_util",
         "//src/mongo/db/pipeline:document_source_mock",

@@ -112,19 +112,21 @@ PatternValueCmp::PatternValueCmp(const BSONObj& pattern,
       originalObj(BSONObj().addField(originalElement).copy()),
       collator(collator) {}
 
-bool PatternValueCmp::operator()(const Value& lhs, const Value& rhs) const {
+BSONObj PatternValueCmp::extractSortKey(const Value& val) const {
     namespace dps = ::mongo::bson;
+    return val.isObject()
+        ? dps::extractElementsBasedOnTemplate(val.getDocument().toBson(), sortPattern, true)
+        : dps::extractNullForAllFieldsBasedOnTemplate(sortPattern);
+}
+
+bool PatternValueCmp::operator()(const Value& lhs, const Value& rhs) const {
     if (useWholeValue) {
         const bool descending = (sortPattern.firstElement().number() < 0);
         return (descending ? ValueComparator(collator).getLessThan()(rhs, lhs)
                            : ValueComparator(collator).getLessThan()(lhs, rhs));
     } else {
-        BSONObj lhsKey = lhs.isObject()
-            ? dps::extractElementsBasedOnTemplate(lhs.getDocument().toBson(), sortPattern, true)
-            : dps::extractNullForAllFieldsBasedOnTemplate(sortPattern);
-        BSONObj rhsKey = rhs.isObject()
-            ? dps::extractElementsBasedOnTemplate(rhs.getDocument().toBson(), sortPattern, true)
-            : dps::extractNullForAllFieldsBasedOnTemplate(sortPattern);
+        BSONObj lhsKey = extractSortKey(lhs);
+        BSONObj rhsKey = extractSortKey(rhs);
         return lhsKey.woCompare(rhsKey, sortPattern, false, collator) < 0;
     }
 }

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/convert_utils.h"
 #include "mongo/db/exec/expression/evaluate.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 
 #include <bit>
 #include <cstring>
@@ -464,8 +465,49 @@ Value evaluate(const ExpressionSortArray& expr,
     }
 
     std::vector<Value> array = input.getArray();
-    std::sort(array.begin(), array.end(), expr.getSortBy());
-    return Value(std::move(array));
+    const PatternValueCmp& cmp = expr.getSortBy();
+
+    if (cmp.useWholeValue) {
+        std::sort(array.begin(), array.end(), cmp);
+        return Value(std::move(array));
+    }
+
+    // Pre-extract sort keys once per element rather than re-extracting inside the comparator on
+    // every comparison. Each extraction requires a Value->BSONObj conversion and dotted-path
+    // traversal, which dominates sort cost for pattern-based sorts on arrays of objects.
+    int64_t keyBytes = 0;
+    ScopeGuard deductKeyMemory([&] {
+        if (ctx.tracker && keyBytes > 0) {
+            ctx.tracker->add(-keyBytes);
+        }
+    });
+    // Note that we use an ordinary int for the array indexes rather than a size_t here.
+    // We get a solid 5% bump in performance with a 32-bit int, which seems worth it
+    // given that arrays larger than INT_MAX are too large to fit in a BSON document.
+    static_assert(BSONObjMaxUserSize <= std::numeric_limits<int>::max());
+    std::vector<std::pair<BSONObj, int>> keysAndIdx;
+    keysAndIdx.reserve(array.size());
+    for (int i = 0; i < std::ssize(array); ++i) {
+        auto key = cmp.extractSortKey(array[i]);
+        if (ctx.tracker) {
+            const size_t sz = key.objsize() + sizeof(int);
+            keyBytes += sz;
+            ctx.tracker->add(sz);
+            ctx.tracker->assertWithinMemoryLimit(ExpressionSortArray::kName);
+        }
+        keysAndIdx.emplace_back(std::move(key), i);
+    }
+
+    std::sort(keysAndIdx.begin(), keysAndIdx.end(), [&](const auto& a, const auto& b) {
+        return a.first.woCompare(b.first, cmp.sortPattern, false, cmp.collator) < 0;
+    });
+
+    std::vector<Value> sorted;
+    sorted.reserve(array.size());
+    for (const auto& [_, i] : keysAndIdx) {
+        sorted.push_back(std::move(array[i]));
+    }
+    return Value(std::move(sorted));
 }
 
 Value evaluate(const ExpressionTopN& expr,
