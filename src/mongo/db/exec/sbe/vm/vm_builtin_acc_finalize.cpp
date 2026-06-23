@@ -53,9 +53,8 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
     // into an array which is the over-the-wire data format from a shard to a merging side.
     if (fieldTag == value::TypeTags::NumberInt32 || fieldTag == value::TypeTags::NumberInt64 ||
         fieldTag == value::TypeTags::NumberDouble) {
-        auto [tag, val] = value::makeNewArray();
-        value::ValueGuard guard{tag, val};
-        auto newArr = value::getArrayView(val);
+        value::TagValueOwned result{value::makeNewArray()};
+        auto newArr = value::getArrayView(result.value());
 
         DoubleDoubleSummation res;
         BSONType resType = BSONType::numberInt;
@@ -82,8 +81,7 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
         newArr->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(sum));
         newArr->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(addend));
 
-        guard.reset();
-        return {true, tag, val};
+        return std::move(result);
     }
 
     tassert(6546501, "The result slot must be an Array", fieldTag == value::TypeTags::Array);
@@ -94,9 +92,8 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
                           << " elements but got: " << arr->size(),
             arr->size() >= AggSumValueElems::kMaxSizeOfArray - 1);
 
-    auto [tag, val] = makeCopyArray(*arr);
-    value::ValueGuard guard{tag, val};
-    auto newArr = value::getArrayView(val);
+    value::TagValueOwned result{makeCopyArray(*arr)};
+    auto newArr = value::getArrayView(result.value());
 
     // Replaces the first element by the corresponding 'BSONType'.
     auto bsonType = [=]() -> int {
@@ -117,8 +114,7 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
                   value::TypeTags::NumberInt32,
                   value::bitcastFrom<int>(bsonType));
 
-    guard.reset();
-    return {true, tag, val};
+    return std::move(result);
 }  // ByteCode::builtinDoubleDoublePartialSumFinalize
 
 value::TagValueMaybeOwned ByteCode::builtinStdDevPopFinalize(ArityType arity) {

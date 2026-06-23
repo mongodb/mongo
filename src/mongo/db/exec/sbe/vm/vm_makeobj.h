@@ -365,7 +365,7 @@ private:
         int64_t lamPos = value::bitcastTo<int64_t>(lamVal);
 
         auto [outputOwned, outputTag, outputVal] = invokeLambda(lamPos, tag, val);
-        value::ValueGuard guard(outputOwned, outputTag, outputVal);
+        value::TagValueMaybeOwned output{outputOwned, outputTag, outputVal};
 
         bob.appendValue(fieldName, outputTag, outputVal);
     }

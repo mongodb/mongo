@@ -268,9 +268,8 @@ value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
 
     // Get date parts.
     auto dateParts = timezone.dateParts(date);
-    auto [dateObjTag, dateObjVal] = value::makeNewObject();
-    value::ValueGuard guard{dateObjTag, dateObjVal};
-    auto dateObj = value::getObjectView(dateObjVal);
+    value::TagValueOwned result{value::makeNewObject()};
+    auto dateObj = value::getObjectView(result.value());
     dateObj->reserve(7);
     dateObj->push_back_raw("year", value::TypeTags::NumberInt32, dateParts.year);
     dateObj->push_back_raw("month", value::TypeTags::NumberInt32, dateParts.month);
@@ -279,8 +278,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
     dateObj->push_back_raw("minute", value::TypeTags::NumberInt32, dateParts.minute);
     dateObj->push_back_raw("second", value::TypeTags::NumberInt32, dateParts.second);
     dateObj->push_back_raw("millisecond", value::TypeTags::NumberInt32, dateParts.millisecond);
-    guard.reset();
-    return {true, dateObjTag, dateObjVal};
+    return std::move(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
@@ -310,9 +308,8 @@ value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
 
     // Get date parts.
     auto dateParts = timezone.dateIso8601Parts(date);
-    auto [dateObjTag, dateObjVal] = value::makeNewObject();
-    value::ValueGuard guard{dateObjTag, dateObjVal};
-    auto dateObj = value::getObjectView(dateObjVal);
+    value::TagValueOwned result{value::makeNewObject()};
+    auto dateObj = value::getObjectView(result.value());
     dateObj->reserve(7);
     dateObj->push_back_raw("isoWeekYear", value::TypeTags::NumberInt32, dateParts.year);
     dateObj->push_back_raw("isoWeek", value::TypeTags::NumberInt32, dateParts.weekOfYear);
@@ -321,8 +318,7 @@ value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
     dateObj->push_back_raw("minute", value::TypeTags::NumberInt32, dateParts.minute);
     dateObj->push_back_raw("second", value::TypeTags::NumberInt32, dateParts.second);
     dateObj->push_back_raw("millisecond", value::TypeTags::NumberInt32, dateParts.millisecond);
-    guard.reset();
-    return {true, dateObjTag, dateObjVal};
+    return std::move(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDayOfYear(ArityType arity) {

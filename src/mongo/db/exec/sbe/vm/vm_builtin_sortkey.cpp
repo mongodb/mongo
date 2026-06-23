@@ -128,17 +128,15 @@ value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorToArray(ArityTy
         auto [copyTag, copyVal] = value::copyValue(tag, val);
         return {true, copyTag, copyVal};
     } else {
-        auto [arrayTag, arrayVal] = value::makeNewArray();
-        value::ValueGuard arrayGuard{arrayTag, arrayVal};
-        auto array = value::getArrayView(arrayVal);
+        value::TagValueOwned arr{value::makeNewArray()};
+        auto array = value::getArrayView(arr.value());
         array->reserve(sortVec->elts.size());
         for (size_t i = 0; i < sortVec->elts.size(); ++i) {
             auto [tag, val] = sortVec->elts[i];
             auto [copyTag, copyVal] = value::copyValue(tag, val);
             array->push_back_raw(copyTag, copyVal);
         }
-        arrayGuard.reset();
-        return {true, arrayTag, arrayVal};
+        return std::move(arr);
     }
 }
 

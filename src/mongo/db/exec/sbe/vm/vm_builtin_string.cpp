@@ -49,9 +49,8 @@ value::TagValueMaybeOwned ByteCode::builtinSplit(ArityType arity) {
     auto inputStr = value::getStringView(input.tag, input.value);
     auto separatorStr = value::getStringView(separator.tag, separator.value);
 
-    auto [tag, val] = value::makeNewArray();
-    auto arr = value::getArrayView(val);
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned result{value::makeNewArray()};
+    auto arr = value::getArrayView(result.value());
 
     size_t splitPos;
     while ((splitPos = inputStr.find(separatorStr)) != std::string::npos) {
@@ -68,8 +67,7 @@ value::TagValueMaybeOwned ByteCode::builtinSplit(ArityType arity) {
         arr->push_back_raw(tag, val);
     }
 
-    guard.reset();
-    return {true, tag, val};
+    return std::move(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinReplaceOne(ArityType arity) {

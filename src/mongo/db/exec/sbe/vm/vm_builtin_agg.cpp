@@ -3148,7 +3148,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableSetUnionRemove(ArityType 
         // capture a structured binding in a lambda expression.
         [&accMultiSet = accMultiSet, &accMultiSetSize = accMultiSetSize](
             value::TypeTags elemBeingRemovedTag, value::Value elemBeingRemovedVal) {
-            value::ValueGuard removedGuard{elemBeingRemovedTag, elemBeingRemovedVal};
+            value::TagValueOwned removed{elemBeingRemovedTag, elemBeingRemovedVal};
             auto elemSize = value::getApproximateSize(elemBeingRemovedTag, elemBeingRemovedVal);
             tassert(11093711,
                     "Size of element is larger than size of accumulator multiset",

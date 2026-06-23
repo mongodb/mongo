@@ -199,9 +199,8 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
     uint32_t codePointPos = 0;
 
     // Prepare the result array of matching objects.
-    auto [arrTag, arrVal] = value::makeNewArray();
-    value::ValueGuard arrGuard{arrTag, arrVal};
-    auto arrayView = value::getArrayView(arrVal);
+    value::TagValueOwned arr{value::makeNewArray()};
+    auto arrayView = value::getArrayView(arr.value());
 
     int resultSize = 0;
     do {
@@ -244,8 +243,7 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
         }
     } while (startBytePos < inputString.size());
 
-    arrGuard.reset();
-    return {true, arrTag, arrVal};
+    return std::move(arr);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinGetRegexPattern(ArityType arity) {
