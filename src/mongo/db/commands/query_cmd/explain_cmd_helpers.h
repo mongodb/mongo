@@ -35,7 +35,11 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <memory>
+
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 namespace explain_cmd_helpers {
 
@@ -69,6 +73,18 @@ ExplainedCommand makeExplainedCommand(OperationContext* opCtx,
  * command to shards, we are able to preserve the generic arguments.
  */
 BSONObj makeExplainedObjForMongos(const BSONObj& outerObj, const BSONObj& innerObj);
+
+/**
+ * Resolves the effective maxTimeMS for an explain command from the explain command's own maxTimeMS
+ * and a maxTimeMS nested inside the explained command. When both are positive the smaller (more
+ * restrictive) value wins. A value of 0 means "no limit" and never overrides a positive value; an
+ * explicit 0 in either placement is preserved (rather than collapsing to "unset") so it bypasses
+ * defaultMaxTimeMS. The result is unset only when both placements are unset. Folding the result
+ * back into the explain command's maxTimeMS lets the standard deadline machinery enforce a nested
+ * maxTimeMS exactly like a top-level one.
+ */
+boost::optional<std::int64_t> resolveMaxTimeMS(boost::optional<std::int64_t> explainMaxTimeMS,
+                                               boost::optional<std::int64_t> nestedMaxTimeMS);
 
 }  // namespace explain_cmd_helpers
 }  // namespace mongo

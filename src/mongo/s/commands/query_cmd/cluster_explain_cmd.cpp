@@ -102,6 +102,13 @@ public:
                                                           request().getSerializationContext());
             _innerRequest = std::move(innerCommand.innerRequest);
             _innerInvocation = std::move(innerCommand.innerInvocation);
+
+            // Fold a maxTimeMS nested inside the explained command into this command's own
+            // maxTimeMS so the standard deadline machinery enforces it like a top-level maxTimeMS.
+            auto& explainArgs = request().getGenericArguments();
+            explainArgs.setMaxTimeMS(explain_cmd_helpers::resolveMaxTimeMS(
+                explainArgs.getMaxTimeMS(),
+                _innerInvocation->getGenericArguments().getMaxTimeMS()));
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,

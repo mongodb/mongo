@@ -33,6 +33,8 @@
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/util/serialization_context.h"
 
+#include <algorithm>
+
 namespace mongo {
 namespace explain_cmd_helpers {
 using namespace std::literals::string_view_literals;
@@ -84,6 +86,25 @@ ExplainedCommand makeExplainedCommand(OperationContext* opCtx,
         isRawDataOperation(opCtx) = true;
     }
     return {std::move(innerRequest), std::move(innerInvocation)};
+}
+
+boost::optional<std::int64_t> resolveMaxTimeMS(boost::optional<std::int64_t> explainMaxTimeMS,
+                                               boost::optional<std::int64_t> nestedMaxTimeMS) {
+    const bool explainLimits = explainMaxTimeMS && *explainMaxTimeMS > 0;
+    const bool nestedLimits = nestedMaxTimeMS && *nestedMaxTimeMS > 0;
+    if (explainLimits && nestedLimits) {
+        return std::min(*explainMaxTimeMS, *nestedMaxTimeMS);
+    }
+    if (explainLimits) {
+        return explainMaxTimeMS;
+    }
+    if (nestedLimits) {
+        return nestedMaxTimeMS;
+    }
+    // Neither value imposes a positive limit, so both are 0 ("no limit") or unset. An explicit 0
+    // must be preserved (unlike an unset value) so it bypasses defaultMaxTimeMS. Keep the explain
+    // value when it is set, otherwise fall back to the nested value (an explicit 0, or unset).
+    return explainMaxTimeMS ? explainMaxTimeMS : nestedMaxTimeMS;
 }
 
 BSONObj makeExplainedObjForMongos(const BSONObj& outerObj, const BSONObj& innerObj) {

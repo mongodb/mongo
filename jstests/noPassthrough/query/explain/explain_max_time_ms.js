@@ -1,6 +1,8 @@
 /**
  * Tests the explain command with the maxTimeMS option.
  */
+import {runWithFailpoint} from "jstests/libs/query/command_diagnostic_utils.js";
+
 const standalone = MongoRunner.runMongod();
 assert.neq(null, standalone, "mongod was unable to start up");
 
@@ -24,63 +26,73 @@ assert.commandWorked(coll.insert({i: 1, j: 1}));
 assert.commandWorked(coll.insert({i: 2, j: 1}));
 assert.commandWorked(coll.insert({i: 2, j: 2}));
 
-// Set fail point to make sure operations with "maxTimeMS" set will time out.
+// The shell explain helpers hoist a nested maxTimeMS up to the top level, so they would not exercise
+// the path where maxTimeMS lives inside the explained command. Issue explain via raw db.runCommand
+// to verify the server honors maxTimeMS in both cases across a range of explained commands.
+const explainedCommands = [
+    {find: collName, filter: {i: 1}},
+    {aggregate: collName, pipeline: [{$match: {i: 1}}], cursor: {}},
+    {count: collName, query: {i: 1}},
+    {distinct: collName, key: "i"},
+    {findAndModify: collName, update: {$inc: {j: 1}}},
+    {mapReduce: collName, map: mapFn, reduce: reduceFn, out: destCollName},
+];
+
+// With the fail point on, any operation that has a deadline set times out immediately.
+runWithFailpoint(db, "maxTimeAlwaysTimeOut", {}, () => {
+    for (const verbosity of ["executionStats", "allPlansExecution"]) {
+        for (const explained of explainedCommands) {
+            // A maxTimeMS nested inside the explained command times out.
+            assert.commandFailedWithCode(
+                db.runCommand({explain: {...explained, maxTimeMS: 1}, verbosity}),
+                ErrorCodes.MaxTimeMSExpired,
+            );
+            // A top-level maxTimeMS on the explain command times out.
+            assert.commandFailedWithCode(
+                db.runCommand({explain: explained, verbosity, maxTimeMS: 1}),
+                ErrorCodes.MaxTimeMSExpired,
+            );
+        }
+    }
+});
+
+const verbosity = "executionStats";
+
+// With no fail point and no maxTimeMS, or a nested maxTimeMS that is not exceeded, explain succeeds.
+assert.commandWorked(db.runCommand({explain: {find: collName, filter: {i: 1}}, verbosity}));
 assert.commandWorked(
-    db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}),
+    db.runCommand({explain: {find: collName, filter: {i: 1}, maxTimeMS: 600000}, verbosity}),
 );
 
-for (const verbosity of ["executionStats", "allPlansExecution"]) {
-    // Expect explain to time out if "maxTimeMS" is set on the aggregate command.
-    assert.commandFailedWithCode(
-        assert.throws(function () {
-            coll.explain(verbosity).aggregate([{$match: {i: 1}}], {maxTimeMS: 1});
-        }),
-        ErrorCodes.MaxTimeMSExpired,
-    );
-    // Expect explain to time out if "maxTimeMS" is set on the count command.
-    assert.commandFailedWithCode(
-        assert.throws(function () {
-            coll.explain(verbosity).count({i: 1}, {maxTimeMS: 1});
-        }),
-        ErrorCodes.MaxTimeMSExpired,
-    );
-    // Expect explain to time out if "maxTimeMS" is set on the distinct command.
-    assert.commandFailedWithCode(
-        assert.throws(function () {
-            coll.explain(verbosity).distinct("i", {}, {maxTimeMS: 1});
-        }),
-        ErrorCodes.MaxTimeMSExpired,
-    );
-    // Expect explain to time out if "maxTimeMS" is set on the find command.
-    assert.commandFailedWithCode(
-        assert.throws(function () {
-            coll.find().maxTimeMS(1).explain(verbosity);
-        }),
-        ErrorCodes.MaxTimeMSExpired,
-    );
-    assert.commandFailedWithCode(
-        assert.throws(function () {
-            coll.explain(verbosity).find().maxTimeMS(1).finish();
-        }),
-        ErrorCodes.MaxTimeMSExpired,
-    );
-    // Expect explain to time out if "maxTimeMS" is set on the findAndModify command.
-    assert.commandFailedWithCode(
-        assert.throws(function () {
-            coll.explain(verbosity).findAndModify({update: {$inc: {j: 1}}, maxTimeMS: 1});
-        }),
-        ErrorCodes.MaxTimeMSExpired,
-    );
-    // Expect explain to time out if "maxTimeMS" is set on the mapReduce command.
-    assert.commandFailedWithCode(
-        assert.throws(function () {
-            coll.explain(verbosity).mapReduce(mapFn, reduceFn, {out: destCollName, maxTimeMS: 1});
-        }),
-        ErrorCodes.MaxTimeMSExpired,
-    );
-}
-
-// Disable fail point.
-assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
+// When both are provided, the smaller of the two maxTimeMS values should be honored. Block the explain long enough that only the
+// smaller deadline is exceeded: the larger value on its own would not time out, so a timeout shows
+// the smaller value was the one applied.
+const smallMaxTimeMS = 1;
+const largeMaxTimeMS = 600000;
+runWithFailpoint(
+    db,
+    "failCommand",
+    {failCommands: ["explain"], blockConnection: true, blockTimeMS: 1000},
+    () => {
+        // The top-level value is the smaller one.
+        assert.commandFailedWithCode(
+            db.runCommand({
+                explain: {find: collName, filter: {i: 1}, maxTimeMS: largeMaxTimeMS},
+                verbosity,
+                maxTimeMS: smallMaxTimeMS,
+            }),
+            ErrorCodes.MaxTimeMSExpired,
+        );
+        // The nested value is the smaller one.
+        assert.commandFailedWithCode(
+            db.runCommand({
+                explain: {find: collName, filter: {i: 1}, maxTimeMS: smallMaxTimeMS},
+                verbosity,
+                maxTimeMS: largeMaxTimeMS,
+            }),
+            ErrorCodes.MaxTimeMSExpired,
+        );
+    },
+);
 
 MongoRunner.stopMongod(standalone);
