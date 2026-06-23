@@ -2950,19 +2950,6 @@ __wt_ref_ascend(WT_SESSION_IMPL *session, WT_REF **refp, WT_PAGE_INDEX **pindexp
 }
 
 /*
- * __wt_cache_page_footprint_incr --
- *     Increment a page's memory footprint without touching cache or btree totals.
- */
-static WT_INLINE void
-__wt_cache_page_footprint_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
-{
-    WT_ASSERT(session, size < WT_EXABYTE);
-    if (size == 0)
-        return;
-    (void)__wt_atomic_add_size_relaxed(&page->memory_footprint, size);
-}
-
-/*
  * __wt_cache_shared_dsk_inmem_incr --
  *     Increment the shared disk in memory cache statistics.
  */
@@ -3039,4 +3026,20 @@ __wt_cache_shared_dsk_inmem_decr(WT_SESSION_IMPL *session, uint8_t image_type, s
                   session, &cache->bytes_internal_stable, size, "WT_CACHE.bytes_internal_stable");
         }
     }
+}
+
+/*
+ * __wt_btree_row_leaf_entries_update --
+ *     Update the per-btree EWMA of row-store leaf page K/V pair count with a new sample. Uses
+ *     alpha=1/16: new_ewma = (15 * old + sample) / 16. Races between threads are tolerated since
+ *     the result is approximate.
+ */
+static WT_INLINE void
+__wt_btree_row_leaf_entries_update(WT_BTREE *btree, uint64_t sample)
+{
+    uint64_t old;
+
+    old = __wt_atomic_load_uint64_relaxed(&btree->leaf_entry_ewma);
+    __wt_atomic_store_uint64_relaxed(
+      &btree->leaf_entry_ewma, old == 0 ? sample : (15 * old + sample) / 16);
 }

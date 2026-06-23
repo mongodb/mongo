@@ -170,6 +170,7 @@ EQ
 ERANGE
 ETIME
 ETIMEDOUT
+EWMA
 EXTLIST
 EXTLIST's
 EXTSUBPATH
@@ -998,6 +999,7 @@ ev
 evd
 eventv
 evictable
+ewma
 exactp
 exc
 exe

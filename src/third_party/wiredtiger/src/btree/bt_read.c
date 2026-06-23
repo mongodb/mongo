@@ -448,6 +448,8 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     __wt_free(session, tmp);
 
 skip_disk_read:
+    if (page->type == WT_PAGE_ROW_LEAF && page->entries > 0)
+        __wt_btree_row_leaf_entries_update(btree, page->entries);
     if (page->disagg_info != NULL) {
         if (shared_dsk_item != NULL)
             block_meta = shared_dsk_item->block_meta;

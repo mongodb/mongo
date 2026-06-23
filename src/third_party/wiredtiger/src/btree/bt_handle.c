@@ -823,6 +823,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     else
         btree->next_page_id = ckpt->next_page_id;
 
+    __wt_atomic_store_uint64_relaxed(&btree->leaf_entry_ewma, ckpt->leaf_entry_ewma);
+    __wt_atomic_store_uint64_relaxed(&btree->approx_leaf_pages, ckpt->approx_leaf_pages);
+
     /*
      * We've just overwritten the runtime write generation based off the fact that know that we're
      * importing and therefore, the checkpoint data's runtime write generation is meaningless. We

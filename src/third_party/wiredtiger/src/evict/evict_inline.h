@@ -298,13 +298,13 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_BTREE *btree;
     WT_CACHE *cache;
     WT_PAGE_MODIFY *modify;
-    uint64_t memory_footprint;
+    uint64_t btree_footprint, memory_footprint;
     bool is_disagg;
 
     btree = S2BT(session);
     cache = S2C(session)->cache;
     modify = page->modify;
-    memory_footprint = __wt_atomic_load_size_relaxed(&page->memory_footprint);
+    btree_footprint = memory_footprint = __wt_atomic_load_size_relaxed(&page->memory_footprint);
     is_disagg = __wt_conn_is_disagg(session);
 
     /*
@@ -320,7 +320,7 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 
     /* Update the bytes in-memory to reflect the eviction. */
     __wt_cache_decr_check_uint64(
-      session, &btree->bytes_inmem, memory_footprint, "WT_BTREE.bytes_inmem");
+      session, &btree->bytes_inmem, btree_footprint, "WT_BTREE.bytes_inmem");
     __wt_cache_decr_check_uint64(
       session, &cache->bytes_inmem, memory_footprint, "WT_CACHE.bytes_inmem");
     if (is_disagg) {
@@ -335,7 +335,7 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
     /* Update the bytes_internal value to reflect the eviction */
     if (WT_PAGE_IS_INTERNAL(page)) {
         __wt_cache_decr_check_uint64(
-          session, &btree->bytes_internal, memory_footprint, "WT_BTREE.bytes_internal");
+          session, &btree->bytes_internal, btree_footprint, "WT_BTREE.bytes_internal");
         __wt_cache_decr_check_uint64(
           session, &cache->bytes_internal, memory_footprint, "WT_CACHE.bytes_internal");
         if (is_disagg) {

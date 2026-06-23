@@ -1486,6 +1486,8 @@ __rec_split(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t next_len)
     /* Set the entries, timestamps and size for the just finished chunk. */
     r->cur_ptr->entries = r->entries;
     r->cur_ptr->image.size = inuse;
+    if (r->page->type == WT_PAGE_ROW_LEAF && r->entries > 0)
+        __wt_btree_row_leaf_entries_update(btree, r->entries / 2);
 
     /*
      * Normally we keep two chunks in memory at a given time, and we write the previous chunk at
@@ -1715,6 +1717,8 @@ __wti_rec_split_finish(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     /* Set the number of entries and size for the just finished chunk. */
     r->cur_ptr->entries = r->entries;
     r->cur_ptr->image.size = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
+    if (r->page->type == WT_PAGE_ROW_LEAF && r->entries > 0)
+        __wt_btree_row_leaf_entries_update(S2BT(session), r->entries / 2);
 
     /*  Potentially reconsider a previous chunk. */
     if (r->prev_ptr != NULL)

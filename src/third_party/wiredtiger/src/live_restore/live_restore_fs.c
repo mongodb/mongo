@@ -311,11 +311,6 @@ __live_restore_fs_directory_list_worker(WT_FILE_SYSTEM *fs, WT_SESSION *wt_sessi
 
         for (uint32_t i = 0; i < num_src_files; ++i) {
             /*
-             * If a file in source hasn't been background migrated yet we need to add it to the
-             * list.
-             */
-            bool add_source_file = false;
-            /*
              * Stop files should never exist in the source directory. We check this on startup but
              * add a sanity check here.
              */
@@ -323,9 +318,8 @@ __live_restore_fs_directory_list_worker(WT_FILE_SYSTEM *fs, WT_SESSION *wt_sessi
               !WT_SUFFIX_MATCH(dirlist_src[i], WTI_LIVE_RESTORE_STOP_FILE_SUFFIX),
               "'%s' found in the source directory! Stop files should only exist in the destination",
               dirlist_src[i]);
-            if (!dest_folder_exists)
-                add_source_file = true;
-            else {
+
+            if (dest_folder_exists) {
                 /*
                  * We're iterating files in the source, but we want to check if they exist in the
                  * destination, so create the file path to the backing destination file.
@@ -337,15 +331,18 @@ __live_restore_fs_directory_list_worker(WT_FILE_SYSTEM *fs, WT_SESSION *wt_sessi
                   false);
                 WT_ERR(__dest_has_stop_file(lr_fs, (char *)filename->data, session, &have_stop));
 
-                add_source_file = !dest_exist && !have_stop;
+                /* Skip files already background migrated to the destination or marked deleted. */
+                if (dest_exist || have_stop)
+                    continue;
             }
 
-            if (add_source_file) {
-                WT_ERR(
-                  __wt_realloc_def(session, &dirallocsz, count_dest + count_src + 1, &entries));
-                WT_ERR(__wt_strdup(session, dirlist_src[i], &entries[count_dest + count_src]));
-                ++count_src;
-            }
+            /*
+             * Reaching the end of the loop means this file is valid, add it to the returned file
+             * list.
+             */
+            WT_ERR(__wt_realloc_def(session, &dirallocsz, count_dest + count_src + 1, &entries));
+            WT_ERR(__wt_strdup(session, dirlist_src[i], &entries[count_dest + count_src]));
+            ++count_src;
 
             if (single)
                 goto done;

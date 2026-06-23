@@ -506,6 +506,21 @@ __wt_atomic_decrement_if_positive(uint32_t *valuep)
 }
 
 /*
+ * __wt_atomic_decrement_if_positive_uint64 --
+ *     Use compare and swap to atomically decrement a uint64_t value by 1 if it's positive.
+ */
+static WT_INLINE void
+__wt_atomic_decrement_if_positive_uint64(uint64_t *valuep)
+{
+    uint64_t old_value;
+    do {
+        old_value = __wt_atomic_load_uint64_relaxed(valuep);
+        if (old_value == 0)
+            break;
+    } while (!__wt_atomic_cas_uint64(valuep, old_value, old_value - 1));
+}
+
+/*
  *    Calculate max/min statistic values. Currently we use load + store for that purpose since
  *     statistic is allowed to be fuzzy. FIXME-WT-15755: Consider using relaxed CAS instead to
  *     ensure it is lossless.

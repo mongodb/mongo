@@ -355,3 +355,52 @@ TEST_CASE("Live Restore Directory List", "[live_restore],[live_restore_directory
           file_list_equals(directory_list_prefix(env, ""), lr_files{file_1, file_2, "lr_tmp"}));
     }
 }
+
+TEST_CASE(
+  "Live Restore Directory List Single", "[live_restore],[live_restore_directory_list_single]")
+{
+    live_restore_test_env env;
+    WT_SESSION *wt_session = reinterpret_cast<WT_SESSION *>(env.session);
+    WTI_LIVE_RESTORE_FS *lr_fs = env.lr_fs;
+
+    /*
+     * The ineligible file must be examined first in the directory listing. Since different
+     * filesystems return files in different physical orders, we dynamically determine the physical
+     * order of two test files, then designate the first returned file as ineligible and the second
+     * as eligible.
+     */
+
+    create_file(env.source_file_path("test_file1.wt").c_str());
+    create_file(env.source_file_path("test_file2.wt").c_str());
+
+    char **src_order = nullptr;
+    uint32_t src_order_count = 0;
+    REQUIRE(lr_fs->os_file_system->fs_directory_list(lr_fs->os_file_system, wt_session,
+              env.DB_SOURCE.c_str(), "test_", &src_order, &src_order_count) == 0);
+    REQUIRE(src_order_count == 2);
+
+    std::string ineligible_file = src_order[0];
+    std::string eligible_file = src_order[1];
+
+    lr_fs->os_file_system->fs_directory_list_free(
+      lr_fs->os_file_system, wt_session, src_order, src_order_count);
+
+    create_file(env.tombstone_file_path(ineligible_file.c_str()).c_str());
+
+    /*
+     * Verify the eligible file is reachable via the full listing. The full listing is not affected
+     * by the single-mode bug; a failure here means the test setup is wrong.
+     */
+    REQUIRE(directory_list(env, env.DB_DEST, "test_") == lr_files{eligible_file});
+
+    /* The single listing must return the eligible file found by the full listing. */
+    char **dirlist = nullptr;
+    uint32_t count = 0;
+    REQUIRE(lr_fs->iface.fs_directory_list_single((WT_FILE_SYSTEM *)lr_fs, wt_session,
+              env.DB_DEST.c_str(), "test_", &dirlist, &count) == 0);
+
+    REQUIRE(count == 1);
+    REQUIRE(std::string(dirlist[0]) == eligible_file);
+
+    lr_fs->iface.fs_directory_list_free((WT_FILE_SYSTEM *)lr_fs, wt_session, dirlist, count);
+}

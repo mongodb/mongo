@@ -350,7 +350,7 @@ __clayered_open_stable(WT_CURSOR_LAYERED *clayered, bool checkpoint_expected)
  *     Return true if the stable cursor can be advanced to a newer checkpoint at this time.
  */
 static bool
-__clayered_can_advance_stable(WT_CURSOR_LAYERED *clayered, bool iteration)
+__clayered_can_advance_stable(WT_CURSOR_LAYERED *clayered, uint64_t conn_lsn, bool iteration)
 {
     WT_SESSION_IMPL *session;
     WT_TXN_SHARED *txn_shared;
@@ -361,15 +361,21 @@ __clayered_can_advance_stable(WT_CURSOR_LAYERED *clayered, bool iteration)
     if (S2C(session)->layered_table_manager.leader)
         return (false);
 
+    /* No need to advance if there is no newer checkpoint. */
+    if (clayered->stable_checkpoint_meta_lsn == conn_lsn)
+        return (false);
+
     /*
      * Layered cursor is positioned on the stable cursor. Changing it may lose the layered cursor
-     * position. FIXME-WT-16467: If we are reading with a timestamp and can ensure that we never
-     * select a checkpoint with an oldest timestamp greater than the pinned timestamp, we should
-     * safely advance to a newer checkpoint. This is because the version we intend to read would
-     * still be present in the newer checkpoint.
+     * position.
+     *
+     * FIXME-WT-16467: If we are reading with a timestamp and can ensure that we never select a
+     * checkpoint with an oldest timestamp greater than the pinned timestamp, we should safely
+     * advance to a newer checkpoint. This is because the version we intend to read would still be
+     * present in the newer checkpoint.
      */
-    if (F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) &&
-      clayered->current_cursor == clayered->stable_cursor)
+    if (clayered->stable_cursor != NULL && clayered->current_cursor == clayered->stable_cursor &&
+      F_ISSET(clayered->stable_cursor, WT_CURSTD_KEY_INT))
         return (false);
 
     /*
@@ -591,7 +597,8 @@ __clayered_update_stable(WT_CURSOR_LAYERED *clayered, uint32_t flags)
             WT_STAT_CONN_DSRC_INCR(session, layered_curs_open_stable);
         }
     } else if (FLD_ISSET(flags, CLAYERED_ENTER_ROLE_CHANGE) ||
-      __clayered_can_advance_stable(clayered, FLD_ISSET(flags, CLAYERED_ENTER_ITERATION))) {
+      __clayered_can_advance_stable(
+        clayered, conn_lsn, FLD_ISSET(flags, CLAYERED_ENTER_ITERATION))) {
         /*
          * Reopen the cursor.
          *
@@ -2228,7 +2235,7 @@ static WT_INLINE int
 __clayered_remove_follower(
   WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, const WT_ITEM *key, bool positioned)
 {
-    WT_CURSOR *const c = clayered->ingest_cursor;
+    WT_CURSOR *const c_ingest = clayered->ingest_cursor;
     WT_DECL_RET;
     WT_ITEM value;
 
@@ -2236,26 +2243,25 @@ __clayered_remove_follower(
 
     WT_RET(__clayered_modify_check(session, clayered, key));
 
-    if (positioned) {
-        if (clayered->current_cursor == c) {
-            WT_ASSERT(session, F_ISSET(c, WT_CURSTD_KEY_INT));
-            WT_ASSERT(session, F_ISSET(c, WT_CURSTD_VALUE_INT));
-            /*
-             * If we are erasing a record that is already a tombstone, don't write another one: we
-             * don't ever want consecutive tombstones on an update chain.
-             */
-            WT_ITEM_SET(value, c->value);
-            if (__wt_clayered_deleted(&value))
-                return (WT_NOTFOUND);
-        }
-    } else {
+    /* The cached value can be stale once VALUE_INT is cleared (localized at a txn boundary). */
+    bool hold_value =
+      clayered->current_cursor != NULL && F_ISSET(clayered->current_cursor, WT_CURSTD_VALUE_INT);
+
+    if (!positioned || !hold_value) {
+        /* Cached value isn't reliable (unpositioned or not holding the value ref); re-read it. */
         WT_ASSERT(session, F_ISSET(&clayered->iface, WT_CURSTD_KEY_EXT));
         WT_RET(__clayered_lookup(session, clayered, &value));
+    } else if (clayered->current_cursor == c_ingest) {
+        WT_ASSERT(session, F_ISSET(c_ingest, WT_CURSTD_KEY_INT));
+        /* Skip an existing tombstone: no consecutive tombstones on an update chain. */
+        WT_ITEM_SET(value, c_ingest->value);
+        if (__wt_clayered_deleted(&value))
+            return (WT_NOTFOUND);
     }
 
     /* If we are positioned on the stable table, we need to set the key. */
-    if (clayered->current_cursor != c)
-        c->set_key(c, key);
+    if (clayered->current_cursor != c_ingest)
+        c_ingest->set_key(c_ingest, key);
 
     /*
      * Clear the stable cursor position. Don't clear the ingest cursor: we're about to use it
@@ -2270,9 +2276,9 @@ __clayered_remove_follower(
      */
     WT_RET(__wt_layered_table_truncate_detect_write_conflict(
       session, (WT_LAYERED_TABLE *)clayered->dhandle, key));
-    c->set_value(c, &__wt_tombstone);
-    WT_ERR(c->update(c));
-    clayered->current_cursor = c;
+    c_ingest->set_value(c_ingest, &__wt_tombstone);
+    WT_ERR(c_ingest->update(c_ingest));
+    clayered->current_cursor = c_ingest;
 
 err:
     if (ret != 0)

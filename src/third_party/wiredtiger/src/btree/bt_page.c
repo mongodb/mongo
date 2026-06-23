@@ -1028,6 +1028,22 @@ err:
 }
 
 /*
+ * __inmem_shared_dsk_account --
+ *     Account a shared disk image's bytes in the page footprint and the owning btree's in-memory
+ *     totals.
+ */
+static void
+__inmem_shared_dsk_account(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+{
+    WT_BTREE *btree = S2BT(session);
+
+    (void)__wt_atomic_add_size_relaxed(&page->memory_footprint, size);
+    (void)__wt_atomic_add_uint64_relaxed(&btree->bytes_inmem, size);
+    if (WT_PAGE_IS_INTERNAL(page))
+        (void)__wt_atomic_add_uint64_relaxed(&btree->bytes_internal, size);
+}
+
+/*
  * __wti_page_inmem --
  *     Build in-memory page information.
  */
@@ -1182,9 +1198,9 @@ __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint3
     WT_ASSERT(session, shared_dsk_item == NULL || page->disagg_info != NULL);
     if (page->disagg_info != NULL) {
         page->disagg_info->shared_dsk_item = shared_dsk_item;
-        /* memory footprint still includes disk size so per-page eviction logic stays unchanged. */
+        /* Count the disk image in the page footprint and this btree's in-memory total. */
         if (LF_ISSET(WT_PAGE_DISK_SHARED))
-            __wt_cache_page_footprint_incr(session, page, dsk->mem_size);
+            __inmem_shared_dsk_account(session, page, dsk->mem_size);
     }
 
     *pagep = page;

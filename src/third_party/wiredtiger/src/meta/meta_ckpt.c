@@ -1064,6 +1064,16 @@ __ckpt_load(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_C
     if (ret != WT_NOTFOUND && a.len != 0)
         ckpt->next_page_id = (uint64_t)a.val;
 
+    ret = __wt_config_subgets(session, v, "leaf_entry_ewma", &a);
+    WT_RET_NOTFOUND_OK(ret);
+    if (ret != WT_NOTFOUND && a.len != 0)
+        ckpt->leaf_entry_ewma = (uint64_t)a.val;
+
+    ret = __wt_config_subgets(session, v, "approx_leaf_pages", &a);
+    WT_RET_NOTFOUND_OK(ret);
+    if (ret != WT_NOTFOUND && a.len != 0)
+        ckpt->approx_leaf_pages = (uint64_t)a.val;
+
     return (0);
 }
 
@@ -1194,13 +1204,15 @@ __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM 
           "=(addr=\"%.*s\",order=%" PRId64 ",time=%" PRIu64 ",size=%" PRId64
           ",newest_start_durable_ts=%" PRId64 ",oldest_start_ts=%" PRId64 ",newest_txn=%" PRId64
           ",newest_stop_durable_ts=%" PRId64 ",newest_stop_ts=%" PRId64 ",newest_stop_txn=%" PRId64
-          ",prepare=%d,write_gen=%" PRId64 ",run_write_gen=%" PRId64 ",next_page_id=%" PRId64 ")",
+          ",prepare=%d,write_gen=%" PRId64 ",run_write_gen=%" PRId64 ",next_page_id=%" PRId64
+          ",leaf_entry_ewma=%" PRId64 ",approx_leaf_pages=%" PRId64 ")",
           (int)ckpt->addr.size, (char *)ckpt->addr.data, ckpt->order, ckpt->sec,
           (int64_t)ckpt->size, (int64_t)ckpt->ta.newest_start_durable_ts,
           (int64_t)ckpt->ta.oldest_start_ts, (int64_t)ckpt->ta.newest_txn,
           (int64_t)ckpt->ta.newest_stop_durable_ts, (int64_t)ckpt->ta.newest_stop_ts,
           (int64_t)ckpt->ta.newest_stop_txn, (int)ckpt->ta.prepare, (int64_t)ckpt->write_gen,
-          (int64_t)ckpt->run_write_gen, (int64_t)ckpt->next_page_id));
+          (int64_t)ckpt->run_write_gen, (int64_t)ckpt->next_page_id, (int64_t)ckpt->leaf_entry_ewma,
+          (int64_t)ckpt->approx_leaf_pages));
     }
     WT_RET(__wt_buf_catfmt(session, buf, ")"));
 
@@ -1358,6 +1370,8 @@ __wt_meta_ckptlist_set(
     WT_CKPT_FOREACH (ckptbase, ckpt) {
         if (F_ISSET(ckpt, WT_CKPT_ADD)) {
             ckpt->next_page_id = btree->next_page_id;
+            ckpt->leaf_entry_ewma = __wt_atomic_load_uint64_relaxed(&btree->leaf_entry_ewma);
+            ckpt->approx_leaf_pages = __wt_atomic_load_uint64_relaxed(&btree->approx_leaf_pages);
             /*
              * For disaggregated storage, save the total bytes to the checkpoint size field. Track
              * the delta between this checkpoint and the previous one, this delta will be applied to
