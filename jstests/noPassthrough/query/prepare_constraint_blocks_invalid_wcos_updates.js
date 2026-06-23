@@ -20,6 +20,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const dbName = "test";
 const validator = {a: {$exists: true}};
@@ -134,6 +135,16 @@ function assertStateUnchanged() {
 describe("cross-shard updates that could dodge the upgrade-to-constraint validator scan", function () {
     before(function () {
         st = new ShardingTest({shards: 2, rs: {nodes: 1}});
+        // hangCollScanDoWork only fires on the classic collection scan. With featureFlagSbeFull
+        // the scan runs in SBE and the failpoint never fires.
+        // TODO SERVER-129253: replace with an SBE-compatible failpoint so this test runs under SBE full.
+        if (checkSbeFullyEnabled(st.rs0.getPrimary().getDB("admin"))) {
+            jsTest.log.info(
+                `Skipping ${jsTestName()} as SBE full bypasses the classic collscan failpoint`,
+            );
+            st.stop();
+            quit();
+        }
 
         collName = jsTestName();
         mongosDB = st.s.getDB(dbName);
