@@ -438,12 +438,12 @@ void appendData(const std::string& tag, std::vector<MyType>& out) {
   ```
 
 - Do not use "using directives" (i.e. `using namespace foo;`) for arbitrary namespaces as a naming
-  shortcut. Some namespaces are designed to be used this way in restricted contexts, but still never
-  at namespace-scope in header files. These carefully curated namespaces contain only a few
-  definitions. Examples of these limited exceptional namespaces would include:
+  shortcut. Some namespaces are designed to be used this way in restricted contexts, but even these
+  are generally disallowed at namespace-scope in header files. These carefully curated namespaces
+  contain only a few definitions. Examples of these limited exceptional namespaces would include:
 
-  - The `std::literals`, `fmt::literals`, and similar namespaces that hold user-defined literal
-    operators. Using directives are necessary for importing user-defined literals.
+  - The `std::string_literals`, `fmt::literals`, and similar namespaces that hold user-defined
+    literal operators. Using directives are necessary for importing user-defined literals.
   - The `std::placeholders` namespace containing `_1`, `_2`, for use with the `std::bind` API (which
     we have banned anyway).
 
@@ -453,6 +453,21 @@ void appendData(const std::string& tag, std::vector<MyType>& out) {
   namespace bc = timeseries::bucket_catalog;
   namespace bfs = boost::filesystem;
   ```
+
+  - As controlled and specific exceptions, `namespace mongo` and nested namespaces within it may
+    contain _using directives_ for `std::string_literals` or `std::string_view_literals`, even in
+    headers. Example:
+
+    ```c++
+    // .h file
+    #include <string>
+    #include <string_view>
+    namespace mongo {
+    using namespace std::string_view_literals;
+    constexpr auto myGreeting = "hello"sv;
+    constexpr auto myBlob = "\x00\x01\x02\x03\x04"sv;
+    }  // namespace mongo
+    ```
 
 - No unnamed namespaces in headers at all. They can produce subtle correctness risks, particularly
   in the form of
