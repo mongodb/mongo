@@ -122,7 +122,6 @@ if jsEngine:
             'mozjs/scripting_util.idl',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/bson/bson_validate',
             'scripting_common',
         ],
         LIBDEPS_PRIVATE=[

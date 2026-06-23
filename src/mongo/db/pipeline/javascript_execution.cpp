@@ -29,8 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bson_validate.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 
 #include <iostream>
@@ -89,13 +87,7 @@ Value JsExecution::callFunction(ScriptingFunction func,
 
     BSONObjBuilder returnValue;
     _scope->append(returnValue, "", "__returnValue");
-    BSONObj result = returnValue.done();
-    if (auto status = validateBSON(result); !status.isOK()) {
-        uasserted(ErrorCodes::InvalidBSONFromJavaScript,
-                  str::stream() << "Invalid BSON returned from JavaScript function: "
-                                << status.toString());
-    }
-    return Value(result.firstElement());
+    return Value(returnValue.done().firstElement());
 }
 
 void JsExecution::callFunctionWithoutReturn(ScriptingFunction func,

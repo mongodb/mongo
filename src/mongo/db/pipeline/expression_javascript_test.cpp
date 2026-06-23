@@ -274,29 +274,5 @@ TEST_F(MapReduceFixture, ExpressionInternalJsErrorsIfProducesTooManyDocumentsFor
     ASSERT_THROWS_CODE(
         expr->evaluate(Document{BSON("val" << 1)}, getVariables()), AssertionException, 31292);
 }
-
-TEST_F(MapReduceFixture, ExpressionFunctionRejectsMalformedBSONColumn) {
-    BSONArrayBuilder emptyArgs;
-    auto bsonExpr = BSON("expr" << BSON("body"
-                                        << "function() { return new BinData(7, 'Ag=='); };"
-                                        << "args" << emptyArgs.arr() << "lang"
-                                        << ExpressionFunction::kJavaScript));
-    auto expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
-    ASSERT_THROWS_CODE(expr->evaluate({}, getVariables()),
-                       AssertionException,
-                       ErrorCodes::InvalidBSONFromJavaScript);
-}
-
-TEST_F(MapReduceFixture, ExpressionInternalJsEmitRejectsMalformedBSONColumn) {
-    auto bsonExpr =
-        BSON("expr" << BSON("this"
-                            << "$$ROOT"
-                            << "eval"
-                            << "function() { emit(this._id, new BinData(7, 'Ag==')); }"));
-    auto expr = ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
-    ASSERT_THROWS_CODE(expr->evaluate(Document{BSON("_id" << 1)}, getVariables()),
-                       AssertionException,
-                       ErrorCodes::InvalidBSONFromJavaScript);
-}
 }  // namespace
 }  // namespace mongo
