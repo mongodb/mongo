@@ -9,6 +9,10 @@ filters:
   - "*txn*":
     approvers:
       - 10gen/server-transactions
+  - "max_key_*scan_state.idl":
+    approvers:
+      - 10gen/server-cluster-scalability
+      - 10gen/server-catalog-and-routing
   - "shardsvr_resolve_view_command_test.cpp":
     approvers:
       - 10gen/query-integration-search

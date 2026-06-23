@@ -71,6 +71,7 @@ const StringDataSet kConfigCollections{
     NamespaceString::kLogicalSessionsNamespace.coll(),
     NamespaceString::kMigrationCoordinatorsNamespace.coll(),
     NamespaceString::kMigrationRecipientsNamespace.coll(),
+    NamespaceString::kConfigMaxKeyZoneScanStateNamespace.coll(),
     NamespaceString::kQueryShapeRepresentativeQueriesNamespace.coll(),
     NamespaceString::kRangeDeletionForRenameNamespace.coll(),
     NamespaceString::kRangeDeletionNamespace.coll(),

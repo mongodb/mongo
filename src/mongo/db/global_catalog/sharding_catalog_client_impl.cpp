@@ -512,7 +512,8 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
     OperationContext* opCtx,
     AggregateCommandRequest& aggRequest,
     const repl::ReadConcernArgs& readConcern,
-    const Milliseconds& maxTimeout) {
+    const Milliseconds& maxTimeout,
+    Shard::RetryPolicy retryPolicy) {
     // Reads on the config server may run on any node in its replica set. Such reads use the config
     // time as an afterClusterTime token, but config time is only inclusive of majority committed
     // data, so we should not use a weaker read concern. Note if the local node is a config server,
@@ -540,8 +541,7 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
 
     // Run the aggregation
     const auto configShard = _getConfigShard(opCtx);
-    return uassertStatusOK(
-        configShard->runAggregationWithResult(opCtx, aggRequest, Shard::RetryPolicy::kIdempotent));
+    return uassertStatusOK(configShard->runAggregationWithResult(opCtx, aggRequest, retryPolicy));
 }
 
 CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,

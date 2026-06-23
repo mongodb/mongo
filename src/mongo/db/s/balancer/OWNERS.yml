@@ -3,3 +3,7 @@ filters:
   - "*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "*max_key*":
+    approvers:
+      - 10gen/server-cluster-scalability
+      - 10gen/server-catalog-and-routing

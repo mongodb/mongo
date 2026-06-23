@@ -49,6 +49,7 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/client/shard_gen.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -100,7 +101,8 @@ public:
         OperationContext* opCtx,
         AggregateCommandRequest& aggRequest,
         const repl::ReadConcernArgs& readConcern,
-        const Milliseconds& maxTimeout = Milliseconds(defaultConfigCommandTimeoutMS.load())) = 0;
+        const Milliseconds& maxTimeout = Milliseconds(defaultConfigCommandTimeoutMS.load()),
+        Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent) = 0;
 
     /**
      * Retrieves the metadata for a given database, if it exists.

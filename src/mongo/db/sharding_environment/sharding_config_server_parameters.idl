@@ -159,3 +159,13 @@ server_parameters:
         validator:
             gte: 1
         redact: false
+
+    maxKeyZoneScanEnabled:
+        description: >-
+            When set to false the MaxKey zone inventory scan is skipped. Re-enabling it will run
+            the scan on next stepup. Has no effect unless featureFlagMaxKeyDetection is enabled.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gMaxKeyZoneScanEnabled
+        default: true
+        redact: false

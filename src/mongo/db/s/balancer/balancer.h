@@ -89,6 +89,29 @@ public:
     ~Balancer() override;
 
     /**
+     * Returns true if 'upperBound', interpreted alongside the compound 'shardKeyPattern',
+     * matches the buggy MaxKey zone fingerprint: a non-empty run of leading MaxKey fields
+     * followed by a non-empty run of trailing MinKey fields, with nothing else. That is the
+     * shape an all-MaxKey ("global max") prefix would have produced if it had been extended to
+     * the full shard key with MinKey instead of MaxKey. A legitimate prefix zone (e.g. user max
+     * {a: 10} stored as {a: 10, b: MinKey}) carries a normal value before its trailing MinKey
+     * padding and is *not* flagged. Single-field shard keys are exempt and must be filtered out
+     * by the caller; a field-count mismatch is treated as not-buggy. Static and side-effect
+     * free; exposed for unit testing of the MaxKey zone inventory scan.
+     */
+    static bool isBuggyMinKeyZoneFingerprint(const BSONObj& shardKeyPattern,
+                                             const BSONObj& upperBound);
+
+    /**
+     * Builds the aggregation pipeline that drives the MaxKey zone inventory scan over config.tags.
+     * The pipeline joins each tag to its collection's shard key ($lookup + $unwind on
+     * config.collections), filters out single-field shard keys server-side ($match), and projects
+     * away every field the scan does not classify on ($project) to bound the in-memory result set.
+     * Exposed for unit testing of the MaxKey zone inventory scan.
+     */
+    static std::vector<BSONObj> buildMaxKeyZoneScanPipeline();
+
+    /**
      * Invoked when the config server primary enters the 'PRIMARY' state and is invoked while the
      * caller is holding the global X lock. Kicks off the main balancer thread (which will in turn
      * instantiate a secondary worker and the CommandsScheduler) and returns immediately.
@@ -255,6 +278,32 @@ private:
                                  const MigrateInfoVector& chunksToDefragment);
 
     void _onActionsStreamPolicyStateUpdate();
+
+    /**
+     * MaxKey zone one-shot inventory scan.
+     *
+     * Gated by featureFlagMaxKeyDetection; a no-op when the flag is disabled. Also a no-op when the
+     * 'maxKeyZoneScanEnabled' server parameter is set to false, which is a runtime kill switch
+     * operators can use to stop the scan from re-attempting without an FCV change or restart.
+     *
+     * Reads config.tags joined to config.collections in a single majority aggregation (via the
+     * local catalog client), and flags any compound-key zone whose upper bound matches the buggy
+     * MaxKey fingerprint (see isBuggyMinKeyZoneFingerprint). Single-field shard keys and unsharded
+     * collections are skipped.
+     *
+     *
+     * Persists outcome to 'config.maxKeyZoneScanState'. On the first transition of
+     * foundBuggyZone to true, emits a single WARNING before the persist; later rescans
+     * suppress it via the persisted alertEmitted flag.
+     *
+     * One-shot: short-circuits if a scanCompletedAt is already persisted.
+     *
+     * Transient aggregation CursorInvalidatedError category (e.g. QueryPlanKilled) are retried by
+     * the config shard via Shard::RetryPolicy::kIdempotentOrCursorInvalidated. Other non-fatal read
+     * errors are swallowed and leave the scan incomplete so the next stepup retries; scan-fatal
+     * errors (shutdown, cancellation, replica-state transitions) propagate.
+     */
+    void _runMaxKeyZoneScan(OperationContext* opCtx);
 
     /**
      * To be invoked on completion of an action requested to by an ActionStream policy to

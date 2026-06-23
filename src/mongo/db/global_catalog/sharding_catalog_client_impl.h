@@ -114,11 +114,12 @@ public:
                                                    const CollectionType& coll,
                                                    bool upsert);
 
-    std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
-                                               AggregateCommandRequest& aggRequest,
-                                               const repl::ReadConcernArgs& readConcern,
-                                               const Milliseconds& maxTimeout = Milliseconds(
-                                                   defaultConfigCommandTimeoutMS.load())) override;
+    std::vector<BSONObj> runCatalogAggregation(
+        OperationContext* opCtx,
+        AggregateCommandRequest& aggRequest,
+        const repl::ReadConcernArgs& readConcern,
+        const Milliseconds& maxTimeout = Milliseconds(defaultConfigCommandTimeoutMS.load()),
+        Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent) override;
 
     DatabaseType getDatabase(OperationContext* opCtx,
                              const DatabaseName& db,

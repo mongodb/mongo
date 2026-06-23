@@ -208,6 +208,16 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagCheckVersioningCorrectness
         default: false
         fcv_gated: true
+    featureFlagMaxKeyDetection:
+        description: >-
+            Feature flag protecting the one-shot MaxKey inventory scans run on each primary
+            stepup. On shards, the RangeDeleterService scan detects shard-key documents whose
+            value is the global MaxKey and records the result in config.maxKeyOrphanScanState.
+            On the config server, the Balancer scan detects zones whose upper bound matches the
+            buggy trailing-MinKey fingerprint and records the result in config.maxKeyZoneScanState.
+        cpp_varname: feature_flags::gMaxKeyDetection
+        default: false
+        fcv_gated: false
     featureFlagHashedShardKeyIndexOptionalUponShardingCollection:
         description:
             "Feature flag to make shardCollection and reshardCollection not require a hashed

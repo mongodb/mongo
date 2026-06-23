@@ -64,6 +64,10 @@ filters:
   - "*zone*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "max_key_zone*":
+    approvers:
+      - 10gen/server-cluster-scalability
+      - 10gen/server-catalog-and-routing
   - "add_shard_*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
