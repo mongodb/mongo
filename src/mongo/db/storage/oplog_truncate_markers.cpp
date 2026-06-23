@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
@@ -300,13 +301,20 @@ bool OplogTruncateMarkers::awaitHasExpiredOplogOrDead(OperationContext* opCtx, R
                 return true;
             }
             RecordId pin(opCtx->getServiceContext()->getStorageEngine()->getPinnedOplog().asULL());
-            bool hasExpiredRecord =
-                newestExpiredRecord(opCtx, rs, pin, newestExpiredWallTime(opCtx)).has_value();
-            // newestExpiredRecord opens a reverse oplog cursor, which implicitly starts a read
-            // transaction. Abandon it so the idle wait that follows holds no snapshot and does not
-            // pin oldest_id for the entire check period. Abandoning on every evaluation also
-            // ensures the next check observes oplog appended during the wait rather than reusing a
-            // stale snapshot.
+
+            // Wrap newestExpiredRecord in a writeConflictRetry because it opens a reverse oplog
+            // cursor, which implicitly starts a read transaction, and is therefore susceptible to a
+            // WriteConflictException.
+            bool hasExpiredRecord = writeConflictRetry(
+                opCtx, "awaitHasExpiredOplogOrDead", NamespaceString::kRsOplogNamespace, [&] {
+                    return newestExpiredRecord(opCtx, rs, pin, newestExpiredWallTime(opCtx))
+                        .has_value();
+                });
+
+            // Abandon the snapshot opened during newestExpiredRecord so the idle wait that follows
+            // holds no snapshot and does not pin oldest_id for the entire check period. Abandoning
+            // on every evaluation also ensures the next check observes oplog appended during the
+            // wait rather than reusing a stale snapshot.
             shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             return hasExpiredRecord;
         });
