@@ -91,15 +91,7 @@ void FLEPerCollectionStats::serialize(BSONObjBuilder* builder) const {
 FLEStatusSection::FLEStatusSection(std::string name, ClusterRole role, TickSource* tickSource)
     : ServerStatusSection(std::move(name), std::move(role)),
       _tickSource(tickSource),
-      _deletedCollStats(Milliseconds{0}, tickSource) {
-    ECStats zeroStats;
-    ECOCStats zeroECOC;
-
-    _compactStats.setEsc(zeroStats);
-    _compactStats.setEcoc(zeroECOC);
-    _cleanupStats.setEsc(zeroStats);
-    _cleanupStats.setEcoc(zeroECOC);
-}
+      _deletedCollStats(Milliseconds{0}, tickSource) {}
 
 FLEStatusSection& FLEStatusSection::get() {
     return fleStatusSection;
@@ -108,24 +100,6 @@ FLEStatusSection& FLEStatusSection::get() {
 BSONObj FLEStatusSection::generateSection(OperationContext* opCtx,
                                           const BSONElement& configElement) const {
     BSONObjBuilder builder;
-    {
-        CompactStats temp;
-        {
-            stdx::lock_guard<stdx::mutex> lock(_compactMutex);
-            temp = _compactStats;
-        }
-        auto sub = BSONObjBuilder(builder.subobjStart("compactStats"));
-        temp.serialize(&sub);
-    }
-    {
-        CleanupStats temp;
-        {
-            stdx::lock_guard<stdx::mutex> lock(_cleanupMutex);
-            temp = _cleanupStats;
-        }
-        auto sub = BSONObjBuilder(builder.subobjStart("cleanupStats"));
-        temp.serialize(&sub);
-    }
 
     if (gTestingDiagnosticsEnabledAtStartup &&
         gUnsupportedDangerousTestingFLEDiagnosticsEnabledAtStartup) {

@@ -245,7 +245,6 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
             ->getValue(boost::none)
             .getMaxESCEntriesPerCompactionDelete();
     cleanupESCNonAnchors(opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, &stats.getEsc());
-    FLEStatusSection::get().updateCompactionStats(stats);
 
     if (MONGO_unlikely(fleCompactSkipECOCDropUnsharded.shouldFail())) {
         LOGV2(7299612,
@@ -312,6 +311,10 @@ public:
 
     std::set<StringData> sensitiveFieldNames() const final {
         return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
+    }
+
+    bool includeInCommandStats() const final {
+        return false;
     }
 };
 MONGO_REGISTER_COMMAND(CompactStructuredEncryptionDataCmd).forShard();

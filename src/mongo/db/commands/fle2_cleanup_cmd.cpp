@@ -318,7 +318,6 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
           "Done cleaning up the encrypted compaction collection",
           logAttrs(request.getNamespace()));
 
-    FLEStatusSection::get().updateCleanupStats(stats);
     return stats;
 }
 
@@ -367,6 +366,10 @@ public:
 
     std::set<StringData> sensitiveFieldNames() const final {
         return {CleanupStructuredEncryptionData::kCleanupTokensFieldName};
+    }
+
+    bool includeInCommandStats() const final {
+        return false;
     }
 };
 MONGO_REGISTER_COMMAND(CleanupStructuredEncryptionDataCmd).forShard();

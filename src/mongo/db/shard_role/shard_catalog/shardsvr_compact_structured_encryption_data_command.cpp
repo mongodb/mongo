@@ -100,6 +100,10 @@ public:
         return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
     }
 
+    bool includeInCommandStats() const final {
+        return false;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
