@@ -996,12 +996,12 @@ IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
     IndexIntervals intervals) {
-    sbe::value::TagValueOwned boundsGuard{sbe::value::makeNewArray()};
-    auto arr = sbe::value::getArrayView(boundsGuard.value());
+    sbe::value::TagValueOwned bounds{sbe::value::makeNewArray()};
+    auto arr = sbe::value::getArrayView(bounds.value());
     arr->reserve(intervals.size());
     for (auto&& [lowKey, highKey] : intervals) {
-        sbe::value::TagValueOwned guard{sbe::value::makeNewObject()};
-        auto obj = sbe::value::getObjectView(guard.value());
+        sbe::value::TagValueOwned interval{sbe::value::makeNewObject()};
+        auto obj = sbe::value::getObjectView(interval.value());
         obj->reserve(2);
         obj->push_back_raw("l"sv,
                            sbe::value::TypeTags::keyString,
@@ -1009,9 +1009,9 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
         obj->push_back_raw("h"sv,
                            sbe::value::TypeTags::keyString,
                            sbe::value::makeKeyString(std::move(highKey)).second);
-        arr->push_back_raw(guard.releaseToRaw());
+        arr->push_back_raw(interval.releaseToRaw());
     }
-    return boundsGuard.releaseToRaw();
+    return bounds.releaseToRaw();
 }
 
 std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(

@@ -1063,8 +1063,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
 
     auto vsn = static_cast<const VirtualScanNode*>(root);
 
-    sbe::value::TagValueOwned inputGuard{sbe::value::makeNewArray()};
-    auto inputView = sbe::value::getArrayView(inputGuard.value());
+    sbe::value::TagValueOwned input{sbe::value::makeNewArray()};
+    auto inputView = sbe::value::getArrayView(input.value());
 
     if (vsn->docs.size()) {
         inputView->reserve(vsn->docs.size());
@@ -1074,7 +1074,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
         }
     }
 
-    auto [inputTag, inputVal] = inputGuard.releaseToRaw();
+    auto [inputTag, inputVal] = input.releaseToRaw();
 
     // Make a VirtualScanStage, and then make a ProjectStage to unpack the elements of the array
     // produced by the scan.
@@ -4171,15 +4171,15 @@ public:
                 return SbExpr{boundSlot};
             }
             if (unit) {
-                sbe::value::TagValueOwned unitGuard{
+                sbe::value::TagValueOwned unitStr{
                     sbe::value::makeNewString(serializeTimeUnit(*unit))};
-                sbe::value::TagValueOwned timezoneGuard{sbe::value::makeNewString("UTC")};
+                sbe::value::TagValueOwned timezoneStr{sbe::value::makeNewString("UTC")};
                 auto longOffset = genericNumConvert(
                     offset.first, offset.second, sbe::value::TypeTags::NumberInt64);
-                auto unitConstant = b.makeConstant(unitGuard.tag(), unitGuard.value());
-                auto timezoneConstant = b.makeConstant(timezoneGuard.tag(), timezoneGuard.value());
-                unitGuard.disown();
-                timezoneGuard.disown();
+                auto unitConstant = b.makeConstant(unitStr.tag(), unitStr.value());
+                auto timezoneConstant = b.makeConstant(timezoneStr.tag(), timezoneStr.value());
+                unitStr.disown();
+                timezoneStr.disown();
                 return b.makeFunction(sbe::EFn::kDateAdd,
                                       SbSlot{*state.getTimeZoneDBSlot()},
                                       boundSlot,
