@@ -64,6 +64,7 @@ let testCases = {
     _configsvrCommitMergeAllChunksOnShard: {skip: "primary only"},
     _configsvrCommitMergeAllPrecomputedChunksOnShard: {skip: "primary only"},
     _configsvrConfigureCollectionBalancing: {skip: "primary only"},
+    _configsvrConvertShardRefsInNamespaceMetadata: {skip: "primary only"},
     _configsvrMoveRange: {skip: "primary only"},
     _configsvrRemoveShardFromZone: {skip: "primary only"},
     _configsvrResetPlacementHistory: {skip: "primary only"},

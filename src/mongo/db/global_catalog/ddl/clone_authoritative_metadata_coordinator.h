@@ -63,6 +63,15 @@ private:
      */
     void _prepareDbsToClone(OperationContext* opCtx);
 
+
+    /*
+     * Requests to the config server to update any persisted metadata concerning the targeted
+     * namespace so that each existing ShardId reference gets converted into its related shard
+     * UUID.
+     */
+    void _convertShardRefsInNamespaceMetadataInGlobalCatalog(OperationContext* opCtx,
+                                                             const NamespaceString& ns);
+
     /**
      * Clones the metadata for all databases that were marked for cloning to the shard
      * catalog. This function iterates through the list of databases and attempts to clone them

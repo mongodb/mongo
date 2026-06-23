@@ -30,8 +30,11 @@
 
 #include "mongo/db/global_catalog/ddl/clone_authoritative_metadata_coordinator.h"
 
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/ddl/convert_shard_refs_in_namespace_metadata_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -125,6 +128,28 @@ void CloneAuthoritativeMetadataCoordinator::_clone(
     }
 }
 
+void CloneAuthoritativeMetadataCoordinator::_convertShardRefsInNamespaceMetadataInGlobalCatalog(
+    OperationContext* opCtx, const NamespaceString& ns) {
+    if (_doc.getShardIdentificationType() == ShardIdentificationTypeEnum::kShardId) {
+        // The command is currently running under an FCV version that does not support the new
+        // ShardRef format. Skip the conversion.
+        return;
+    }
+
+    ConfigsvrConvertShardRefsInNamespaceMetadata cmd(
+        NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault()));
+    cmd.setDbName(DatabaseName::kAdmin);
+    generic_argument_util::setMajorityWriteConcern(cmd);
+
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::kAdmin,
+            cmd.toBSON(),
+            Shard::RetryPolicy::kIdempotent)));
+}
+
 void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     OperationContext* opCtx,
     const DatabaseName& dbName,
@@ -170,6 +195,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
         opCtx, dbName, "cloneAuthoritativeMetadata"sv, MODE_IX);
 
     {
+        _convertShardRefsInNamespaceMetadataInGlobalCatalog(opCtx, NamespaceString(dbName));
         // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata
         // because 1) we hold the DDL lock, which guarantees that no other conflicting DDL
         // operations are in progress and 2) the clone serves as a refresh from the config server,
@@ -187,6 +213,8 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
         try {
             DDLLockManager::ScopedCollectionDDLLock collLock(
                 opCtx, nss, "cloneAuthoritativeMetadata"sv, MODE_X);
+
+            _convertShardRefsInNamespaceMetadataInGlobalCatalog(opCtx, nss);
 
             sharding_ddl_util::cloneAuthoritativeCollectionMetadataToShards(
                 opCtx,

@@ -10,7 +10,7 @@
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-describe("FCV upgrade/downgrade uuid fields", function () {
+describe("[Dedicated CSRS] FCV upgrade/downgrade uuid fields", function () {
     let st;
 
     before(function () {
@@ -196,7 +196,7 @@ describe("FCV upgrade/downgrade uuid fields", function () {
         verifyShardMetadataOnShardingState(configServer, "config", configServerIdentityDoc.uuid);
     }
 
-    it("[Dedicated CSRS] Should set consistent metadata on FCV upgrade", function () {
+    it("Should set consistent metadata in 'config.shards' on FCV upgrade", function () {
         setupForFCVUpgradeTest(true /* clearExistingUuids */);
         const topologyTimeBeforeUpgrade = getMaxTopologyTimeInConfigShards();
         assert.commandWorked(
@@ -229,7 +229,7 @@ describe("FCV upgrade/downgrade uuid fields", function () {
         checkIndexOnShardUuid(true /* expectedToBePresent */);
     });
 
-    it("[Dedicated CSRS] Pre-existing uuid values should be preserved during an FCV downgrade/upgrade cycle", function () {
+    it("Pre-existing uuid values in 'config.shards' should be preserved during an FCV downgrade/upgrade cycle", function () {
         setupForFCVUpgradeTest(true /* clearExistingUuids */);
 
         // Perform a first upgrade to set uuid fields for each shard.
@@ -255,7 +255,7 @@ describe("FCV upgrade/downgrade uuid fields", function () {
         checkIndexOnShardUuid(true /* expectedToBePresent */);
     });
 
-    it("[Dedicated CSRS] Should drop the uuid_1 index of config.shards on FCV downgrade", function () {
+    it("Should drop the uuid_1 index of config.shards on FCV downgrade", function () {
         assert.commandWorked(
             st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
         );
@@ -264,5 +264,118 @@ describe("FCV upgrade/downgrade uuid fields", function () {
             st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
         );
         checkIndexOnShardUuid(false /* expectedToBePresent */);
+    });
+
+    // TODO SERVER-129221 Re-enable test case.
+    it.skip("Should set consistent UUIDs in shardRef fields of the global catalog on FCV upgrade", function () {
+        const dbName = "testDB";
+        const collName = "coll";
+        const nss = `${dbName}.${collName}`;
+
+        setupForFCVUpgradeTest(true /* clearExistingUuids */);
+
+        // Transition to embedded config server to also cover how its shardRef is updated during the upgrade.
+        assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
+
+        let shardByName = {};
+        for (const shardDoc of st.s.getDB("config").shards.find({}).toArray()) {
+            shardByName[shardDoc._id] = shardDoc;
+        }
+
+        const primaryShardName = (() => {
+            const randomShardIdx = Math.floor(Math.random() * Object.keys(shardByName).length);
+            let visited = 0;
+            for (let shardId of Object.keys(shardByName)) {
+                if (visited === randomShardIdx) {
+                    return shardId;
+                }
+                visited++;
+            }
+        })();
+
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}),
+        );
+
+        const dbDocBefore = st.s.getDB("config").databases.findOne({_id: dbName});
+        assert.neq(null, dbDocBefore, `${dbName} should appear in config.databases`);
+        assert.eq(
+            primaryShardName,
+            dbDocBefore.primary,
+            `config.databases.primary should be the shard name before FCV upgrade`,
+        );
+
+        assert.commandWorked(
+            st.s.adminCommand({
+                shardCollection: nss,
+                key: {_id: "hashed"},
+                numInitialChunks: 4,
+            }),
+        );
+
+        const collUuid = st.s.getDB("config").collections.findOne({_id: nss}).uuid;
+        const chunksBefore = st.s.getDB("config").chunks.find({uuid: collUuid}).toArray();
+        for (const chunk of chunksBefore) {
+            assert(
+                shardByName[chunk.shard] !== undefined,
+                `chunk shard should match a config.shards _id before FCV upgrade for ${nss}`,
+                {chunk},
+            );
+        }
+
+        // Record shard assignments before upgrade for precise post-upgrade verification.
+        const chunkIdToParentShardId = {};
+        for (const chunk of chunksBefore) {
+            chunkIdToParentShardId[tojsononeline(chunk._id)] = chunk.shard;
+        }
+
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+
+        // Recompute the mapping after FCV upgrade.
+        shardByName = {};
+        for (const shardDoc of st.s.getDB("config").shards.find({}).toArray()) {
+            shardByName[shardDoc._id] = shardDoc;
+        }
+
+        // Assert config.databases.primary for testDB is now the UUID of its primary shard.
+        const dbDocAfter = st.s.getDB("config").databases.findOne({_id: dbName});
+        assert.neq(
+            null,
+            dbDocAfter,
+            `${dbName} should still appear in config.databases after FCV upgrade`,
+        );
+        const expectedDbUuid = shardByName[primaryShardName].uuid;
+        assert.neq(
+            undefined,
+            expectedDbUuid,
+            `config.shards should have a uuid for shard ${primaryShardName} after FCV upgrade`,
+        );
+        assertIsUUID(dbDocAfter.primary);
+        assert.eq(
+            expectedDbUuid,
+            dbDocAfter.primary,
+            `config.databases.primary should be updated to the shard UUID after FCV upgrade for ${dbName}`,
+        );
+
+        // Assert each config.chunks shard field for testDB.testColl is now the UUID of its shard.
+        const chunksAfter = st.s.getDB("config").chunks.find({uuid: collUuid}).toArray();
+        assert.eq(4, chunksAfter.length, `expected 4 chunks for ${nss} after FCV upgrade`, {
+            chunksAfter,
+        });
+        for (const chunk of chunksAfter) {
+            const originalShardName = chunkIdToParentShardId[tojsononeline(chunk._id)];
+            const expectedChunkUuid = shardByName[originalShardName].uuid;
+            assertIsUUID(chunk.shard);
+            assert.eq(
+                expectedChunkUuid,
+                chunk.shard,
+                `chunk shard should be updated to UUID of shard ${originalShardName} after FCV upgrade for ${nss}`,
+            );
+        }
+
+        // Drop the converted database to ensure proper test teardown
+        assert.commandWorked(st.s.getDB(dbName).dropDatabase());
     });
 });

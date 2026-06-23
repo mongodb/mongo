@@ -1091,6 +1091,7 @@ const allTestCases = {
         _configsvrCommitReshardCollection: {skip: "TODO"},
         _configsvrCommitShardRemoval: {skip: "runs on the configserver"},
         _configsvrConfigureCollectionBalancing: {skip: "TODO"},
+        _configsvrConvertShardRefsInNamespaceMetadata: {skip: "internal command"},
         _configsvrCreateDatabase: {skip: "TODO"},
         _configsvrEnsureChunkVersionIsGreaterThan: {skip: "TODO"},
         _configsvrGetHistoricalPlacement: {skip: "TODO"},

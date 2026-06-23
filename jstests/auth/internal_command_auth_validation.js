@@ -178,6 +178,10 @@ const internalCommandsMap = {
         testname: "_configsvrConfigureCollectionBalancing",
         command: {_configsvrConfigureCollectionBalancing: "test.x"},
     },
+    _configsvrConvertShardRefsInNamespaceMetadata: {
+        testname: "_configsvrConvertShardRefsInNamespaceMetadata",
+        command: {_configsvrConvertShardRefsInNamespaceMetadata: "test.x"},
+    },
     _configsvrCreateDatabase: {
         testname: "_configsvrCreateDatabase",
         command: {_configsvrCreateDatabase: "test.x", primaryShardId: ""},
