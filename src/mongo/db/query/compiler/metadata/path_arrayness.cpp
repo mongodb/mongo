@@ -58,7 +58,20 @@ bool PathArrayness::isIndexEligibleToAddToPathArrayness(const IndexDescriptor& d
     if (descriptor.isPartial() || descriptor.hidden()) {
         return false;
     }
-    return descriptor.getIndexType() == INDEX_BTREE;
+    if (descriptor.getIndexType() != INDEX_BTREE) {
+        return false;
+    }
+    // Indexes with numeric path components (e.g. {"a.0.x": 1}) cannot be used to reason about
+    // arrayness. A numeric component may access an array element positionally (e.g. a[0]), in which
+    // case the array at the parent component is not recorded as multikey even though it is an
+    // array. Trusting the multikey metadata for such indexes would incorrectly classify the parent
+    // path as non-array. Conservatively exclude these indexes.
+    for (const auto& key : descriptor.keyPattern()) {
+        if (FieldRef(key.fieldNameStringData()).hasNumericPathComponents()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void PathArrayness::addPath(const FieldPath& path,

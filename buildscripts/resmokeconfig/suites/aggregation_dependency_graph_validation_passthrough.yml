@@ -26,8 +26,6 @@ selector:
     - jstests/aggregation/sources/group/groupMissing.js
     # TODO SERVER-127292
     - jstests/aggregation/sbe/sbe_pushdown_replan_reason.js
-    # TODO SERVER-127302
-    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
     # TODO SERVER-127304
     - jstests/aggregation/sources/project/remove_redundant_projects.js
     # TODO SERVER-128465

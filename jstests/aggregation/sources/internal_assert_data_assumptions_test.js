@@ -276,4 +276,33 @@ describe("$_internalAssertDataAssumptions", function () {
             {internalEnableDependencyGraphValidation: true},
         );
     });
+
+    // Regression test for a false-positive arrayness validation failure. An index whose key pattern
+    // contains a numeric path component (e.g. {"a.0.x": 1}) accesses array elements positionally, so
+    // the index is not marked multikey at "a" even when "a" holds an array. The dependency graph's
+    // arrayness analysis (canPathBeArray) must not trust such an index to conclude that "a" cannot be
+    // an array.
+    it("does not fire false positive for numeric path component index over array data", function () {
+        const numericColl = db[jsTestName() + "_numeric_component"];
+        numericColl.drop();
+
+        assert.commandWorked(numericColl.createIndex({"a.0.x": 1}));
+        // "a" holds an array, but the {"a.0.x": 1} index is not multikey at "a" because the numeric
+        // component accesses the array positionally.
+        assert.commandWorked(numericColl.insert({_id: 0, a: [{x: 1}, {x: 2}]}));
+
+        runWithKnobs(
+            db,
+            () => {
+                // With auto-injection enabled, the dependency graph inserts validation stages based
+                // on canPathBeArray(). Before the fix, canPathBeArray("a") incorrectly returned
+                // false, so this query failed with code 12508302.
+                const result = numericColl.aggregate([{$match: {"a.0.x": 1}}]).toArray();
+
+                assert.eq(result.length, 1, "Expected the array document to be returned");
+                assert.eq(result[0]._id, 0);
+            },
+            {internalEnableDependencyGraphValidation: true},
+        );
+    });
 });

@@ -154,7 +154,9 @@ public:
      * column store, etc.) either have unbounded multikey paths, do not expose meaningful array path
      * semantics, or are not used by the query planner in a way that benefits from this structure.
      * Among BTREE indexes, partial indexes (don't cover the full document set) and hidden indexes
-     * (invisible to the query optimizer) are also excluded.
+     * (invisible to the query optimizer) are also excluded. Indexes whose key pattern contains a
+     * numeric path component (e.g. {"a.0.x": 1}) are also excluded, because positional array access
+     * means the multikey metadata does not reliably reflect whether the parent path is an array.
      */
     static bool isIndexEligibleToAddToPathArrayness(const IndexDescriptor& descriptor);
 

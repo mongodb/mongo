@@ -999,4 +999,20 @@ TEST(PathArraynessIndexEligibilityTest, TwoDIsNotEligible) {
     IndexDescriptor desc(IndexNames::GEO_2D, spec);
     ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
 }
+
+TEST(PathArraynessIndexEligibilityTest, NumericPathComponentIsNotEligible) {
+    // An index on "a.0.x" accesses array elements positionally, so its multikey metadata does not
+    // reliably reflect whether "a" is an array. It must not be added to the trie.
+    BSONObj spec = BSON("v" << 2 << "key" << BSON("a.0.x" << 1) << "name" << "a.0.x_1");
+    IndexDescriptor desc(IndexNames::BTREE, spec);
+    ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
+
+TEST(PathArraynessIndexEligibilityTest, NumericPathComponentInCompoundIndexIsNotEligible) {
+    // If any indexed field contains a numeric path component, the whole index is excluded.
+    BSONObj spec =
+        BSON("v" << 2 << "key" << BSON("b" << 1 << "a.0.x" << 1) << "name" << "b_1_a.0.x_1");
+    IndexDescriptor desc(IndexNames::BTREE, spec);
+    ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
 }  // namespace mongo
