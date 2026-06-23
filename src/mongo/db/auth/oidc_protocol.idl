@@ -28,7 +28,8 @@
 
 global:
     cpp_namespace: "mongo::auth"
-    cpp_includes: []
+    cpp_includes:
+        - "mongo/util/net/http_client.h"
     mod_visibility: public
 
 imports:
@@ -56,6 +57,7 @@ structs:
                     the iss of provided access tokens, and be viable for RFC8414
                     metadata discovery and RFC9207 identification.
                 type: string
+                validator: {callback: "HttpClient::endpointIsSecure"}
             clientId:
                 description: "Unique client ID for this OIDC client"
                 type: string

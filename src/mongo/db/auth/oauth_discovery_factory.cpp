@@ -60,8 +60,26 @@ OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(std::string_view
     DataBuilder results = _client->get(openIDConfiguationEndpoint);
     std::string_view textResult =
         uassertStatusOK(results.getCursor().readAndAdvanceNoThrow<std::string_view>());
-    return OAuthAuthorizationServerMetadata::parseOwned(fromjson(textResult),
-                                                        IDLParserContext("metadata"));
+    auto metadata = OAuthAuthorizationServerMetadata::parseOwned(fromjson(textResult),
+                                                                 IDLParserContext("metadata"));
+
+    // RFC 8414 §3.3: "The 'issuer' value returned MUST be identical to the issuer identifier value
+    // into which the well-known URI string was inserted to create the URL used to retrieve the
+    // metadata. If these values are not identical, the data contained in the response MUST NOT be
+    // used." Enforcing this prevents a malicious server from pointing the client at an
+    // attacker-controlled discovery document whose endpoints redirect client-side requests
+    // elsewhere.
+    std::string_view returnedIssuer = metadata.getIssuer();
+    if (returnedIssuer.ends_with('/')) {
+        returnedIssuer.remove_suffix(1);
+    }
+    uassert(ErrorCodes::BadValue,
+            fmt::format("Discovered metadata issuer '{}' does not match the expected issuer '{}'",
+                        returnedIssuer,
+                        issuer),
+            returnedIssuer == issuer);
+
+    return metadata;
 }
 
 }  // namespace mongo

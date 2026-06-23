@@ -169,9 +169,13 @@ TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryIssuerWithFwdSlash) {
     ASSERT_EQ(defaultMetadata, metadata);
 }
 
-TEST_F(OAuthDiscoveryFactoryFixture, IssuerAndJWKSUriMustBeSecure) {
+TEST_F(OAuthDiscoveryFactoryFixture, AllEndpointsMustBeSecure) {
     auto defaultMetadata = makeDefaultMetadata();
 
+    // Every URL advertised in the discovery document must be secure (https, or localhost under
+    // test). A malicious server must not be able to direct the client to make plaintext requests
+    // to an arbitrary host, even for endpoints the server itself does not use (e.g. the token and
+    // device authorization endpoints, which are followed by the client).
     for (const auto& field : defaultMetadata.toBSON()) {
         BSONObj splicedMetadata = [&] {
             BSONObjBuilder builder;
@@ -187,18 +191,7 @@ TEST_F(OAuthDiscoveryFactoryFixture, IssuerAndJWKSUriMustBeSecure) {
             {200, {}, splicedMetadata.jsonString()});
         OAuthDiscoveryFactory factory(std::move(client));
 
-        // If the insecure field is jwks_uri or issuer, then the factory should throw upon
-        // retrieving the well-known document.
-        if (field.fieldName() == "jwks_uri"sv || field.fieldName() == "issuer"sv) {
-            ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
-        } else {
-            // All other endpoints are permitted to not be https since the server will not directly
-            // use them.
-            OAuthAuthorizationServerMetadata precomputedMetadata =
-                OAuthAuthorizationServerMetadata::parse(splicedMetadata,
-                                                        IDLParserContext("metadata"));
-            ASSERT_EQ(precomputedMetadata, factory.acquire("https://idp.example"));
-        }
+        ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
     }
 }
 
@@ -206,6 +199,13 @@ TEST_F(OAuthDiscoveryFactoryFixture, EndpointMayBeInsecureLocalhostUnderTest) {
     auto defaultMetadata = makeDefaultMetadata();
 
     for (const auto& field : defaultMetadata.toBSON()) {
+        // The issuer must continue to match the requested issuer (RFC 8414 §3.3), so changing it to
+        // localhost while requesting https://idp.example is covered separately by
+        // LocalhostIssuerMatchesUnderTest.
+        if (field.fieldName() == "issuer"_sd) {
+            continue;
+        }
+
         BSONObj splicedMetadata = [&] {
             BSONObjBuilder builder;
             builder.append(
@@ -225,6 +225,53 @@ TEST_F(OAuthDiscoveryFactoryFixture, EndpointMayBeInsecureLocalhostUnderTest) {
         OAuthDiscoveryFactory factory(std::move(client));
         ASSERT_EQ(precomputedMetadata, factory.acquire("https://idp.example"));
     }
+}
+
+TEST_F(OAuthDiscoveryFactoryFixture, LocalhostIssuerMatchesUnderTest) {
+    // A localhost issuer is permitted under test as long as the returned metadata issuer matches
+    // the requested issuer.
+    OAuthAuthorizationServerMetadata metadata;
+    metadata.setIssuer("http://localhost:9000"_sd);
+    metadata.setJwksUri("http://localhost:9000/jwks"_sd);
+
+    std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
+    client->expect(
+        {HttpClient::HttpMethod::kGET, "http://localhost:9000/.well-known/openid-configuration"},
+        {200, {}, metadata.toBSON().jsonString()});
+
+    OAuthDiscoveryFactory factory(std::move(client));
+    ASSERT_EQ(metadata, factory.acquire("http://localhost:9000"));
+}
+
+TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryIssuerMustMatchRequestedIssuer) {
+    // RFC 8414 §3.3: a returned metadata issuer that differs from the issuer used to construct the
+    // discovery URL must be rejected, even when it is itself a secure URL. This prevents a
+    // malicious server from redirecting the client to an attacker-controlled discovery document.
+    auto defaultMetadata = makeDefaultMetadata();
+
+    std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
+    client->expect(
+        {HttpClient::HttpMethod::kGET, "https://other.example/.well-known/openid-configuration"},
+        {200, {}, defaultMetadata.toBSON().jsonString()});
+
+    OAuthDiscoveryFactory factory(std::move(client));
+    ASSERT_THROWS(factory.acquire("https://other.example"), DBException);
+}
+
+TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryIssuerMatchesWithTrailingSlashMismatch) {
+    // A trailing slash difference between the requested issuer and the returned metadata issuer is
+    // tolerated; the comparison normalizes a single trailing slash on each side.
+    OAuthAuthorizationServerMetadata metadata;
+    metadata.setIssuer("https://idp.example/"_sd);
+    metadata.setJwksUri(kJWKSUri);
+
+    std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
+    client->expect(
+        {HttpClient::HttpMethod::kGET, "https://idp.example/.well-known/openid-configuration"},
+        {200, {}, metadata.toBSON().jsonString()});
+
+    OAuthDiscoveryFactory factory(std::move(client));
+    ASSERT_EQ(metadata, factory.acquire("https://idp.example"));
 }
 }  // namespace
 }  // namespace mongo
