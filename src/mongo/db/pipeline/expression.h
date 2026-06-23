@@ -1235,6 +1235,13 @@ public:
         return make_intrusive<ExpressionArray>(expCtx, std::move(children));
     }
 
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount("$array");
+        return ExpressionNaryBase<ExpressionArray>::parse(expCtx, bsonExpr, vps);
+    }
+
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 
@@ -1518,6 +1525,14 @@ public:
         : ExpressionVariadic<ExpressionConcatArrays>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount(bsonExpr.fieldNameStringData());
+        return ExpressionNaryBase<ExpressionConcatArrays>::parse(expCtx, bsonExpr, vps);
+    }
+
     const char* getOpName() const final;
 
     Associativity getAssociativity() const final {
@@ -2934,6 +2949,14 @@ public:
         : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount(bsonExpr.fieldNameStringData());
+        return ExpressionNaryBase<ExpressionRange>::parse(expCtx, bsonExpr, vps);
+    }
+
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -3217,6 +3240,14 @@ public:
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount(bsonExpr.fieldNameStringData());
+        return ExpressionNaryBase<ExpressionSetUnion>::parse(expCtx, bsonExpr, vps);
+    }
+
     const char* getOpName() const final;
 
     Associativity getAssociativity() const final {

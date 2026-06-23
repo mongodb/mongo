@@ -678,6 +678,18 @@ server_parameters:
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
 
+  internalQueryMaxMemoryIntensiveExpressions:
+      description: >-
+          Limits the number of memory-intensive aggregation expressions that can appear in a single query.
+      set_at: [startup, runtime]
+      cpp_varname: "internalQueryMaxMemoryIntensiveExpressions"
+      cpp_vartype: AtomicWord<int>
+      default:
+          expr: std::numeric_limits<int>::max()
+      validator:
+          gte: 0
+      redact: false
+
   internalQueryJavaScriptHeapSizeLimitMB:
     description: "Limits the JavaScript heap size used in aggregation. Will defer to the global
     'jsHeapLimitMB' limit if the global limit is smaller."

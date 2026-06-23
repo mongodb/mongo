@@ -510,6 +510,12 @@ public:
      */
     void stopExpressionCounters();
 
+    /**
+     * Increments the memory-intensive expression counter and throws ExceededMemoryLimit if it
+     * exceeds internalQueryMaxMemoryIntensiveExpressions.
+     */
+    void checkAndIncrementMemoryIntensiveExprCount(StringData exprName);
+
     bool expressionCountersAreActive() {
         return static_cast<bool>(_expressionCounters);
     }
@@ -884,6 +890,7 @@ private:
                       const boost::optional<BSONObj>& letParameters = boost::none);
 
     std::unique_ptr<ExpressionCounters> _expressionCounters;
+    uint32_t _memoryIntensiveExprCount = 0;
     bool _gotTemporarilyUnavailableException = false;
 
     // Allows the foreign collection of a lookup to be in a different database than the local
