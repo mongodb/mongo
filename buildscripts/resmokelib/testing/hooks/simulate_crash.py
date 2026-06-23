@@ -159,6 +159,11 @@ class SimulateCrash(bghook.BGHook):
                 if cfg_v
             ]
 
+            node_set_parameters = node.mongod_options.get("set_parameters", {})
+            for ff in config.ENABLED_FEATURE_FLAGS:
+                if ff in node_set_parameters:
+                    extra_configs += ["--setParameter", f"{ff}={node_set_parameters[ff]}"]
+
             mdb = process.Process(
                 self.logger,
                 [
