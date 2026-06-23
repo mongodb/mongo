@@ -14,6 +14,7 @@ import {
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {checkLog} from "src/mongo/shell/check_log.js";
 
 const timeField = "my_time";
 const metaField = "my_meta";
@@ -185,9 +186,15 @@ function testShardingCommandsNotCounted(st) {
 
 // Standalone mongod.
 {
-    const mongod = MongoRunner.runMongod();
+    const mongod = MongoRunner.runMongod({useLogFiles: true});
     try {
         testDirectBucketTargeting({name: "standalone", primaryConn: mongod, otherConns: []});
+        checkLog.containsJson(mongod.fullOptions.logFile, 11259900, {
+            command: "create",
+            appName: "MongoDB Shell",
+            driverName: "MongoDB Internal Client",
+            isRouter: false,
+        });
     } finally {
         MongoRunner.stopMongod(mongod);
     }

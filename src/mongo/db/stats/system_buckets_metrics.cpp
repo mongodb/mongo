@@ -35,6 +35,7 @@
 #include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/version_context.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/string_map.h"
 
 
@@ -87,6 +88,13 @@ void SystemBucketsMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
     const bool isRouter = opCtx->getService()->role().hasExclusively(ClusterRole::RouterServer);
     if (!isInternal) {
         // Only count external commands
+        StringData appName;
+        StringData driverName;
+        if (auto clientMetadata = ClientMetadata::get(opCtx->getClient())) {
+            appName = clientMetadata->getApplicationName();
+            driverName = clientMetadata->getDriverName();
+        }
+
         LOGV2_DEBUG(11259900,
                     _logSuppressor().toInt(),
                     "Received command targeting directly a system buckets namespace",
@@ -94,7 +102,9 @@ void SystemBucketsMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
                     "isRouter"_attr = isRouter,
                     "namespace"_attr = nss.toStringForErrorMsg(),
                     "client"_attr = opCtx->getClient()->clientAddress(true),
-                    "connId"_attr = opCtx->getClient()->getConnectionId());
+                    "connId"_attr = opCtx->getClient()->getConnectionId(),
+                    "appName"_attr = appName,
+                    "driverName"_attr = driverName);
         _commandsExecuted->increment();
     }
 
