@@ -114,11 +114,12 @@ assertValidTimeseriesCollectionInAllNodes({
 });
 
 assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-// Upgrade does not restore 'fixedBucketing'.
-// TODO(SERVER-128095): expect false instead of undefined once upgrade sets it.
+// Upgrade conservatively sets 'fixedBucketing' to false on existing collections
 assertValidTimeseriesCollectionInAllNodes({
     expectViewlessFormat: true,
-    expectedFixedBucketing: undefined,
+    expectedFixedBucketing: FeatureFlagUtil.isPresentAndEnabled(db, "FixedBucketingCatalog")
+        ? false
+        : undefined,
 });
 
 rst.stopSet();

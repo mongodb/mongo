@@ -8,8 +8,8 @@
  *   1. A concurrent $out to the same target: the replacement collection is created with the
  *      creation-time default ('fixedBucketing: true'), so a concurrent $out whose snapshot
  *      captured a different value sees a mismatch.
- *   2. An FCV downgrade: the SERVER-126822 pass strips 'fixedBucketing' from existing
- *      collections; a subsequent upgrade does not re-add it to existing ones.
+ *   2. An FCV downgrade+upgrade cycle: downgrade strips 'fixedBucketing' from existing
+ *      collections; upgrade sets it back to false.
  *
  * The fix is in checkTargetCollectionOptionsMatch (rename_collection.cpp): 'fixedBucketing' is
  * excluded from the shape comparison alongside the existing 'uuid' exclusion.
@@ -170,10 +170,10 @@ jsTestLog("Case 1: concurrent $out changes fixedBucketing on the target");
 // Note: a single downgrade (without re-upgrade) is intentionally not tested
 // here — the viewless→viewful format change trips checkTimeseriesUpgradeDowngrade
 // (error 485) before the options comparison. We test the full down+up cycle
-// because in that interleaving the format reverts to viewless but fixedBucketing
-// is not re-added, so the format-change guard does not fire.
+// because in that interleaving the format reverts to viewless and the upgrade forces
+// fixedBucketing to false, so the format-change guard does not fire.
 // ---------------------------------------------------------------------------
-jsTestLog("Case 2: FCV downgrade+upgrade strips fixedBucketing from the live target");
+jsTestLog("Case 2: FCV downgrade+upgrade forces fixedBucketing to false on the live target");
 {
     setupSource();
 
@@ -191,7 +191,7 @@ jsTestLog("Case 2: FCV downgrade+upgrade strips fixedBucketing from the live tar
     );
 
     const res = runOutWithHook(() => {
-        // Downgrade strips fixedBucketing from the target; upgrade does not re-add it.
+        // Downgrade strips fixedBucketing from the target; upgrade forces it to false.
         assert.commandWorked(
             primary
                 .getDB("admin")
@@ -203,11 +203,12 @@ jsTestLog("Case 2: FCV downgrade+upgrade strips fixedBucketing from the live tar
                 .runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
         );
 
-        // Confirm the strip happened.
+        // Confirm the upgrade forced fixedBucketing to false.
         const infoAfter = testDB.getCollectionInfos({name: outCollName})[0];
-        assert(
-            !infoAfter.options.timeseries.hasOwnProperty("fixedBucketing"),
-            `Expected fixedBucketing stripped after FCV cycle: ${tojson(infoAfter)}`,
+        assert.eq(
+            infoAfter.options.timeseries.fixedBucketing,
+            false,
+            `Expected fixedBucketing: false after FCV cycle: ${tojson(infoAfter)}`,
         );
     });
 

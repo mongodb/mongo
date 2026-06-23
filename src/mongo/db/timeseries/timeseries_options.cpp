@@ -379,9 +379,9 @@ bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& 
     // The fixedBucketing option must match exactly. Treat unset, false, and true as three distinct
     // states.
     // NOTE: in practice, calling code normalizes the 'unset' case for brand-new collections, but
-    // collections converted from legacy timeseries may still have 'unset'.
-    // TODO(SERVER-128095): once upgrade sets 'fixedBucketing' to false on existing collections,
-    // 'unset' should no longer be reachable here and can be asserted away.
+    // legacy timeseries collections still have 'unset'.
+    // TODO(SERVER-127534): assert that 'fixedBucketing' is never unset once support for legacy
+    // timeseries is fully removed (NOTE: some malformed legacy timeseries can survive in FCV 9.0)
     if (option1.getFixedBucketing().has_value() != option2.getFixedBucketing().has_value()) {
         return false;
     }

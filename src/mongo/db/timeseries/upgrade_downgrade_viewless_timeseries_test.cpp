@@ -567,5 +567,54 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeStripsFixedBucketing) {
         << "fixedBucketing must be stripped on downgrade";
 }
 
+/**
+ * A legacy (viewful) collection upgraded to viewless must have fixedBucketing set to false
+ * when featureFlagFixedBucketingCatalog is enabled.
+ */
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeSetsFixedBucketingToFalse) {
+    unittest::ServerParameterGuard fixedBucketingFlag("featureFlagFixedBucketingCatalog", true);
+    auto uuid = createViewfulTimeseriesCollection(nss1);
+
+    auto* opCtx = operationContext();
+    // A legacy collection has no 'fixedBucketing' field.
+    const auto bucketsNssBefore = nss1.makeTimeseriesBucketsNamespace();
+    ASSERT_FALSE(CollectionCatalog::get(opCtx)
+                     ->lookupCollectionByNamespace(opCtx, bucketsNssBefore)
+                     ->getTimeseriesOptions()
+                     ->getFixedBucketing()
+                     .has_value())
+        << "fixedBucketing must be absent on a legacy collection before upgrade";
+
+    unittest::ServerParameterGuard featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    upgradeToViewlessTimeseries(opCtx, nss1);
+
+    assertIsViewlessTimeseries(nss1, uuid);
+
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss1);
+    const auto fixedBucketing = coll->getTimeseriesOptions()->getFixedBucketing();
+    ASSERT_TRUE(fixedBucketing.has_value()) << "fixedBucketing must be set after upgrade";
+    ASSERT_FALSE(fixedBucketing) << "fixedBucketing must be false after upgrade";
+}
+
+/**
+ * When featureFlagFixedBucketingCatalog is disabled, upgrade must leave fixedBucketing unset.
+ */
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeDoesNotSetFixedBucketingWhenFlagOff) {
+    unittest::ServerParameterGuard fixedBucketingFlag("featureFlagFixedBucketingCatalog", false);
+    auto uuid = createViewfulTimeseriesCollection(nss1);
+
+    unittest::ServerParameterGuard featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    upgradeToViewlessTimeseries(operationContext(), nss1);
+
+    assertIsViewlessTimeseries(nss1, uuid);
+
+    auto* opCtx = operationContext();
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss1);
+    ASSERT_FALSE(coll->getTimeseriesOptions()->getFixedBucketing().has_value())
+        << "fixedBucketing must remain unset when featureFlagFixedBucketingCatalog is off";
+}
+
 }  // namespace
 }  // namespace mongo::timeseries

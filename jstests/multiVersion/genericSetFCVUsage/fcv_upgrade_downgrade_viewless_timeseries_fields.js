@@ -2,15 +2,12 @@
  * Tests that config.collections timeseries fields timeseriesBucketsMayHaveMixedSchemaData and
  * fixedBucketing are correctly populated during FCV upgrade and removed during FCV downgrade.
  *
- * TODO(SERVER-128095): populating fixedBucketing on FCV upgrade is not yet implemented; this test
- * currently only covers stripping it on downgrade.
- *
  * Also verifies upgrade-idempotency for `fixedBucketing`: a collection created in FCV 8.0 (before
- * `fixedBucketing` existed) must not have the field set after upgrading to FCV 9.0, and
- * re-creating that collection in FCV 9.0 while omitting `fixedBucketing` must succeed and must
- * not flip the field to true. Similarly verifies downgrade-idempotency: after a downgrade strips
- * the field, re-creating the collection while omitting `fixedBucketing` must succeed and must not
- * resurrect it.
+ * `fixedBucketing` existed) must conservatively adopt `fixedBucketing: false` after upgrading to
+ * FCV 9.0, and re-creating that collection in FCV 9.0 while omitting `fixedBucketing` must succeed
+ * and must not flip the field to true. Similarly verifies downgrade-idempotency: after a downgrade
+ * strips the field, re-creating the collection while omitting `fixedBucketing` must succeed and
+ * must not resurrect it.
  *
  * TODO (SERVER-116499): Remove this file once 9.0 becomes last LTS.
  *
@@ -72,9 +69,18 @@ function testFCVTransition(startFCV, targetFCV) {
     // for both values.
     // NOTE: featureFlagFixedBucketingCatalog is FCV-gated, so this is only enabled at the latest FCV,
     // i.e. effectively only in the downgrade run, where collections are created before downgrading.
-    const fixedBucketingEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "FixedBucketingCatalog");
-    createShardedTimeseries(collNameNoMixed, fixedBucketingEnabled ? {fixedBucketing: false} : {});
-    createShardedTimeseries(collNameMixed, fixedBucketingEnabled ? {fixedBucketing: true} : {});
+    const fixedBucketingEnabledAtCollCreation = FeatureFlagUtil.isPresentAndEnabled(
+        db,
+        "FixedBucketingCatalog",
+    );
+    createShardedTimeseries(
+        collNameNoMixed,
+        fixedBucketingEnabledAtCollCreation ? {fixedBucketing: false} : {},
+    );
+    createShardedTimeseries(
+        collNameMixed,
+        fixedBucketingEnabledAtCollCreation ? {fixedBucketing: true} : {},
+    );
 
     // Set mixed-schema flag to true on one collection via collMod.
     assert.commandWorked(
@@ -83,13 +89,14 @@ function testFCVTransition(startFCV, targetFCV) {
 
     // Verify config.collections state before conversion.
     if (isUpgrade) {
-        // Legacy format: config.collections should NOT have timeseriesBucketsMayHaveMixedSchemaData.
-        // TODO(SERVER-128095): also assert fixedBucketing is absent here once it is populated on upgrade.
+        // Legacy format: config.collections should NOT have timeseriesBucketsMayHaveMixedSchemaData
+        // or fixedBucketing.
         for (const name of [collNameNoMixed, collNameMixed]) {
             const entry = getConfigEntry(name);
             assert(
                 !entry.timeseriesFields.hasOwnProperty("timeseriesBucketsMayHaveMixedSchemaData"),
             );
+            assert(!entry.timeseriesFields.hasOwnProperty("fixedBucketing"));
         }
     } else {
         // Viewless format: config.collections should have timeseriesBucketsMayHaveMixedSchemaData.
@@ -99,7 +106,7 @@ function testFCVTransition(startFCV, targetFCV) {
         const entryMixed = getConfigEntry(collNameMixed);
         assert.eq(true, entryMixed.timeseriesFields.timeseriesBucketsMayHaveMixedSchemaData);
 
-        if (fixedBucketingEnabled) {
+        if (fixedBucketingEnabledAtCollCreation) {
             assert.eq(false, entryNoMixed.timeseriesFields.fixedBucketing);
             assert.eq(true, entryMixed.timeseriesFields.fixedBucketing);
         }
@@ -124,7 +131,8 @@ function testFCVTransition(startFCV, targetFCV) {
 
     // Verify config.collections state after conversion.
     if (isUpgrade) {
-        // After upgrade to viewless: collNoMixed should have field=false, collMixed should have field=true.
+        // After upgrade to viewless: collNoMixed should have field=false, collMixed should have
+        // field=true.
         const entryNoMixed = getConfigEntry(collNameNoMixed);
         assert.eq(false, entryNoMixed.timeseriesFields.timeseriesBucketsMayHaveMixedSchemaData);
 
@@ -132,7 +140,20 @@ function testFCVTransition(startFCV, targetFCV) {
         const entryMixed = getConfigEntry(collNameMixed);
         assert.eq(true, entryMixed.timeseriesFields.timeseriesBucketsMayHaveMixedSchemaData);
 
-        // TODO(SERVER-128095): once fixedBucketing is populated on upgrade, assert it here too.
+        // On upgrade, collections created in FCV 8.0 (no fixedBucketing) adopt fixedBucketing=false
+        // conservatively. When the flag is disabled the field stays absent.
+        const fixedBucketingEnabledAfterUpgrade = FeatureFlagUtil.isPresentAndEnabled(
+            db,
+            "FixedBucketingCatalog",
+        );
+
+        if (fixedBucketingEnabledAfterUpgrade) {
+            assert.eq(false, entryNoMixed.timeseriesFields.fixedBucketing);
+            assert.eq(false, entryMixed.timeseriesFields.fixedBucketing);
+        } else {
+            assert(!entryNoMixed.timeseriesFields.hasOwnProperty("fixedBucketing"));
+            assert(!entryMixed.timeseriesFields.hasOwnProperty("fixedBucketing"));
+        }
     } else {
         // After downgrade to legacy: viewless-only fields must be stripped from config.collections.
         for (const name of [collNameNoMixed, collNameMixed]) {
@@ -140,9 +161,7 @@ function testFCVTransition(startFCV, targetFCV) {
             assert(
                 !entry.timeseriesFields.hasOwnProperty("timeseriesBucketsMayHaveMixedSchemaData"),
             );
-            if (fixedBucketingEnabled) {
-                assert(!entry.timeseriesFields.hasOwnProperty("fixedBucketing"));
-            }
+            assert(!entry.timeseriesFields.hasOwnProperty("fixedBucketing"));
         }
     }
 
@@ -165,14 +184,14 @@ const fixedBucketingFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
     /* ignoreFCV */ true,
 );
 
-// Test upgrade-idempotency for fixedBucketing: a collection created in FCV 8.0 must not gain
-// fixedBucketing=true after upgrading to FCV 9.0, and re-creating it without specifying
-// fixedBucketing must succeed (idempotent) and leave the field unset.
+// Test upgrade-idempotency for fixedBucketing: a collection created in FCV 8.0 must have
+// fixedBucketing=false (not true) after upgrading to FCV 9.0, and re-creating it without
+// specifying fixedBucketing must succeed (idempotent) and leave the field as false.
 if (fixedBucketingFlagEnabled) {
     jsTest.log.info(
         "Testing fixedBucketing upgrade-idempotency: collection created in lastLTSFCV " +
-            "must not have fixedBucketing set after upgrade, and re-creating it without " +
-            "fixedBucketing must leave the field absent.",
+            "must have fixedBucketing=false after upgrade, and re-creating it without " +
+            "fixedBucketing must leave the field as false.",
     );
 
     const collName = "ts_fixedbucketing_idempotency";
@@ -185,29 +204,31 @@ if (fixedBucketingFlagEnabled) {
     );
     createShardedTimeseries(collName);
 
-    // Upgrade to latestFCV. The upgrade path does NOT set fixedBucketing on existing collections.
+    // Upgrade to latestFCV. The upgrade path sets fixedBucketing=false conservatively on
+    // existing collections, since we cannot prove their buckets are fixed.
     assert.commandWorked(
         adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
     );
 
-    // Assert that fixedBucketing is absent after upgrade (the field must not be set to true or
-    // false by the upgrade procedure).
+    // Assert that fixedBucketing is false after upgrade (not true, not absent).
     const entryAfterUpgrade = getConfigEntry(collName);
-    assert(
-        !entryAfterUpgrade.timeseriesFields.hasOwnProperty("fixedBucketing"),
-        "fixedBucketing must not be set on a collection created in lastLTSFCV after upgrading to latestFCV",
+    assert.eq(
+        false,
+        entryAfterUpgrade.timeseriesFields.fixedBucketing,
+        "fixedBucketing must be false on a collection created in lastLTSFCV after upgrading to latestFCV",
         {timeseriesFieldsAfterUpgrade: entryAfterUpgrade.timeseriesFields},
     );
 
     // Re-create the collection via createCollection, omitting fixedBucketing. In FCV 9.0 a brand
-    // new collection would default fixedBucketing=true, but this collection already exists with the
-    // field absent, so the idempotent re-creation must not flip it to true.
+    // new collection would default fixedBucketing=true, but this collection already exists with
+    // fixedBucketing=false, so the idempotent re-creation must not flip it to true.
     assert.commandWorked(db.createCollection(collName, {timeseries: tsOpts}));
 
     const entryAfterRecreate = getConfigEntry(collName);
-    assert(
-        !entryAfterRecreate.timeseriesFields.hasOwnProperty("fixedBucketing"),
-        "fixedBucketing must remain absent after idempotent re-creation of a collection " +
+    assert.eq(
+        false,
+        entryAfterRecreate.timeseriesFields.fixedBucketing,
+        "fixedBucketing must remain false after idempotent re-creation of a collection " +
             "that was originally created in lastLTSFCV",
         {timeseriesFieldsAfterRecreate: entryAfterRecreate.timeseriesFields},
     );

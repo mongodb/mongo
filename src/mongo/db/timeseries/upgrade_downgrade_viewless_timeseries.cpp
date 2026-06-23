@@ -327,6 +327,14 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
                                                           BSONObj() /* newValidator */,
                                                           boost::none /* validationLevel */,
                                                           boost::none /* validatorAction */));
+
+            // Conservatively set the viewless-only 'fixedBucketing' option to false: a legacy
+            // collection predates this option, so we cannot prove its buckets are fixed.
+            if (gFeatureFlagFixedBucketingCatalog.isEnabled(VersionContext::getDecoration(opCtx))) {
+                auto options = *writableColl->getTimeseriesOptions();
+                options.setFixedBucketing(false);
+                writableColl->setTimeseriesOptions(opCtx, options);
+            }
         }
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.

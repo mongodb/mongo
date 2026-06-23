@@ -103,6 +103,10 @@ void populateTimeseriesFields(OperationContext* opCtx,
     // state into the global catalog.
     tsFields.setTimeseriesBucketsMayHaveMixedSchemaData(
         coll->getTimeseriesMixedSchemaBucketsState().mustConsiderMixedSchemaBucketsInReads());
+
+    // Mirror the shard-local 'fixedBucketing' state into the global catalog (false when the
+    // upgrade set it, unset when the feature is disabled).
+    tsFields.setFixedBucketing(coll->getTimeseriesOptions()->getFixedBucketing());
 }
 
 }  // namespace
