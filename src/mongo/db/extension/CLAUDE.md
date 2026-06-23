@@ -105,7 +105,7 @@ into pipeline of other stages during parsing).
 
 ### API Versioning
 
-Uses MAJOR.MINOR (current: `0.1`). At startup, the host passes supported versions to
+Uses MAJOR.MINOR (current: `1.0`). At startup, the host passes supported versions to
 `get_mongodb_extension`; the extension negotiates a compatible version. MAJOR must match; host
 minor >= extension minor. The server supports two major versions simultaneously (N and N-1). Minor
 bumps add default SDK implementations; major bumps maintain frozen old API header snapshots.

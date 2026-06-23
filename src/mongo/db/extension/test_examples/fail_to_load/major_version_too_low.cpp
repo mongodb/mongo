@@ -37,9 +37,8 @@ public:
     void initialize(const sdk::HostPortalHandle& portal) override {}
 };
 
-// Major version is one less than the currently-supported version (wraps to UINT32_MAX when the
-// supported major is 0). Host-side negotiation rejects in phase 1, so this adapter is never
-// instantiated in the current host order.
+// Major version is one less than the currently-supported version. Host-side negotiation rejects in
+// phase 1, so this adapter is never instantiated in the current host order.
 REGISTER_EXTENSION_WITH_VERSION(MyExtension,
                                 (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_VERSION.major - 1,
                                                             0}))
