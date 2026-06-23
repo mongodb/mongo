@@ -173,6 +173,18 @@ void ExpressionContext::stopExpressionCounters() {
     _expressionCounters.reset();
 }
 
+void ExpressionContext::checkAndIncrementMemoryIntensiveExprCount(StringData exprName) {
+    ++_memoryIntensiveExprCount;
+    const auto limit =
+        static_cast<uint32_t>(internalQueryMaxMemoryIntensiveExpressions.loadRelaxed());
+    uassert(12876600,
+            str::stream() << "Pipeline contains too many memory-intensive expressions. " << exprName
+                          << " caused the count to reach " << _memoryIntensiveExprCount
+                          << ", which exceeds the limit of " << limit
+                          << " (internalQueryMaxMemoryIntensiveExpressions).",
+            _memoryIntensiveExprCount <= limit);
+}
+
 void ExpressionContext::initializeReferencedSystemVariables() {
     if (_systemVarsReferencedInQuery.contains(Variables::kNowId) &&
         !variables.hasValue(Variables::kNowId)) {

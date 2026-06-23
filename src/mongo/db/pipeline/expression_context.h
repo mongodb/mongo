@@ -441,6 +441,12 @@ public:
      */
     void stopExpressionCounters();
 
+    /**
+     * Increments the memory-intensive expression counter and throws ExceededMemoryLimit if it
+     * exceeds internalQueryMaxMemoryIntensiveExpressions.
+     */
+    void checkAndIncrementMemoryIntensiveExprCount(StringData exprName);
+
     bool expressionCountersAreActive() const {
         return static_cast<bool>(_expressionCounters);
     }
@@ -1299,6 +1305,7 @@ protected:
 
 private:
     std::unique_ptr<ExpressionCounters> _expressionCounters;
+    uint32_t _memoryIntensiveExprCount = 0;
     bool _gotTemporarilyUnavailableException = false;
 
     bool _isCappedDelete = false;

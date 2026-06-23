@@ -1605,6 +1605,7 @@ boost::intrusive_ptr<ExpressionObject> ExpressionObject::create(
 intrusive_ptr<ExpressionObject> ExpressionObject::parse(ExpressionContext* const expCtx,
                                                         BSONObj obj,
                                                         const VariablesParseState& vps) {
+    expCtx->checkAndIncrementMemoryIntensiveExprCount("$object"_sd);
     // Make sure we don't have any duplicate field names.
     stdx::unordered_set<string> specifiedFields;
 
@@ -3695,6 +3696,7 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
             str::stream() << "$zip only supports an object as an argument, found "
                           << typeName(expr.type()),
             expr.type() == BSONType::object);
+    expCtx->checkAndIncrementMemoryIntensiveExprCount(expr.fieldNameStringData());
 
     auto useLongestLength = false;
     std::vector<boost::intrusive_ptr<Expression>> children;

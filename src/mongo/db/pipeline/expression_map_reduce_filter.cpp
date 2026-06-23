@@ -69,8 +69,9 @@ boost::intrusive_ptr<Expression> ExpressionMap::parse(ExpressionContext* const e
                                                       BSONElement expr,
                                                       const VariablesParseState& vpsIn) {
     MONGO_verify(expr.fieldNameStringData() == "$map");
-
     uassert(16878, "$map only supports an object as its argument", expr.type() == BSONType::object);
+    expCtx->checkAndIncrementMemoryIntensiveExprCount(expr.fieldNameStringData());
+
 
     const bool isExposeArrayIndexEnabled = expCtx->shouldParserIgnoreFeatureFlagCheck() ||
         feature_flags::gFeatureFlagExposeArrayIndexInMapFilterReduce
@@ -193,6 +194,7 @@ boost::intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* cons
             str::stream() << "$reduce requires an object as an argument, found: "
                           << typeName(expr.type()),
             expr.type() == BSONType::object);
+    expCtx->checkAndIncrementMemoryIntensiveExprCount(expr.fieldNameStringData());
 
     const bool isExposeArrayIndexEnabled = expCtx->shouldParserIgnoreFeatureFlagCheck() ||
         feature_flags::gFeatureFlagExposeArrayIndexInMapFilterReduce

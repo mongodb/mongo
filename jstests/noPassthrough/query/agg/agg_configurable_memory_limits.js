@@ -182,4 +182,40 @@ assert.commandWorked(bulk.execute());
     }
 })();
 
+(function testInternalQueryMaxMemoryIntensiveExpressions() {
+    // Pipeline covering all 9 tracked memory-intensive expressions:
+    //   $addFields stage: $range (1)
+    //   $project stage:   $range (2), $map (3), $reduce (4), $concatArrays (5),
+    //                     $setUnion (6), $zip (7), $array literal (8), $object literal (9)
+    // The $addFields stage creates an array field so downstream expressions can reference it
+    // via "$arr" instead of introducing extra tracked sub-expressions.
+    // $array is triggered by the [1, 2, 3] literal inside $arrayElemAt's argument list.
+    // $object is triggered by the {a: "$y"} literal passed as the $mergeObjects argument.
+    const pipeline = [
+        {$addFields: {arr: {$range: [0, 3]}}},
+        {
+            $project: {
+                ranged: {$range: [0, 5]},
+                mapped: {$map: {input: "$arr", as: "x", in: "$$x"}},
+                reduced: {
+                    $reduce: {input: "$arr", initialValue: 0, in: {$add: ["$$value", "$$this"]}},
+                },
+                concat: {$concatArrays: ["$arr", "$arr"]},
+                union: {$setUnion: ["$arr", "$arr"]},
+                zipped: {$zip: {inputs: ["$arr", "$arr"]}},
+                firstOfArr: {$arrayElemAt: [[1, 2, 3], 0]},
+                merged: {$mergeObjects: {a: "$y"}},
+            },
+        },
+    ];
+
+    // Verify the pipeline works at the default limit.
+    assert.doesNotThrow(() => coll.aggregate(pipeline));
+
+    // Set limit below expression count (9) to trigger the error at parse time.
+    const originalVal = setParam("internalQueryMaxMemoryIntensiveExpressions", 8);
+    assert.throwsWithCode(() => coll.aggregate(pipeline), 12876600);
+    setParam("internalQueryMaxMemoryIntensiveExpressions", originalVal);
+})();
+
 MongoRunner.stopMongod(conn);
