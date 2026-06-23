@@ -312,7 +312,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingVerificationDeltaWaitRemainingCriticalSectionPercent
         default:
-            expr: 80
+            expr: 50
         validator:
             gte: 0
             lte: 100

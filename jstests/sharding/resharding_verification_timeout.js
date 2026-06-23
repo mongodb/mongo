@@ -21,8 +21,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const kCsmStallFailpoint = "hangReshardingChangeStreamsMonitorBeforeStarting";
-const kDefaultVerificationPercent = 80;
-// Exceeds the ciritical section deadline so the timeout is what ends the coordinator's wait for CSM on donor and recipients.
+// Exceeds the critical section deadline so the timeout is what ends the coordinator's wait for CSM on donor and recipients.
 const kFetchHangTimeMS = 6 * 1000;
 
 function setVerificationTimeoutPercent(reshardingTest, percent) {
@@ -83,6 +82,13 @@ const reshardingTest = new ReshardingTest({
     criticalSectionTimeoutMS: 5000,
 });
 reshardingTest.setup();
+
+const kDefaultVerificationPercent = assert.commandWorked(
+    reshardingTest._st.configRS.getPrimary().adminCommand({
+        getParameter: 1,
+        reshardingVerificationDeltaWaitRemainingCriticalSectionPercent: 1,
+    }),
+).reshardingVerificationDeltaWaitRemainingCriticalSectionPercent;
 
 jsTestLog(
     "Stall the donor's change-streams monitor and verify resharding still commits because " +
