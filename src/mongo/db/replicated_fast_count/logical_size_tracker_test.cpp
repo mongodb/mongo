@@ -96,8 +96,16 @@ TEST_F(LogicalSizeTrackerTest, SnapshotHotOnly) {
     tracker.refreshLatestSnapshot_ForTest(operationContext());
 
     const auto snapshot = tracker.getLatestSnapshot();
-    ASSERT_EQ(snapshot.logicalBytesHot, 300);
-    ASSERT_EQ(snapshot.logicalBytesCold, 0);
+    ASSERT_EQ(snapshot.getLogicalBytesHot(), 300);
+    ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
+}
+
+TEST_F(LogicalSizeTrackerTest, SnapshotVersionMatchesIDLDefault) {
+    LogicalSizeTracker tracker;
+    tracker.refreshLatestSnapshot_ForTest(operationContext());
+
+    const auto snapshot = tracker.getLatestSnapshot();
+    ASSERT_EQ(snapshot.getVersion(), LogicalSizeSnapshot{}.getVersion());
 }
 
 TEST_F(LogicalSizeTrackerTest, SnapshotSumsCollectionsAcrossDatabases) {
@@ -110,8 +118,8 @@ TEST_F(LogicalSizeTrackerTest, SnapshotSumsCollectionsAcrossDatabases) {
     tracker.refreshLatestSnapshot_ForTest(operationContext());
 
     const auto snapshot = tracker.getLatestSnapshot();
-    ASSERT_EQ(snapshot.logicalBytesHot, 300);
-    ASSERT_EQ(snapshot.logicalBytesCold, 0);
+    ASSERT_EQ(snapshot.getLogicalBytesHot(), 300);
+    ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
 
 TEST_F(LogicalSizeTrackerTest, SnapshotColdOnly) {
@@ -128,8 +136,8 @@ TEST_F(LogicalSizeTrackerTest, SnapshotColdOnly) {
     tracker.refreshLatestSnapshot_ForTest(operationContext());
 
     const auto snapshot = tracker.getLatestSnapshot();
-    ASSERT_EQ(snapshot.logicalBytesHot, 0);
-    ASSERT_EQ(snapshot.logicalBytesCold, 300);
+    ASSERT_EQ(snapshot.getLogicalBytesHot(), 0);
+    ASSERT_EQ(snapshot.getLogicalBytesCold(), 300);
 }
 
 TEST_F(LogicalSizeTrackerTest, SnapshotHotAndCold) {
@@ -144,8 +152,8 @@ TEST_F(LogicalSizeTrackerTest, SnapshotHotAndCold) {
     tracker.refreshLatestSnapshot_ForTest(operationContext());
 
     const auto snapshot = tracker.getLatestSnapshot();
-    ASSERT_EQ(snapshot.logicalBytesHot, 100);
-    ASSERT_EQ(snapshot.logicalBytesCold, 200);
+    ASSERT_EQ(snapshot.getLogicalBytesHot(), 100);
+    ASSERT_EQ(snapshot.getLogicalBytesCold(), 200);
 }
 
 TEST_F(LogicalSizeTrackerTest, OplogWritesContributeToHotBytes) {
@@ -177,8 +185,8 @@ TEST_F(LogicalSizeTrackerTest, OplogWritesContributeToHotBytes) {
     const auto after = tracker.getLatestSnapshot();
 
     // The oplog is hot by default, so only the hot bucket should change.
-    ASSERT_EQ(after.logicalBytesCold, before.logicalBytesCold);
-    ASSERT_EQ(after.logicalBytesHot - before.logicalBytesHot, expectedOplogDelta);
+    ASSERT_EQ(after.getLogicalBytesCold(), before.getLogicalBytesCold());
+    ASSERT_EQ(after.getLogicalBytesHot() - before.getLogicalBytesHot(), expectedOplogDelta);
 }
 
 TEST_F(LogicalSizeTrackerTest, SnapshotIncludesTimeseriesBuckets) {
@@ -195,8 +203,8 @@ TEST_F(LogicalSizeTrackerTest, SnapshotIncludesTimeseriesBuckets) {
     tracker.refreshLatestSnapshot_ForTest(operationContext());
 
     const auto snapshot = tracker.getLatestSnapshot();
-    ASSERT_EQ(snapshot.logicalBytesHot, 300);
-    ASSERT_EQ(snapshot.logicalBytesCold, 0);
+    ASSERT_EQ(snapshot.getLogicalBytesHot(), 300);
+    ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
 
 TEST_F(LogicalSizeTrackerTest, EmptyCollectionsReportZeroSize) {
@@ -209,8 +217,8 @@ TEST_F(LogicalSizeTrackerTest, EmptyCollectionsReportZeroSize) {
     tracker.refreshLatestSnapshot_ForTest(operationContext());
 
     const auto snapshot = tracker.getLatestSnapshot();
-    ASSERT_EQ(snapshot.logicalBytesHot, 0);
-    ASSERT_EQ(snapshot.logicalBytesCold, 0);
+    ASSERT_EQ(snapshot.getLogicalBytesHot(), 0);
+    ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
 
 TEST_F(LogicalSizeTrackerTest, NegativeSizeCollectionTreatedAsZero) {
@@ -221,8 +229,8 @@ TEST_F(LogicalSizeTrackerTest, NegativeSizeCollectionTreatedAsZero) {
     tracker.refreshLatestSnapshot_ForTest(operationContext());
 
     const auto snapshot = tracker.getLatestSnapshot();
-    ASSERT_EQ(snapshot.logicalBytesHot, 0);
-    ASSERT_EQ(snapshot.logicalBytesCold, 0);
+    ASSERT_EQ(snapshot.getLogicalBytesHot(), 0);
+    ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
 
 TEST_F(LogicalSizeTrackerTest, NegativeSizeExcludedFromPositiveTotal) {
@@ -235,8 +243,8 @@ TEST_F(LogicalSizeTrackerTest, NegativeSizeExcludedFromPositiveTotal) {
     tracker.refreshLatestSnapshot_ForTest(operationContext());
 
     const auto snapshot = tracker.getLatestSnapshot();
-    ASSERT_EQ(snapshot.logicalBytesHot, 100);
-    ASSERT_EQ(snapshot.logicalBytesCold, 0);
+    ASSERT_EQ(snapshot.getLogicalBytesHot(), 100);
+    ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
 
 using LogicalSizeTrackerDeathTest = LogicalSizeTrackerTest;

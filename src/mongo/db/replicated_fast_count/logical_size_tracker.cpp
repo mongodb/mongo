@@ -48,7 +48,7 @@ bool isColdStorageTier(StorageEngine* storageEngine, const CollectionOptions& op
 
 }  // namespace
 
-LogicalSizeTracker::Snapshot LogicalSizeTracker::getLatestSnapshot() const {
+LogicalSizeSnapshot LogicalSizeTracker::getLatestSnapshot() const {
     return _latestSnapshot;
 }
 
@@ -59,11 +59,12 @@ void LogicalSizeTracker::_refreshLatestSnapshot(OperationContext* opCtx) {
     auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
     invariant(storageEngine);
 
-    Snapshot newSnapshot{};
+    int64_t logicalBytesHot = 0;
+    int64_t logicalBytesCold = 0;
 
     for (const auto& dbName : dbNames) {
         for (const auto& coll : catalog->range(dbName)) {
-            const auto collBytes = coll->dataSize(opCtx);
+            const int64_t collBytes = coll->dataSize(opCtx);
             if (collBytes < 0) {
                 LOGV2_WARNING(12894101,
                               "Collection reported negative data logical bytes for collection; "
@@ -74,8 +75,7 @@ void LogicalSizeTracker::_refreshLatestSnapshot(OperationContext* opCtx) {
             }
 
             const bool isCold = isColdStorageTier(storageEngine, coll->getCollectionOptions());
-            auto& tierTotalBytes =
-                isCold ? newSnapshot.logicalBytesCold : newSnapshot.logicalBytesHot;
+            auto& tierTotalBytes = isCold ? logicalBytesCold : logicalBytesHot;
 
             const auto tierPreviousTotal = tierTotalBytes;
             if (MONGO_unlikely(overflow::add(tierPreviousTotal, collBytes, &tierTotalBytes))) {
@@ -88,6 +88,11 @@ void LogicalSizeTracker::_refreshLatestSnapshot(OperationContext* opCtx) {
             }
         }
     }
+
+    LogicalSizeSnapshot newSnapshot;
+    newSnapshot.setLogicalBytesHot(logicalBytesHot);
+    newSnapshot.setLogicalBytesCold(logicalBytesCold);
+    // Version implicitly set to IDL defined default.
 
     _latestSnapshot = newSnapshot;
 }

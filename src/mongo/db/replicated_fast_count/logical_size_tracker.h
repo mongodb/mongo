@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/replicated_fast_count/logical_size_snapshot_gen.h"
 
 namespace mongo {
 
@@ -39,20 +40,12 @@ namespace mongo {
 class LogicalSizeTracker {
 public:
     /**
-     * A snapshot of the current total bytes across hot and cold collections.
-     */
-    struct Snapshot {
-        long long logicalBytesHot{0};
-        long long logicalBytesCold{0};
-    };
-
-    /**
      * Returns a snapshot of the total logical bytes for hot and cold collections across the
      * node.
      *
      * Avoids excessive locking beyond taking the GlobalLock. Results are subject to staleness.
      */
-    Snapshot getLatestSnapshot() const;
+    LogicalSizeSnapshot getLatestSnapshot() const;
 
     void refreshLatestSnapshot_ForTest(OperationContext* opCtx) {
         _refreshLatestSnapshot(opCtx);
@@ -68,7 +61,7 @@ private:
     /**
      * TODO SERVER-128941: Introduced concurrency control and background job semantics.
      */
-    Snapshot _latestSnapshot;
+    LogicalSizeSnapshot _latestSnapshot;
 };
 
 }  // namespace mongo
