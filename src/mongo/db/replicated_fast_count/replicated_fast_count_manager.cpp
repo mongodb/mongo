@@ -92,8 +92,7 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
                 acquireFastCountCollectionForRead(opCtx).has_value());
     }
 
-    // Only applies to the new write path, but done outside the lifecycle mutex since it incurs I/O.
-    const auto lastPersistedCheckpointTS = [&] {
+    const Timestamp lastPersistedCheckpointTS = [&] {
         Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
         return _timestampStore->read(opCtx).value_or(Timestamp{});
     }();
@@ -105,18 +104,14 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
         return oplogColl->uuid();
     }();
 
-    std::lock_guard lock(_lifecycleMutex);
+    std::lock_guard lock(_checkpointerMutex);
 
-    // FCV upgrade sometimes calls startup() while already running. The idempotency check and
-    // state assignment are one atomic critical section under _lifecycleMutex.
-    if (_backgroundThread.joinable() || _checkpointer) {
+    if (_checkpointer) {
         LOGV2(12542400, "ReplicatedFastCountManager already running; skipping startup");
         return;
     }
 
-    LOGV2(12051100, "Starting up ReplicatedFastCountManager thread");
-    ObservableMutexRegistry::get().add("ReplicatedFastCountManager::_lifecycleMutex",
-                                       _lifecycleMutex);
+    LOGV2(12051100, "Starting up ReplicatedFastCountManager checkpoint coordinator");
     _checkpointer = std::make_unique<SizeCountCheckpointCoordinator>(
         *_sizeCountStore, *_timestampStore, _metrics, oplogUuid);
     if (!_isUnderTest) {
@@ -129,59 +124,36 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
 void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     LOGV2(11648800, "Shutting down ReplicatedFastCountManager");
 
-    // Move both lifecycle resources out under one lock acquisition. After the lock is released,
-    // _checkpointer and _backgroundThread are null/non-joinable: concurrent flushAsync() calls
-    // see a stopped state immediately, and any idempotent re-entry into shutdown() finds nothing
-    // to claim.
     std::unique_ptr<SizeCountCheckpointCoordinator> checkpointer;
-    stdx::thread backgroundThread;
     {
-        std::lock_guard lock(_lifecycleMutex);
+        std::lock_guard lock(_checkpointerMutex);
         checkpointer = std::move(_checkpointer);
-        backgroundThread = std::move(_backgroundThread);
-        if (backgroundThread.joinable()) {
-            _isEnabled.store(false);
+        if (!checkpointer) {
+            return;
         }
     }
 
-    if (checkpointer) {
-        if (!_isUnderTest) {
-            checkpointer->shutdown();
-            // Final synchronous flush after checkpointer threads have stopped.
-            try {
-                advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
-            } catch (const DBException& ex) {
-                if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
-                    ex.code() == ErrorCodes::NotWritablePrimary) {
-                    LOGV2_DEBUG(12101806,
-                                2,
-                                "ReplicatedFastCountManager final checkpoint flush interrupted",
-                                "error"_attr = ex.toStatus());
-                } else {
-                    LOGV2_WARNING(12101807,
-                                  "ReplicatedFastCountManager failed to flush on shutdown",
-                                  "error"_attr = ex.toStatus());
-                }
+    if (!_isUnderTest) {
+        checkpointer->shutdown();
+        // Final synchronous flush after checkpoint coordinator threads have stopped.
+        try {
+            advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
+                ex.code() == ErrorCodes::NotWritablePrimary) {
+                LOGV2_DEBUG(12101806,
+                            2,
+                            "ReplicatedFastCountManager final checkpoint flush interrupted",
+                            "error"_attr = ex.toStatus());
+            } else {
+                LOGV2_WARNING(12101807,
+                              "ReplicatedFastCountManager failed to flush on shutdown",
+                              "error"_attr = ex.toStatus());
             }
         }
-        LOGV2(12101800, "ReplicatedFastCountManager stopped");
-        _metrics.setIsRunning(false);
-        return;
     }
 
-    if (!backgroundThread.joinable()) {
-        LOGV2(12150400,
-              "ReplicatedFastCountManager background thread is not running; skipping shutdown");
-        return;
-    }
-
-    // _isEnabled was set false under _lifecycleMutex above; notify so the thread observes it.
-    _backgroundThreadReadyForFlush.notify_one();
-    backgroundThread.join();
-
-    _doFlush(opCtx);
-
-    LOGV2(11751501, "ReplicatedFastCountManager stopped");
+    LOGV2(12101800, "ReplicatedFastCountManager stopped");
     _metrics.setIsRunning(false);
 }
 
@@ -430,55 +402,26 @@ boost::optional<Timestamp> ReplicatedFastCountManager::findPersistedTimestampSto
 }
 
 void ReplicatedFastCountManager::flushAsync() {
-    {
-        std::lock_guard lock(_lifecycleMutex);
-        if (_checkpointer) {
-            // Hold _lifecycleMutex through requestFlush() so shutdown() cannot destroy
-            // _checkpointer between the null-check and the call.
-            _checkpointer->requestFlush();
-            return;
-        }
+    std::lock_guard lock(_checkpointerMutex);
+    if (_checkpointer) {
+        _checkpointer->requestFlush();
     }
-    std::lock_guard lock(_flushMutex);
-    _flushRequested = true;
-    _backgroundThreadReadyForFlush.notify_one();
 }
 
 void ReplicatedFastCountManager::flushSync_ForTest(OperationContext* opCtx) {
-    {
-        std::lock_guard lock(_lifecycleMutex);
-        if (_checkpointer) {
-            try {
-                _checkpointer->flushSync_ForTest(opCtx);
-            } catch (const DBException& ex) {
-                if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
-                    ex.code() == ErrorCodes::NotWritablePrimary) {
-                    return;
-                }
-                LOGV2_WARNING(12101810,
-                              "Failed to persist collection sizeCount metadata",
-                              "error"_attr = ex.toStatus());
-            }
-            return;
-        }
-    }
-
-    if (MONGO_unlikely(hangAfterReplicatedFastCountSnapshot.shouldFail())) {
-        hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
-    }
-
-    _doFlush(opCtx);
+    std::lock_guard lock(_checkpointerMutex);
+    invariant(_checkpointer, "flushSync_ForTest() requires startup() to have been called");
+    _checkpointer->flushSync_ForTest(opCtx);
 }
 
 void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
-    invariant(!_backgroundThread.joinable(),
-              "Background thread started running before disabling periodic metadata writes");
+    invariant(!_checkpointer, "flushSync_ForTest() requires startup() to have been called");
     _isUnderTest = true;
 }
 
 bool ReplicatedFastCountManager::isRunning_ForTest() {
-    std::lock_guard lock(_lifecycleMutex);
-    return _checkpointer || _backgroundThread.joinable();
+    std::lock_guard lock(_checkpointerMutex);
+    return _checkpointer && _checkpointer->isRunning_ForTest();
 }
 
 bool ReplicatedFastCountManager::usesContainers_ForTest() const {
@@ -488,85 +431,6 @@ bool ReplicatedFastCountManager::usesContainers_ForTest() const {
 std::pair<SizeCountStore*, SizeCountTimestampStore*>
 ReplicatedFastCountManager::getSizeCountStores_ForTest() const {
     return {_sizeCountStore.get(), _timestampStore.get()};
-}
-
-void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx) {
-    // Flushing the logical size and count metadata checkpoint is an internal maintenance operation
-    // that should not be blocked by admission control. Metadata checkpoint persistence requires
-    // traversing the oplog since the last metadata checkpoint and must not fall behind to prevent
-    // compounding lag.
-    ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
-        opCtx, AdmissionContext::Priority::kExempt);
-    try {
-        const Date_t startTime = Date_t::now();
-
-        if (MONGO_unlikely(failDuringFlush.shouldFail())) {
-            uasserted(12311500, "Injected failure in _doFlush for testing");
-        }
-
-        hangBeforePersistingNewFastCountEntries.pauseWhileSet();
-
-        const size_t entryWriteCount = advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
-
-        // Failpoint used in testing for:
-        // 1. indicating a flush has completed
-        // 2. (optionally) elongating the duration of a flush.
-        sleepAfterFlush.execute([](const BSONObj& data) {
-            if (auto elem = data["sleepMs"]; elem) {
-                sleepmillis(elem.numberInt());
-            }
-        });
-
-        recordFlush(startTime, entryWriteCount);
-    } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
-            ex.code() == ErrorCodes::NotWritablePrimary) {
-            LOGV2_DEBUG(11905701,
-                        2,
-                        "ReplicatedFastCountManager iteration interrupted due to "
-                        "replication state",
-                        "error"_attr = ex.toStatus());
-            return;
-        }
-
-        _metrics.incrementFlushFailureCount();
-        LOGV2_WARNING(12311501,
-                      "Failed to persist collection sizeCount metadata",
-                      "error"_attr = ex.toStatus());
-    }
-}
-
-void ReplicatedFastCountManager::_startBackgroundThread(ServiceContext* svcCtx) {
-    ThreadClient tc(_threadName, svcCtx->getService());
-    AuthorizationSession::get(cc())->grantInternalAuthorization();
-    try {
-        _flushPeriodicallyOnSignal();
-    } catch (const DBException& ex) {
-        LOGV2_WARNING(11648806,
-                      "Failure in thread",
-                      "threadName"_attr = _threadName,
-                      "error"_attr = ex.toStatus());
-    }
-
-    LOGV2(11648804, "ReplicatedFastCountManager exited");
-}
-
-void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
-    while (_isEnabled.load()) {
-        {
-            std::unique_lock lock(_flushMutex);
-            _backgroundThreadReadyForFlush.wait(
-                lock, [this] { return _flushRequested || !_isEnabled.load(); });
-            _flushRequested = false;
-            // If the condition variable was signalled during shutdown, we can exit early.
-            if (!_isEnabled.load()) {
-                break;
-            }
-        }
-
-        auto opCtx = cc().makeOperationContext();
-        _doFlush(opCtx.get());
-    }
 }
 
 UUID ReplicatedFastCountManager::_UUIDForKey(const RecordId key) const {

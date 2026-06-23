@@ -184,18 +184,6 @@ protected:
     unittest::ServerParameterGuard _ffDurability{"featureFlagReplicatedFastCountDurability", false};
 };
 
-TEST_F(ReplicatedFastCountManagerLegacyMetricsTest,
-       LifecycleMutexRegisteredWithObservableMutexRegistry) {
-    _fastCountManager->flushSync_ForTest(operationContext());
-
-    const BSONObj report = ObservableMutexRegistry::get().report(false);
-    const std::string_view name = "ReplicatedFastCountManager::_lifecycleMutex";
-    EXPECT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
-    const BSONObj exclusive =
-        report.getObjectField(name).getObjectField(ObservableMutexRegistry::kExclusiveFieldName);
-    EXPECT_GT(exclusive.getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName), 0);
-}
-
 TEST_F(ReplicatedFastCountManagerMetricsTest, IsRunningGaugeSetByStartup) {
     EXPECT_EQ(_capturer.readInt64Gauge(MetricNames::kReplicatedFastCountIsRunning), 1);
 }

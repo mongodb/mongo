@@ -30,7 +30,6 @@
 #pragma once
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -40,14 +39,9 @@
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_coordinator.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/flush_all_files_observer.h"
-#include "mongo/db/storage/snapshot.h"
-#include "mongo/platform/atomic.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/uuid.h"
 
 #include <mutex>
@@ -60,8 +54,9 @@
 namespace mongo::replicated_fast_count {
 
 /**
- * Singleton `ServiceContext` decoration that facilitates committing and flushing replicated
- * collection size and count changes.
+ * Singleton `ServiceContext` decoration that facilitates initializing and committing collection
+ * size and counts. This class also manages the lifetime of the background threads used for
+ * writing collection size and count to disk.
  *
  * Terminology:
  * - Collection "count" refers to the number of documents in a collection.
@@ -114,19 +109,18 @@ public:
     void initializeFastCountCommitFn();
 
     /**
-     * Spawns fastcount thread.
-     * Skips running thread when _isUnderTest.
+     * Creates the checkpoint coordinator and starts its background threads. Skips starting the
+     * coordinator's threads when _isUnderTest is true.
      *
-     * This function is idempotent when the background thread is already running. See implementation
-     * for more details.
+     * This function is idempotent when the coordinator is already running.
      */
     void startup(OperationContext* opCtx);
 
     /**
-     * Signals fastcount thread to stop and flushes final changes synchronously.
+     * Signals the checkpoint coordinator to stop and flushes final changes synchronously.
      *
-     * This function is idempotent since we cannot gaurantee that the background thread is joinable
-     * during shutdown(). See implementation for more details.
+     * This function is idempotent since shutdown() may be called when the coordinator was never
+     * started or has already been shut down.
      */
     void shutdown(OperationContext* opCtx);
 
@@ -177,10 +171,7 @@ public:
         OperationContext* opCtx, UUID uuid) const;
 
     /**
-     * Signals the background thread to perform a flush.
-     *
-     * This flush involves snapshotting and writing dirty in-memory SizeCounts to the internal
-     * fastcount collection on disk.
+     * Signals the checkpointer thread to perform a flush.
      */
     void flushAsync();
 
@@ -208,7 +199,7 @@ public:
     void disablePeriodicWrites_ForTest();
 
     /**
-     * Returns true if the fastcount thread is running.
+     * Returns true if the checkpoint coordinator has been started and not yet shut down.
      */
     bool isRunning_ForTest();
 
@@ -225,23 +216,6 @@ public:
     std::pair<SizeCountStore*, SizeCountTimestampStore*> getSizeCountStores_ForTest() const;
 
 private:
-    /**
-     * Centralized point for flushing logic.
-     */
-    void _doFlush(OperationContext* opCtx);
-
-    /**
-     * Runs background thread, performing final flush.
-     */
-    void _startBackgroundThread(ServiceContext* svcCtx);
-
-    /**
-     * Flushes updates to size and count when signalled.
-     * Sleeps on a condition variable - _backgroundThreadReadyForFlush - waiting for _flushRequested
-     * to be true.
-     */
-    void _flushPeriodicallyOnSignal();
-
     using SizeCountAccumulator = absl::flat_hash_map<UUID, CollectionSizeCount>;
 
     /**
@@ -267,27 +241,7 @@ private:
     // one ReplicatedFastCountManager per mongod process.
     static inline ReplicatedFastCountMetrics _metrics;
 
-    std::string_view _threadName = "replicatedSizeCount"_sd;
-    stdx::thread _backgroundThread;
-    Atomic<bool> _isEnabled = false;
-    stdx::condition_variable _backgroundThreadReadyForFlush;
     bool _isUnderTest = false;  // Used to force synchronous writes in tests.
-
-    /**
-     * Guards _checkpointer, _backgroundThread, and _isEnabled across startup(), shutdown(), and
-     * flushAsync(). Holding this lock through the idempotency check + state assignment in startup()
-     * and through the move-to-claim in shutdown() makes those transitions self-protecting — no
-     * reliance on external FCV/replication lock ordering for memory safety.
-     *
-     * Lock ordering: _lifecycleMutex is never acquired while _flushMutex is held. They are always
-     * acquired separately, never nested.
-     */
-    mutable ObservableMutex<std::mutex> _lifecycleMutex;
-
-    /**
-     * Guarded by _lifecycleMutex.
-     */
-    std::unique_ptr<SizeCountCheckpointCoordinator> _checkpointer;
 
     /**
      * Interface for reads / writes to the fast count metadata store.
@@ -300,11 +254,15 @@ private:
     std::unique_ptr<SizeCountTimestampStore> _timestampStore;
 
     /**
-     * Synchronizes the background flush thread with `flushAsync()` and `shutdown()`. Guards
-     * `_flushRequested` and is paired with `_backgroundThreadReadyForFlush`.
+     * Guards _checkpointer.
      */
-    mutable ObservableMutex<std::mutex> _flushMutex;
-    bool _flushRequested = false;  // Prevents spurious wakeups.
+    mutable std::mutex _checkpointerMutex;
+
+    /**
+     * Maintains the oplog tailer and checkpoint flusher threads. The lifetime of _checkpointer
+     * is equal to one primary term.
+     */
+    std::unique_ptr<SizeCountCheckpointCoordinator> _checkpointer;
 };
 
 }  // namespace mongo::replicated_fast_count
