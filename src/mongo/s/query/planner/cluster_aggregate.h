@@ -41,9 +41,9 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/modules.h"
@@ -134,7 +134,7 @@ public:
         AggregateCommandRequest& request,
         const LiteParsedPipeline& liteParsedPipeline,
         const PrivilegeVector& privileges,
-        boost::optional<ResolvedView> resolvedView,
+        boost::optional<ResolvedNamespace> resolvedView,
         boost::optional<AggregateCommandRequest> originalRequest,
         boost::optional<ExplainOptions::Verbosity> verbosity,
         BSONObjBuilder* result,
@@ -159,7 +159,7 @@ public:
     [[deprecated]] static Status retryOnViewOrIFRKickbackError(
         OperationContext* opCtx,
         const AggregateCommandRequest& request,
-        const std::variant<ResolvedView, IFRFlagRetryInfo>& errInfo,
+        const std::variant<ResolvedNamespace, IFRFlagRetryInfo>& errInfo,
         const NamespaceString& requestedNss,
         const PrivilegeVector& privileges,
         boost::optional<ExplainOptions::Verbosity> verbosity,

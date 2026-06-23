@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
@@ -56,7 +57,6 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -320,7 +320,7 @@ public:
                         result,
                         *cmdRequestForShards,
                         query->getExpCtx()->getQuerySettings(),
-                        *ex.extraInfo<ResolvedView>(),
+                        *ex.extraInfo<ResolvedNamespace>(),
                         // An empty PrivilegeVector is acceptable because these privileges
                         // are only checked on getMore and explain will not open a cursor.
                         {},
@@ -372,7 +372,7 @@ public:
             rpc::ReplyBuilderInterface* result,
             const FindCommandRequest& findCommand,
             const query_settings::QuerySettings& querySettings,
-            const ResolvedView& resolvedView,
+            const ResolvedNamespace& resolvedView,
             const PrivilegeVector& privileges,
             boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
             auto bodyBuilder = result->getBodyBuilder();

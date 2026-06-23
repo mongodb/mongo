@@ -73,6 +73,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
@@ -122,7 +123,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/views/pipeline_resolver.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -914,7 +914,7 @@ void setupViewContext(const AggExState& aggExState,
     auto* opCtx = expCtx->getOperationContext();
     search_helpers::checkAndSetViewOnExpCtx(expCtx,
                                             aggExState.getOriginalLiteParsedPipeline(),
-                                            aggExState.getResolvedView(),
+                                            aggExState.getResolvedNamespace(),
                                             aggExState.getOriginalNss());
 
     if (aggExState.isHybridSearchPipeline()) {
@@ -940,11 +940,12 @@ void setupViewContext(const AggExState& aggExState,
         // situation where a stage desugars into a $unionWith that runs on a different view as
         // the top-level query view), so we gate this call to only happen during Hybrid Search
         // queries.
-        expCtx->addResolvedNamespace(aggExState.getOriginalNss(),
-                                     ResolvedNamespace(aggExState.getResolvedView().getNamespace(),
-                                                       aggExState.getResolvedView().getPipeline(),
-                                                       aggCatalogState.getUUID(),
-                                                       true /*involvedNamespaceIsAView*/));
+        expCtx->addResolvedNamespace(
+            aggExState.getOriginalNss(),
+            ResolvedNamespace(aggExState.getResolvedNamespace().getResolvedNamespace(),
+                              aggExState.getResolvedNamespace().getBsonPipeline(),
+                              aggCatalogState.getUUID(),
+                              true /*involvedNamespaceIsAView*/));
     }
 }
 
@@ -1037,7 +1038,7 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
     // rewrites.
     // TODO SERVER-101599 remove this code once 9.0 becomes last LTS. By then only viewless
     // timeseries collections will exist.
-    if (aggExState.isView() && aggExState.getResolvedView().isTimeseries()) {
+    if (aggExState.isView() && aggExState.getResolvedNamespace().isTimeseries()) {
         return SecondParseRequirement::kReparseFromBson;
     }
 
@@ -1053,7 +1054,7 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
                 11856001, 4, "Skipping view pipeline prepend because this is a mongot query");
             PipelineResolver::validateStagesOnView(
                 desugaredLPP,
-                aggExState.getResolvedView(),
+                aggExState.getResolvedNamespace(),
                 aggExState.getOriginalNss(),
                 uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())),
                 LiteParserOptions{.ifrContext = aggExState.getIfrContext()});
@@ -1068,7 +1069,7 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
         // `additionalResolvedNamespaces` map.
         PipelineResolver::insertTopLevelViewEntry(resolvedNamespaces,
                                                   aggExState.getOriginalNss(),
-                                                  aggExState.getResolvedView(),
+                                                  aggExState.getResolvedNamespace(),
                                                   aggCatalogState.getIfrContext());
     }
 
@@ -1405,11 +1406,11 @@ Status executeResolvedAggregate(const AggExState& aggExState,
  */
 Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolvedViewAggExState,
                                  rpc::ReplyBuilderInterface* result) {
-    auto resolvedView = resolvedViewAggExState->getResolvedView();
+    auto resolvedView = resolvedViewAggExState->getResolvedNamespace();
 
     auto* opCtx = resolvedViewAggExState->getOpCtx();
     const auto& originalNss = resolvedViewAggExState->getOriginalNss();
-    const auto& underlyingNss = resolvedView.getNamespace();
+    const auto& underlyingNss = resolvedView.getResolvedNamespace();
 
     // Stash the shard role for the resolved view nss, in case it was set, as we are about to
     // transition into the router role for it.
@@ -1512,7 +1513,7 @@ Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
 
     // Under featureFlagExtensionsInsideHybridSearch, if the request came from a router, proactively
     // resolve the transitive closure of sub-pipeline namespaces and — if any resolve to a view —
-    // throw a ResolvedView so mongos reparses with view expansions inlined and re-dispatches.
+    // throw a ResolvedNamespace so mongos reparses with view expansions inlined and re-dispatches.
     // Otherwise this is a no-op (legacy per-namespace resolution during ExpressionContext
     // construction handles it). See the method comment for the fold-top-level-view behavior.
     aggCatalogState->maybeProactivelyResolveInvolvedNamespaces(*aggExState);

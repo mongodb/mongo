@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/query_shape/count_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape_hash.h"
@@ -56,7 +57,6 @@
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/views/pipeline_resolver.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
@@ -354,7 +354,7 @@ public:
                                 query_request_conversion::asAggregateCommandRequest(
                                     originalCountRequest);
 
-                            const ResolvedView& resolvedView = *ex.extraInfo<ResolvedView>();
+                            const auto& resolvedView = *ex.extraInfo<ResolvedNamespace>();
                             auto resolvedAggRequest =
                                 PipelineResolver::buildRequestWithResolvedPipeline(
                                     expCtx->getIfrContext(), resolvedView, aggRequestOnView);
@@ -581,7 +581,7 @@ public:
                         return ClusterAggregate::retryOnViewOrIFRKickbackError(
                             opCtx,
                             aggRequestOnView,
-                            *ex.extraInfo<ResolvedView>(),
+                            *ex.extraInfo<ResolvedNamespace>(),
                             nss,
                             PrivilegeVector(),
                             verbosity,

@@ -40,10 +40,10 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/pipeline/resolved_namespace.h"  // IWYU pragma: keep
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/views/resolved_view.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 
 #include <string_view>
@@ -613,7 +613,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
             const std::vector<BSONObj>& resolvedViewPipe =
                 (e->isTimeseries() && isRawDataOperation(pExpCtx->getOperationContext()))
                 ? std::vector<BSONObj>{}
-                : e->getPipeline();
+                : e->getBsonPipeline();
 
             // The exception owns the BSONObjs in resolvedViewPipe; they are freed when 'e' goes
             // out of scope at catch-block exit. Construct _params.fromLpp from those stages now,
@@ -621,8 +621,8 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
             // view definition rather than re-throwing.
             LiteParserOptions lppOpts;
             lppOpts.ifrContext = _fromExpCtx->getIfrContext();
-            _params.fromLpp.emplace(e->getNamespace(), resolvedViewPipe, lppOpts);
-            _fromExpCtx = makeCopyFromExpressionContext(_fromExpCtx, e->getNamespace());
+            _params.fromLpp.emplace(e->getResolvedNamespace(), resolvedViewPipe, lppOpts);
+            _fromExpCtx = makeCopyFromExpressionContext(_fromExpCtx, e->getResolvedNamespace());
             _fromExpCtx->addResolvedNamespaces((*_params.fromLpp)->getInvolvedNamespaces());
 
             // Preserve the storage-site invariant: _params.fromLpp is always stored desugared.
@@ -633,8 +633,9 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                 3,
                 "$graphLookup found view definition. ns: {namespace}, pipeline: {pipeline}. "
                 "New $graphLookup sub-pipeline: {new_pipe}",
-                logAttrs(e->getNamespace()),
-                "pipeline"_attr = mongo::Pipeline::serializePipelineForLogging(e->getPipeline()),
+                logAttrs(e->getResolvedNamespace()),
+                "pipeline"_attr =
+                    mongo::Pipeline::serializePipelineForLogging(e->getBsonPipeline()),
                 "new_pipe"_attr = mongo::Pipeline::serializePipelineForLogging(resolvedViewPipe));
         }
     }

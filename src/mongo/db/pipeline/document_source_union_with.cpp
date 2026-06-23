@@ -51,13 +51,13 @@
 #include "mongo/db/pipeline/lite_parsed_union_with.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -160,8 +160,8 @@ MONGO_COMPILER_NOINLINE void logShardedViewFound(
                 3,
                 "$unionWith found view definition. ns: {namespace}, pipeline: {pipeline}. New "
                 "$unionWith sub-pipeline: {new_pipe}",
-                logAttrs(e->getNamespace()),
-                "pipeline"_attr = Value(e->getPipeline()),
+                logAttrs(e->getResolvedNamespace()),
+                "pipeline"_attr = Value(e->getBsonPipeline()),
                 "new_pipe"_attr = pipeline);
 }
 
@@ -266,7 +266,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         // This takes care of the case where this code is executing on mongos and we had to get the
         // view pipeline from a shard.
         // We set the resolvedUnionNs from the execption view defintion.
-        resolvedUnionNs = ResolvedNamespace{e->getNamespace(), e->getPipeline()};
+        resolvedUnionNs = ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()};
         _sharedState = std::make_shared<UnionWithSharedState>(
             parsePipelineWithMaybeViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
             nullptr,
@@ -350,7 +350,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         }
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
         logShardedViewFound(e, userPipeline);
-        resolvedUnionNs = ResolvedNamespace{e->getNamespace(), e->getPipeline()};
+        resolvedUnionNs = ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()};
         // Fall back to BSON-based parsing for the sharded view case since the view pipeline
         // is discovered dynamically from the exception and needs full re-parsing.
         _sharedState = std::make_shared<UnionWithSharedState>(
@@ -647,10 +647,11 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
                 // Update pipelineContextColl to the resolved underlying collection so that the
                 // $unionWith.coll field in the explain output reflects the actual execution
                 // namespace rather than the view name.
-                pipelineContextColl = Value(opts.serializeIdentifier(e->getNamespace().coll()));
+                pipelineContextColl =
+                    Value(opts.serializeIdentifier(e->getResolvedNamespace().coll()));
                 auto resolvedPipeline = parsePipelineWithMaybeViewDefinition(
                     getExpCtx(),
-                    ResolvedNamespace{e->getNamespace(), e->getPipeline()},
+                    ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()},
                     std::move(serializedPipe),
                     _userNss);
                 return preparePipelineAndExplain(std::move(resolvedPipeline));

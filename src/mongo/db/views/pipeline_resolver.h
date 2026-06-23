@@ -35,9 +35,9 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -56,7 +56,7 @@ public:
      */
     static AggregateCommandRequest buildRequestWithResolvedPipeline(
         const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
-        const ResolvedView& resolvedView,
+        const ResolvedNamespace& resolvedView,
         const AggregateCommandRequest& request);
 
     /**
@@ -67,7 +67,7 @@ public:
      * featureFlagExtensionsInsideHybridSearch is fully rolled out.
      */
     static void applyViewToLiteParsed(LiteParsedPipeline* userLPP,
-                                      const ResolvedView& resolvedView,
+                                      const ResolvedNamespace& resolvedView,
                                       const NamespaceString& viewNss,
                                       const ResolvedNamespaceMap& resolvedNamespaces,
                                       const LiteParserOptions& options = LiteParserOptions{});
@@ -78,7 +78,7 @@ public:
      * resolution itself, but subsequent extension stages still need view validation.
      */
     static void validateStagesOnView(LiteParsedPipeline* userLPP,
-                                     const ResolvedView& resolvedView,
+                                     const ResolvedNamespace& resolvedView,
                                      const NamespaceString& viewNss,
                                      const ResolvedNamespaceMap& resolvedNamespaces,
                                      const LiteParserOptions& options = LiteParserOptions{});
@@ -105,7 +105,7 @@ public:
     static void insertTopLevelViewEntry(
         ResolvedNamespaceMap& resolvedNamespaces,
         const NamespaceString& requestedNss,
-        const ResolvedView& resolvedView,
+        ResolvedNamespace resolvedView,
         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
 
     using MakeExpressionContextFn = std::function<boost::intrusive_ptr<ExpressionContext>(
@@ -159,7 +159,7 @@ public:
     static MongosViewRequestResult buildResolvedMongosViewRequest(
         OperationContext* opCtx,
         const AggregateCommandRequest& request,
-        const boost::optional<ResolvedView>& resolvedView,
+        const boost::optional<ResolvedNamespace>& resolvedView,
         const NamespaceString& requestedNss,
         boost::optional<ExplainOptions::Verbosity> verbosity,
         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,

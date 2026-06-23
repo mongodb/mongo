@@ -147,10 +147,10 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
     return liteParsedPipeline.getInvolvedNamespaces();
 }
 
-StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
-                                     std::shared_ptr<const CollectionCatalog> catalog,
-                                     const NamespaceString& nss,
-                                     boost::optional<BSONObj> timeSeriesCollator) {
+StatusWith<ResolvedNamespace> resolveView(OperationContext* opCtx,
+                                          std::shared_ptr<const CollectionCatalog> catalog,
+                                          const NamespaceString& nss,
+                                          boost::optional<BSONObj> timeSeriesCollator) {
     // Points to the name of the most resolved namespace.
     const NamespaceString* resolvedNss = &nss;
 
@@ -195,16 +195,17 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
             auto curOp = CurOp::get(opCtx);
             curOp->debug().addResolvedViews(dependencyChain, resolvedPipeline);
 
-            return StatusWith<ResolvedView>(
+            return StatusWith<ResolvedNamespace>(
                 {nss,
                  *resolvedNss,
                  std::move(resolvedPipeline),
                  collation ? std::move(collation.value()) : CollationSpec::kSimpleSpec,
-                 tsOptions,
-                 mixedData,
-                 hasExtendedRange,
-                 fixedBuckets,
-                 isNewTimeseriesWithoutView});
+                 ResolvedNamespaceViewOptions{
+                     .timeseriesMetadata =
+                         TimeseriesViewMetadata{
+                             tsOptions, mixedData, hasExtendedRange, fixedBuckets},
+                     .validateIsNotViewlessTimeseries = true,
+                     .isViewlessTimeseries = isNewTimeseriesWithoutView}});
         }
 
         lastViewDefinition = view;
@@ -250,7 +251,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
             auto curOp = CurOp::get(opCtx);
             curOp->debug().addResolvedViews(dependencyChain, resolvedPipeline);
 
-            return StatusWith<ResolvedView>(
+            return StatusWith<ResolvedNamespace>(
                 {nss, *resolvedNss, std::move(resolvedPipeline), std::move(collation.value())});
         }
     }

@@ -26,7 +26,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "resolved_view",
     srcs = [
-        "resolved_view.cpp",
+        "resolved_namespace_timeseries.cpp",
     ],
     deps = [
         "//src/mongo:base",

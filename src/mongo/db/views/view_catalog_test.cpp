@@ -40,6 +40,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -60,7 +61,6 @@
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/db/views/view_graph.h"
@@ -767,7 +767,7 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
                                      BSON("$match" << BSON("foo" << 2)),
                                      BSON("$match" << BSON("foo" << 3))};
 
-    std::vector<BSONObj> result = resolvedView.getValue().getPipeline();
+    std::vector<BSONObj> result = resolvedView.getValue().getBsonPipeline();
 
     ASSERT_EQ(expected.size(), result.size());
 
@@ -784,8 +784,8 @@ TEST_F(ViewCatalogFixture, ResolveViewOnCollectionNamespace) {
     auto resolvedView = uassertStatusOK(view_catalog_helpers::resolveView(
         operationContext(), getCatalog(), collectionNamespace, boost::none));
 
-    ASSERT_EQ(resolvedView.getNamespace(), collectionNamespace);
-    ASSERT_EQ(resolvedView.getPipeline().size(), 0U);
+    ASSERT_EQ(resolvedView.getResolvedNamespace(), collectionNamespace);
+    ASSERT_EQ(resolvedView.getBsonPipeline().size(), 0U);
 }
 
 TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
@@ -808,11 +808,11 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
         view_catalog_helpers::resolveView(operationContext(), getCatalog(), view2, boost::none);
     ASSERT(resolvedView.isOK());
 
-    ASSERT_EQ(resolvedView.getValue().getNamespace(), viewOn);
+    ASSERT_EQ(resolvedView.getValue().getResolvedNamespace(), viewOn);
 
     std::vector<BSONObj> expected = {BSON("$match" << BSON("foo" << 1)),
                                      BSON("$match" << BSON("foo" << 2))};
-    std::vector<BSONObj> result = resolvedView.getValue().getPipeline();
+    std::vector<BSONObj> result = resolvedView.getValue().getBsonPipeline();
     ASSERT_EQ(expected.size(), result.size());
     for (uint32_t i = 0; i < expected.size(); i++) {
         ASSERT(SimpleBSONObjComparator::kInstance.evaluate(expected[i] == result[i]));

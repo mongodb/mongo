@@ -35,10 +35,10 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/resolved_namespace.h"  // IWYU pragma: keep
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/views/resolved_view.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 
 #include <string_view>
@@ -84,8 +84,8 @@ MONGO_COMPILER_NOINLINE void logShardedViewFound(
                 3,
                 "$unionWith found view definition. ns: {namespace}, pipeline: {pipeline}. New "
                 "$unionWith sub-pipeline: {new_pipe}",
-                logAttrs(e->getNamespace()),
-                "pipeline"_attr = Value(e->getPipeline()),
+                logAttrs(e->getResolvedNamespace()),
+                "pipeline"_attr = Value(e->getBsonPipeline()),
                 "new_pipe"_attr = new_pipeline.serializeToBson());
 }
 
@@ -136,7 +136,7 @@ GetNextResult UnionWithStage::doGetNext() {
             // definition instead, and we attempt to prepare it again.
             _sharedState->_pipeline = DocumentSourceUnionWith::parsePipelineWithMaybeViewDefinition(
                 pExpCtx,
-                ResolvedNamespace{e->getNamespace(), e->getPipeline()},
+                ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()},
                 std::move(serializedPipeline),
                 _userNss);
             logShardedViewFound(e, *_sharedState->_pipeline);

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,55 +29,21 @@
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 
-#include "mongo/db/views/resolved_view.h"
-
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
-#include <string_view>
-
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ResolvedView);
-
-ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
-    return ResolvedView(ResolvedNamespace::fromBSON(commandResponseObj));
-}
-
-void ResolvedView::serialize(BSONObjBuilder* builder) const {
-    _wrappedNamespace.serialize(builder);
-}
-
-std::shared_ptr<const ErrorExtraInfo> ResolvedView::parse(const BSONObj& cmdReply) {
-    return std::make_shared<ResolvedView>(fromBSON(cmdReply));
-}
-
-ResolvedView ResolvedView::parseFromBSON(const BSONElement& elem) {
-    return ResolvedView(ResolvedNamespace::parseFromBSON(elem));
-}
-
-void ResolvedView::serializeToBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
-    serialize(builder);
-}
-
-void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const {
+void ResolvedNamespace::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const {
     // Stages that are constrained to be the first stage of the pipeline ($collStats, $indexStats)
     // require special handling since $_internalUnpackBucket is the first stage.
     if (resolvedPipeline->size() >= 2 &&
@@ -129,7 +95,7 @@ void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipelin
              unpackStage[DocumentSourceInternalUnpackBucket::kStageNameInternal].Obj()) {
             builder.append(elem);
         }
-        auto timeseriesMetadata = _wrappedNamespace.getTimeseriesViewMetadata();
+        auto timeseriesMetadata = getTimeseriesViewMetadata();
         if (timeseriesMetadata.has_value()) {
             builder.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
                            (timeseriesMetadata->mayContainMixedData &&
@@ -148,7 +114,7 @@ void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipelin
     }
 }
 
-boost::optional<BSONObj> ResolvedView::rewriteIndexHintForTimeseries(
+boost::optional<BSONObj> ResolvedNamespace::rewriteIndexHintForTimeseries(
     const BSONObj& originalHint) const {
     if (!isTimeseries()) {
         return boost::none;
@@ -160,7 +126,7 @@ boost::optional<BSONObj> ResolvedView::rewriteIndexHintForTimeseries(
     }
 
     auto converted = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-        _wrappedNamespace.getTimeseriesViewMetadata()->options.value(), originalHint);
+        getTimeseriesViewMetadata()->options.value(), originalHint);
     if (converted.isOK()) {
         return converted.getValue();
     }

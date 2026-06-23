@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/util/deferred.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/modules.h"
 
@@ -271,7 +271,7 @@ public:
         return false;
     }
 
-    virtual const ResolvedView& getResolvedView() const {
+    virtual const ResolvedNamespace& getResolvedNamespace() const {
         MONGO_UNREACHABLE;
     }
 
@@ -390,10 +390,10 @@ public:
     }
 
     /**
-     * Returns the resolved view attached to the class.
+     * Returns the resolved namespace attached to the class.
      */
-    const ResolvedView& getResolvedView() const override {
-        return _resolvedView;
+    const ResolvedNamespace& getResolvedNamespace() const override {
+        return _resolvedNamespace;
     }
 
     ScopedSetShardRole setShardRole(const CollectionRoutingInfo& cri);
@@ -421,7 +421,7 @@ private:
     // request. This variable will never be reassigned after construction.
     const std::unique_ptr<AggregateRequestDerivatives> _originalAggReqDerivatives;
 
-    ResolvedView _resolvedView;
+    ResolvedNamespace _resolvedNamespace;
 
     // After construction of the ResolvedViewAggExState, we return to the start of runAggregate()
     // Both of these fields below will now be the underlying resolved _aggReqDerivatives for
@@ -540,7 +540,7 @@ public:
     /**
      * Use the acquired catalog to resolve the view.
      */
-    virtual StatusWith<ResolvedView> resolveView(
+    virtual StatusWith<ResolvedNamespace> resolveView(
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<BSONObj> timeSeriesCollator) const = 0;

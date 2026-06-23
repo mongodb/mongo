@@ -38,7 +38,6 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/views/pipeline_resolver.h"
-#include "mongo/db/views/resolved_view.h"
 
 #include <algorithm>
 #include <iterator>
@@ -267,10 +266,11 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     // the request — otherwise extension stages inside the view would lite-parse against the
     // global flag value and the retry would never converge.
     {
-        const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
         auto resolvedNamespaces = subPipelineExpCtx->getResolvedNamespaces();
-        PipelineResolver::insertTopLevelViewEntry(
-            resolvedNamespaces, originalNs, resolvedView, subPipelineExpCtx->getIfrContext());
+        PipelineResolver::insertTopLevelViewEntry(resolvedNamespaces,
+                                                  originalNs,
+                                                  std::move(resolvedNs),
+                                                  subPipelineExpCtx->getIfrContext());
         PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
             &userLiteParsedPipeline, originalNs, resolvedNamespaces);
     }

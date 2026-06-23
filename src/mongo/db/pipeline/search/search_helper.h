@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
@@ -110,7 +111,7 @@ bool isSearchMetaPipeline(const Pipeline* pipeline);
  */
 void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const LiteParsedPipeline& liteParsedPipeline,
-                             ResolvedView resolvedView,
+                             const ResolvedNamespace& resolvedView,
                              const NamespaceString& viewName);
 
 /**

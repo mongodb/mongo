@@ -63,6 +63,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -73,7 +74,6 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
@@ -519,11 +519,13 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
                                          fromjson("{$match: {_id: 'unionResult'}}")};
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
-            Status{ResolvedView{expectedBackingNs, viewPipeline, BSONObj()}, "It was a view!"sv});
+            Status{ResolvedNamespace{expectedBackingNs, expectedBackingNs, viewPipeline, BSONObj()},
+                   "It was a view!"_sd});
     });
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
-            Status{ResolvedView{expectedBackingNs, viewPipeline, BSONObj()}, "It was a view!"sv});
+            Status{ResolvedNamespace{expectedBackingNs, expectedBackingNs, viewPipeline, BSONObj()},
+                   "It was a view!"_sd});
     });
 
     // That error should be incorporated, then we should target both shards. The results should be

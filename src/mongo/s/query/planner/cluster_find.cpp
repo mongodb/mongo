@@ -889,7 +889,7 @@ void ClusterFind::runQuery(OperationContext* opCtx,
                     uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
                         opCtx,
                         aggRequestOnView,
-                        *ex.extraInfo<ResolvedView>(),
+                        *ex.extraInfo<ResolvedNamespace>(),
                         origNss,
                         {Privilege(ResourcePattern::forExactNamespace(origNss), ActionType::find)},
                         boost::none,

@@ -62,7 +62,7 @@ namespace {
 // When future work is completed to cache the views catalog on the router aware, we will be able to
 // eliminate this race condition and get a single/locked instance of the view graph for each search
 // index command.
-StatusWith<std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>> resolveViewHelper(
+StatusWith<std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>>> resolveViewHelper(
     OperationContext* opCtx, const CachedDatabaseInfo& cdb, NamespaceString nss) {
 
     BSONObjBuilder bob;
@@ -76,12 +76,12 @@ StatusWith<std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>> reso
         bob.obj(),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         Shard::RetryPolicy::kIdempotent);
-    boost::optional<ResolvedView> resolvedView;
+    boost::optional<ResolvedNamespace> resolvedView;
     boost::optional<UUID> uuid;
     auto data = uassertStatusOK(response.swResponse).data;
 
     if (data.hasField("resolvedView")) {
-        resolvedView = boost::make_optional(ResolvedView::parseFromBSON(data["resolvedView"]));
+        resolvedView = boost::make_optional(ResolvedNamespace::parseFromBSON(data["resolvedView"]));
     }
     if (data.hasField("collectionUUID")) {
         uuid = boost::make_optional(uassertStatusOK(UUID::parse(data["collectionUUID"])));
@@ -90,7 +90,7 @@ StatusWith<std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>> reso
 }
 }  // namespace
 
-std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
+std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>>
 SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
                                                             const NamespaceString& nss,
                                                             bool failOnTsColl) {
@@ -98,7 +98,7 @@ SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* op
     auto uuidAndPossibleCollName = router.route(
         "get collection UUID",
         [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb)
-            -> std::pair<boost::optional<UUID>, boost::optional<ResolvedView>> {
+            -> std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>> {
             ListCollections listCollections;
             listCollections.setDbName(nss.dbName());
             listCollections.setFilter(BSON("name" << nss.coll()));
@@ -140,7 +140,7 @@ SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* op
     return uuidAndPossibleCollName;
 }
 
-std::pair<UUID, boost::optional<ResolvedView>>
+std::pair<UUID, boost::optional<ResolvedNamespace>>
 SearchIndexProcessRouter::fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
                                                                    const NamespaceString& nss) {
     auto uuidResolvdNssPair = fetchCollectionUUIDAndResolveView(opCtx, nss);

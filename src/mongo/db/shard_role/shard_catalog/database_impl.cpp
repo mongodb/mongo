@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -85,7 +86,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
@@ -363,7 +363,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
                 }
 
                 // The name of the most resolved namespace, which is a collection.
-                auto resolvedNs = swResolvedView.getValue().getNamespace();
+                auto resolvedNs = swResolvedView.getValue().getResolvedNamespace();
 
                 if (catalog->lookupCollectionByNamespace(opCtx, resolvedNs)) {
                     // The collection exists for this view.

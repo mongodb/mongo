@@ -413,7 +413,7 @@ error_codes:
   - {
       code: 169,
       name: CommandOnShardedViewNotSupportedOnMongod,
-      extra: ResolvedView,
+      extra: ResolvedNamespace,
     }
   - {code: 170, name: TooManyMatchingDocuments}
   - {code: 171, name: CannotIndexParallelArrays}

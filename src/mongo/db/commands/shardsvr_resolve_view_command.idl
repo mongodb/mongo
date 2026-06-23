@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/views/resolved_view.h"
+        - "mongo/db/pipeline/resolved_namespace.h"
     mod_visibility: private
 
 imports:
@@ -38,12 +38,12 @@ imports:
 types:
     resolved_view:
         description:
-            "custom IDL type that wraps the cpp_type ResolvedView, used by ShardsvrResolveViewReply.
+            "custom IDL type that wraps the cpp_type ResolvedNamespace, used by ShardsvrResolveViewReply.
             The custom serialize and deserialize methods instruct IDL how to covert to/from C++ and BSON.  "
         bson_serialization_type: any
-        cpp_type: "mongo::ResolvedView"
-        serializer: "mongo::ResolvedView::serializeToBSON"
-        deserializer: "mongo::ResolvedView::parseFromBSON"
+        cpp_type: "mongo::ResolvedNamespace"
+        serializer: "mongo::ResolvedNamespace::serializeToBSON"
+        deserializer: "mongo::ResolvedNamespace::parseFromBSON"
 
 structs:
     ShardsvrResolveViewReply:

@@ -54,6 +54,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -82,7 +83,6 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/version_context.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -220,7 +220,7 @@ BSONObj prepareDistinctForPassthrough(
 void runDistinctAsAgg(OperationContext* opCtx,
                       RoutingContext& routingCtx,
                       std::unique_ptr<CanonicalQuery> canonicalQuery,
-                      boost::optional<const ResolvedView&> resolvedView,
+                      boost::optional<ResolvedNamespace> resolvedView,
                       boost::optional<ExplainOptions::Verbosity> verbosity,
                       BSONObjBuilder& bob) {
     const auto& nss = canonicalQuery->nss();
@@ -520,7 +520,7 @@ public:
                     boost::none /*runtimeConstants*/,
                     !verbosity.has_value() /* eligibleForSampling */);
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-                const auto& resolvedView = *ex.extraInfo<ResolvedView>();
+                const auto resolvedView = *ex.extraInfo<ResolvedNamespace>();
                 runDistinctAsAgg(opCtx,
                                  routingCtx,
                                  std::move(canonicalQuery),

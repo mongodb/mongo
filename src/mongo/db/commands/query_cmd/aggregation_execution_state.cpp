@@ -121,7 +121,7 @@ public:
         return _catalog;
     }
 
-    StatusWith<ResolvedView> resolveView(
+    StatusWith<ResolvedNamespace> resolveView(
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<BSONObj> timeSeriesCollator) const override {
@@ -181,7 +181,7 @@ public:
                     "Aggregations involving timeseries views are not yet supported under "
                     "featureFlagExtensionsInsideHybridSearch. Retrying with the flag disabled.");
 
-                auto&& underlyingNs = resolvedView.getValue().getNamespace();
+                auto&& underlyingNs = resolvedView.getValue().getResolvedNamespace();
                 // Attempt to acquire UUID of the underlying collection using lock free method.
                 boost::optional<UUID> uuid = _catalog->lookupUUIDByNSS(opCtx, underlyingNs);
                 ResolvedNamespaceViewOptions viewOpts;
@@ -193,17 +193,18 @@ public:
                 resolvedNamespaces[ns] =
                     ResolvedNamespace(ns,
                                       underlyingNs,
-                                      resolvedView.getValue().getPipeline(),
+                                      resolvedView.getValue().getBsonPipeline(),
                                       resolvedView.getValue().getDefaultCollation(),
                                       std::move(viewOpts));
 
                 // We parse the pipeline corresponding to the resolved view in case we must
                 // resolve other view namespaces that are also involved.
                 LiteParserOptions resolvedViewLpOpts{.ifrContext = getIfrContext()};
-                LiteParsedPipeline resolvedViewLitePipeline(resolvedView.getValue().getNamespace(),
-                                                            resolvedView.getValue().getPipeline(),
-                                                            /*makeSubpipelineOwned=*/false,
-                                                            resolvedViewLpOpts);
+                LiteParsedPipeline resolvedViewLitePipeline(
+                    resolvedView.getValue().getResolvedNamespace(),
+                    resolvedView.getValue().getBsonPipeline(),
+                    /*makeSubpipelineOwned=*/false,
+                    resolvedViewLpOpts);
 
                 const auto& resolvedViewInvolvedNamespaces =
                     resolvedViewLitePipeline.getInvolvedNamespaces();
@@ -550,7 +551,7 @@ public:
         return _catalog;
     }
 
-    StatusWith<ResolvedView> resolveView(
+    StatusWith<ResolvedNamespace> resolveView(
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<BSONObj> timeSeriesCollator) const override {
@@ -736,16 +737,16 @@ ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
                                                const ViewDefinition& view)
     : AggExState(std::move(baseState)),
       _originalAggReqDerivatives(std::move(_aggReqDerivatives)),
-      _resolvedView(uassertStatusOK(aggCatalogState.resolveView(
+      _resolvedNamespace(uassertStatusOK(aggCatalogState.resolveView(
           _opCtx,
           _originalAggReqDerivatives->request.getNamespace(),
           view.timeseries() ? _originalAggReqDerivatives->request.getCollation() : boost::none))),
       _resolvedViewRequest_DO_NOT_USE_DIRECTLY(PipelineResolver::buildRequestWithResolvedPipeline(
-          _ifrContext, _resolvedView, _originalAggReqDerivatives->request)),
+          _ifrContext, _resolvedNamespace, _originalAggReqDerivatives->request)),
       _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY(_resolvedViewRequest_DO_NOT_USE_DIRECTLY,
                                                           true) {
     bool isExplain = _originalAggReqDerivatives->request.getExplain().get_value_or(false);
-    uassert(std::move(_resolvedView),
+    uassert(std::move(_resolvedNamespace),
             "Explain of a resolved view must be executed by mongos",
             !ShardingState::get(_opCtx)->enabled() || !isExplain);
 
@@ -754,7 +755,7 @@ ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
         _resolvedViewRequest_DO_NOT_USE_DIRECTLY,
         _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY);
 
-    setExecutionNss(_resolvedView.getNamespace());
+    setExecutionNss(_resolvedNamespace.getResolvedNamespace());
 }
 
 StatusWith<std::unique_ptr<ResolvedViewAggExState>> ResolvedViewAggExState::create(
@@ -853,8 +854,8 @@ void AggCatalogState::maybeProactivelyResolveInvolvedNamespaces(AggExState& aggE
         auto mainViewResolved = uassertStatusOK(
             resolveView(opCtx, aggExState.getExecutionNss(), boost::none /* timeSeriesCollator */));
         operationCollationSpec = mainViewResolved.getDefaultCollation();
-        LiteParsedPipeline mainViewLpp(mainViewResolved.getNamespace(),
-                                       mainViewResolved.getPipeline(),
+        LiteParsedPipeline mainViewLpp(mainViewResolved.getResolvedNamespace(),
+                                       mainViewResolved.getBsonPipeline(),
                                        /*makeSubpipelineOwned=*/false,
                                        LiteParserOptions{.ifrContext = ifrContext});
         const auto& namespacesSet = mainViewLpp.getInvolvedNamespaces();
@@ -920,7 +921,7 @@ void AggCatalogState::maybeProactivelyResolveInvolvedNamespaces(AggExState& aggE
                                "Involved namespaces include views; kickback to mongos with "
                                "top-level view folded in"));
     } else {
-        uassertStatusOK(Status(ResolvedView::makeWithSentinelPrimary(std::move(viewEntries)),
+        uassertStatusOK(Status(ResolvedNamespace::makeWithSentinelPrimary(std::move(viewEntries)),
                                "Involved namespaces include views; kickback to mongos"));
     }
 }

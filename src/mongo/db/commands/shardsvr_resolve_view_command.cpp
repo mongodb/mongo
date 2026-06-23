@@ -96,8 +96,9 @@ public:
                 view_catalog_helpers::resolveView(opCtx, catalog, nss, boost::none));
             Response res;
             res.setResolvedView(resolvedView);
-            if (auto uuid = catalog->lookupUUIDByNSS(opCtx, resolvedView.getNamespace())) {
-                res.setCollectionUUID(catalog->lookupUUIDByNSS(opCtx, resolvedView.getNamespace()));
+            if (auto uuid = catalog->lookupUUIDByNSS(opCtx, resolvedView.getResolvedNamespace())) {
+                res.setCollectionUUID(
+                    catalog->lookupUUIDByNSS(opCtx, resolvedView.getResolvedNamespace()));
             }
 
             return res;

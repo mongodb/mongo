@@ -29,6 +29,8 @@
 
 #include "mongo/db/pipeline/resolved_namespace.h"
 
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/util/assert_util.h"
@@ -36,6 +38,8 @@
 #include <string_view>
 
 namespace mongo {
+
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ResolvedNamespace);
 
 namespace {
 
@@ -478,7 +482,7 @@ void ResolvedNamespace::serialize(BSONObjBuilder* builder) const {
     }
 }
 
-std::shared_ptr<const ResolvedNamespace> ResolvedNamespace::parse(const BSONObj& cmdReply) {
+std::shared_ptr<const ErrorExtraInfo> ResolvedNamespace::parse(const BSONObj& cmdReply) {
     return std::make_shared<ResolvedNamespace>(fromBSON(cmdReply));
 }
 

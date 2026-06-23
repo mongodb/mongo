@@ -33,8 +33,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
@@ -64,10 +64,10 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
  * with the request's collation (timeSeriesCollator) rather than the collection's default
  * collator.
  */
-StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
-                                     std::shared_ptr<const CollectionCatalog> catalog,
-                                     const NamespaceString& nss,
-                                     boost::optional<BSONObj> timeseriesCollator);
+StatusWith<ResolvedNamespace> resolveView(OperationContext* opCtx,
+                                          std::shared_ptr<const CollectionCatalog> catalog,
+                                          const NamespaceString& nss,
+                                          boost::optional<BSONObj> timeseriesCollator);
 
 }  // namespace MONGO_MOD_PUBLIC view_catalog_helpers
 }  // namespace mongo

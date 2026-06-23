@@ -337,10 +337,12 @@ TEST(PipelineResolverTest, ResolvesInnerViewNestedUnderRepeatedBaseCollectionRef
 }
 
 TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {
-    // Build a ResolvedView backed by kBackingNss.
+    // Build a ResolvedNamespace representing a view backed by kBackingNss.
     BSONObj viewStage = BSON("$match" << BSON("v" << 1));
     std::vector<BSONObj> viewPipeline{viewStage};
-    ResolvedView resolvedView(kBackingNss, viewPipeline, BSONObj{});
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    ResolvedNamespace resolvedView(kUserNss, kBackingNss, viewPipeline, BSONObj{}, opts);
 
     // Build an empty ResolvedNamespaceMap.
     ResolvedNamespaceMap map;
@@ -361,8 +363,8 @@ TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {
     // Assert: involvedNamespaceIsAView is true.
     ASSERT_TRUE(entry.involvedNamespaceIsAView);
 
-    // Assert: backing namespace (entry.ns) matches the ResolvedView's namespace.
-    ASSERT_EQ(entry.ns, resolvedView.getNamespace());
+    // Assert: backing namespace (entry.ns) matches the ResolvedNamespace's resolved namespace.
+    ASSERT_EQ(entry.ns, resolvedView.getResolvedNamespace());
 }
 
 }  // namespace

@@ -51,7 +51,6 @@
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/assert_util.h"
 
@@ -293,7 +292,7 @@ bool isSearchMetaPipeline(const Pipeline* pipeline) {
 
 void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const LiteParsedPipeline& liteParsedPipeline,
-                             ResolvedView resolvedView,
+                             const ResolvedNamespace& resolvedView,
                              const NamespaceString& viewName) {
     // Search queries on views behave differently than non-search aggregations on views.
     // When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
@@ -304,9 +303,9 @@ void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
     // storedSource is disabled, idLookup will retrieve full/unmodified documents during
     // (from the _id values returned by mongot), apply the view's data transforms, and pass
     // said transformed documents through the rest of the user pipeline.
-    if (liteParsedPipeline.hasSearchStage() && !resolvedView.getPipeline().empty()) {
+    if (liteParsedPipeline.hasSearchStage() && !resolvedView.getBsonPipeline().empty()) {
         expCtx->setView(boost::make_optional(ResolvedNamespace::makeForView(
-            viewName, resolvedView.getNamespace(), resolvedView.getPipeline())));
+            viewName, resolvedView.getResolvedNamespace(), resolvedView.getBsonPipeline())));
     }
 }
 

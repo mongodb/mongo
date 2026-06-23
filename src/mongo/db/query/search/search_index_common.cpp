@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/search/search_index_common.h"
 
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_index_options.h"
@@ -116,10 +117,11 @@ retrieveCollectionUUIDAndResolveView(OperationContext* opCtx,
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
         // The request is on a view! Therefore, currentOperationNss refers to the view
         // NS and the namespace on resolvedView refers to the underlying source collection.
-        sourceCollectionNss = resolvedView.value().getNamespace();
+        sourceCollectionNss = resolvedView.value().getResolvedNamespace();
 
         // Construct a SearchQueryViewSpec object.
-        view.emplace(std::string(currentOperationNss.coll()), resolvedView.value().getPipeline());
+        view.emplace(std::string(currentOperationNss.coll()),
+                     resolvedView.value().getBsonPipeline());
     }
     return std::make_tuple(collUUID, sourceCollectionNss, view);
 }

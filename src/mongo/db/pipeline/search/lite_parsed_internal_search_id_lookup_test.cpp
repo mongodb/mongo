@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/views/pipeline_resolver.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -195,7 +195,7 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest,
     // Create a ResolvedView with a two-stage view pipeline and register it in the namespace map.
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("status" << "active")),
                                          BSON("$project" << BSON("name" << 1 << "status" << 1))};
-    const ResolvedView resolvedView{kResolvedNss, viewPipeline, BSONObj()};
+    const ResolvedNamespace resolvedView{kResolvedNss, kResolvedNss, viewPipeline, BSONObj()};
 
     ResolvedNamespaceMap resolvedNamespaces;
     PipelineResolver::insertTopLevelViewEntry(resolvedNamespaces, kTestNss, resolvedView);

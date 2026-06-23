@@ -33,10 +33,10 @@
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
@@ -46,15 +46,16 @@ namespace {
  * resolved view's namespace (if any), and handling explain/cursor precedence. When 'resolvedView'
  * is boost::none the namespace is left unchanged (top-level is a base collection).
  */
-AggregateCommandRequest buildBaseResolvedRequest(const boost::optional<ResolvedView>& resolvedView,
-                                                 const AggregateCommandRequest& originalRequest) {
+AggregateCommandRequest buildBaseResolvedRequest(
+    const boost::optional<ResolvedNamespace>& resolvedView,
+    const AggregateCommandRequest& originalRequest) {
     // Start with a copy of the original request and modify fields as needed. We assume that most
     // fields should be unchanged from the original request; any fields that need to be changed will
     // be modified below.
     // TODO SERVER-110454: Avoid copying the original pipeline when possible.
     AggregateCommandRequest resolvedRequest = originalRequest;
     if (resolvedView) {
-        resolvedRequest.setNamespace(resolvedView->getNamespace());
+        resolvedRequest.setNamespace(resolvedView->getResolvedNamespace());
     }
 
     // If both 'explain' and 'cursor' are set, we give precedence to 'explain' and drop 'cursor'.
@@ -73,7 +74,7 @@ AggregateCommandRequest buildBaseResolvedRequest(const boost::optional<ResolvedV
  */
 std::vector<BSONObj> buildResolvedPipelineForSimpleCase(
     const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
-    const ResolvedView& resolvedView,
+    const ResolvedNamespace& resolvedView,
     const std::vector<BSONObj>& userPipeline) {
     // Mongot user pipelines are a unique case: $_internalSearchIdLookup applies the view pipeline.
     // For this reason, we do not expand the aggregation request to include the view pipeline.
@@ -85,7 +86,7 @@ std::vector<BSONObj> buildResolvedPipelineForSimpleCase(
 
     // The new pipeline consists of two parts: first, 'pipeline' in this ResolvedView; then, the
     // pipeline in 'request'.
-    auto& viewPipeline = resolvedView.getPipeline();
+    auto& viewPipeline = resolvedView.getBsonPipeline();
     std::vector<BSONObj> resolvedPipeline;
     resolvedPipeline.reserve(viewPipeline.size() + userPipeline.size());
     resolvedPipeline.insert(resolvedPipeline.end(), viewPipeline.begin(), viewPipeline.end());
@@ -107,7 +108,7 @@ std::vector<BSONObj> buildResolvedPipelineForSimpleCase(
 std::pair<std::vector<BSONObj>, boost::optional<LiteParsedPipeline>>
 buildResolvedPipelineForRegularView(OperationContext* opCtx,
                                     const AggregateCommandRequest& request,
-                                    const boost::optional<ResolvedView>& resolvedView,
+                                    const boost::optional<ResolvedNamespace>& resolvedView,
                                     const NamespaceString& requestedNss,
                                     boost::optional<ExplainOptions::Verbosity> verbosity,
                                     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,
@@ -148,7 +149,8 @@ buildResolvedPipelineForRegularView(OperationContext* opCtx,
     // to BSON. This ensures that any view info bound to LiteParsedDocumentSources is included
     // in the BSON sent from mongos to the shards. When the top-level is a base collection, fall
     // back to the request's own namespace and collation.
-    const auto& executionNss = resolvedView ? resolvedView->getNamespace() : request.getNamespace();
+    const auto& executionNss =
+        resolvedView ? resolvedView->getResolvedNamespace() : request.getNamespace();
     BSONObj collationObj = resolvedView ? resolvedView->getDefaultCollation()
                                         : request.getCollation().value_or(BSONObj{});
     auto expCtx = helpers.makeExpressionContext(opCtx,
@@ -188,7 +190,7 @@ buildResolvedPipelineForRegularView(OperationContext* opCtx,
  */
 void applyFinalTransformations(AggregateCommandRequest& resolvedRequest,
                                std::vector<BSONObj>&& resolvedPipeline,
-                               const boost::optional<ResolvedView>& resolvedView,
+                               const boost::optional<ResolvedNamespace>& resolvedView,
                                const AggregateCommandRequest& originalRequest) {
     // Apply timeseries rewrites if the first stage is $_internalUnpackBucket.
     if (resolvedView && !resolvedPipeline.empty() &&
@@ -221,7 +223,7 @@ void applyFinalTransformations(AggregateCommandRequest& resolvedRequest,
 
 AggregateCommandRequest PipelineResolver::buildRequestWithResolvedPipeline(
     const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
-    const ResolvedView& resolvedView,
+    const ResolvedNamespace& resolvedView,
     const AggregateCommandRequest& originalRequest) {
     AggregateCommandRequest expandedRequest =
         buildBaseResolvedRequest(resolvedView, originalRequest);
@@ -236,7 +238,7 @@ AggregateCommandRequest PipelineResolver::buildRequestWithResolvedPipeline(
 }
 
 void PipelineResolver::applyViewToLiteParsed(LiteParsedPipeline* userLPP,
-                                             const ResolvedView& resolvedView,
+                                             const ResolvedNamespace& resolvedView,
                                              const NamespaceString& viewNss,
                                              const ResolvedNamespaceMap& resolvedNamespaces,
                                              const LiteParserOptions& options) {
@@ -244,18 +246,18 @@ void PipelineResolver::applyViewToLiteParsed(LiteParsedPipeline* userLPP,
     // registered by lite_parsed_desugarer.cpp to avoid a circular build dependency between
     // ResolvedNamespace and LiteParsedDesugarer.
     auto view = ResolvedNamespace::makeForView(
-        viewNss, resolvedView.getNamespace(), resolvedView.getPipeline(), options);
+        viewNss, resolvedView.getResolvedNamespace(), resolvedView.getBsonPipeline(), options);
     view.desugarViewPipeline();
     userLPP->handleView(view, resolvedNamespaces);
 }
 
 void PipelineResolver::validateStagesOnView(LiteParsedPipeline* userLPP,
-                                            const ResolvedView& resolvedView,
+                                            const ResolvedNamespace& resolvedView,
                                             const NamespaceString& viewNss,
                                             const ResolvedNamespaceMap& resolvedNamespaces,
                                             const LiteParserOptions& options) {
     auto view = ResolvedNamespace::makeForView(
-        viewNss, resolvedView.getNamespace(), resolvedView.getPipeline(), options);
+        viewNss, resolvedView.getResolvedNamespace(), resolvedView.getBsonPipeline(), options);
     view.desugarViewPipeline();
     userLPP->bindResolvedNamespaceToStages(view, resolvedNamespaces);
 }
@@ -263,7 +265,7 @@ void PipelineResolver::validateStagesOnView(LiteParsedPipeline* userLPP,
 PipelineResolver::MongosViewRequestResult PipelineResolver::buildResolvedMongosViewRequest(
     OperationContext* opCtx,
     const AggregateCommandRequest& request,
-    const boost::optional<ResolvedView>& resolvedView,
+    const boost::optional<ResolvedNamespace>& resolvedView,
     const NamespaceString& requestedNss,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,
@@ -423,7 +425,7 @@ bool PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
 void PipelineResolver::insertTopLevelViewEntry(
     ResolvedNamespaceMap& resolvedNamespaces,
     const NamespaceString& requestedNss,
-    const ResolvedView& resolvedView,
+    ResolvedNamespace resolvedView,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     ResolvedNamespaceViewOptions viewOptions;
     viewOptions.involvedNamespaceIsAView = true;
@@ -443,8 +445,8 @@ void PipelineResolver::insertTopLevelViewEntry(
     }
     resolvedNamespaces.insert_or_assign(requestedNss,
                                         ResolvedNamespace(requestedNss,
-                                                          resolvedView.getNamespace(),
-                                                          resolvedView.getPipeline(),
+                                                          resolvedView.getResolvedNamespace(),
+                                                          resolvedView.getBsonPipeline(),
                                                           resolvedView.getDefaultCollation(),
                                                           viewOptions));
 }

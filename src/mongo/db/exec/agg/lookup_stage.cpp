@@ -36,11 +36,11 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/pipeline/resolved_namespace.h"  // IWYU pragma: keep
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
-#include "mongo/db/views/resolved_view.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 
 #include <string_view>
@@ -514,10 +514,10 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
             // pipeline with the resolved view definition.
             return buildPipelineFromViewDefinition(
                 fromExpCtx,
-                e->getNamespace(),
+                e->getResolvedNamespace(),
                 isRawDataOperation(pExpCtx->getOperationContext()) && e->isTimeseries()
                     ? std::vector<BSONObj>{}
-                    : e->getPipeline(),
+                    : e->getBsonPipeline(),
                 true /* attachCursorAfterOptimizing */,
                 shardTargetingPolicy,
                 pipeline_optimization::optimizeAndValidatePipeline);
@@ -554,10 +554,10 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
         // pipeline with the resolved view definition and retry to attach the cursor.
         pipeline = buildPipelineFromViewDefinition(
             fromExpCtx,
-            e->getNamespace(),
+            e->getResolvedNamespace(),
             isRawDataOperation(pExpCtx->getOperationContext()) && e->isTimeseries()
                 ? std::vector<BSONObj>{}
-                : e->getPipeline(),
+                : e->getBsonPipeline(),
             !cacheIsServing,
             shardTargetingPolicy,
             optimizePipeline);

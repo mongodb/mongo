@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
@@ -82,8 +84,9 @@ extern const ResolvedNamespaceViewOptions kSimpleViewOptions;
  * the view pipeline (raw BSON and optionally parsed), collation, and timeseries
  * metadata. Supports BSON serialization for the ErrorExtraInfo API.
  */
-class MONGO_MOD_PUBLIC ResolvedNamespace {
+class MONGO_MOD_PUBLIC ResolvedNamespace final : public ErrorExtraInfo {
 public:
+    static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
     // Callback type for desugaring a parsed view pipeline. This indirection exists because
     // ResolvedNamespace lives in the lite_parsed_document_source target while the desugarer lives
     // in its own target that depends on lite_parsed_document_source. A direct call would create a
@@ -115,7 +118,7 @@ public:
     ResolvedNamespace& operator=(const ResolvedNamespace& other);
     ResolvedNamespace(ResolvedNamespace&& other) noexcept;
     ResolvedNamespace& operator=(ResolvedNamespace&& other) noexcept;
-    ~ResolvedNamespace();
+    ~ResolvedNamespace() override;
 
     // Constructor for collections or minimal view resolution (used for secondary namespaces).
     // "Secondary" in this context means a namespace discovered while resolving the pipeline (for
@@ -205,12 +208,13 @@ public:
         return _hasSentinelPrimary;
     }
 
+    void applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const;
+    boost::optional<BSONObj> rewriteIndexHintForTimeseries(const BSONObj& originalHint) const;
+
     // ErrorExtraInfo API
-    // TODO SERVER-122118 Change ResolvedNamespace to inherit from ErrorExtraInfo, to replace
-    // ResolvedView.
     static ResolvedNamespace fromBSON(const BSONObj& commandResponseObj);
-    void serialize(BSONObjBuilder* bob) const;
-    static std::shared_ptr<const ResolvedNamespace> parse(const BSONObj&);
+    void serialize(BSONObjBuilder* bob) const override;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
     /*
      * These methods support IDL parsing of ResolvedNamespace.

@@ -61,6 +61,7 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
@@ -93,7 +94,6 @@
 #include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/views/pipeline_resolver.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
@@ -448,7 +448,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     bool hasChangeStream,
     bool shouldDoFLERewrite,
     bool requiresCollationForParsingUnshardedAggregate,
-    boost::optional<ResolvedView> resolvedView,
+    boost::optional<ResolvedNamespace> resolvedView,
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     bool alreadyDesugared,
@@ -627,7 +627,7 @@ Status _parseQueryStatsAndReturnEmptyResult(
     const ClusterAggregate::Namespaces& namespaces,
     AggregateCommandRequest& request,
     const LiteParsedPipeline& liteParsedPipeline,
-    boost::optional<ResolvedView> resolvedView,
+    boost::optional<ResolvedNamespace> resolvedView,
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
@@ -707,7 +707,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                         AggregateCommandRequest& req,
                         const LiteParsedPipeline& liteParsedPipeline,
                         const PrivilegeVector& privileges,
-                        boost::optional<ResolvedView> resolvedView,
+                        boost::optional<ResolvedNamespace> resolvedView,
                         boost::optional<AggregateCommandRequest> originalRequest,
                         boost::optional<ExplainOptions::Verbosity> verbosity,
                         BSONObjBuilder* res,
@@ -1080,7 +1080,8 @@ Status runAggregateImpl(OperationContext* opCtx,
     return status;
 }
 
-ResolvedView chainViews(boost::optional<ResolvedView> currentView, const ResolvedView& newView) {
+ResolvedNamespace chainViews(boost::optional<ResolvedNamespace> currentView,
+                             const ResolvedNamespace& newView) {
     // Multiple view kickbacks can occur if the collection changes after the first view
     // kickback. If we already have a resolved view, we must compose the two resolved
     // pipelines to avoid losing the pipeline accumulated from the first kickback.
@@ -1089,8 +1090,8 @@ ResolvedView chainViews(boost::optional<ResolvedView> currentView, const Resolve
     }
 
     // Compose the two pipelines.
-    std::vector<BSONObj> composedPipeline = newView.getPipeline();
-    const std::vector<BSONObj>& toPrepend = currentView->getPipeline();
+    std::vector<BSONObj> composedPipeline = newView.getBsonPipeline();
+    const std::vector<BSONObj>& toPrepend = currentView->getBsonPipeline();
     composedPipeline.insert(composedPipeline.end(), toPrepend.begin(), toPrepend.end());
 
     // All views seen during the resolution will have the same collation, so we can just use the
@@ -1098,13 +1099,12 @@ ResolvedView chainViews(boost::optional<ResolvedView> currentView, const Resolve
     // We will only ever have 1 timeseries view per aggregation and it is guaranteed to be the last
     // view resolved, since it is internally created.
     // TODO SERVER-111172: Remove this timeseries specific handling after 9.0 is LTS.
-    return ResolvedView(newView.getNamespace(),
-                        std::move(composedPipeline),
-                        currentView->getDefaultCollation(),
-                        newView.getTimeseriesOptions(),
-                        newView.getMayContainMixedData(),
-                        newView.getUsesExtendedRange(),
-                        newView.getFixedBuckets());
+    return ResolvedNamespace(
+        newView.getNamespace(),
+        newView.getResolvedNamespace(),
+        std::move(composedPipeline),
+        currentView->getDefaultCollation(),
+        ResolvedNamespaceViewOptions{.timeseriesMetadata = newView.getTimeseriesViewMetadata()});
 }
 
 
@@ -1186,7 +1186,7 @@ struct RetryState {
     // Information about the view that the top-level pipeline is running against.
     // This is not populated until after a shard throws the CommandOnShardedViewNotSupportedOnMongod
     // exception.
-    boost::optional<ResolvedView> resolvedView;
+    boost::optional<ResolvedNamespace> resolvedView;
     // A set containing IFR flags that should be disabled via the IFRFlagRetry kickback exception
     // retry loop.
     stdx::unordered_set<IncrementalRolloutFeatureFlag*> ifrFlagsToDisableOnRetries;
@@ -1236,7 +1236,7 @@ PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
     state.alreadyDesugared = resolved.liteParsedPipeline.has_value();
 
     if (state.resolvedView) {
-        state.currentNamespaces.executionNss = state.resolvedView->getNamespace();
+        state.currentNamespaces.executionNss = state.resolvedView->getResolvedNamespace();
         uassert(
             ErrorCodes::OptionNotSupportedOnView,
             "$rankFusion and $scoreFusion are unsupported on timeseries collections",
@@ -1302,7 +1302,7 @@ void handleViewKickback(
     // involved-namespace resolution, sending back a single ResolvedView containing all view
     // resolution information.
     // TODO SERVER-121094 Remove when feature flag is removed.
-    auto kickedBackView = ex.extraInfo<ResolvedView>();
+    auto kickedBackView = ex.extraInfo<ResolvedNamespace>();
     const bool hybridSearchFlagEnabled = ifrContext &&
         ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
 
@@ -1640,7 +1640,7 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
     AggregateCommandRequest& request,
     const LiteParsedPipeline& liteParsedPipeline,
     const PrivilegeVector& privileges,
-    boost::optional<ResolvedView> resolvedView,
+    boost::optional<ResolvedNamespace> resolvedView,
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
@@ -1664,7 +1664,7 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
 Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     OperationContext* opCtx,
     const AggregateCommandRequest& request,
-    const std::variant<ResolvedView, IFRFlagRetryInfo>& errInfo,
+    const std::variant<ResolvedNamespace, IFRFlagRetryInfo>& errInfo,
     const NamespaceString& requestedNss,
     const PrivilegeVector& privileges,
     boost::optional<ExplainOptions::Verbosity> verbosity,
@@ -1700,7 +1700,7 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     }
 
     // For view retries, we need to build the resolved request before calling runAggregate.
-    const auto& resolvedView = std::get<ResolvedView>(errInfo);
+    const auto& resolvedView = std::get<ResolvedNamespace>(errInfo);
     PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
                                                     resolveInvolvedNamespaces};
 
@@ -1710,7 +1710,7 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
 
     // Now call runAggregate with the resolved namespace and request.
     return runAggregate(opCtx,
-                        Namespaces{requestedNss, resolvedView.getNamespace()},
+                        Namespaces{requestedNss, resolvedView.getResolvedNamespace()},
                         resolved.resolvedRequest,
                         privileges,
                         verbosity,

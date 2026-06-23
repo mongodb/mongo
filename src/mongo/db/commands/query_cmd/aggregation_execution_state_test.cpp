@@ -552,8 +552,8 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
     // Check the resolved view correspond to the expected one
     auto resolvedView = aggCatalogState->resolveView(operationContext(), viewNss, boost::none);
     ASSERT_TRUE(resolvedView.isOK());
-    ASSERT_EQ(resolvedView.getValue().getNamespace(), viewOn);
-    std::vector<BSONObj> result = resolvedView.getValue().getPipeline();
+    ASSERT_EQ(resolvedView.getValue().getResolvedNamespace(), viewOn);
+    std::vector<BSONObj> result = resolvedView.getValue().getBsonPipeline();
     ASSERT_EQ(expectedPipeline.size(), result.size());
     for (uint32_t i = 0; i < expectedPipeline.size(); i++) {
         ASSERT(SimpleBSONObjComparator::kInstance.evaluate(expectedPipeline[i] == result[i]));

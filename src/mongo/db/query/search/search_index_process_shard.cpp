@@ -49,7 +49,7 @@ ServiceContext::ConstructorActionRegisterer SearchIndexProcessShardImplementatio
     }};
 
 
-std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
+std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>>
 SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            bool failOnTsColl) {
@@ -68,12 +68,12 @@ SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opC
         auto resolvedView =
             view_catalog_helpers::resolveView(opCtx, catalog, nss, boost::none).getValue();
 
-        return std::make_pair(catalog->lookupUUIDByNSS(opCtx, resolvedView.getNamespace()),
+        return std::make_pair(catalog->lookupUUIDByNSS(opCtx, resolvedView.getResolvedNamespace()),
                               boost::make_optional(resolvedView));
     }
 }
 
-std::pair<UUID, boost::optional<ResolvedView>>
+std::pair<UUID, boost::optional<ResolvedNamespace>>
 SearchIndexProcessShard::fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
                                                                   const NamespaceString& nss) {
     auto uuidResolvedViewPair = fetchCollectionUUIDAndResolveView(opCtx, nss);
