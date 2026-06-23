@@ -31,14 +31,24 @@ const kViolatingValidatorErrorCode = 12370902;
 let st;
 let mongosDB;
 let collName;
+let ns;
 let nonCompliantDocId;
 
-// Pauses collection scans on shard0, starts the upgrade-to-'constraint' collMod (whose validator
-// scan pauses on shard0 before reaching the non-compliant doc), runs testFn while the scan is
-// paused, then resumes the scan and joins the collMod. The resumed scan must find the
-// non-compliant doc and fail the collMod with kViolatingValidatorErrorCode.
+// Pauses the validator scan's aggregate cursor on shard0, starts the upgrade-to-'constraint'
+// collMod, runs testFn while the scan is paused, then resumes and joins the collMod. The resumed
+// scan must find the non-compliant doc and fail the collMod with kViolatingValidatorErrorCode.
+//
+// disablePipelineOptimization prevents $match from being absorbed into the PlanExecutor, ensuring
+// the aggregate goes through CursorStage::loadBatch() where hangBeforeDocumentSourceCursorLoadBatch
+// fires.
 function runWhileValidatorScanPaused(testFn) {
-    const fp = configureFailPoint(st.rs0.getPrimary(), "hangCollScanDoWork");
+    const shard0Primary = st.rs0.getPrimary();
+    const disableOpt = configureFailPoint(shard0Primary, "disablePipelineOptimization");
+    const hangCursor = configureFailPoint(
+        shard0Primary,
+        "hangBeforeDocumentSourceCursorLoadBatch",
+        {nss: ns},
+    );
 
     const awaitCollMod = startParallelShell(
         funWithArgs(
@@ -57,26 +67,25 @@ function runWhileValidatorScanPaused(testFn) {
         st.s.port,
     );
 
-    // Always resume the scan and join the collMod, even on assertion failure; a leaked failpoint
-    // turns any failure in testFn into a teardown hang.
+    // Always resume the scan and join the collMod, even on assertion failure; leaked failpoints
+    // turn any failure in testFn into a teardown hang.
     try {
-        fp.wait();
+        hangCursor.wait();
 
-        // The failpoint pauses any collection scan on the node, so confirm via currentOp that
-        // the paused operation is the validator scan on our collection before proceeding. The
-        // scan work happens in a getMore (the aggregate returns its cursor with an empty first
-        // batch), so match the originating command as well.
+        // The failpoint fires before the aggregate cursor loads its first batch. Confirm via
+        // currentOp that the paused operation is the validator scan on our collection before
+        // proceeding. The scan work happens in a getMore (the aggregate returns its cursor with
+        // an empty first batch), so match the originating command as well.
         assert.soon(() => {
             return (
-                st.rs0
-                    .getPrimary()
+                shard0Primary
                     .getDB("admin")
                     .aggregate([
                         {$currentOp: {}},
                         {
                             $match: {
                                 active: true,
-                                ns: `${dbName}.${collName}`,
+                                ns: ns,
                                 $or: [
                                     {"command.aggregate": collName},
                                     {"cursor.originatingCommand.aggregate": collName},
@@ -90,14 +99,14 @@ function runWhileValidatorScanPaused(testFn) {
 
         testFn();
     } finally {
-        fp.off();
+        hangCursor.off();
+        disableOpt.off();
         awaitCollMod();
     }
 }
 
 // Asserts the non-compliant doc is still on shard0, and that the failed upgrade left
-// validationLevel and the prepare flag unchanged. Must be called after the failpoint is off:
-// these finds have no index on 'b', so their COLLSCAN would hit the failpoint and hang.
+// validationLevel and the prepare flag unchanged.
 function assertStateUnchanged() {
     const onShard0 = st.shard0
         .getDB(dbName)
@@ -147,6 +156,7 @@ describe("cross-shard updates that could dodge the upgrade-to-constraint validat
         }
 
         collName = jsTestName();
+        ns = `${dbName}.${collName}`;
         mongosDB = st.s.getDB(dbName);
         const coll = mongosDB[collName];
 
