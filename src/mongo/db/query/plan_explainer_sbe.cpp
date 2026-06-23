@@ -740,6 +740,10 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                            std::move(estimates),
                            std::move(rejectedPlans)},
       _classicRuntimePlannerStage{std::move(classicRuntimePlannerStage)},
+      // TODO SERVER-129170: Refactor to avoid copying on the explain path.
+      _ceSamplingMetadata{maybeExplainData
+                              ? boost::make_optional(maybeExplainData->ceSamplingMetadata)
+                              : boost::none},
       _classicRuntimePlannerExplainer{
           _classicRuntimePlannerStage  // If there were no multi-planning, this will be nullptr.
               ? plan_explainer_factory::make(_classicRuntimePlannerStage.get(),
@@ -790,5 +794,10 @@ PlanExplainerClassicRuntimePlannerForSBE::getRejectedPlansStats(
     return _classicRuntimePlannerExplainer
         ? _classicRuntimePlannerExplainer->getRejectedPlansStats(verbosity)
         : std::vector<PlanExplainer::PlanStatsDetails>{};
+}
+
+boost::optional<StringMap<cost_based_ranker::SamplingMetadata>>
+PlanExplainerClassicRuntimePlannerForSBE::getCeSamplingMetadata() const {
+    return _ceSamplingMetadata;
 }
 }  // namespace mongo

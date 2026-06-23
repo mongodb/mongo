@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
@@ -459,6 +460,18 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         }
     }
 
+    // Collect per-namespace sampling metadata for explain output.
+    boost::optional<PlanExplainerData> maybeExplainData;
+    if (ctx.explain) {
+        PlanExplainerData explainData;
+        for (const auto& [nss, estimator] : samplingEstimators) {
+            explainData.ceSamplingMetadata.emplace(
+                NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext()),
+                estimator->getSamplingMetadata());
+        }
+        maybeExplainData = std::move(explainData);
+    }
+
     // TODO SERVER-111913: Once we are no-longer cloning QSN for single-table plans, the estimate
     // map from join-reordering 'reordered.estimates' can be combined with the estimate map from
     // CBR 'ctx.singleTableAccess.estimate' before creating the executor below.
@@ -475,7 +488,11 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                             false /* cachedPlanHash */,
                                             true /*usedJoinOpt*/,
                                             std::move(reordered.estimates),
-                                            std::move(rejectedPlans));
+                                            std::move(rejectedPlans),
+                                            nullptr /* remoteCursors */,
+                                            nullptr /* remoteExplains */,
+                                            nullptr /* classicRuntimePlannerStage */,
+                                            std::move(maybeExplainData));
 
     return JoinReorderedExecutorResult{.executor = std::move(exec), .model = std::move(model)};
 }

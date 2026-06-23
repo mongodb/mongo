@@ -167,12 +167,18 @@ public:
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const final;
+    boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
+        const override;
 
 private:
     // Using a pointer to a MultiPlanStage, we can create a classic PlanExplainerImpl from which we
     // can extract the necessary information regarding the classic multi-planner's trial period
     // using the same format as we would for the classic engine.
     const std::unique_ptr<PlanStage> _classicRuntimePlannerStage;
+    boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> _ceSamplingMetadata;
+    // Do not call getCeSamplingMetadata() on this explainer; it returns boost::none because
+    // ceSamplingMetadata is copied into _ceSamplingMetadata above. Callers should use
+    // getCeSamplingMetadata() on PlanExplainerClassicRuntimePlannerForSBE instead.
     const std::unique_ptr<PlanExplainer> _classicRuntimePlannerExplainer;
 };
 
