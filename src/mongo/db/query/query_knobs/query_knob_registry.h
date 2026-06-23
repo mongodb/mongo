@@ -164,12 +164,12 @@ void registerQueryKnob(QueryKnobRegistry::Entry&& entry);
 
 // Internal: defines the global QueryKnob<T> handle for each EXPAND row, with a dense id
 // freshly allocated from the global QueryKnobInitializer.
-#define MONGO_DETAIL_DEFINE_QUERY_KNOB(var, name, global) \
+#define MONGO_DETAIL_DEFINE_QUERY_KNOB(var, name, global, ...) \
     decltype(var) var{detail::allocateQueryKnobId()};
 
 // Internal: registers one knob into the global QueryKnobInitializer; called inside the
 // initializer body.
-#define MONGO_DETAIL_INITIALIZE_QUERY_KNOB(var, name, global) \
+#define MONGO_DETAIL_INITIALIZE_QUERY_KNOB(var, name, global, ...) \
     detail::registerQueryKnob(QueryKnobRegistry::Entry::create<global>(var, name));
 
 // Internal: emits a MONGO_INITIALIZER that runs after all ServerParameters have been

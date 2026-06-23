@@ -41,99 +41,129 @@
     /* Multi-plan ranking */                                                              \
     KNOB(kPlanEvaluationMaxResults,                                                       \
          kInternalQueryPlanEvaluationMaxResultsName,                                      \
-         internalQueryPlanEvaluationMaxResults)                                           \
+         internalQueryPlanEvaluationMaxResults,                                           \
+         getPlanEvaluationMaxResultsForOp)                                                \
     KNOB(kPlanEvaluationCollFraction,                                                     \
          kInternalQueryPlanEvaluationCollFractionName,                                    \
-         internalQueryPlanEvaluationCollFraction)                                         \
+         internalQueryPlanEvaluationCollFraction,                                         \
+         getPlanEvaluationCollFraction)                                                   \
     KNOB(kPlanTotalEvaluationCollFraction,                                                \
          kInternalQueryPlanTotalEvaluationCollFractionName,                               \
-         internalQueryPlanTotalEvaluationCollFraction)                                    \
+         internalQueryPlanTotalEvaluationCollFraction,                                    \
+         getPlanTotalEvaluationCollFraction)                                              \
     /* Planning and enumeration */                                                        \
     KNOB(kPlannerMaxIndexedSolutions,                                                     \
          kInternalQueryPlannerMaxIndexedSolutionsName,                                    \
-         internalQueryPlannerMaxIndexedSolutions)                                         \
+         internalQueryPlannerMaxIndexedSolutions,                                         \
+         getPlannerMaxIndexedSolutions)                                                   \
     KNOB(kMaxScansToExplode,                                                              \
          kInternalQueryMaxScansToExplodeName,                                             \
-         internalQueryMaxScansToExplode)                                                  \
+         internalQueryMaxScansToExplode,                                                  \
+         getMaxScansToExplodeForOp)                                                       \
     KNOB(kPlannerUseMultiplannerForSingleSolutions,                                       \
          kInternalQueryPlannerUseMultiplannerForSingleSolutionsName,                      \
-         internalQueryPlannerUseMultiplannerForSingleSolutions)                           \
+         internalQueryPlannerUseMultiplannerForSingleSolutions,                           \
+         getUseMultiplannerForSingleSolutions)                                            \
     KNOB(kMinAllPlansEnumerationSubsetLevel,                                              \
          kInternalMinAllPlansEnumerationSubsetLevelName,                                  \
-         internalMinAllPlansEnumerationSubsetLevel)                                       \
+         internalMinAllPlansEnumerationSubsetLevel,                                       \
+         getInternalMinAllPlansEnumerationSubsetLevel)                                    \
     KNOB(kMaxAllPlansEnumerationSubsetLevel,                                              \
          kInternalMaxAllPlansEnumerationSubsetLevelName,                                  \
-         internalMaxAllPlansEnumerationSubsetLevel)                                       \
+         internalMaxAllPlansEnumerationSubsetLevel,                                       \
+         getInternalMaxAllPlansEnumerationSubsetLevel)                                    \
     /* Join optimization */                                                               \
     KNOB(kEnableJoinOptimization,                                                         \
          kInternalEnableJoinOptimizationName,                                             \
-         internalEnableJoinOptimization)                                                  \
+         internalEnableJoinOptimization,                                                  \
+         isJoinOrderingEnabled)                                                           \
     KNOB(kRandomJoinOrderSeed,                                                            \
          kInternalRandomJoinOrderSeedName,                                                \
-         internalRandomJoinOrderSeed)                                                     \
+         internalRandomJoinOrderSeed,                                                     \
+         getRandomJoinOrderSeed)                                                          \
     KNOB(kMaxNodesInJoinGraph,                                                            \
          kInternalMaxNodesInJoinGraphName,                                                \
-         internalMaxNodesInJoinGraph)                                                     \
+         internalMaxNodesInJoinGraph,                                                     \
+         getMaxNodesInJoinGraph)                                                          \
     KNOB(kMaxEdgesInJoinGraph,                                                            \
          kInternalMaxEdgesInJoinGraphName,                                                \
-         internalMaxEdgesInJoinGraph)                                                     \
+         internalMaxEdgesInJoinGraph,                                                     \
+         getMaxEdgesInJoinGraph)                                                          \
     KNOB(kInferSingleTablePredicates,                                                     \
          kInternalInferSingleTablePredicatesName,                                         \
-         internalInferSingleTablePredicates)                                              \
+         internalInferSingleTablePredicates,                                              \
+         getInferSingleTablePredicates)                                                   \
     KNOB(kMaxNumberNodesConsideredForImplicitEdges,                                       \
          kInternalMaxNumberNodesConsideredForImplicitEdgesName,                           \
-         internalMaxNumberNodesConsideredForImplicitEdges)                                \
+         internalMaxNumberNodesConsideredForImplicitEdges,                                \
+         getMaxNumberNodesConsideredForImplicitEdges)                                     \
     KNOB(kEnableJoinEnumerationHJOrderPruning,                                            \
          kInternalEnableJoinEnumerationHJOrderPruningName,                                \
-         internalEnableJoinEnumerationHJOrderPruning)                                     \
+         internalEnableJoinEnumerationHJOrderPruning,                                     \
+         getEnableJoinEnumerationHJOrderPruning)                                          \
     KNOB(kEnableJoinOptimizationUseIndexUniqueness,                                       \
          kInternalEnableJoinOptimizationUseIndexUniquenessName,                           \
-         internalEnableJoinOptimizationUseIndexUniqueness)                                \
+         internalEnableJoinOptimizationUseIndexUniqueness,                                \
+         getEnableJoinOptimizationUseIndexUniqueness)                                     \
     KNOB(kJoinPlanSamplingSize,                                                           \
          kInternalJoinPlanSamplingSizeName,                                               \
-         internalJoinPlanSamplingSize)                                                    \
+         internalJoinPlanSamplingSize,                                                    \
+         getInternalJoinPlanSamplingSize)                                                 \
     KNOB(kJoinEnumerateCollScanPlans,                                                     \
          kInternalJoinEnumerateCollScanPlansName,                                         \
-         internalJoinEnumerateCollScanPlans)                                              \
+         internalJoinEnumerateCollScanPlans,                                              \
+         getInternalJoinEnumerateCollScanPlans)                                           \
     /* Sampling / cardinality estimation */                                               \
     KNOB(kSamplingMarginOfError,                                                          \
          kSamplingMarginOfErrorName,                                                      \
-         samplingMarginOfError)                                                           \
+         samplingMarginOfError,                                                           \
+         getSamplingMarginOfError)                                                        \
     KNOB(kNumChunksForChunkBasedSampling,                                                 \
          kInternalQueryNumChunksForChunkBasedSamplingName,                                \
-         internalQueryNumChunksForChunkBasedSampling)                                     \
+         internalQueryNumChunksForChunkBasedSampling,                                     \
+         getNumChunksForChunkBasedSampling)                                               \
     /* Pipeline rewrites */                                                               \
     KNOB(kEnablePathArrayness,                                                            \
          kInternalEnablePathArraynessName,                                                \
-         internalEnablePathArrayness)                                                     \
+         internalEnablePathArrayness,                                                     \
+         getEnablePathArrayness)                                                          \
     KNOB(kEnablePipelineOptimizationAdditionalTestingRules,                               \
          kInternalEnablePipelineOptimizationAdditionalTestingRulesName,                   \
-         internalEnablePipelineOptimizationAdditionalTestingRules)                        \
+         internalEnablePipelineOptimizationAdditionalTestingRules,                        \
+         getEnablePipelineOptimizationAdditionalTestingRules)                             \
     /* cpp_class enum knobs */                                                            \
     KNOB(kPlanRankerMode,                                                                 \
          kInternalQueryCBRCEModeName,                                                     \
-         QueryPlanRankerMode)                                                             \
+         QueryPlanRankerMode,                                                             \
+         getPlanRankerMode)                                                               \
     KNOB(kPlanRankingStrategyForAutomaticQueryPlanRankerMode,                             \
          kAutomaticCEPlanRankingStrategyName,                                             \
-         QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode)                         \
+         QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode,                         \
+         getPlanRankingStrategyForAutomaticQueryPlanRankerMode)                           \
     KNOB(kSamplingConfidenceInterval,                                                     \
          kSamplingConfidenceIntervalName,                                                 \
-         SamplingConfidenceInterval)                                                      \
+         SamplingConfidenceInterval,                                                      \
+         getConfidenceInterval)                                                           \
     KNOB(kSamplingCEMethod,                                                               \
          kInternalQuerySamplingCEMethodName,                                              \
-         CBRSamplingCEMethod)                                                             \
+         CBRSamplingCEMethod,                                                             \
+         getInternalQuerySamplingCEMethod)                                                \
     KNOB(kJoinReorderMode,                                                                \
          kInternalJoinReorderModeName,                                                    \
-         JoinReorderMode)                                                                 \
+         JoinReorderMode,                                                                 \
+         getJoinReorderMode)                                                              \
     KNOB(kJoinPlanTreeShape,                                                              \
          kInternalJoinPlanTreeShapeName,                                                  \
-         JoinPlanTreeShape)                                                               \
+         JoinPlanTreeShape,                                                               \
+         getJoinPlanTreeShape)                                                            \
     KNOB(kJoinMethod,                                                                     \
          kInternalJoinMethodName,                                                         \
-         ForcedJoinMethod)                                                                \
+         ForcedJoinMethod,                                                                \
+         getJoinMethod)                                                                   \
     KNOB(kJoinSamplingCEMethod,                                                           \
          kInternalJoinOptimizationSamplingCEMethodName,                                   \
-         JoinSamplingCEMethod)                                                            \
+         JoinSamplingCEMethod,                                                            \
+         getInternalJoinOptimizationSamplingCEMethod)                                     \
     /* End MONGO_EXPAND_QUERY_KNOBS_OPTIMIZATION */
 // clang-format on
 

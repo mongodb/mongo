@@ -31,6 +31,8 @@
 
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
+#include "mongo/db/query/query_knob_descriptors_optimization.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -42,7 +44,9 @@ namespace mongo {
  * A class for query-related knobs, it sets all the knob values on the first time a knob is accessed
  * and ensures the values are same though the whole lifetime of a query.
  */
-class QueryKnobConfiguration {
+class QueryKnobConfiguration
+    : public query_knobs::AccessorMixinQueryOptimizationKnobs<QueryKnobConfiguration>,
+      public query_knobs::AccessorMixinQueryExecutionKnobs<QueryKnobConfiguration> {
 public:
     /**
      * NOTE: QueryKnobConfiguration construction requires 'querySettings', because settings may
@@ -67,85 +71,22 @@ public:
      */
     BSONObj serializeForExplain() const;
 
-    QueryFrameworkControlEnum getInternalQueryFrameworkControlForOp() const;
-    QueryPlanRankerModeEnum getPlanRankerMode() const;
-    QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum
-    getPlanRankingStrategyForAutomaticQueryPlanRankerMode() const;
-    SamplingConfidenceIntervalEnum getConfidenceInterval() const;
-    SamplingCEMethodEnum getInternalQuerySamplingCEMethod() const;
-    double getSamplingMarginOfError() const;
-    int64_t getNumChunksForChunkBasedSampling() const;
-    SbeHashAggIncreasedSpillingModeEnum getSbeHashAggIncreasedSpillingMode() const;
-
-    bool getSbeDisableGroupPushdownForOp() const;
-    bool getSbeDisableLookupPushdownForOp() const;
-    bool getSbeDisableTimeSeriesForOp() const;
+    // Most typed knob accessors (getPlanRankerMode(), getMaxNodesInJoinGraph(),
+    // getSbeDisableGroupPushdownForOp(), ...) are generated from the knob tables by the
+    // AccessorMixin base classes. Only accessors that compute over a knob rather than returning it
+    // directly are declared here.
 
     /**
      * Returns true if internal query framework control knob is set to 'forceClassicEngine', false
      * otherwise.
      */
     bool isForceClassicEngineEnabled() const;
-    size_t getPlanEvaluationMaxResultsForOp() const;
-    size_t getPlannerMaxIndexedSolutions() const;
-    double getPlanEvaluationCollFraction() const;
-    double getPlanTotalEvaluationCollFraction() const;
-    size_t getMaxScansToExplodeForOp() const;
-
-    /**
-     * Query knobs configuring join reordering.
-     */
-    bool isJoinOrderingEnabled() const;
-    size_t getRandomJoinOrderSeed() const;
-    JoinReorderModeEnum getJoinReorderMode() const;
-    JoinPlanTreeShapeEnum getJoinPlanTreeShape() const;
-    ForcedJoinMethodEnum getJoinMethod() const;
-    size_t getMaxNodesInJoinGraph() const;
-    size_t getMaxEdgesInJoinGraph() const;
-    size_t getMaxNumberNodesConsideredForImplicitEdges() const;
-    bool getEnableJoinEnumerationHJOrderPruning() const;
-    size_t getInternalJoinPlanSamplingSize() const;
-    bool getInternalJoinEnumerateCollScanPlans() const;
-    size_t getInternalMinAllPlansEnumerationSubsetLevel() const;
-    size_t getInternalMaxAllPlansEnumerationSubsetLevel() const;
-    bool getEnableJoinOptimizationUseIndexUniqueness() const;
-    SamplingCEMethodEnum getInternalJoinOptimizationSamplingCEMethod() const;
-    bool getInferSingleTablePredicates() const;
-
 
     /**
      * Returns whether we can push down fully compatible stages to sbe. This is only true when the
      * query knob is 'trySbeEngine'.
      */
     bool canPushDownFullyCompatibleStages() const;
-
-    int64_t getInternalQuerySpillingMinAvailableDiskSpaceBytes() const;
-
-    bool getMeasureQueryExecutionTimeInNanoseconds() const;
-    bool getUseMultiplannerForSingleSolutions() const;
-
-    /**
-     * Returns the limit on how many accumulators a $group can have and still run in SBE, even when
-     * the limit is unenforced because of featureFlagSbeFull.
-     */
-    int64_t getMaxGroupAccumulatorsInSbe() const;
-
-    /**
-     * Returns whether we should use PathArrayness when applying optimizations.
-     */
-    bool getEnablePathArrayness() const;
-
-    /**
-     * Returns the max amount of time that queries are allowed to spend uninterrupted in an
-     * operation's response. A value of 0 means "unlimited". Currently only meaningful for change
-     * stream queries.
-     */
-    int64_t getOperationResponseMaxMS() const;
-
-    /**
-     * Returns whether to apply experimental testing aggregation pipeline rules.
-     */
-    bool getEnablePipelineOptimizationAdditionalTestingRules() const;
 
 private:
     QueryKnobSnapshot _snapshot;

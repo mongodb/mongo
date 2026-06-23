@@ -34,11 +34,11 @@
 
 // clang-format off
 #define MONGO_EXPAND_QUERY_KNOBS_TEST(KNOB) \
-    KNOB(testIntKnob, "testIntKnob", gTestIntKnob) \
-    KNOB(testDoubleKnob, "testDoubleKnob", gTestDoubleKnob) \
-    KNOB(testBoolKnob, "testBoolKnob", gTestBoolKnob) \
-    KNOB(testLLKnob, "testLLKnob", gTestLLKnob) \
-    KNOB(testEnumKnob, "testEnumKnob", TestEnumKnob)
+    KNOB(testIntKnob, "testIntKnob", gTestIntKnob, getTestInt) \
+    KNOB(testDoubleKnob, "testDoubleKnob", gTestDoubleKnob, getTestDouble) \
+    KNOB(testBoolKnob, "testBoolKnob", gTestBoolKnob, getTestBool) \
+    KNOB(testLLKnob, "testLLKnob", gTestLLKnob, getTestLL) \
+    KNOB(testEnumKnob, "testEnumKnob", TestEnumKnob, getTestEnum)
     /**/
 // clang-format on
 

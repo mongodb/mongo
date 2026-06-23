@@ -1231,7 +1231,8 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
 
     // Too many ixscans spoil the performance.
     if (totalNumScans >
-        query.getExpCtx()->getQueryKnobConfiguration().getMaxScansToExplodeForOp()) {
+        static_cast<size_t>(
+            query.getExpCtx()->getQueryKnobConfiguration().getMaxScansToExplodeForOp())) {
         (*solnRoot)->hitScanLimit = true;
         LOGV2_DEBUG(
             20950,

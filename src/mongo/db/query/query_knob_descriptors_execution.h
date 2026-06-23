@@ -40,31 +40,40 @@
 #define MONGO_EXPAND_QUERY_KNOBS_EXECUTION(KNOB)                                          \
     KNOB(kSbeDisableGroupPushdown,                                                        \
          kInternalQuerySlotBasedExecutionDisableGroupPushdownName,                        \
-         internalQuerySlotBasedExecutionDisableGroupPushdown)                             \
+         internalQuerySlotBasedExecutionDisableGroupPushdown,                             \
+         getSbeDisableGroupPushdownForOp)                                                 \
     KNOB(kSbeDisableLookupPushdown,                                                       \
          kInternalQuerySlotBasedExecutionDisableLookupPushdownName,                       \
-         internalQuerySlotBasedExecutionDisableLookupPushdown)                            \
+         internalQuerySlotBasedExecutionDisableLookupPushdown,                            \
+         getSbeDisableLookupPushdownForOp)                                                \
     KNOB(kSbeDisableTimeSeriesPushdown,                                                   \
          kInternalQuerySlotBasedExecutionDisableTimeSeriesPushdownName,                   \
-         internalQuerySlotBasedExecutionDisableTimeSeriesPushdown)                        \
+         internalQuerySlotBasedExecutionDisableTimeSeriesPushdown,                        \
+         getSbeDisableTimeSeriesForOp)                                                    \
     KNOB(kMeasureQueryExecutionTimeInNanoseconds,                                         \
          kInternalMeasureQueryExecutionTimeInNanosecondsName,                             \
-         internalMeasureQueryExecutionTimeInNanoseconds)                                  \
+         internalMeasureQueryExecutionTimeInNanoseconds,                                  \
+         getMeasureQueryExecutionTimeInNanoseconds)                                       \
     KNOB(kSpillingMinAvailableDiskSpaceBytes,                                             \
          kInternalQuerySpillingMinAvailableDiskSpaceBytesName,                            \
-         internalQuerySpillingMinAvailableDiskSpaceBytes)                                 \
+         internalQuerySpillingMinAvailableDiskSpaceBytes,                                 \
+         getInternalQuerySpillingMinAvailableDiskSpaceBytes)                              \
     KNOB(kMaxGroupAccumulatorsInSbe,                                                      \
          kInternalMaxGroupAccumulatorsInSbeName,                                          \
-         gInternalMaxGroupAccumulatorsInSbe)                                              \
+         gInternalMaxGroupAccumulatorsInSbe,                                              \
+         getMaxGroupAccumulatorsInSbe)                                                    \
     KNOB(kQueryFrameworkControl,                                                          \
          kInternalQueryFrameworkControlName,                                              \
-         QueryFrameworkControl)                                                           \
+         QueryFrameworkControl,                                                           \
+         getInternalQueryFrameworkControlForOp)                                           \
     KNOB(kSbeHashAggIncreasedSpillingMode,                                                \
          kInternalQuerySlotBasedExecutionHashAggIncreasedSpillingName,                    \
-         SbeHashAggIncreasedSpillingMode)                                                 \
+         SbeHashAggIncreasedSpillingMode,                                                 \
+         getSbeHashAggIncreasedSpillingMode)                                              \
     KNOB(kOperationResponseMaxMS,                                                         \
          kInternalOperationResponseMaxMSName,                                             \
-         internalOperationResponseMaxMS)                                                  \
+         internalOperationResponseMaxMS,                                                  \
+         getOperationResponseMaxMS)                                                       \
     /* End MONGO_EXPAND_QUERY_KNOBS_EXECUTION */
 // clang-format on
 

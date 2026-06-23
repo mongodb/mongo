@@ -291,7 +291,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         .joinGraphBuildParams =
             JoinGraphBuildParams(config.getMaxNodesInJoinGraph(), config.getMaxEdgesInJoinGraph()),
         .maxNumberNodesConsideredForImplicitEdges =
-            config.getMaxNumberNodesConsideredForImplicitEdges()};
+            static_cast<size_t>(config.getMaxNumberNodesConsideredForImplicitEdges())};
     auto swModel = AggJoinModel::constructJoinModel(pipeline, buildParams);
     if (!swModel.isOK()) {
         // We failed to apply join-reordering, so we take the regular path.

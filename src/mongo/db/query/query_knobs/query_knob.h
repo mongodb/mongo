@@ -163,13 +163,14 @@ struct QueryKnob {
  *
  * Define an EXPAND table with one row per knob:
  *
- *   #define MY_EXPAND(KNOB)                                          \
- *       KNOB(myIntKnob,  "myIntParam",  gMyIntAtomicGlobal)          \
- *       KNOB(myEnumKnob, "myEnumParam", MyEnumServerParam)
+ *   #define MY_EXPAND(KNOB)                                              \
+ *       KNOB(myIntKnob,  "myIntParam",  gMyIntAtomicGlobal, getMyInt)    \
+ *       KNOB(myEnumKnob, "myEnumParam", MyEnumServerParam,  getMyEnum)
  *
  *   var    — C++ identifier for the QueryKnob variable
  *   name   — server parameter string (must match the ServerParameter IDL name)
  *   global — atomic global for scalar knobs; ServerParameter type for enum knobs
+ *   getter — name of the accessor method generated on the AccessorMixin for this knob
  *
  * In the group header (inside the knob namespace):
  *   DECLARE_QUERY_KNOBS(GroupName, MY_EXPAND)
@@ -180,11 +181,25 @@ struct QueryKnob {
  * See query_knob_test_knobs.h/cpp for a worked example.
  */
 
-// Internal: emits one extern QueryKnob declaration per EXPAND row.
-#define MONGO_DETAIL_DECLARE_QUERY_KNOB(var, name, global) \
+// Internal: emits one extern QueryKnob declaration per EXPAND row. The trailing getter
+// column is unused here.
+#define MONGO_DETAIL_DECLARE_QUERY_KNOB(var, name, global, ...) \
     extern const QueryKnob<decltype(detail::queryKnobValueType<global>())> var;
 
+#define MONGO_DETAIL_DEFINE_GETTER(var, name, global, getter) \
+    auto getter() const {                                     \
+        return static_cast<const Derived*>(this)->get(var);   \
+    }
+
+#define MONGO_DETAIL_DEFINE_ACCESSOR_MIXIN(group, EXPAND)   \
+    template <typename Derived>                             \
+    class AccessorMixin##group {                            \
+    public:                                                 \
+        EXPAND(MONGO_DETAIL_DEFINE_GETTER)                  \
+    };
+
 // Declares all knobs in EXPAND. Place in the group header inside the knob namespace.
-#define DECLARE_QUERY_KNOBS(group, EXPAND) \
-    EXPAND(MONGO_DETAIL_DECLARE_QUERY_KNOB)
+#define DECLARE_QUERY_KNOBS(group, EXPAND)              \
+    EXPAND(MONGO_DETAIL_DECLARE_QUERY_KNOB)             \
+    MONGO_DETAIL_DEFINE_ACCESSOR_MIXIN(group, EXPAND)
 // clang-format on

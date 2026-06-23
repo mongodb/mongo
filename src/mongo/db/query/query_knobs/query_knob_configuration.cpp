@@ -98,132 +98,13 @@ BSONObj QueryKnobConfiguration::serializeForExplain() const {
     return bob.obj();
 }
 
-QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
-    return get(query_knobs::kQueryFrameworkControl);
-}
-
-QueryPlanRankerModeEnum QueryKnobConfiguration::getPlanRankerMode() const {
-    return get(query_knobs::kPlanRankerMode);
-}
-
-QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum
-QueryKnobConfiguration::getPlanRankingStrategyForAutomaticQueryPlanRankerMode() const {
-    return get(query_knobs::kPlanRankingStrategyForAutomaticQueryPlanRankerMode);
-}
-
-SamplingConfidenceIntervalEnum QueryKnobConfiguration::getConfidenceInterval() const {
-    return get(query_knobs::kSamplingConfidenceInterval);
-}
-
-SamplingCEMethodEnum QueryKnobConfiguration::getInternalQuerySamplingCEMethod() const {
-    return get(query_knobs::kSamplingCEMethod);
-}
-
-size_t QueryKnobConfiguration::getRandomJoinOrderSeed() const {
-    return static_cast<size_t>(get(query_knobs::kRandomJoinOrderSeed));
-}
-
-bool QueryKnobConfiguration::isJoinOrderingEnabled() const {
-    return get(query_knobs::kEnableJoinOptimization);
-}
-
-JoinReorderModeEnum QueryKnobConfiguration::getJoinReorderMode() const {
-    return get(query_knobs::kJoinReorderMode);
-}
-
-JoinPlanTreeShapeEnum QueryKnobConfiguration::getJoinPlanTreeShape() const {
-    return get(query_knobs::kJoinPlanTreeShape);
-}
-
-size_t QueryKnobConfiguration::getMaxNodesInJoinGraph() const {
-    return static_cast<size_t>(get(query_knobs::kMaxNodesInJoinGraph));
-}
-
-size_t QueryKnobConfiguration::getMaxEdgesInJoinGraph() const {
-    return static_cast<size_t>(get(query_knobs::kMaxEdgesInJoinGraph));
-}
-
-size_t QueryKnobConfiguration::getMaxNumberNodesConsideredForImplicitEdges() const {
-    return static_cast<size_t>(get(query_knobs::kMaxNumberNodesConsideredForImplicitEdges));
-}
-
-bool QueryKnobConfiguration::getEnableJoinEnumerationHJOrderPruning() const {
-    return get(query_knobs::kEnableJoinEnumerationHJOrderPruning);
-}
-
-ForcedJoinMethodEnum QueryKnobConfiguration::getJoinMethod() const {
-    return get(query_knobs::kJoinMethod);
-}
-
-size_t QueryKnobConfiguration::getInternalJoinPlanSamplingSize() const {
-    return static_cast<size_t>(get(query_knobs::kJoinPlanSamplingSize));
-}
-
-bool QueryKnobConfiguration::getInternalJoinEnumerateCollScanPlans() const {
-    return get(query_knobs::kJoinEnumerateCollScanPlans);
-}
-
-size_t QueryKnobConfiguration::getInternalMinAllPlansEnumerationSubsetLevel() const {
-    return static_cast<size_t>(get(query_knobs::kMinAllPlansEnumerationSubsetLevel));
-}
-
-size_t QueryKnobConfiguration::getInternalMaxAllPlansEnumerationSubsetLevel() const {
-    return static_cast<size_t>(get(query_knobs::kMaxAllPlansEnumerationSubsetLevel));
-}
-
-bool QueryKnobConfiguration::getEnableJoinOptimizationUseIndexUniqueness() const {
-    return get(query_knobs::kEnableJoinOptimizationUseIndexUniqueness);
-}
-
-double QueryKnobConfiguration::getSamplingMarginOfError() const {
-    return get(query_knobs::kSamplingMarginOfError);
-}
-
-int64_t QueryKnobConfiguration::getNumChunksForChunkBasedSampling() const {
-    return get(query_knobs::kNumChunksForChunkBasedSampling);
-}
-
-SbeHashAggIncreasedSpillingModeEnum QueryKnobConfiguration::getSbeHashAggIncreasedSpillingMode()
-    const {
-    return get(query_knobs::kSbeHashAggIncreasedSpillingMode);
-}
-
-
-bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() const {
-    return get(query_knobs::kSbeDisableGroupPushdown);
-}
-
-bool QueryKnobConfiguration::getSbeDisableLookupPushdownForOp() const {
-    return get(query_knobs::kSbeDisableLookupPushdown);
-}
-
-bool QueryKnobConfiguration::getSbeDisableTimeSeriesForOp() const {
-    return get(query_knobs::kSbeDisableTimeSeriesPushdown);
-}
+// The remaining typed knob accessors are generated from the knob tables by the AccessorMixin base
+// classes (see query_knob.h and query_knob_descriptors_{optimization,execution}.h). Only the
+// accessors below compute over a knob value rather than returning it directly.
 
 bool QueryKnobConfiguration::isForceClassicEngineEnabled() const {
     return get(query_knobs::kQueryFrameworkControl) ==
         QueryFrameworkControlEnum::kForceClassicEngine;
-}
-
-size_t QueryKnobConfiguration::getPlanEvaluationMaxResultsForOp() const {
-    return static_cast<size_t>(get(query_knobs::kPlanEvaluationMaxResults));
-}
-
-size_t QueryKnobConfiguration::getPlannerMaxIndexedSolutions() const {
-    return static_cast<size_t>(get(query_knobs::kPlannerMaxIndexedSolutions));
-}
-
-double QueryKnobConfiguration::getPlanEvaluationCollFraction() const {
-    return get(query_knobs::kPlanEvaluationCollFraction);
-}
-
-double QueryKnobConfiguration::getPlanTotalEvaluationCollFraction() const {
-    return get(query_knobs::kPlanTotalEvaluationCollFraction);
-}
-
-size_t QueryKnobConfiguration::getMaxScansToExplodeForOp() const {
-    return static_cast<size_t>(get(query_knobs::kMaxScansToExplode));
 }
 
 bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
@@ -236,42 +117,5 @@ bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
     }
     MONGO_UNREACHABLE;
 }
-
-int64_t QueryKnobConfiguration::getInternalQuerySpillingMinAvailableDiskSpaceBytes() const {
-    return get(query_knobs::kSpillingMinAvailableDiskSpaceBytes);
-}
-
-bool QueryKnobConfiguration::getMeasureQueryExecutionTimeInNanoseconds() const {
-    return get(query_knobs::kMeasureQueryExecutionTimeInNanoseconds);
-}
-
-bool QueryKnobConfiguration::getUseMultiplannerForSingleSolutions() const {
-    return get(query_knobs::kPlannerUseMultiplannerForSingleSolutions);
-}
-
-int64_t QueryKnobConfiguration::getMaxGroupAccumulatorsInSbe() const {
-    return get(query_knobs::kMaxGroupAccumulatorsInSbe);
-}
-
-bool QueryKnobConfiguration::getEnablePathArrayness() const {
-    return get(query_knobs::kEnablePathArrayness);
-}
-
-int64_t QueryKnobConfiguration::getOperationResponseMaxMS() const {
-    return get(query_knobs::kOperationResponseMaxMS);
-}
-
-bool QueryKnobConfiguration::getEnablePipelineOptimizationAdditionalTestingRules() const {
-    return get(query_knobs::kEnablePipelineOptimizationAdditionalTestingRules);
-}
-
-SamplingCEMethodEnum QueryKnobConfiguration::getInternalJoinOptimizationSamplingCEMethod() const {
-    return get(query_knobs::kJoinSamplingCEMethod);
-}
-
-bool QueryKnobConfiguration::getInferSingleTablePredicates() const {
-    return get(query_knobs::kInferSingleTablePredicates);
-}
-
 
 }  // namespace mongo

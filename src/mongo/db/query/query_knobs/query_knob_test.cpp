@@ -51,6 +51,31 @@ const QueryKnobRegistry::Entry& entryFor(const QueryKnob<T>& knob) {
     return QueryKnobRegistry::instance().entry(knob.id);
 }
 
+// Exercises the generated AccessorMixin getters: each getter must dispatch to the matching
+// get() overload, passing the QueryKnob handle declared for that row in the EXPAND table.
+struct MockKnobConfiguration : test_knobs::AccessorMixinTestKnobs<MockKnobConfiguration> {
+    int get(const QueryKnob<int>& knob) const {
+        ASSERT_EQ(&knob, &test_knobs::testIntKnob);
+        return 7;
+    }
+    double get(const QueryKnob<double>& knob) const {
+        ASSERT_EQ(&knob, &test_knobs::testDoubleKnob);
+        return 1.5;
+    }
+    bool get(const QueryKnob<bool>& knob) const {
+        ASSERT_EQ(&knob, &test_knobs::testBoolKnob);
+        return true;
+    }
+    long long get(const QueryKnob<long long>& knob) const {
+        ASSERT_EQ(&knob, &test_knobs::testLLKnob);
+        return 42LL;
+    }
+    TestKnobModeEnum get(const QueryKnob<TestKnobModeEnum>& knob) const {
+        ASSERT_EQ(&knob, &test_knobs::testEnumKnob);
+        return TestKnobModeEnum::kBeta;
+    }
+};
+
 TEST(QueryKnobTest, SyntheticKnobsRegisteredAgainstServerParameters) {
     ASSERT_EQ(entryFor(test_knobs::testIntKnob).param->name(), "testIntKnob"sv);
     ASSERT_EQ(entryFor(test_knobs::testDoubleKnob).param->name(), "testDoubleKnob"sv);
@@ -195,6 +220,15 @@ TEST(QueryKnobTest, ToBSONRoundTripLongLong) {
 TEST(QueryKnobTest, DeleteQueryKnobOverrideDefault) {
     QueryKnobValue v;
     ASSERT(std::holds_alternative<DeleteQueryKnobOverride>(v));
+}
+
+TEST(QueryKnobTest, DefineQueryKnobGettersDispatchesToGet) {
+    MockKnobConfiguration mock;
+    ASSERT_EQ(mock.getTestInt(), 7);
+    ASSERT_APPROX_EQUAL(mock.getTestDouble(), 1.5, 1e-9);
+    ASSERT_EQ(mock.getTestBool(), true);
+    ASSERT_EQ(mock.getTestLL(), 42LL);
+    ASSERT_EQ(mock.getTestEnum(), TestKnobModeEnum::kBeta);
 }
 
 }  // namespace
