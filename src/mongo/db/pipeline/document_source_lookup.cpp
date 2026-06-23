@@ -418,6 +418,11 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     parseAndDefineLetVariables(letVariables, pExpCtx);
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
     _fromExpCtx->startExpressionCounters();
+    // The desugared mongot stage's injected 'view' field requires isHybridSearch on the
+    // sub-pipeline's expCtx.
+    if (hybrid_scoring_util::isHybridSearchPipeline(userPipeline)) {
+        _fromExpCtx->setIsHybridSearch();
+    }
     const auto& resolvedNamespaces = pExpCtx->getResolvedNamespaces();
     auto it = resolvedNamespaces.find(_fromNs);
     if (it != resolvedNamespaces.end() && !it->second.pipeline.empty()) {
@@ -466,7 +471,7 @@ void DocumentSourceLookUp::relocateFieldMatchPlaceholder(
 
 DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
     LookUpStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
     // search stage.
     if (params.isHybridSearch || hybrid_scoring_util::isHybridSearchPipeline(params.pipeline)) {
         hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(params.fromNss, expCtx);

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -1397,6 +1398,24 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
         })",
             asOneObj);
     }
+}
+
+TEST_F(DocumentSourceScoreTest, LiteParsedReportsScoreDetailsFromSpec) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto liteParse = [&](BSONObj spec) {
+        auto result = ScoreLiteParsed::parse(nss, spec.firstElement(), LiteParserOptions{});
+        result->makeOwned();
+        return result;
+    };
+
+    // scoreDetails present and true.
+    ASSERT_TRUE(liteParse(fromjson(R"({$score: {score: "$x", scoreDetails: true}})"))
+                    ->isScoreDetailsStage());
+    // scoreDetails present and false.
+    ASSERT_FALSE(liteParse(fromjson(R"({$score: {score: "$x", scoreDetails: false}})"))
+                     ->isScoreDetailsStage());
+    // scoreDetails absent defaults to false.
+    ASSERT_FALSE(liteParse(fromjson(R"({$score: {score: "$x"}})"))->isScoreDetailsStage());
 }
 
 }  // namespace

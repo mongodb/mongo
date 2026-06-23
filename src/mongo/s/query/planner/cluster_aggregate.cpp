@@ -517,7 +517,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // If the routing table exists, then the collection is tracked in the router role and we can
     // validate if it is timeseries. If the collection is untracked, this validation will happen in
     // the shard role.
-    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
     // search stage.
     if (request.getIsHybridSearch() && cri && cri->hasRoutingTable()) {
         uassert(10557300,
@@ -647,7 +647,11 @@ Status _parseQueryStatsAndReturnEmptyResult(
     // never happens on the sharding node for single shard/sharded cluster with unsharded collection
     // topologies.
     try {
-        performValidationChecks(opCtx, request, liteParsedPipeline);
+        // As in runAggregateImpl(): validate only the original (pre-desugar) pipeline; an
+        // already-desugared resolved-view pipeline contains server-generated internal stages.
+        if (!alreadyDesugared) {
+            performValidationChecks(opCtx, request, liteParsedPipeline);
+        }
     } catch (const ExceptionFor<ErrorCodes::IFRFlagRetry>&) {
         // Let IFRFlagRetry propagate so the outer ClusterAggregate::runAggregate retry loop can
         // disable the flag and reparse the pipeline.
@@ -770,7 +774,12 @@ Status runAggregateImpl(OperationContext* opCtx,
     BSONObjBuilder result;
     AggregateCommandRequest request{req};
 
-    performValidationChecks(opCtx, request, liteParsedPipeline);
+    // An already-desugared resolved-view pipeline was validated pre-desugar on the first pass;
+    // re-validating would wrongly reject server-generated internal stages (e.g. the
+    // kInternal-only $_internalHybridSearch) under the user's client.
+    if (!alreadyDesugared) {
+        performValidationChecks(opCtx, request, liteParsedPipeline);
+    }
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         // Note that if this decision is stale, and a collection has transitioned from sharded to

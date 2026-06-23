@@ -63,7 +63,9 @@ assert.commandWorked(
     ]),
 );
 
-// Error if the weights array doesn't have elements of type safe double
+// Error if the weights array doesn't have elements of type safe double: the lite-parse desugar
+// path reports 12559404, the legacy flag-off numeric-type check reports 13118.
+// TODO SERVER-121094: drop the flag-off code once featureFlagExtensionsInsideHybridSearch is gone.
 assert.commandFailedWithCode(
     runPipeline([
         {
@@ -73,7 +75,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    13118,
+    [12559404, 13118],
 );
 
 // Check that an array of ints for weights is a valid input

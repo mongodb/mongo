@@ -54,9 +54,6 @@ std::unique_ptr<LiteParsedScoreFusion> LiteParsedScoreFusion::parse(
                           << " must take a nested object but found: " << spec,
             spec.type() == BSONType::object);
 
-    // TODO SERVER-121970: Remove once $scoreFusion is supported with
-    // featureFlagExtensionsInsideHybridSearch. The actual IFR kickback is thrown from
-    // validate() — see LiteParsedScoreFusion::_extensionsInHybridSearchEnabled for why.
     const bool extensionsInHybridSearchEnabled = options.ifrContext &&
         options.ifrContext->getSavedFlagValue(
             feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
@@ -109,19 +106,21 @@ void LiteParsedScoreFusion::validate() const {
                               << scorePipelineMsg,
                 !stages.empty());
 
-        // IFR kickback must fire BEFORE scored/selection checks because extension
-        // $vectorSearch doesn't report isScoredStage() on its LiteParsedExpandable.
-        search_helpers::throwIfrKickbackIfNecessary(
-            pipeline.hasExtensionVectorSearchStage(),
-            feature_flags::gFeatureFlagVectorSearchExtension,
-            vector_search_metrics::inHybridSearchKickbackRetryCount,
-            "$vectorSearch-as-an-extension is not allowed in a $scoreFusion pipeline.");
+        // IFR kickback must fire BEFORE scored/selection checks. When the extensions-inside-
+        // hybrid-search flag is ON we are already in the correct code path; suppress the kickback.
+        if (!_extensionsInHybridSearchEnabled) {
+            search_helpers::throwIfrKickbackIfNecessary(
+                pipeline.hasExtensionVectorSearchStage(),
+                feature_flags::gFeatureFlagVectorSearchExtension,
+                vector_search_metrics::inHybridSearchKickbackRetryCount,
+                "$vectorSearch-as-an-extension is not allowed in a $scoreFusion pipeline.");
 
-        search_helpers::throwIfrKickbackIfNecessary(
-            pipeline.hasExtensionSearchStage(),
-            feature_flags::gFeatureFlagSearchExtension,
-            search_metrics::inHybridSearchKickbackRetryCount,
-            "$search-as-an-extension is not allowed in a $scoreFusion pipeline.");
+            search_helpers::throwIfrKickbackIfNecessary(
+                pipeline.hasExtensionSearchStage(),
+                feature_flags::gFeatureFlagSearchExtension,
+                search_metrics::inHybridSearchKickbackRetryCount,
+                "$search-as-an-extension is not allowed in a $scoreFusion pipeline.");
+        }
 
         // No nested hybrid search stages ($rankFusion/$scoreFusion).
         uassert(12108711,
@@ -130,7 +129,8 @@ void LiteParsedScoreFusion::validate() const {
                     scorePipelineMsg,
                 !pipeline.hasHybridSearchStage());
 
-        // Pipeline must be scored.
+        // LiteParsedExpandable delegates isScoredStage() to its expanded stages, so extension
+        // stages report scored-ness correctly.
         uassert(12108712,
                 "Pipeline did not begin with a scored stage and did not contain an explicit "
                 "$score stage. " +
@@ -140,18 +140,6 @@ void LiteParsedScoreFusion::validate() const {
         // All stages must be selection stages.
         pipeline.validateAllStagesAreSelection(12108713, "$scoreFusion");
     }
-
-    // TODO SERVER-121970: Remove once $scoreFusion is supported with
-    // featureFlagExtensionsInsideHybridSearch. Deferred from parse() so the IFRFlagRetry is
-    // thrown inside the runAggregate retry loop where it can be caught and retried with the
-    // flag disabled. Throwing during parse() (invoked at command-invocation construction time
-    // on mongos) would propagate before the retry handler is installed.
-    search_helpers::throwIfrKickbackIfNecessary(
-        _extensionsInHybridSearchEnabled,
-        feature_flags::gFeatureFlagExtensionsInsideHybridSearch,
-        search_metrics::inHybridSearchKickbackRetryCount,
-        "$scoreFusion is not yet supported when featureFlagExtensionsInsideHybridSearch is "
-        "enabled.");
 }
 
 std::map<std::string, std::unique_ptr<Pipeline>> ScoreFusionStageParams::buildInputPipelines(

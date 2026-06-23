@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
 #include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
+#include "mongo/db/pipeline/document_source_internal_hybrid_search.h"
 #include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
 #include "mongo/db/pipeline/document_source_internal_list_collections.h"
 #include "mongo/db/pipeline/document_source_internal_shardserver_info.h"
@@ -162,6 +163,7 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceInternalConvertBucketIndexStats,
                        DocumentSourceInternalDensify,
                        DocumentSourceInternalGeoNearDistance,
+                       DocumentSourceInternalHybridSearch,
                        DocumentSourceInternalInhibitOptimization,
                        DocumentSourceInternalListCollections,
                        DocumentSourceInternalSearchIdLookUp,

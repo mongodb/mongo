@@ -259,6 +259,8 @@ const skippedAuthTestingAggStages = [
     "$merge", // Already covered in 'aggregate_merge_insert_documents' and
     // 'aggregate_merge_replace_documents'.
     "$set", // Alias for "$addFields" and already covered.
+    "$_internalHybridSearch", // Already covered in
+    // jstests/aggregation/sources/internal_hybrid_search_rejected_in_user_request.js.
 ];
 
 // The following commands are skipped in 'authCommandsLib' because they are unable to be

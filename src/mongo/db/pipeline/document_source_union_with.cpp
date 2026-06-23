@@ -85,7 +85,7 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
                 !expCtx->getInRouter() && !expCtx->getFromRouter());
     }
 
-    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
     // search stage.
     if (hybrid_scoring_util::isHybridSearchPipeline(params.pipeline) || params.isHybridSearch) {
         hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(params.unionNss, expCtx);
@@ -203,6 +203,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
           UnionWithSharedState::ExecutionProgress::kIteratingSource)),
       _userNss(original._userNss),
       _userPipeline(original._userPipeline),
+      _userPipelineIsHybridSearch(original._userPipelineIsHybridSearch),
       _fromNsIsAView(original._fromNsIsAView) {
     _sharedState->_pipeline->getContext()->setInUnionWith(true);
 
@@ -291,6 +292,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 
     _userNss = std::move(unionNss);
     _userPipeline = std::move(pipeline);
+    _userPipelineIsHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -373,6 +375,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 
     _userNss = std::move(unionNss);
     _userPipeline = std::move(userPipeline);
+    _userPipelineIsHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
 }
 
 DocumentSourceUnionWith::~DocumentSourceUnionWith() {
@@ -536,7 +539,7 @@ Value DocumentSourceUnionWith::legacyUnionWithSerialize(
         } else {
             spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));
         }
-        bool isHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
+        bool isHybridSearch = _userPipelineIsHybridSearch;
         if (isHybridSearch) {
             spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
         }
@@ -601,7 +604,8 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
                     getExpCtx(),
                     ResolvedNamespace{_resolvedNsForView->ns, _resolvedNsForView->pipeline},
                     std::move(recoveredPipeline),
-                    _userNss);
+                    _userNss,
+                    _userPipelineIsHybridSearch);
             } else {
                 pipeCopy = pipeline_factory::makePipeline(recoveredPipeline,
                                                           _sharedState->_pipeline->getContext(),
@@ -653,7 +657,8 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
                     getExpCtx(),
                     ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()},
                     std::move(serializedPipe),
-                    _userNss);
+                    _userNss,
+                    _userPipelineIsHybridSearch);
                 return preparePipelineAndExplain(std::move(resolvedPipeline));
             }
         }();
@@ -715,7 +720,7 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
         } else {
             spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));
         }
-        bool isHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
+        bool isHybridSearch = _userPipelineIsHybridSearch;
         if (isHybridSearch) {
             spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
         }
@@ -795,7 +800,8 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ResolvedNamespace& resolvedNs,
     std::vector<BSONObj> currentPipeline,
-    const NamespaceString& userNss) {
+    const NamespaceString& userNss,
+    bool isHybridSearch) {
     // We will call optimize() when finalizing the pipeline in 'doGetNext()'.
     auto opts = pipeline_factory::kDesugarOnly;
     opts.validator = assertAllStagesAllowedInUnionWith;
@@ -803,6 +809,12 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
     subExpCtx->setInUnionWith(true);
+    // The desugared mongot stage's injected 'view' field requires isHybridSearch on the
+    // sub-pipeline's expCtx. 'currentPipeline' may already be desugared; those callers pass
+    // isHybridSearch=true.
+    if (isHybridSearch || hybrid_scoring_util::isHybridSearchPipeline(currentPipeline)) {
+        subExpCtx->setIsHybridSearch();
+    }
     if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
         isRawDataOperation(expCtx->getOperationContext())) {
         // Raw Data operations on timeseries collections operate without the timeseries view.
@@ -823,6 +835,13 @@ DocumentSourceUnionWith::parsePipelineFromStageParamsWithMaybeViewDefinition(
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
     subExpCtx->setInUnionWith(true);
+    // The desugared mongot stage's injected 'view' field requires isHybridSearch on the
+    // sub-pipeline's expCtx.
+    // TODO SERVER-121094: remove once the $_internalHybridSearch marker is the single
+    // hybrid-search signal and these per-site setIsHybridSearch() calls are no longer needed.
+    if (hybrid_scoring_util::isHybridSearchPipeline(rawPipeline)) {
+        subExpCtx->setIsHybridSearch();
+    }
 
     auto opts = pipeline_factory::kDesugarOnly;
     opts.validator = assertAllStagesAllowedInUnionWith;

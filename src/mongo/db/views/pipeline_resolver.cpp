@@ -443,6 +443,16 @@ void PipelineResolver::insertTopLevelViewEntry(
     if (auto it = resolvedNamespaces.find(requestedNss); it != resolvedNamespaces.end()) {
         viewOptions.collUUID = it->second.uuid;
     }
+    // The resolution loop does not add the top-level view's namespace, so fall back to the
+    // caller-supplied backing-collection UUID; without it, $search inside the desugared $unionWith
+    // on this view fails with "a uuid is required for a search query".
+    if (!viewOptions.collUUID) {
+        viewOptions.collUUID = resolvedView.uuid;
+    } else if (resolvedView.uuid) {
+        tassert(12828500,
+                "Conflicting backing-collection UUIDs for the top-level view entry",
+                *viewOptions.collUUID == *resolvedView.uuid);
+    }
     resolvedNamespaces.insert_or_assign(requestedNss,
                                         ResolvedNamespace(requestedNss,
                                                           resolvedView.getResolvedNamespace(),

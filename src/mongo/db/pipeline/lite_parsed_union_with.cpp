@@ -101,7 +101,9 @@ std::unique_ptr<LiteParsedUnionWith> LiteParsedUnionWith::parse(const NamespaceS
             unionNss = NamespaceString::makeCollectionlessAggregateNSS(nss.dbName());
         }
 
-        // Recursively lite parse the nested pipeline, if one exists.
+        // Recursively lite-parse the nested pipeline, threading the IFR context: a hybrid stage
+        // here LP-desugars and the view machinery resolves the inner $unionWith shard-safely,
+        // and extension stages need the context for their view-policy checks.
         if (auto pipeline = unionWithSpec.getPipeline()) {
             ownedPipeline = OwnedLiteParsedPipeline(unionNss, *pipeline, options);
             rawPipeline = *pipeline;

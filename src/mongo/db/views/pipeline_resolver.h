@@ -101,6 +101,13 @@ public:
      * LiteParserOptions so that extension stages inside the view pipeline lite-parse with the
      * same feature-flag view as the top-level request. Pass nullptr if there is no relevant IFR
      * context (e.g. internal test fixtures).
+     *
+     * 'underlyingCollUUID' is the UUID of the view's underlying collection (i.e. the collection the
+     * aggregation actually executes against). It is recorded as the entry's collUUID when the map
+     * does not already carry one. This matters when the top-level view is also targeted by a
+     * sub-pipeline stage (e.g. a $rankFusion/$scoreFusion input desugared into a $unionWith on the
+     * same view): the sub-pipeline's $search/$vectorSearch reads pExpCtx->getUUID(), so without the
+     * UUID those stages would error ("a uuid is required for a search query") or return EOF.
      */
     static void insertTopLevelViewEntry(
         ResolvedNamespaceMap& resolvedNamespaces,

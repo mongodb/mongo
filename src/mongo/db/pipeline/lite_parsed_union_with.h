@@ -83,7 +83,7 @@ public:
     std::vector<BSONObj> pipeline;
     bool hasForeignDB;
 
-    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // TODO SERVER-121094 This can be removed once hybrid search desugars into the internal hybrid
     // search stage.
     bool isHybridSearch;
 

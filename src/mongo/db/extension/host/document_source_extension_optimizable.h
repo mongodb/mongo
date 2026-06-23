@@ -206,6 +206,30 @@ public:
         // bindResolvedNamespace().
         bool hasExtensionSearchStage() const override;
 
+        // These checks must consider every expanded stage, as if inlined into the pipeline:
+        // ranked/scored if ANY expanded stage is (matching isRankedPipeline()/isScoredPipeline()),
+        // selection only if ALL are. isInitialSource() above intentionally stays front-only.
+        // TODO SERVER-129047: replace this host-side reduction with the extension-declared
+        // ParseNode properties once get_properties is exposed on the ParseNode vtable, and delete
+        // these overrides.
+        bool isRankedStage() const override {
+            return std::any_of(_expanded.begin(), _expanded.end(), [](const auto& stage) {
+                return stage->isRankedStage();
+            });
+        }
+
+        bool isScoredStage() const override {
+            return std::any_of(_expanded.begin(), _expanded.end(), [](const auto& stage) {
+                return stage->isScoredStage();
+            });
+        }
+
+        bool isSelectionStage() const override {
+            return std::all_of(_expanded.begin(), _expanded.end(), [](const auto& stage) {
+                return stage->isSelectionStage();
+            });
+        }
+
         // Extension stages are unsupported on timeseries collections.
         Constraints constraints() const override {
             return {.canRunOnTimeseries = false};

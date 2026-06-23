@@ -74,6 +74,10 @@ public:
     bool isSelectionStage() const final {
         return true;
     }
+
+    bool isScoreDetailsStage() const final {
+        return _originalBson.isABSONObj() && _originalBson.Obj().getBoolField("scoreDetails");
+    }
 };
 
 /**
