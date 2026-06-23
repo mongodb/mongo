@@ -381,6 +381,14 @@ public:
     static constexpr MetricName kAggregateOpCount =
         MetricNameMaker::make("serverStatus.opcounters.aggregates");
 
+    // Asserts - Counts every assertion failure broken down by `kind` attribute (one
+    // of: "regular", "msg", "user", "tripwire"). Mirrors the per-type counters under
+    // `serverStatus.asserts.*`; `warning` is omitted because nothing increments it, and
+    // `rollovers` is omitted because the OTel counter is int64 and never wraps.
+    // TODO (follow-up SERVER ticket): add a `command` attribute so failures can be sliced by
+    // command name (the "(c)" approach from the design discussion).
+    static constexpr MetricName kAsserts = MetricNameMaker::make("serverStatus.asserts");
+
     // Query Performance Counters
     static constexpr MetricName kQueryExecutorScanned =
         MetricNameMaker::make("serverStatus.metrics.queryExecutor.scanned");

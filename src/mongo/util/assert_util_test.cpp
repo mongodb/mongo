@@ -817,5 +817,97 @@ TEST(ScopedDebugInfoStack, Disabled) {
     ASSERT_EQ(error_details::scopedDebugInfoStack().size(), 0);
 }
 
+// AssertionIncrementObserver tests
+//
+// Shared file-static state for observer probes. The observer typedef is a captureless function
+// pointer, so probes can't carry per-test state via lambda capture; they fan out into these.
+namespace observer_probe {
+std::atomic<int> count{0};
+std::atomic<AssertionKind> lastKind{AssertionKind::kRegular};
+
+void record(AssertionKind kind) noexcept {
+    count.fetch_add(1);
+    lastKind.store(kind);
+}
+
+void reset() {
+    count.store(0);
+    lastKind.store(AssertionKind::kRegular);
+}
+
+struct InstallGuard {
+    explicit InstallGuard(AssertionIncrementObserver observer) {
+        reset();
+        setAssertionIncrementObserver(observer);
+    }
+    ~InstallGuard() {
+        setAssertionIncrementObserver(nullptr);
+    }
+};
+}  // namespace observer_probe
+
+TEST(AssertionIncrementObserver, UassertNotifiesUser) {
+    observer_probe::InstallGuard guard(&observer_probe::record);
+    try {
+        uasserted(ErrorCodes::BadValue, "probe");
+    } catch (const DBException&) {
+    }
+    ASSERT_EQ(observer_probe::count.load(), 1);
+    ASSERT(observer_probe::lastKind.load() == AssertionKind::kUser);
+}
+
+TEST(AssertionIncrementObserver, MassertNotifiesMsg) {
+    observer_probe::InstallGuard guard(&observer_probe::record);
+    try {
+        masserted(ErrorCodes::BadValue, "probe");
+    } catch (const DBException&) {
+    }
+    ASSERT_EQ(observer_probe::count.load(), 1);
+    ASSERT(observer_probe::lastKind.load() == AssertionKind::kMsg);
+}
+
+TEST(AssertionIncrementObserver, TassertNotifiesTripwire) {
+    observer_probe::InstallGuard guard(&observer_probe::record);
+    try {
+        tasserted(Status(ErrorCodes::BadValue, "probe"));
+    } catch (const DBException&) {
+    }
+    ASSERT_EQ(observer_probe::count.load(), 1);
+    ASSERT(observer_probe::lastKind.load() == AssertionKind::kTripwire);
+    // tassert leaves a tripwire flag set; clear it so the process-exit check in the test harness
+    // doesn't fail.
+    assertionCount.tripwire.subtractAndFetch(1);
+}
+
+TEST(AssertionIncrementObserver, ClearingObserverStopsNotifications) {
+    {
+        observer_probe::InstallGuard guard(&observer_probe::record);
+        try {
+            uasserted(ErrorCodes::BadValue, "probe-installed");
+        } catch (const DBException&) {
+        }
+        ASSERT_EQ(observer_probe::count.load(), 1);
+    }
+    // Observer cleared on guard destruction.
+    const auto countAfterClear = observer_probe::count.load();
+    try {
+        uasserted(ErrorCodes::BadValue, "probe-cleared");
+    } catch (const DBException&) {
+    }
+    ASSERT_EQ(observer_probe::count.load(), countAfterClear);
+}
+
+namespace double_install_probe {
+void a(AssertionKind) noexcept {}
+void b(AssertionKind) noexcept {}
+}  // namespace double_install_probe
+
+DEATH_TEST_REGEX(AssertionIncrementObserverDeathTest,
+                 DoubleInstallTriggersInvariant,
+                 "observer already installed") {
+    setAssertionIncrementObserver(&double_install_probe::a);
+    setAssertionIncrementObserver(&double_install_probe::b);  // must abort.
+}
+
 }  // namespace
 }  // namespace mongo

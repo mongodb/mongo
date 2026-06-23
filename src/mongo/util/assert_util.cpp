@@ -31,6 +31,7 @@
 
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/active_exception_witness.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/demangle.h"
@@ -116,6 +117,46 @@ AssertionCount assertionCount;
 
 AssertionCount::AssertionCount() : regular(0), warning(0), msg(0), user(0), rollovers(0) {}
 
+namespace {
+Atomic<AssertionIncrementObserver> gAssertionIncrementObserver{nullptr};
+
+void notifyAssertionIncrement(AssertionKind kind) noexcept {
+    if (auto observer = gAssertionIncrementObserver.loadRelaxed()) {
+        observer(kind);
+    }
+}
+
+// Bumps the legacy AssertionCount field for `kind` and notifies the observer. The caller
+// passes only the kind; the helper looks up the matching legacy field so a (kind, counter)
+// mismatch is impossible at the call site.
+void bumpAssertion(AssertionKind kind) {
+    switch (kind) {
+        case AssertionKind::kRegular:
+            assertionCount.condrollover(assertionCount.regular.addAndFetch(1));
+            break;
+        case AssertionKind::kMsg:
+            assertionCount.condrollover(assertionCount.msg.addAndFetch(1));
+            break;
+        case AssertionKind::kUser:
+            assertionCount.condrollover(assertionCount.user.addAndFetch(1));
+            break;
+        case AssertionKind::kTripwire:
+            assertionCount.condrollover(assertionCount.tripwire.addAndFetch(1));
+            break;
+    }
+    notifyAssertionIncrement(kind);
+}
+}  // namespace
+
+void setAssertionIncrementObserver(AssertionIncrementObserver observer) noexcept {
+    auto prev = gAssertionIncrementObserver.swap(observer);
+    // Allow nullptr→observer (initial install) and observer→nullptr (shutdown clear). Reject
+    // observer→different-observer so accidental double-install surfaces loudly in dev/test.
+    invariant(
+        prev == nullptr || observer == nullptr,
+        "assertion increment observer already installed; clear with nullptr before replacing");
+}
+
 void AssertionCount::rollover() {
     rollovers.fetchAndAdd(1);
     regular.store(0);
@@ -184,7 +225,7 @@ MONGO_COMPILER_NOINLINE void invariantFailedWithMsg(const char* expr,
 }
 
 MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, SourceLocation loc) {
-    assertionCount.condrollover(assertionCount.regular.addAndFetch(1));
+    bumpAssertion(AssertionKind::kRegular);
     LOGV2_ERROR(23076, "Assertion failure", "expr"_attr = expr, "location"_attr = loc);
     logErrorBlock();
     std::stringstream temp;
@@ -283,13 +324,13 @@ MONGO_COMPILER_NORETURN void failedNoTrace(MsgId msgid,
 
 namespace error_details {
 MONGO_COMPILER_NOINLINE void uassertedWithLocation(const Status& status, SourceLocation loc) {
-    assertionCount.condrollover(assertionCount.user.addAndFetch(1));
+    bumpAssertion(AssertionKind::kUser);
     LOGV2_DEBUG(23074, 1, "User assertion", "error"_attr = redact(status), "location"_attr = loc);
     error_details::throwExceptionForStatus(status);
 }
 
 MONGO_COMPILER_NOINLINE void massertedWithLocation(const Status& status, SourceLocation loc) {
-    assertionCount.condrollover(assertionCount.msg.addAndFetch(1));
+    bumpAssertion(AssertionKind::kMsg);
     LOGV2_ERROR(23077, "Assertion", "error"_attr = redact(status), "location"_attr = loc);
     error_details::throwExceptionForStatus(status);
 }
@@ -300,7 +341,7 @@ void iassertFailed(const Status& status, SourceLocation loc) {
 }
 
 void tassertFailed(const Status& status, SourceLocation loc) {
-    assertionCount.condrollover(assertionCount.tripwire.addAndFetch(1));
+    bumpAssertion(AssertionKind::kTripwire);
     LOGV2_ERROR(
         TRIPWIRE_ASSERTION_ID, "Tripwire assertion", "error"_attr = status, "location"_attr = loc);
     logErrorBlock();

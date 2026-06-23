@@ -182,23 +182,57 @@ export function getLatestMetrics(directory) {
 }
 
 /**
+ * Finds the first data point in `record` whose metric name equals `metricName` and whose
+ * attributes include `{attrKey: attrValue}`. `getDataPoints(metric)` selects the instrument
+ * array (e.g. `metric.sum?.dataPoints`); `getValue(dp)` extracts the numeric payload.
+ * Returns 0 if no matching point is found.
+ */
+function findDataPointByAttribute(record, metricName, attrKey, attrValue, getDataPoints, getValue) {
+    if (!record) return 0;
+    for (const metric of getFlatMetricsList(record)) {
+        if (metric.name !== metricName) continue;
+        for (const dp of getDataPoints(metric)) {
+            const match = (dp.attributes ?? []).some(
+                (a) => a.key === attrKey && a.value?.stringValue === attrValue,
+            );
+            if (match) return Number(getValue(dp));
+        }
+    }
+    return 0;
+}
+
+/**
+ * Returns the counter data point value for a specific metric name and attribute key/value pair
+ * from the latest metrics snapshot, or 0 if not found. Useful for counters with multiple data
+ * points keyed by an attribute (e.g. kind: "user" on the asserts counter).
+ */
+export function getCounterByAttribute(metricsDir, metricName, attrKey, attrValue) {
+    const record = getLatestRawRecord(metricsDir);
+    return findDataPointByAttribute(
+        record,
+        metricName,
+        attrKey,
+        attrValue,
+        (m) => m.sum?.dataPoints ?? [],
+        (dp) => dp.asInt ?? dp.asDouble ?? 0,
+    );
+}
+
+/**
  * Returns the histogram data point count for a specific metric name and attribute key/value pair
  * from the latest metrics snapshot, or 0 if not found. Useful for histograms with multiple data
  * points keyed by an attribute (e.g. op_type: "read").
  */
 export function getHistogramCount(metricsDir, metricName, attrKey, attrValue) {
     const record = getLatestRawRecord(metricsDir);
-    if (!record) return 0;
-    for (const metric of getFlatMetricsList(record)) {
-        if (metric.name !== metricName) continue;
-        for (const dp of metric.histogram?.dataPoints ?? []) {
-            const match = (dp.attributes ?? []).some(
-                (a) => a.key === attrKey && a.value?.stringValue === attrValue,
-            );
-            if (match) return Number(dp.count ?? 0);
-        }
-    }
-    return 0;
+    return findDataPointByAttribute(
+        record,
+        metricName,
+        attrKey,
+        attrValue,
+        (m) => m.histogram?.dataPoints ?? [],
+        (dp) => dp.count ?? 0,
+    );
 }
 
 /**

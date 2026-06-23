@@ -85,6 +85,38 @@ public:
 };
 
 MONGO_MOD_NEEDS_REPLACEMENT extern AssertionCount assertionCount;
+
+/**
+ * Kinds of assertion failures tracked by AssertionCount. Excludes `warning` (never incremented)
+ * and `rollovers` (a legacy int32 wrap counter with no int64 analogue). Also excludes `iassert`
+ * (an internal control-flow path that does not bump any AssertionCount field) and
+ * `fassert`/`invariant`/`dassert` (process-fatal, not counter-tracked).
+ *
+ * When adding a new kind, update the bumpAssertion() switch in assert_util.cpp, the
+ * kindToAttributeValue switch and kKindAttributeValues array in asserts_otel_metric.cpp, and add
+ * coverage in assert_util_test.cpp. The -Wswitch warning in those switches catches the assert_util
+ * side at compile time.
+ */
+enum class AssertionKind {
+    kRegular,
+    kMsg,
+    kUser,
+    kTripwire,
+};
+
+/**
+ * Observer invoked from inside the assertion-failure paths after the legacy AssertionCount has
+ * been bumped. Higher-level layers (e.g., the OTel metrics layer) install one here so they can
+ * mirror the increment into an OTel counter without `mongo:base` depending on the OTel library.
+ *
+ * The observer is `noexcept`: it runs inside the assertion path and is not allowed to throw, since
+ * a throw would replace the in-flight DBException (or, for tassert, bypass the abort).
+ * `setAssertionIncrementObserver` is single-slot — installing a non-null observer over an
+ * existing non-null observer triggers an invariant. Pass `nullptr` to clear (e.g., from a dtor at
+ * shutdown).
+ */
+using AssertionIncrementObserver = void (*)(AssertionKind) noexcept;
+void setAssertionIncrementObserver(AssertionIncrementObserver observer) noexcept;
 class DBException;
 
 /** Most mongo exceptions inherit from this; this is commonly caught in most threads */
