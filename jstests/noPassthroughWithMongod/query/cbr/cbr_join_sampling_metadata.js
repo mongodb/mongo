@@ -185,16 +185,6 @@ describe("ceSamplingMetadata in join explain", function () {
             }),
         );
 
-        // TODO SERVER-128713: remove knob setting once persistent samples and sequential scan work
-        // together. Sequential scan mode bypasses tryLoadPersistentSample, so disable it for this
-        // test and restore it afterwards.
-        const origSeqScan = assert.commandWorked(
-            db.adminCommand({getParameter: 1, internalQuerySamplingBySequentialScan: 1}),
-        ).internalQuerySamplingBySequentialScan;
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}),
-        );
-
         try {
             joinTestWrapper(db, () => {
                 // Set both parameters inside the wrapper so it snapshots the originals and
@@ -298,13 +288,6 @@ describe("ceSamplingMetadata in join explain", function () {
                 );
             });
         } finally {
-            // TODO SERVER-128713: remove knob restore once persistent samples and sequential scan work together.
-            assert.commandWorked(
-                db.adminCommand({
-                    setParameter: 1,
-                    internalQuerySamplingBySequentialScan: origSeqScan,
-                }),
-            );
             dropSamplesColl(db);
         }
     });
