@@ -159,6 +159,7 @@ def create_backport_ticket(version: str):
     for attempt in range(3):
         try:
             server_issue = jira.create_issue(fields=server_issue_dict)
+            server_issue.update({"customfield_26868": {"value": "No"}})
             backport_issue = jira.create_issue(fields=backport_issue_dict)
             # For some reason you cant assign a team on creation for backport tickets
             backport_issue.update({"customfield_12751": [{"value": PROFILE_DATA_OWNING_TEAM}]})
@@ -239,7 +240,7 @@ def ensure_pr(repo, target_branch: str, new_branch: str):
         return
 
     jira_ticket = "SERVER-110427"
-    # This is a versioned backport branch if it stats with v
+    # This is a versioned backport branch if it starts with v
     if target_branch != "master" and target_branch[0] == "v":
         # get v8.0 from either v8.0 or v8.0-staging
         version = target_branch.split("-")[0]
@@ -250,7 +251,7 @@ def ensure_pr(repo, target_branch: str, new_branch: str):
             jira_ticket = "[Jira Ticket Creation Broken]"
 
     try:
-        repo.create_pull(
+        pr = repo.create_pull(
             base=target_branch,
             head=new_branch,
             title=f"{jira_ticket} Update profiling data",
@@ -260,12 +261,18 @@ def ensure_pr(repo, target_branch: str, new_branch: str):
         message = str(e.data)
         if e.status == 422 and "pull request already exists" in message:
             print(f"PR for {new_branch} was created concurrently, nothing to do.")
+            return
         elif e.status == 422 and "No commits between" in message:
             print(
                 f"{new_branch} has no diff against {target_branch}; profile data is already up to date."
             )
+            return
         else:
             raise
+
+    # Backport PRs (any non-master target) get a reviewer from the backport team.
+    if target_branch != "master":
+        pr.create_review_request(team_reviewers=["performance-backport"])
 
 
 def create_profile_data_pr(repo, args, target_branch, new_branch):
