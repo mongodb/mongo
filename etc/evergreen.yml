@@ -105,9 +105,6 @@ parameters:
   - key: evergreen_config_file_path
     value: "etc/evergreen.yml"
     description: "path to this file"
-  - key: enable_evergreen_api_test_selection
-    value: false
-    description: "Enable test selection using Evergreen API"
   - key: test_selection_strategies_array
     description: "Array of test selection strategies"
   - key: message_filter_plugin_release_version
