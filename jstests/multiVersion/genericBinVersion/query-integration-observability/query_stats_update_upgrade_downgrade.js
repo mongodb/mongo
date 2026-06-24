@@ -82,6 +82,9 @@ function assertUpdateCommandsNotRecorded(primaryConn) {
     assert.soonNoExcept(() => {
         resetQueryStatsStore(db, "1MB");
         assert.commandWorked(db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}));
+        // Intentionally left unscoped (no collName filter): this negative assertion is most useful
+        // when it is broad, so it also catches any unexpected shell-issued update that leaked into
+        // the store (e.g. an internal write recorded while the feature flag was enabled).
         queryStats = getQueryStatsUpdateCmd(db);
         return true;
     });
@@ -128,7 +131,11 @@ function assertUpdateCommandRecorded(primaryConn) {
     assert.soonNoExcept(() => {
         resetQueryStatsStore(db, "1MB");
         assert.commandWorked(db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}));
-        queryStats = getQueryStatsUpdateCmd(db);
+        // We are interested only in the query stats for the test collection, so we restrict by
+        // collection name explicitly. Here that restriction is functionally redundant, since we
+        // just reset the query stats store; we keep it to express the intent clearly and to stay
+        // correct even if other shell-issued updates reach this node.
+        queryStats = getQueryStatsUpdateCmd(db, {collName});
         return true;
     });
     assert.neq(queryStats, [], "Expected query stats entry for update command, but found none");
@@ -176,7 +183,10 @@ function assertUpdateCommandRecordedOnShardsExceptRouter(primaryConn) {
 
     const assertRecordedOnShardServer = (conn) => {
         const db = getDB(conn);
-        const queryStats = getQueryStatsUpdateCmd(db);
+        // Scope to the test collection, to filter out operations on the FCV document.
+        // This is to ensure that the additional updates performed on the FCV document during
+        // the upgrade/downgrade process are not included in the query stat results.
+        const queryStats = getQueryStatsUpdateCmd(db, {collName});
         assert.neq(queryStats, [], "Expected query stats entry for update command, but found none");
         assert.eq(
             queryStats.length,
