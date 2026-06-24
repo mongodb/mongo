@@ -215,7 +215,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
     // The INLJ will produce the join key for each document. The index probe, across all
     // invocations, will produce the number of documents this join outputs.
     CardinalityEstimate numDocsProcessed = leftDocs * 2 + numDocsOutput;
-    // Assume that sequential IO done by the index scan is neglible.
+    // Assume that sequential IO done by the index scan is negligible.
     CardinalityEstimate numSeqIOs = zeroCE;
 
     // Model the random IO performed by doing the index probe and fetch.
@@ -239,7 +239,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
         _jCtx.catStats.numPagesInStorageEngineCache(nss),
         // In a MongoDB index, we append the RecordId (RID) to the index key. This means that a
         // single index probe will read index keys for the same join key in RID order. Because
-        // MongoDB collections are clustered on RID, each fetch is not performing a truely
+        // MongoDB collections are clustered on RID, each fetch is not performing a truly
         // random I/O but rather a sorted-sparse access pattern over the collection. For this
         // calculation, we assume that each index probe performs a single random I/O and we model
         // the sorted-sparse I/O cost separately.

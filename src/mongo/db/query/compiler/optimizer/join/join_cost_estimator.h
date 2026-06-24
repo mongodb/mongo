@@ -85,7 +85,7 @@ public:
                                               EdgeId edgeId) = 0;
 
     /**
-     * Estiamte the cost of a nested loop join plan fragment.
+     * Estimate the cost of a nested loop join plan fragment.
      */
     virtual JoinCostEstimate costNLJFragment(const JoinPlanNode& left,
                                              const JoinPlanNode& right) = 0;

@@ -53,9 +53,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQueryFromSingleMatchE
  * Example: two edges A.a = B.b and B.b = C.c form an implicit edge A.a = C.c.
  *
  * We then re-use the disjoint set we created to add these implicit edges, to infer and propagate
- * single table predicates across equivalence classses, if any exist.
+ * single table predicates across equivalence classes, if any exist.
  *
- * Example: Taking the equivalence class above, {A.a, B.b, C.c} and the the STP B.b = 5, we can
+ * Example: Taking the equivalence class above, {A.a, B.b, C.c} and the STP B.b = 5, we can
  * infer A.a = 5 and C.c = 5 and thus propagate those new access paths to nodes A and C. However, we
  * need to hang onto the original access paths before replacing them or that backing BSON will be
  * destroyed (see  propagateSingleTablePredicate() for more details). Thus we return the original

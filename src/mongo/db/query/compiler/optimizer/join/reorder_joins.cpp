@@ -494,7 +494,7 @@ StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
     size_t maxRandomHintRetries) {
     random_utils::PseudoRandomGenerator rand(seed);
 
-    // We always run once, then rety up to 'maxRandomHintTries' times.
+    // We always run once, then retry up to 'maxRandomHintTries' times.
     for (size_t tries = 0; tries <= maxRandomHintRetries; tries++) {
         if (tries > 0) {
             LOGV2_DEBUG(11458205, 5, "Hint failed, trying again", "try"_attr = tries);

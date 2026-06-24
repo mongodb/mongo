@@ -630,7 +630,7 @@ TEST_F(ExtractExprPredicatesTest, NestedAnd) {
 }
 
 /**
- * An expressions constains non-equality predicate cannot be fully absorbed.
+ * An expression that contains a non-equality predicate cannot be fully absorbed.
  */
 TEST_F(ExtractExprPredicatesTest, ExpressionAndWithGt) {
     static constexpr std::string_view json = R"(

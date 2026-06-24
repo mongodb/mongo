@@ -54,7 +54,7 @@ struct ReorderedJoinSolution {
  * a random walk of the join graph in 'ctx' to determine the join order, the provided parameters to
  * specify the shape of tree and the method to use, and invokes the bottom up enumerator while
  * hinting all this information to get a join order. If the enumerator fails, will retry generating
- * a randomized hint up to 'maxRandomHintTries' times (this excludes the first attempt).
+ * a randomized hint up to 'maxRandomHintRetries' times (this excludes the first attempt).
  *
  * The cost & cardinality estimators may be null, since they're not used for choosing a plan-
  * however, if they're not null, costs and cardinalities of all join plan nodes will be generated.

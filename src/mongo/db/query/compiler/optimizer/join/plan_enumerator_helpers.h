@@ -57,7 +57,7 @@ public:
     uint64_t next();
 
 private:
-    // Value of n when calculating C(n, k). Stays constants for the life of this object.
+    // Value of n when calculating C(n, k). Stays constant for the life of this object.
     int _n;
     // Current k in the sequence. The subsequent call to next() will return C(n, k).
     int _k;
@@ -87,7 +87,7 @@ bool indexSatisfiesJoinPredicates(const BSONObj& keyPattern,
                                   const std::vector<IndexedJoinPredicate>& joinPreds);
 
 /**
- * Returns the best index that can satify the indexed predicates by "index probe". If there is
+ * Returns the best index that can satisfy the indexed predicates by "index probe". If there is
  * no index that can satisfy it then return boost::none. If multiple indexes can satisfy the
  * join predicates, this function selects one using deterministic heuristics:
  *  1. Prefer the index with fewer fields.

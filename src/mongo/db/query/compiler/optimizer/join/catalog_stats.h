@@ -37,7 +37,7 @@
 namespace mongo::join_ordering {
 
 /**
- * Statisitics for a single collection.
+ * Statistics for a single collection.
  */
 struct CollectionStats {
     CollectionStats(double logicalDataSizeBytes,
