@@ -33,12 +33,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/config_engine_gen.h"
-#include "mongo/scripting/config_engine_wasm_gen.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
 #include "mongo/util/scopeguard.h"
@@ -50,7 +48,11 @@
 
 namespace mongo::mozjs {
 
+// Name of the field used to store function return values in the BSONObj returned by invoke().
 const std::string kReturnValueField = "__value";
+
+// Name of the JS global variable used as the invoke return slot.
+// Used to identify getXxx calls that should be served from the C++ cache.
 constexpr std::string_view kReturnValueGlobal = "__returnValue";
 
 WasmtimeImplScope::WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wasmEngineCtx,
@@ -59,104 +61,40 @@ WasmtimeImplScope::WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wa
     init(nullptr);
 }
 
-WasmtimeImplScope::WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wasmEngineCtx,
-                                     boost::optional<int> jsHeapLimitMB,
-                                     std::unique_ptr<wasm::MozJSWasmBridge> idleBridge,
-                                     FunctionCacheMap /*cachedFunctions*/)
-    : _wasmEngineCtx(std::move(wasmEngineCtx)),
-      _jsHeapLimitMB(jsHeapLimitMB),
-      _bridge(std::move(idleBridge)) {
-    // Do NOT pre-populate _cachedFunctions here. init(useNewWasmRealm=true) calls
-    // resetRealm() which invalidates all compiled function handles — any cache stored now
-    // would be cleared by the useNewWasmRealm branch inside init(). Handles from the old
-    // realm are stale after resetRealm() and cannot be reused.
-    init(nullptr, /*useNewWasmRealm=*/true);
-}
-
 WasmtimeImplScope::~WasmtimeImplScope() {
     // Must unregister before _bridge is destroyed, otherwise a concurrent interrupt() reading the
     // OperationContext decoration could dereference a freed _bridge. This is because
     // unregisterOperation() takes the Client lock, serialising with respect to interrupt().
     unregisterOperation();
-
-    LOGV2_DEBUG(11542368,
-                2,
-                "WASM scope destroying",
-                "opId"_attr = _currentOpId(),
-                "bridgePresent"_attr = static_cast<bool>(_bridge),
-                "initialised"_attr = _bridge && _bridge->isInitialized(),
-                "trapped"_attr = _bridge && _bridge->hasTrapped(),
-                "oom"_attr = _bridge && _bridge->hasOomError(),
-                "killPending"_attr = _bridge && _bridge->isKillPending(),
-                "emitSetupBytes"_attr = _emitSetupBytes,
-                "invokeCount"_attr = _invokeSeq);
-
-    // Park a healthy bridge for reuse on this thread to avoid the ~30 ms WASM instantiation
-    // + SpiderMonkey init cost on the next request.
-    //
-    // Do NOT park a bridge that has ever called setupEmit. Each setupEmit
-    // allocates ~117 MB of WASM linear memory that cannot be released — WASM linear memory
-    // only grows, and resetRealm() does not return the underlying pages. Reusing a parked
-    // emit-configured bridge would call setupEmit() again, accumulating another ~117 MB.
-    // After enough MapReduce operations on the same thread, cumulative linear memory exceeds
-    // the store cap, causing a CannotLeaveComponent trap. Non-MR bridges still get parked.
-    if (_bridge && _bridge->isHealthy() && !_bridge->wasEmitConfigured()) {
-        if (auto* engine = dynamic_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine())) {
-            engine->parkBridgeForCurrentThread(
-                std::move(_bridge), std::move(_wasmEngineCtx), std::move(_cachedFunctions));
-            return;
-        }
-    }
-
-    // Skip shutdown() when kill was pending — increment_epoch() may cause the WIT
-    // shutdown call to trap if WASM is mid-execution.
-    if (_bridge && _bridge->isInitialized() && !_bridge->isKillPending()) {
-        _bridge->shutdown();
-    }
 }
 
 void WasmtimeImplScope::reset() {
     // Clear the decoration under the Client lock before tearing down _bridge, so a racing
     // interrupt() cannot call kill() on a dangling bridge.
     unregisterOperation();
-
-    const bool wasKillPending = _bridge && _bridge->isKillPending();
-    const bool bridgeHealthy = _bridge && _bridge->isHealthy();
-
-    LOGV2_DEBUG(11542369,
-                2,
-                "WASM scope reset",
-                "opId"_attr = _currentOpId(),
-                "bridgeHealthy"_attr = bridgeHealthy,
-                "killPending"_attr = wasKillPending,
-                "trapped"_attr = _bridge && _bridge->hasTrapped(),
-                "oom"_attr = _bridge && _bridge->hasOomError(),
-                "emitSetupBytes"_attr = _emitSetupBytes,
-                "invokeCount"_attr = _invokeSeq);
-
-    if (!bridgeHealthy) {
-        // Skip shutdown() when kill was pending — increment_epoch() may cause the WIT
-        // shutdown call to trap if WASM is mid-execution.
-        if (_bridge && _bridge->isInitialized() && !wasKillPending) {
-            _bridge->shutdown();
-        }
-        _bridge = nullptr;
-        _emitSetupBytes = 0;
-
-        // Only recreate WasmEngineContext when a kill was pending. kill() calls
-        // Engine::increment_epoch(), which is engine-wide state — a fresh Engine+Component avoids
-        // epoch contamination on the next Store instantiation. For non-kill resets the existing
-        // Engine is clean and a new Store can be safely created from it.
-        if (wasKillPending || !_wasmEngineCtx) {
-            _wasmEngineCtx.reset();
-            if (auto* engine = getGlobalScriptEngine()) {
-                _wasmEngineCtx =
-                    static_cast<WasmtimeScriptEngine*>(engine)->createWasmEngineContext();
-            }
-        }
-        // Handles from the old bridge are invalid after recreation — must recompile.
-        _cachedFunctions.clear();
+    if (_bridge && _bridge->isInitialized() && !_bridge->hasTrapped() && !_bridge->hasOomError() &&
+        !_bridge->isKillPending()) {
+        _bridge->shutdown();
     }
+    _bridge = nullptr;
+
+    // Drop the old engine context and build a fresh one. kill() calls Engine::increment_epoch(),
+    // which is engine-wide state — reusing the same engine after a kill poisons any future Store
+    // created from it (new instantiations can fail outright, or be born past their epoch
+    // deadline). A fresh Engine+Component per reset() cycle keeps contamination bounded to the
+    // bridge that was actually killed.
+    _wasmEngineCtx.reset();
+    if (auto* engine = getGlobalScriptEngine()) {
+        _wasmEngineCtx = static_cast<WasmtimeScriptEngine*>(engine)->createWasmEngineContext();
+    }
+
+    _cachedFunctions.clear();
+    // Force loadStored() to reload system.js after the bridge is recreated above. The base class
+    // _loadedVersion is not cleared by the bridge teardown, so without this reset loadStored()
+    // would see _loadedVersion == _lastVersion and skip reloading — leaving the fresh bridge
+    // with no stored functions installed.
+    _loadedVersion = 0;
+
     init(nullptr);
     _emitCallback = nullptr;
     _emitCallbackData = nullptr;
@@ -164,46 +102,9 @@ void WasmtimeImplScope::reset() {
 }
 
 void WasmtimeImplScope::init(const BSONObj* data) {
-    init(data, /*useNewWasmRealm=*/false);
-}
-
-void WasmtimeImplScope::init(const BSONObj* data, bool useNewWasmRealm) {
-    const uint32_t storeLimit = static_cast<uint32_t>(gWasmtimeStoreMemoryLimitMB.load());
-    // Use gJSHeapLimitMB as the default heap limit, matching the bridge constructor. Using
-    // storeLimit here would cause the fast-path check to always fail (bridge->getHeapLimitMB()
-    // returns gJSHeapLimitMB, not storeLimit).
-    const uint32_t heapLimit = _jsHeapLimitMB ? static_cast<uint32_t>(*_jsHeapLimitMB)
-                                              : static_cast<uint32_t>(gJSHeapLimitMB.load());
-    if (_bridge && _bridge->isHealthy() && _bridge->getStoreLimitMB() == storeLimit &&
-        _bridge->getHeapLimitMB() == heapLimit) {
-        // Conservative: can't observe whether resetEngine() preserves the WASM-side
-        // emit buffer, so always invalidate to ensure re-issue on the next injectNative().
-        _emitSetupBytes = 0;
-        _loadedVersion = 0;
-        if (useNewWasmRealm) {
-            _bridge->resetRealm();
-            _cachedFunctions.clear();
-        } else {
-            _bridge->resetEngine();
-        }
-        _storeLinearMemBytes = static_cast<int64_t>(storeLimit) * 1024 * 1024;
-        if (data) {
-            BSONObjIterator i(*data);
-            while (i.more()) {
-                BSONElement e = i.next();
-                BSONObjBuilder bob;
-                bob.appendAs(e, "");
-                _bridge->setGlobalValue(e.fieldName(), bob.obj());
-            }
-        }
-        return;
-    }
-
-    // Slow path: full bridge teardown and recreation. Handles are invalid after teardown.
     if (_bridge && _bridge->isInitialized()) {
         _bridge->shutdown();
     }
-    _cachedFunctions.clear();
     wasm::MozJSWasmBridge::Options opts{};
     if (_jsHeapLimitMB) {
         opts.jsHeapLimitMB = static_cast<uint32_t>(*_jsHeapLimitMB);
@@ -227,29 +128,11 @@ void WasmtimeImplScope::init(const BSONObj* data, bool useNewWasmRealm) {
     }
 }
 
-bool WasmtimeImplScope::execPredicate(ScriptingFunction func,
-                                      const BSONObj& doc,
-                                      int /*timeoutMs*/) {
-    // Single WASM crossing instead of 3 (setObject + setBoolean + invoke).
-    // obj/fullObject are set on the WASM side inside invokePredicate() — no extra host calls.
-    // No per-invocation deadline: wasmtime epoch interruption covers infinite loops, and the
-    // opCtx deadline (maxTimeMS) covers the outer query.
-    auto bsonVal = wasm::wasm_helpers::convertBsonToWcVal(doc);
-    return _bridge->invokePredicate(func, std::move(bsonVal));
-}
-
 ScriptingFunction WasmtimeImplScope::_createFunction(const char* raw) {
-    // Check the per-scope cache first.  Compiled function handles survive resetEngine() (the
-    // per-document fast-path reset), so the cache is valid across pool round-trips as long as
-    // no resetRealm() has occurred (_cachedFunctions is cleared there).  Skipping recompilation
-    // eliminates the dominant cost of repeated $where queries on the same scope.
-    std::string code(raw);
-    auto [it, inserted] = _cachedFunctions.emplace(code, ScriptingFunction{});
-    if (!inserted) {
-        return it->second;
-    }
-    it->second = _bridge->createFunction(std::string_view(code));
-    return it->second;
+    // The engine's createFunction calls __parseJSFunctionOrExpression (installed during init)
+    // to correctly wrap the source — matching MozJSImplScope::_MozJSCreateFunction behavior.
+    ScriptingFunction handle = _bridge->createFunction(std::string_view(raw));
+    return handle;
 }
 
 int WasmtimeImplScope::invoke(ScriptingFunction func,
@@ -264,71 +147,58 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
     // JavaScript code cannot mutate them during execution.
 
     // Convert BSON to a wc::Val before starting the deadline so the O(N) host-side work is
-    // not charged against the JS function timeout.
+    // not charged against the JS function timeout. See bridge.h for details.
     const BSONObj& bsonArg =
         (recv && !recv->isEmpty()) ? *recv : (args ? *args : BSONObj::kEmptyObject);
     auto bsonVal = wasm::wasm_helpers::convertBsonToWcVal(bsonArg);
+    bool predicateResult = false;
+    StatusWith<BSONObj> result{BSONObj{}};
 
-    const uint64_t seq = ++_invokeSeq;
-    const uint64_t opId = _currentOpId();
+    // The deadline monitor is scoped only around the JS invocations. Post-call work
+    // (_drainEmitToCallback, result extraction) is host-side C++ and should not be charged
+    // against the JS timeout.
+    _deadlineMonitor.startDeadline(this, timeoutMs);
+    try {
+        ScopeGuard deadlineGuard([&] { _deadlineMonitor.stopDeadline(this); });
+        if (recv && !recv->isEmpty()) {
+            if (_emitCallback) {
+                uassert(ErrorCodes::BadValue,
+                        "emit() cannot be used in a function that returns a value",
+                        ignoreReturn);
+                _bridge->invokeMap(func, std::move(bsonVal));
+            } else {
+                predicateResult = _bridge->invokePredicate(func, std::move(bsonVal));
+            }
+        } else {
+            result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
+        }
+    } catch (const DBException& ex) {
+        // When the WASM epoch interrupt fires, the bridge always throws Interrupted (11601).
+        // Translate to the real kill reason (e.g. MaxTimeMSExpired) so callers see the correct
+        // error code.
+        if (ex.code() == ErrorCodes::Interrupted && _opCtx)
+            uassertStatusOK(_opCtx->checkForInterruptNoAssert());
+        throw;
+    }
 
     if (recv && !recv->isEmpty()) {
         if (_emitCallback) {
-            uassert(ErrorCodes::BadValue,
-                    "emit() cannot be used in a function that returns a value",
-                    ignoreReturn);
-            LOGV2_DEBUG(11542363,
-                        3,
-                        "WASM scope invoking map function",
-                        "invokeSeq"_attr = seq,
-                        "opId"_attr = opId,
-                        "func"_attr = static_cast<uint64_t>(func),
-                        "emitSetupBytes"_attr = _emitSetupBytes,
-                        "argSize"_attr = bsonArg.objsize());
-            _deadlineMonitor.startDeadline(this, timeoutMs);
-            {
-                ScopeGuard mapGuard([&] { _deadlineMonitor.stopDeadline(this); });
-                _bridge->invokeMap(func, std::move(bsonVal));
-            }
             _drainEmitToCallback();
             return 0;
-        }
-
-        LOGV2_DEBUG(11542364,
-                    3,
-                    "WASM scope invoking predicate function",
-                    "invokeSeq"_attr = seq,
-                    "opId"_attr = opId,
-                    "func"_attr = static_cast<uint64_t>(func),
-                    "argSize"_attr = bsonArg.objsize());
-        bool predicateResult;
-        _deadlineMonitor.startDeadline(this, timeoutMs);
-        {
-            ScopeGuard predGuard([&] { _deadlineMonitor.stopDeadline(this); });
-            predicateResult = _bridge->invokePredicate(func, std::move(bsonVal));
         }
         if (!ignoreReturn) {
             _lastReturnValue = BSON(kReturnValueField << predicateResult);
         }
         return 0;
     }
-    LOGV2_DEBUG(11542365,
-                3,
-                "WASM scope invoking function",
-                "invokeSeq"_attr = seq,
-                "opId"_attr = opId,
-                "func"_attr = static_cast<uint64_t>(func),
-                "argSize"_attr = bsonArg.objsize(),
-                "ignoreReturn"_attr = ignoreReturn);
-    StatusWith<BSONObj> result{BSONObj{}};
-    _deadlineMonitor.startDeadline(this, timeoutMs);
-    {
-        ScopeGuard funcGuard([&] { _deadlineMonitor.stopDeadline(this); });
-        result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
-    }
+
     uassertStatusOK(result.getStatus());
     if (!ignoreReturn) {
-        BSONObj wrapped = result.getValue();
+        // invokeFunction's direct return goes through getGlobal which flattens JS arrays
+        // into BSON objects. Use getReturnValueWrapped() instead, which returns
+        // {"__returnValue": val} preserving array type info. Re-key as {"__value": val}
+        // for the scope's getters.
+        BSONObj wrapped = _bridge->getReturnValueWrapped();
         BSONElement retVal = wrapped["__returnValue"];
         if (retVal.ok()) {
             BSONObjBuilder bob;
@@ -351,16 +221,6 @@ void WasmtimeImplScope::injectNative(const char* field, NativeFunction func, voi
 
     _emitCallback = func;
     _emitCallbackData = data;
-
-    // evaluate_javascript.cpp calls injectNative a second time with data=nullptr to
-    // invalidate the emitState pointer after the map function returns. That call must NOT
-    // trigger a fresh setupEmit: the buffer is already drained, and setupEmit allocates
-    // ~117 MB of WASM linear memory — repeated calls accumulate heap pressure and can
-    // exhaust the store limit (CannotLeaveComponent trap).
-    if (!data) {
-        return;
-    }
-
     // Margin lets WASM buffer one over-limit doc so the host's EmitState sees
     // it during drain and can throw, instead of WASM silently dropping it.
     const int64_t emitBufBytes =
@@ -369,30 +229,7 @@ void WasmtimeImplScope::injectNative(const char* field, NativeFunction func, voi
             "internalQueryMaxJsEmitBytes exceeds wasmtimeStoreMemoryLimitMB: the emit buffer "
             "must fit within the WASM store's linear memory",
             emitBufBytes <= _storeLinearMemBytes);
-
-    // setupEmit() is logically idempotent for a given byte limit but
-    // allocates ~117 MB of WASM linear memory each call. Cache to call it at most once per
-    // (bridge, byte-limit) tuple. _emitSetupBytes is reset to 0 on every path that discards
-    // or resets the bridge so a new bridge always re-initialises its emit buffer.
-    if (_emitSetupBytes == emitBufBytes) {
-        LOGV2_DEBUG(11542366,
-                    4,
-                    "WASM scope reusing existing emit setup",
-                    "opId"_attr = _currentOpId(),
-                    "emitBufBytes"_attr = emitBufBytes);
-        return;
-    }
-
-    // INFO so each setupEmit (~117 MB allocation) is recorded in CI logs.
-    // Expected: ~1 per request. More = regression; zero before invokeMap = cache bug.
-    LOGV2(11542367,
-          "WASM scope calling setupEmit",
-          "opId"_attr = _currentOpId(),
-          "previousEmitSetupBytes"_attr = _emitSetupBytes,
-          "newEmitSetupBytes"_attr = emitBufBytes,
-          "storeLinearMemBytes"_attr = _storeLinearMemBytes);
     _bridge->setupEmit(emitBufBytes);
-    _emitSetupBytes = emitBufBytes;
 }
 
 BSONObj WasmtimeImplScope::_resolveGlobal(const char* field) const {
@@ -404,13 +241,12 @@ BSONObj WasmtimeImplScope::_resolveGlobal(const char* field) const {
 BSONObj WasmtimeImplScope::getObject(const char* field) {
     BSONObj result = _resolveGlobal(field);
     BSONElement val = result[kReturnValueField];
-    // invoke-function results are wrapped as {"__value": obj}; globals set via setObject()
-    // are stored raw. Scope::append() calls getObject() for both BSONType::object and
-    // BSONType::array, so both must be unwrapped.
+    // invoke-function results are stored as {"__value": obj} by the C++ invoke() normalisation.
+    // Globals set via setObject() are stored raw by the WASM bridge (no __value wrapper).
+    // Arrays must also be unwrapped here — Scope::append() calls getObject() for both
+    // BSONType::object and BSONType::array (via appendArray), so both need extraction.
     if (val.type() == BSONType::object || val.type() == BSONType::array) {
-        // val.Obj() is a view into result's SharedBuffer. Return an owned copy: the next
-        // invoke() replaces _lastReturnValue, freeing the buffer and leaving a dangling ptr.
-        return val.Obj().getOwned();
+        return val.Obj();
     }
     return result;
 }
@@ -438,11 +274,9 @@ int WasmtimeImplScope::getNumberInt(const char* field) {
 long long WasmtimeImplScope::getNumberLongLong(const char* field) {
     BSONObj obj = _resolveGlobal(field);
     BSONElement elem = obj[kReturnValueField];
-    // Scope::append() calls getNumberLongLong() for BSONType::date expecting millis-since-epoch.
-    // BSONElement::numberLong() returns 0 for non-numeric types, so without this branch
-    // every Date return value becomes epoch 0.
+    // BSONElement::numberLong() returns 0 for Date type; extract the actual ms value instead.
     if (elem.type() == BSONType::date) {
-        return elem.Date().toMillisSinceEpoch();
+        return elem.date().toMillisSinceEpoch();
     }
     return elem.numberLong();
 }
@@ -496,7 +330,8 @@ void WasmtimeImplScope::setString(const char* field, std::string_view val) {
 }
 
 void WasmtimeImplScope::setObject(const char* field, const BSONObj& obj, bool readOnly) {
-    // readOnly is silently ignored: the WASM engine does not support freezing objects.
+    // readOnly is silently ignored since the WASM engine does not support freezing objects, but we
+    // can still store the object in the global scope.
     _bridge->setGlobalValue(field, BSON("" << obj));
 }
 
@@ -505,8 +340,9 @@ void WasmtimeImplScope::setBoolean(const char* field, bool val) {
 }
 
 void WasmtimeImplScope::setFunction(const char* field, const char* code) {
-    // BSONType::code triggers newFunction in ValueReader, which calls
-    // __parseJSFunctionOrExpression — mirroring MozJSImplScope::setFunction behaviour.
+    // Mirror MozJSImplScope::setFunction: parse code as a function expression via the engine's
+    // newFunction path (BSONType::code triggers runtime->newFunction in ValueReader, which now
+    // calls __parseJSFunctionOrExpression), then set it directly as a named global property.
     _bridge->setGlobalValue(field, BSON("" << BSONCode(code)));
 }
 
@@ -563,20 +399,17 @@ std::string WasmtimeImplScope::getError() {
 }
 
 void WasmtimeImplScope::registerOperation(OperationContext* opCtx) {
-    _opCtx.store(opCtx, std::memory_order_release);
+    _opCtx = opCtx;
     if (auto* engine = getGlobalScriptEngine()) {
-        static_cast<WasmtimeScriptEngine*>(engine)->registerOperation(
-            opCtx, this, [this] { _opCtx.store(nullptr, std::memory_order_release); });
+        static_cast<WasmtimeScriptEngine*>(engine)->registerOperation(opCtx, this);
     }
 }
 void WasmtimeImplScope::unregisterOperation() {
-    // Atomically take ownership of _opCtx so we call engine->unregisterOperation() exactly once,
-    // even if the onTeardown callback races with us from the OperationContext's destructor.
-    auto* opCtx = _opCtx.exchange(nullptr, std::memory_order_acq_rel);
-    if (opCtx) {
+    if (_opCtx) {
         if (auto* engine = getGlobalScriptEngine()) {
-            static_cast<WasmtimeScriptEngine*>(engine)->unregisterOperation(opCtx);
+            static_cast<WasmtimeScriptEngine*>(engine)->unregisterOperation(_opCtx);
         }
+        _opCtx = nullptr;
     }
 }
 void WasmtimeImplScope::kill() {
@@ -593,8 +426,35 @@ bool WasmtimeImplScope::hasOutOfMemoryException() {
 }
 
 void WasmtimeImplScope::_installHelpers() {
-    // Array helpers are installed during engine init (_setupNewGlobal). No-op here so the
-    // slow-path in init() can call it without branching.
+    auto h = _bridge->createFunction(
+        "function() {"
+        "  Array.sum = function(arr) {"
+        "    if (arr.length == 0) return null;"
+        "    var s = arr[0];"
+        "    for (var i = 1; i < arr.length; i++) s += arr[i];"
+        "    return s;"
+        "  };"
+        "  Array.avg = function(arr) {"
+        "    if (arr.length == 0) return null;"
+        "    return Array.sum(arr) / arr.length;"
+        "  };"
+        "  Array.contains = function(arr, obj) {"
+        "    for (var i = 0; i < arr.length; i++) {"
+        "      if (arr[i] === obj) return true;"
+        "    }"
+        "    return false;"
+        "  };"
+        "  Array.unique = function(arr) {"
+        "    var r = [];"
+        "    for (var i = 0; i < arr.length; i++) {"
+        "      if (!Array.contains(r, arr[i])) r.push(arr[i]);"
+        "    }"
+        "    return r;"
+        "  };"
+        "  return null;"
+        "}");
+    uassertStatusOK(_bridge->invokeFunction(
+        h, wasm::wasm_helpers::convertBsonToWcVal(BSONObj()), /*ignoreReturn=*/true));
 }
 
 void WasmtimeImplScope::_drainEmitToCallback() {

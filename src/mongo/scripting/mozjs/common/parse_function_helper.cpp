@@ -53,11 +53,7 @@ namespace {
 static const char kParseHelperSrc[] = R"js(
 (function() {
     const _Reflect = Reflect;
-    // Non-enumerable + non-writable + configurable: hidden from Object.keys() and cannot be
-    // replaced by user code, but configurable so postInstall() can move it off the global.
-    Object.defineProperty(globalThis, '__parseJSFunctionOrExpression', {
-        configurable: true,
-        value: function(fnSrc) {
+    globalThis.__parseJSFunctionOrExpression = function(fnSrc) {
         // Ensure that a provided expression or function body is not terminated with a ';'.
         // This ensures we interpret the input as a single expression, rather than a sequence
         // of expressions, and can wrap it in parentheses.
@@ -128,10 +124,7 @@ static const char kParseHelperSrc[] = R"js(
         } else {
             return "function() { " + fnSrc + " }";
         }
-        },
-        enumerable: false,
-        writable: false,
-    });
+    };
 })();
 )js";
 

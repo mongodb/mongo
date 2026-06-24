@@ -47,17 +47,11 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/client.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/config_engine_gen.h"
-#include "mongo/scripting/config_engine_wasm_gen.h"
 #include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/unittest/unittest.h"
 
-#include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <set>
@@ -106,18 +100,7 @@ protected:
     BSONObj invokeFunction(uint64_t handle, const BSONObj& args) {
         auto result = _bridge->invokeFunction(handle, wasm_helpers::convertBsonToWcVal(args));
         uassert(result.getStatus().code(), result.getStatus().reason(), result.isOK());
-        BSONObj bson = result.getValue();
-        // invokeFunction returns {"__returnValue": value}. Normalize to match the old
-        // _getReturnValueBson() contract: object returns as the object itself, primitives
-        // as {"__value": primitive}.
-        BSONElement inner = bson["__returnValue"];
-        if (inner.eoo())
-            return bson;
-        if (inner.type() == BSONType::object || inner.type() == BSONType::array)
-            return inner.Obj().getOwned();
-        BSONObjBuilder bob;
-        bob.appendAs(inner, "__value");
-        return bob.obj();
+        return result.getValue();
     }
 
     // Uses the production-path (same as scope.cpp::invoke) to get the return value.
@@ -185,65 +168,6 @@ TEST_F(WasmMozJSBridgeTest, EngineInitializeAndShutdown) {
 
     _bridge->shutdown();
     ASSERT_FALSE(_bridge->isInitialized());
-}
-
-TEST_F(WasmMozJSBridgeTest, GetMemoryStatsReportsLinearMemoryAndGcHeap) {
-    auto stats = _bridge->getMemoryStats();
-    ASSERT_FALSE(stats.isEmpty());
-
-    const auto linearBytes = stats["linearMemoryBytes"].numberLong();
-    const auto gcHeapBytes = stats["gcHeapBytes"].numberLong();
-    ASSERT_GT(linearBytes, 0);
-    ASSERT_GTE(gcHeapBytes, 0);
-    // Linear memory backs the entire WASM instance, so it must be at least as large
-    // as the GC-managed heap inside it.
-    ASSERT_GTE(linearBytes, gcHeapBytes);
-    ASSERT_TRUE(stats.hasField("gcNumber"));
-
-    // Allocating inside JS must not shrink linear memory (it only grows).
-    auto handle = createFunction("function() { return new Array(100000).fill('x').join(''); }");
-    invokeFunction(handle, BSONObj());
-    auto after = _bridge->getMemoryStats();
-    ASSERT_GTE(after["linearMemoryBytes"].numberLong(), linearBytes);
-}
-
-TEST_F(WasmMozJSBridgeTest, InvokeFunctionArgsDoNotLeakLinearMemory) {
-    // Regression: the canonical ABI hands ownership of lowered argument
-    // buffers to the in-WASM bindings, which must free them. Before the ArgListGuard fix
-    // in engine/api.cpp, every invoke-function call leaked its full BSON input, so linear
-    // memory grew by ~bytesIn until the wasmtime store cap trapped with "cannot leave
-    // component instance".
-    auto handle = createFunction("function(doc) { return doc.n; }");
-
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder nested(bob.subobjStart("doc"));
-        nested.append("n", 1);
-        nested.append("blob", std::string(300 * 1024, 'x'));
-    }
-    const auto args = bob.obj();
-
-    // Warm up so one-time allocations (JIT, lazily-grown malloc arenas) don't count.
-    // resetEngine() runs a GC, so each sample sees the post-collection floor rather than
-    // whatever garbage the GC heuristics happened to let accumulate.
-    constexpr int kIterations = 100;
-    for (int i = 0; i < kIterations; ++i) {
-        invokeFunction(handle, args);
-    }
-    _bridge->resetEngine();
-    const auto before = _bridge->getMemoryStats()["linearMemoryBytes"].numberLong();
-
-    for (int i = 0; i < kIterations; ++i) {
-        invokeFunction(handle, args);
-    }
-    _bridge->resetEngine();
-    const auto after = _bridge->getMemoryStats()["linearMemoryBytes"].numberLong();
-
-    // 100 calls x ~300 KB input = ~30 MB passed in. With the leak, linear memory grows by
-    // the full ~30 MB; without it, growth after a GC should be near zero. Allow generous
-    // slack for malloc-arena growth and GC laziness.
-    const long long inputVolume = static_cast<long long>(kIterations) * args.objsize();
-    ASSERT_LT(after - before, inputVolume / 2);
 }
 
 TEST_F(WasmMozJSBridgeTest, CreateFunctionReturnsHandle) {
@@ -2885,242 +2809,6 @@ TEST_F(WasmMozJSBridgeTest, ReturnDateFromMillis) {
     ASSERT_EQ(retVal.type(), BSONType::date);
     ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), 1577871673790LL);
 }
-
-// resetRealm() security tests
-//
-// These tests hit the bridge directly (no scope layer) to verify that
-// resetRealm() — the cross-request isolation primitive — actually erases
-// each class of attacker state.
-// ---------------------------------------------------------------------------
-
-// A global variable written by the attacker must not be readable after resetRealm().
-TEST_F(WasmMozJSBridgeTest, Security_RealmReset_GlobalVarDoesNotPersist) {
-    auto write = createFunction("function() { globalThis.__stolen__ = 'secret'; return 1; }");
-    ASSERT_EQ(1, invokeFunction(write, BSONObj()).getField("__value").numberInt());
-
-    _bridge->resetRealm();
-
-    auto read =
-        createFunction("function() { return typeof globalThis.__stolen__ === 'undefined'; }");
-    ASSERT_TRUE(invokeFunction(read, BSONObj()).getField("__value").boolean());
-}
-
-// Object.prototype getter trap must not survive resetRealm().
-TEST_F(WasmMozJSBridgeTest, Security_RealmReset_ObjectPrototypeGetterGone) {
-    auto plant = createFunction(
-        "function() {"
-        "  try {"
-        "    Object.defineProperty(Object.prototype, '__trap__', {"
-        "      get: function() { return 'EXFILTRATED'; }, configurable: true"
-        "    });"
-        "  } catch(e) {}"
-        "  return 1;"
-        "}");
-    invokeFunction(plant, BSONObj());
-
-    _bridge->resetRealm();
-
-    auto check = createFunction("function() { return typeof ({}).__trap__ === 'undefined'; }");
-    ASSERT_TRUE(invokeFunction(check, BSONObj()).getField("__value").boolean());
-}
-
-// Poisoned JSON.stringify must be restored to the native implementation by resetRealm().
-TEST_F(WasmMozJSBridgeTest, Security_RealmReset_JSONStringifyRestored) {
-    auto poison = createFunction(
-        "function() { JSON.stringify = function() { return 'POISONED'; }; return 1; }");
-    invokeFunction(poison, BSONObj());
-
-    _bridge->resetRealm();
-
-    auto check = createFunction("function() { return JSON.stringify({x: 1}) !== 'POISONED'; }");
-    ASSERT_TRUE(invokeFunction(check, BSONObj()).getField("__value").boolean());
-}
-
-// A non-configurable property planted on globalThis must be gone after resetRealm()
-// because the entire global object is replaced.
-TEST_F(WasmMozJSBridgeTest, Security_RealmReset_NonConfigurableGlobalGone) {
-    auto plant = createFunction(
-        "function() {"
-        "  try {"
-        "    Object.defineProperty(globalThis, '__nc__', {"
-        "      value: 'PERSISTENT', writable: false, configurable: false"
-        "    });"
-        "  } catch(e) {}"
-        "  return 1;"
-        "}");
-    invokeFunction(plant, BSONObj());
-
-    _bridge->resetRealm();
-
-    auto check = createFunction("function() { return typeof globalThis.__nc__ === 'undefined'; }");
-    ASSERT_TRUE(invokeFunction(check, BSONObj()).getField("__value").boolean());
-}
-
-// A closure capturing sensitive data, installed as a global function, must not be
-// callable after resetRealm() — the handle is invalidated and the global is gone.
-TEST_F(WasmMozJSBridgeTest, Security_RealmReset_ClosureHandleInvalidated) {
-    auto plant = createFunction(
-        "function() {"
-        "  var secret = 'TOP_SECRET';"
-        "  globalThis.__leak = function() { return secret; };"
-        "  return 1;"
-        "}");
-    invokeFunction(plant, BSONObj());
-
-    // Capture the handle to the exfil function before reset.
-    auto exfilHandle = createFunction("function() { return __leak(); }");
-
-    _bridge->resetRealm();
-
-    // The handle is invalidated by resetRealm(); invoking it must throw.
-    ASSERT_THROWS_CODE(
-        invokeFunction(exfilHandle, BSONObj()), DBException, ErrorCodes::JSInterpreterFailure);
-}
-
-// Array.prototype.push replacement must be scrubbed by resetRealm().
-TEST_F(WasmMozJSBridgeTest, Security_RealmReset_ArrayPrototypePushRestored) {
-    auto poison = createFunction(
-        "function() { Array.prototype.push = function() { return 'POISONED'; }; return 1; }");
-    invokeFunction(poison, BSONObj());
-
-    _bridge->resetRealm();
-
-    auto check = createFunction(
-        "function() {"
-        "  var a = [1, 2];"
-        "  a.push(3);"
-        "  return a.length === 3 && a[2] === 3;"
-        "}");
-    ASSERT_TRUE(invokeFunction(check, BSONObj()).getField("__value").boolean());
-}
-
-// A Symbol.toPrimitive trap planted on Object.prototype must not survive resetRealm().
-TEST_F(WasmMozJSBridgeTest, Security_RealmReset_SymbolToPrimitiveTrapGone) {
-    auto plant = createFunction(
-        "function() {"
-        "  try {"
-        "    Object.defineProperty(Object.prototype, Symbol.toPrimitive, {"
-        "      value: function() { return 'POISONED'; }, configurable: true"
-        "    });"
-        "  } catch(e) {}"
-        "  return 1;"
-        "}");
-    invokeFunction(plant, BSONObj());
-
-    _bridge->resetRealm();
-
-    auto check = createFunction(
-        "function() {"
-        "  var obj = { valueOf: function() { return 42; } };"
-        "  return +obj === 42;"
-        "}");
-    ASSERT_TRUE(invokeFunction(check, BSONObj()).getField("__value").boolean());
-}
-
-// ---------------------------------------------------------------------------
-// _throwAfterTrap error-code mapping tests
-// ---------------------------------------------------------------------------
-
-// Fixture that adds a ServiceContext so tests can bind a Client + OperationContext
-// to the current thread, enabling _throwAfterTrap's Client::getCurrent() path.
-class WasmMozJSBridgeKillTest : public WasmMozJSBridgeTest,
-                                public ScopedGlobalServiceContextForTest {};
-
-// When kill() fires and the current thread's OperationContext is marked killed
-// with a specific code, _throwAfterTrap must throw that code (not a generic
-// Interrupted or kWasmtimeTrapErrorCode).
-TEST_F(WasmMozJSBridgeKillTest, ThrowAfterTrap_MarkedOpCtx_PropagatesRealErrorCode) {
-    auto fn = createFunction("while (true) {}");
-
-    // Run the blocking invoke in a background thread so we can bound the kill loop and
-    // surface a clear failure if the epoch interrupt mechanism is broken.
-    // The client + opCtx are created on the invoker thread so _throwAfterTrap finds the
-    // correct (killed) opCtx via the thread-local current-client mechanism.
-    std::atomic<bool> invokeDone{false};
-    std::exception_ptr invokeEx;
-    std::thread invoker([&] {
-        auto client = getService()->makeClient("WasmBridgeKillTest");
-        AlternativeClientRegion acr(client);
-        auto opCtx = cc().makeOperationContext();
-        opCtx->markKilled(ErrorCodes::MaxTimeMSExpired);
-        try {
-            (void)_bridge->invokeFunction(fn, wasm_helpers::convertBsonToWcVal(BSONObj()));
-        } catch (...) {
-            invokeEx = std::current_exception();
-        }
-        invokeDone.store(true, std::memory_order_release);
-    });
-
-    // Kill every 5 ms; cap at 400 iterations (~2 s). In a healthy system the first kill
-    // fires the epoch interrupt and invoker exits within ~5 ms.
-    for (int i = 0; i < 400 && !invokeDone.load(std::memory_order_acquire); ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        _bridge->kill();
-    }
-
-    if (invoker.joinable()) {
-        if (!invokeDone.load(std::memory_order_acquire))
-            invoker.detach();  // epoch interrupt broken; detach to avoid blocking teardown
-        else
-            invoker.join();
-    }
-
-    ASSERT(invokeDone.load(std::memory_order_relaxed))
-        << "invokeFunction did not throw within 2s; epoch interrupt may be broken";
-    ASSERT(invokeEx) << "invokeFunction returned without throwing";
-    try {
-        std::rethrow_exception(invokeEx);
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::MaxTimeMSExpired);
-    } catch (...) {
-        FAIL("invokeFunction threw an unexpected exception type");
-    }
-}
-
-// When kill() fires but no OperationContext is bound to the current thread,
-// _throwAfterTrap falls back to Interrupted.
-TEST_F(WasmMozJSBridgeTest, ThrowAfterTrap_NoOpCtx_FallsBackToInterrupted) {
-    auto fn = createFunction("while (true) {}");
-
-    // Run the blocking invoke in a background thread so we can bound the kill loop and
-    // surface a clear failure if the epoch interrupt mechanism is broken.
-    std::atomic<bool> invokeDone{false};
-    std::exception_ptr invokeEx;
-    std::thread invoker([&] {
-        try {
-            (void)_bridge->invokeFunction(fn, wasm_helpers::convertBsonToWcVal(BSONObj()));
-        } catch (...) {
-            invokeEx = std::current_exception();
-        }
-        invokeDone.store(true, std::memory_order_release);
-    });
-
-    // Kill every 5 ms; cap at 400 iterations (~2 s).
-    for (int i = 0; i < 400 && !invokeDone.load(std::memory_order_acquire); ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        _bridge->kill();
-    }
-
-    if (invoker.joinable()) {
-        if (!invokeDone.load(std::memory_order_acquire))
-            invoker.detach();  // epoch interrupt broken; detach to avoid blocking teardown
-        else
-            invoker.join();
-    }
-
-    ASSERT(invokeDone.load(std::memory_order_relaxed))
-        << "invokeFunction did not throw within 2s; epoch interrupt may be broken";
-    ASSERT(invokeEx) << "invokeFunction returned without throwing";
-    try {
-        std::rethrow_exception(invokeEx);
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::Interrupted);
-    } catch (...) {
-        FAIL("invokeFunction threw an unexpected exception type");
-    }
-}
-
-
 /**
  * Tests exposed javascript functions.
  */
@@ -3159,49 +2847,7 @@ TEST_F(WasmMozJSBridgeTest, AssertTest) {
     BSONObj emptyArgs;
     auto result = invokeFunction(handle, emptyArgs);
 }
-
 }  // namespace
 }  // namespace wasm
 }  // namespace mozjs
 }  // namespace mongo
-
-namespace mongo::mozjs::wasm {
-
-TEST(WasmBridgeStatsTest, ToBSONContainsAllCounters) {
-    WasmBridgeStats stats;
-    stats.setupEmitCallCount.store(1);
-    stats.invokeFunctionCallCount.store(2);
-    stats.invokeMapCallCount.store(3);
-    stats.invokePredicateCallCount.store(4);
-    stats.resetEngineCallCount.store(5);
-    stats.resetRealmCallCount.store(6);
-    stats.createFunctionCallCount.store(7);
-    stats.drainEmitBufferCallCount.store(8);
-    stats.setGlobalCallCount.store(9);
-    stats.bytesInToWasm.store(100);
-    stats.bytesOutFromWasm.store(200);
-    stats.maxSingleCallBytesIn.store(50);
-    stats.maxSingleCallBytesOut.store(60);
-    stats.maxEmitByteLimit.store(1000);
-    stats.killCount.store(11);
-
-    BSONObj bson = stats.toBSON();
-
-    ASSERT_EQ(bson["setupEmitCalls"].Long(), 1);
-    ASSERT_EQ(bson["invokeFunctionCalls"].Long(), 2);
-    ASSERT_EQ(bson["invokeMapCalls"].Long(), 3);
-    ASSERT_EQ(bson["invokePredicateCalls"].Long(), 4);
-    ASSERT_EQ(bson["resetEngineCalls"].Long(), 5);
-    ASSERT_EQ(bson["resetRealmCalls"].Long(), 6);
-    ASSERT_EQ(bson["createFunctionCalls"].Long(), 7);
-    ASSERT_EQ(bson["drainEmitBufferCalls"].Long(), 8);
-    ASSERT_EQ(bson["setGlobalCalls"].Long(), 9);
-    ASSERT_EQ(bson["bytesInToWasm"].Long(), 100);
-    ASSERT_EQ(bson["bytesOutFromWasm"].Long(), 200);
-    ASSERT_EQ(bson["maxSingleCallBytesIn"].Long(), 50);
-    ASSERT_EQ(bson["maxSingleCallBytesOut"].Long(), 60);
-    ASSERT_EQ(bson["maxEmitByteLimit"].Long(), 1000);
-    ASSERT_EQ(bson["killCount"].Long(), 11);
-}
-
-}  // namespace mongo::mozjs::wasm

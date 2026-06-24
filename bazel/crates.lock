@@ -1,5 +1,5 @@
 {
-  "checksum": "b01cc541b36e01fc3bdb689603bcc4967bc3f75d36e39e5f2ff96e7d45f306df",
+  "checksum": "85caffaf4b251683fd2c989e9c45fdef6ac475abf5774a64edee2b414ad7973f",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -17151,7 +17151,6 @@
           "sha256": "372db8bbad8ec962038101f75ab2c3ffcd18797d7d3ae877a58ab9873cd0c4bd",
           "patches": [
             "@@//bazel/wasmtime:val_bytes_fast_path.patch",
-            "@@//bazel/wasmtime:val_bytes_lift_fast_path.patch",
             "@@//bazel/wasmtime:val_bytes_wave_fast_path.patch"
           ],
           "patch_args": [

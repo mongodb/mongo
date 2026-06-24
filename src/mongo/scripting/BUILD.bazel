@@ -30,11 +30,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "config_engine_wasm_gen",
-    src = "config_engine_wasm.idl",
-)
-
-idl_generator(
     name = "deadline_monitor_gen",
     src = "deadline_monitor.idl",
 )

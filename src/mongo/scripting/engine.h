@@ -146,11 +146,6 @@ public:
                        bool readOnlyArgs = false,
                        bool readOnlyRecv = false) = 0;
 
-    // Evaluate a $where-style predicate with doc as both `this` and the global `obj`.
-    // The default implementation uses the generic setObject+setBoolean+invoke sequence.
-    // Engines that have a cheaper single-call predicate path (e.g. WASM) override this.
-    virtual bool execPredicate(ScriptingFunction func, const BSONObj& doc, int timeoutMs);
-
     void invokeSafe(ScriptingFunction func,
                     const BSONObj* args,
                     const BSONObj* recv,

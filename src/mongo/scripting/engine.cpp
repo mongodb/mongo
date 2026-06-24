@@ -193,15 +193,6 @@ int Scope::invoke(const char* code, const BSONObj* args, const BSONObj* recv, in
     return invoke(func, args, recv, timeoutMs);
 }
 
-bool Scope::execPredicate(ScriptingFunction func, const BSONObj& doc, int timeoutMs) {
-    setObject("obj", doc);
-    setBoolean("fullObject", true);
-    int err = invoke(func, nullptr, &doc, timeoutMs, false);
-    uassert(5038802, "error on invocation of $where function:\n" + getError(), err != -3);
-    uassert(5038803, "unknown error in invocation of $where function", err == 0);
-    return getBoolean("__returnValue");
-}
-
 bool Scope::execFile(const string& filename, bool printResult, bool reportError, int timeoutMs) {
 #ifdef _WIN32
     boost::filesystem::path p(toWideString(filename.c_str()));
@@ -580,9 +571,6 @@ public:
     }
     bool isKillPending() const override {
         return _real->isKillPending();
-    }
-    bool execPredicate(ScriptingFunction func, const BSONObj& doc, int timeoutMs) override {
-        return _real->execPredicate(func, doc, timeoutMs);
     }
     int type(const char* field) override {
         return _real->type(field);
