@@ -125,3 +125,35 @@ TEST_CASE(
         REQUIRE(env.bucket_size(0) == 1);
     }
 }
+
+TEST_CASE("cross_checkpoint_caching_put: a shared disk image is counted once in cache usage",
+  "[cross_checkpoint_caching],[cross_checkpoint_caching_put]")
+{
+    cross_checkpoint_caching_test_env env(1);
+    WT_CACHE *cache = S2C(env.session())->cache;
+    const uint8_t addr[] = {0x01, 0x02};
+    const size_t image_size = CROSS_CHECKPOINT_CACHING_TEST_DATA_SIZE;
+
+    uint64_t inmem_before = __wt_atomic_load_uint64_relaxed(&cache->bytes_inmem);
+    uint64_t image_before = __wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf);
+
+    /* Inserting the image accounts its bytes once in the cache totals. */
+    WT_SHARED_DSK_ITEM *item = env.put(addr, sizeof(addr));
+    REQUIRE(item->ref_count == 1);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_inmem) == inmem_before + image_size);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf) == image_before + image_size);
+
+    /* Sharing the image via a put collision bumps the reference count without recounting bytes. */
+    env.put(addr, sizeof(addr));
+    REQUIRE(item->ref_count == 2);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_inmem) == inmem_before + image_size);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf) == image_before + image_size);
+
+    /* Sharing it via get behaves the same way. */
+    WT_SHARED_DSK_ITEM *got = nullptr;
+    __wt_shared_dsk_cache_get(env.session(), addr, sizeof(addr), &got);
+    REQUIRE(got == item);
+    REQUIRE(item->ref_count == 3);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_inmem) == inmem_before + image_size);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf) == image_before + image_size);
+}

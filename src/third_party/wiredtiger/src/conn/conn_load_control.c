@@ -67,8 +67,8 @@ __wti_conn_load_control_config(WT_SESSION_IMPL *session, const char *cfg[], bool
     /* load control threshold determines when the load control will be activated */
 
     WT_RET(__wt_config_gets(session, cfg, "load_control.control_threshold", &cval));
-    __wt_atomic_store_uint8_relaxed(
-      &load_control->control_threshold, (((uint8_t)cval.val > 200) ? 200 : (uint8_t)cval.val));
+    __wt_atomic_store_uint16_relaxed(
+      &load_control->control_threshold, (((uint16_t)cval.val > 1000) ? 1000 : (uint16_t)cval.val));
 
     /*
      * Load control thresholds are calculated based on the configuration settings of load control as
@@ -84,13 +84,13 @@ __wti_conn_load_control_config(WT_SESSION_IMPL *session, const char *cfg[], bool
  * __conn_calc_load_pct --
  *     Calculate the percentage of part relative to whole. Returns 0 if whole is zero.
  */
-static WT_INLINE uint8_t
+static WT_INLINE uint16_t
 __conn_calc_load_pct(uint64_t part, uint64_t whole)
 {
     if (whole == 0)
         return (0);
 
-    return (((uint8_t)WT_MIN((part * 100) / whole, 200)));
+    return ((uint16_t)WT_MIN((part * 100) / whole, 1000));
 }
 
 /*
@@ -102,7 +102,7 @@ __wt_conn_calc_read_load(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_LOAD_CONTROL *load_control;
     uint64_t bytes_inuse, bytes_max;
-    uint8_t load;
+    uint16_t load;
 
     load_control = &S2C(session)->load_control;
     if (F_ISSET(load_control, WT_CONN_LOAD_CONTROL)) {
@@ -110,7 +110,7 @@ __wt_conn_calc_read_load(WT_SESSION_IMPL *session)
         bytes_inuse = __wt_cache_bytes_inuse(S2C(session)->cache);
 
         load = __conn_calc_load_pct(bytes_inuse, bytes_max);
-        __wt_atomic_store_uint8_relaxed(&load_control->read_load, load);
+        __wt_atomic_store_uint16_relaxed(&load_control->read_load, load);
         WT_STAT_CONN_SET(session, read_load, load);
     }
     return;
@@ -125,7 +125,7 @@ __wt_conn_calc_write_load(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_LOAD_CONTROL *load_control;
     uint64_t bytes_dirty, bytes_max;
-    uint8_t load;
+    uint16_t load;
 
     load_control = &S2C(session)->load_control;
     if (F_ISSET(load_control, WT_CONN_LOAD_CONTROL)) {
@@ -133,7 +133,7 @@ __wt_conn_calc_write_load(WT_SESSION_IMPL *session)
         bytes_dirty = __wt_cache_dirty_inuse(S2C(session)->cache);
 
         load = __conn_calc_load_pct(bytes_dirty, bytes_max);
-        __wt_atomic_store_uint8_relaxed(&load_control->write_load, load);
+        __wt_atomic_store_uint16_relaxed(&load_control->write_load, load);
         WT_STAT_CONN_SET(session, write_load, load);
     }
     return;

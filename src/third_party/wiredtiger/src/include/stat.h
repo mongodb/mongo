@@ -486,6 +486,7 @@ struct __wt_connection_stats {
     int64_t disagg_block_get;
     int64_t disagg_block_get_cold;
     int64_t disagg_block_hs_get;
+    int64_t disagg_block_plh_put_failed;
     int64_t disagg_block_page_discard;
     int64_t disagg_block_put;
     int64_t disagg_block_put_cold;
@@ -1466,6 +1467,7 @@ struct __wt_dsrc_stats {
     int64_t disagg_block_get;
     int64_t disagg_block_get_cold;
     int64_t disagg_block_hs_get;
+    int64_t disagg_block_plh_put_failed;
     int64_t disagg_block_page_discard;
     int64_t disagg_block_put;
     int64_t disagg_block_put_cold;

@@ -156,3 +156,34 @@ TEST_CASE(
     __wt_shared_dsk_cache_get(env.session(), addr, sizeof(addr), &got_a);
     REQUIRE(got_a == nullptr);
 }
+
+TEST_CASE(
+  "cross_checkpoint_caching_release: shared image bytes are drained only on the last release",
+  "[cross_checkpoint_caching],[cross_checkpoint_caching_release]")
+{
+    cross_checkpoint_caching_test_env env(1);
+    WT_CACHE *cache = S2C(env.session())->cache;
+    const uint8_t addr[] = {0x01, 0x02};
+    const size_t image_size = CROSS_CHECKPOINT_CACHING_TEST_DATA_SIZE;
+
+    uint64_t inmem_before = __wt_atomic_load_uint64_relaxed(&cache->bytes_inmem);
+    uint64_t image_before = __wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf);
+
+    /* Two pages share one disk image: counted once, reference count two. */
+    WT_SHARED_DSK_ITEM *item = env.put(addr, sizeof(addr));
+    env.put(addr, sizeof(addr));
+    REQUIRE(item->ref_count == 2);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_inmem) == inmem_before + image_size);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf) == image_before + image_size);
+
+    /* Releasing one of two references keeps the image, so its bytes stay counted. */
+    __wt_shared_dsk_cache_release(env.session(), item);
+    REQUIRE(item->ref_count == 1);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_inmem) == inmem_before + image_size);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf) == image_before + image_size);
+
+    /* The last release removes the image and drains its bytes once, back to the baseline. */
+    __wt_shared_dsk_cache_release(env.session(), item);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_inmem) == inmem_before);
+    REQUIRE(__wt_atomic_load_uint64_relaxed(&cache->bytes_image_leaf) == image_before);
+}

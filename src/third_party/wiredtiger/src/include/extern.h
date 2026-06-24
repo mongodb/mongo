@@ -2027,9 +2027,9 @@ static WT_INLINE bool __wt_conf_get_compiled(WT_CONNECTION_IMPL *conn, const cha
   WT_CONF **confp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_conf_is_compiled(WT_CONNECTION_IMPL *conn, const char *config)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static WT_INLINE bool __wt_conn_load_control_read_overload(WT_SESSION_IMPL *session)
+static WT_INLINE bool __wt_conn_load_control_read_loadshed(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static WT_INLINE bool __wt_conn_load_control_write_overload(WT_SESSION_IMPL *session)
+static WT_INLINE bool __wt_conn_load_control_write_loadshed(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_cursor_has_cached_memory(WT_CURSOR *cursor)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

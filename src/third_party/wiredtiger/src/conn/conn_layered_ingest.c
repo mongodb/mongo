@@ -132,26 +132,19 @@ err:
 static int
 __layered_clear_ingest_table(WT_SESSION_IMPL *session, const char *uri)
 {
+    WT_DECL_RET;
+
     WT_ASSERT(session, WT_URI_IS_INGEST(uri));
 
     /*
-     * Truncate needs a running txn. We should probably do something more like the history store and
-     * make this non-transactional -- this happens during step-up, so we know there are no other
-     * transactions running, so it's safe.
+     * Clearing the ingest table is final and owned by no transaction. The session flag makes the
+     * truncate write globally visible tombstones that are immediately visible to every reader.
      */
-    WT_RET(__wt_txn_begin(session, NULL));
+    F_SET(session, WT_SESSION_NON_TRANSACTIONAL_TRUNCATE);
+    ret = session->iface.truncate(&session->iface, uri, NULL, NULL, NULL);
+    F_CLR(session, WT_SESSION_NON_TRANSACTIONAL_TRUNCATE);
 
-    /*
-     * No other transactions are running, we're only doing this truncate, and it should become
-     * immediately visible. So this transaction doesn't have to care about timestamps.
-     */
-    F_SET(session->txn, WT_TXN_TS_NOT_SET);
-
-    WT_RET(session->iface.truncate(&session->iface, uri, NULL, NULL, NULL));
-
-    WT_RET(__wt_txn_commit(session, NULL));
-
-    return (0);
+    return (ret);
 }
 
 /*

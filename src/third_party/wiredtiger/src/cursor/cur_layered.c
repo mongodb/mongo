@@ -25,6 +25,21 @@ typedef enum {
 } WT_CLAYERED_PUT_OP;
 
 /*
+ * Increment the ingest or stable variant of a read statistic according to which constituent cursor
+ * holds the result. Call only on the success path of a read, once the operation has positioned the
+ * cursor; the assert enforces that.
+ */
+#define WT_STAT_CLAYERED_READ_CONSTITUENT_INCR(session, clayered, fld)                   \
+    do {                                                                                 \
+        if ((clayered)->current_cursor == (clayered)->ingest_cursor)                     \
+            WT_STAT_CONN_DSRC_INCR(session, fld##_ingest);                               \
+        else {                                                                           \
+            WT_ASSERT(session, (clayered)->current_cursor == (clayered)->stable_cursor); \
+            WT_STAT_CONN_DSRC_INCR(session, fld##_stable);                               \
+        }                                                                                \
+    } while (0)
+
+/*
  * __clayered_is_deleted_encoded --
  *     Check if the value starts with the tombstone.
  */
@@ -1297,13 +1312,7 @@ __clayered_next(WT_CURSOR *cursor)
 
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_next);
     WT_ERR(__clayered_iterate(clayered, WT_CLAYERED_ITERATE_NEXT));
-
-    if (clayered->current_cursor == clayered->ingest_cursor)
-        WT_STAT_CONN_DSRC_INCR(session, layered_curs_next_ingest);
-    else {
-        WT_ASSERT(session, clayered->current_cursor == clayered->stable_cursor);
-        WT_STAT_CONN_DSRC_INCR(session, layered_curs_next_stable);
-    }
+    WT_STAT_CLAYERED_READ_CONSTITUENT_INCR(session, clayered, layered_curs_next);
 
 err:
     API_END_RET(session, ret);
@@ -1331,13 +1340,7 @@ __clayered_prev(WT_CURSOR *cursor)
 
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_prev);
     WT_ERR(__clayered_iterate(clayered, WT_CLAYERED_ITERATE_PREV));
-
-    if (clayered->current_cursor == clayered->ingest_cursor)
-        WT_STAT_CONN_DSRC_INCR(session, layered_curs_prev_ingest);
-    else {
-        WT_ASSERT(session, clayered->current_cursor == clayered->stable_cursor);
-        WT_STAT_CONN_DSRC_INCR(session, layered_curs_prev_stable);
-    }
+    WT_STAT_CLAYERED_READ_CONSTITUENT_INCR(session, clayered, layered_curs_prev);
 
 err:
     API_END_RET(session, ret);
@@ -1747,12 +1750,7 @@ __clayered_search(WT_CURSOR *cursor)
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_search);
     WT_ERR(__clayered_lookup(session, clayered, &cursor->value));
     WT_ITEM_SET(cursor->key, clayered->current_cursor->key);
-    if (clayered->current_cursor == clayered->ingest_cursor)
-        WT_STAT_CONN_DSRC_INCR(session, layered_curs_search_ingest);
-    else {
-        WT_ASSERT(session, clayered->current_cursor == clayered->stable_cursor);
-        WT_STAT_CONN_DSRC_INCR(session, layered_curs_search_stable);
-    }
+    WT_STAT_CLAYERED_READ_CONSTITUENT_INCR(session, clayered, layered_curs_search);
 
 err:
     __clayered_leave(clayered);
@@ -2033,17 +2031,12 @@ __clayered_search_near(WT_CURSOR *cursor, int *exactp)
 
     CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
+    WT_STAT_CONN_DSRC_INCR(session, layered_curs_search_near);
     WT_ERR(__clayered_search_near_int(session, cursor, exactp));
+    WT_STAT_CLAYERED_READ_CONSTITUENT_INCR(session, clayered, layered_curs_search_near);
 
     WT_ITEM_SET(cursor->key, clayered->current_cursor->key);
     WT_ITEM_SET(cursor->value, clayered->current_cursor->value);
-
-    WT_STAT_CONN_DSRC_INCR(session, layered_curs_search_near);
-    /* FIXME-WT-15545: Handle the case of current_cursor being NULL */
-    if (clayered->current_cursor == clayered->ingest_cursor)
-        WT_STAT_CONN_DSRC_INCR(session, layered_curs_search_near_ingest);
-    else
-        WT_STAT_CONN_DSRC_INCR(session, layered_curs_search_near_stable);
 
 err:
     __clayered_leave(clayered);

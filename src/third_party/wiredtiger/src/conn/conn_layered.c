@@ -1011,18 +1011,18 @@ err:
 static int
 __disagg_step_up(WT_SESSION_IMPL *session)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_SESSION_IMPL *internal_session;
+    WT_SESSION_IMPL *internal_session = NULL;
     uint64_t now;
 
-    conn = S2C(session);
+    WT_CONNECTION_IMPL *conn = S2C(session);
+    F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP);
 
     /*
      * Some functionality in stepping up needs a session that can open data handles. The default
      * session used to call this function cannot do that.
      */
-    WT_RET(__wt_open_internal_session(conn, "disagg-step-up", false, 0, 0, &internal_session));
+    WT_ERR(__wt_open_internal_session(conn, "disagg-step-up", false, 0, 0, &internal_session));
 
     /*
      * We need to hold the checkpoint lock while stepping up, because if we change the role
@@ -1033,7 +1033,6 @@ __disagg_step_up(WT_SESSION_IMPL *session)
 
     __wt_verbose_debug1(
       session, WT_VERB_DISAGGREGATED_STORAGE, "%s", "Stepping up to the leader mode");
-    F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP);
 
     /*
      * Step up to the leader mode. We need to do this first, because the rest of the operations
@@ -1075,7 +1074,8 @@ __disagg_step_up(WT_SESSION_IMPL *session)
     __wt_atomic_store_uint8_release(&conn->cache->shared_dsk_cache.state, WT_DSK_CACHE_READONLY);
 
 err:
-    WT_TRET(__wt_session_close_internal(internal_session));
+    if (internal_session != NULL)
+        WT_TRET(__wt_session_close_internal(internal_session));
     F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP);
     return (ret);
 }
@@ -1141,7 +1141,9 @@ __disagg_step_down(WT_SESSION_IMPL *session)
 {
     WT_SHARED_DSK_CACHE *shared_dsk_cache;
 
-    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+    WT_CONNECTION_IMPL *conn = S2C(session);
+    F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_DOWN);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
     __wt_verbose_debug1(
       session, WT_VERB_DISAGGREGATED_STORAGE, "%s", "Stepping down to the follower mode");
@@ -1160,7 +1162,7 @@ __disagg_step_down(WT_SESSION_IMPL *session)
      * Re-enable the shared disk cache on step-down. Create the table only if this node never had
      * one, otherwise it was kept alive and is reused.
      */
-    shared_dsk_cache = &S2C(session)->cache->shared_dsk_cache;
+    shared_dsk_cache = &conn->cache->shared_dsk_cache;
     if (shared_dsk_cache->hash == NULL)
         WT_IGNORE_RET(
           __wt_shared_dsk_cache_init(session, WT_SHARED_DSK_CACHE_DEFAULT_HASH_SIZE(session)));
@@ -1168,6 +1170,8 @@ __disagg_step_down(WT_SESSION_IMPL *session)
     WT_ASSERT(session, shared_dsk_cache->hash != NULL);
     if (shared_dsk_cache->hash != NULL)
         __wt_atomic_store_uint8_release(&shared_dsk_cache->state, WT_DSK_CACHE_ACTIVE);
+
+    F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_DOWN);
 }
 
 /*

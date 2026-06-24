@@ -651,6 +651,7 @@ argc
 args
 argv
 asan
+asc
 ascii
 assertEqual
 assertGreater
@@ -947,6 +948,7 @@ dryrun
 ds
 dsb
 dsbs
+dsc
 dsk
 dsrc
 dst
@@ -1046,6 +1048,7 @@ fixup
 floatnum
 fmt
 fmterr
+fn
 fnv
 fnvhash
 foc
@@ -1261,6 +1264,7 @@ lldb
 llll
 llu
 llvm
+loadshed
 loadtext
 loc
 localTime
@@ -1403,6 +1407,7 @@ nonconflicting
 nonliteral
 nonoverlapping
 nonstandalone
+nontxn
 noop
 nop
 nopos
@@ -1627,6 +1632,7 @@ salvageUntilSuccess
 sanitizer
 sanitizers
 scalable
+scen
 schemas
 sclose
 scr

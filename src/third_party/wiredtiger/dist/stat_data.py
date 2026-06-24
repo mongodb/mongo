@@ -1379,6 +1379,7 @@ conn_dsrc_stats = [
     BlockDisaggStat('disagg_block_hs_get', 'Disaggregated block manager get from the shared history store in SLS'),
     BlockDisaggStat('disagg_block_hs_put', 'Disaggregated block manager put to the shared history store in SLS'),
     BlockDisaggStat('disagg_block_page_discard', 'Disaggregated block manager page discard calls'),
+    BlockDisaggStat('disagg_block_plh_put_failed', 'Disaggregated block manager log handle put failure'),
     BlockDisaggStat('disagg_block_put', 'Disaggregated block manager put'),
     BlockDisaggStat('disagg_block_put_cold', 'Disaggregated block manager put cold page'),
     BlockDisaggStat('disagg_block_read_ahead_frontier', 'Disaggregated block manager read ahead of materialization frontier'),

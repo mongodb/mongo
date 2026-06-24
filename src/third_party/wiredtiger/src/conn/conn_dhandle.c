@@ -454,8 +454,13 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
         bm = btree->bm;
         if (bm != NULL)
             is_mapped = bm->is_mapped(bm, session);
-        if (!discard && mark_dead && (bm == NULL || !is_mapped))
-            marked_dead = true;
+        if (!discard && mark_dead && (bm == NULL || !is_mapped)) {
+            /* On the final close, discard pages now because no later sweep will run. */
+            if (final)
+                discard = true;
+            else
+                marked_dead = true;
+        }
 
         /*
          * Flush dirty data from any durable trees we couldn't mark dead. That involves writing a

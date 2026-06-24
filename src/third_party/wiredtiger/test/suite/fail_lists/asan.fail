@@ -2,11 +2,6 @@
 # List test files that are not run because they are known failures.
 # They are suppressed because they produce too many warnings that should be solved separately.
 
-# FIXME-WT-17767: in-memory page leaks on panicked or failed connection close
-test_corrupt01.py
-test_salvage03.py
-test_txn18.py
-
 # FIXME-WT-17765: memory leaks in dir_store storage source
 test_tiered06.py
 

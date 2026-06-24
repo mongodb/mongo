@@ -46,6 +46,8 @@ class test_load01(wttest.WiredTigerTestCase):
 
         # Try different load control reconfigurations.
         configs = [
+            "load_control=[enable=false,control_threshold=0]",
+            "load_control=[enable=true,control_threshold=0]",
             "load_control=[enable=false,control_threshold=10]",
             "load_control=[enable=false,control_threshold=25]",
             "load_control=[enable=false,control_threshold=50]",
@@ -62,10 +64,8 @@ class test_load01(wttest.WiredTigerTestCase):
 
         # Try different load control failure reconfigurations.
         failure_configs = [
-            "load_control=[enable=false,control_threshold=0]",
-            "load_control=[enable=true,control_threshold=0]",
             "load_control=[enable=true,control_threshold=-1]",
-            "load_control=[enable=true,control_threshold=210]",
+            "load_control=[enable=true,control_threshold=1110]",
         ]
 
         for cfg in configs:

@@ -542,6 +542,34 @@ __cursor_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *value, u_int modify_type)
 }
 
 /*
+ * __cursor_truncate_nontxn --
+ *     Non-transactional remove for truncate: insert a globally visible tombstone.
+ */
+static WT_INLINE int
+__cursor_truncate_nontxn(WT_CURSOR_BTREE *cbt, const WT_ITEM *value, u_int modify_type)
+{
+    WT_BTREE *btree = CUR2BT(cbt);
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session = CUR2S(cbt);
+    WT_UPDATE *tombstone;
+
+    WT_UNUSED(value);
+    WT_UNUSED(modify_type);
+    WT_ASSERT(session, modify_type == WT_UPDATE_TOMBSTONE);
+    WT_RET(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
+    if (btree->type == BTREE_COL_VAR)
+        ret =
+          __wt_col_modify(cbt, cbt->iface.recno, NULL, &tombstone, WT_UPDATE_INVALID, false, false);
+    else
+        ret =
+          __wt_row_modify(cbt, &cbt->iface.key, NULL, &tombstone, WT_UPDATE_INVALID, false, false);
+
+    if (ret != 0)
+        __wt_free(session, tombstone);
+    return (ret);
+}
+
+/*
  * __cursor_restart --
  *     Common cursor restart handling.
  */
@@ -1911,7 +1939,17 @@ __wt_btcur_range_truncate(WT_TRUNCATE_INFO *trunc_info)
      * truncate so we're good to go: if that ever changes, we'd need to do something here to ensure
      * a fully instantiated cursor.
      */
-    WT_ERR(__wt_cursor_truncate(start, stop, __cursor_modify));
+    if (F_ISSET(session, WT_SESSION_NON_TRANSACTIONAL_TRUNCATE)) {
+        /*
+         * A non-transactional truncate writes globally visible tombstones that cannot be rolled
+         * back, so it must not be logged: there would be no in-memory operations to undo on
+         * recovery. It is only allowed for clearing the ingest table during step-up.
+         */
+        WT_ASSERT(session, !logging);
+        WT_ASSERT(session, F_ISSET(CUR2BT(start), WT_BTREE_GARBAGE_COLLECT));
+        WT_ERR(__wt_cursor_truncate(start, stop, __cursor_truncate_nontxn));
+    } else
+        WT_ERR(__wt_cursor_truncate(start, stop, __cursor_modify));
 
 err:
     if (logging)

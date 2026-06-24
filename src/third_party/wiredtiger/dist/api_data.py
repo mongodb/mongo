@@ -957,9 +957,11 @@ connection_runtime_config = [
             Load control will actively reject the work, based on other settings, to keep the
             system healthy.''',
             type='boolean'),
-        Config('control_threshold', '100', r'''
-            Threshold at which load control will actively start rejecting the work.''',
-            min=10, max=200),
+        Config('control_threshold', '200', r'''
+            Load level, expressed as a percentage of the cache eviction trigger (100 means at
+            the eviction trigger, 200 means twice the trigger), at or above which load control
+            sheds incoming operations. Set to 0 to disable shedding.''',
+            min=0, max=1000),
         ]),
     Config('operation_timeout_ms', '0', r'''
         this option is no longer supported, retained for backward compatibility.''',
@@ -1033,7 +1035,7 @@ connection_runtime_config = [
         'compact_slow', 'conn_close_stress_log_printf', 'evict_reposition',
         'failpoint_disagg_checkpoint_queue_drain', 'failpoint_eviction_split',
         'failpoint_history_store_delete_key_from_ts',
-        'failpoint_rec_before_wrapup', 'failpoint_rec_split_write',
+        'failpoint_page_log_handle_put', 'failpoint_rec_before_wrapup', 'failpoint_rec_split_write',
         'history_store_checkpoint_delay', 'history_store_search',
         'history_store_sweep_race', 'live_restore_clean_up', 'open_index_slow', 'prefetch_1',
         'prefetch_2', 'prefetch_3', 'prefix_compare', 'prepare_checkpoint_delay',

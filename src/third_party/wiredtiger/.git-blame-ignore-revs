@@ -15,3 +15,6 @@ c12c796f486b852da1737a25f66bcd59e9975d69
 
 # WT-17744 Use clang-format 19.1.7 (same as Mongo toolchain v5)
 9257a9fc35359808a583a5863df565b44d43b825
+
+# WT-17635 Add unicode and space checks to s_all (#14004)
+4df671d6ebb92dbad31078fe00ef75cd957b7804

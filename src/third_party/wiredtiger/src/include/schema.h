@@ -291,6 +291,9 @@ struct __wt_import_list {
  *	Acquire the schema lock, perform an operation, drop the lock.
  *	Check that we are not already holding some other lock: the schema lock
  *	must be taken first.
+ *
+ * FIXME-WT-17880: Remove the "role transition" assertions once we have asynchronous
+ * step-up/step-down.
  */
 #define WT_WITH_SCHEMA_LOCK(session, op)                                                      \
     do {                                                                                      \
@@ -299,27 +302,37 @@ struct __wt_import_list {
             !FLD_ISSET(session->lock_flags,                                                   \
               WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_NO_SCHEMA_LOCK |                     \
                 WT_SESSION_LOCKED_TABLE));                                                    \
+        WT_ASSERT_ALWAYS(session,                                                             \
+          !F_ISSET_ATOMIC_32(                                                                 \
+            S2C(session), WT_CONN_RECONFIGURING_STEP_UP | WT_CONN_RECONFIGURING_STEP_DOWN) || \
+            F_ISSET(session, WT_SESSION_INTERNAL),                                            \
+          "schema lock acquired during role transition");                                     \
         WT_WITH_LOCK_WAIT(session, &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA, op); \
     } while (0)
-#define WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret, op)                                         \
-    do {                                                                                     \
-        WT_ASSERT(session,                                                                   \
-          FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA) ||                        \
-            !FLD_ISSET(session->lock_flags,                                                  \
-              WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_NO_SCHEMA_LOCK |                    \
-                WT_SESSION_LOCKED_TABLE));                                                   \
-        int __schema_lock_ret;                                                               \
-        WT_WITH_LOCK_NOWAIT(session, ret, __schema_lock_ret, &S2C(session)->schema_lock,     \
-          WT_SESSION_LOCKED_SCHEMA, op);                                                     \
-        if (__schema_lock_ret != 0) {                                                        \
-            if (__schema_lock_ret == EBUSY)                                                  \
-                __wt_session_set_last_error(session, EBUSY, WT_CONFLICT_SCHEMA_LOCK,         \
-                  "another thread is currently holding the schema lock");                    \
-            else                                                                             \
-                __wt_session_set_last_error(                                                 \
-                  session, __schema_lock_ret, WT_NONE, "failed to acquire the schema lock"); \
-            ret = __schema_lock_ret;                                                         \
-        }                                                                                    \
+#define WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret, op)                                          \
+    do {                                                                                      \
+        WT_ASSERT(session,                                                                    \
+          FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA) ||                         \
+            !FLD_ISSET(session->lock_flags,                                                   \
+              WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_NO_SCHEMA_LOCK |                     \
+                WT_SESSION_LOCKED_TABLE));                                                    \
+        WT_ASSERT_ALWAYS(session,                                                             \
+          !F_ISSET_ATOMIC_32(                                                                 \
+            S2C(session), WT_CONN_RECONFIGURING_STEP_UP | WT_CONN_RECONFIGURING_STEP_DOWN) || \
+            F_ISSET(session, WT_SESSION_INTERNAL),                                            \
+          "schema lock acquired during role transition");                                     \
+        int __schema_lock_ret;                                                                \
+        WT_WITH_LOCK_NOWAIT(session, ret, __schema_lock_ret, &S2C(session)->schema_lock,      \
+          WT_SESSION_LOCKED_SCHEMA, op);                                                      \
+        if (__schema_lock_ret != 0) {                                                         \
+            if (__schema_lock_ret == EBUSY)                                                   \
+                __wt_session_set_last_error(session, EBUSY, WT_CONFLICT_SCHEMA_LOCK,          \
+                  "another thread is currently holding the schema lock");                     \
+            else                                                                              \
+                __wt_session_set_last_error(                                                  \
+                  session, __schema_lock_ret, WT_NONE, "failed to acquire the schema lock");  \
+            ret = __schema_lock_ret;                                                          \
+        }                                                                                     \
     } while (0)
 
 /*
