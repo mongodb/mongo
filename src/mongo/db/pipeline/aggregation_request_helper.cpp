@@ -43,7 +43,9 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
@@ -114,7 +116,8 @@ void addIfrFlagsToRequest(AggregateCommandRequest& request,
 
 void validate(const AggregateCommandRequest& aggregate,
               const BSONObj& cmdObj,
-              const NamespaceString& nss) {
+              const NamespaceString& nss,
+              Client* client) {
     bool hasExplain = aggregate.getExplain().has_value();
     bool hasFromRouterElem = getFromRouter(aggregate).has_value();
     bool hasNeedsMergeElem = aggregate.getNeedsMerge().has_value();
@@ -164,6 +167,10 @@ void validate(const AggregateCommandRequest& aggregate,
                     SimpleBSONObjComparator::kInstance.evaluate(
                         hintElem.value() == BSON(query_request_helper::kNaturalSortField << 1)));
     }
+
+    if (client) {
+        assertInternalParamsAreSetByInternalClients(client, aggregate);
+    }
 }
 
 void validateRequestWithClient(const OperationContext* opCtx,
@@ -199,13 +206,6 @@ void validateRequestWithClient(const OperationContext* opCtx,
                                  "'apiStrict: true' in API Version "
                               << apiVersion,
                 isInternalThreadOrClient);
-    }
-
-    // Forbid users from passing 'originalQueryShapeHash' explicitly.
-    if (request.getOriginalQueryShapeHash()) {
-        uassert(10742706,
-                "BSON field 'originalQueryShapeHash' is an unknown field",
-                isInternalThreadOrClient || client->isInDirectClient());
     }
 
     // Forbid users from passing 'ifrFlags' explicitly.
@@ -373,3 +373,5 @@ void serializeAggregateCursorToBSON(const mongo::SimpleCursorOptions& cursor,
     return;
 }
 }  // namespace mongo
+
+

@@ -77,7 +77,7 @@ describe("User-facing querySettings when flag is off", function () {
                 cursor: {},
                 querySettings,
             }),
-            [7708000, 7708001],
+            [7923000],
         );
     });
 

@@ -114,11 +114,13 @@ void addIfrFlagsToRequest(AggregateCommandRequest& request,
                           std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext);
 
 /**
- * Validate the aggregate command object.
+ * Validate the aggregate command object. If 'client' is provided, also validates that internal
+ * fields such as 'querySettings' and 'originalQueryShapeHash' are only set by internal clients.
  */
 void validate(const AggregateCommandRequest& aggregate,
               const BSONObj& cmdObj,
-              const NamespaceString& nss);
+              const NamespaceString& nss,
+              Client* client = nullptr);
 
 /**
  * Validates if 'AggregateCommandRequest' specs complies with the current Client, which is required

@@ -358,7 +358,7 @@ describe("originalQueryShapeHash appears in slow logs", function () {
             cursor: {},
             originalQueryShapeHash: exampleHash,
         };
-        assert.commandFailedWithCode(routerDB.runCommand(query), 10742706);
+        assert.commandFailedWithCode(routerDB.runCommand(query), [10742702, 10742706]);
     });
 
     it("should error when aggregate includes originalQueryShapeHash on shard", function () {
@@ -368,7 +368,7 @@ describe("originalQueryShapeHash appears in slow logs", function () {
             cursor: {},
             originalQueryShapeHash: exampleHash,
         };
-        assert.commandFailedWithCode(shard0DB.runCommand(query), 10742706);
+        assert.commandFailedWithCode(shard0DB.runCommand(query), [10742702, 10742706]);
     });
 
     it("should error when count includes originalQueryShapeHash on router", function () {
@@ -406,6 +406,6 @@ describe("originalQueryShapeHash appears in slow logs", function () {
             query: {x: 4},
             originalQueryShapeHash: exampleHash,
         };
-        assert.commandFailedWithCode(shard0DB.runCommand(query), 10742702);
+        assert.commandFailedWithCode(shard0DB.runCommand(query), [10742702, 10742706]);
     });
 });

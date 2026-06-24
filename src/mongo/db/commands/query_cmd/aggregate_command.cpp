@@ -52,7 +52,6 @@
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/server_options.h"
@@ -254,10 +253,8 @@ public:
             const auto& body = unparsedRequest().body;
             boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
 
-            uassertNoQuerySettings(opCtx);
-
             // Run aggregate-specific semantic validation beyond what the IDL-parsing provides.
-            aggregation_request_helper::validate(request(), body, ns());
+            aggregation_request_helper::validate(request(), body, ns(), opCtx->getClient());
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx,
                                                              !Pipeline::aggHasWriteStage(body));
 
@@ -314,8 +311,6 @@ public:
                      rpc::ReplyBuilderInterface* reply) override {
             const auto& body = unparsedRequest().body;
 
-            uassertNoQuerySettings(opCtx);
-
             // Mark this request as 'explain' so that downstream components such as query stats key
             // construction can see it.
             request().setExplain(true);
@@ -324,7 +319,7 @@ public:
                     "The 'explain' option is illegal when an explain verbosity is also provided",
                     !body.hasField(AggregateCommandRequest::kExplainFieldName));
 
-            aggregation_request_helper::validate(request(), body, ns());
+            aggregation_request_helper::validate(request(), body, ns(), opCtx->getClient());
 
             // See run() method for details.
             uassertStatusOK(runAggregate(opCtx,
@@ -336,14 +331,6 @@ public:
                                          reply,
                                          _usedExternalDataSources,
                                          _ifrContext));
-        }
-
-        void uassertNoQuerySettings(OperationContext* opCtx) const {
-            // Forbid users from passing 'querySettings' explicitly.
-            uassert(7708001,
-                    "BSON field 'querySettings' is an unknown field",
-                    query_settings::allowQuerySettingsFromClient(opCtx->getClient()) ||
-                        !request().getQuerySettings().has_value());
         }
 
         bool canRetryOnStaleShardMetadataError(const OpMsgRequest& /* unused */) const override {

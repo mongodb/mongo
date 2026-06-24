@@ -37,7 +37,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/modules.h"
@@ -158,10 +157,9 @@ public:
             const auto& body = unparsedRequest().body;
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx,
                                                              !Pipeline::aggHasWriteStage(body));
-            uassertNoQuerySettings();
 
             // Run aggregate-specific semantic validation beyond what the IDL-parsing provides.
-            aggregation_request_helper::validate(request(), body, ns());
+            aggregation_request_helper::validate(request(), body, ns(), opCtx->getClient());
 
             Impl::checkCanRunHere(opCtx);
 
@@ -177,7 +175,6 @@ public:
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
-            uassertNoQuerySettings();
 
             // Mark this request as 'explain' so that downstream components such as query stats key
             // construction can see it.
@@ -188,7 +185,8 @@ public:
                     !unparsedRequest().body.hasField(AggregateCommandRequest::kExplainFieldName));
 
             // Run aggregate-specific semantic validation beyond what the IDL-parsing provides.
-            aggregation_request_helper::validate(request(), unparsedRequest().body, ns());
+            aggregation_request_helper::validate(
+                request(), unparsedRequest().body, ns(), opCtx->getClient());
 
             auto bodyBuilder = result->getBodyBuilder();
             _runAggCommand(opCtx, &bodyBuilder, verbosity);
@@ -196,16 +194,6 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             Impl::doCheckAuthorization(opCtx, unparsedRequest(), _privileges);
-        }
-
-        // TODO SERVER-119513: Remove once aggregation_request_helper::validate() handles this
-        // check.
-        void uassertNoQuerySettings() const {
-            // Forbid users from passing 'querySettings' explicitly unless the feature flag is on.
-            uassert(7708000,
-                    "BSON field 'querySettings' is an unknown field",
-                    !request().getQuerySettings().has_value() ||
-                        feature_flags::gFeatureFlagAllowUserFacingQuerySettings.isEnabled());
         }
 
         NamespaceString ns() const override {
