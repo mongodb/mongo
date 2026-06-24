@@ -41,33 +41,26 @@ namespace traces {
 
 namespace {
 
-Status initializeHttp(ServiceContext* serviceContext, std::string name, std::string endpoint) {
-    auto tracerProviderService = TracerProviderService::get(serviceContext);
+Status initializeHttp(std::string name, std::string endpoint) {
+    auto tracerProviderService = getGlobalTracerProviderService();
     if (!tracerProviderService) {
         return Status(ErrorCodes::InternalError, "TracerProviderService not initialized");
     }
     return tracerProviderService->initializeHttp(name, endpoint);
 }
 
-Status initializeFile(ServiceContext* serviceContext, std::string name, std::string directory) {
-    auto tracerProviderService = TracerProviderService::get(serviceContext);
+Status initializeFile(std::string name, std::string directory) {
+    auto tracerProviderService = getGlobalTracerProviderService();
     if (!tracerProviderService) {
         return Status(ErrorCodes::InternalError, "TracerProviderService not initialized");
     }
     return tracerProviderService->initializeFile(name, directory);
 }
 
-void initializeNoOp(ServiceContext* serviceContext) {
-    auto tracerProviderService = TracerProviderService::get(serviceContext);
+void initializeNoOp() {
+    auto tracerProviderService = getGlobalTracerProviderService();
     if (tracerProviderService) {
         tracerProviderService->initializeNoOp();
-    }
-}
-
-void shutdownTracerProvider(ServiceContext* serviceContext) {
-    auto tracerProviderService = TracerProviderService::get(serviceContext);
-    if (tracerProviderService) {
-        tracerProviderService->shutdown();
     }
 }
 
@@ -95,32 +88,29 @@ void validateOptions() {
 
 }  // namespace
 
-Status initialize(ServiceContext* serviceContext, std::string name) {
-    if (!serviceContext) {
-        return Status(ErrorCodes::InternalError, "No global ServiceContext available");
-    }
-
+Status initialize(std::string name) {
     validateOptions();
 
     // In production mongod this is always a fresh service; in tests, callers may pre-set a
-    // mock provider via TracerProviderService::set(), so only create one if absent.
-    if (!TracerProviderService::get(serviceContext)) {
-        TracerProviderService::set(serviceContext, TracerProviderService::create());
+    // mock provider via setGlobalTracerProviderService(), so only create one if absent.
+    if (!getGlobalTracerProviderService()) {
+        setGlobalTracerProviderService(TracerProviderService::create());
     }
 
     if (!gOpenTelemetryHttpEndpoint.empty()) {
-        return initializeHttp(serviceContext, name, gOpenTelemetryHttpEndpoint);
+        return initializeHttp(name, gOpenTelemetryHttpEndpoint);
     } else if (!gOpenTelemetryTraceDirectory.empty()) {
-        return initializeFile(serviceContext, name, gOpenTelemetryTraceDirectory);
+        return initializeFile(name, gOpenTelemetryTraceDirectory);
     } else {
-        initializeNoOp(serviceContext);
+        initializeNoOp();
         return Status::OK();
     }
 }
 
-void shutdown(ServiceContext* serviceContext) {
-    if (serviceContext) {
-        shutdownTracerProvider(serviceContext);
+void shutdown() {
+    auto tracerProviderService = getGlobalTracerProviderService();
+    if (tracerProviderService) {
+        tracerProviderService->shutdown();
     }
 }
 

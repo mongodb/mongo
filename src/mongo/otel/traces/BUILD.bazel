@@ -131,7 +131,6 @@ mongo_cc_library(
     deps = [
         ":tracing_feature_flags",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",
     ],
 )
 
@@ -302,7 +301,6 @@ mongo_cc_unit_test(
         ":tracing_initialization",
         ":tracing_test_util",
         ":tracing_utils",
-        "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/otel",
         "//src/mongo/otel/traces/sampler",
         "//src/mongo/unittest:server_parameter_guard",
@@ -322,7 +320,6 @@ mongo_cc_unit_test(
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
         ":tracing",
-        "//src/mongo/db:service_context_test_fixture",
         "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_grpc_exporter",
     ],
 )

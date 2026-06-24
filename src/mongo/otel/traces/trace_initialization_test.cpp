@@ -29,7 +29,6 @@
 
 #include "mongo/otel/traces/trace_initialization.h"
 
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -43,20 +42,18 @@ namespace {
 
 constexpr auto kServiceName = "mongod";
 
-class TraceInitializationTest : public ServiceContextTest {
+class TraceInitializationTest : public unittest::Test {
 public:
     void setUp() override {
-        ServiceContextTest::setUp();
         // Initialize TracerProviderService with no-op provider
         auto tracerProviderService = TracerProviderService::create();
         tracerProviderService->setTracerProvider_ForTest(
             std::make_shared<opentelemetry::trace::NoopTracerProvider>());
-        TracerProviderService::set(getServiceContext(), std::move(tracerProviderService));
+        setGlobalTracerProviderService(std::move(tracerProviderService));
     }
 
     void tearDown() override {
-        TracerProviderService::set(getServiceContext(), nullptr);
-        ServiceContextTest::tearDown();
+        setGlobalTracerProviderService(nullptr);
     }
 };
 
@@ -65,33 +62,33 @@ bool isNoop(opentelemetry::trace::TracerProvider* provider) {
 }
 
 TEST_F(TraceInitializationTest, NoTraceProvider) {
-    ASSERT_OK(otel::traces::initialize(getServiceContext(), kServiceName));
+    ASSERT_OK(otel::traces::initialize(kServiceName));
 
-    auto tracerProviderService = TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
     EXPECT_FALSE(tracerProviderService->isEnabled());
 }
 
 TEST_F(TraceInitializationTest, Shutdown) {
-    shutdown(getServiceContext());
+    shutdown();
 
-    auto tracerProviderService = TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
     EXPECT_FALSE(tracerProviderService->isEnabled());
 
     unittest::ServerParameterGuard directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
-    shutdown(getServiceContext());
+    shutdown();
 
-    tracerProviderService = TracerProviderService::get(getServiceContext());
+    tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
     EXPECT_FALSE(tracerProviderService->isEnabled());
 }
 
 TEST_F(TraceInitializationTest, FileTraceProvider) {
     unittest::ServerParameterGuard directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
-    ASSERT_OK(initialize(getServiceContext(), kServiceName));
+    ASSERT_OK(initialize(kServiceName));
 
-    auto tracerProviderService = TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
     EXPECT_TRUE(tracerProviderService->isEnabled());
     EXPECT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
@@ -100,9 +97,9 @@ TEST_F(TraceInitializationTest, FileTraceProvider) {
 TEST_F(TraceInitializationTest, HttpTraceProvider) {
     unittest::ServerParameterGuard endpointParam{"opentelemetryHttpEndpoint",
                                                  "http://localhost:4318/v1/traces"};
-    ASSERT_OK(initialize(getServiceContext(), kServiceName));
+    ASSERT_OK(initialize(kServiceName));
 
-    auto tracerProviderService = TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
     EXPECT_TRUE(tracerProviderService->isEnabled());
     EXPECT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
@@ -112,10 +109,9 @@ TEST_F(TraceInitializationTest, HttpAndDirectorySetSimultaneouslyFails) {
     unittest::ServerParameterGuard endpointParam{"opentelemetryHttpEndpoint",
                                                  "http://localhost:4318/v1/traces"};
     unittest::ServerParameterGuard directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
-    ASSERT_THROWS_CODE(
-        initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(initialize(kServiceName), DBException, ErrorCodes::InvalidOptions);
 
-    auto tracerProviderService = TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
     EXPECT_TRUE(tracerProviderService->isEnabled());
     EXPECT_TRUE(isNoop(tracerProviderService->getTracerProvider().get()));
@@ -123,34 +119,31 @@ TEST_F(TraceInitializationTest, HttpAndDirectorySetSimultaneouslyFails) {
 
 TEST_F(TraceInitializationTest, InvalidCompressionFails) {
     unittest::ServerParameterGuard compressionParam{"openTelemetryTracingCompression", "zstd"};
-    ASSERT_THROWS_CODE(
-        initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(initialize(kServiceName), DBException, ErrorCodes::InvalidOptions);
 }
 
 TEST_F(TraceInitializationTest, GzipCompressionWithoutHttpEndpointFails) {
     unittest::ServerParameterGuard compressionParam{"openTelemetryTracingCompression", "gzip"};
-    ASSERT_THROWS_CODE(
-        initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(initialize(kServiceName), DBException, ErrorCodes::InvalidOptions);
 }
 
 TEST_F(TraceInitializationTest, GzipCompressionWithHttpEndpointSucceeds) {
     unittest::ServerParameterGuard compressionParam{"openTelemetryTracingCompression", "gzip"};
     unittest::ServerParameterGuard endpointParam{"opentelemetryHttpEndpoint",
                                                  "http://localhost:4318/v1/traces"};
-    ASSERT_OK(initialize(getServiceContext(), kServiceName));
+    ASSERT_OK(initialize(kServiceName));
 }
 
 TEST_F(TraceInitializationTest, MaxBatchSizeExceedsMaxQueueSizeFails) {
     unittest::ServerParameterGuard batchSizeParam{"openTelemetryTracingMaxBatchSize", 5000};
     unittest::ServerParameterGuard queueSizeParam{"openTelemetryTracingMaxQueueSize", 100};
-    ASSERT_THROWS_CODE(
-        initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(initialize(kServiceName), DBException, ErrorCodes::InvalidOptions);
 }
 
 TEST_F(TraceInitializationTest, MaxBatchSizeEqualToMaxQueueSizeSucceeds) {
     unittest::ServerParameterGuard batchSizeParam{"openTelemetryTracingMaxBatchSize", 512};
     unittest::ServerParameterGuard queueSizeParam{"openTelemetryTracingMaxQueueSize", 512};
-    ASSERT_OK(initialize(getServiceContext(), kServiceName));
+    ASSERT_OK(initialize(kServiceName));
 }
 
 }  // namespace

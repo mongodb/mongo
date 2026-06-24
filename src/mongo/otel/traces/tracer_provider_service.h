@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/service_context.h"
 
 #include <memory>
 #include <string>
@@ -42,23 +41,11 @@
 namespace mongo::otel::traces {
 
 /**
- * Service class that manages the OpenTelemetry TracerProvider using ServiceContext decorations.
- * This allows the tracer provider to be isolated from other code that may interact with the
- * OpenTelemetry library.
+ * Service class that manages the OpenTelemetry TracerProvider. This allows the tracer provider to
+ * be isolated from other code that may interact with the OpenTelemetry library.
  */
 class TracerProviderService {
 public:
-    /**
-     * Get the TracerProviderService instance from ServiceContext decoration.
-     */
-    static TracerProviderService* get(ServiceContext* serviceContext);
-    static TracerProviderService* get(OperationContext* opCtx);
-
-    /**
-     * Set the TracerProviderService instance in ServiceContext decoration.
-     */
-    static void set(ServiceContext* serviceContext, std::unique_ptr<TracerProviderService> service);
-
     /**
      * Initialize the tracer provider with HTTP exporter.
      */
@@ -113,5 +100,10 @@ private:
     std::shared_ptr<opentelemetry::trace::TracerProvider> _tracerProvider;
     bool _enabled = false;
 };
+
+/** May return nullptr if tracing is not initialized or supported in the current environment. */
+TracerProviderService* getGlobalTracerProviderService();
+
+void setGlobalTracerProviderService(std::unique_ptr<TracerProviderService> service);
 
 }  // namespace mongo::otel::traces

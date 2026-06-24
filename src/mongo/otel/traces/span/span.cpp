@@ -30,7 +30,6 @@
 #ifdef MONGO_CONFIG_OTEL
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
@@ -123,12 +122,7 @@ void Span::setStatus(const Status& status) {
 }
 
 Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, std::string_view name) {
-    ServiceContext* serviceContext = getGlobalServiceContext();
-    if (!serviceContext) {
-        return Span{};
-    }
-
-    auto tracerProviderService = TracerProviderService::get(serviceContext);
+    TracerProviderService* tracerProviderService = getGlobalTracerProviderService();
     if (!tracerProviderService || !tracerProviderService->isEnabled()) {
         return Span{};
     }

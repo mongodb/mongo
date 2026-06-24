@@ -33,6 +33,7 @@
 #include "mongo/otel/traces/mock_exporter.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
 #include <opentelemetry/sdk/trace/simple_processor_factory.h>
@@ -76,13 +77,12 @@ public:
         auto tracerProviderService = TracerProviderService::create();
         tracerProviderService->setTracerProvider_ForTest(provider);
 
-        TracerProviderService::set(getServiceContext(), std::move(tracerProviderService));
+        setGlobalTracerProviderService(std::move(tracerProviderService));
     }
 
     void clearProvider() {
         _mockExporter = nullptr;
-        // Clear the TracerProviderService from ServiceContext
-        TracerProviderService::set(getServiceContext(), nullptr);
+        setGlobalTracerProviderService(nullptr);
     }
 
     bool isEmpty() const {

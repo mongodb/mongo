@@ -2043,7 +2043,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::shutDownOtelTraces,
                                        &shutdownTimeElapsedBuilder);
-        otel::traces::shutdown(serviceContext);
+        otel::traces::shutdown();
     }
 
     {
@@ -2168,7 +2168,7 @@ int mongod_main(int argc, char* argv[]) {
         quickExit(ExitCode::auditRotateError);
     }
 
-    uassertStatusOK(otel::traces::initialize(service, "mongod"));
+    uassertStatusOK(otel::traces::initialize("mongod"));
 
     setLocalExecutor(service, createLocalExecutor(service, "Standalone"));
 

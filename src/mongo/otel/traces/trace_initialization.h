@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/config.h"
-#include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -41,16 +40,16 @@ namespace MONGO_MOD_PUBLIC traces {
 
 #ifdef MONGO_CONFIG_OTEL
 
-Status initialize(ServiceContext* serviceContext, std::string name);
-void shutdown(ServiceContext* serviceContext);
+Status initialize(std::string name);
+void shutdown();
 
 #else
 
-inline Status initialize(ServiceContext* serviceContext, std::string) {
+inline Status initialize(std::string) {
     return Status::OK();
 }
 
-inline void shutdown(ServiceContext* serviceContext) {}
+inline void shutdown() {}
 
 #endif
 

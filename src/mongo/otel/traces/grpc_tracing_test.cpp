@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/unittest/unittest.h"
 
@@ -43,25 +42,23 @@ namespace otel {
 namespace traces {
 namespace {
 
-class GRPCTracingTest : public ServiceContextTest {
+class GRPCTracingTest : public unittest::Test {
 public:
     void setUp() override {
-        ServiceContextTest::setUp();
         // Initialize TracerProviderService with a basic provider
         auto tracerProviderService = TracerProviderService::create();
         tracerProviderService->setTracerProvider_ForTest(
             opentelemetry::trace::Provider::GetTracerProvider());
-        TracerProviderService::set(getServiceContext(), std::move(tracerProviderService));
+        setGlobalTracerProviderService(std::move(tracerProviderService));
     }
 
     void tearDown() override {
-        TracerProviderService::set(getServiceContext(), nullptr);
-        ServiceContextTest::tearDown();
+        setGlobalTracerProviderService(nullptr);
     }
 };
 
 TEST_F(GRPCTracingTest, GetTracer) {
-    auto tracerProviderService = TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
     auto tracer = tracerProviderService->getTracerProvider()->GetTracer("grpc");
     ASSERT(tracer);

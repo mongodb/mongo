@@ -29,10 +29,10 @@
 
 #include "mongo/otel/traces/tracer_provider_service.h"
 
-#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/traces/trace_settings.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
+#include "mongo/util/static_immortal.h"
 
 #include <string_view>
 
@@ -53,8 +53,10 @@
 namespace mongo::otel::traces {
 namespace {
 
-const auto getTracerProviderService =
-    ServiceContext::declareDecoration<std::unique_ptr<TracerProviderService>>();
+std::unique_ptr<TracerProviderService>& globalTracerProviderService() {
+    static StaticImmortal<std::unique_ptr<TracerProviderService>> instance;
+    return *instance;
+}
 
 /** Populates BatchSpanProcessorOptions from the current tracing server parameters. */
 opentelemetry::sdk::trace::BatchSpanProcessorOptions makeBatchSpanProcessorOptions() {
@@ -82,17 +84,12 @@ opentelemetry::sdk::resource::Resource makeResource(std::string_view name, std::
 }
 }  // namespace
 
-TracerProviderService* TracerProviderService::get(ServiceContext* serviceContext) {
-    return getTracerProviderService(serviceContext).get();
+TracerProviderService* getGlobalTracerProviderService() {
+    return globalTracerProviderService().get();
 }
 
-TracerProviderService* TracerProviderService::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
-}
-
-void TracerProviderService::set(ServiceContext* serviceContext,
-                                std::unique_ptr<TracerProviderService> service) {
-    getTracerProviderService(serviceContext) = std::move(service);
+void setGlobalTracerProviderService(std::unique_ptr<TracerProviderService> service) {
+    globalTracerProviderService() = std::move(service);
 }
 
 Status TracerProviderService::initializeHttp(std::string name, std::string endpoint) {
