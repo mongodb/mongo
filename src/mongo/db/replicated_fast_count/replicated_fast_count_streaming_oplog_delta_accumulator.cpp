@@ -251,7 +251,6 @@ FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
 // (0 or 1) when handled.
 boost::optional<int> tryRecordFastCrud(const ScanFields& f,
                                        const BSONObj& raw,
-                                       const boost::optional<UUID>& uuidFilter,
                                        SizeCountDeltas& sizeCountDeltasOut) {
     if (f.m.eoo()) {
         return 0;  // No `m` field → no delta possible from this entry. Counted as "processed".
@@ -293,9 +292,6 @@ boost::optional<int> tryRecordFastCrud(const ScanFields& f,
         return boost::none;
     }
     const auto entryUuid = uassertStatusOK(UUID::parse(f.ui));
-    if (uuidFilter && entryUuid != *uuidFilter) {
-        return 0;
-    }
     int32_t countDelta;
     switch (f.op.valueStringData()[0]) {
         case 'i':
@@ -335,9 +331,7 @@ struct FastApplyOpsOutcome {
 // is internal the outcome is `kAllInternal` (skip the entry, like `operationsOnFastCountStores`).
 // If the applyOps mixes user and internal inner ops, the internal ones are dropped silently and
 // only the user-collection deltas are recorded.
-FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f,
-                                    const boost::optional<UUID>& uuidFilter,
-                                    SizeCountDeltas& sizeCountDeltasOut) {
+FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCountDeltasOut) {
     const auto oObj = f.o.Obj();
 
     // Prepared applyOps hold their deltas until the matching commitTransaction. The prepare entry
@@ -401,7 +395,7 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f,
         }
 
         sawUserOp = true;
-        auto handled = tryRecordFastCrud(innerF, innerRaw, uuidFilter, localDeltas);
+        auto handled = tryRecordFastCrud(innerF, innerRaw, localDeltas);
         if (!handled) {
             // Inner op had a shape Layer 2 couldn't handle. Bail out so Layer 3 can reprocess
             // from scratch. localDeltas is discarded, avoiding any double-counting.
@@ -423,9 +417,7 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f,
 
 // Layer 2.5: handle a `commitTransaction` entry by reading the `m` array variant directly.
 // Returns boost::none if the shape is unexpected; `m` absent yields 0.
-boost::optional<int> tryFastCommitTxn(const ScanFields& f,
-                                      const boost::optional<UUID>& uuidFilter,
-                                      SizeCountDeltas& sizeCountDeltasOut) {
+boost::optional<int> tryFastCommitTxn(const ScanFields& f, SizeCountDeltas& sizeCountDeltasOut) {
     if (f.m.eoo()) {
         return 0;
     }
@@ -445,9 +437,6 @@ boost::optional<int> tryFastCommitTxn(const ScanFields& f,
             return boost::none;
         }
         const auto uuid = uassertStatusOK(UUID::parse(uuidElem));
-        if (uuidFilter && uuid != *uuidFilter) {
-            continue;
-        }
         recordCollectionSizeCountDelta(
             uuid,
             CollectionSizeCount{.size = szElem.safeNumberLong(), .count = ctElem.safeNumberLong()},
@@ -514,7 +503,6 @@ bool operationsOnFastCountStores(const NamespaceString& nss, const repl::OplogEn
 }  // namespace
 
 boost::optional<int> TxnDeltaBuffer::tryConsume(const repl::OplogEntry& entry,
-                                                const boost::optional<UUID>& uuidFilter,
                                                 SizeCountDeltas& globalResult) {
     if (entry.getCommandType() != repl::OplogEntry::CommandType::kApplyOps) {
         if (_isTrackingActiveChain()) {
@@ -554,14 +542,14 @@ boost::optional<int> TxnDeltaBuffer::tryConsume(const repl::OplogEntry& entry,
         } else {
             _txnChainState->lastOpTime = entry.getOpTime();
         }
-        return processOplogEntry(entry, uuidFilter, _txnChainState->deltas);
+        return processOplogEntry(entry, _txnChainState->deltas);
     }
 
     if (!_isTrackingActiveChain()) {
         return boost::none;
     }
 
-    int n = processOplogEntry(entry, uuidFilter, _txnChainState->deltas);
+    int n = processOplogEntry(entry, _txnChainState->deltas);
     mergeDeltas(_txnChainState->deltas, globalResult);
     _clearTxnChainState();
     return n;
@@ -583,13 +571,11 @@ void TxnDeltaBuffer::_clearTxnChainState() {
     _txnChainState = boost::none;
 }
 
-int DeltaAccumulator::consume(const repl::OplogEntry& oplogEntry,
-                              const boost::optional<UUID>& uuidFilter,
-                              SizeCountDeltas& globalResult) {
-    if (auto n = _txnBuffer.tryConsume(oplogEntry, uuidFilter, globalResult)) {
+int DeltaAccumulator::consume(const repl::OplogEntry& oplogEntry, SizeCountDeltas& globalResult) {
+    if (auto n = _txnBuffer.tryConsume(oplogEntry, globalResult)) {
         return *n;
     }
-    return processOplogEntry(oplogEntry, uuidFilter, globalResult);
+    return processOplogEntry(oplogEntry, globalResult);
 }
 
 StreamingOplogDeltaAccumulator::StreamingOplogDeltaAccumulator(Options options)
@@ -602,10 +588,8 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
     // including writes to the fast-count internal collections themselves. Those internal
     // entries are filtered out of per-collection accumulation below, but their bytes remain
     // counted against the oplog UUID.
-    if (_options.oplogUuid) {
-        _result.deltas[*_options.oplogUuid].sizeCount.size += static_cast<int64_t>(rec.data.size());
-        _result.deltas[*_options.oplogUuid].sizeCount.count += 1;
-    }
+    _result.deltas[_options.oplogUuid].sizeCount.size += static_cast<int64_t>(rec.data.size());
+    _result.deltas[_options.oplogUuid].sizeCount.count += 1;
 
     const auto raw = rec.data.toBson();
 
@@ -633,8 +617,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                 }
                 return;
             case FastDecision::kCrud:
-                if (auto handled =
-                        tryRecordFastCrud(fields, raw, _options.uuidFilter, _result.deltas)) {
+                if (auto handled = tryRecordFastCrud(fields, raw, _result.deltas)) {
                     if (fields.ts.type() == BSONType::timestamp) {
                         _result.lastTimestamp = fields.ts.timestamp();
                     }
@@ -646,7 +629,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                 }
                 break;
             case FastDecision::kApplyOps: {
-                const auto outcome = tryFastApplyOps(fields, _options.uuidFilter, _result.deltas);
+                const auto outcome = tryFastApplyOps(fields, _result.deltas);
                 if (outcome.kind == FastApplyOpsOutcome::kFallThrough) {
                     break;
                 }
@@ -666,7 +649,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                 return;
             }
             case FastDecision::kCommitTxn:
-                if (auto handled = tryFastCommitTxn(fields, _options.uuidFilter, _result.deltas)) {
+                if (auto handled = tryFastCommitTxn(fields, _result.deltas)) {
                     if (fields.ts.type() == BSONType::timestamp) {
                         _result.lastTimestamp = fields.ts.timestamp();
                     }
@@ -693,7 +676,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
             "StreamingOplogDeltaAccumulator requires entries in strictly increasing timestamp "
             "order");
     _result.lastTimestamp = entry.getTimestamp();
-    int n = _deltaAccumulator.consume(entry, _options.uuidFilter, _result.deltas);
+    int n = _deltaAccumulator.consume(entry, _result.deltas);
     if (_options.isCheckpoint) {
         recordCheckpointOplogEntryProcessed();
         recordCheckpointSizeCountEntryProcessed(n);
@@ -703,19 +686,17 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
 OplogScanResult StreamingOplogDeltaAccumulator::finish() {
     dassert(!_finished, "finish() called twice on the same accumulator");
     _finished = true;
-    if (_options.isCheckpoint && _options.oplogUuid && !_result.lastTimestamp) {
-        _result.deltas.erase(*_options.oplogUuid);
+    if (_options.isCheckpoint && !_result.lastTimestamp) {
+        _result.deltas.erase(_options.oplogUuid);
     }
     return std::move(_result);
 }
 
 OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCursor,
                                                 const Timestamp& seekAfterTS,
-                                                const boost::optional<UUID>& uuidFilter,
-                                                bool isCheckpoint,
-                                                const boost::optional<UUID>& oplogUuid) {
+                                                UUID oplogUuid,
+                                                bool isCheckpoint) {
     StreamingOplogDeltaAccumulator acc({
-        .uuidFilter = uuidFilter,
         .isCheckpoint = isCheckpoint,
         .oplogUuid = oplogUuid,
     });

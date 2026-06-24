@@ -303,7 +303,7 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         // We pass the oplog UUID here to include the oplog's own size and count in the
         // aggregation.
         return aggregateSizeCountDeltasInOplog(
-            *oplogCursor, seekAfterTimestamp, {}, /*isCheckpoint=*/false, oplogColl->uuid());
+            *oplogCursor, seekAfterTimestamp, oplogColl->uuid(), /*isCheckpoint=*/false);
     }();
 
     for (const auto& [uuid, delta] : scanResult.deltas) {

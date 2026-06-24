@@ -259,7 +259,6 @@ boost::optional<UUID> getUUIDFromOplogEntry(const repl::OplogEntry& oplogEntry) 
 
 // Unpacks MultiOpSizeMetadata from a commitTransaction entry and records per-collection deltas.
 int extractSizeCountDeltasForCommitTxn(const repl::OplogEntry& entry,
-                                       const boost::optional<UUID>& uuidFilter,
                                        SizeCountDeltas& sizeCountDeltasOut) {
     tassert(12406401,
             "extractSizeCountDeltasForCommitTxn called on non-commitTransaction entry",
@@ -275,9 +274,6 @@ int extractSizeCountDeltasForCommitTxn(const repl::OplogEntry& entry,
     const auto& multiMd = std::get<std::vector<MultiOpSizeMetadata>>(sizeMd.value());
     int processed = 0;
     for (const auto& meta : multiMd) {
-        if (uuidFilter && meta.getUuid() != *uuidFilter) {
-            continue;
-        }
         recordCollectionSizeCountDelta(
             meta.getUuid(),
             CollectionSizeCount{.size = meta.getSz(), .count = meta.getCt()},
@@ -292,21 +288,15 @@ int extractSizeCountDeltasForCommitTxn(const repl::OplogEntry& entry,
 // Processes a single oplog entry and accumulates its size/count contribution into
 // 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, commitTransaction, and
 // CRUD operations.
-int processOplogEntry(const repl::OplogEntry& entry,
-                      const boost::optional<UUID>& uuidFilter,
-                      SizeCountDeltas& sizeCountDeltasOut) {
+int processOplogEntry(const repl::OplogEntry& entry, SizeCountDeltas& sizeCountDeltasOut) {
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction) {
-        return extractSizeCountDeltasForCommitTxn(entry, uuidFilter, sizeCountDeltasOut);
+        return extractSizeCountDeltasForCommitTxn(entry, sizeCountDeltasOut);
     }
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        return extractSizeCountDeltasForApplyOps(entry, uuidFilter, sizeCountDeltasOut);
+        return extractSizeCountDeltasForApplyOps(entry, sizeCountDeltasOut);
     }
 
     const auto& entryUuid = getUUIDFromOplogEntry(entry);
-    if (uuidFilter && entryUuid != uuidFilter) {
-        return 0;
-    }
-
     switch (entry.getCommandType()) {
         case repl::OplogEntry::CommandType::kImportCollection: {
             const auto importEntry = mongo::ImportCollectionOplogEntry::parse(
@@ -404,7 +394,6 @@ std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
 }
 
 int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
-                                      const boost::optional<UUID>& uuidFilter,
                                       SizeCountDeltas& sizeCountDeltasOut) {
     massert(12116000,
             str::stream() << "Unexpected input: Expected applyOps oplog entry for extracting size "
@@ -419,7 +408,7 @@ int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
 
     int processed = 0;
     for (const auto& op : innerEntries) {
-        processed += processOplogEntry(op, uuidFilter, sizeCountDeltasOut);
+        processed += processOplogEntry(op, sizeCountDeltasOut);
     }
     return processed;
 }

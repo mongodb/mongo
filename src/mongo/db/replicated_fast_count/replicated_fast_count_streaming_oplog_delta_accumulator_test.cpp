@@ -98,6 +98,20 @@ protected:
         return acc.finish();
     }
 
+    // Convenience overloads for tests that only assert on per-collection deltas. Strips the oplog's
+    // own self-delta from the result.
+    OplogScanResult runAccumulator(std::list<repl::OplogEntry> entries) {
+        auto result = runAccumulator({.oplogUuid = oplogUuid}, std::move(entries));
+        result.deltas.erase(oplogUuid);
+        return result;
+    }
+
+    OplogScanResult runAccumulatorRaw(const std::vector<BSONObj>& rawRecords) {
+        auto result = runAccumulatorRaw({.oplogUuid = oplogUuid}, rawRecords);
+        result.deltas.erase(oplogUuid);
+        return result;
+    }
+
     // Builds a noop (`n`) oplog BSON without `m` or `ui` — Layer 1 returns kCountedNoDelta and
     // advances lastTimestamp without recording any delta.
     BSONObj makeNoopBson(Timestamp ts) {
@@ -227,7 +241,7 @@ protected:
 };
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, EmptyStream_NoLastTimestampNoDeltas) {
-    const auto result = runAccumulator({}, {});
+    const auto result = runAccumulator({});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
 }
@@ -235,7 +249,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, EmptyStream_NoLastTimestampNoDeltas) 
 TEST_F(StreamingOplogDeltaAccumulatorTest, SingleEntry_AccumulatesAndAdvancesTimestamp) {
     const Timestamp ts{1, 5};
     const auto result = runAccumulator(
-        {}, {test_helpers::makeOplogEntry(ts, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)});
+        {test_helpers::makeOplogEntry(ts, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 10);
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
@@ -247,8 +261,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, MultipleEntries_LastTimestampIsLatest
     const Timestamp ts2{1, 2};
     const Timestamp ts3{1, 3};
     const auto result =
-        runAccumulator({},
-                       {test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, 10),
+        runAccumulator({test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, 10),
                         test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 20),
                         test_helpers::makeOplogEntry(ts3, collB, repl::OpTypeEnum::kInsert, 30)});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
@@ -258,19 +271,6 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, MultipleEntries_LastTimestampIsLatest
     EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 30);
     EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 1);
     EXPECT_EQ(result.lastTimestamp, ts3);
-}
-
-TEST_F(StreamingOplogDeltaAccumulatorTest, UuidFilter_OnlyMatchingUuidAccumulated) {
-    const Timestamp ts1{1, 1};
-    const Timestamp ts2{1, 2};
-    const auto result =
-        runAccumulator({.uuidFilter = collA.uuid},
-                       {test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, 10),
-                        test_helpers::makeOplogEntry(ts2, collB, repl::OpTypeEnum::kInsert, 20)});
-    ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_FALSE(result.deltas.contains(collB.uuid));
-    // lastTimestamp tracks the latest non-internal entry regardless of the UUID filter.
-    EXPECT_EQ(result.lastTimestamp, ts2);
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, OplogUuid_TracksRawBytesAcrossAllRecords) {
@@ -302,7 +302,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, OplogUuid_TrackedEvenForInternalEntri
 TEST_F(StreamingOplogDeltaAccumulatorTest, InternalOnly_NoLastTimestamp) {
     const Timestamp ts1{1, 1};
     const auto result = runAccumulator(
-        {}, {test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+        {test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
     EXPECT_FALSE(result.lastTimestamp);
     EXPECT_TRUE(result.deltas.empty());
 }
@@ -311,7 +311,6 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, InternalThenUser_LastTimestampIsUserE
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
     const auto result = runAccumulator(
-        {},
         {test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10),
          test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 50)});
     EXPECT_EQ(result.lastTimestamp, ts2);
@@ -324,7 +323,6 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, UserThenInternal_LastTimestampDoesNot
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
     const auto result = runAccumulator(
-        {},
         {test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, 50),
          test_helpers::makeOplogEntry(ts2, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
     // Internal entry must not advance lastTimestamp past the latest non-internal entry.
@@ -376,7 +374,6 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, PartialTxn_FollowedByNonApplyOps_Chai
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
     const auto result = runAccumulator(
-        {},
         {makePartialApplyOpsEntry(ts1, collA, /*sizeDelta=*/100, repl::OpTime{}),
          test_helpers::makeOplogEntry(ts2, collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/70)});
     // collA's partial chain is discarded when the non-applyOps entry interrupts it.
@@ -395,8 +392,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, PartialTxn_AtEndOfStream_Discarded) {
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
     const auto result =
-        runAccumulator({},
-                       {makePartialApplyOpsEntry(ts1, collA, /*sizeDelta=*/100, repl::OpTime{}),
+        runAccumulator({makePartialApplyOpsEntry(ts1, collA, /*sizeDelta=*/100, repl::OpTime{}),
                         makePartialApplyOpsEntry(ts2, collA, /*sizeDelta=*/200, opTimeAt(ts1))});
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     // lastTimestamp advances to the last scanned entry even though its delta is not yet visible.
@@ -414,14 +410,14 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, PartialTxn_AtEndOfStream_Discarded) {
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_Noop_AdvancesTimestampNoDeltas) {
     const Timestamp ts{1, 1};
-    const auto result = runAccumulatorRaw({}, {makeNoopBson(ts)});
+    const auto result = runAccumulatorRaw({makeNoopBson(ts)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_UnrelatedCommand_AdvancesTimestampNoDeltas) {
     const Timestamp ts{1, 1};
-    const auto result = runAccumulatorRaw({}, {makeUnrelatedCommandBson(ts)});
+    const auto result = runAccumulatorRaw({makeUnrelatedCommandBson(ts)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -430,7 +426,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ContainerOpOnUserIdent_Advan
     // ci/cu/cd targeting a non-fast-count ident are still counted-no-delta (ts advances).
     const Timestamp ts{1, 1};
     const auto result =
-        runAccumulatorRaw({}, {makeContainerOpBson(ts, "ci"_sd, "collection-user-ident"_sd)});
+        runAccumulatorRaw({makeContainerOpBson(ts, "ci"_sd, "collection-user-ident"_sd)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -442,7 +438,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     // checkpoint store itself). The container field stores the ident string, not the namespace.
     const Timestamp ts{1, 1};
     const auto result =
-        runAccumulatorRaw({}, {makeContainerOpBson(ts, "ci"_sd, ident::kFastCountMetadataStore)});
+        runAccumulatorRaw({makeContainerOpBson(ts, "ci"_sd, ident::kFastCountMetadataStore)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
 }
@@ -452,7 +448,6 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_DirectCrudOnFastCountStore_NoTimestampAdvance) {
     const Timestamp ts{1, 1};
     const auto result = runAccumulator(
-        {},
         {test_helpers::makeOplogEntry(ts, fastCountColl, repl::OpTypeEnum::kInsert, /*sz=*/10)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
@@ -464,7 +459,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudMissingM_NoDeltas) {
     // CRUD entry without `m` size metadata is treated as no-delta. ts still advances.
     const Timestamp ts{1, 1};
     const auto result = runAccumulatorRaw(
-        {}, {makeRawCrudBson(ts, "i"_sd, collA.nss, collA.uuid, /*mField=*/boost::none)});
+        {makeRawCrudBson(ts, "i"_sd, collA.nss, collA.uuid, /*mField=*/boost::none)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -475,19 +470,9 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudIneligibleNamespace_NoDe
     const auto localNss =
         NamespaceString::createNamespaceString_forTest("local", "rs.oplog.rs.archive");
     const Timestamp ts{1, 1};
-    const auto result = runAccumulatorRaw(
-        {}, {makeRawCrudBson(ts, "i"_sd, localNss, UUID::gen(), BSON("sz" << 10))});
-    EXPECT_TRUE(result.deltas.empty());
-    EXPECT_EQ(result.lastTimestamp, ts);
-}
-
-TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_UuidFilterMismatch_NoDelta) {
-    // CRUD entry on a UUID outside the filter is dropped silently. ts still advances.
-    const Timestamp ts{1, 1};
     const auto result =
-        runAccumulator({.uuidFilter = collA.uuid},
-                       {test_helpers::makeOplogEntry(ts, collB, repl::OpTypeEnum::kInsert, 50)});
-    EXPECT_FALSE(result.deltas.contains(collB.uuid));
+        runAccumulatorRaw({makeRawCrudBson(ts, "i"_sd, localNss, UUID::gen(), BSON("sz" << 10))});
+    EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
@@ -499,7 +484,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_PreparedApplyOps_AdvancesTim
     const Timestamp ts{1, 1};
     const auto applyOpsBson =
         makeApplyOpsBson(ts, BSON_ARRAY(makeInnerInsertBson(collA, 100)), /*prepare=*/true);
-    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    const auto result = runAccumulatorRaw({applyOpsBson});
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -509,7 +494,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     const Timestamp ts{1, 1};
     const auto applyOpsBson = makeApplyOpsBson(
         ts, BSON_ARRAY(makeInnerInsertBson(collA, 100) << makeInnerInsertBson(collB, 200)));
-    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    const auto result = runAccumulatorRaw({applyOpsBson});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
@@ -526,7 +511,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     const Timestamp ts{1, 1};
     const auto applyOpsBson =
         makeApplyOpsBson(ts, BSON_ARRAY(makeInnerInsertBson(fastCountColl, 50)));
-    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    const auto result = runAccumulatorRaw({applyOpsBson});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
 }
@@ -538,7 +523,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     const Timestamp ts{1, 1};
     const auto applyOpsBson = makeApplyOpsBson(
         ts, BSON_ARRAY(makeInnerInsertBson(fastCountColl, 1) << makeInnerInsertBson(collA, 100)));
-    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    const auto result = runAccumulatorRaw({applyOpsBson});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
     EXPECT_FALSE(result.deltas.contains(fastCountColl.uuid));
@@ -555,7 +540,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ApplyOpsInnerNonCrud_FallsTh
         BSON("op" << "n"
                   << "ns" << collA.nss.ns_forTest() << "o" << BSON("msg" << "noop"));
     const auto applyOpsBson = makeApplyOpsBson(ts, BSON_ARRAY(innerNoop));
-    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    const auto result = runAccumulatorRaw({applyOpsBson});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -565,7 +550,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ApplyOpsInnerNonCrud_FallsTh
 TEST_F(StreamingOplogDeltaAccumulatorTest,
        FastLane_CommitTxnWithoutSizeMetadata_AdvancesTimestampNoDeltas) {
     const Timestamp ts{1, 1};
-    const auto result = runAccumulatorRaw({}, {makeCommitTxnBson(ts, /*mArray=*/boost::none)});
+    const auto result = runAccumulatorRaw({makeCommitTxnBson(ts, /*mArray=*/boost::none)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -578,25 +563,13 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     BSONArrayBuilder mArr;
     mArr.append(BSON("uuid" << collA.uuid << "sz" << int64_t{300} << "ct" << int64_t{3}));
     mArr.append(BSON("uuid" << collB.uuid << "sz" << int64_t{500} << "ct" << int64_t{5}));
-    const auto result = runAccumulatorRaw({}, {makeCommitTxnBson(ts, mArr.arr())});
+    const auto result = runAccumulatorRaw({makeCommitTxnBson(ts, mArr.arr())});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 300);
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 3);
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
     EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 500);
     EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 5);
-    EXPECT_EQ(result.lastTimestamp, ts);
-}
-
-TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CommitTxnUuidFilter_FiltersPerEntry) {
-    const Timestamp ts{1, 1};
-    BSONArrayBuilder mArr;
-    mArr.append(BSON("uuid" << collA.uuid << "sz" << int64_t{300} << "ct" << int64_t{3}));
-    mArr.append(BSON("uuid" << collB.uuid << "sz" << int64_t{500} << "ct" << int64_t{5}));
-    const auto result =
-        runAccumulatorRaw({.uuidFilter = collA.uuid}, {makeCommitTxnBson(ts, mArr.arr())});
-    ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_FALSE(result.deltas.contains(collB.uuid));
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
@@ -620,7 +593,7 @@ DEATH_TEST_F(StreamingOplogDeltaAccumulatorDeathTest, FastLane_TidFieldCrashes, 
     b.append("wall", Date_t::now());
     b.append("o", BSON("_id" << 1));
     b.append("m", BSON("sz" << 10));
-    runAccumulatorRaw({}, {b.obj()});
+    runAccumulatorRaw({b.obj()});
 }
 
 // ----- Checkpoint metrics interaction -----
@@ -632,8 +605,10 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     // lastTimestamp. This is the contract Layer 1 has with the checkpoint accountant.
     const Timestamp ts{1, 1};
     const auto result = runAccumulator(
-        {.isCheckpoint = true},
+        {.isCheckpoint = true, .oplogUuid = oplogUuid},
         {test_helpers::makeOplogEntry(ts, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+    // The only entry is an internal store write, so lastTimestamp never advances and finish()
+    // erases the oplog self-delta, leaving no deltas.
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
 }

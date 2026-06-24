@@ -52,9 +52,8 @@ SizeCountCheckpointSnapshot computeNextCheckpoint(OperationContext* opCtx,
             opCtx, *shard_role_details::getRecoveryUnit(opCtx));
         return aggregateSizeCountDeltasInOplog(*oplogCursor,
                                                seekAfterTimestamp,
-                                               {},
-                                               /*isCheckpoint=*/true,
-                                               oplogColl->uuid());
+                                               oplogColl->uuid(),
+                                               /*isCheckpoint=*/true);
     }();
 
     return materializeCheckpointSnapshot(

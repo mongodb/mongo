@@ -847,7 +847,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateWithNoPriorState) 
     }}};
 
     SizeCountDeltas sizeCountDeltas;
-    extractSizeCountDeltasForApplyOps(applyOpsEntry, boost::none, sizeCountDeltas);
+    extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas);
 
     EXPECT_EQ(sizeCountDeltas.size(), 1u);
     ASSERT_TRUE(sizeCountDeltas.contains(_uuid1));
@@ -880,7 +880,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDrop) {
     }}};
 
     SizeCountDeltas sizeCountDeltas;
-    extractSizeCountDeltasForApplyOps(applyOpsEntry, boost::none, sizeCountDeltas);
+    extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas);
 
     EXPECT_EQ(sizeCountDeltas.size(), 1u);
     ASSERT_TRUE(sizeCountDeltas.contains(_uuid1));
@@ -915,7 +915,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDropThenInser
     }}};
 
     SizeCountDeltas sizeCountDeltas;
-    extractSizeCountDeltasForApplyOps(applyOpsEntry, boost::none, sizeCountDeltas);
+    extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas);
 
     EXPECT_EQ(sizeCountDeltas.size(), 1u);
     ASSERT_TRUE(sizeCountDeltas.contains(_uuid1));
@@ -949,9 +949,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateWithPreExistingWri
 
     SizeCountDeltas sizeCountDeltas;
     ASSERT_THROWS_CODE(
-        extractSizeCountDeltasForApplyOps(applyOpsEntry, boost::none, sizeCountDeltas),
-        DBException,
-        12554002);
+        extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas), DBException, 12554002);
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest,
@@ -980,9 +978,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest,
 
     SizeCountDeltas sizeCountDeltas;
     ASSERT_THROWS_CODE(
-        extractSizeCountDeltasForApplyOps(applyOpsEntry, boost::none, sizeCountDeltas),
-        DBException,
-        12054100);
+        extractSizeCountDeltasForApplyOps(applyOpsEntry, sizeCountDeltas), DBException, 12054100);
 }
 
 // ===========================================================================
@@ -1001,28 +997,6 @@ struct AggregateDeltaExpectation {
     // collection.
     Timestamp lastTimestamp;
 };
-
-/**
- * Test methods should default to testing aggregate size count with this method, as it checks
- * both methods of aggregation (acquiring a map of deltas across uuids and aggregating deltas
- * for a single uuid) yield equivalent results for the 'uuid'.
- */
-void assertExpectedAggregateDelta(const AggregateDeltaExpectation& expected,
-                                  const UUID& uuid,
-                                  const Timestamp& seekAfterTS,
-                                  SeekableRecordCursor& oplogCursor) {
-    // Deltas across UUIDs.
-    const auto deltas = aggregateSizeCountDeltasInOplog(oplogCursor, seekAfterTS);
-    ASSERT_TRUE(deltas.deltas.contains(uuid));
-    EXPECT_EQ(deltas.deltas.at(uuid).sizeCount, expected.delta);
-    EXPECT_EQ(deltas.lastTimestamp, expected.lastTimestamp);
-
-    // Also correct when filtered explicitly by 'uuid'
-    const auto filteredDeltas = aggregateSizeCountDeltasInOplog(oplogCursor, seekAfterTS, uuid);
-    ASSERT_TRUE(filteredDeltas.deltas.contains(uuid));
-    EXPECT_EQ(expected.delta, filteredDeltas.deltas.at(uuid).sizeCount);
-    EXPECT_EQ(filteredDeltas.lastTimestamp, expected.lastTimestamp);
-}
 
 class AggregateSizeCountFromOplogTest : public CatalogTestFixture {
 protected:
@@ -1111,6 +1085,28 @@ protected:
     test_helpers::NsAndUUID collB = {
         .nss = NamespaceString::createNamespaceString_forTest("agg_size_count_from_oplog", "collB"),
         .uuid = UUID::gen()};
+
+    UUID oplogUuid = UUID::gen();
+
+    // Runs the aggregation with the fixture's oplog UUID and drops the oplog's own self-delta,
+    // leaving only the per-collection deltas the tests assert on.
+    OplogScanResult aggregateCollectionSizeCountDeltas(SeekableRecordCursor& oplogCursor,
+                                                       const Timestamp& seekAfterTS) {
+        auto result = aggregateSizeCountDeltasInOplog(oplogCursor, seekAfterTS, oplogUuid);
+        result.deltas.erase(oplogUuid);
+        return result;
+    }
+
+    // Test methods should default to asserting aggregate size count via this method.
+    void assertExpectedAggregateDelta(const AggregateDeltaExpectation& expected,
+                                      const UUID& uuid,
+                                      const Timestamp& seekAfterTS,
+                                      SeekableRecordCursor& oplogCursor) {
+        const auto deltas = aggregateCollectionSizeCountDeltas(oplogCursor, seekAfterTS);
+        ASSERT_TRUE(deltas.deltas.contains(uuid));
+        EXPECT_EQ(deltas.deltas.at(uuid).sizeCount, expected.delta);
+        EXPECT_EQ(deltas.lastTimestamp, expected.lastTimestamp);
+    }
 };
 
 TEST_F(AggregateSizeCountFromOplogTest, AggregateSingleColl) {
@@ -1144,11 +1140,8 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateSingleColl) {
 
     // (3) Timestamp at or past the last entry yields no deltas.
     // Check the result without a uuid filter.
-    const auto oplogScanResult = aggregateSizeCountDeltasInOplog(oplogCursor, ts3);
+    const auto oplogScanResult = aggregateCollectionSizeCountDeltas(oplogCursor, ts3);
     EXPECT_EQ(oplogScanResult.deltas.size(), 0u);
-
-    // Check the result with a uuid filter.
-    EXPECT_FALSE(aggregateSizeCountDeltasInOplog(oplogCursor, ts3, uuidA).deltas.contains(uuidA));
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, AggregateMultipleCollections) {
@@ -1179,7 +1172,8 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateMultipleCollections) {
     // Aggregating from Timestamp::min() aggregates all entries.
     {
         // 2 collections tracked.
-        EXPECT_EQ(aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()).deltas.size(), 2u);
+        EXPECT_EQ(aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()).deltas.size(),
+                  2u);
         assertExpectedAggregateDelta(
             {.delta = CollectionSizeCount{.size = (insertA1 + insertA2 + delA1), .count = 1},
              .lastTimestamp = ts5},
@@ -1195,7 +1189,7 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateMultipleCollections) {
 
     // Aggregating after ts3 (the last insert) only sees the two deletes.
     {
-        EXPECT_EQ(aggregateSizeCountDeltasInOplog(oplogCursor, ts3).deltas.size(), 2u);
+        EXPECT_EQ(aggregateCollectionSizeCountDeltas(oplogCursor, ts3).deltas.size(), 2u);
         assertExpectedAggregateDelta(
             {.delta = CollectionSizeCount{.size = delA1, .count = -1}, .lastTimestamp = ts5},
             collA.uuid,
@@ -1211,13 +1205,13 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateMultipleCollections) {
     // Aggregating with ts5 doesn't yield deltas because the aggregation excludes the timestamp
     // provided.
     {
-        const auto oplogScanResult = aggregateSizeCountDeltasInOplog(oplogCursor, ts5);
+        const auto oplogScanResult = aggregateCollectionSizeCountDeltas(oplogCursor, ts5);
         EXPECT_EQ(oplogScanResult.deltas.size(), 0u);
     }
 
     {
         // Timestamp::max() is too large a value to extract a RecordId from the oplog from.
-        ASSERT_THROWS_CODE(aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::max()),
+        ASSERT_THROWS_CODE(aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::max()),
                            DBException,
                            ErrorCodes::BadValue);
     }
@@ -1247,7 +1241,7 @@ TEST_F(AggregateSizeCountFromOplogTest, ForwardCursorRespectsOplogVisibilityTime
     auto cursor =
         oplogColl->getRecordStore()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 
-    const auto result = aggregateSizeCountDeltasInOplog(*cursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(*cursor, Timestamp::min());
 
     // Only the ts1 entry was visible; ts2 must not appear in the deltas.
     EXPECT_EQ(result.deltas.size(), 1u);
@@ -1380,7 +1374,7 @@ TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationMarksStateCreated) {
     std::list<repl::OplogEntry> entries{test_helpers::makeCreateOplogEntry(ts1, collA)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
@@ -1393,7 +1387,7 @@ TEST_F(AggregateSizeCountFromOplogTest, CollectionDropMarksStateDropped) {
     std::list<repl::OplogEntry> entries{test_helpers::makeDropOplogEntry(ts1, collA)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDropped);
@@ -1410,7 +1404,7 @@ TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationThenInsertsMarkedCreat
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
@@ -1429,7 +1423,7 @@ TEST_F(AggregateSizeCountFromOplogTest, InsertAndDropMarkedDropped) {
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDropped);
@@ -1469,42 +1463,6 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateMixedCrudAndApplyOps) {
         oplogCursor);
 }
 
-TEST_F(AggregateSizeCountFromOplogTest, AggregateApplyOpsFilteredByUUID) {
-    const Timestamp ts1{1, 1};
-
-    std::list<repl::OplogEntry> entries{
-        makeApplyOpsOplogEntry(
-            ts1,
-            {{collA, repl::OpTypeEnum::kInsert, 100}, {collB, repl::OpTypeEnum::kInsert, 200}}),
-    };
-    OplogCursorMock oplogCursor(std::move(entries));
-
-    {
-        const auto result =
-            aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min(), collA.uuid);
-        ASSERT_TRUE(result.deltas.contains(collA.uuid));
-        EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
-                  (CollectionSizeCount{.size = 100, .count = 1}));
-        EXPECT_FALSE(result.deltas.contains(collB.uuid));
-    }
-
-    {
-        const auto result =
-            aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min(), collB.uuid);
-        ASSERT_TRUE(result.deltas.contains(collB.uuid));
-        EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount,
-                  (CollectionSizeCount{.size = 200, .count = 1}));
-        EXPECT_FALSE(result.deltas.contains(collA.uuid));
-    }
-
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
-    EXPECT_EQ(result.deltas.size(), 2u);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
-              (CollectionSizeCount{.size = 100, .count = 1}));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount,
-              (CollectionSizeCount{.size = 200, .count = 1}));
-}
-
 TEST_F(AggregateSizeCountFromOplogTest, AggregateApplyOpsWithMixedSizeMetadata) {
     const Timestamp ts1{1, 1};
 
@@ -1527,14 +1485,9 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateApplyOpsWithMixedSizeMetadata) 
 TEST_F(AggregateSizeCountFromOplogTest, AggregateEmptyOplog) {
     OplogCursorMock oplogCursor({});
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp.has_value());
-
-    const auto filtered =
-        aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min(), collA.uuid);
-    EXPECT_TRUE(filtered.deltas.empty());
-    EXPECT_FALSE(filtered.lastTimestamp.has_value());
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, AggregateOplogWithNoSizeMetadata) {
@@ -1550,7 +1503,7 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateOplogWithNoSizeMetadata) {
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
     EXPECT_TRUE(result.deltas.empty());
 }
 
@@ -1576,7 +1529,7 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateCrudWithSizeMetadataMissingUiTh
     };
     OplogCursorMock oplogCursor(std::move(entries));
     ASSERT_THROWS_CODE(
-        aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()), DBException, 12116001);
+        aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()), DBException, 12116001);
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, AggregateApplyOpsInnerOpMissingUiThrows) {
@@ -1597,7 +1550,7 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateApplyOpsInnerOpMissingUiThrows)
     };
     OplogCursorMock oplogCursor(std::move(entries));
     ASSERT_THROWS_CODE(
-        aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()), DBException, 12116001);
+        aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()), DBException, 12116001);
 }
 
 class AggregateSizeCountFromOplogTxnVisibilityTest : public AggregateSizeCountFromOplogTest {
@@ -1684,7 +1637,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnBasicVisibilityN
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
     EXPECT_TRUE(result.deltas.empty());
 }
 
@@ -1717,7 +1670,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnBasicVisibilityW
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    EXPECT_EQ(aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()).deltas.size(), 2u);
+    EXPECT_EQ(aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()).deltas.size(), 2u);
     assertExpectedAggregateDelta(
         {.delta = CollectionSizeCount{.size = 50, .count = 1}, .lastTimestamp = ts2},
         collA.uuid,
@@ -1750,7 +1703,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, NotPreparedChainAccountedFo
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
@@ -1772,7 +1725,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     // collA's partial chain (100 bytes) is discarded when the non-txn entry interrupts it.
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
@@ -1805,7 +1758,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PartialTxnOpenAtEndOfLogIsD
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.lastTimestamp, ts2);
@@ -1844,7 +1797,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     // The commit's size metadata (300 bytes, 3 docs) is used, not the sum of the partial
     // entries (100+150 = 250 bytes) or the prepared applyOps (50 bytes).
@@ -1866,7 +1819,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnFollowedByAbortP
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_TRUE(result.deltas.empty());
 }
@@ -1890,7 +1843,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_TRUE(result.deltas.empty());
 }
@@ -1914,7 +1867,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
@@ -1943,7 +1896,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, ChainedTxnWithCreateThenDro
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     // A create followed by a drop within the same transaction chain cancels out.
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
@@ -1975,7 +1928,7 @@ DEATH_TEST_F(AggregateSizeCountFromOplogTxnVisibilityDeathTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 }
 
 TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
@@ -2001,7 +1954,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
@@ -2027,7 +1980,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, NoSessionPartialTxnOpenAtEn
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.lastTimestamp, ts2);
@@ -2041,7 +1994,7 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionCreatesEntry) {
         test_helpers::makeImportCollectionOplogEntry(ts1, collA, numRecords, dataSize)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
@@ -2057,7 +2010,7 @@ TEST_F(AggregateSizeCountFromOplogTest, DryRunImportCollectionIsIgnored) {
         ts1, collA, numRecords, dataSize, /*dryRun=*/true)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
 }
@@ -2081,7 +2034,7 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionAndInsert) {
 
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
@@ -2112,7 +2065,7 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionInsertAndDrop) {
 
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
 }
@@ -2125,26 +2078,12 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionFilterWithMatchingUUID) 
         test_helpers::makeImportCollectionOplogEntry(ts1, collA, numRecords, dataSize)};
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min(), collA.uuid);
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, numRecords);
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, dataSize);
-}
-
-TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionFilteredByNonMatchingUUID) {
-    const Timestamp ts1{1, 1};
-    const int64_t numRecords = 100;
-    const int64_t dataSize = 5000;
-    std::list<repl::OplogEntry> entries{
-        test_helpers::makeImportCollectionOplogEntry(ts1, collA, numRecords, dataSize)};
-    OplogCursorMock oplogCursor(std::move(entries));
-
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min(), collB.uuid);
-
-    EXPECT_FALSE(result.deltas.contains(collA.uuid));
-    EXPECT_FALSE(result.deltas.contains(collB.uuid));
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, DropThenImportCollection) {
@@ -2158,7 +2097,7 @@ TEST_F(AggregateSizeCountFromOplogTest, DropThenImportCollection) {
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDroppedAndRecreated);
@@ -2180,7 +2119,7 @@ TEST_F(AggregateSizeCountFromOplogTest, DropThenImportCollectionThenInserts) {
     };
     OplogCursorMock oplogCursor(std::move(entries));
 
-    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    const auto result = aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min());
 
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDroppedAndRecreated);
@@ -2201,7 +2140,7 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionWithPreExistingWritesFai
     OplogCursorMock oplogCursor(std::move(entries));
 
     ASSERT_THROWS_CODE(
-        aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()), DBException, 12601900);
+        aggregateCollectionSizeCountDeltas(oplogCursor, Timestamp::min()), DBException, 12601900);
 }
 
 // Verifies that the local `isFastCountEligibleNonStore` helper agrees with the canonical

@@ -389,9 +389,10 @@ void setItemsProcessed(benchmark::State& state) {
 }
 
 void runScan(benchmark::State& state, const std::vector<BSONObj>& entries) {
+    const auto oplogUuid = UUID::gen();
     for (auto _ : state) {
         InMemoryOplogCursor cursor(&entries);
-        auto result = aggregateSizeCountDeltasInOplog(cursor, Timestamp(0, 0), boost::none, false);
+        auto result = aggregateSizeCountDeltasInOplog(cursor, Timestamp(0, 0), oplogUuid);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }
@@ -422,9 +423,10 @@ void BM_Scan_MixedCRUD(benchmark::State& state) {
 void BM_Scan_TransactionalApplyOps(benchmark::State& state) {
     const auto entries =
         genTransactionalApplyOps(kApplyOpsOuterCount, static_cast<int>(state.range(0)));
+    const auto oplogUuid = UUID::gen();
     for (auto _ : state) {
         InMemoryOplogCursor cursor(&entries);
-        auto result = aggregateSizeCountDeltasInOplog(cursor, Timestamp(0, 0), boost::none, false);
+        auto result = aggregateSizeCountDeltasInOplog(cursor, Timestamp(0, 0), oplogUuid);
         benchmark::DoNotOptimize(result);
         benchmark::ClobberMemory();
     }

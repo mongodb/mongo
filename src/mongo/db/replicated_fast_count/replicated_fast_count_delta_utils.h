@@ -29,11 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
-#include "mongo/db/shard_role/shard_role.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -68,14 +65,12 @@ MONGO_MOD_PUBLIC std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
 
 /**
  * Accumulates cumulative size and count deltas for each uuid across the inner operations of the
- * 'applyOpsEntry' into 'sizeCountDeltasOut'. If 'uuidFilter' is provided, only entries for that
- * UUID are collected. Returns the number of size/count entries processed.
+ * 'applyOpsEntry' into 'sizeCountDeltasOut'. Returns the number of size/count entries processed.
  *
  * The OplogEntry provided must be of type 'repl::OplogEntry::CommandType::kApplyOps'; otherwise,
  * the method throws and terminates the current operation.
  */
 int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
-                                      const boost::optional<UUID>& uuidFilter,
                                       SizeCountDeltas& sizeCountDeltasOut);
 
 /**
@@ -83,9 +78,7 @@ int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
  * 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, commitTransaction,
  * and CRUD operations. Returns the number of size/count entries processed.
  */
-int processOplogEntry(const repl::OplogEntry& entry,
-                      const boost::optional<UUID>& uuidFilter,
-                      SizeCountDeltas& sizeCountDeltasOut);
+int processOplogEntry(const repl::OplogEntry& entry, SizeCountDeltas& sizeCountDeltasOut);
 
 /**
  * Merges per-UUID deltas from 'src' into 'dst', handling DDL states (kCreated requires recording

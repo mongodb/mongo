@@ -68,9 +68,7 @@ struct OplogScanResult {
  */
 class TxnDeltaBuffer {
 public:
-    boost::optional<int> tryConsume(const repl::OplogEntry& entry,
-                                    const boost::optional<UUID>& uuidFilter,
-                                    SizeCountDeltas& globalResult);
+    boost::optional<int> tryConsume(const repl::OplogEntry& entry, SizeCountDeltas& globalResult);
 
     bool isTrackingChain() const {
         return _isTrackingActiveChain();
@@ -90,9 +88,7 @@ private:
  */
 class DeltaAccumulator {
 public:
-    int consume(const repl::OplogEntry& oplogEntry,
-                const boost::optional<UUID>& uuidFilter,
-                SizeCountDeltas& globalResult);
+    int consume(const repl::OplogEntry& oplogEntry, SizeCountDeltas& globalResult);
 
     // True if a partial-transaction applyOps chain is currently being buffered. The fast-scan
     // lanes only run when no chain is active; otherwise every entry must keep flowing through
@@ -117,19 +113,14 @@ private:
 class StreamingOplogDeltaAccumulator {
 public:
     struct Options {
-        // If set, only entries for this UUID contribute to the per-collection accumulation.
-        // Does not affect oplog self-size tracking (see oplogUuid).
-        boost::optional<UUID> uuidFilter;
-
         // If true, emits per-record checkpoint metrics and, in finish(), erases the oplog UUID's
         // delta if no non-internal entries were seen (so a no-op scan does not advance the
         // persisted checkpoint).
         bool isCheckpoint = false;
 
-        // If set, every record's raw byte size and count are attributed to this UUID, in
-        // addition to any per-collection delta processing. Used to track the oplog collection's
-        // own physical size.
-        boost::optional<UUID> oplogUuid;
+        // Every record's raw byte size and count are attributed to this UUID, in addition to any
+        // per-collection delta processing. Used to track the oplog collection's own physical size.
+        UUID oplogUuid;
     };
 
     explicit StreamingOplogDeltaAccumulator(Options options);
@@ -182,17 +173,13 @@ private:
 
 /**
  * Given a cursor to the oplog, scans the oplog starting after "seekAfterTS" (exclusive bound) and
- * aggregates the size count deltas across UUIDs. Only accumulates size count information for
- * "uuidFilter" when provided. Pass 'isCheckpoint=true' only on the checkpoint scan path to
- * increment checkpoint scan counters; leave false (the default) on read paths.
- *
- * If a non-none 'oplogUuid' is passed in, tracks updates to the oplog size and count.
+ * aggregates the size count deltas across UUIDs including the oplog collection itself. Pass
+ * 'isCheckpoint=true' only on the checkpoint scan path to increment checkpoint scan counters; leave
+ * false (the default) on read paths.
  */
-OplogScanResult aggregateSizeCountDeltasInOplog(
-    SeekableRecordCursor& oplogCursor,
-    const Timestamp& seekAfterTS,
-    const boost::optional<UUID>& uuidFilter = boost::none,
-    bool isCheckpoint = false,
-    const boost::optional<UUID>& oplogUuid = boost::none);
+OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCursor,
+                                                const Timestamp& seekAfterTS,
+                                                UUID oplogUuid,
+                                                bool isCheckpoint = false);
 
 }  // namespace mongo::replicated_fast_count
