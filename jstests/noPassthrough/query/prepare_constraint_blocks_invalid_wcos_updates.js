@@ -10,7 +10,6 @@
  *
  * @tags: [
  *   requires_fcv_90,
- *   featureFlagConstraintValidationLevel,
  *   requires_sharding,
  *   uses_parallel_shell,
  * ]

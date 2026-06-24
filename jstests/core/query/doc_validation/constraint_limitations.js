@@ -6,7 +6,7 @@
  * ]
  */
 
-import {after, describe, it} from "jstests/libs/mochalite.js";
+import {after, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
 const dbName = "constraint_tests";
 const collName = "test";
@@ -313,8 +313,11 @@ describe("constraint validationLevel", () => {
     });
 
     describe("validator rules", () => {
-        it("cannot be changed while validationLevel is 'constraint'", () => {
+        beforeEach(() => {
             createConstraintCollection();
+        });
+
+        it("cannot be changed while validationLevel is 'constraint'", () => {
             assert.commandFailed(
                 myDb.runCommand({
                     "collMod": collName,
@@ -326,7 +329,6 @@ describe("constraint validationLevel", () => {
 
         it("cannot be changed when also passing 'constraint' validationLevel", () => {
             // Exercises the upgrade-path check in addition to the at-constraint guard.
-            createConstraintCollection();
             assert.commandFailed(
                 myDb.runCommand({
                     "collMod": collName,
@@ -338,7 +340,6 @@ describe("constraint validationLevel", () => {
         });
 
         it("can be changed when downgrading to 'strict' in the same collMod", () => {
-            createConstraintCollection();
             assert.commandWorked(
                 myDb.runCommand({
                     "collMod": collName,
@@ -351,7 +352,6 @@ describe("constraint validationLevel", () => {
 
         it("cannot be changed when upgrading to 'constraint' from 'strict' in the same collMod", () => {
             // Rules changes must be done before upgrading to constraint.
-            createConstraintCollection();
             assert.commandWorked(
                 myDb.runCommand({
                     "collMod": collName,
@@ -380,8 +380,11 @@ describe("constraint validationLevel", () => {
     });
 
     describe("downgrading to 'strict'", () => {
-        it("succeeds", () => {
+        beforeEach(() => {
             createConstraintCollection();
+        });
+
+        it("succeeds", () => {
             assert.commandWorked(
                 myDb.runCommand({
                     "collMod": collName,
@@ -393,8 +396,11 @@ describe("constraint validationLevel", () => {
     });
 
     describe("document writes", () => {
-        it("rejects non-conforming documents", () => {
+        beforeEach(() => {
             createConstraintCollection();
+        });
+
+        it("rejects non-conforming documents", () => {
             assert.commandFailed(
                 myDb.runCommand({
                     insert: collName,
@@ -405,7 +411,6 @@ describe("constraint validationLevel", () => {
         });
 
         it("rejects bypassDocumentValidation regardless of document conformance", () => {
-            createConstraintCollection();
             // conforming doc (bypassDocumentValidation:true always fails with constraint
             // validationLevel)
             assert.commandFailed(
@@ -428,7 +433,6 @@ describe("constraint validationLevel", () => {
         });
 
         it("accepts conforming documents without bypassDocumentValidation", () => {
-            createConstraintCollection();
             assert.commandWorked(
                 myDb.runCommand({
                     insert: collName,
@@ -440,7 +444,6 @@ describe("constraint validationLevel", () => {
         });
 
         it("rejects non-conforming documents without bypassDocumentValidation", () => {
-            createConstraintCollection();
             assert.commandFailed(
                 myDb.runCommand({
                     insert: collName,
@@ -448,6 +451,105 @@ describe("constraint validationLevel", () => {
                     bypassDocumentValidation: false,
                     writeConcern: {w: "majority"},
                 }),
+            );
+        });
+    });
+
+    describe("update and findAndModify", () => {
+        beforeEach(() => {
+            createConstraintCollection();
+        });
+
+        it("update: conforming update succeeds", () => {
+            assert.commandWorked(
+                myDb.runCommand({
+                    insert: collName,
+                    documents: [{a: 1}],
+                    writeConcern: {w: "majority"},
+                }),
+            );
+            assert.commandWorked(
+                myDb.runCommand({
+                    update: collName,
+                    updates: [{q: {a: 1}, u: {$set: {a: 2}}}],
+                    writeConcern: {w: "majority"},
+                }),
+            );
+        });
+
+        it("update: good-to-bad update fails", () => {
+            assert.commandWorked(
+                myDb.runCommand({
+                    insert: collName,
+                    documents: [{a: 1}],
+                    writeConcern: {w: "majority"},
+                }),
+            );
+            assert.commandFailedWithCode(
+                myDb.runCommand({
+                    update: collName,
+                    updates: [{q: {a: 1}, u: {$unset: {a: ""}}}],
+                    writeConcern: {w: "majority"},
+                }),
+                ErrorCodes.DocumentValidationFailure,
+            );
+        });
+
+        it("update: bypassDocumentValidation is rejected", () => {
+            assert.commandWorked(
+                myDb.runCommand({
+                    insert: collName,
+                    documents: [{a: 1}],
+                    writeConcern: {w: "majority"},
+                }),
+            );
+            assert.commandFailedWithCode(
+                myDb.runCommand({
+                    update: collName,
+                    updates: [{q: {a: 1}, u: {$set: {a: 2}}}],
+                    bypassDocumentValidation: true,
+                    writeConcern: {w: "majority"},
+                }),
+                ErrorCodes.BadValue,
+            );
+        });
+
+        it("findAndModify: non-conforming update fails", () => {
+            assert.commandWorked(
+                myDb.runCommand({
+                    insert: collName,
+                    documents: [{a: 1}],
+                    writeConcern: {w: "majority"},
+                }),
+            );
+            assert.commandFailedWithCode(
+                myDb.runCommand({
+                    findAndModify: collName,
+                    query: {a: 1},
+                    update: {$unset: {a: ""}},
+                    writeConcern: {w: "majority"},
+                }),
+                ErrorCodes.DocumentValidationFailure,
+            );
+        });
+
+        it("findAndModify: bypassDocumentValidation is rejected", () => {
+            assert.commandWorked(
+                myDb.runCommand({
+                    insert: collName,
+                    documents: [{a: 1}],
+                    writeConcern: {w: "majority"},
+                }),
+            );
+            assert.commandFailedWithCode(
+                myDb.runCommand({
+                    findAndModify: collName,
+                    query: {a: 1},
+                    update: {$set: {a: 2}},
+                    bypassDocumentValidation: true,
+                    writeConcern: {w: "majority"},
+                }),
+                ErrorCodes.BadValue,
             );
         });
     });

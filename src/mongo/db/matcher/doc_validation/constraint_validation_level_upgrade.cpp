@@ -49,10 +49,16 @@
 namespace mongo {
 namespace {
 
-Status makeViolatingValidatorStatus(const BSONObj& validator, std::string_view collName) {
+Status makeViolatingValidatorStatus(const BSONObj& validator,
+                                    std::string_view collName,
+                                    const BSONElement& offendingId) {
     str::stream msg;
     msg << "Cannot upgrade validationLevel to 'constraint': the collection contains documents "
            "that do not satisfy the validator.";
+    if (!offendingId.eoo()) {
+        msg << " First offending document _id: "
+            << offendingId.toString(/*includeFieldName=*/false);
+    }
     constexpr size_t kMaxValidatorInErrorMessage = 10 * 1024;
     StringBuilder validatorStr;
     validator.toString(validatorStr, /*isArray=*/false, /*full=*/true);
@@ -146,11 +152,12 @@ Status noDocumentsViolatingValidator(OperationContext* opCtx,
         return cursorResponse.getStatus();
     }
 
-    if (cursorResponse.getValue().getBatch().empty()) {
+    const auto& batch = cursorResponse.getValue().getBatch();
+    if (batch.empty()) {
         return Status::OK();
     }
 
-    return makeViolatingValidatorStatus(validator, nss.coll());
+    return makeViolatingValidatorStatus(validator, nss.coll(), batch[0]["_id"]);
 }
 
 }  // namespace mongo

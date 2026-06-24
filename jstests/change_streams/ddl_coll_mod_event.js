@@ -5,6 +5,7 @@
  *   requires_fcv_60,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
@@ -238,8 +239,53 @@ function runTest(startChangeStream) {
     options = {expireAfterSeconds: NumberLong(100000)};
     testCollModIndex({c: 1}, options);
 
+    function testCollModPrepareConstraintValidationLevel() {
+        // Prerequisites for setting the flag: validator + validationLevel strict + validationAction error.
+        // These setup collMods happen before the cursor is opened so they are not captured.
+        const schema = {"$jsonSchema": {"bsonType": "object", "required": ["a"]}};
+        assert.commandWorked(
+            testDB.runCommand({
+                collMod: collName,
+                validator: schema,
+                validationLevel: "strict",
+                validationAction: "error",
+            }),
+        );
+
+        let cursor = startChangeStream();
+
+        assert.commandWorked(
+            testDB[collName].runCommand({
+                collMod: collName,
+                prepareConstraintValidationLevel: true,
+            }),
+        );
+
+        const numShards = FixtureHelpers.numberOfShardsForCollection(testDB[collName]);
+        let expectedChanges = [];
+        for (let i = 0; i < numShards; ++i) {
+            expectedChanges.push({
+                operationType: "modify",
+                ns: ns,
+                operationDescription: {prepareConstraintValidationLevel: true},
+                stateBeforeChange: {
+                    collectionOptions: {
+                        uuid: getCollectionUuid(collName),
+                        validator: schema,
+                        validationLevel: "strict",
+                        validationAction: "error",
+                    },
+                },
+            });
+        }
+        assertNextChangeEvent(cursor, expectedChanges);
+    }
+
     // Test 'collMod' commands by modifying validation options on the collection.
     testCollModValidator();
+    if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ConstraintValidationLevel")) {
+        testCollModPrepareConstraintValidationLevel();
+    }
 
     testDB[collName].drop();
 }

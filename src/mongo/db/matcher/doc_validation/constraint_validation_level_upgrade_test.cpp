@@ -226,6 +226,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageTruncatesLargeValidator
                                       PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                       makeLocalValidatorScanFn(opCtx));
     ASSERT_EQ(status.code(), 12370902);
+    ASSERT_STRING_CONTAINS(status.reason(), "First offending document _id: 1");
     ASSERT_STRING_CONTAINS(status.reason(), "<your collection's validator>");
     ASSERT_STRING_OMITS(status.reason(), longTitle);
 }
@@ -254,6 +255,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageContainsValidatorAndCol
                                       PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                       makeLocalValidatorScanFn(opCtx));
     ASSERT_EQ(status.code(), 12370902);
+    ASSERT_STRING_CONTAINS(status.reason(), "First offending document _id: 1");
     ASSERT_STRING_CONTAINS(status.reason(), "Run db.testcoll.find({\"$nor\": [");
     StringBuilder validatorStr;
     options.validator.toString(validatorStr, /*isArray=*/false, /*full=*/true);

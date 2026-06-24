@@ -8,6 +8,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {RollbackTestDeluxe} from "jstests/replsets/libs/rollback_test_deluxe.js";
 
 const testName = "rollback_collmods";
@@ -17,6 +18,8 @@ let coll1Name = "NoInitialValidationAtAll";
 let coll2Name = "NoInitialValidationAction";
 let coll3Name = "NoInitialValidator";
 let coll4Name = "NoInitialValidationLevel";
+let coll5Name = "ConstraintValidationLevelFullUpgrade";
+let coll6Name = "ConstraintValidationLevelPartialUpgrade";
 
 function printCollectionOptionsForNode(node, time) {
     let opts = assert.commandWorked(node.getDB(dbName).runCommand({"listCollections": 1}));
@@ -58,6 +61,29 @@ let CommonOps = (node) => {
     assert.commandWorked(
         testDb.runCommand({collMod: coll4Name, validator: {a: 1}, validationAction: "warn"}),
     );
+
+    // Seed collections for constraint validationLevel upgrade rollback tests.
+    if (constraintFlagEnabled) {
+        assert.commandWorked(testDb[coll5Name].insert({a: 5, b: 5}));
+        assert.commandWorked(
+            testDb.runCommand({
+                collMod: coll5Name,
+                validator: {a: {$exists: true}},
+                validationLevel: "strict",
+                validationAction: "error",
+            }),
+        );
+
+        assert.commandWorked(testDb[coll6Name].insert({a: 6, b: 6}));
+        assert.commandWorked(
+            testDb.runCommand({
+                collMod: coll6Name,
+                validator: {a: {$exists: true}},
+                validationLevel: "strict",
+                validationAction: "error",
+            }),
+        );
+    }
 };
 
 // Operations that will be performed on the rollback node past the common point.
@@ -87,6 +113,22 @@ let RollbackOps = (node) => {
             validationLevel: "moderate",
         }),
     );
+
+    if (constraintFlagEnabled) {
+        // coll5: full two-step upgrade to constraint where both collMods will be rolled back.
+        assert.commandWorked(
+            testDb.runCommand({collMod: coll5Name, prepareConstraintValidationLevel: true}),
+        );
+        assert.commandWorked(
+            testDb.runCommand({collMod: coll5Name, validationLevel: "constraint"}),
+        );
+
+        // coll6: partial upgrade where only the prepare flag is set; the validationLevel upgrade
+        // never happens before rollback. Tests that the transient flag is correctly reverted.
+        assert.commandWorked(
+            testDb.runCommand({collMod: coll6Name, prepareConstraintValidationLevel: true}),
+        );
+    }
 };
 
 // Operations that will be performed on the sync source node after rollback.
@@ -96,10 +138,18 @@ let SteadyStateOps = (node) => {
     assert.commandWorked(testDb.runCommand({collMod: coll2Name, validator: {b: 1}}));
     assert.commandWorked(testDb.runCommand({collMod: coll3Name, validationAction: "error"}));
     assert.commandWorked(testDb.runCommand({collMod: coll4Name, validationAction: "error"}));
+    if (constraintFlagEnabled) {
+        assert.commandWorked(testDb.runCommand({collMod: coll5Name, validationAction: "error"}));
+        assert.commandWorked(testDb.runCommand({collMod: coll6Name, validationAction: "error"}));
+    }
 };
 
 // Set up Rollback Test.
 let rollbackTest = new RollbackTestDeluxe(testName);
+const constraintFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    rollbackTest.getPrimary().getDB("admin"),
+    "ConstraintValidationLevel",
+);
 CommonOps(rollbackTest.getPrimary());
 
 let rollbackNode = rollbackTest.transitionToRollbackOperations();
@@ -115,7 +165,8 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();
 printCollectionOptions(rollbackTest, "after rollback");
 
-SteadyStateOps(rollbackTest.getPrimary());
+const primary = rollbackTest.getPrimary();
+SteadyStateOps(primary);
 printCollectionOptions(rollbackTest, "at completion");
 
 rollbackTest.stop();
