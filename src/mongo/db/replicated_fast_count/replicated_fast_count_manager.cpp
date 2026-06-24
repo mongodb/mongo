@@ -113,12 +113,12 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
 
     LOGV2(12051100, "Starting up ReplicatedFastCountManager checkpoint coordinator");
     _checkpointer = std::make_unique<SizeCountCheckpointCoordinator>(
-        *_sizeCountStore, *_timestampStore, _metrics, oplogUuid);
+        *_sizeCountStore, *_timestampStore, oplogUuid);
     if (!_isUnderTest) {
         _checkpointer->startup(opCtx->getServiceContext(), lastPersistedCheckpointTS);
     }
 
-    _metrics.setIsRunning(true);
+    setIsRunning(true);
 }
 
 void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
@@ -154,7 +154,7 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     }
 
     LOGV2(12101800, "ReplicatedFastCountManager stopped");
-    _metrics.setIsRunning(false);
+    setIsRunning(false);
 }
 
 int ReplicatedFastCountManager::_hydrateMetadataFromContainer(

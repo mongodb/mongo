@@ -67,7 +67,7 @@ protected:
         ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), _opCtx));
 
         _coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, _metrics, oplogUuid());
+            _sizeCountStore, _timestampStore, oplogUuid());
     }
 
     UUID oplogUuid() const {
@@ -90,7 +90,6 @@ protected:
     OperationContext* _opCtx = nullptr;
     CollectionSizeCountStore _sizeCountStore;
     CollectionSizeCountTimestampStore _timestampStore;
-    ReplicatedFastCountMetrics _metrics;
     std::unique_ptr<SizeCountCheckpointCoordinator> _coordinator;
 };
 
@@ -229,7 +228,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
     writeInsert(persistedTs);
 
     auto coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-        _sizeCountStore, _timestampStore, _metrics, oplogUuid());
+        _sizeCountStore, _timestampStore, oplogUuid());
     coordinator->flushSync_ForTest(_opCtx);
 
     ASSERT_EQ(readTimestampStore(), boost::optional<Timestamp>(persistedTs));
@@ -264,7 +263,11 @@ TEST_F(SizeCountCheckpointCoordinatorTest, FlushFailureIncrementsFlushFailureCou
     // catch (incrementing the metric) and exited, so the assertion needs no polling.
     _coordinator->shutdown();
 
-    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushFailureCount), 1);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushFailureCount), 1);
+
+    // A failed flush does not increment success metrics.
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushSuccessCount), 0);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 0);
 }
 
 TEST_F(SizeCountCheckpointCoordinatorTest, BufferHasNoPendingWorkBeforeAnyTailCycle) {
@@ -295,7 +298,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest,
        DestructorJoinsBackgroundThreadsWithoutExplicitShutdown) {
     {
         auto localCoord = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, _metrics, oplogUuid());
+            _sizeCountStore, _timestampStore, oplogUuid());
         localCoord->startup(getServiceContext(), Timestamp::min());
         // Destructor calls shutdown() and joins the worker threads.
     }
@@ -348,7 +351,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, RepeatedConcurrentStartupShutdownLeav
 TEST_F(SizeCountCheckpointCoordinatorTest, ConcurrentRequestFlushAndShutdownNeverDeadlocks) {
     for (int i = 0; i < 50; ++i) {
         auto coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, _metrics, oplogUuid());
+            _sizeCountStore, _timestampStore, oplogUuid());
         coordinator->startup(getServiceContext(), Timestamp::min());
 
         stdx::thread flusher([&] {

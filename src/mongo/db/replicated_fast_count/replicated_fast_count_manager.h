@@ -188,10 +188,6 @@ public:
      */
     void flushSync_ForTest(OperationContext* opCtx);
 
-    ReplicatedFastCountMetrics& getReplicatedFastCountMetrics() {
-        return _metrics;
-    }
-
     /**
      * Disables periodic background writes of metadata for testing purposes. Must be called before
      * startup().
@@ -235,13 +231,10 @@ private:
 
     UUID _UUIDForKey(RecordId key) const;
 
-    // Metrics for the ReplicatedFastCountManager reported via both serverStatus and OTel.
-    //
-    // Metrics are shared between ReplicatedFastCountManager instances. We assume there is exactly
-    // one ReplicatedFastCountManager per mongod process.
-    static inline ReplicatedFastCountMetrics _metrics;
-
-    bool _isUnderTest = false;  // Used to force synchronous writes in tests.
+    /**
+     * Used to force synchronous writes in tests.
+     */
+    bool _isUnderTest = false;
 
     /**
      * Interface for reads / writes to the fast count metadata store.

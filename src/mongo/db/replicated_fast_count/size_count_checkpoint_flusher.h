@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_buffer.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/fail_point.h"
@@ -47,8 +46,7 @@ class SizeCountTimestampStore;
 class SizeCountCheckpointFlusher {
 public:
     SizeCountCheckpointFlusher(SizeCountStore* sizeCountStore,
-                               SizeCountTimestampStore* timestampStore,
-                               ReplicatedFastCountMetrics& metrics);
+                               SizeCountTimestampStore* timestampStore);
 
     /**
      * Runs the flush loop until opCtx is interrupted (shutdown signal).
@@ -77,7 +75,6 @@ private:
 
     SizeCountStore* _sizeCountStore;
     SizeCountTimestampStore* _timestampStore;
-    ReplicatedFastCountMetrics& _metrics;
 
     FailPoint* _fpFailDuringFlush{nullptr};
     FailPoint* _fpHangAfterReplicatedFastCountSnapshot{nullptr};

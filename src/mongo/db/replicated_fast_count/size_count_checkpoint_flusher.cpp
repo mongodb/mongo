@@ -45,9 +45,8 @@
 namespace mongo::replicated_fast_count {
 
 SizeCountCheckpointFlusher::SizeCountCheckpointFlusher(SizeCountStore* sizeCountStore,
-                                                       SizeCountTimestampStore* timestampStore,
-                                                       ReplicatedFastCountMetrics& metrics)
-    : _sizeCountStore(sizeCountStore), _timestampStore(timestampStore), _metrics(metrics) {
+                                                       SizeCountTimestampStore* timestampStore)
+    : _sizeCountStore(sizeCountStore), _timestampStore(timestampStore) {
     auto& registry = globalFailPointRegistry();
     _fpFailDuringFlush = registry.find("failDuringFlush");
     _fpHangAfterReplicatedFastCountSnapshot = registry.find("hangAfterReplicatedFastCountSnapshot");
@@ -79,7 +78,7 @@ void SizeCountCheckpointFlusher::run(OperationContext* opCtx, SizeCountCheckpoin
                             "error"_attr = ex.toStatus());
                 return;
             } else {
-                _metrics.incrementFlushFailureCount();
+                incrementFlushFailureCount();
                 LOGV2_WARNING(12917805,
                               "Exception handled in SizeCountCheckpointFlusher::run()",
                               "error"_attr = ex.toStatus());
@@ -109,8 +108,7 @@ void SizeCountCheckpointFlusher::runOneFlushCycle_ForTest(OperationContext* opCt
 void SizeCountCheckpointFlusher::_runOneFlushCycle(OperationContext* opCtx,
                                                    SizeCountCheckpointBuffer& buffer) {
     const Date_t flushStart = Date_t::now();
-    size_t entryWriteCount = 0;
-    entryWriteCount = _doFlush(opCtx, buffer);
+    const size_t entryWriteCount = _doFlush(opCtx, buffer);
 
     if (_fpSleepAfterFlush) {
         _fpSleepAfterFlush->execute([](const BSONObj& data) {

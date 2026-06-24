@@ -38,19 +38,16 @@ namespace MONGO_MOD_PUBLIC mongo {
 class ServiceContext;
 
 /**
- * Wrapper for the ReplicatedFastCountManager OpenTelemetry metric instruments. All metrics are
- * reported directly via OTel and serverStatus.
+ * Free functions wrapping the ReplicatedFastCountManager OpenTelemetry metric instruments. All
+ * metrics are reported via OTel and serverStatus.
  */
-class ReplicatedFastCountMetrics {
-public:
-    void setIsRunning(bool running);
+void setIsRunning(bool running);
 
-    void incrementFlushFailureCount();
+void incrementFlushFailureCount();
 
-    void incrementInsertCount();
+void incrementInsertCount();
 
-    void incrementUpdateCount();
-};
+void incrementUpdateCount();
 
 /**
  * Records metrics for a successful flush. Updates flush timing, success count, and
@@ -60,7 +57,7 @@ void recordFlush(Date_t startTime, size_t batchSize);
 
 /**
  * Free functions for recording checkpoint oplog scan metrics. These functions are safe to call from
- * any code in the checkpoint scan path without needing a ReplicatedFastCountMetrics instance.
+ * any code in the checkpoint scan path.
  */
 void recordCheckpointOplogEntryProcessed();
 void recordCheckpointOplogEntrySkipped();

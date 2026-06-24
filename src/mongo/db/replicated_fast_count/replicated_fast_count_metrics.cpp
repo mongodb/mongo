@@ -130,19 +130,19 @@ void refreshOplogLagGauge() {
 
 }  // namespace
 
-void ReplicatedFastCountMetrics::setIsRunning(bool running) {
+void setIsRunning(bool running) {
     isRunningGauge.set(running ? 1 : 0);
 }
 
-void ReplicatedFastCountMetrics::incrementFlushFailureCount() {
+void incrementFlushFailureCount() {
     flushFailureCounter.add(1);
 }
 
-void ReplicatedFastCountMetrics::incrementInsertCount() {
+void incrementInsertCount() {
     insertCounter.add(1);
 }
 
-void ReplicatedFastCountMetrics::incrementUpdateCount() {
+void incrementUpdateCount() {
     updateCounter.add(1);
 }
 

@@ -83,12 +83,11 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
 
 TEST(ReplicatedFastCountMetricsTest, IsRunningGaugeClearedBySetIsRunning) {
     OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
-    metrics.setIsRunning(false);
+    setIsRunning(false);
 
     EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountIsRunning), 0);
 
-    metrics.setIsRunning(true);
+    setIsRunning(true);
 
     EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountIsRunning), 1);
 }
@@ -103,23 +102,21 @@ TEST(ReplicatedFastCountMetricsTest, FlushSuccessCounterIncrementsViaRecordFlush
 
 TEST(ReplicatedFastCountMetricsTest, FlushFailureCounterIncrement) {
     OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
 
-    metrics.incrementFlushFailureCount();
-    metrics.incrementFlushFailureCount();
+    incrementFlushFailureCount();
+    incrementFlushFailureCount();
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushFailureCount), 2);
 }
 
 TEST(ReplicatedFastCountMetricsTest, InsertAndUpdateCountersIncrement) {
     OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
 
-    metrics.incrementInsertCount();
-    metrics.incrementInsertCount();
+    incrementInsertCount();
+    incrementInsertCount();
 
-    metrics.incrementUpdateCount();
-    metrics.incrementUpdateCount();
+    incrementUpdateCount();
+    incrementUpdateCount();
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountInsertCount), 2);
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountUpdateCount), 2);
@@ -132,25 +129,6 @@ TEST(ReplicatedFastCountMetricsTest, FlushedDocsTotalUpdatedAfterFlushes) {
     recordFlush(Date_t::now(), /*batchSize=*/1);
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 11);
-}
-
-TEST(ReplicatedFastCountMetricsTest, StaticMetrics) {
-    OtelMetricsCapturer capturer;
-
-    ReplicatedFastCountManager manager1;
-    manager1.getReplicatedFastCountMetrics().incrementUpdateCount();
-    manager1.getReplicatedFastCountMetrics().incrementInsertCount();
-
-    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountInsertCount), 1);
-    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountUpdateCount), 1);
-
-    ReplicatedFastCountManager manager2;
-    manager2.getReplicatedFastCountMetrics().incrementUpdateCount();
-    manager2.getReplicatedFastCountMetrics().incrementInsertCount();
-
-    // Metrics are shared between ReplicatedFastCountManager instances.
-    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountInsertCount), 2);
-    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountUpdateCount), 2);
 }
 
 class ReplicatedFastCountManagerMetricsTest : public CatalogTestFixture {
