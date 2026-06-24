@@ -528,7 +528,7 @@ void SamplingEstimatorImpl::generateFullCollScanSample() {
 
 void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
     _sampleSize = sampleSize;
-    auto tryLoadStatus = tryLoadPersistentSample(SamplingCEMethodEnum::kRandom);
+    auto tryLoadStatus = tryLoadPersistentSample(SamplingTechniqueEnum::kRandom);
     if (tryLoadStatus.isOK()) {
         return;
     }
@@ -555,7 +555,7 @@ void SamplingEstimatorImpl::generateRandomSample() {
 
 void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
     _sampleSize = sampleSize;
-    auto tryLoadStatus = tryLoadPersistentSample(SamplingCEMethodEnum::kChunk);
+    auto tryLoadStatus = tryLoadPersistentSample(SamplingTechniqueEnum::kChunk);
     if (tryLoadStatus.isOK()) {
         return;
     }
@@ -598,23 +598,23 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
 
     if (internalQuerySamplingBySequentialScan.load()) {
         // This is only used for testing purposes when a repeatable sample is needed.
-        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kSeqScan;
-        generateSampleForTesting(cost_based_ranker::SamplingTechnique::kSeqScan);
+        _usedSamplingTechnique = SamplingTechniqueEnum::kSeqScan;
+        generateSampleForTesting(SamplingTechniqueEnum::kSeqScan);
     } else if (internalQuerySamplingByStrides.load()) {
         // This is only used for testing purposes when a repeatable sample is needed.
-        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kStrides;
-        generateSampleForTesting(cost_based_ranker::SamplingTechnique::kStrides);
+        _usedSamplingTechnique = SamplingTechniqueEnum::kStrides;
+        generateSampleForTesting(SamplingTechniqueEnum::kStrides);
     } else if (_sampleSize >= _collectionCard.toDouble()) {
         // If the required sample is larger than the collection, the sample is generated from all
         // the documents on the collection.
-        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kFullCollScan;
+        _usedSamplingTechnique = SamplingTechniqueEnum::kFullCollScan;
         generateFullCollScanSample();
     } else if (_samplingStyle == SamplingCEMethodEnum::kRandom) {
-        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kRandom;
+        _usedSamplingTechnique = SamplingTechniqueEnum::kRandom;
         generateRandomSample();
     } else {
         tassert(9372901, "The number of chunks should be positive.", _numChunks && *_numChunks > 0);
-        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kChunk;
+        _usedSamplingTechnique = SamplingTechniqueEnum::kChunk;
         generateChunkSample();
     }
     if (!_wasSamplePersisted) {
@@ -624,12 +624,11 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
     hangAfterCBRSamplingGenerateSample.pauseWhileSet(_opCtx);
 }
 
-void SamplingEstimatorImpl::generateSampleForTesting(
-    cost_based_ranker::SamplingTechnique technique) {
+void SamplingEstimatorImpl::generateSampleForTesting(SamplingTechniqueEnum technique) {
     tassert(12433205,
             "generateSampleForTesting only supports kSeqScan and kStrides",
-            technique == cost_based_ranker::SamplingTechnique::kSeqScan ||
-                technique == cost_based_ranker::SamplingTechnique::kStrides);
+            technique == SamplingTechniqueEnum::kSeqScan ||
+                technique == SamplingTechniqueEnum::kStrides);
 
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
@@ -643,7 +642,7 @@ void SamplingEstimatorImpl::generateSampleForTesting(
         collection, staticData->resultSlot, boost::none, boost::none, false, sbeYieldPolicy.get());
 
     switch (technique) {
-        case cost_based_ranker::SamplingTechnique::kSeqScan: {
+        case SamplingTechniqueEnum::kSeqScan: {
             // Scan the first '_sampleSize' documents sequentially from the start of the target
             // collection in order to generate a repeatable sample.
             stage = sbe::makeS<sbe::LimitSkipStage>(
@@ -654,7 +653,7 @@ void SamplingEstimatorImpl::generateSampleForTesting(
                 0 /* nodeId */);
             break;
         }
-        case cost_based_ranker::SamplingTechnique::kStrides: {
+        case SamplingTechniqueEnum::kStrides: {
             const auto collCard = static_cast<size_t>(_collectionCard.toDouble());
             tassert(12433206,
                     "Sample size must be greater than zero for stride sampling",
@@ -1103,7 +1102,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
-Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingCEMethodEnum method) {
+Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingTechniqueEnum method) {
     if (!feature_flags::gFeatureFlagPersistentStats.isEnabled(
             VersionContext::getDecoration(_opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -1119,7 +1118,7 @@ Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingCEMethodEnum metho
     }
 
     const boost::optional<int> numChunks =
-        (method == SamplingCEMethodEnum::kChunk) ? _numChunks : boost::none;
+        (method == SamplingTechniqueEnum::kChunk) ? _numChunks : boost::none;
 
     PersistentSampleLoader loader;
     auto parsed =
@@ -1153,7 +1152,7 @@ SamplingMetadata SamplingEstimatorImpl::getSamplingMetadata() const {
     meta.requestedDocCount = _requestedSampleSize;
     meta.memorySizeBytes = memorySizeBytes;
     meta.technique = *_usedSamplingTechnique;
-    if (*_usedSamplingTechnique == cost_based_ranker::SamplingTechnique::kChunk) {
+    if (*_usedSamplingTechnique == SamplingTechniqueEnum::kChunk) {
         meta.numChunks = _numChunks;
     }
     meta.createdAt = _sampleCreatedAt;

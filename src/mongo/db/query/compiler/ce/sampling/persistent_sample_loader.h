@@ -35,7 +35,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -58,15 +57,15 @@ inline constexpr int kPersistentSampleSchemaVersion = 1;
  * command) produce identical keys.
  */
 std::string buildPersistentSampleId(const UUID& collectionUuid,
-                                    SamplingCEMethodEnum method,
+                                    SamplingTechniqueEnum method,
                                     size_t sampleSize,
                                     boost::optional<int> numChunks);
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 
 /**
- * This class coordinates the loading of persisted samples from the `<dbName>.system.stats.samples`
- * collection.
+ * This class coordinates the loading of persisted samples from the
+ * `<dbName>.system.stats.samples` collection.
  */
 class PersistentSampleLoader {
 public:
@@ -81,7 +80,7 @@ public:
     StatusWith<PersistentSampleDoc> tryLoad(OperationContext* opCtx,
                                             const DatabaseName& dbName,
                                             const UUID& collectionUuid,
-                                            SamplingCEMethodEnum method,
+                                            SamplingTechniqueEnum method,
                                             size_t sampleSize,
                                             boost::optional<int> numChunks) const;
 };

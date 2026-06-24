@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/sampling/ce_multikey_dotted_path_support.h"
+#include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
@@ -406,7 +407,7 @@ private:
      *     BSONElementHasher, which is stable across process restarts. The result is capped at
      *     '_sampleSize' documents.
      */
-    void generateSampleForTesting(cost_based_ranker::SamplingTechnique technique);
+    void generateSampleForTesting(SamplingTechniqueEnum technique);
 
     /**
      * If '_samplingSource' is kPersistentSample, attempts to load a previously persisted sample
@@ -416,7 +417,7 @@ private:
      * a malformed doc. The caller is responsible for logging non-NoSuchKey failures and falling
      * back to SBE sampling.
      */
-    Status tryLoadPersistentSample(SamplingCEMethodEnum method);
+    Status tryLoadPersistentSample(SamplingTechniqueEnum method);
 
     OperationContext* _opCtx;
     // The collection the sampling plan runs against and is the one accessed by the query being
@@ -449,7 +450,7 @@ private:
     //      no full chunk can be collected for that cursor, so the actual sample is smaller.
     size_t _requestedSampleSize = 0;
     // The actual sampling strategy used. Set by generateSample() before dispatch.
-    boost::optional<cost_based_ranker::SamplingTechnique> _usedSamplingTechnique;
+    boost::optional<SamplingTechniqueEnum> _usedSamplingTechnique;
 };
 
 }  // namespace mongo::ce

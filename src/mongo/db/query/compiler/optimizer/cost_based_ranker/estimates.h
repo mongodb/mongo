@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/util/named_enum.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fixed_string.h"
@@ -771,17 +772,6 @@ EstimateType approxMax(const OptimizerEstimate<ValueType, EstimateType>& a,
 CardinalityEstimate saturatingSubtract(const CardinalityEstimate& a, const CardinalityEstimate& b);
 
 /**
- * The actual strategy used to generate the sample.
- */
-enum class SamplingTechnique {
-    kRandom,
-    kChunk,
-    kFullCollScan,
-    kSeqScan,
-    kStrides,
-};
-
-/**
  * Metadata about the sample used when 'ceSource == Sampling'.
  */
 struct SamplingMetadata {
@@ -789,7 +779,7 @@ struct SamplingMetadata {
     size_t docCount;           // number of documents in the sample
     size_t requestedDocCount;  // number of documents originally requested
     size_t memorySizeBytes;
-    SamplingTechnique technique;
+    ce::SamplingTechniqueEnum technique;
     boost::optional<int> numChunks;
     boost::optional<Date_t> createdAt;
 };

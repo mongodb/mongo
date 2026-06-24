@@ -45,19 +45,32 @@
 namespace mongo::ce {
 
 std::string buildPersistentSampleId(const UUID& collectionUuid,
-                                    SamplingCEMethodEnum method,
+                                    SamplingTechniqueEnum method,
                                     size_t sampleSize,
                                     boost::optional<int> numChunks) {
     std::string methodStr;
-    if (method == SamplingCEMethodEnum::kChunk) {
-        tassert(
-            12432800, "Chunk-based persistent sample ID requires numChunks", numChunks.has_value());
-        methodStr = fmt::format("chunk{}", *numChunks);
-    } else {
-        tassert(12432801,
-                "numChunks must only be set for chunk-technique persistent samples",
-                !numChunks.has_value());
-        methodStr = std::string(idlSerialize(method));
+
+    tassert(12432800,
+            "Chunk-based persistent sample ID requires numChunks",
+            method != SamplingTechniqueEnum::kChunk || numChunks.has_value());
+    tassert(12432801,
+            "numChunks must only be set for chunk-technique persistent samples",
+            method == SamplingTechniqueEnum::kChunk || !numChunks.has_value());
+
+    switch (method) {
+        case SamplingTechniqueEnum::kSeqScan:
+        case SamplingTechniqueEnum::kStrides:
+        case SamplingTechniqueEnum::kRandom:
+            methodStr = idlSerialize(method);
+            break;
+        case SamplingTechniqueEnum::kChunk:
+            methodStr = fmt::format("{}{}", idlSerialize(method), *numChunks);
+            break;
+        case SamplingTechniqueEnum::kFullCollScan:
+            tasserted(12831700,
+                      "A persistent sample document should never be created or looked up with "
+                      "sampling method kFullCollScan");
+            break;
     }
     return fmt::format("{}_{}_{}_v{}",
                        collectionUuid.toString(),
@@ -84,10 +97,15 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
         return ex.toStatus();
     }
 
-    if (parsed.getSamplingMethod() == SamplingCEMethodEnum::kChunk &&
+    if (parsed.getSamplingMethod() == SamplingTechniqueEnum::kChunk &&
         !parsed.getNumChunks().has_value()) {
         return Status(ErrorCodes::UnsupportedFormat,
                       "persistent sample 'numChunks' is required for chunk-technique samples");
+    }
+    if (parsed.getSamplingMethod() != SamplingTechniqueEnum::kChunk &&
+        parsed.getNumChunks().has_value()) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      "persistent sample 'numChunks' must only be set for chunk-technique samples");
     }
 
     const auto sampleSize = static_cast<size_t>(parsed.getSampleSize());
@@ -126,7 +144,7 @@ StatusWith<PersistentSampleDoc> PersistentSampleLoader::tryLoad(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const UUID& collectionUuid,
-    SamplingCEMethodEnum method,
+    SamplingTechniqueEnum method,
     size_t sampleSize,
     boost::optional<int> numChunks) const {
     const NamespaceString nss = NamespaceStringUtil::deserialize(dbName, kSamplesCollectionName);

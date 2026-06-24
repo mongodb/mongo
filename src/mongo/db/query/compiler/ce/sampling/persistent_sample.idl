@@ -31,7 +31,17 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/query/query_optimization_knobs.idl"
+
+enums:
+    SamplingTechnique:
+        description: "The method used to generate the sample."
+        type: string
+        values:
+            kRandom: "random"
+            kChunk: "chunk"
+            kFullCollScan: "fullCollScan"
+            kSeqScan: "seqScan"
+            kStrides: "strides"
 
 structs:
     PersistentSampleDoc:
@@ -48,7 +58,7 @@ structs:
             collectionUuid:
                 type: string
             samplingMethod:
-                type: SamplingCEMethod
+                type: SamplingTechnique
             sampleSize:
                 type: long
                 validator: {gt: 0}

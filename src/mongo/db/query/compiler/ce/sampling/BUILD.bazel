@@ -14,7 +14,16 @@ idl_generator(
     src = "persistent_sample.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/query:query_optimization_knobs_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "persistent_sample_gen_lib",
+    srcs = [
+        ":persistent_sample_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -59,12 +68,12 @@ mongo_cc_library(
     name = "persistent_samples",
     srcs = [
         "persistent_sample_loader.cpp",
-        ":persistent_sample_gen",
     ],
     hdrs = [
         "persistent_sample_loader.h",
     ],
     deps = [
+        ":persistent_sample_gen_lib",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db/query:query_knobs",
     ],

@@ -49,6 +49,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/query/compiler/ce/sampling:persistent_sample_gen_lib",
     ],
 )
 

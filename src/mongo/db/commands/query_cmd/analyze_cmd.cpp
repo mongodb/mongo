@@ -144,6 +144,17 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                             << BSONObj() << "allowDiskUse" << false);
 }
 
+ce::SamplingTechniqueEnum samplingMethodToTechnique(SamplingCEMethodEnum samplingMethod) {
+    switch (samplingMethod) {
+        case SamplingCEMethodEnum::kRandom:
+            return ce::SamplingTechniqueEnum::kRandom;
+        case SamplingCEMethodEnum::kChunk:
+            return ce::SamplingTechniqueEnum::kChunk;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 void runSampleMode(OperationContext* opCtx,
                    const NamespaceString& nss,
                    boost::optional<int> sampleSizeOpt,
@@ -230,8 +241,8 @@ void runSampleMode(OperationContext* opCtx,
 
     tassert(12433002, "collUUID must be initialized by end of sampling block", collUUID);
 
-    std::string docId =
-        ce::buildPersistentSampleId(*collUUID, samplingMethod, sampleSize, numChunksOpt);
+    std::string docId = ce::buildPersistentSampleId(
+        *collUUID, samplingMethodToTechnique(samplingMethod), sampleSize, numChunksOpt);
 
     // Build the sample document using IDL field name constants to guarantee the stored document
     // matches the schema expected by PersistentSampleLoader.
@@ -244,7 +255,7 @@ void runSampleMode(OperationContext* opCtx,
     sampleDocBuilder.append(ce::PersistentSampleDoc::kSampleSizeFieldName,
                             static_cast<long long>(sampleSize));
     sampleDocBuilder.append(ce::PersistentSampleDoc::kSamplingMethodFieldName,
-                            idlSerialize(samplingMethod));
+                            idlSerialize(samplingMethodToTechnique(samplingMethod)));
     if (samplingMethod == SamplingCEMethodEnum::kChunk) {
         sampleDocBuilder.append(ce::PersistentSampleDoc::kNumChunksFieldName, *numChunksOpt);
     }

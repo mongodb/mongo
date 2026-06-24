@@ -599,7 +599,7 @@ size_t numberKeysMatch(const IndexBounds& bounds,
 }
 
 BSONObj buildPersistentSampleDoc(const UUID& collUuid,
-                                 SamplingCEMethodEnum method,
+                                 SamplingTechniqueEnum method,
                                  size_t sampleSize,
                                  const std::vector<BSONObj>& docs,
                                  boost::optional<int> numChunks,
@@ -608,7 +608,7 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
     BSONObjBuilder builder;
     // _id is required by the IDL schema. For intentionally-malformed docs (e.g. kChunk without
     // numChunks used in parse-rejection tests) we can't build a valid key, so use a dummy string.
-    const bool validForKey = (method != SamplingCEMethodEnum::kChunk || numChunks.has_value());
+    const bool validForKey = (method != SamplingTechniqueEnum::kChunk || numChunks.has_value());
     if (validForKey) {
         builder.append("_id", buildPersistentSampleId(collUuid, method, sampleSize, numChunks));
     } else {

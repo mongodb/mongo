@@ -2218,7 +2218,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(
-            uuid, SamplingCEMethodEnum::kRandom, persistedDocs.size(), persistedDocs)});
+            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)});
 
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
@@ -2304,7 +2304,7 @@ TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(
-            uuid, SamplingCEMethodEnum::kRandom, persistedDocs.size(), persistedDocs)});
+            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)});
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
 
@@ -2348,7 +2348,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(uuid,
-                                  SamplingCEMethodEnum::kChunk,
+                                  SamplingTechniqueEnum::kChunk,
                                   persistedDocs.size(),
                                   persistedDocs,
                                   /*numChunks=*/testNumChunks)});
@@ -2401,7 +2401,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlag
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(
-            uuid, SamplingCEMethodEnum::kRandom, persistedDocs.size(), persistedDocs)});
+            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)});
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
 
@@ -2451,7 +2451,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingSkipsPersistentSampleWhenFeatureFlagD
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(uuid,
-                                  SamplingCEMethodEnum::kChunk,
+                                  SamplingTechniqueEnum::kChunk,
                                   persistedDocs.size(),
                                   persistedDocs,
                                   /*numChunks=*/testNumChunks)});
@@ -2512,7 +2512,7 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
         {buildPersistentSampleDoc(uuid,
-                                  SamplingCEMethodEnum::kRandom,
+                                  SamplingTechniqueEnum::kRandom,
                                   persistedDocs.size(),
                                   persistedDocs,
                                   /*numChunks=*/boost::none,

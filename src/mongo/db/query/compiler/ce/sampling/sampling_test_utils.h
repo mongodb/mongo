@@ -330,7 +330,7 @@ size_t numberKeysMatch(const IndexBounds& bounds,
  * malformed-doc cases (bad schema_version, non-array docs, wrong collection_uuid type, etc.).
  */
 BSONObj buildPersistentSampleDoc(const UUID& collUuid,
-                                 SamplingCEMethodEnum method,
+                                 SamplingTechniqueEnum method,
                                  size_t sampleSize,
                                  const std::vector<BSONObj>& docs,
                                  boost::optional<int> numChunks = boost::none,

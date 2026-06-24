@@ -156,24 +156,11 @@ void generatePlannerInfo(PlanExecutor* exec,
         for (const auto& [ns, meta] : ceSamplingMeta.value()) {
             BSONObjBuilder nsMetaBob(ceSamplingMetaBob.subobjStart(ns));
             nsMetaBob.append("sampleSource", meta.isPersisted ? "persisted" : "onTheFly");
-            static constexpr auto techniqueToStr =
-                [](cost_based_ranker::SamplingTechnique t) -> std::string_view {
-                switch (t) {
-                    case cost_based_ranker::SamplingTechnique::kRandom:
-                        return "random"sv;
-                    case cost_based_ranker::SamplingTechnique::kChunk:
-                        return "chunk"sv;
-                    case cost_based_ranker::SamplingTechnique::kFullCollScan:
-                        return "fullCollScan"sv;
-                    case cost_based_ranker::SamplingTechnique::kSeqScan:
-                        return "seqScan"sv;
-                    case cost_based_ranker::SamplingTechnique::kStrides:
-                        return "strides"sv;
-                }
-                MONGO_UNREACHABLE;
-            };
-            nsMetaBob.append("sampleTechnique", techniqueToStr(meta.technique));
-            if (meta.technique == cost_based_ranker::SamplingTechnique::kChunk && meta.numChunks) {
+            nsMetaBob.append("sampleTechnique", idlSerialize(meta.technique));
+            if (meta.technique == ce::SamplingTechniqueEnum::kChunk) {
+                tassert(12871302,
+                        "numChunks must have a value when technique is chunk",
+                        meta.numChunks);
                 nsMetaBob.appendNumber("sampleNumChunks", *meta.numChunks);
             }
             nsMetaBob.appendNumber("sampleRequestedDocCount",
