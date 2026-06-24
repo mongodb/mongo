@@ -35,13 +35,16 @@
 #include "mongo/db/admission/app_name_exemption_matcher.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
+#include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/service_context.h"
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/cidr_range_list_parameter.h"
 #include "mongo/util/decorable.h"
 
+#include <memory>
 #include <string_view>
 
 #include <boost/optional.hpp>
@@ -71,6 +74,26 @@ const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
     "InitIngressRequestRateLimiter", [](ServiceContext* ctx) {
         getIngressRequestRateLimiter(ctx).emplace();
     }};
+
+// The OTel instrument names and serverStatus path used by the ingress request rate limiter's
+// metrics recorder.
+RateLimiterOtelMetricsRecorder::MetricsSpec ingressRequestRateLimiterSpec() {
+    using otel::metrics::MetricNames;
+    return RateLimiterOtelMetricsRecorder::MetricsSpec{
+        .attemptedAdmissions = MetricNames::kIngressRequestRateLimiterAttemptedAdmissions,
+        .successfulAdmissions = MetricNames::kIngressRequestRateLimiterSuccessfulAdmissions,
+        .rejectedAdmissions = MetricNames::kIngressRequestRateLimiterRejectedAdmissions,
+        .exemptedAdmissions = MetricNames::kIngressRequestRateLimiterExemptedAdmissions,
+        .addedToQueue = MetricNames::kIngressRequestRateLimiterAddedToQueue,
+        .removedFromQueue = MetricNames::kIngressRequestRateLimiterRemovedFromQueue,
+        .interruptedInQueue = MetricNames::kIngressRequestRateLimiterInterruptedInQueue,
+        .tokensAcquired = MetricNames::kIngressRequestRateLimiterTokensAcquired,
+        .currentQueueDepth = MetricNames::kIngressRequestRateLimiterCurrentQueueDepth,
+        .totalAvailableTokens = MetricNames::kIngressRequestRateLimiterTotalAvailableTokens,
+        .averageTimeQueuedMicros = MetricNames::kIngressRequestRateLimiterAverageTimeQueuedMicros,
+        .timeQueuedMicros = MetricNames::kIngressRequestRateLimiterTimeQueuedMicros,
+    };
+}
 
 class ClientAdmissionControlState {
 public:
@@ -175,10 +198,13 @@ Status IngressRequestRateLimiterAppExemptions::setFromString(std::string_view st
 }
 
 IngressRequestRateLimiter::IngressRequestRateLimiter()
-    : _rateLimiter{static_cast<double>(gIngressRequestRateLimiterRatePerSec.load()),
-                   gIngressRequestRateLimiterBurstCapacitySecs.load(),
-                   gIngressRequestAdmissionMaxQueueDepth.load(),
-                   "ingressRequestRateLimiter"} {
+    : _rateLimiter{
+          static_cast<double>(gIngressRequestRateLimiterRatePerSec.load()),
+          gIngressRequestRateLimiterBurstCapacitySecs.load(),
+          gIngressRequestAdmissionMaxQueueDepth.load(),
+          "ingressRequestRateLimiter",
+          RateLimiter::Options{.metricsRecorder = std::make_unique<RateLimiterOtelMetricsRecorder>(
+                                   ingressRequestRateLimiterSpec())}} {
     if (const auto scopedFp = ingressRequestRateLimiterFractionalRateOverride.scoped();
         MONGO_unlikely(scopedFp.isActive())) {
         const auto rate = scopedFp.getData().getField("rate").numberDouble();
@@ -186,9 +212,17 @@ IngressRequestRateLimiter::IngressRequestRateLimiter()
     }
 }
 
-
 IngressRequestRateLimiter& IngressRequestRateLimiter::get(ServiceContext* service) {
     return *getIngressRequestRateLimiter(service);
+}
+
+void IngressRequestRateLimiter::installOtelMetrics(ServiceContext* svcCtx) {
+    _metricsSamplingJob =
+        static_cast<RateLimiterOtelMetricsRecorder&>(_rateLimiter.stats())
+            .installOtelMetrics(svcCtx->getPeriodicRunner(),
+                                Seconds{1},
+                                "ingressRequestRateLimiter",
+                                [this] { return _rateLimiter.sampledAvailableTokens(); });
 }
 
 const Status& IngressRequestRateLimiter::rejectionStatus() {

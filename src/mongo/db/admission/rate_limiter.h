@@ -29,14 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/counter.h"
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/rate_limiter_counter_metrics_recorder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/moving_average.h"
 #include "mongo/util/system_tick_source.h"
 
 namespace mongo {
@@ -114,66 +112,29 @@ public:
         Milliseconds _napTime{0};
     };
 
-    struct Stats {
-        /**
-         * addedToQueue is the count of acquireToken calls that involved entering a sleep.
-         */
-        Counter64 addedToQueue;
-        /**
-         * removedFromQueue is the count of acquireToken calls that involved waking from a
-         * sleep.
-         */
-        Counter64 removedFromQueue;
-        /**
-         * interruptedInQueue is the count of acquireToken calls that involved waking from a
-         * sleep early due to some interrupt condition.
-         */
-        Counter64 interruptedInQueue;
-        /**
-         * rejectedAdmissions is the count of acquireToken calls that would have been
-         * queued (due to an unavailability of tokens), but were instead rejected due to there
-         * already being too many callers in the queue (threads sleeping in acquireToken).
-         */
-        Counter64 rejectedAdmissions;
-        /**
-         * successfulAdmissions is the count of non-error-returning calls to acquireToken. It
-         * excludes interrupted and rejected calls.
-         */
-        Counter64 successfulAdmissions;
-        /**
-         * exemptedAdmissions is the count of calls to recordExemption. It indicates how often
-         * the rate limiter was told to admit immediately.
-         */
-        Counter64 exemptedAdmissions;
-        /**
-         * attemptedAdmissions is the count of all calls to acquireToken, regardless of the
-         * result.
-         */
-        Counter64 attemptedAdmissions;
-        /**
-         * averageTimeQueuedMicros is an exponential moving average of the amount of
-         * microseconds that callers spent sleeping in acquireToken, excluding rejected calls
-         * and excluding interrupted calls.
-         */
-        MovingAverage averageTimeQueuedMicros{0.2};
-        /**
-         * tokensAcquired is the cumulative sum of tokens consumed across all successful
-         * acquireToken calls.
-         */
-        Atomic<double> tokensAcquired;
-    };
-
     /**
      * The error code used when the rate limter denies a request to acquire a token (e.g. because
      * the max queue depth is exceeded).
      */
     constexpr static ErrorCodes::Error kRejectedErrorCode = ErrorCodes::RateLimitExceeded;
 
+    struct Options {
+        TickSource* tickSource{globalSystemTickSource()};
+        std::unique_ptr<RateLimiterMetricsRecorder> metricsRecorder{
+            std::make_unique<RateLimiterCounterMetricsRecorder>()};
+    };
+
     RateLimiter(double refreshRatePerSec,
                 double burstCapacitySecs,
                 int64_t maxQueueDepth,
                 std::string name,
                 TickSource* tickSource = globalSystemTickSource());
+
+    RateLimiter(double refreshRatePerSec,
+                double burstCapacitySecs,
+                int64_t maxQueueDepth,
+                std::string name,
+                Options options);
 
     ~RateLimiter();
 
@@ -226,13 +187,23 @@ public:
     void setMaxQueueDepth(int64_t maxQueueDepth);
 
     /** Returns a read-only view of the statistics collected by this rate limiter instance. */
-    const Stats& stats() const;
+    const RateLimiterMetricsRecorder& stats() const;
+
+    /** Returns the statistics collected by this rate limiter instance. */
+    RateLimiterMetricsRecorder& stats();
 
     /** Adds named entries to bob based on this object's stats(). **/
     void appendStats(BSONObjBuilder* bob) const;
 
     /** Returns the number of tokens available in the underlying token bucket. **/
     double tokensAvailable() const;
+
+    /**
+     * Returns a snapshot of available tokens clamped to [0, INT64_MAX]. This is the value reported
+     * to metrics consumers (FTDC/serverStatus and the OTel gauge), which may not handle infinity or
+     * negative balances.
+     */
+    double sampledAvailableTokens() const;
 
     /**
      * Returns the balance of tokens in the bucket, which may be negative if requests have

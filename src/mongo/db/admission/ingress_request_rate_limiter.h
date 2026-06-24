@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/periodic_runner.h"
 
 #include <cstdint>
 
@@ -114,6 +115,13 @@ public:
      */
     void appendStats(BSONObjBuilder* bob) const;
 
+    /**
+     * Starts the periodic job that samples this rate limiter's available-token gauge and pushes it
+     * to the installed metrics recorder. Intended to be called once during OTel metrics
+     * installation, after the ServiceContext's PeriodicRunner is available.
+     */
+    void installOtelMetrics(ServiceContext* svcCtx);
+
     /** Clears any pending deferred admission token stored on the client. */
     static void clearDeferredAdmissionToken(Client* client);
     /** Test-only helper to seed a pending DeferredToken on a client. */
@@ -123,6 +131,10 @@ public:
 
 private:
     RateLimiter _rateLimiter;
+
+    // Owns the periodic available-token sampling job. Declared last so it is destroyed (and the job
+    // stopped) before `_rateLimiter` and its recorder, which the job touches, are torn down.
+    PeriodicRunner::JobAnchor _metricsSamplingJob;
 };
 
 }  // namespace admission

@@ -205,5 +205,6 @@ mongo_cc_library(
         ":mongodb_build_info_metrics",
         ":system_health_metrics",
         ":system_mount_metrics",
+        "//src/mongo/db/admission:ingress_request_rate_limiter",
     ],
 )

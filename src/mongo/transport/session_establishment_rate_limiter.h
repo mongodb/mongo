@@ -84,7 +84,7 @@ public:
     }
 
     int64_t rejected() const {
-        return _rateLimiter.stats().rejectedAdmissions.get();
+        return _rateLimiter.stats().rejectedAdmissions();
     }
 
     /** These stats go in the "connections" section of the server status. **/

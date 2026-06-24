@@ -65,7 +65,7 @@ public:
      */
     void acquireTicket(OperationContext* opCtx, FlowControlTicketholder::CurOp* curOp);
 
-    const admission::RateLimiter::Stats& stats() const;
+    const admission::RateLimiterMetricsRecorder& stats() const;
     int64_t queued() const;
     void appendStats(BSONObjBuilder* bob) const;
 

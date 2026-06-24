@@ -85,7 +85,7 @@ TEST_F(FlowControlRateLimiterTest, StatsIncrementOnMultipleAcquires) {
     }
 
     ASSERT_EQUALS(stats.ticketsAcquired, 10);
-    ASSERT_GTE(rl.stats().successfulAdmissions.get(), 10);
+    ASSERT_GTE(rl.stats().successfulAdmissions(), 10);
 }
 
 TEST_F(FlowControlRateLimiterTest, ServiceContextDecoration) {
@@ -145,8 +145,8 @@ TEST_F(FlowControlRateLimiterTest, RateLimiterStatsAccessible) {
     rl.acquireTicket(_opCtx.get(), &stats);
 
     const auto& rlStats = rl.stats();
-    ASSERT_GTE(rlStats.successfulAdmissions.get(), 1);
-    ASSERT_GTE(rlStats.attemptedAdmissions.get(), 1);
+    ASSERT_GTE(rlStats.successfulAdmissions(), 1);
+    ASSERT_GTE(rlStats.attemptedAdmissions(), 1);
 }
 
 TEST_F(FlowControlRateLimiterTest, CustomMaxQueueDepth) {

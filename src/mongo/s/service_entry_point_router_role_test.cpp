@@ -128,7 +128,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, WaitForAdmissionResolvesDeferredTokenBef
 
     runCommandTestWithResponse(BSON("ping" << 1), opCtx.get(), Status::OK());
     ASSERT_EQ(limiterForDeferredToken.queued(), 0);
-    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions.get(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions(), 1);
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest,
@@ -152,9 +152,9 @@ TEST_F(ServiceEntryPointRouterRoleTest,
     auto msg = constructMessage(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
     ASSERT_OK(handleRequest(msg, opCtx.get()));
 
-    ASSERT_EQ(limiterForDeferredToken.stats().addedToQueue.get(), 1);
-    ASSERT_EQ(limiterForDeferredToken.stats().removedFromQueue.get(), 1);
-    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions.get(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().addedToQueue(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().removedFromQueue(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions(), 1);
     ASSERT_EQ(limiterForDeferredToken.queued(), 0);
 }
 
@@ -192,7 +192,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionInterrupted) {
     auto response = dbResponseToBSON(swDbResponse.getValue());
     auto status = getStatusFromCommandResult(response);
     ASSERT_EQ(status.code(), ErrorCodes::Interrupted);
-    ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue.get(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionRespectsMaxTimeMS) {
@@ -243,7 +243,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionRespectsMaxTimeMS) {
     const auto response = dbResponseToBSON(swDbResponse.getValue());
     const auto status = getStatusFromCommandResult(response);
     ASSERT_EQ(status.code(), ErrorCodes::MaxTimeMSExpired);
-    ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue.get(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionWithLargeMaxTimeMSSucceeds) {
@@ -291,7 +291,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionWithLargeMaxTimeMSSucceed
 
     ASSERT_OK(swDbResponse);
     ASSERT_EQ(getStatusFromCommandResult(dbResponseToBSON(swDbResponse.getValue())), Status::OK());
-    ASSERT_EQ(limiterForDeferredToken.stats().successfulAdmissions.get(), 2);
+    ASSERT_EQ(limiterForDeferredToken.stats().successfulAdmissions(), 2);
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, HandleRequestException) {

@@ -161,6 +161,36 @@ public:
         MetricNameMaker::make("serverStatus.connections.active");
     static constexpr MetricName kMongoDBBuildInfo = MetricNameMaker::make("mongodb.build.info");
 
+    // Ingress Request Rate Limiter (Admission Control) Metrics. These mirror the fields that
+    // RateLimiter::appendStats() historically reported under
+    static constexpr MetricName kIngressRequestRateLimiterAttemptedAdmissions =
+        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.attemptedAdmissions");
+    static constexpr MetricName kIngressRequestRateLimiterSuccessfulAdmissions =
+        MetricNameMaker::make(
+            "serverStatus.network.ingressRequestRateLimiter.successfulAdmissions");
+    static constexpr MetricName kIngressRequestRateLimiterRejectedAdmissions =
+        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.rejectedAdmissions");
+    static constexpr MetricName kIngressRequestRateLimiterExemptedAdmissions =
+        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.exemptedAdmissions");
+    static constexpr MetricName kIngressRequestRateLimiterAddedToQueue =
+        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.addedToQueue");
+    static constexpr MetricName kIngressRequestRateLimiterRemovedFromQueue =
+        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.removedFromQueue");
+    static constexpr MetricName kIngressRequestRateLimiterInterruptedInQueue =
+        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.interruptedInQueue");
+    static constexpr MetricName kIngressRequestRateLimiterTokensAcquired =
+        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.tokensAcquired");
+    static constexpr MetricName kIngressRequestRateLimiterCurrentQueueDepth =
+        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.currentQueueDepth");
+    static constexpr MetricName kIngressRequestRateLimiterTotalAvailableTokens =
+        MetricNameMaker::make(
+            "serverStatus.network.ingressRequestRateLimiter.totalAvailableTokens");
+    static constexpr MetricName kIngressRequestRateLimiterAverageTimeQueuedMicros =
+        MetricNameMaker::make(
+            "serverStatus.network.ingressRequestRateLimiter.averageTimeQueuedMicros");
+    static constexpr MetricName kIngressRequestRateLimiterTimeQueuedMicros =
+        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.timeQueuedMicros");
+
     // Query Execution Team Metrics
     static constexpr MetricName kChangeStreamCursorsTotalOpened =
         MetricNameMaker::make("change_streams.cursor.total_opened");

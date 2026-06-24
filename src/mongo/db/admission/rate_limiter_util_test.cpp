@@ -28,8 +28,10 @@
  */
 
 #include "mongo/db/admission/rate_limiter.h"
+#include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
@@ -37,6 +39,8 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -156,22 +160,152 @@ private:
                                                           logv2::LogSeverity::Debug(4)};
 };
 
-// Verify that a RateLimiter with sufficient capacity will dispense a token.
-TEST_F(RateLimiterWithMockClockTest, BasicTokenAcquisition) {
-    RateLimiter rateLimiter = makeRateLimiter("BasicTokenAcquisition");
-    auto opCtx = makeOperationContext();
+// Spec used to drive the OTel-backed recorder in dual-recorder tests. It mirrors the ingress
+// request rate limiter's instrument names so the recorder exercises real, registered metrics.
+inline RateLimiterOtelMetricsRecorder::MetricsSpec makeOtelMetricsSpec() {
+    using otel::metrics::MetricNames;
+    return RateLimiterOtelMetricsRecorder::MetricsSpec{
+        .attemptedAdmissions = MetricNames::kIngressRequestRateLimiterAttemptedAdmissions,
+        .successfulAdmissions = MetricNames::kIngressRequestRateLimiterSuccessfulAdmissions,
+        .rejectedAdmissions = MetricNames::kIngressRequestRateLimiterRejectedAdmissions,
+        .exemptedAdmissions = MetricNames::kIngressRequestRateLimiterExemptedAdmissions,
+        .addedToQueue = MetricNames::kIngressRequestRateLimiterAddedToQueue,
+        .removedFromQueue = MetricNames::kIngressRequestRateLimiterRemovedFromQueue,
+        .interruptedInQueue = MetricNames::kIngressRequestRateLimiterInterruptedInQueue,
+        .tokensAcquired = MetricNames::kIngressRequestRateLimiterTokensAcquired,
+        .currentQueueDepth = MetricNames::kIngressRequestRateLimiterCurrentQueueDepth,
+        .totalAvailableTokens = MetricNames::kIngressRequestRateLimiterTotalAvailableTokens,
+        .averageTimeQueuedMicros = MetricNames::kIngressRequestRateLimiterAverageTimeQueuedMicros,
+        .timeQueuedMicros = MetricNames::kIngressRequestRateLimiterTimeQueuedMicros,
+    };
+}
+
+// Policy that keeps the RateLimiter's default in-process metrics recorder.
+class DefaultRecorderPolicy {
+public:
+    std::unique_ptr<RateLimiterMetricsRecorder> recorder() {
+        return std::make_unique<RateLimiterCounterMetricsRecorder>();
+    }
+};
+
+// Policy that installs an OTel-backed recorder so the same assertions also exercise the path that
+// mirrors values into OTel instruments and reads them back through the recorder's accessors.
+class OtelRecorderPolicy {
+public:
+    std::unique_ptr<RateLimiterMetricsRecorder> recorder() {
+        return std::make_unique<RateLimiterOtelMetricsRecorder>(makeOtelMetricsSpec());
+    }
+};
+
+template <typename RecorderPolicy>
+class RateLimiterRecorderTest : public RateLimiterWithMockClockTest {
+public:
+    // Snapshot of the cumulative counters exposed by a recorder. The OTel-backed recorder reads
+    // these values back from process-global OTel instruments, which accumulate across tests that
+    // run in the same binary (the in-process counter recorder, by contrast, starts at zero per
+    // instance). To stay agnostic to which recorder is in use, tests assert on the delta a single
+    // test produced rather than on absolute, leak-prone values. The moving-average queue time is
+    // tracked per recorder instance and does not leak, so it is read directly and not captured
+    // here.
+    struct RecorderStats {
+        int64_t addedToQueue;
+        int64_t removedFromQueue;
+        int64_t interruptedInQueue;
+        int64_t rejectedAdmissions;
+        int64_t successfulAdmissions;
+        int64_t exemptedAdmissions;
+        int64_t attemptedAdmissions;
+        double tokensAcquired;
+    };
+
+    void setUp() override {
+        RateLimiterWithMockClockTest::setUp();
+    }
+
+    std::unique_ptr<RateLimiterMetricsRecorder> recorder() {
+        return _policy.recorder();
+    }
+
+    RateLimiter makeRateLimiterWithRecorder(
+        std::string name,
+        std::unique_ptr<RateLimiterMetricsRecorder> recorder =
+            std::make_unique<RateLimiterCounterMetricsRecorder>(),
+        double refreshRate = 1.0,
+        double burstCapacitySecs = 1.0,
+        int maxQueueDepth = INT_MAX) {
+        return RateLimiter(refreshRate,
+                           burstCapacitySecs,
+                           maxQueueDepth,
+                           name,
+                           RateLimiter::Options{.tickSource = getServiceContext()->getTickSource(),
+                                                .metricsRecorder = std::move(recorder)});
+    }
+
+    // Reads a recorder's current cumulative counters.
+    static RecorderStats snapshot(const RateLimiterMetricsRecorder& s) {
+        return RecorderStats{
+            .addedToQueue = s.addedToQueue(),
+            .removedFromQueue = s.removedFromQueue(),
+            .interruptedInQueue = s.interruptedInQueue(),
+            .rejectedAdmissions = s.rejectedAdmissions(),
+            .successfulAdmissions = s.successfulAdmissions(),
+            .exemptedAdmissions = s.exemptedAdmissions(),
+            .attemptedAdmissions = s.attemptedAdmissions(),
+            .tokensAcquired = s.tokensAcquired(),
+        };
+    }
+
+    // Convenience overload to snapshot a RateLimiter's recorder.
+    static RecorderStats snapshot(const RateLimiter& rateLimiter) {
+        return snapshot(rateLimiter.stats());
+    }
+
+    // Cumulative counters produced since `baseline` was captured. Each test snapshots the
+    // RateLimiter's recorder right after construction and passes that baseline here, so the
+    // assertions are agnostic to whether the recorder's counters leak across tests (the OTel-backed
+    // recorder reads process-global instruments) or start at zero (the in-process counter
+    // recorder).
+    static RecorderStats statsDelta(const RateLimiter& rateLimiter, const RecorderStats& baseline) {
+        const auto current = snapshot(rateLimiter);
+        return RecorderStats{
+            .addedToQueue = current.addedToQueue - baseline.addedToQueue,
+            .removedFromQueue = current.removedFromQueue - baseline.removedFromQueue,
+            .interruptedInQueue = current.interruptedInQueue - baseline.interruptedInQueue,
+            .rejectedAdmissions = current.rejectedAdmissions - baseline.rejectedAdmissions,
+            .successfulAdmissions = current.successfulAdmissions - baseline.successfulAdmissions,
+            .exemptedAdmissions = current.exemptedAdmissions - baseline.exemptedAdmissions,
+            .attemptedAdmissions = current.attemptedAdmissions - baseline.attemptedAdmissions,
+            .tokensAcquired = current.tokensAcquired - baseline.tokensAcquired,
+        };
+    }
+
+private:
+    RecorderPolicy _policy;
+};
+
+using RecorderPolicies = ::testing::Types<DefaultRecorderPolicy, OtelRecorderPolicy>;
+TYPED_TEST_SUITE(RateLimiterRecorderTest, RecorderPolicies);
+
+// Verify that a RateLimiter with sufficient capacity will dispense a token. Run against every
+// metrics recorder implementation so they all report identical accounting.
+TYPED_TEST(RateLimiterRecorderTest, BasicTokenAcquisition) {
+    RateLimiter rateLimiter =
+        this->makeRateLimiterWithRecorder("BasicTokenAcquisition", this->recorder());
+    const auto baseline = this->snapshot(rateLimiter);
+    auto opCtx = this->makeOperationContext();
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get()));
 
-    ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
-    ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), 1);
+    const auto stats = this->statsDelta(rateLimiter, baseline);
+    ASSERT_EQ(stats.successfulAdmissions, 1);
+    ASSERT_EQ(stats.attemptedAdmissions, 1);
 
-    ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 0);
-    ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
-    ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
+    ASSERT_EQ(stats.addedToQueue, 0);
+    ASSERT_EQ(stats.removedFromQueue, 0);
+    ASSERT_EQ(stats.rejectedAdmissions, 0);
     // Immediate acquisition (without throttling, i.e. no sleep) still counts as a queue time of
     // zero, so the average timing metric will have that as its first value.
-    ASSERT(rateLimiter.stats().averageTimeQueuedMicros.get().has_value());
-    ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0, 0.1);
+    ASSERT(rateLimiter.stats().averageTimeQueuedMicros().has_value());
+    ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros(), 0.0, 0.1);
 }
 
 // Verify that RateLimiter::setBurstSize range checks its input.
@@ -237,7 +371,7 @@ TEST_F(RateLimiterWithMockClockTest, RejectOverMaxWaiters) {
         // Assert that exactly one of the statuses is from rate limiter rejection.
         ASSERT((status1.code() == RateLimiter::kRejectedErrorCode) ^
                (status2.code() == RateLimiter::kRejectedErrorCode));
-        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 1);
+        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions(), 1);
 
         // One token is "borrowed" from the bucket due to the queued request.
         ASSERT_EQ(rateLimiter.tokenBalance(), -1);
@@ -276,9 +410,9 @@ TEST_F(RateLimiterWithMockClockTest, QueueingDisabled) {
             LOGV2(10574301, "Final token acquisition result", "status"_attr = token);
             ASSERT_EQ(token, Status(RateLimiter::kRejectedErrorCode, ""));
 
-            ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), 2);
+            ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), 1);
+            ASSERT_EQ(rateLimiter.stats().rejectedAdmissions(), 1);
+            ASSERT_EQ(rateLimiter.stats().attemptedAdmissions(), 2);
 
             // Assert that the token balance is 0, as only one token should have been
             // consumed from the bucket.
@@ -289,20 +423,24 @@ TEST_F(RateLimiterWithMockClockTest, QueueingDisabled) {
 
 // Verify that a negative max queue depth takes the try-acquire path: requests that would queue are
 // rejected immediately.
-TEST_F(RateLimiterWithMockClockTest, NegativeMaxQueueDepthDisablesQueueing) {
-    RateLimiter rateLimiter = makeRateLimiter("NegativeMaxQueueDepthDisablesQueueing",
-                                              /*refreshRate=*/1.0,
-                                              /*burstCapacitySecs=*/1.0,
-                                              /*maxQueueDepth=*/-1);
-    auto opCtx = makeOperationContext();
+TYPED_TEST(RateLimiterRecorderTest, NegativeMaxQueueDepthDisablesQueueing) {
+    RateLimiter rateLimiter =
+        this->makeRateLimiterWithRecorder("NegativeMaxQueueDepthDisablesQueueing",
+                                          this->recorder(),
+                                          /*refreshRate=*/1.0,
+                                          /*burstCapacitySecs=*/1.0,
+                                          /*maxQueueDepth=*/-1);
+    const auto baseline = this->snapshot(rateLimiter);
+    auto opCtx = this->makeOperationContext();
 
     // Consume the initial burst token so the next request must queue.
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get()));
 
     auto tokenResult = rateLimiter.acquireToken();
     ASSERT_FALSE(tokenResult);
-    ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 0);
-    ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 1);
+    const auto stats = this->statsDelta(rateLimiter, baseline);
+    ASSERT_EQ(stats.addedToQueue, 0);
+    ASSERT_EQ(stats.rejectedAdmissions, 1);
     ASSERT_EQ(rateLimiter.queued(), 0);
 }
 
@@ -337,13 +475,13 @@ TEST_F(RateLimiterWithMockClockTest, InterruptedDueToOperationKilled) {
             // The second thread was enqueued, then was interrupted, and then was dequeued.
             // The second thread was enqueued for some finite time, so the average queue time
             // could be greater than zero.
-            ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().interruptedInQueue.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), 2);
-            ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
-            ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
-            ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+            ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), 1);
+            ASSERT_EQ(rateLimiter.stats().interruptedInQueue(), 1);
+            ASSERT_EQ(rateLimiter.stats().attemptedAdmissions(), 2);
+            ASSERT_EQ(rateLimiter.stats().addedToQueue(), 1);
+            ASSERT_EQ(rateLimiter.stats().removedFromQueue(), 1);
+            ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros(), boost::none);
+            ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros(), 0.0);
             // Assert that the token balance is 0, as only one token should have been
             // consumed from the bucket.
             ASSERT_EQ(rateLimiter.tokenBalance(), 0);
@@ -402,12 +540,12 @@ TEST_F(RateLimiterWithMockClockTest, InterruptedDueToKillAllOperations) {
         // dequeued.
         // The second thread and this thread were enqueued for some finite time, so the average
         // queue time is not null.
-        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
-        ASSERT_EQ(rateLimiter.stats().interruptedInQueue.get(), 2);
-        ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 2);
-        ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 2);
-        ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), 3);
-        ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
+        ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), 1);
+        ASSERT_EQ(rateLimiter.stats().interruptedInQueue(), 2);
+        ASSERT_EQ(rateLimiter.stats().addedToQueue(), 2);
+        ASSERT_EQ(rateLimiter.stats().removedFromQueue(), 2);
+        ASSERT_EQ(rateLimiter.stats().attemptedAdmissions(), 3);
+        ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros(), boost::none);
     });
 }
 
@@ -444,24 +582,27 @@ TEST_F(RateLimiterWithPreciseClockSpyTest,
 
     ASSERT_FALSE(clockSpy()->sleepWasAttempted())
         << "get() should not call sleepUntil when the token ready time has already passed";
-    ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 2);
-    ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 1);
-    ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
+    ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), 2);
+    ASSERT_EQ(rateLimiter.stats().addedToQueue(), 1);
+    ASSERT_EQ(rateLimiter.stats().removedFromQueue(), 1);
 }
 
 // Verify that `RateLimiter::recordExemption()` increments the exemption metric but no others.
-TEST_F(RateLimiterWithMockClockTest, RecordExemption) {
-    RateLimiter rateLimiter = makeRateLimiter("RecordExemption");
+TYPED_TEST(RateLimiterRecorderTest, RecordExemption) {
+    RateLimiter rateLimiter =
+        this->makeRateLimiterWithRecorder("RecordExemption", this->recorder());
+    const auto baseline = this->snapshot(rateLimiter);
     rateLimiter.recordExemption();
 
-    ASSERT_EQ(rateLimiter.stats().exemptedAdmissions.get(), 1);
+    const auto stats = this->statsDelta(rateLimiter, baseline);
+    ASSERT_EQ(stats.exemptedAdmissions, 1);
 
-    ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), 0);
-    ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 0);
-    ASSERT_EQ(rateLimiter.stats().interruptedInQueue.get(), 0);
-    ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 0);
-    ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
-    ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
+    ASSERT_EQ(stats.attemptedAdmissions, 0);
+    ASSERT_EQ(stats.successfulAdmissions, 0);
+    ASSERT_EQ(stats.interruptedInQueue, 0);
+    ASSERT_EQ(stats.addedToQueue, 0);
+    ASSERT_EQ(stats.removedFromQueue, 0);
+    ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros(), boost::none);
 }
 
 // Verify that a newly initialized RateLimiter can immediately dispense up to its burst rate of
@@ -515,11 +656,11 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         // Queue timing metric samples have been collected, but they're also zero due to the
         // burst availability.
         // Some threads might have been enqueued, but none have been dequeued.
-        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens);
-        ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
-        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
-        ASSERT(rateLimiter.stats().averageTimeQueuedMicros.get().has_value());
-        ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0, .1);
+        ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), maxTokens);
+        ASSERT_EQ(rateLimiter.stats().removedFromQueue(), 0);
+        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions(), 0);
+        ASSERT(rateLimiter.stats().averageTimeQueuedMicros().has_value());
+        ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros(), 0.0, .1);
 
         // Make sure we've enqueued all the remaining waiters so that we don't race with advancing
         // the mock clock. Use a real-time deadline instead of a bounded retry loop so the wait
@@ -537,12 +678,12 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         ASSERT_EQ(rateLimiter.queued(), numThreads - maxTokens);
         ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens);
 
-        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens);
-        ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), numThreads - maxTokens);
-        ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
-        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
-        ASSERT(rateLimiter.stats().averageTimeQueuedMicros.get().has_value());
-        ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0, .1);
+        ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), maxTokens);
+        ASSERT_EQ(rateLimiter.stats().addedToQueue(), numThreads - maxTokens);
+        ASSERT_EQ(rateLimiter.stats().removedFromQueue(), 0);
+        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions(), 0);
+        ASSERT(rateLimiter.stats().averageTimeQueuedMicros().has_value());
+        ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros(), 0.0, .1);
 
         // Advancing time less than tokenInterval doesn't cause a token to be acquired.
         auto smallAdvance = Milliseconds{10};
@@ -571,10 +712,10 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         }
 
         // Verify final metrics.
-        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), numThreads);
-        ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), remainingTokens);
-        ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
-        ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+        ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), numThreads);
+        ASSERT_EQ(rateLimiter.stats().removedFromQueue(), remainingTokens);
+        ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros(), boost::none);
+        ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros(), 0.0);
 
         ASSERT_EQ((int)tokenAcquisitionTimes.size(), numThreads);
 
@@ -593,7 +734,7 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         }
 
         // By the end, there was one attempt per thread.
-        ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), numThreads);
+        ASSERT_EQ(rateLimiter.stats().attemptedAdmissions(), numThreads);
     });
 }
 
@@ -668,13 +809,13 @@ TEST_F(RateLimiterWithMockClockTest, InterruptedDueToOperationDeadline) {
             // The second thread was enqueued, then timed out, and then was dequeued.
             // The second thread was enqueued for some finite time, so the average queue time
             // could be greater than zero.
-            ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().interruptedInQueue.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), 2);
-            ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
-            ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
-            ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+            ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), 1);
+            ASSERT_EQ(rateLimiter.stats().interruptedInQueue(), 1);
+            ASSERT_EQ(rateLimiter.stats().addedToQueue(), 1);
+            ASSERT_EQ(rateLimiter.stats().attemptedAdmissions(), 2);
+            ASSERT_EQ(rateLimiter.stats().removedFromQueue(), 1);
+            ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros(), boost::none);
+            ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros(), 0.0);
         }));
 
         firstTokenAcquired.get();
@@ -684,9 +825,11 @@ TEST_F(RateLimiterWithMockClockTest, InterruptedDueToOperationDeadline) {
 
 // Verify that calling recordExemption() on a non-ready DeferredToken records the exemption stat,
 // and that DeferredToken destruction then returns the borrowed token and releases the queue slot.
-TEST_F(RateLimiterWithMockClockTest, DeferredTokenRecordExemptionAndReleaseQueueSlot) {
-    RateLimiter rateLimiter = makeRateLimiter("DeferredTokenRecordExemptionAndReleaseQueueSlot");
-    auto opCtx = makeOperationContext();
+TYPED_TEST(RateLimiterRecorderTest, DeferredTokenRecordExemptionAndReleaseQueueSlot) {
+    RateLimiter rateLimiter = this->makeRateLimiterWithRecorder(
+        "DeferredTokenRecordExemptionAndReleaseQueueSlot", this->recorder());
+    const auto baseline = this->snapshot(rateLimiter);
+    auto opCtx = this->makeOperationContext();
 
     // Exhaust the burst so the next token must queue.
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get()));
@@ -700,27 +843,28 @@ TEST_F(RateLimiterWithMockClockTest, DeferredTokenRecordExemptionAndReleaseQueue
         // Token is borrowed (bucket goes negative).
         ASSERT_EQ(rateLimiter.tokenBalance(), -1);
         ASSERT_EQ(rateLimiter.queued(), 1);
-        ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 1);
+        ASSERT_EQ(this->statsDelta(rateLimiter, baseline).addedToQueue, 1);
 
         // Mark as exempt: records the stat, queued-token cleanup runs in the DeferredToken
         // destructor.
         std::move(deferredToken).recordExemption();
-        ASSERT_EQ(rateLimiter.stats().exemptedAdmissions.get(), 1);
+        ASSERT_EQ(this->statsDelta(rateLimiter, baseline).exemptedAdmissions, 1);
     }
 
     ASSERT_EQ(rateLimiter.tokenBalance(), 0);
     ASSERT_EQ(rateLimiter.queued(), 0);
-    ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
+    ASSERT_EQ(this->statsDelta(rateLimiter, baseline).removedFromQueue, 1);
     // The exempted DeferredToken was never admitted successfully.
-    ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
+    ASSERT_EQ(this->statsDelta(rateLimiter, baseline).successfulAdmissions, 1);
 }
 
 // Verify that dropping a non-ready DeferredToken without consuming it causes the destructor
 // to return the borrowed token and release the queue slot, preventing resource leaks.
-TEST_F(RateLimiterWithMockClockTest, DeferredTokenDestructorCleansUpDroppedNonReadyToken) {
-    RateLimiter rateLimiter =
-        makeRateLimiter("DeferredTokenDestructorCleansUpDroppedNonReadyToken");
-    auto opCtx = makeOperationContext();
+TYPED_TEST(RateLimiterRecorderTest, DeferredTokenDestructorCleansUpDroppedNonReadyToken) {
+    RateLimiter rateLimiter = this->makeRateLimiterWithRecorder(
+        "DeferredTokenDestructorCleansUpDroppedNonReadyToken", this->recorder());
+    const auto baseline = this->snapshot(rateLimiter);
+    auto opCtx = this->makeOperationContext();
 
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get()));
     ASSERT_EQ(rateLimiter.tokenBalance(), 0);
@@ -737,16 +881,19 @@ TEST_F(RateLimiterWithMockClockTest, DeferredTokenDestructorCleansUpDroppedNonRe
 
     ASSERT_EQ(rateLimiter.tokenBalance(), 0);
     ASSERT_EQ(rateLimiter.queued(), 0);
-    ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 1);
-    ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
-    ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
+    const auto stats = this->statsDelta(rateLimiter, baseline);
+    ASSERT_EQ(stats.addedToQueue, 1);
+    ASSERT_EQ(stats.removedFromQueue, 1);
+    ASSERT_EQ(stats.successfulAdmissions, 1);
 }
 
 // Verify that dropping a ready DeferredToken without calling get() is a no-op: the token was
 // already
 // permanently consumed by acquireToken() and successfulAdmissions was already recorded.
-TEST_F(RateLimiterWithMockClockTest, DeferredTokenReadyDestructorIsNoOp) {
-    RateLimiter rateLimiter = makeRateLimiter("DeferredTokenReadyDestructorIsNoOp");
+TYPED_TEST(RateLimiterRecorderTest, DeferredTokenReadyDestructorIsNoOp) {
+    RateLimiter rateLimiter =
+        this->makeRateLimiterWithRecorder("DeferredTokenReadyDestructorIsNoOp", this->recorder());
+    const auto baseline = this->snapshot(rateLimiter);
     const double initialBalance = rateLimiter.tokenBalance();
 
     {
@@ -755,22 +902,25 @@ TEST_F(RateLimiterWithMockClockTest, DeferredTokenReadyDestructorIsNoOp) {
         auto deferredToken = std::move(*tokenResult);
         ASSERT_TRUE(deferredToken.isReady());
         // For ready DeferredTokens, acquireToken() already incremented successfulAdmissions.
-        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
+        ASSERT_EQ(this->statsDelta(rateLimiter, baseline).successfulAdmissions, 1);
         ASSERT_EQ(rateLimiter.tokenBalance(), initialBalance - 1);
         // Destructor runs here — should be a no-op for ready DeferredTokens.
     }
 
     // Token remains consumed; no return to bucket.
     ASSERT_EQ(rateLimiter.tokenBalance(), initialBalance - 1);
-    ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 0);
-    ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
+    const auto stats = this->statsDelta(rateLimiter, baseline);
+    ASSERT_EQ(stats.addedToQueue, 0);
+    ASSERT_EQ(stats.removedFromQueue, 0);
 }
 
 // Verify that moving a DeferredToken nulls the source (making its destructor a no-op) and
 // that exactly one cleanup occurs when the destination goes out of scope.
-TEST_F(RateLimiterWithMockClockTest, DeferredTokenMoveSemantics) {
-    RateLimiter rateLimiter = makeRateLimiter("DeferredTokenMoveSemantics");
-    auto opCtx = makeOperationContext();
+TYPED_TEST(RateLimiterRecorderTest, DeferredTokenMoveSemantics) {
+    RateLimiter rateLimiter =
+        this->makeRateLimiterWithRecorder("DeferredTokenMoveSemantics", this->recorder());
+    const auto baseline = this->snapshot(rateLimiter);
+    auto opCtx = this->makeOperationContext();
 
     // Exhaust burst so the next token queues.
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get()));
@@ -795,21 +945,24 @@ TEST_F(RateLimiterWithMockClockTest, DeferredTokenMoveSemantics) {
 
     ASSERT_EQ(rateLimiter.queued(), 0);
     ASSERT_EQ(rateLimiter.tokenBalance(), 0);
-    ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 1);
-    ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
+    const auto stats = this->statsDelta(rateLimiter, baseline);
+    ASSERT_EQ(stats.addedToQueue, 1);
+    ASSERT_EQ(stats.removedFromQueue, 1);
 }
 
-TEST_F(RateLimiterWithMockClockTest, TokensAcquiredMetric) {
-    RateLimiter rateLimiter = makeRateLimiter("TokensAcquiredMetric",
-                                              /*refreshRate=*/100.0,
-                                              /*burstCapacitySecs=*/3.0);
-    auto opCtx = makeOperationContext();
+TYPED_TEST(RateLimiterRecorderTest, TokensAcquiredMetric) {
+    RateLimiter rateLimiter = this->makeRateLimiterWithRecorder("TokensAcquiredMetric",
+                                                                this->recorder(),
+                                                                /*refreshRate=*/100.0,
+                                                                /*burstCapacitySecs=*/3.0);
+    const auto baseline = this->snapshot(rateLimiter);
+    auto opCtx = this->makeOperationContext();
 
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get(), 1.0));
-    ASSERT_EQ(rateLimiter.stats().tokensAcquired.loadRelaxed(), 1.0);
+    ASSERT_EQ(this->statsDelta(rateLimiter, baseline).tokensAcquired, 1.0);
 
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get(), 2.0));
-    ASSERT_EQ(rateLimiter.stats().tokensAcquired.loadRelaxed(), 3.0);
+    ASSERT_EQ(this->statsDelta(rateLimiter, baseline).tokensAcquired, 3.0);
 }
 
 TEST_F(RateLimiterWithMockClockTest, ReturnTokens) {

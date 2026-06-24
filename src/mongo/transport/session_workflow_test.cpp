@@ -55,6 +55,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/platform/atomic_word.h"
@@ -830,6 +831,11 @@ public:
         }
 
         _requestLimiterEnabled.emplace("ingressRequestRateLimiterEnabled", true);
+
+        // The rate limiter's admission counters are backed by process-global OTel instruments.
+        // Snapshot the counters now so each test can assert on the delta it
+        // produced rather than on absolute, leak-prone values.
+        _baselineStats = getRateLimiterStats();
     }
 
     auto enableRateOverrideBehaviorWithSpecifiedBurstSize(double burstSize) -> void {
@@ -857,6 +863,20 @@ public:
         };
     }
 
+    auto getRateLimiterStatsDelta() -> IngressRequestRateLimiterStats {
+        const auto current = getRateLimiterStats();
+        return IngressRequestRateLimiterStats{
+            .rejectedAdmissions = current.rejectedAdmissions - _baselineStats.rejectedAdmissions,
+            .successfulAdmissions =
+                current.successfulAdmissions - _baselineStats.successfulAdmissions,
+            .exemptedAdmissions = current.exemptedAdmissions - _baselineStats.exemptedAdmissions,
+            .attemptedAdmissions = current.attemptedAdmissions - _baselineStats.attemptedAdmissions,
+            .addedToQueue = current.addedToQueue - _baselineStats.addedToQueue,
+            .removedFromQueue = current.removedFromQueue - _baselineStats.removedFromQueue,
+            .totalAvailableTokens = current.totalAvailableTokens,
+        };
+    }
+
     auto compressMessage(Message message) -> Message {
         MessageCompressorManager compressorManager{};
         const auto cid = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
@@ -879,6 +899,7 @@ private:
     boost::optional<unittest::ServerParameterGuard> _requestLimiterEnabled;
     boost::optional<unittest::ServerParameterGuard> _requestLimiterBurstCapacitySecs;
     boost::optional<unittest::ServerParameterGuard> _requestAdmissionRatePerSec;
+    IngressRequestRateLimiterStats _baselineStats{};
 };
 
 TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponse) {
@@ -900,7 +921,7 @@ TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponse) {
 
     joinSessions();
 
-    const auto stats = getRateLimiterStats();
+    const auto stats = getRateLimiterStatsDelta();
 
     ASSERT_EQ(stats.rejectedAdmissions, 1);
     ASSERT_EQ(stats.successfulAdmissions, 1);
@@ -929,7 +950,7 @@ TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponseCompressed) {
 
     joinSessions();
 
-    const auto stats = getRateLimiterStats();
+    const auto stats = getRateLimiterStatsDelta();
 
     ASSERT_EQ(stats.rejectedAdmissions, 1);
     ASSERT_EQ(stats.successfulAdmissions, 1);
@@ -973,7 +994,7 @@ TEST_F(IngressRequestRateLimiterTest, IterationFrameClearsDeferredAdmissionToken
 
     // Iter 1 took the burst (success). Iter 2 added one to the queue, and the IterationFrame
     // destructor tore down the unconsumed deferred token, releasing the queue slot.
-    const auto stats = getRateLimiterStats();
+    const auto stats = getRateLimiterStatsDelta();
     ASSERT_EQ(stats.attemptedAdmissions, 2);
     ASSERT_EQ(stats.successfulAdmissions, 1);
     ASSERT_EQ(stats.rejectedAdmissions, 0);
@@ -1016,7 +1037,7 @@ TEST_F(IngressRequestRateLimiterTest, ImmediateRejectionHasExpectedErrorLabels) 
                                 ErrorLabel::kRetryableError,
                                 ErrorLabel::kNoWritesPerformed}));
 
-    const auto stats = getRateLimiterStats();
+    const auto stats = getRateLimiterStatsDelta();
     ASSERT_EQ(stats.attemptedAdmissions, 2);
     ASSERT_EQ(stats.successfulAdmissions, 1);
     ASSERT_EQ(stats.rejectedAdmissions, 1);
@@ -1065,7 +1086,7 @@ TEST_F(IngressRequestRateLimiterTest, QueueDepthExceededRejectionHasExpectedErro
                                 ErrorLabel::kRetryableError,
                                 ErrorLabel::kNoWritesPerformed}));
 
-    const auto stats = getRateLimiterStats();
+    const auto stats = getRateLimiterStatsDelta();
     ASSERT_EQ(stats.attemptedAdmissions, 3);  // iter1 + queue-filler + iter2
     ASSERT_EQ(stats.successfulAdmissions, 1);
     ASSERT_EQ(stats.rejectedAdmissions, 1);

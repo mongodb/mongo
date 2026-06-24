@@ -122,7 +122,7 @@ void SessionEstablishmentRateLimiter::appendStatsConnections(BSONObjBuilder* bob
 
     BSONObjBuilder subBuilder = bob->subobjStart("establishmentRateLimit");
     subBuilder.append("rejected", rejected());
-    subBuilder.append("exempted", _rateLimiter.stats().exemptedAdmissions.get());
+    subBuilder.append("exempted", _rateLimiter.stats().exemptedAdmissions());
     subBuilder.append("interruptedDueToClientDisconnect", _interruptedDueToClientDisconnect.get());
     subBuilder.done();
 }

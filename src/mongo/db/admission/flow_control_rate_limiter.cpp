@@ -78,7 +78,7 @@ void FlowControlRateLimiter::acquireTicket(OperationContext* opCtx,
     curOp->ticketsAcquired++;
 }
 
-const admission::RateLimiter::Stats& FlowControlRateLimiter::stats() const {
+const admission::RateLimiterMetricsRecorder& FlowControlRateLimiter::stats() const {
     return _rateLimiter->stats();
 }
 
