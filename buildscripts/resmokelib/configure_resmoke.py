@@ -1281,12 +1281,14 @@ def _detect_js_engine(mongod_executable: Optional[str]) -> Optional[str]:
     executable = mongod_executable or _config.DEFAULT_MONGOD_EXECUTABLE
     if shutil.which(executable) is None:
         return None
+    # Sanitizer builds can take tens of seconds to start up.
+    version_timeout_secs = 120 if _config.IS_SAN else 10
     try:
         result = subprocess.run(
             [executable, "--version"],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=version_timeout_secs,
         )
         # The output is: "db version v...\nBuild Info: <pretty-printed JSON>\n"
         # Grab everything from "Build Info: " to the end and parse it as one JSON blob.
@@ -1295,8 +1297,13 @@ def _detect_js_engine(mongod_executable: Optional[str]) -> Optional[str]:
         if idx != -1:
             build_info = json.loads(result.stdout[idx + len(marker) :].strip())
             return build_info.get("javascriptEngine")
-    except Exception:  # pylint: disable=broad-except
-        pass
+        reason = "'Build Info:' marker not found in --version output"
+    except Exception as exc:  # pylint: disable=broad-except
+        reason = repr(exc)
+    print(
+        f"Warning: failed to detect the JS engine from '{executable} --version' ({reason}).",
+        file=sys.stderr,
+    )
     return None
 
 
