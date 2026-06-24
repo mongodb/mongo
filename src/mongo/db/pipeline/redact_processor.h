@@ -49,8 +49,11 @@ public:
                     const boost::intrusive_ptr<Expression>& expression,
                     Variables::Id currentId);
 
-    // Processes the given document and returns the redacted document.
-    boost::optional<Document> process(const Document& input) const;
+    // Processes the given document and returns the redacted document. The optional 'ctx' parameter
+    // carries evaluation state (see EvaluationContext); when it holds a memory tracker, memory
+    // usage observed while evaluating the redact expression is accumulated against it.
+    boost::optional<Document> process(const Document& input,
+                                      const EvaluationContext& ctx = {}) const;
 
     boost::intrusive_ptr<Expression>& getExpression() {
         return _expression;
@@ -66,8 +69,9 @@ public:
 
 private:
     // These both work over pExpCtx->variables.
-    boost::optional<Document> redactObject(const Document& root) const;  // redacts CURRENT
-    Value redactValue(const Value& in, const Document& root) const;
+    boost::optional<Document> redactObject(const Document& root,
+                                           const EvaluationContext& ctx) const;  // redacts CURRENT
+    Value redactValue(const Value& in, const Document& root, const EvaluationContext& ctx) const;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     boost::intrusive_ptr<Expression> _expression;

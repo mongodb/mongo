@@ -1515,6 +1515,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/extension/host:extension_loader",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline/optimization:pipeline_optimization",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/sharding_environment:shard_server_test_fixture",

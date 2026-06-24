@@ -34,10 +34,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -45,6 +49,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceRedactTest = AggregationContextFixture;
@@ -83,6 +88,111 @@ TEST_F(DocumentSourceRedactTest, ShouldPropagatePauses) {
     ASSERT_TRUE(redactStage->getNext().isPaused());
     ASSERT_TRUE(redactStage->getNext().isEOF());
     ASSERT_TRUE(redactStage->getNext().isEOF());
+}
+
+// Test-only expression, registered as $_testRedactMemoryTrackerObserver, used as a $redact
+// expression. It records whether the evaluation context carried a memory tracker and always
+// returns the "$$KEEP" sentinel so the document is passed through unchanged.
+class RedactMemoryTrackerObservingExpression final : public Expression {
+public:
+    static inline int gEvaluations = 0;
+    static inline int gEvaluationsWithTracker = 0;
+    static inline int64_t gLastTrackerMaxBytes = -1;
+    static void resetObservations() {
+        gEvaluations = 0;
+        gEvaluationsWithTracker = 0;
+        gLastTrackerMaxBytes = -1;
+    }
+
+    explicit RedactMemoryTrackerObservingExpression(ExpressionContext* expCtx)
+        : Expression(expCtx) {}
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState&) {
+        return make_intrusive<RedactMemoryTrackerObservingExpression>(expCtx);
+    }
+
+    Value evaluate(const Document&, Variables*, const EvaluationContext& ctx) const final {
+        ++gEvaluations;
+        if (ctx.tracker != nullptr) {
+            ++gEvaluationsWithTracker;
+            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
+        }
+        return Value("keep"sv);
+    }
+
+    Value serialize(const query_shape::SerializationOptions&) const final {
+        return Value(Document{});
+    }
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<RedactMemoryTrackerObservingExpression>(&expCtx);
+    }
+    void acceptVisitor(ExpressionMutableVisitor*) final {}
+    void acceptVisitor(ExpressionConstVisitor*) const final {}
+};
+
+REGISTER_TEST_EXPRESSION(_testRedactMemoryTrackerObserver,
+                         RedactMemoryTrackerObservingExpression::parse,
+                         AllowedWithApiStrict::kAlways,
+                         AllowedWithClientType::kAny,
+                         nullptr /* featureFlag */);
+
+// Runs a $redact whose expression is the tracker-observing expression over a single document,
+// resetting the observation counters first.
+void runRedactWithObservingExpression(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    RedactMemoryTrackerObservingExpression::resetObservations();
+
+    auto redactSpec = BSON("$redact" << BSON("$_testRedactMemoryTrackerObserver" << BSONObj()));
+    auto redact = DocumentSourceRedact::createFromBson(redactSpec.firstElement(), expCtx);
+
+    auto mock = exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"a", 1}}}, expCtx);
+    auto redactStage = exec::agg::buildStageAndStitch(redact, mock);
+    while (redactStage->getNext().isAdvanced()) {
+    }
+}
+
+TEST_F(DocumentSourceRedactTest, ThreadsMemoryTrackerWhenEvaluatingExpression) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    runRedactWithObservingExpression(getExpCtx());
+
+    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gEvaluations, 1);
+    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
+}
+
+TEST_F(DocumentSourceRedactTest, DoesNotThreadMemoryTrackerWhenExpressionMemoryTrackingDisabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", false);
+
+    runRedactWithObservingExpression(getExpCtx());
+
+    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gEvaluations, 1);
+    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
+}
+
+TEST_F(DocumentSourceRedactTest, DoesNotThreadMemoryTrackerWhenQueryMemoryTrackingDisabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", false);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    runRedactWithObservingExpression(getExpCtx());
+
+    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gEvaluations, 1);
+    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
+}
+
+TEST_F(DocumentSourceRedactTest, MemoryTrackerLimitReflectsKnob) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+    const long long customLimit = 1024;
+    unittest::ServerParameterGuard knobGuard("internalRedactStageMaxExpressionEvaluationBytes",
+                                             customLimit);
+
+    runRedactWithObservingExpression(getExpCtx());
+
+    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
+    ASSERT_EQ(RedactMemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
 }
 }  // namespace
 }  // namespace mongo

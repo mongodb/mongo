@@ -30,7 +30,10 @@
 #include "mongo/db/exec/agg/redact_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_redact.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/assert_util.h"
 
 #include <string_view>
@@ -54,13 +57,21 @@ REGISTER_AGG_STAGE_MAPPING(redact, DocumentSourceRedact::id, documentSourceRedac
 RedactStage::RedactStage(std::string_view stageName,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const std::shared_ptr<RedactProcessor>& redactProcessor)
-    : Stage(stageName, expCtx), _redactProcessor{redactProcessor} {}
+    : Stage(stageName, expCtx),
+      _redactProcessor{redactProcessor},
+      _memoryTracker(OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
+          *expCtx, loadMemoryLimit(StageMemoryLimit::RedactStageMaxExpressionEvaluationBytes))) {
+    _trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
+}
 
 GetNextResult RedactStage::doGetNext() {
+    const EvaluationContext evalCtx =
+        _trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{};
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         if (boost::optional<Document> result =
-                _redactProcessor->process(nextInput.releaseDocument())) {
+                _redactProcessor->process(nextInput.releaseDocument(), evalCtx)) {
             return std::move(*result);
         }
     }

@@ -45,17 +45,20 @@ RedactProcessor::RedactProcessor(const intrusive_ptr<ExpressionContext>& expCtx,
                                  Variables::Id currentId)
     : _expCtx(expCtx), _expression(expression), _currentId(currentId) {}
 
-boost::optional<Document> RedactProcessor::process(const Document& input) const {
+boost::optional<Document> RedactProcessor::process(const Document& input,
+                                                   const EvaluationContext& ctx) const {
     auto& variables = _expCtx->variables;
     variables.setValue(_currentId, Value(input));
-    return redactObject(input);
+    return redactObject(input, ctx);
 }
 
-Value RedactProcessor::redactValue(const Value& in, const Document& root) const {
+Value RedactProcessor::redactValue(const Value& in,
+                                   const Document& root,
+                                   const EvaluationContext& ctx) const {
     const BSONType valueType = in.getType();
     if (valueType == BSONType::object) {
         _expCtx->variables.setValue(_currentId, in);
-        const boost::optional<Document> result = redactObject(root);
+        const boost::optional<Document> result = redactObject(root, ctx);
         if (result) {
             return Value(*result);
         } else {
@@ -67,7 +70,7 @@ Value RedactProcessor::redactValue(const Value& in, const Document& root) const 
         const std::vector<Value>& arr = in.getArray();
         for (size_t i = 0; i < arr.size(); i++) {
             if (arr[i].getType() == BSONType::object || arr[i].getType() == BSONType::array) {
-                const Value toAdd = redactValue(arr[i], root);
+                const Value toAdd = redactValue(arr[i], root, ctx);
                 if (!toAdd.missing()) {
                     newArr.push_back(toAdd);
                 }
@@ -81,9 +84,10 @@ Value RedactProcessor::redactValue(const Value& in, const Document& root) const 
     }
 }
 
-boost::optional<Document> RedactProcessor::redactObject(const Document& root) const {
+boost::optional<Document> RedactProcessor::redactObject(const Document& root,
+                                                        const EvaluationContext& ctx) const {
     auto& variables = _expCtx->variables;
-    const Value expressionResult = _expression->evaluate(root, &variables);
+    const Value expressionResult = _expression->evaluate(root, &variables, ctx);
 
     ValueComparator simpleValueCmp;
     if (simpleValueCmp.evaluate(expressionResult == keepVal)) {
@@ -102,7 +106,7 @@ boost::optional<Document> RedactProcessor::redactObject(const Document& root) co
             const Document::FieldPair field(fields.next());
 
             // This changes CURRENT so don't read from variables after this
-            Value val = redactValue(field.second, root);
+            Value val = redactValue(field.second, root, ctx);
             if (!val.missing()) {
                 out.addField(field.first, std::move(val));
             }
