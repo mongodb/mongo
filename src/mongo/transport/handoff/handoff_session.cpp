@@ -225,6 +225,19 @@ StatusWith<size_t> HandoffSession::_syncRead(char* buf, size_t len) {
     while (totalRead < len) {
         switch (_state) {
             case HandoffSession::State::TLS: {
+                // First use any data remaining in _unconsumedBytes.
+                const size_t toConsume = std::min(len, _unconsumedBytes.size());
+                std::copy_n(_unconsumedBytes.data(), toConsume, buf);
+                _unconsumedBytes = _unconsumedBytes.subspan(toConsume);
+                if (_unconsumedBytes.empty() && !_unconsumedBuffer.empty()) {
+                    _unconsumedBuffer.clear();
+                    _unconsumedBuffer.shrink_to_fit();
+                }
+                totalRead += toConsume;
+                if (totalRead == len) {
+                    return totalRead;
+                }
+
                 s2n_blocked_status blocked = S2N_NOT_BLOCKED;
                 ssize_t n = s2n_recv(_s2nConnection, buf + totalRead, len - totalRead, &blocked);
 
@@ -505,6 +518,11 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
         _posix.shutdown(_fd, SHUT_RDWR);
     }
 
+    if (boost::optional<ConstDataRange> extra = handoffMsg.getExtraCleartext()) {
+        _unconsumedBuffer.assign(extra->data(), extra->data() + extra->length());
+        _unconsumedBytes = std::span<char>{_unconsumedBuffer.begin(), _unconsumedBuffer.end()};
+    }
+
     cleanupOnFailure.dismiss();
 
     LOGV2(12823501,
@@ -625,6 +643,7 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
                             errorMessage(lastSocketError())),
                 _posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
     }
+
     ON_BLOCK_EXIT([this] {
         struct timeval tv = {0, 0};
         _posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));

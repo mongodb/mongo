@@ -30,9 +30,7 @@
 #include "mongo/transport/handoff/handoff_session.h"
 
 #include "mongo/base/data_range.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/handoff_s2n_init.h"
@@ -49,10 +47,12 @@
 
 #include <algorithm>
 #include <chrono>
+#include <concepts>
 #include <cstdint>
 #include <fstream>
 #include <future>
 #include <memory>
+#include <span>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -66,6 +66,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 
 namespace mongo::transport {
 namespace {
@@ -111,13 +112,18 @@ void readAll(int fd, char* buf, size_t len) {
     }
 }
 
+iovec fromMessage(const Message& msg) {
+    iovec result;
+    result.iov_base = const_cast<char*>(msg.buf());
+    result.iov_len = msg.size();
+    return result;
+}
+
 /**
  * Sends a wire message over a UDS with the given fds packed into a single SCM_RIGHTS cmsghdr.
  */
 void sendMessageWithFds(int udsFd, const Message& msg, std::initializer_list<int> fds) {
-    struct iovec iov;
-    iov.iov_base = const_cast<char*>(msg.buf());
-    iov.iov_len = msg.size();
+    iovec iov = fromMessage(msg);
 
     size_t fdBytes = fds.size() * sizeof(int);
     std::vector<char> controlBuf(CMSG_SPACE(fdBytes), 0);
@@ -142,14 +148,27 @@ void sendMessageWithFds(int udsFd, const Message& msg, std::initializer_list<int
     ASSERT_GT(n, 0) << "sendmsg failed: " << errorMessage(lastSocketError());
 }
 
+struct SessionHandoffMessageOptions {
+    bool omitEmptyExtraCleartext = true;
+};
+
 /**
- * Builds an OP_HANDOFF wire message containing the serialized s2n session state.
- * The state is encoded as a BSON BinData field named "s2nState". Metadata (SNI, cert DN,
- * roles) is carried in the PROXY v2 header sent before this message, not in the BSON body.
+ * Builds an OP_HANDOFF wire message containing the serialized s2n session state and extra
+ * cleartext.
+ * The state is encoded as a BSON BinData field named "s2nState".
+ * The extra cleartext is encoded as a BSON BinData field named "extraCleartext" if either of the
+ * following are true:
+ * - extraCleartext is nonempty
+ * - the optionally specified options has `.omitEmptyExtraCleartext = false`. It defaults to `true`.
  */
-inline Message buildSessionHandoffMessage(const std::vector<uint8_t>& serializedState) {
+Message buildSessionHandoffMessage(const std::vector<uint8_t>& serializedState,
+                                   const std::vector<uint8_t>& extraCleartext,
+                                   SessionHandoffMessageOptions options = {}) {
     SessionHandoffMessage handoffMsg;
     handoffMsg.setS2nState(ConstDataRange(serializedState.data(), serializedState.size()));
+    if (!extraCleartext.empty() || !options.omitEmptyExtraCleartext) {
+        handoffMsg.setExtraCleartext(ConstDataRange(extraCleartext.data(), extraCleartext.size()));
+    }
     BSONObj body = handoffMsg.toBSON();
 
     int totalLen = sizeof(MSGHEADER::Value) + body.objsize();
@@ -226,7 +245,7 @@ private:
 class HandoffSessionPropertiesTest : public HandoffSessionCleartextFixture {};
 
 /** A freshly constructed session begins in Cleartext mode. */
-TEST_F(HandoffSessionPropertiesTest, InitialStateIsCleartext) {
+TEST_F(HandoffSessionPropertiesTest, InitialStateIsProxyHeader) {
     auto session = makeSession();
     ASSERT_EQ(session->getState_forTest(), HandoffSession::State::Cleartext);
 }
@@ -695,7 +714,9 @@ protected:
 TEST_F(HandoffSessionHandoffMessageValidationTest, SourceMessageRejectsHandoffWithoutFd) {
     auto session = makeSession();
 
-    Message msg = buildSessionHandoffMessage(/*serializedState=*/std::vector<uint8_t>(16, 0));
+    const std::vector<uint8_t> serializedState(16, 0);
+    const std::vector<uint8_t> extraCleartext;
+    Message msg = buildSessionHandoffMessage(serializedState, extraCleartext);
     writeAll(proxyFd(), msg.buf(), msg.size());  // Sent without an attached fd.
 
     ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::ProtocolError);
@@ -792,7 +813,9 @@ TEST_F(HandoffSessionHandoffMessageValidationTest, SourceMessageRejectsHandoffWi
     int pipeWriteDup = ::dup(pipeWrite);
     ASSERT_GTE(pipeWriteDup, 0) << "dup failed: " << errorMessage(lastSocketError());
 
-    Message msg = buildSessionHandoffMessage(/*serializedState=*/std::vector<uint8_t>(16, 0));
+    const std::vector<uint8_t> serializedState(16, 0);
+    const std::vector<uint8_t> extraCleartext;
+    Message msg = buildSessionHandoffMessage(serializedState, extraCleartext);
     sendMessageWithFds(proxyFd(), msg, {pipeWrite, pipeWriteDup});
     // Close our copies now that they are queued. The session holds the only remaining
     // write-end references once it receives them.
@@ -882,7 +905,7 @@ public:
         clientTlsFd = tlsFds[1];  // client's end.
 
         // Create and connect s2n server and client connections.
-        auto* serverConn = s2n_connection_new(S2N_SERVER);
+        serverConn = s2n_connection_new(S2N_SERVER);
         ASSERT_TRUE(serverConn);
         ASSERT_EQ(s2n_connection_set_config(serverConn, _serverConfig), S2N_SUCCESS);
         ASSERT_EQ(s2n_connection_set_fd(serverConn, proxyTlsFd), S2N_SUCCESS);
@@ -893,19 +916,10 @@ public:
         ASSERT_EQ(s2n_connection_set_fd(clientConn, clientTlsFd), S2N_SUCCESS);
 
         std::thread serverThread([&] {
-            ASSERT_EQ(_negotiateBlocking(serverConn), S2N_SUCCESS) << s2n_strerror(s2n_errno, "EN");
+            ASSERT_EQ(negotiateBlocking(serverConn), S2N_SUCCESS) << s2n_strerror(s2n_errno, "EN");
         });
-        ASSERT_EQ(_negotiateBlocking(clientConn), S2N_SUCCESS) << s2n_strerror(s2n_errno, "EN");
+        ASSERT_EQ(negotiateBlocking(clientConn), S2N_SUCCESS) << s2n_strerror(s2n_errno, "EN");
         serverThread.join();
-
-        // Serialize the server-side TLS state.
-        uint32_t serializedLen = 0;
-        ASSERT_EQ(s2n_connection_serialization_length(serverConn, &serializedLen), S2N_SUCCESS);
-        ASSERT_GT(serializedLen, 0u);
-        serializedState.resize(serializedLen);
-        ASSERT_EQ(s2n_connection_serialize(serverConn, serializedState.data(), serializedLen),
-                  S2N_SUCCESS);
-        s2n_connection_free(serverConn);
 
         // Create a UDS socketpair for the HandoffSession.
         int udsFds[2];
@@ -946,6 +960,10 @@ public:
             s2n_connection_free(clientConn);
             clientConn = nullptr;
         }
+        if (serverConn) {
+            s2n_connection_free(serverConn);
+            serverConn = nullptr;
+        }
         if (_serverConfig) {
             s2n_config_free(_serverConfig);
         }
@@ -972,52 +990,68 @@ public:
         proxyUdsFd = -1;
     }
 
-    void clientSend(const Message& msg) {
-        clientSend(msg.buf(), msg.size());
+    template <typename... Messages>
+    requires(std::same_as<Messages, Message> && ...)
+    void clientSend(const Message& first, const Messages&... rest) {
+        const iovec iovs[] = {fromMessage(first), fromMessage(rest)...};
+        clientSend(iovs);
     }
 
-    void clientSend(const char* buf, size_t len) {
+    void clientSend(const char* data, size_t len) {
+        iovec bufs[1];
+        bufs[0].iov_base = const_cast<char*>(data);
+        bufs[0].iov_len = len;
+        clientSend(bufs);
+    }
+
+    void clientSend(std::span<const iovec> buffers) {
+        size_t len = 0;
+        for (const iovec& buf : buffers) {
+            len += buf.iov_len;
+        }
+
         size_t written = 0;
         while (written < len) {
             s2n_blocked_status blocked;
-            ssize_t n = s2n_send(clientConn, buf + written, len - written, &blocked);
-            if (n < 0) {
-                uassert(ErrorCodes::InternalError,
-                        s2n_strerror(s2n_errno, "EN"),
-                        s2n_error_get_type(s2n_errno) == S2N_ERR_T_BLOCKED);
-                continue;
-            }
+            ssize_t n = s2n_sendv_with_offset(
+                clientConn, buffers.data(), buffers.size(), written, &blocked);
+            uassert(ErrorCodes::InternalError, s2n_strerror(s2n_errno, "EN"), n > 0);
             written += n;
         }
     }
 
     Message clientReceive(int expectedSize) {
-        auto buf = SharedBuffer::allocate(expectedSize);
-        size_t totalRead = 0;
-        while (static_cast<int>(totalRead) < expectedSize) {
-            s2n_blocked_status blocked;
-            ssize_t n =
-                s2n_recv(clientConn, buf.get() + totalRead, expectedSize - totalRead, &blocked);
-            if (n < 0) {
-                uassert(ErrorCodes::InternalError,
-                        s2n_strerror(s2n_errno, "EN"),
-                        s2n_error_get_type(s2n_errno) == S2N_ERR_T_BLOCKED);
-                continue;
-            }
-            uassert(ErrorCodes::InternalError, "client connection closed unexpectedly", n > 0);
-            totalRead += n;
-        }
-        return Message(std::move(buf));
+        return _receive(clientConn, expectedSize);
+    }
+
+    Message serverReceive(int expectedSize) {
+        return _receive(serverConn, expectedSize);
+    }
+
+    void serializeConnection() {
+        // Serialize the server-side TLS state and remaining decrypted data.
+        const uint32_t extraCount = s2n_peek(serverConn);
+        extraCleartext.resize(extraCount);
+        s2n_blocked_status blocked;
+        ASSERT_EQ(s2n_recv(serverConn, extraCleartext.data(), extraCount, &blocked), extraCount);
+
+        uint32_t serializedLen = 0;
+        ASSERT_EQ(s2n_connection_serialization_length(serverConn, &serializedLen), S2N_SUCCESS);
+        ASSERT_GT(serializedLen, 0u);
+        serializedState.resize(serializedLen);
+        ASSERT_EQ(s2n_connection_serialize(serverConn, serializedState.data(), serializedLen),
+                  S2N_SUCCESS);
     }
 
 protected:
     std::shared_ptr<HandoffSession> session;
-    std::vector<uint8_t> serializedState;
     int proxyTlsFd = -1;
     int proxyUdsFd = -1;
     int clientTlsFd = -1;
     struct s2n_connection* clientConn = nullptr;
-    POSIXInterface _posix;
+    struct s2n_connection* serverConn = nullptr;
+    std::vector<uint8_t> serializedState;
+    std::vector<uint8_t> extraCleartext;
 
 private:
     static constexpr auto kServerCertKeyFile = "jstests/libs/server.pem";
@@ -1073,7 +1107,7 @@ private:
         return {certChain, privateKey};
     }
 
-    static int _negotiateBlocking(struct s2n_connection* conn) {
+    static int negotiateBlocking(struct s2n_connection* conn) {
         s2n_blocked_status blocked;
         while (true) {
             int rc = s2n_negotiate(conn, &blocked);
@@ -1086,10 +1120,24 @@ private:
         }
     }
 
+    Message _receive(s2n_connection* conn, int expectedSize) {
+        auto buf = SharedBuffer::allocate(expectedSize);
+        int totalRead = 0;
+        while (totalRead < expectedSize) {
+            s2n_blocked_status blocked;
+            ssize_t n = s2n_recv(conn, buf.get() + totalRead, expectedSize - totalRead, &blocked);
+            uassert(ErrorCodes::InternalError, s2n_strerror(s2n_errno, "EN"), n != S2N_FAILURE);
+            uassert(ErrorCodes::InternalError, "client connection closed unexpectedly", n > 0);
+            totalRead += n;
+        }
+        return Message(std::move(buf));
+    }
+
     struct s2n_config* _serverConfig = nullptr;
     struct s2n_config* _clientConfig = nullptr;
     struct s2n_config* _deserConfig = nullptr;
     struct s2n_cert_chain_and_key* _certChainAndKey = nullptr;
+    POSIXInterface _posix;
 };
 
 //
@@ -1102,7 +1150,8 @@ class HandoffSessionHandoffTransitionTest : public HandoffSessionTLSFixture {};
  * A valid OP_HANDOFF transitions the session to TLS mode and causes proxyUdsFd to reach EOF.
  */
 TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoff) {
-    Message handoffMsg = buildSessionHandoffMessage(serializedState);
+    serializeConnection();
+    Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
     sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
     // The session receives a dup of proxyTlsFd via SCM_RIGHTS and uses it for TLS I/O.
     // Our copy is no longer needed.
@@ -1141,7 +1190,8 @@ TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoffUpdatesEndpoints) {
     ASSERT_EQ(session->remote(), HostAndPort("anonymous unix socket"));
     ASSERT_EQ(session->local(), HostAndPort("/dummy/mongod"));
 
-    Message handoffMsg = buildSessionHandoffMessage(serializedState);
+    serializeConnection();
+    Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
     sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
     ::close(proxyTlsFd);
     proxyTlsFd = -1;
@@ -1175,8 +1225,10 @@ TEST_F(HandoffSessionHandoffTransitionTest, FailedHandoffWithCorruptState) {
     int pipeRead = pipeFds[0];
     int pipeWrite = pipeFds[1];
 
-    std::vector<uint8_t> corruptState(serializedState.size(), 0xDE);
-    Message handoffMsg = buildSessionHandoffMessage(corruptState);
+    serializeConnection();
+    const std::vector<uint8_t> corruptState(serializedState.size(), 0xDE);
+    const std::vector<uint8_t> extraCleartext;
+    Message handoffMsg = buildSessionHandoffMessage(corruptState, extraCleartext);
     sendMessageWithFds(proxyUdsFd, handoffMsg, {pipeWrite});
     // Close our copy so the session's dup is the only remaining write-end reference. When the
     // session closes its dup on failure, the write end becomes fully closed and pipeRead sees
@@ -1201,18 +1253,209 @@ TEST_F(HandoffSessionHandoffTransitionTest, FailedHandoffWithCorruptState) {
 }
 
 /**
+ * If there is decrypted data remaining in the proxy's s2n connection, then it is sent alongside the
+ * serialized connection state in OP_HANDOFF.
+ * The server session then uses the remaining data as the prefix of the next Message obtained from
+ * sourceMessage().
+ * If the extra data contained only part of a Message, then the sourceMessage() invocation that
+ * processed the OP_HANDOFF will consume the Message part sent and then block waiting for the rest
+ * of the data.
+ * If we then send the rest of the data, sourceMessage() will return the complete Message.
+ * The following set of parameterized tests send zero or more full messages, followed by possibly a
+ * partial message and then subsequently the rest of it.
+ */
+enum class PartialMessageExtent {
+    None,
+    OneByte,
+    HeaderMinusOneByte,
+    Header,
+    HeaderPlusOneByte,
+    SizeMinusOneByte,
+};
+
+class HandoffSessionHandoffTransitionParamTest
+    : public HandoffSessionHandoffTransitionTest,
+      public ::testing::WithParamInterface<std::tuple<int, PartialMessageExtent>> {};
+
+TEST_P(HandoffSessionHandoffTransitionParamTest, ExtraCleartextContainsPartialMessage) {
+    // numFullMessages is the number of full messages in the extra data. We additionally send one
+    // message beforehand so that the proxy has something to receive.
+    // partialMessageExtent is how much of an extra message will be at the end of the extra data.
+    // See the INSTANTIATE_TEST_SUITE_P macros below this TEST_P.
+    const auto [numFullMessages, partialMessageExtent] = GetParam();
+    std::vector<Message> fullMessages;
+    Message partialMessage;
+    size_t partialMessagePrefixSize = 0;
+    std::vector<iovec> chunks;
+    for (int i = 0; i < numFullMessages + 1; ++i) {
+        fullMessages.push_back(
+            makeMessage(dbMsg, BSON("ping" << (i + 1) << "padding" << std::vector<char>(i + 1))));
+        chunks.push_back(fromMessage(fullMessages.back()));
+    }
+    if (partialMessageExtent != PartialMessageExtent::None) {
+        partialMessage = makeMessage(dbMsg, BSON("hello" << 1));
+        chunks.push_back(fromMessage(partialMessage));
+        switch (partialMessageExtent) {
+            case PartialMessageExtent::OneByte:
+                partialMessagePrefixSize = 1;
+                break;
+            case PartialMessageExtent::HeaderMinusOneByte:
+                partialMessagePrefixSize = sizeof(MSGHEADER::Value) - 1;
+                break;
+            case PartialMessageExtent::Header:
+                partialMessagePrefixSize = sizeof(MSGHEADER::Value);
+                break;
+            case PartialMessageExtent::HeaderPlusOneByte:
+                partialMessagePrefixSize = sizeof(MSGHEADER::Value) + 1;
+                break;
+            case PartialMessageExtent::SizeMinusOneByte:
+                partialMessagePrefixSize = partialMessage.size() - 1;
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+        chunks.back().iov_len = partialMessagePrefixSize;
+    }
+
+    clientSend(chunks);
+
+    const Message firstReceived = serverReceive(fullMessages.front().size());
+    ASSERT_EQ(firstReceived.size(), fullMessages.front().size());
+    ASSERT_EQ(memcmp(firstReceived.buf(), fullMessages.front().buf(), fullMessages.front().size()),
+              0);
+
+    // The remaining messages and optional partial message are now in the proxy's s2n peek buffer,
+    // since they all fit in one TLS record.
+    // That data will be sent to the server as `extraCleartext`.
+    serializeConnection();
+    size_t fullExtraMessagesTotalSize = 0;
+    for (size_t i = 1; i < fullMessages.size(); ++i) {
+        fullExtraMessagesTotalSize += fullMessages[i].size();
+    }
+    ASSERT_EQ(extraCleartext.size(), fullExtraMessagesTotalSize + partialMessagePrefixSize);
+
+    Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
+    sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
+    // The session receives a dup of proxyTlsFd via SCM_RIGHTS and uses it for TLS I/O.
+    // Our copy is no longer needed.
+    ::close(proxyTlsFd);
+    proxyTlsFd = -1;
+
+    std::vector<StatusWith<Message>> results;
+    std::thread t([&] {
+        for (int i = 0; i < numFullMessages; ++i) {
+            results.push_back(session->sourceMessage());
+        }
+        if (partialMessageExtent != PartialMessageExtent::None) {
+            results.push_back(session->sourceMessage());
+        }
+    });
+
+    waitForSessionHandoff();
+
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
+    ASSERT_TRUE(session->isConnected());
+
+    if (partialMessageExtent != PartialMessageExtent::None) {
+        // Send the rest of the partially sent message.
+        clientSend(partialMessage.buf() + partialMessagePrefixSize,
+                   partialMessage.size() - partialMessagePrefixSize);
+    }
+
+    t.join();
+
+    ASSERT_EQ(results.size(),
+              numFullMessages + (partialMessageExtent != PartialMessageExtent::None));
+    auto sent = fullMessages.begin() + 1;
+    auto received = results.begin();
+    for (; sent != fullMessages.end() && received != results.end(); ++sent, ++received) {
+        ASSERT_OK(received->getStatus());
+        ASSERT_EQ(received->getValue().size(), sent->size());
+        ASSERT_EQ(memcmp(received->getValue().buf(), sent->buf(), sent->size()), 0);
+    }
+
+    if (partialMessageExtent != PartialMessageExtent::None) {
+        ASSERT_OK(results.back().getStatus());
+        ASSERT_EQ(results.back().getValue().size(), partialMessage.size());
+        ASSERT_EQ(
+            memcmp(results.back().getValue().buf(), partialMessage.buf(), partialMessage.size()),
+            0);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(FullAndPartialMessages,
+                         HandoffSessionHandoffTransitionParamTest,
+                         testing::Combine(testing::Values(1, 2),  // numFullMessages
+                                          testing::Values(PartialMessageExtent::None,
+                                                          PartialMessageExtent::OneByte,
+                                                          PartialMessageExtent::HeaderMinusOneByte,
+                                                          PartialMessageExtent::Header,
+                                                          PartialMessageExtent::HeaderPlusOneByte,
+                                                          PartialMessageExtent::SizeMinusOneByte)));
+
+INSTANTIATE_TEST_SUITE_P(JustPartialMessages,
+                         HandoffSessionHandoffTransitionParamTest,
+                         testing::Combine(testing::Values(0),  // numFullMessages
+                                          testing::Values(PartialMessageExtent::OneByte,
+                                                          PartialMessageExtent::HeaderMinusOneByte,
+                                                          PartialMessageExtent::Header,
+                                                          PartialMessageExtent::HeaderPlusOneByte,
+                                                          PartialMessageExtent::SizeMinusOneByte)));
+
+/**
+ * If there is no decrypted data remaining in the proxy's s2n connection, then the OP_HANDOFF
+ * "extraCleartext" can be omitted.
+ * However, if it is included in the OP_HANDOFF body and is empty, the server will behave the same
+ * as if the "extraCleartext" field were omitted.
+ * This test case is almost identical to "SuccessfulHandoff".
+ */
+TEST_F(HandoffSessionHandoffTransitionTest, ExtraCleartextPresentButEmpty) {
+    serializeConnection();
+
+    // Here's where we differ from "SuccessfulHandoff": `.omitEmptyExtraCleartext = false`
+    Message handoffMsg = buildSessionHandoffMessage(
+        serializedState, extraCleartext, {.omitEmptyExtraCleartext = false});
+
+    sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
+    // The session receives a dup of proxyTlsFd via SCM_RIGHTS and uses it for TLS I/O.
+    // Our copy is no longer needed.
+    ::close(proxyTlsFd);
+    proxyTlsFd = -1;
+
+    // sourceMessage() processes the handoff inline, closes mongodUdsFd, then recurses and blocks
+    // waiting for the first TLS message. Run it on a thread so we can confirm the handoff
+    // completed (via EOF on proxyUdsFd) before sending the TLS message to unblock it.
+    Message msg = makeMessage(dbMsg, BSON("hello" << 1));
+    StatusWith<Message> result = Status(ErrorCodes::InternalError, "not set");
+    std::thread t([&] { result = session->sourceMessage(); });
+
+    waitForSessionHandoff();
+
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
+    ASSERT_TRUE(session->isConnected());
+
+    // Send a TLS message to unblock sourceMessage().
+    clientSend(msg);
+    t.join();
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue().size(), msg.size());
+    ASSERT_EQ(memcmp(result.getValue().buf(), msg.buf(), msg.size()), 0);
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
+    ASSERT_TRUE(session->isConnected());
+}
+
+/**
  * An OP_HANDOFF message whose header arrives in two fragments completes the handoff successfully.
  * The SCM_RIGHTS fd is attached to the first fragment, which is smaller than the message header,
  * so the fd arrives before the full header has been received.
  */
 TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoffWithFragmentedHeader) {
-    Message handoffMsg = buildSessionHandoffMessage(serializedState);
+    serializeConnection();
+    Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
 
     StatusWith<Message> result = Status(ErrorCodes::InternalError, "not set");
     std::thread t([&] { result = session->sourceMessage(); });
-
-    // Wait for sourceMessage() to block before any data arrives.
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
     // Send the first 4 bytes of the header with the SCM_RIGHTS fd attached.
     constexpr size_t kFirstChunk = 4;
@@ -1239,7 +1482,7 @@ TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoffWithFragmentedHeade
 
         ssize_t n;
         do {
-            n = ::sendmsg(proxyUdsFd, &hdr, MSG_NOSIGNAL);
+            n = ::sendmsg(proxyUdsFd, &hdr, 0);
         } while (n < 0 && errno == EINTR);
         ASSERT_GT(n, 0) << "sendmsg failed: " << errorMessage(lastSocketError());
         ASSERT_EQ(n, static_cast<ssize_t>(kFirstChunk)) << "sendmsg sent less than expected";
@@ -1276,8 +1519,9 @@ public:
     void setUp() override {
         HandoffSessionTLSFixture::setUp();
 
+        serializeConnection();
         // Send OP_HANDOFF to the session.
-        Message handoffMsg = buildSessionHandoffMessage(serializedState);
+        Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
         sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
         // The session receives a dup of proxyTlsFd via SCM_RIGHTS and uses it for TLS I/O.
         // Our copy is no longer needed.
@@ -1583,7 +1827,8 @@ TEST_F(HandoffSessionPostHandoffEndSessionTest, EndUnblocksBlockedWaitForData) {
 class HandoffSessionProxyHeaderTest : public HandoffSessionTLSFixture {
 protected:
     void driveHandoff() {
-        Message handoffMsg = buildSessionHandoffMessage(serializedState);
+        serializeConnection();
+        Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
         sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
         ::close(proxyTlsFd);
         proxyTlsFd = -1;
@@ -2170,7 +2415,8 @@ TEST_F(HandoffSessionProxyHeaderTest, FullSessionLifecycle) {
 
     // Drive the handoff inline so the result for the message right after handoff is accessible
     // for content verification.
-    Message handoffMsg = buildSessionHandoffMessage(serializedState);
+    serializeConnection();
+    Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
     sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
     ::close(proxyTlsFd);
     proxyTlsFd = -1;
