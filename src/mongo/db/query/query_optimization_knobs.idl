@@ -141,7 +141,8 @@ server_parameters:
             For small collections, the max number of times we call work() on plans during the
             runtime plan selection trial period. Applies only to the classic execution engine. The complete
             formula for calculating the maximum trial period works depends on
-            'internalQueryPlanEvaluationCollFraction' as well as this parameter.
+            'internalQueryPlanEvaluationCollFraction', 'internalQueryPlanTotalEvaluationCollFraction',
+            and this parameter.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanEvaluationWorks"
         cpp_vartype: AtomicWord<int>
@@ -152,8 +153,11 @@ server_parameters:
 
     internalQueryPlanEvaluationCollFraction:
         description: >-
-            For large collections, the ceiling for the number times we work() candidate plans
+            For large collections, the ceiling for the number times we work() each candidate plan
             is taken as this fraction of the collection size. Applies only to the classic execution engine.
+            The complete formula for calculating the maximum trial period works depends on
+            'internalQueryPlanEvaluationWorks', 'internalQueryPlanTotalEvaluationCollFraction',
+            and this parameter.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanEvaluationCollFraction"
         cpp_vartype: AtomicWord<double>
@@ -169,7 +173,10 @@ server_parameters:
     internalQueryPlanTotalEvaluationCollFraction:
         description: >-
             Similar to 'internalQueryPlanEvaluationCollFraction', but defines a ceiling for
-            the number of times we work() all candidate plans in total. Applies only to the classic execution engine.
+            the total number of times we work() all candidate plans combined. Applies only to the classic execution engine.
+            The complete formula for calculating the maximum trial period works depends on
+            'internalQueryPlanEvaluationWorks', 'internalQueryPlanEvaluationCollFraction',
+            and this parameter.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanTotalEvaluationCollFraction"
         cpp_vartype: AtomicWord<double>
