@@ -549,15 +549,15 @@ private:
                                 value::TagValueView field,
                                 CollatorInterface* collator = nullptr);
 
-    FastTuple<bool, value::TypeTags, value::Value> aggFirst(value::TypeTags accTag,
-                                                            value::Value accValue,
-                                                            value::TypeTags fieldTag,
-                                                            value::Value fieldValue);
+    value::TagValueMaybeOwned aggFirst(value::TypeTags accTag,
+                                       value::Value accValue,
+                                       value::TypeTags fieldTag,
+                                       value::Value fieldValue);
 
-    FastTuple<bool, value::TypeTags, value::Value> aggLast(value::TypeTags accTag,
-                                                           value::Value accValue,
-                                                           value::TypeTags fieldTag,
-                                                           value::Value fieldValue);
+    value::TagValueMaybeOwned aggLast(value::TypeTags accTag,
+                                      value::Value accValue,
+                                      value::TypeTags fieldTag,
+                                      value::Value fieldValue);
 
     value::TagValueMaybeOwned genericAcos(value::TagValueView operand);
     value::TagValueMaybeOwned genericAcosh(value::TagValueView operand);

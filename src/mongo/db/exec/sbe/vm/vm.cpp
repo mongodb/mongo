@@ -518,10 +518,10 @@ value::TagValueOwned ByteCode::aggMax(value::TagValueView acc,
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggFirst(value::TypeTags accTag,
-                                                                  value::Value accValue,
-                                                                  value::TypeTags fieldTag,
-                                                                  value::Value fieldValue) {
+value::TagValueMaybeOwned ByteCode::aggFirst(value::TypeTags accTag,
+                                             value::Value accValue,
+                                             value::TypeTags fieldTag,
+                                             value::Value fieldValue) {
     // Skip aggregation step if we don't have the input.
     if (fieldTag == value::TypeTags::Nothing) {
         auto [tag, val] = value::copyValue(accTag, accValue);
@@ -539,10 +539,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggFirst(value::TypeTag
     return {true, tag, val};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggLast(value::TypeTags accTag,
-                                                                 value::Value accValue,
-                                                                 value::TypeTags fieldTag,
-                                                                 value::Value fieldValue) {
+value::TagValueMaybeOwned ByteCode::aggLast(value::TypeTags accTag,
+                                            value::Value accValue,
+                                            value::TypeTags fieldTag,
+                                            value::Value fieldValue) {
     // Skip aggregation step if we don't have the input.
     if (fieldTag == value::TypeTags::Nothing) {
         auto [tag, val] = value::copyValue(accTag, accValue);

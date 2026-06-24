@@ -1234,7 +1234,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
         auto [accOwned, accTag, accVal] = getFromStack(0);
 
-        auto [owned, tag, val] = aggFirst(accTag, accVal, fieldTag, fieldVal);
+        auto [owned, tag, val] = aggFirst(accTag, accVal, fieldTag, fieldVal).releaseToRaw();
 
         topStack(owned, tag, val);
         if (accOwned) {
@@ -1249,7 +1249,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
         auto [accOwned, accTag, accVal] = getFromStack(0);
 
-        auto [owned, tag, val] = aggLast(accTag, accVal, fieldTag, fieldVal);
+        auto [owned, tag, val] = aggLast(accTag, accVal, fieldTag, fieldVal).releaseToRaw();
 
         topStack(owned, tag, val);
         if (accOwned) {
