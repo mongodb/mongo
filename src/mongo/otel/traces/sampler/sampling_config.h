@@ -34,32 +34,28 @@
 
 namespace mongo::otel::traces {
 
+struct SamplingParameters {
+    /** Sampling factor for a span. 0.0 means never sampled, while 1.0 means always sampled. */
+    double factor = 0.0;
+
+    /** The rate at which tokens are added to the span's rate limiter token bucket, in tokens per
+     * second. */
+    double refillRate = 1.0;
+
+    /** The maximum number of tokens that can be stored in the span's rate limiter token bucket. */
+    int maxTokens = 10;
+};
+
 /** Configuration for trace sampling. */
 struct MONGO_MOD_PUBLIC SamplingConfig {
-    /**
-     * The sampling factor for spans that are sampled by default. 0.0 means never sampled, while
-     * 1.0 means always sampled.
-     */
-    double defaultFactor = 0.0;
+    /** The parameters used for spans that are sampled by default. */
+    SamplingParameters defaultSpans;
 
     /**
-     * The number of tokens to refill per second in the token bucket of each span that's sampled
-     * by default.
+     * Per-span-name overrides. An entry here takes precedence over defaultSpans for that span name,
+     * if applicable.
      */
-    double defaultRefillRate = 1.0;
-
-    /**
-     * The maximum number of tokens that can be held in the token bucket of each span that's sampled
-     * by default.
-     */
-    int defaultMaxTokens = 10;
-
-    /**
-     * Per-span-name overrides. Values are sampling factors in [0.0, 1.0], with the same semantics
-     * as defaultFactor. An entry here takes precedence over defaultFactor for that span name, if
-     * applicable.
-     */
-    StringMap<double> perSpanFactors;
+    StringMap<SamplingParameters> perSpanOverrides;
 };
 
 }  // namespace mongo::otel::traces

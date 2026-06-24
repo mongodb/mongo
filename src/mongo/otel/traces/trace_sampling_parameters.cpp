@@ -45,19 +45,25 @@ Status applySamplingConfig(const BSONObj& obj) {
         auto config = OpenTelemetryTracingSamplingConfig::parse(obj, ctx);
 
         const auto& defaultSampling = config.getDefaultSampling();
-        const auto& rateLimit = defaultSampling.getTokenBucketRateLimit();
+        const auto& defaultRateLimit = defaultSampling.getTokenBucketRateLimit();
         SamplingConfig samplingConfig{
-            .defaultFactor = defaultSampling.getSamplingFactor(),
-            .defaultRefillRate = rateLimit.getRefillRate(),
-            .defaultMaxTokens = rateLimit.getMaxTokens(),
+            .defaultSpans =
+                {
+                    .factor = defaultSampling.getSamplingFactor(),
+                    .refillRate = defaultRateLimit.getRefillRate(),
+                    .maxTokens = defaultRateLimit.getMaxTokens(),
+                },
         };
         if (const auto& samples = config.getSamples()) {
             for (const auto& sample : *samples) {
-                // TODO(SERVER-127464): Incorporate span-specific rate limit parameters.
-                samplingConfig.perSpanFactors[sample.getSpanSelection().getName()] =
-                    sample.getSamplingStrategy()
-                        .value_or(config.getDefaultSampling())
-                        .getSamplingFactor();
+                const auto& strategy =
+                    sample.getSamplingStrategy().value_or(config.getDefaultSampling());
+                const auto& rateLimit = strategy.getTokenBucketRateLimit();
+                samplingConfig.perSpanOverrides[sample.getSpanSelection().getName()] = {
+                    .factor = strategy.getSamplingFactor(),
+                    .refillRate = rateLimit.getRefillRate(),
+                    .maxTokens = rateLimit.getMaxTokens(),
+                };
             }
         }
 
@@ -94,22 +100,24 @@ void OpenTelemetryTracingSamplingServerParameter::append(OperationContext*,
     auto config = TracingSampler::get().getConfig();
 
     OpenTelemetryTracingSamplingStrategy defaultStrategy;
-    defaultStrategy.setSamplingFactor(config.defaultFactor);
-    defaultStrategy.getTokenBucketRateLimit().setRefillRate(config.defaultRefillRate);
-    defaultStrategy.getTokenBucketRateLimit().setMaxTokens(config.defaultMaxTokens);
+    defaultStrategy.setSamplingFactor(config.defaultSpans.factor);
+    defaultStrategy.getTokenBucketRateLimit().setRefillRate(config.defaultSpans.refillRate);
+    defaultStrategy.getTokenBucketRateLimit().setMaxTokens(config.defaultSpans.maxTokens);
 
     OpenTelemetryTracingSamplingConfig idlConfig;
     idlConfig.setDefaultSampling(std::move(defaultStrategy));
 
-    if (!config.perSpanFactors.empty()) {
+    if (!config.perSpanOverrides.empty()) {
         std::vector<OpenTelemetryTracingSample> samples;
-        samples.reserve(config.perSpanFactors.size());
-        for (const auto& [spanName, factor] : config.perSpanFactors) {
+        samples.reserve(config.perSpanOverrides.size());
+        for (const auto& [spanName, params] : config.perSpanOverrides) {
             OpenTelemetryTracingSpanSelection selection;
             selection.setName(spanName);
 
             OpenTelemetryTracingSamplingStrategy strategy;
-            strategy.setSamplingFactor(factor);
+            strategy.setSamplingFactor(params.factor);
+            strategy.getTokenBucketRateLimit().setRefillRate(params.refillRate);
+            strategy.getTokenBucketRateLimit().setMaxTokens(params.maxTokens);
 
             OpenTelemetryTracingSample sample;
             sample.setSpanSelection(std::move(selection));

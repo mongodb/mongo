@@ -67,8 +67,6 @@ bool TracingSamplerImpl::shouldSample(StringData spanName, double sampleValue) {
 }
 
 void TracingSamplerImpl::updateConfig(const SamplingConfig& config) {
-    invariant(config.defaultRefillRate > 0);
-    invariant(config.defaultMaxTokens > 0);
     std::lock_guard lk(_mutex);
     _samplingConfig = config;
     _rebuild(lk);
@@ -95,6 +93,8 @@ void TracingSamplerImpl::_rebuild(WithLock) {
         [&](std::string_view name, double factor, double refillRate, int maxTokens) {
             newSamplingFactors[name] = factor;
 
+            invariant(refillRate > 0, fmt::format("Invalid refillRate for {} span", name));
+            invariant(maxTokens > 0, fmt::format("Invalid maxTokens for {} span", name));
             double burstCapacitySecs = maxTokens / refillRate;
             if (auto it = oldSnapshot->rateLimiterMap.find(name);
                 it != oldSnapshot->rateLimiterMap.end()) {
@@ -114,17 +114,15 @@ void TracingSamplerImpl::_rebuild(WithLock) {
 
     for (const auto& name : _defaultSampledSpanNames) {
         setSamplingFactorAndRateLimits(name,
-                                       _samplingConfig.defaultFactor,
-                                       _samplingConfig.defaultRefillRate,
-                                       _samplingConfig.defaultMaxTokens);
+                                       _samplingConfig.defaultSpans.factor,
+                                       _samplingConfig.defaultSpans.refillRate,
+                                       _samplingConfig.defaultSpans.maxTokens);
     }
 
     // Per-span overrides intentionally overwrite the default-seeded entries above, and also
     // apply to spans that were never registered via sampleByDefault.
-    for (const auto& [name, factor] : _samplingConfig.perSpanFactors) {
-        // TODO(SERVER-127464): Override default rates based on the span-specific configuration.
-        setSamplingFactorAndRateLimits(
-            name, factor, _samplingConfig.defaultRefillRate, _samplingConfig.defaultMaxTokens);
+    for (const auto& [name, params] : _samplingConfig.perSpanOverrides) {
+        setSamplingFactorAndRateLimits(name, params.factor, params.refillRate, params.maxTokens);
     }
     samplerState.update(std::make_shared<const SamplerState>(std::move(newSamplingFactors),
                                                              std::move(newRateLimiters)));

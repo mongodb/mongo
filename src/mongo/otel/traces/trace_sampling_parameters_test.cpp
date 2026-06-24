@@ -41,7 +41,10 @@ namespace mongo::otel::traces {
 namespace {
 
 using mongo::unittest::match::StatusIsOK;
+using ::testing::AllOf;
+using ::testing::ElementsAre;
 using ::testing::Not;
+using ::testing::Pair;
 
 class TraceSamplingParametersTest : public unittest::Test {
 public:
@@ -85,7 +88,7 @@ public:
 
 TEST_F(TraceSamplingParametersTest, SetUpdatesGlobalSampler) {
     ASSERT_OK(setDefaultFactor(0.5));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultFactor, 0.5);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.factor, 0.5);
 }
 
 TEST_F(TraceSamplingParametersTest, AppendReflectsCurrentSamplerState) {
@@ -105,7 +108,7 @@ TEST_F(TraceSamplingParametersTest, AppendAfterMultipleSetsReflectsLastValue) {
     param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
 
     EXPECT_DOUBLE_EQ(readDefaultFactor(bob.obj()), 0.9);
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultFactor, 0.9);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.factor, 0.9);
 }
 
 TEST_F(TraceSamplingParametersTest, NonObjectElementFails) {
@@ -117,12 +120,12 @@ TEST_F(TraceSamplingParametersTest, NonObjectElementFails) {
 TEST_F(TraceSamplingParametersTest, SetFromStringWithValidJsonUpdatesGlobalSampler) {
     ASSERT_OK(param.setFromString(R"({"defaultSampling": {"samplingFactor": 0.5}})",
                                   /*tenantId=*/boost::none));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultFactor, 0.5);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.factor, 0.5);
 }
 
 TEST_F(TraceSamplingParametersTest, SetFromStringWithEmptyJsonUsesDefaults) {
     ASSERT_OK(param.setFromString("{}", /*tenantId=*/boost::none));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultFactor, 0.000045);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.factor, 0.000045);
 }
 
 TEST_F(TraceSamplingParametersTest, SetWithOutOfRangeFactorFails) {
@@ -141,8 +144,8 @@ TEST_F(TraceSamplingParametersTest, SetFromStringWithInvalidJsonFails) {
 
 TEST_F(TraceSamplingParametersTest, SetRateLimitUpdatesGlobalSampler) {
     ASSERT_OK(setRateLimit(2.0, 5));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultRefillRate, 2.0);
-    EXPECT_EQ(TracingSampler::get().getConfig().defaultMaxTokens, 5);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.refillRate, 2.0);
+    EXPECT_EQ(TracingSampler::get().getConfig().defaultSpans.maxTokens, 5);
 }
 
 TEST_F(TraceSamplingParametersTest, AppendReflectsCurrentRateLimit) {
@@ -160,14 +163,14 @@ TEST_F(TraceSamplingParametersTest, SetFromStringWithRateLimitUpdatesGlobalSampl
     ASSERT_OK(param.setFromString(
         R"({"defaultSampling": {"tokenBucketRateLimit": {"refillRate": 4.0, "maxTokens": 20}}})",
         /*tenantId=*/boost::none));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultRefillRate, 4.0);
-    EXPECT_EQ(TracingSampler::get().getConfig().defaultMaxTokens, 20);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.refillRate, 4.0);
+    EXPECT_EQ(TracingSampler::get().getConfig().defaultSpans.maxTokens, 20);
 }
 
 TEST_F(TraceSamplingParametersTest, SetFromStringWithEmptyJsonUsesRateLimitDefaults) {
     ASSERT_OK(param.setFromString("{}", /*tenantId=*/boost::none));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultRefillRate, 1.0);
-    EXPECT_EQ(TracingSampler::get().getConfig().defaultMaxTokens, 10);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.refillRate, 1.0);
+    EXPECT_EQ(TracingSampler::get().getConfig().defaultSpans.maxTokens, 10);
 }
 
 TEST_F(TraceSamplingParametersTest, SetUpdatesBothFactorAndRateLimit) {
@@ -178,9 +181,9 @@ TEST_F(TraceSamplingParametersTest, SetUpdatesBothFactorAndRateLimit) {
     ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
 
     auto config = TracingSampler::get().getConfig();
-    EXPECT_DOUBLE_EQ(config.defaultFactor, 0.5);
-    EXPECT_DOUBLE_EQ(config.defaultRefillRate, 2.0);
-    EXPECT_EQ(config.defaultMaxTokens, 5);
+    EXPECT_DOUBLE_EQ(config.defaultSpans.factor, 0.5);
+    EXPECT_DOUBLE_EQ(config.defaultSpans.refillRate, 2.0);
+    EXPECT_EQ(config.defaultSpans.maxTokens, 5);
 }
 
 TEST_F(TraceSamplingParametersTest, SetWithNegativeRefillRateFails) {
@@ -199,7 +202,7 @@ TEST_F(TraceSamplingParametersTest, SetWithZeroMaxTokensFails) {
     EXPECT_THAT(setRateLimit(1.0, 0), Not(StatusIsOK()));
 }
 
-TEST_F(TraceSamplingParametersTest, SetWithSamplesArrayUpdatesPerSpanFactors) {
+TEST_F(TraceSamplingParametersTest, SetWithSamplesArrayUpdatesperSpanOverrides) {
     auto storage =
         BSON("v" << BSON("defaultSampling"
                          << BSON("samplingFactor" << 0.5) << "samples"
@@ -207,8 +210,9 @@ TEST_F(TraceSamplingParametersTest, SetWithSamplesArrayUpdatesPerSpanFactors) {
                                                             << "samplingStrategy"
                                                             << BSON("samplingFactor" << 0.8)))));
     ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().perSpanFactors.at("test_only.span1"), 0.8);
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultFactor, 0.5);
+    EXPECT_DOUBLE_EQ(
+        TracingSampler::get().getConfig().perSpanOverrides.at("test_only.span1").factor, 0.8);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.factor, 0.5);
 }
 
 TEST_F(TraceSamplingParametersTest, AppendRoundTripsSamples) {
@@ -238,7 +242,8 @@ TEST_F(TraceSamplingParametersTest, SamplesOnlyConfigIsApplied) {
                         "spanSelection" << BSON("name" << "test_only.span1") << "samplingStrategy"
                                         << BSON("samplingFactor" << 0.7)))));
     ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().perSpanFactors.at("test_only.span1"), 0.7);
+    EXPECT_DOUBLE_EQ(
+        TracingSampler::get().getConfig().perSpanOverrides.at("test_only.span1").factor, 0.7);
 }
 
 TEST_F(TraceSamplingParametersTest, SamplesDefaultToDefaultFactorWhenNoSamplingStrategyIsProvided) {
@@ -247,7 +252,8 @@ TEST_F(TraceSamplingParametersTest, SamplesDefaultToDefaultFactorWhenNoSamplingS
                     << BSON("samplingFactor" << 0.3) << "samples"
                     << BSON_ARRAY(BSON("spanSelection" << BSON("name" << "test_only.span1")))));
     ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().perSpanFactors.at("test_only.span1"), 0.3);
+    EXPECT_DOUBLE_EQ(
+        TracingSampler::get().getConfig().perSpanOverrides.at("test_only.span1").factor, 0.3);
 }
 
 TEST_F(TraceSamplingParametersTest, ErrorWhenSpanSelectionIsMissing) {
@@ -255,6 +261,85 @@ TEST_F(TraceSamplingParametersTest, ErrorWhenSpanSelectionIsMissing) {
         BSON("v" << BSON("samples"
                          << BSON_ARRAY(BSON("samplingStrategy" << BSON("samplingFactor" << 0.3)))));
     EXPECT_THAT(param.set(storage.firstElement(), /*tenantId=*/boost::none), Not(StatusIsOK()));
+}
+
+MATCHER_P(HasRefillRate, rate, "") {
+    return arg.refillRate == rate;
+}
+MATCHER_P(HasMaxTokens, tokens, "") {
+    return arg.maxTokens == tokens;
+}
+
+TEST_F(TraceSamplingParametersTest, SetWithSamplesArrayUpdatesPerSpanRateLimits) {
+    auto storage =
+        BSON("v" << BSON(
+                 "defaultSampling"
+                 << BSON("samplingFactor" << 0.5) << "samples"
+                 << BSON_ARRAY(BSON("spanSelection"
+                                    << BSON("name" << "test_only.span1") << "samplingStrategy"
+                                    << BSON("samplingFactor"
+                                            << 0.8 << "tokenBucketRateLimit"
+                                            << BSON("refillRate" << 3.0 << "maxTokens" << 15))))));
+    ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
+    auto config = TracingSampler::get().getConfig();
+    EXPECT_THAT(config.perSpanOverrides,
+                ElementsAre(Pair("test_only.span1", AllOf(HasRefillRate(3.0), HasMaxTokens(15)))));
+}
+
+TEST_F(TraceSamplingParametersTest, DefaultsToDefaultRateLimitWhenNoSamplingStrategyIsProvided) {
+    auto storage = BSON(
+        "v" << BSON("defaultSampling"
+                    << BSON("samplingFactor" << 0.3 << "tokenBucketRateLimit"
+                                             << BSON("refillRate" << 5.0 << "maxTokens" << 20))
+                    << "samples"
+                    << BSON_ARRAY(BSON("spanSelection" << BSON("name" << "test_only.span1")))));
+    ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
+    auto config = TracingSampler::get().getConfig();
+    EXPECT_THAT(config.perSpanOverrides,
+                ElementsAre(Pair("test_only.span1", AllOf(HasRefillRate(5.0), HasMaxTokens(20)))));
+}
+
+TEST_F(TraceSamplingParametersTest, AppendRoundTripsPerSpanRateLimits) {
+    auto storage = BSON(
+        "v" << BSON("defaultSampling"
+                    << BSON("samplingFactor" << 0.5) << "samples"
+                    << BSON_ARRAY(
+                           BSON("spanSelection"
+                                << BSON("name" << "test_only.span1") << "samplingStrategy"
+                                << BSON("samplingFactor"
+                                        << 0.8 << "tokenBucketRateLimit"
+                                        << BSON("refillRate" << 3.0 << "maxTokens" << 15)))
+                           << BSON("spanSelection"
+                                   << BSON("name" << "test_only.span2") << "samplingStrategy"
+                                   << BSON("samplingFactor"
+                                           << 0.6 << "tokenBucketRateLimit"
+                                           << BSON("refillRate" << 5.0 << "maxTokens" << 25))))));
+    ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
+
+    BSONObjBuilder bob;
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    auto result = bob.obj();
+
+    auto samples = result["openTelemetryTracingSampling"]["samples"].Array();
+    ASSERT_EQ(samples.size(), 2u);
+
+    // Find each span by name since append order may vary.
+    BSONElement span1, span2;
+    for (const auto& s : samples) {
+        auto name = s["spanSelection"]["name"].String();
+        if (name == "test_only.span1")
+            span1 = s;
+        else if (name == "test_only.span2")
+            span2 = s;
+    }
+
+    ASSERT_FALSE(span1.eoo());
+    EXPECT_DOUBLE_EQ(span1["samplingStrategy"]["tokenBucketRateLimit"]["refillRate"].Double(), 3.0);
+    EXPECT_EQ(span1["samplingStrategy"]["tokenBucketRateLimit"]["maxTokens"].Int(), 15);
+
+    ASSERT_FALSE(span2.eoo());
+    EXPECT_DOUBLE_EQ(span2["samplingStrategy"]["tokenBucketRateLimit"]["refillRate"].Double(), 5.0);
+    EXPECT_EQ(span2["samplingStrategy"]["tokenBucketRateLimit"]["maxTokens"].Int(), 25);
 }
 
 }  // namespace
