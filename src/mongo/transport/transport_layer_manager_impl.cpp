@@ -46,12 +46,19 @@
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/version.h"
 
 #ifdef MONGO_CONFIG_GRPC
 #include "mongo/transport/grpc/grpc_feature_flag_gen.h"
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
+#endif
+
+#ifdef MONGO_CONFIG_CONNECTION_HANDOFF
+#include "mongo/transport/handoff/handoff_feature_flag_gen.h"
+#include "mongo/transport/handoff/handoff_session_manager.h"
+#include "mongo/transport/handoff/handoff_transport_layer.h"
 #endif
 
 #ifdef MONGO_CONFIG_SSL
@@ -295,6 +302,21 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
         auto tl = std::make_unique<AsioTransportLayer>(opts, std::move(sm));
         retVector.push_back(std::move(tl));
     }
+
+#ifdef MONGO_CONFIG_CONNECTION_HANDOFF
+    if (feature_flags::gFeatureFlagTLSConnectionHandoff.isEnabled()) {
+        retVector.push_back(std::make_unique<HandoffTransportLayer>(HandoffTransportLayer::Params{
+            .socketPrefix =
+                config->proxySocketPrefix.empty() ? config->socket : config->proxySocketPrefix,
+            .port = config->port,
+            .socketGroupID = config->proxySocketGid,
+            .listenBacklog = serverGlobalParams.listenBacklog
+                ? *serverGlobalParams.listenBacklog
+                : ProcessInfo::getDefaultListenBacklog(),
+            .sessionManager = std::make_unique<HandoffSessionManager>(svcCtx),
+        }));
+    }
+#endif
 
 #ifdef MONGO_CONFIG_GRPC
     using GRPCTL = grpc::GRPCTransportLayerImpl;

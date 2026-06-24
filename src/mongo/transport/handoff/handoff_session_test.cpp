@@ -799,7 +799,7 @@ TEST_F(HandoffSessionHandoffMessageValidationTest, SourceMessageRejectsHandoffWi
 class HandoffSessionTLSFixture : public unittest::Test {
 public:
     void setUp() override {
-        ASSERT_EQ(s2nInitOnce(), nullptr);
+        ASSERT_OK(s2nInitOnce());
 
         // Build the server config with TLS 1.2, serialization enabled, and a server cert.
         _serverConfig = s2n_config_new_minimal();

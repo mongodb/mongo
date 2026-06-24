@@ -419,6 +419,7 @@ public:
 
 
     std::function<void(Client*)> onClientDisconnectCb;
+    std::function<void()> onPreludeCb;
 
 protected:
     class SWTObserver : public ClientTransportObserver {
@@ -459,6 +460,10 @@ private:
             };
             sinkMessageCb = [fixture](const Message& m) {
                 return fixture->_onMockEvent<Event::sessionSinkMessage>(std::tie(m));
+            };
+            preludeCb = [fixture] {
+                if (fixture->onPreludeCb)
+                    fixture->onPreludeCb();
             };
             // The async variants will just run the same callback on `_threadPool`.
             auto async = [fixture](auto cb) {
@@ -528,6 +533,37 @@ private:
     std::shared_ptr<ThreadPool> _threadPool = _makeThreadPool();
     test::TransportLayerMockWithReactor* _transportLayer{nullptr};
 };
+
+/**
+ * Verifies that `Session::prelude()` is invoked exactly once by `SessionWorkflow`, and that this
+ * happens before any messages are sourced (read).
+ */
+TEST_F(SessionWorkflowTest, PreludeCalledExactlyOnceBeforeSourceMessage) {
+    int preludeCount = 0;
+    onPreludeCb = [&] {
+        ++preludeCount;
+    };
+
+    startSession();
+
+    // Once expect<sessionSourceMessage>() returns, the worker has already passed prelude(), so
+    // preludeCount must be 1.
+    expect<Event::sessionSourceMessage>(makeOpMsg());
+    ASSERT_EQ(preludeCount, 1);
+    expect<Event::sepHandleRequest>(makeResponse(makeOpMsg()));
+    expect<Event::sessionSinkMessage>(Status::OK());
+
+    // Second iteration: prelude() will not fire again.
+    expect<Event::sessionSourceMessage>(makeOpMsg());
+    expect<Event::sepHandleRequest>(makeResponse(makeOpMsg()));
+    expect<Event::sessionSinkMessage>(Status::OK());
+
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    ASSERT_EQ(preludeCount, 1);
+}
 
 TEST_F(SessionWorkflowTest, StartThenEndSession) {
     startSession();
@@ -805,6 +841,38 @@ TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
     ASSERT_EQ(getConnectionStats()["establishmentRateLimit"]["exempted"].numberLong(), 1);
 
     joinSessions();
+}
+
+/**
+ * Verifies that `Session::prelude()` is invoked before the session establishement rate limiter is
+ * consulted.
+ */
+TEST_F(ConnectionEstablishmentQueueingTest, PreludeCalledBeforeConnectionEstablishmentRateLimiter) {
+    unittest::ServerParameterGuard refreshRate{"ingressConnectionEstablishmentRatePerSec", 1.0};
+    unittest::ServerParameterGuard burstCapacitySecs{
+        "ingressConnectionEstablishmentBurstCapacitySecs", 1};
+
+    // The first session consumes the burst token and completes.
+    startSession();
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    // Second session: burst is exhausted and queueing is disabled, so the connection establishment
+    // rate limiter will reject it. Verify that `Session::prelude()` was called anyway (before the
+    // rate limiter rejected the session).
+    bool preludeFired = false;
+    onPreludeCb = [&] {
+        preludeFired = true;
+    };
+    initializeNewSession();
+    startSession();
+
+    // Because the rate limiter rejected the session, it is now ended.
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    ASSERT_TRUE(preludeFired);
 }
 
 class IngressRequestRateLimiterTest : public SessionWorkflowTest {

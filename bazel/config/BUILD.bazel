@@ -1412,6 +1412,18 @@ selects.config_setting_group(
 )
 
 # --------------------------------------
+# connection handoff options
+# --------------------------------------
+
+selects.config_setting_group(
+    name = "build_connection_handoff_enabled",
+    match_any = [
+        ":linux_aarch64",
+        ":linux_x86_64",
+    ],
+)
+
+# --------------------------------------
 # linkstatic options
 # --------------------------------------
 

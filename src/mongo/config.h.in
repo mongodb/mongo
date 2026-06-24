@@ -111,6 +111,9 @@
 // Defined if grpc support is enabled
 @mongo_config_grpc@
 
+// Defined if TLS connection handoff support is enabled
+@mongo_config_connection_handoff@
+
 // Defined if the glibc rseq header is present
 @mongo_config_glibc_rseq@
 

@@ -74,8 +74,19 @@ protected:
     /** Generate a unique thread name for this session. */
     virtual std::string getClientThreadName(const Session&) const = 0;
 
-    /** Imbue the new Client with a ServiceExecutorContext. */
-    virtual void configureServiceExecutorContext(Client* client,
+    /**
+     * Returns whether the specified session ought to be exempt from all of the following:
+     * - the maximum number of open sessions
+     * - the connection establishment rate limiter
+     * - the ingress request rate limiter
+     */
+    virtual bool isPrivileged(const Session&) const;
+
+    /**
+     * Imbues the new Client with a ServiceExecutorContext. `isPrivilegedSession` was obtained from
+     * a previous call to `isPrivileged` with the session from which the Client was made.
+     */
+    virtual void configureServiceExecutorContext(Client& client,
                                                  bool isPrivilegedSession) const = 0;
 
     /** Called upon client connection. Default behavior is to do nothing. */
