@@ -258,9 +258,8 @@ std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::map(const ColumnOp& op
     size_t numVals = _vals.size();
     if (numVals == 0) {
         // The block has only Nothing values.
-        auto [resultTag, resultValue] =
-            op.processSingle(value::TypeTags::Nothing, 0).releaseToRaw();
-        return std::make_unique<value::MonoBlock>(blockSize, resultTag, resultValue);
+        return std::make_unique<value::MonoBlock>(blockSize,
+                                                  op.processSingle(value::TypeTags::Nothing, 0));
     }
 
     std::vector<TypeTags> tags(numVals, TypeTags::Nothing);
