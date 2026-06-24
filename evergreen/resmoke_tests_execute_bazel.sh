@@ -122,23 +122,43 @@ maybe_generate_burn_in_targets() {
     ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:bazel_burn_in -- generate-targets "$base_revision" || echo "Failed to generate burn-in targets"
 }
 
-# Fetches then tests with retries. Leaves the result in the global RET.
-run_fetch_and_test() {
-    local fetch_attempts=3
+# Builds then tests with retries. Leaves the result in the global RET.
+run_build_and_test() {
+    local build_attempts=3
     local test_attempts=2
     if [[ "${resmoke_disable_rbe}" == "true" ]]; then
-        # Local exec runs a full suite serially on a single host; retrying would just
-        # repeat hours of work. Cap to a single attempt and extend the bazel-level
-        # timeout well beyond the remote-exec default so the run can finish.
-        fetch_attempts=1
+        # Local exec runs a full suite serially on a single host, so re-running the tests
+        # would repeat hours of work; cap the test phase to a single attempt and extend the
+        # bazel-level timeout well beyond the remote-exec default so the run can finish. The
+        # build phase still retries: builds are incremental, so a retry resumes from cache and
+        # only redoes the failed actions, which is cheap even locally.
         test_attempts=1
         build_timeout_seconds=14400
         export build_timeout_seconds
     fi
 
+    # Build the test targets before running them, retrying genuine build failures. `bazel
+    # build` fetches all external dependencies as a prerequisite of compiling, so this single
+    # retrying phase subsumes a separate `bazel fetch` (and the repo cache means a compile
+    # failure on a later attempt won't re-download what an earlier attempt already fetched).
+    # `bazel test` builds and runs in one command, so without this phase a build failure
+    # during the test phase below would not be retried (that phase runs with RETRY_ON_FAIL=0
+    # so test failures fail fast and are reported faithfully). The build outputs land in the
+    # same output_base, so the `bazel test` below reuses them from cache and only executes the
+    # tests. Keep the flags identical to the test invocation (minus the BEP file, which is
+    # cache-neutral) so the test phase does not re-analyze and rebuild. The `test` command
+    # runs with --build_tests_only (set under the test: config in .bazelrc), which limits the
+    # build to test targets and their deps; pass it explicitly here so this `build` builds the
+    # same set rather than every target in the ${targets} pattern. Also force
+    # --remote_download_outputs=minimal: this phase only needs to confirm the targets compile,
+    # so on a remote build it should leave outputs in the CAS rather than download test
+    # binaries (and mongod) to this host. Tests execute remotely, so the test phase consumes
+    # them straight from the CAS and downloads only what its own policy requires. The default
+    # is "all" outside the remote_test config, hence the explicit override; it is a no-op for
+    # local exec (no remote executor).
     export RETRY_ON_FAIL=1
-    bazel_evergreen_shutils::retry_bazel_cmd $fetch_attempts "$BAZEL_BINARY" \
-        fetch ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} ${targets}
+    bazel_evergreen_shutils::retry_bazel_cmd $build_attempts "$BAZEL_BINARY" \
+        build --build_tests_only --remote_download_outputs=minimal ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} ${targets}
     RET=$?
 
     if [[ "$RET" != "0" ]]; then
@@ -213,7 +233,7 @@ main() {
     fi
 
     set +o errexit
-    run_fetch_and_test
+    run_build_and_test
     bazel_evergreen_shutils::write_last_engflow_link
     set -o errexit
 
