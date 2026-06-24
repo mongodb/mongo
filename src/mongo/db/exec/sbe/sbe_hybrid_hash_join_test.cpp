@@ -31,6 +31,8 @@
  * This file contains tests for sbe::HybridHashJoin.
  */
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/hybrid_hash_join.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -1286,6 +1288,67 @@ TEST_F(HybridHashJoinTestFixture, TestPartitionDistribution) {
     test([](size_t i) {
         return makeCompositeKeyRow(static_cast<int64_t>(i), static_cast<int64_t>(i));
     });
+}
+
+// Tests save/restore correctness when probe project slots alias into the same underlying buffer:
+// slot j holds a subfield accessor into the BSON document owned by slot i (i < j).
+TEST_F(HybridHashJoinTestFixture, SaveRestoreWithBsonCrossSlotAliasing) {
+    auto hhj = makeHHJ();
+
+    hhj->addBuild(makeKeyRow(42), makeProjectRow("build_value"));
+    hhj->finishBuild();
+
+    auto probeKey = makeKeyRow(42);
+
+    // Build a BSON document with a nested sub-document and copy it into an owned SBE value.
+    // Slot 0 of the probe project will hold the full document; slot 1 will hold a non-owned pointer
+    // into the sub-document that lives inside slot 0's buffer.
+    BSONObj fullDoc = BSON("subdoc" << BSON("value" << 99));
+    auto [docTag, docVal] = value::copyValue(value::TypeTags::bsonObject,
+                                             value::bitcastFrom<const char*>(fullDoc.objdata()));
+    const char* docPtr = value::bitcastTo<const char*>(docVal);
+    const char* subDocPtr = BSONObj(docPtr)["subdoc"].embeddedObject().objdata();
+    ASSERT_GTE(subDocPtr, docPtr);
+    ASSERT_LT(subDocPtr, docPtr + BSONObj(docPtr).objsize());
+
+    value::MaterializedRow probeProject(2);
+    probeProject.reset(0, true, docTag, docVal);  // slot 0: owns the full-document buffer
+    probeProject.reset(
+        1,
+        false,
+        value::TypeTags::bsonObject,
+        value::bitcastFrom<const char*>(subDocPtr));  // slot 1: non-owned, inside slot 0
+
+    auto cursor = JoinCursor::empty();
+    hhj->probe(probeKey, probeProject, cursor);
+
+    // First save: _savedProbeProject[0] gets an independent copy of the full doc (buffer A),
+    // _savedProbeProject[1] gets an independent copy of the sub-doc (buffer B).
+    cursor.saveState();
+
+    // First restore: probeProject[0] -> non-owned A, probeProject[1] -> non-owned B.
+    cursor.restoreState();
+
+    // Simulate the cross-slot aliasing
+    {
+        auto [savedTag, savedVal] = probeProject.getViewOfValue(0);
+        ASSERT_EQ(savedTag, value::TypeTags::bsonObject);
+        const char* savedDocPtr = value::bitcastTo<const char*>(savedVal);
+        const char* savedSubPtr = BSONObj(savedDocPtr)["subdoc"].embeddedObject().objdata();
+        probeProject.reset(
+            1, false, value::TypeTags::bsonObject, value::bitcastFrom<const char*>(savedSubPtr));
+    }
+
+    // Second save: probeProject[1] now aliases into _savedProbeProject[0]'s buffer.
+    cursor.saveState();
+
+    cursor.restoreState();
+
+    // Verify the sub-document value survived both save/restore cycles correctly.
+    auto [tag1, val1] = probeProject.getViewOfValue(1);
+    ASSERT_EQ(tag1, value::TypeTags::bsonObject);
+    BSONObj restoredSubDoc(value::bitcastTo<const char*>(val1));
+    ASSERT_BSONOBJ_EQ(restoredSubDoc, BSON("value" << 99));
 }
 }  // namespace
 }  // namespace mongo::sbe

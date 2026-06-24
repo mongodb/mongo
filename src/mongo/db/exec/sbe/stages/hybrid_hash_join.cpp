@@ -121,15 +121,20 @@ public:
     }
 
     void saveState() override {
-        // Deep-copy slot by slot
+        // Two-pass save: collect all copies into fresh rows before freeing any old saved buffers.
+        value::MaterializedRow newSavedKey(_probeKey.size());
         for (size_t i = 0; i < _probeKey.size(); ++i) {
             auto [tag, val] = _probeKey.getViewOfValue(i);
-            _savedProbeKey.reset(i, value::TagValueOwned::fromRaw(value::copyValue(tag, val)));
+            newSavedKey.reset(i, value::TagValueOwned::fromRaw(value::copyValue(tag, val)));
         }
+        _savedProbeKey = std::move(newSavedKey);
+
+        value::MaterializedRow newSavedProject(_probeProject.size());
         for (size_t i = 0; i < _probeProject.size(); ++i) {
             auto [tag, val] = _probeProject.getViewOfValue(i);
-            _savedProbeProject.reset(i, value::TagValueOwned::fromRaw(value::copyValue(tag, val)));
+            newSavedProject.reset(i, value::TagValueOwned::fromRaw(value::copyValue(tag, val)));
         }
+        _savedProbeProject = std::move(newSavedProject);
     }
 
     void restoreState() override {
