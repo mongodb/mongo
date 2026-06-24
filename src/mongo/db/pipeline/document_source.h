@@ -342,6 +342,17 @@ public:
         const query_shape::SerializationOptions& opts = query_shape::SerializationOptions{}) const;
 
     /**
+     * Whether this stage may serialize to more than one entry when serializing for an
+     * executionStats explain. A stage that lowers to multiple exec::agg stages at build time
+     * (rather than desugaring at the DocumentSource layer) overrides this to true so it can emit
+     * one explain entry per exec stage, keeping the DocumentSource and exec pipelines aligned for
+     * mergeExplains().
+     */
+    virtual bool serializesToMultipleExecStatsExplainOps() const {
+        return false;
+    }
+
+    /**
      * Create a Value that represents the document source.
      *
      * This is used by the default implementation of serializeToArray() to add this object

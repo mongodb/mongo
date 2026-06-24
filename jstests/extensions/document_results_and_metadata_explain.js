@@ -79,8 +79,7 @@ describe("$_internalDocumentResultsAndMetadata explain", function () {
             assert.docEq(kDrmSpecNoMeta, drmSpecs[0], {explain});
         });
 
-        // TODO SERVER-129226: Re-enable once executionStats explain works for DRM.
-        it.skip("executionStats explain reports per-stage execution metrics", function () {
+        it("executionStats explain reports per-stage execution metrics", function () {
             const explain = coll
                 .explain("executionStats")
                 .aggregate([{$extensionMultiStream: {numDocs: 3}}]);
@@ -130,8 +129,7 @@ describe("$_internalDocumentResultsAndMetadata explain", function () {
             }
         });
 
-        // TODO SERVER-129226: Re-enable once executionStats explain works for DRM.
-        it.skip("[sharded] executionStats explain reports per-shard execution stats", function () {
+        it("[sharded] executionStats explain reports per-shard execution stats", function () {
             if (!isSharded || nShards < 2) return;
             const explain = coll
                 .explain("executionStats")

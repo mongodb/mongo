@@ -122,6 +122,16 @@ public:
     Value serialize(const query_shape::SerializationOptions& opts =
                         query_shape::SerializationOptions{}) const final;
 
+    void serializeToArray(std::vector<Value>& array,
+                          const query_shape::SerializationOptions& opts =
+                              query_shape::SerializationOptions{}) const final;
+
+    // This stage lowers to multiple exec::agg stages (Exchange + $replaceRoot [+ $setVar]) at
+    // build time, so at executionStats verbosity serializeToArray() emits one entry per exec stage.
+    bool serializesToMultipleExecStatsExplainOps() const final {
+        return true;
+    }
+
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
 

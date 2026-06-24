@@ -56,6 +56,15 @@ namespace {
 
 constexpr int kMetaResultStreamType = 1;
 
+boost::intrusive_ptr<DocumentSource> makeReplaceRootDs(
+    const boost::intrusive_ptr<ExpressionContext>& ctx) {
+    return DocumentSourceReplaceRoot::create(
+        ctx,
+        ExpressionFieldPath::parse(ctx.get(), "$payload", ctx->variablesParseState),
+        "'payload' expression",
+        SbeCompatibility::notCompatible);
+}
+
 ExchangeSpec buildStreamRoutingSpec(bool hasMetadata) {
     std::vector<BSONObj> boundaries{BSON("" << MINKEY)};
     std::vector<int> consumerIds{0};
@@ -95,15 +104,6 @@ exec::agg::StageExpansion documentSourceInternalDocumentResultsAndMetadataToStag
         buildStreamRoutingSpec(hasMeta),
         // Clone the source onto docExpCtx so the stage's expCtx matches the inner pipeline's.
         Pipeline::create({docResultsAndMeta.getSourceStage()->clone(docExpCtx)}, docExpCtx));
-
-    auto makeReplaceRootDs = [](const boost::intrusive_ptr<ExpressionContext>& ctx)
-        -> boost::intrusive_ptr<DocumentSource> {
-        return DocumentSourceReplaceRoot::create(
-            ctx,
-            ExpressionFieldPath::parse(ctx.get(), "$payload", ctx->variablesParseState),
-            "'payload' expression",
-            SbeCompatibility::notCompatible);
-    };
 
     exec::agg::StageExpansion stages;
     stages.push_back(exec::agg::buildStage(
@@ -250,6 +250,36 @@ Value DocumentSourceInternalDocumentResultsAndMetadata::serialize(
     return Value(Document{{getSourceName(), spec.toBSON(opts)}});
 }
 
+void DocumentSourceInternalDocumentResultsAndMetadata::serializeToArray(
+    std::vector<Value>& array, const query_shape::SerializationOptions& opts) const {
+    // This stage itself serializes to a single entry, which lines up with the Exchange consumer
+    // that heads the exec lowering.
+    array.push_back(serialize(opts));
+
+    // Below executionStats verbosity, PlanExecutorPipeline::writeExplainOps() does not merge in the
+    // exec pipeline, so a single entry is correct.
+    if (!opts.verbosity || *opts.verbosity < ExplainOptions::Verbosity::kExecStats) {
+        return;
+    }
+
+    // At executionStats verbosity the exec pipeline is merged in positionally by mergeExplains().
+    // This single DocumentSource lowers to multiple exec::agg stages, so build the follow-on stages
+    // and let them serialize themselves.
+    const auto& expCtx = getExpCtx();
+    makeReplaceRootDs(expCtx)->serializeToArray(array, opts);
+
+    if (_metadata && !_returnCursor) {
+        // The real inner pipeline ([Exchange consumer, $replaceRoot]) is only built during
+        // lowering and can't be reconstructed here. Emit a minimal placeholder with just the
+        // variable name so the entry count stays aligned for mergeExplains().
+        array.push_back(Value(Document{
+            {DocumentSourceSetVariableFromSubPipeline::kStageName,
+             Document{
+                 {"setVariable",
+                  Value("$$" + Variables::getBuiltinVariableName(Variables::kSearchMetaId))}}}}));
+    }
+}
+
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDocumentResultsAndMetadata::clone(
     const intrusive_ptr<ExpressionContext>& expCtx) const {
     auto cloned = DocumentSourceInternalDocumentResultsAndMetadata::create(
@@ -311,7 +341,8 @@ DocumentSourceInternalDocumentResultsAndMetadata::distributedPlanLogic(
 
     // Flip _returnCursor so the shard-side stage stashes the metadata stream as a secondary cursor
     // that the router reads, rather than consuming it in-process via $setVariableFromSubPipeline.
-    // Only flip on real execution, since explain paths pass nullptr and must not mutate state.
+    // Informational probes (e.g. requiredToRunOnRouter, stageCanRunInParallel) use ctx=nullptr and
+    // shouldn't cause side-effects, whereas SplitPipeline::split() always passes a non-null ctx.
     if (ctx != nullptr) {
         _returnCursor = true;
     }

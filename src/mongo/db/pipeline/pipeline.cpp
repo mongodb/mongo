@@ -583,14 +583,25 @@ std::vector<BSONObj> Pipeline::serializeToBson(
 std::vector<Value> Pipeline::writeExplainOps(const query_shape::SerializationOptions& opts) const {
     std::vector<Value> array;
     array.reserve(_sources.size());
+    const bool isExecStats =
+        opts.verbosity && *opts.verbosity >= ExplainOptions::Verbosity::kExecStats;
     for (auto&& stage : _sources) {
         auto beforeSize = array.size();
         stage->serializeToArray(array, opts);
-        auto afterSize = array.size();
-        tassert(11282934,
-                str::stream() << "Expecting stage " << stage->getSourceName()
-                              << " to serialize into a single BSONObject",
-                afterSize - beforeSize == 1u);
+        auto emitted = array.size() - beforeSize;
+        // If a stage lowers to multiple exec::agg stages at build time, it may emit more than one
+        // entry. Otherwise, each stage must emit exactly one entry.
+        if (isExecStats && stage->serializesToMultipleExecStatsExplainOps()) {
+            tassert(12922600,
+                    str::stream() << "Expecting stage " << stage->getSourceName()
+                                  << " to serialize into at least one BSONObject",
+                    emitted >= 1u);
+        } else {
+            tassert(11282934,
+                    str::stream() << "Expecting stage " << stage->getSourceName()
+                                  << " to serialize into a single BSONObject",
+                    emitted == 1u);
+        }
     }
     return array;
 }
