@@ -31,33 +31,34 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replicated_fast_count/logical_size_snapshot_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
 
 namespace mongo {
 
 /**
- * Enables tracking of the total logical size (bytes) across all collections.
+ * Receiving end for publications of the latest logical size snapshot across uncompressed
+ * collections and index tables.
  */
-class LogicalSizeTracker {
+class MONGO_MOD_OPEN LogicalSizeSnapshotReceiver {
 public:
-    void refreshLatestSnapshot_ForTest(OperationContext* opCtx) {
-        _refreshLatestSnapshot(opCtx);
-    }
-
-private:
-    /**
-     * TODO SERVER-128941 - call this method as a part of the periodic job.
-     *
-     * Computes a new `latesetSnapshot` according to the cached data sizes across collections.
-     */
-    void _refreshLatestSnapshot(OperationContext* opCtx);
-
+    virtual ~LogicalSizeSnapshotReceiver() = default;
 
     /**
-     * TODO SERVER-128941: Introduced concurrency control and background job semantics.
-     * A snapshot of the total logical bytes for hot and cold collections across the node.
+     * Implementation specific logic for handling the latest logical size snapshot. Logic must be
+     * non-blocking to ensure the publisher can continue making forward progress.
      */
-    LogicalSizeSnapshot _latestSnapshot;
+    virtual void onLogicalSizeSnapshotPublished(const LogicalSizeSnapshot& snapshot) = 0;
+
+    /**
+     * Returns the installed receiver for this process, or nullptr if none is installed.
+     */
+    static LogicalSizeSnapshotReceiver* get(ServiceContext* service);
+    static LogicalSizeSnapshotReceiver* get(OperationContext* opCtx);
+
+    static void set(ServiceContext* service, std::unique_ptr<LogicalSizeSnapshotReceiver> receiver);
 };
 
 }  // namespace mongo
-

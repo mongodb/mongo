@@ -571,6 +571,7 @@ mongo_cc_unit_test(
         "server-collection-write-path",
     ],
     deps = [
+        "logical_size_snapshot_receiver",
         "logical_size_tracker",
         "replicated_fast_count_test_helpers",
         "//src/mongo/db/shard_role/lock_manager",
@@ -581,12 +582,24 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "logical_size_snapshot_receiver",
+    srcs = [
+        "logical_size_snapshot_receiver.cpp",
+    ],
+    deps = [
+        "logical_size_snapshot_idl",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
     name = "logical_size_tracker",
     srcs = [
         "logical_size_tracker.cpp",
     ],
     deps = [
         "logical_size_snapshot_idl",
+        "logical_size_snapshot_receiver",
         "//src/mongo/db:service_context",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",

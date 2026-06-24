@@ -29,6 +29,7 @@
 
 #include "mongo/db/replicated_fast_count/logical_size_tracker.h"
 
+#include "mongo/db/replicated_fast_count/logical_size_snapshot_receiver.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
@@ -47,10 +48,6 @@ bool isColdStorageTier(StorageEngine* storageEngine, const CollectionOptions& op
 }
 
 }  // namespace
-
-LogicalSizeSnapshot LogicalSizeTracker::getLatestSnapshot() const {
-    return _latestSnapshot;
-}
 
 void LogicalSizeTracker::_refreshLatestSnapshot(OperationContext* opCtx) {
     AutoReadLockFree lockFreeRead(opCtx);
@@ -95,6 +92,10 @@ void LogicalSizeTracker::_refreshLatestSnapshot(OperationContext* opCtx) {
     // Version implicitly set to IDL defined default.
 
     _latestSnapshot = newSnapshot;
+
+    if (auto* receiver = LogicalSizeSnapshotReceiver::get(opCtx)) {
+        receiver->onLogicalSizeSnapshotPublished(_latestSnapshot);
+    }
 }
 
 }  // namespace mongo

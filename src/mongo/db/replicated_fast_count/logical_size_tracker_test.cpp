@@ -30,6 +30,7 @@
 #include "mongo/db/replicated_fast_count/logical_size_tracker.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/replicated_fast_count/logical_size_snapshot_receiver.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
@@ -72,8 +73,25 @@ private:
     CollectionOptions _opts;
 };
 
+class LogicalSizeSnapshotTestReceiver : public LogicalSizeSnapshotReceiver {
+public:
+    void onLogicalSizeSnapshotPublished(const LogicalSizeSnapshot& snapshot) override {
+        lastSnapshot = snapshot;
+        callCount++;
+    }
+    LogicalSizeSnapshot lastSnapshot;
+    int callCount = 0;
+};
+
 class LogicalSizeTrackerTest : public CatalogTestFixture {
 protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        auto receiver = std::make_unique<LogicalSizeSnapshotTestReceiver>();
+        _receiver = receiver.get();
+        LogicalSizeSnapshotReceiver::set(getServiceContext(), std::move(receiver));
+    }
+
     void registerMockCollection(NamespaceString nss,
                                 UUID uuid,
                                 int64_t size,
@@ -84,6 +102,14 @@ protected:
             catalog.registerCollection(operationContext(), std::move(mock), boost::none);
         });
     }
+
+    LogicalSizeSnapshot refreshAndCapture() {
+        _tracker.refreshLatestSnapshot_ForTest(operationContext());
+        return _receiver->lastSnapshot;
+    }
+
+    LogicalSizeTracker _tracker;
+    LogicalSizeSnapshotTestReceiver* _receiver = nullptr;
 };
 
 TEST_F(LogicalSizeTrackerTest, SnapshotHotOnly) {
@@ -92,19 +118,13 @@ TEST_F(LogicalSizeTrackerTest, SnapshotHotOnly) {
     registerMockCollection(
         NamespaceString::createNamespaceString_forTest("test", "colB"), UUID::gen(), 200);
 
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-
-    const auto snapshot = tracker.getLatestSnapshot();
+    const auto snapshot = refreshAndCapture();
     ASSERT_EQ(snapshot.getLogicalBytesHot(), 300);
     ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
 
 TEST_F(LogicalSizeTrackerTest, SnapshotVersionMatchesIDLDefault) {
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-
-    const auto snapshot = tracker.getLatestSnapshot();
+    const auto snapshot = refreshAndCapture();
     ASSERT_EQ(snapshot.getVersion(), LogicalSizeSnapshot{}.getVersion());
 }
 
@@ -114,10 +134,7 @@ TEST_F(LogicalSizeTrackerTest, SnapshotSumsCollectionsAcrossDatabases) {
     registerMockCollection(
         NamespaceString::createNamespaceString_forTest("db2", "colB"), UUID::gen(), 200);
 
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-
-    const auto snapshot = tracker.getLatestSnapshot();
+    const auto snapshot = refreshAndCapture();
     ASSERT_EQ(snapshot.getLogicalBytesHot(), 300);
     ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
@@ -132,10 +149,7 @@ TEST_F(LogicalSizeTrackerTest, SnapshotColdOnly) {
                            200,
                            coldCollectionOptions());
 
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-
-    const auto snapshot = tracker.getLatestSnapshot();
+    const auto snapshot = refreshAndCapture();
     ASSERT_EQ(snapshot.getLogicalBytesHot(), 0);
     ASSERT_EQ(snapshot.getLogicalBytesCold(), 300);
 }
@@ -148,18 +162,13 @@ TEST_F(LogicalSizeTrackerTest, SnapshotHotAndCold) {
                            200,
                            coldCollectionOptions());
 
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-
-    const auto snapshot = tracker.getLatestSnapshot();
+    const auto snapshot = refreshAndCapture();
     ASSERT_EQ(snapshot.getLogicalBytesHot(), 100);
     ASSERT_EQ(snapshot.getLogicalBytesCold(), 200);
 }
 
 TEST_F(LogicalSizeTrackerTest, OplogWritesContributeToHotBytes) {
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-    const auto before = tracker.getLatestSnapshot();
+    const auto before = refreshAndCapture();
 
     namespace th = replicated_fast_count::test_helpers;
     const th::NsAndUUID collA{
@@ -181,8 +190,7 @@ TEST_F(LogicalSizeTrackerTest, OplogWritesContributeToHotBytes) {
     th::writeToOplog(operationContext(), entry1);
     th::writeToOplog(operationContext(), entry2);
 
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-    const auto after = tracker.getLatestSnapshot();
+    const auto after = refreshAndCapture();
 
     // The oplog is hot by default, so only the hot bucket should change.
     ASSERT_EQ(after.getLogicalBytesCold(), before.getLogicalBytesCold());
@@ -199,10 +207,7 @@ TEST_F(LogicalSizeTrackerTest, SnapshotIncludesTimeseriesBuckets) {
         300,
         opts);
 
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-
-    const auto snapshot = tracker.getLatestSnapshot();
+    const auto snapshot = refreshAndCapture();
     ASSERT_EQ(snapshot.getLogicalBytesHot(), 300);
     ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
@@ -213,10 +218,7 @@ TEST_F(LogicalSizeTrackerTest, EmptyCollectionsReportZeroSize) {
     registerMockCollection(
         NamespaceString::createNamespaceString_forTest("test", "colB"), UUID::gen(), 0);
 
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-
-    const auto snapshot = tracker.getLatestSnapshot();
+    const auto snapshot = refreshAndCapture();
     ASSERT_EQ(snapshot.getLogicalBytesHot(), 0);
     ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
@@ -225,10 +227,7 @@ TEST_F(LogicalSizeTrackerTest, NegativeSizeCollectionTreatedAsZero) {
     registerMockCollection(
         NamespaceString::createNamespaceString_forTest("test", "colA"), UUID::gen(), -100);
 
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-
-    const auto snapshot = tracker.getLatestSnapshot();
+    const auto snapshot = refreshAndCapture();
     ASSERT_EQ(snapshot.getLogicalBytesHot(), 0);
     ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
 }
@@ -239,12 +238,25 @@ TEST_F(LogicalSizeTrackerTest, NegativeSizeExcludedFromPositiveTotal) {
     registerMockCollection(
         NamespaceString::createNamespaceString_forTest("test", "positive"), UUID::gen(), 100);
 
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
-
-    const auto snapshot = tracker.getLatestSnapshot();
+    const auto snapshot = refreshAndCapture();
     ASSERT_EQ(snapshot.getLogicalBytesHot(), 100);
     ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
+}
+
+TEST_F(LogicalSizeTrackerTest, ReceiverCalledWithPublishedSnapshot) {
+    registerMockCollection(
+        NamespaceString::createNamespaceString_forTest("test", "colA"), UUID::gen(), 100);
+
+    ASSERT_EQ(_receiver->callCount, 0);
+    const auto snapshot = refreshAndCapture();
+    ASSERT_EQ(_receiver->callCount, 1);
+    ASSERT_EQ(snapshot.getLogicalBytesHot(), 100);
+    ASSERT_EQ(snapshot.getLogicalBytesCold(), 0);
+}
+
+TEST_F(LogicalSizeTrackerTest, NoReceiverInstalledDoesNotCrash) {
+    LogicalSizeSnapshotReceiver::set(getServiceContext(), nullptr);
+    _tracker.refreshLatestSnapshot_ForTest(operationContext());
 }
 
 using LogicalSizeTrackerDeathTest = LogicalSizeTrackerTest;
@@ -256,8 +268,7 @@ DEATH_TEST_F(LogicalSizeTrackerDeathTest, DataSizeSumOverflowCrashes, "12894100"
     registerMockCollection(
         NamespaceString::createNamespaceString_forTest("test", "colB"), UUID::gen(), 1);
 
-    LogicalSizeTracker tracker;
-    tracker.refreshLatestSnapshot_ForTest(operationContext());
+    _tracker.refreshLatestSnapshot_ForTest(operationContext());
 }
 
 }  // namespace

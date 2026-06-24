@@ -27,37 +27,31 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/replicated_fast_count/logical_size_snapshot_receiver.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/replicated_fast_count/logical_size_snapshot_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
+namespace {
 
-/**
- * Enables tracking of the total logical size (bytes) across all collections.
- */
-class LogicalSizeTracker {
-public:
-    void refreshLatestSnapshot_ForTest(OperationContext* opCtx) {
-        _refreshLatestSnapshot(opCtx);
-    }
+const auto getLogicalSizeSnapshotReceiverDecoration =
+    ServiceContext::declareDecoration<std::unique_ptr<LogicalSizeSnapshotReceiver>>();
 
-private:
-    /**
-     * TODO SERVER-128941 - call this method as a part of the periodic job.
-     *
-     * Computes a new `latesetSnapshot` according to the cached data sizes across collections.
-     */
-    void _refreshLatestSnapshot(OperationContext* opCtx);
+}  // namespace
 
+LogicalSizeSnapshotReceiver* LogicalSizeSnapshotReceiver::get(ServiceContext* service) {
+    return getLogicalSizeSnapshotReceiverDecoration(service).get();
+}
 
-    /**
-     * TODO SERVER-128941: Introduced concurrency control and background job semantics.
-     * A snapshot of the total logical bytes for hot and cold collections across the node.
-     */
-    LogicalSizeSnapshot _latestSnapshot;
-};
+LogicalSizeSnapshotReceiver* LogicalSizeSnapshotReceiver::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
+void LogicalSizeSnapshotReceiver::set(ServiceContext* service,
+                                      std::unique_ptr<LogicalSizeSnapshotReceiver> receiver) {
+    getLogicalSizeSnapshotReceiverDecoration(service) = std::move(receiver);
+}
 
 }  // namespace mongo
-
