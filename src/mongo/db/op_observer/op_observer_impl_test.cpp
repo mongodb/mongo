@@ -40,7 +40,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
@@ -463,34 +462,6 @@ protected:
                 *storageEngine);
         }
         return indexes;
-    }
-
-    // Inserts doc and returns the docHash from the resulting oplog entry.
-    boost::optional<int32_t> insertAndGetDocHash(OperationContext* opCtx,
-                                                 const NamespaceString& ns,
-                                                 const BSONObj& doc) {
-        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        WriteUnitOfWork wuow(opCtx);
-        std::vector<InsertStatement> insert;
-        insert.emplace_back(doc);
-        opObserver.onInserts(opCtx,
-                             *autoColl,
-                             insert.begin(),
-                             insert.end(),
-                             /*recordIds=*/{},
-                             /*fromMigrate=*/std::vector<bool>(insert.size(), false),
-                             /*defaultFromMigrate=*/false);
-        wuow.commit();
-        auto entry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
-        return entry.getDocHash();
-    }
-
-    int32_t calculateDocHash(const BSONObj& doc) {
-        const SHA256Block sha =
-            SHA256Block::computeHash({ConstDataRange(doc.objdata(), doc.objsize())});
-        return ConstDataView(reinterpret_cast<const char*>(sha.data()))
-            .read<LittleEndian<int32_t>>();
     }
 
     const NamespaceString nss =
@@ -1837,51 +1808,6 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
     ASSERT_BSONOBJ_EQ(o, objectEntry.toBSON());
 }
 
-TEST_F(OpObserverTest, CheckHashExistsOnInsertWithBothFlags) {
-    unittest::ServerParameterGuard continuousInternodeScope{
-        "featureFlagContinuousInternodeValidationPerDocument", true};
-    unittest::ServerParameterGuard rridScope{"featureFlagRecordIdsReplicated", true};
-
-    auto opCtxWrapper = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxWrapper.get();
-
-    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-    const int32_t expectedHash = calculateDocHash(doc);
-
-    const boost::optional<int32_t> hash = insertAndGetDocHash(opCtx, nss, doc);
-    ASSERT(hash);
-    EXPECT_EQ(*hash, expectedHash);
-}
-
-TEST_F(OpObserverTest, CheckHashDoesNotExistOnInsertWithOnlyContinuousInternodeFlag) {
-    unittest::ServerParameterGuard continuousInternodeScope{
-        "featureFlagContinuousInternodeValidationPerDocument", true};
-
-    auto opCtxWrapper = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxWrapper.get();
-    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-
-    EXPECT_FALSE(insertAndGetDocHash(opCtx, nss, doc).has_value());
-}
-
-TEST_F(OpObserverTest, CheckHashDoesNotExistOnInsertWithOnlyRRIDFlag) {
-    unittest::ServerParameterGuard rridScope{"featureFlagRecordIdsReplicated", true};
-
-    auto opCtxWrapper = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxWrapper.get();
-    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-
-    EXPECT_FALSE(insertAndGetDocHash(opCtx, nss, doc).has_value());
-}
-
-TEST_F(OpObserverTest, CheckHashDoesNotExistOnInsertWithoutFlags) {
-    auto opCtxWrapper = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxWrapper.get();
-    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-
-    EXPECT_FALSE(insertAndGetDocHash(opCtx, nss, doc).has_value());
-}
-
 /**
  * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
  */
@@ -2190,24 +2116,6 @@ protected:
             ASSERT_EQ(*startOpTime, *txnRecord.getStartOpTime());
         }
     }
-
-    // Performs a transactional insert and returns the docHash from the inner oplog entry.
-    boost::optional<int32_t> txnInsertAndGetDocHash(const NamespaceString& ns, const BSONObj& doc) {
-        txnParticipant().unstashTransactionResources(opCtx(), "insert");
-        AutoGetCollection autoColl(opCtx(), ns, MODE_IX);
-        std::vector<InsertStatement> insert;
-        insert.emplace_back(doc);
-        opObserver().onInserts(opCtx(),
-                               *autoColl,
-                               insert.begin(),
-                               insert.end(),
-                               /*recordIds=*/{},
-                               /*fromMigrate=*/std::vector<bool>(insert.size(), false),
-                               /*defaultFromMigrate=*/false);
-        commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
-        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx())));
-        return getInnerEntryFromApplyOpsOplogEntry(oplogEntry).getDocHash();
-    }
 };
 
 TEST_F(OpObserverTransactionTest, checkIsTimeseriesOnMultiDocTransaction) {
@@ -2227,24 +2135,6 @@ TEST_F(OpObserverTransactionTest, checkIsTimeseriesOnMultiDocTransaction) {
                        AssertionException,
                        ErrorCodes::OperationNotSupportedInTransaction);
     wuow.commit();
-}
-
-TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionInsertWithBothFlags) {
-    unittest::ServerParameterGuard continuousInternodeScope{
-        "featureFlagContinuousInternodeValidationPerDocument", true};
-    unittest::ServerParameterGuard rridScope{"featureFlagRecordIdsReplicated", true};
-
-    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-    const int32_t expectedHash = calculateDocHash(doc);
-
-    const boost::optional<int32_t> hash = txnInsertAndGetDocHash(nss1, doc);
-    ASSERT(hash);
-    EXPECT_EQ(*hash, expectedHash);
-}
-
-TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionInsertWithoutFlags) {
-    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-    EXPECT_FALSE(txnInsertAndGetDocHash(nss1, doc).has_value());
 }
 
 TEST_F(OpObserverTransactionTest, TransactionOpsIncludeVersionContext) {
@@ -3767,38 +3657,6 @@ protected:
     repl::OplogEntry commitBatchedInserts(OperationContext* opCtx,
                                           const CollectionPtr& coll,
                                           const std::vector<bool>& fromMigrateFlags);
-
-    // Performs a batched insert of two documents and returns the docHash of the first from the
-    // inner applyOps entry. Two documents are required because a single-op batch is written as a
-    // direct oplog entry rather than wrapped in applyOps.
-    boost::optional<int32_t> batchedInsertAndGetDocHash(OperationContext* opCtx,
-                                                        const NamespaceString& ns,
-                                                        const BSONObj& doc) {
-        reset(opCtx, ns);
-        reset(opCtx, NamespaceString::kRsOplogNamespace);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
-        ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
-        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        std::vector<InsertStatement> inserts;
-        inserts.emplace_back(doc);
-        inserts.emplace_back(BSON("_id" << 1 << "sentinel" << 1));
-        opCtx->getServiceContext()->getOpObserver()->onInserts(
-            opCtx,
-            *autoColl,
-            inserts.begin(),
-            inserts.end(),
-            /*recordIds=*/{},
-            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
-            /*defaultFromMigrate=*/false);
-        wuow.commit();
-        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
-        ASSERT(oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
-        std::vector<repl::OplogEntry> innerEntries;
-        repl::ApplyOps::extractOperationsTo(
-            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
-        ASSERT_GTE(innerEntries.size(), 1u);
-        return innerEntries[0].getDocHash();
-    }
 };
 
 // Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction replicates its writes
@@ -5455,30 +5313,6 @@ TEST_F(BatchedWriteOutputsTest, TestBatchedWritePreImagesWithMixedFromMigrate) {
                                               /*invariantOnError=*/false);
         ASSERT_TRUE(doc.isEmpty()) << "Pre-image should NOT be recorded for fromMigrate operation";
     }
-}
-
-TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedInsertWithBothFlags) {
-    unittest::ServerParameterGuard continuousInternodeScope{
-        "featureFlagContinuousInternodeValidationPerDocument", true};
-    unittest::ServerParameterGuard rridScope{"featureFlagRecordIdsReplicated", true};
-
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-
-    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-    const int32_t expectedHash = calculateDocHash(doc);
-
-    const boost::optional<int32_t> hash = batchedInsertAndGetDocHash(opCtx, _nss, doc);
-    ASSERT(hash);
-    EXPECT_EQ(*hash, expectedHash);
-}
-
-TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedInsertWithoutFlags) {
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
-
-    EXPECT_FALSE(batchedInsertAndGetDocHash(opCtx, _nss, doc).has_value());
 }
 
 class OnDeleteOutputsTest : public OpObserverTest {
