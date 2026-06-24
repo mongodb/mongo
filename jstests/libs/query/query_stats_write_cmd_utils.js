@@ -12,7 +12,11 @@ import {
     getQueryExecMetrics,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+
+const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
 
 /**
  * Asserts that the most recent query stats entry for `coll` matches a single-execution write
@@ -806,5 +810,103 @@ export function runMongosWriteMetricsTests({
         if (extraTests) {
             extraTests(() => ({st, mongos, testDB}));
         }
+    });
+}
+
+/**
+ * Given an initial connection to the cluster, applies the given function on all shard servers.
+ * @param {*} primaryConn
+ * @param {*} perShardFn Function to apply on each shard server connection.
+ */
+export function applyOnShardServers(primaryConn, perShardFn) {
+    const topology = DiscoverTopology.findConnectedNodes(primaryConn);
+    assert.eq(topology.type, Topology.kShardedCluster);
+
+    // Sharded cluster - run on all shard nodes as well.
+    for (let shardName of Object.keys(topology.shards)) {
+        const shard = topology.shards[shardName];
+        if (shard.type === Topology.kReplicaSet) {
+            // Await replication to ensure all of the shards are queryable.
+            const rst = new ReplSetTest(shard.primary);
+            rst.awaitReplication();
+            perShardFn(newMongoWithRetry(shard.primary));
+        } else if (shard.type === Topology.kStandalone) {
+            perShardFn(newMongoWithRetry(shard.mongod));
+        }
+    }
+}
+
+/**
+ * Asserts that runCmdFn is not recorded in query stats. Note that if FCV is downgraded without restarting
+ * the server binaries, the previously recorded stats will still persist in query store. Thus, we reset the stores
+ * at the beginning of this function to ensure a clean state.
+ */
+export function assertCommandNotRecorded(conn, runCmdFn, getQueryStatsFn) {
+    let queryStats;
+    const db = getDB(conn);
+    // Retry on transient errors: during a rolling restart a node can be briefly unavailable.
+    assert.soonNoExcept(() => {
+        resetQueryStatsStore(conn, "1MB");
+        assert.commandWorked(runCmdFn(db));
+        queryStats = getQueryStatsFn(db);
+        return true;
+    });
+    assert.eq(queryStats, [], "Expected no query stats entries, but found some");
+}
+
+/**
+ * Asserts that runCmdFn is recorded in query stats.
+ */
+export function assertCommandRecorded(conn, runCmdFn, getQueryStatsFn, assertQueryStatsMetricsFn) {
+    let queryStats;
+    const db = getDB(conn);
+    // Retry on transient errors: during a rolling restart a node can be briefly unavailable.
+    assert.soonNoExcept(() => {
+        resetQueryStatsStore(conn, "1MB");
+        assert.commandWorked(runCmdFn(db));
+        queryStats = getQueryStatsFn(db);
+        return true;
+    });
+    assert.neq(queryStats, [], "Expected query stats entries, but found none");
+    assert.eq(queryStats.length, 1, "Expected exactly one query stats entry but found more");
+    const entry = queryStats[0];
+    assertQueryStatsMetricsFn(entry);
+}
+
+/**
+ * Asserts that commands are recorded in query stats on all shard servers but not the router.
+ * Resets each shard's store, runs all ops in runCmdFns, then checks every shard has exactly one entry.
+ *
+ * @param {Mongo} primaryConnection - primary connection, used to discover shards
+ * @param {Function[]} runCmdFns - array of (db) => commandResult, one op targeting each shard
+ * @param {Function} getQueryStatsFn - (db) => queryStats array for the given shard db
+ * @param {Function} assertQueryStatsMetricsFn - (entry) => void
+ */
+export function assertCommandRecordedOnShardsExceptRouter(
+    primaryConn,
+    runCmdFns,
+    getQueryStatsFn,
+    assertQueryStatsMetricsFn,
+) {
+    // Retry on transient errors: during a rolling restart a node can be briefly unavailable.
+    const db = getDB(primaryConn);
+    assert.soonNoExcept(() => {
+        applyOnShardServers(primaryConn, (conn) => {
+            resetQueryStatsStore(conn, "1MB");
+        });
+
+        for (const runCmdFn of runCmdFns) {
+            assert.commandWorked(runCmdFn(db));
+        }
+
+        applyOnShardServers(primaryConn, (conn) => {
+            const db = getDB(conn);
+            const queryStats = getQueryStatsFn(db);
+            assert.neq(queryStats, [], "Expected query stats entries on shard, but found none");
+            assert.eq(queryStats.length, 1, "Expected exactly one query stats entry on shard");
+            assertQueryStatsMetricsFn(queryStats[0]);
+        });
+
+        return true;
     });
 }

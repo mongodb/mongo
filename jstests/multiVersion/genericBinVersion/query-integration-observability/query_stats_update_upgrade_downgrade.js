@@ -1,23 +1,21 @@
 /**
  * Verifies that the query stats for updates behave correctly in FCV upgrade/downgrade scenarios.
  */
-import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
-import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 import {
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
+    getQueryStatsUpdateCmd,
 } from "jstests/libs/query/query_stats_utils.js";
 import {
-    getQueryStatsUpdateCmd,
-    resetQueryStatsStore,
-} from "jstests/libs/query/query_stats_utils.js";
-import {ReplSetTest} from "jstests/libs/replsettest.js";
+    assertCommandNotRecorded,
+    assertCommandRecorded,
+    assertCommandRecordedOnShardsExceptRouter,
+} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 
 const collName = jsTestName();
-const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
 const docs = [
     {_id: 0, a: 100},
     {_id: 1, a: 101},
@@ -32,7 +30,7 @@ const docs = [
 ];
 
 function setupCollection(primaryConnection, shardingTest = null) {
-    const db = getDB(primaryConnection);
+    const db = primaryConnection.getDB(jsTestName());
     const coll = assertDropAndRecreateCollection(db, collName);
 
     assert.commandWorked(coll.insertMany(docs));
@@ -70,25 +68,16 @@ function setupCollection(primaryConnection, shardingTest = null) {
 
 /**
  * Asserts that update commands are not recorded in query stats.
- *
- * Note that if FCV is downgrade without restarting the server binaries, the previously recorded query stats will
- * still persist in the query stores. Therefore, we reset the query stats store at the beginning of this function
- * to ensure a clean state.
  */
 function assertUpdateCommandsNotRecorded(primaryConn) {
-    const db = getDB(primaryConn);
-    let queryStats;
-    // Retry on transient errors: during a rolling restart a node can be briefly unavailable.
-    assert.soonNoExcept(() => {
-        resetQueryStatsStore(db, "1MB");
-        assert.commandWorked(db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}));
+    assertCommandNotRecorded(
         // Intentionally left unscoped (no collName filter): this negative assertion is most useful
         // when it is broad, so it also catches any unexpected shell-issued update that leaked into
         // the store (e.g. an internal write recorded while the feature flag was enabled).
-        queryStats = getQueryStatsUpdateCmd(db);
-        return true;
-    });
-    assert.eq(queryStats, [], "Expected no new query stats entries, but found some");
+        primaryConn,
+        (db) => db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}),
+        (db) => getQueryStatsUpdateCmd(db),
+    );
 }
 
 function assertUpdateQueryStatsMetrics(entry) {
@@ -128,79 +117,34 @@ function assertUpdateQueryStatsMetrics(entry) {
  * Asserts that update commands are recorded in query stats.
  */
 function assertUpdateCommandRecorded(primaryConn) {
-    const db = getDB(primaryConn);
-    let queryStats;
-    // Retry on transient errors: during a rolling restart a node can be briefly unavailable.
-    assert.soonNoExcept(() => {
-        resetQueryStatsStore(db, "1MB");
-        assert.commandWorked(db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}));
-        // We are interested only in the query stats for the test collection, so we restrict by
-        // collection name explicitly. Here that restriction is functionally redundant, since we
-        // just reset the query stats store; we keep it to express the intent clearly and to stay
-        // correct even if other shell-issued updates reach this node.
-        queryStats = getQueryStatsUpdateCmd(db, {collName});
-        return true;
-    });
-    assert.neq(queryStats, [], "Expected query stats entry for update command, but found none");
-    assert.eq(queryStats.length, 1, "Expected exactly one query stats entry for update command");
-    const entry = queryStats[0];
-    assertUpdateQueryStatsMetrics(entry);
-}
-
-/**
- * Given an initial connection to the cluster, applies the given function on all shard servers.
- * @param {*} primaryConn
- * @param {*} perShardFn Function to apply on each shard server connection.
- */
-function applyOnShardServers(primaryConn, perShardFn) {
-    const topology = DiscoverTopology.findConnectedNodes(primaryConn);
-    assert.eq(topology.type, Topology.kShardedCluster);
-
-    // Sharded cluster - run on all shard nodes as well.
-    for (let shardName of Object.keys(topology.shards)) {
-        const shard = topology.shards[shardName];
-        if (shard.type === Topology.kReplicaSet) {
-            // Await replication to ensure all of the shards are queryable.
-            const rst = new ReplSetTest(shard.primary);
-            rst.awaitReplication();
-            perShardFn(newMongoWithRetry(shard.primary));
-        } else if (shard.type === Topology.kStandalone) {
-            perShardFn(newMongoWithRetry(shard.mongod));
-        }
-    }
+    // We are interested only in the query stats for the test collection, so we restrict by
+    // collection name explicitly. Here that restriction is functionally redundant, since we
+    // just reset the query stats store; we keep it to express the intent clearly and to stay
+    // correct even if other shell-issued updates reach this node.
+    assertCommandRecorded(
+        primaryConn,
+        (db) => db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}),
+        (db) => getQueryStatsUpdateCmd(db, {collName}),
+        assertUpdateQueryStatsMetrics,
+    );
 }
 
 /**
  * Asserts that update commands are recorded in query stats on all shard servers except the router.
  */
 function assertUpdateCommandRecordedOnShardsExceptRouter(primaryConn) {
-    const db = getDB(primaryConn);
-    // Retry on transient errors: during a rolling restart a node can be briefly unavailable.
-    assert.soonNoExcept(() => {
-        resetQueryStatsStore(db, "1MB");
-        // Apply updates on one document for each shard
-        assert.commandWorked(db.getCollection(collName).update({_id: 0}, {$inc: {a: 1}}));
-        assert.commandWorked(db.getCollection(collName).update({_id: 6}, {$inc: {a: 1}}));
-        return true;
-    });
-
-    const assertRecordedOnShardServer = (conn) => {
-        const db = getDB(conn);
-        // Scope to the test collection, to filter out operations on the FCV document.
-        // This is to ensure that the additional updates performed on the FCV document during
-        // the upgrade/downgrade process are not included in the query stat results.
-        const queryStats = getQueryStatsUpdateCmd(db, {collName});
-        assert.neq(queryStats, [], "Expected query stats entry for update command, but found none");
-        assert.eq(
-            queryStats.length,
-            1,
-            "Expected exactly one query stats entry for update command",
-        );
-        const entry = queryStats[0];
-        assertUpdateQueryStatsMetrics(entry);
-    };
-
-    applyOnShardServers(primaryConn, assertRecordedOnShardServer);
+    // Scope to the test collection, to filter out operations on the FCV document.
+    // This is to ensure that the additional updates performed on the FCV document during
+    // the upgrade/downgrade process are not included in the query stat results.
+    assertCommandRecordedOnShardsExceptRouter(
+        primaryConn,
+        [
+            (db) => db.getCollection(collName).update({_id: 0}, {$inc: {a: 1}}),
+            (db) => db.getCollection(collName).update({_id: 6}, {$inc: {a: 1}}),
+        ],
+        (db) => getQueryStatsUpdateCmd(db, {collName}),
+        assertUpdateQueryStatsMetrics,
+    );
 }
 
 /**
