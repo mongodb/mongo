@@ -98,6 +98,8 @@ const knobToVal = {internalQueryTransformHoistPolicy: "forMatchPushdown"};
 const correctnessProperty = createQueriesWithKnobsSetAreSameAsControlCollScanProperty(
     controlColl,
     experimentColl,
+    // The hoisting rewrite can affect result order, causing minor numeric differences.
+    {normalizeResults: true},
 );
 
 const workloadModel = makeWorkloadModel({
