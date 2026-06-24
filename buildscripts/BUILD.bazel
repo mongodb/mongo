@@ -710,6 +710,31 @@ py_library(
 )
 
 py_library(
+    name = "evergreen_activate_result_tasks",
+    srcs = ["evergreen_activate_result_tasks.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+    ],
+)
+
+py_library(
     name = "evergreen_resmoke_job_count",
     srcs = ["evergreen_resmoke_job_count.py"],
     visibility = ["//visibility:public"],

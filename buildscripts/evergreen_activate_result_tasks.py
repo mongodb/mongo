@@ -5,6 +5,7 @@ import os
 import sys
 from typing import Annotated, Optional
 
+import requests
 import structlog
 import typer
 from urllib3.util import Retry
@@ -27,7 +28,49 @@ LOGGER = structlog.getLogger(__name__)
 
 EVG_CONFIG_FILE = "./.evergreen.yml"
 
+# Extra HTTP retry attempts (on top of the evergreen.py default) used when activating the
+# result task group. This step runs once at the end of the task and talks to the live
+# Evergreen API, so we want to ride out transient API degradation (e.g. 503s) rather than
+# fail the whole task.
+EXTRA_HTTP_RETRY_ATTEMPTS = 10
+
 app = typer.Typer(pretty_exceptions_show_locals=False)
+
+
+def get_evergreen_api(evergreen_config: str) -> EvergreenApi:
+    """
+    Build an Evergreen API client that retries harder on transient API errors.
+
+    ``RetryingEvergreenApi.get_api`` builds a "sticky" session at construction time with an
+    ``HTTPAdapter`` already mounted using the default ``Retry`` policy. Simply reassigning
+    ``evg_api._http_retry`` afterward does NOT change the retries used by that session, because
+    the mounted adapter holds its own reference to the original ``Retry``. We must re-mount an
+    adapter with the new ``Retry`` so the more aggressive policy actually takes effect.
+
+    :param evergreen_config: Location of the Evergreen configuration file.
+    :return: Evergreen API client whose session retries ``EXTRA_HTTP_RETRY_ATTEMPTS`` more times.
+    """
+    evg_api = RetryingEvergreenApi.get_api(config_file=evergreen_config, log_on_error=True)
+
+    retry = Retry(
+        total=DEFAULT_HTTP_RETRY_ATTEMPTS + EXTRA_HTTP_RETRY_ATTEMPTS,
+        backoff_factor=DEFAULT_HTTP_RETRY_BACKOFF_FACTOR,
+        status_forcelist=DEFAULT_HTTP_RETRY_CODES,
+        # Task activation is a POST, which urllib3's default allowed_methods excludes from
+        # retries. Without this, the 503s we are trying to ride out would never be retried.
+        allowed_methods=False,
+        raise_on_status=False,
+        raise_on_redirect=False,
+    )
+    evg_api._http_retry = retry
+
+    # Re-mount the adapter on the existing sticky session so the new retry policy is applied.
+    adapter = requests.adapters.HTTPAdapter(max_retries=retry)
+    session = evg_api.session
+    for scheme in ("http://", "https://"):
+        session.mount(scheme, adapter)
+
+    return evg_api
 
 
 def get_executed_test_labels(build_events_file: str) -> set[str]:
@@ -176,14 +219,7 @@ def main(
         )
         return
 
-    evg_api = RetryingEvergreenApi.get_api(config_file=evergreen_config, log_on_error=True)
-    evg_api._http_retry = Retry(
-        total=DEFAULT_HTTP_RETRY_ATTEMPTS + 10,
-        backoff_factor=DEFAULT_HTTP_RETRY_BACKOFF_FACTOR,
-        status_forcelist=DEFAULT_HTTP_RETRY_CODES,
-        raise_on_status=False,
-        raise_on_redirect=False,
-    )
+    evg_api = get_evergreen_api(evergreen_config)
 
     activate_result_task_group(build_variant, task_name, version_id, evg_api, build_events_file)
 

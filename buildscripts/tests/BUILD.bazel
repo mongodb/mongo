@@ -134,6 +134,19 @@ py_test(
 )
 
 py_test(
+    name = "test_evergreen_activate_result_tasks",
+    srcs = ["test_evergreen_activate_result_tasks.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:evergreen_activate_result_tasks",
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+    ],
+)
+
+py_test(
     name = "test_evergreen_resmoke_job_count",
     srcs = ["test_evergreen_resmoke_job_count.py"],
     visibility = ["//visibility:public"],
