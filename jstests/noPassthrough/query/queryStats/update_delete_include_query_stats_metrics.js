@@ -42,6 +42,9 @@ function disableQueryStatsSampling(conn) {
  *                       set to 'opIndex'. The command should match all 8 docs in the collection.
  *   makeShardCmd(opIndex) - Returns the inner command for _shardsvrCoordinateMultiUpdate.
  *   expectedWrites    - Expected writes metrics object for a single execution over 8 docs.
+ *   keysInserted/keysDeleted - Expected index-key maintenance counts for a single execution. The
+ *                       shard reports these back via the singleWriteResult metrics, so the
+ *                       router-side entry matches the standalone counts.
  *   verifyShardMetrics(metrics) - Asserts the per-op metrics returned from the primary shard.
  */
 const updateSpec = {
@@ -79,6 +82,9 @@ const updateSpec = {
         nUpdateOps: 1,
         nDeleteOps: 0,
     },
+    // The update modifies only non-indexed fields, so no index keys are inserted or deleted.
+    keysInserted: 0,
+    keysDeleted: 0,
     verifyShardMetrics: (metrics) => {
         assert.eq(metrics.nModified, 1);
         assert.eq(metrics.nMatched, 1);
@@ -106,6 +112,9 @@ const deleteSpec = {
         nUpdateOps: 0,
         nDeleteOps: 1,
     },
+    // Deleting all 8 documents removes one _id index key each.
+    keysInserted: 0,
+    keysDeleted: 8,
     verifyShardMetrics: (metrics) => {
         assert.eq(metrics.nDeleted, 1);
     },
@@ -151,6 +160,13 @@ function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, s
                 entry,
             });
         }
+        // The index-key maintenance counts are recorded on the shard and propagated back to mongos
+        // via the singleWriteResult metrics, so the router-side entry matches the standalone counts.
+        const expectedWrites = {
+            ...spec.expectedWrites,
+            keysInserted: spec.keysInserted,
+            keysDeleted: spec.keysDeleted,
+        };
         // We validate docsExamined above, for assertAggregatedMetricsSingleExec to pass we will pass in the actual docsExamined value.
         assertAggregatedMetricsSingleExec(entry, {
             keysExamined: 0,
@@ -159,7 +175,7 @@ function runIncludeMetricsTest(testDB, opIndex, isStandalone, enabledSampling, s
             usedDisk: false,
             fromMultiPlanner: false,
             fromPlanCache: false,
-            writes: spec.expectedWrites,
+            writes: expectedWrites,
         });
     } else {
         assert.eq(getQueryStats(testDB.getMongo(), {collName}), []);

@@ -212,6 +212,16 @@ structs:
                 type: long
                 stability: unstable
                 default: 0
+            keysInserted:
+                description: "The number of index keys inserted."
+                type: long
+                stability: unstable
+                default: 0
+            keysDeleted:
+                description: "The number of index keys deleted."
+                type: long
+                stability: unstable
+                default: 0
             totalTimeQueuedMicros:
                 description: "Total time spent waiting for a ticket."
                 type: long

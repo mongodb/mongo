@@ -33,6 +33,9 @@ function testSingleDelete(testDB, coll, collName) {
             nInserted: 0,
             nUpdateOps: 0,
             nDeleteOps: 1,
+            // Deleting one document removes its single _id index key.
+            keysInserted: 0,
+            keysDeleted: 1,
         },
     });
 }
@@ -60,6 +63,9 @@ function testIdDelete(testDB, coll, collName) {
             nInserted: 0,
             nUpdateOps: 0,
             nDeleteOps: 1,
+            // Deleting one document removes its single _id index key.
+            keysInserted: 0,
+            keysDeleted: 1,
         },
     });
 }
@@ -84,6 +90,9 @@ function testMultiDelete(testDB, coll, collName) {
             nInserted: 0,
             nUpdateOps: 0,
             nDeleteOps: 1,
+            // Deleting four documents removes one _id index key each.
+            keysInserted: 0,
+            keysDeleted: 4,
         },
     });
 }

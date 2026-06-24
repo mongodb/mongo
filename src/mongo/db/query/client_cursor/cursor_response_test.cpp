@@ -88,6 +88,8 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     nModified: {"$numberLong": "0"},
     nDeleted: {"$numberLong": "0"},
     nInserted: {"$numberLong": "0"},
+    keysInserted: {"$numberLong": "0"},
+    keysDeleted: {"$numberLong": "0"},
     clusterPeakTrackedMemBytes: {"$numberLong": "4096"}
 })");
 

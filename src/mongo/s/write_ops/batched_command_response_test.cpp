@@ -217,9 +217,10 @@ TEST(BatchedCommandResponseTest, ParseQueryStatsMetrics) {
                     << "maxAcquisitionDelinquencyMillis" << 0LL << "numInterruptChecks" << 5LL
                     << "overdueInterruptApproxMaxMillis" << 0LL << "nMatched" << nMatched
                     << "nUpserted" << 0LL << "nModified" << nMatched << "nDeleted" << 0LL
-                    << "nInserted" << 0LL << "totalTimeQueuedMicros" << 0LL << "totalAdmissions"
-                    << 0LL << "totalNormalPriorityAdmissions" << 0LL << "totalLowPriorityAdmissions"
-                    << 0LL << "wasLoadShed" << false << "wasDeprioritized" << false
+                    << "nInserted" << 0LL << "keysInserted" << 0LL << "keysDeleted" << 0LL
+                    << "totalTimeQueuedMicros" << 0LL << "totalAdmissions" << 0LL
+                    << "totalNormalPriorityAdmissions" << 0LL << "totalLowPriorityAdmissions" << 0LL
+                    << "wasLoadShed" << false << "wasDeprioritized" << false
                     << "wasMarkedNonDeprioritizable" << false << "clusterPeakTrackedMemBytes"
                     << 0LL);
     };

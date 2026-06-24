@@ -109,6 +109,10 @@ describe("query stats insert command metrics (mongos)", function () {
                     nInserted: 5,
                     nUpdateOps: 0,
                     nDeleteOps: 0,
+                    // Each document inserts one _id index key; mongos aggregates the per-shard
+                    // counts (3 on shard0, 2 on shard1) back into the router-side entry.
+                    keysInserted: 5,
+                    keysDeleted: 0,
                 },
             });
 
@@ -154,6 +158,9 @@ describe("query stats insert command metrics (mongos)", function () {
                     nInserted: 2,
                     nUpdateOps: 0,
                     nDeleteOps: 0,
+                    // One _id index key per document, both on shard0.
+                    keysInserted: 2,
+                    keysDeleted: 0,
                 },
             });
 
@@ -257,6 +264,9 @@ describe("query stats insert command metrics (mongos)", function () {
                     nInserted: 1,
                     nUpdateOps: 0,
                     nDeleteOps: 0,
+                    // One _id index key for the single inserted document.
+                    keysInserted: 1,
+                    keysDeleted: 0,
                 },
             });
 
@@ -422,6 +432,14 @@ describe("query stats insert command metrics (mongos)", function () {
                     nInserted: 3,
                     nUpdateOps: 0,
                     nDeleteOps: 0,
+                    // keysInserted here reflects the shard's index maintenance on the underlying
+                    // system.buckets collection, whose count depends on how these measurements pack
+                    // into buckets -- a bucketing/granularity implementation detail this test does
+                    // not intend to pin. Assert a lower bound instead, which still verifies the shard
+                    // reported a non-zero count and mongos propagated it, without becoming a tripwire
+                    // for unrelated bucketing changes. (keysDeleted is exact: an insert removes no keys.)
+                    keysInserted: {atLeast: 1},
+                    keysDeleted: 0,
                 },
             });
         });

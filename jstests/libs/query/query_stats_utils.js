@@ -533,6 +533,115 @@ export function assertAggregatedBoolean(metrics, metricName, {trueCount, falseCo
     );
 }
 
+/**
+ * Sentinel for a metric expectation that should NOT be asserted. Pass it as a metric's expected
+ * value (e.g. `keysInserted: kSkipMetric`) to opt that single metric out of validation while every
+ * other metric in the same block is still checked.
+ *
+ * Use this only when a metric is genuinely not what the test is verifying and cannot be pinned to a
+ * value or range. Prefer an exact value, or a `{atLeast}` lower bound, so the test still catches
+ * regressions. Note that a *missing* (undefined) expectation is NOT treated as a skip -- it fails
+ * loudly, so that forgetting to specify a metric (e.g. after a new one is added) is caught rather
+ * than silently passing.
+ */
+export const kSkipMetric = "kSkipMetric";
+
+/**
+ * Asserts that the aggregated metric `section[name]` satisfies `expected`. This is the single place
+ * that interprets a metric expectation; `assertAggregatedMetricsSingleExec` routes every numeric
+ * metric through it. `expected` may take one of four forms:
+ *
+ *   - number n               Exact match (the common case, and the default for deterministic
+ *     (or NumberLong/        values). Asserts the metric reflects a single execution producing n:
+ *      NumberInt)            sum == min == max == n and sumOfSquares == n*n. A NumberLong/NumberInt
+ *                            is accepted too, e.g. when passing a `.sum` read back from an entry.
+ *
+ *   - {atLeast, atMost}      Range match on `sum` (min/max/sumOfSquares are not checked). Either
+ *                            bound may be omitted (e.g. `{atLeast: 1}`). Use this when the exact
+ *                            value is coupled to an implementation detail the test does not intend
+ *                            to pin -- for example time-series `keysInserted`, which depends on how
+ *                            measurements pack into buckets. `{atLeast: 1}` still catches the
+ *                            regression that matters (the value collapsing to 0) without becoming a
+ *                            brittle tripwire for unrelated bucketing/granularity changes.
+ *
+ *   - function(actualDoc)    Custom callback. Receives the raw aggregated sub-document
+ *                            ({sum, max, min, sumOfSquares}, all NumberLong) and asserts whatever it
+ *                            needs. Use for relationships the other forms cannot express.
+ *
+ *   - kSkipMetric            Do not assert this metric at all (see kSkipMetric above).
+ *
+ * For the single-execution helpers, `sum`, `min`, and `max` of an aggregated metric are equal, so a
+ * range bounds the one observed value.
+ */
+export function assertMetricMatches(section, name, expected) {
+    if (expected === kSkipMetric) {
+        return;
+    }
+    assert.neq(
+        expected,
+        undefined,
+        `No expectation provided for metric '${name}'; pass a number, a {atLeast, atMost} range, a ` +
+            `callback, or kSkipMetric`,
+        {section},
+    );
+    const actual = section[name];
+    assert.neq(actual, undefined, `Aggregated metric '${name}' is missing from the entry`, {
+        section,
+    });
+
+    if (typeof expected === "function") {
+        expected(actual);
+        return;
+    }
+    // A range expectation is a plain object carrying atLeast and/or atMost. Check this before the
+    // exact-value path, because mongo-shell numerics (NumberLong/NumberInt) are also typeof "object"
+    // and would otherwise be misclassified as a (malformed) range.
+    if (
+        typeof expected === "object" &&
+        (expected.atLeast !== undefined || expected.atMost !== undefined)
+    ) {
+        if (expected.atLeast !== undefined) {
+            assert.gte(
+                actual.sum,
+                NumberLong(expected.atLeast),
+                `Metric '${name}' sum is below atLeast`,
+                {
+                    actual,
+                    expected,
+                },
+            );
+        }
+        if (expected.atMost !== undefined) {
+            assert.lte(
+                actual.sum,
+                NumberLong(expected.atMost),
+                `Metric '${name}' sum is above atMost`,
+                {
+                    actual,
+                    expected,
+                },
+            );
+        }
+        return;
+    }
+    // Otherwise an exact value: a JS number, or a NumberLong/NumberInt (e.g. a `.sum` read back from
+    // an actual entry). This mirrors the historical numericMetric(value) behavior, which accepted both.
+    assertAggregatedMetric(section, name, {
+        sum: expected,
+        min: expected,
+        max: expected,
+        sumOfSq: expected ** 2,
+    });
+}
+
+/**
+ * Asserts the metrics of a single-execution query stats entry. Every metric field below (the
+ * exec-section `docsExamined`/`keysExamined` and each field of `writes`) accepts any of the forms
+ * understood by `assertMetricMatches`: an exact number, a `{atLeast, atMost}` range, a callback, or
+ * `kSkipMetric`. See `assertMetricMatches` for details and guidance on choosing among them. The
+ * boolean planner flags (`usedDisk`, `hasSortStage`, `fromPlanCache`, `fromMultiPlanner`) are
+ * plain booleans.
+ */
 export function assertAggregatedMetricsSingleExec(
     results,
     {docsExamined, keysExamined, usedDisk, hasSortStage, fromPlanCache, fromMultiPlanner, writes},
@@ -540,21 +649,31 @@ export function assertAggregatedMetricsSingleExec(
     {
         // Need to check if new format is used.
         const queryStatSection = getQueryExecMetrics(results.metrics);
-        const numericMetric = (x) => ({sum: x, min: x, max: x, sumOfSq: x ** 2});
-        assertAggregatedMetric(queryStatSection, "docsExamined", numericMetric(docsExamined));
-        assertAggregatedMetric(queryStatSection, "keysExamined", numericMetric(keysExamined));
+        assertMetricMatches(queryStatSection, "docsExamined", docsExamined);
+        assertMetricMatches(queryStatSection, "keysExamined", keysExamined);
 
         if (writes) {
-            const {nMatched, nUpserted, nModified, nDeleted, nInserted, nUpdateOps, nDeleteOps} =
-                writes;
+            const {
+                nMatched,
+                nUpserted,
+                nModified,
+                nDeleted,
+                nInserted,
+                nUpdateOps,
+                nDeleteOps,
+                keysInserted,
+                keysDeleted,
+            } = writes;
             const writesSection = getWriteMetrics(results.metrics);
-            assertAggregatedMetric(writesSection, "nMatched", numericMetric(nMatched));
-            assertAggregatedMetric(writesSection, "nUpserted", numericMetric(nUpserted));
-            assertAggregatedMetric(writesSection, "nModified", numericMetric(nModified));
-            assertAggregatedMetric(writesSection, "nDeleted", numericMetric(nDeleted));
-            assertAggregatedMetric(writesSection, "nInserted", numericMetric(nInserted));
-            assertAggregatedMetric(writesSection, "nUpdateOps", numericMetric(nUpdateOps));
-            assertAggregatedMetric(writesSection, "nDeleteOps", numericMetric(nDeleteOps));
+            assertMetricMatches(writesSection, "nMatched", nMatched);
+            assertMetricMatches(writesSection, "nUpserted", nUpserted);
+            assertMetricMatches(writesSection, "nModified", nModified);
+            assertMetricMatches(writesSection, "nDeleted", nDeleted);
+            assertMetricMatches(writesSection, "nInserted", nInserted);
+            assertMetricMatches(writesSection, "nUpdateOps", nUpdateOps);
+            assertMetricMatches(writesSection, "nDeleteOps", nDeleteOps);
+            assertMetricMatches(writesSection, "keysInserted", keysInserted);
+            assertMetricMatches(writesSection, "keysDeleted", keysDeleted);
         }
     }
 

@@ -22,6 +22,9 @@ const kQueryStatsServerParams = {
 function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
     assert.commandWorked(coll.deleteMany({}));
     assert.commandWorked(testDB.runCommand({insert: collName, documents: [{v: 1}]}));
+    // One _id index key is inserted per document. On a sharded cluster the shard reports this back
+    // in its write response and mongos aggregates it into the router-side entry, so the count
+    // matches the replica set case.
     assertWriteCmdQueryStatsSingleExec(testDB, coll, {
         command: "insert",
         keysExamined: 0,
@@ -34,6 +37,8 @@ function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
             nInserted: 1,
             nUpdateOps: 0,
             nDeleteOps: 0,
+            keysInserted: 1,
+            keysDeleted: 0,
         },
     });
 
@@ -58,6 +63,9 @@ function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
                 nInserted: 1,
                 nUpdateOps: 0,
                 nDeleteOps: 0,
+                // One _id index key inserted on the shard for the single inserted document.
+                keysInserted: 1,
+                keysDeleted: 0,
             },
         });
     }
@@ -68,6 +76,10 @@ function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
     assert.commandWorked(
         testDB.runCommand({insert: collName, documents: [{v: 1}, {v: 2}, {v: 3}]}),
     );
+    // One _id index key is inserted per document, so three in total. The shell-generated ObjectId
+    // _ids all sort into the same chunk (ObjectId sorts after numbers in BSON canonical type order,
+    // so they fall in the upper chunk), so all three documents route to a single shard (shard0),
+    // which reports keysInserted back to mongos for aggregation into the router-side entry.
     assertWriteCmdQueryStatsSingleExec(testDB, coll, {
         command: "insert",
         keysExamined: 0,
@@ -80,6 +92,8 @@ function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
             nInserted: 3,
             nUpdateOps: 0,
             nDeleteOps: 0,
+            keysInserted: 3,
+            keysDeleted: 0,
         },
     });
 
@@ -104,6 +118,9 @@ function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
                 nInserted: 3,
                 nUpdateOps: 0,
                 nDeleteOps: 0,
+                // One _id index key inserted on the shard for each of the three documents.
+                keysInserted: 3,
+                keysDeleted: 0,
             },
         });
     }
@@ -211,11 +228,9 @@ describe("query stats insert command metrics (replica set)", function () {
             };
 
             const retryResult = assert.commandWorked(testDB.runCommand(retryCmd));
-            assert.eq(
-                retryResult.retriedStmtIds,
-                [0, 1],
-                "Expected retriedStmtIds [0, 1]: " + tojson(retryResult.retriedStmtIds),
-            );
+            assert.eq(retryResult.retriedStmtIds, [0, 1], "Expected retriedStmtIds [0, 1]", {
+                retriedStmtIds: retryResult.retriedStmtIds,
+            });
 
             entries = getQueryStatsInsertCmd(conn, {collName: collName});
             assert.eq(entries.length, 1, "Expected still 1 query stats entry after partial retry");
@@ -249,8 +264,10 @@ describe("query stats insert command metrics (replica set)", function () {
             assert.eq(
                 allRetryResult.retriedStmtIds,
                 [0, 1],
-                "Expected retriedStmtIds [0, 1] (every statement a retry): " +
-                    tojson(allRetryResult.retriedStmtIds),
+                "Expected retriedStmtIds [0, 1] (every statement a retry)",
+                {
+                    retriedStmtIds: allRetryResult.retriedStmtIds,
+                },
             );
 
             entries = getQueryStatsInsertCmd(conn, {collName: collName});

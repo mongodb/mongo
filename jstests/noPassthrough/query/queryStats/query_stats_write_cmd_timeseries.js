@@ -296,6 +296,11 @@ function testMetaFieldUpdateRecordedOnMongos(testDB, coll, collName) {
             nInserted: 0,
             nUpdateOps: 1,
             nDeleteOps: 0,
+            // Moving the two matched measurements to the bucket(s) for the new meta value deletes
+            // the two old index keys and inserts two new ones on the shard; the shard reports these
+            // back to mongos.
+            keysInserted: 2,
+            keysDeleted: 2,
         },
     });
     assertExpectedResults({
@@ -481,6 +486,8 @@ describe("time-series query stats (sharded)", function () {
                     nInserted: 0,
                     nUpdateOps: 1,
                     nDeleteOps: 0,
+                    keysInserted: 0,
+                    keysDeleted: 0,
                 },
             });
         });

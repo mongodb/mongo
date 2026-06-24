@@ -68,6 +68,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
     uint64_t nModified = 0;
     uint64_t nDeleted = 0;
     uint64_t nInserted = 0;
+    uint64_t keysInserted = 0;
+    uint64_t keysDeleted = 0;
 
     Microseconds totalTimeQueuedMicros{0};
     uint64_t totalAdmissions = 0;
@@ -110,6 +112,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         nModified += other.nModified;
         nDeleted += other.nDeleted;
         nInserted += other.nInserted;
+        keysInserted += other.keysInserted;
+        keysDeleted += other.keysDeleted;
         totalTimeQueuedMicros += other.totalTimeQueuedMicros;
         totalAdmissions += other.totalAdmissions;
         totalNormalPriorityAdmissions += other.totalNormalPriorityAdmissions;
@@ -174,6 +178,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         nModified += metrics.getNModified();
         nDeleted += metrics.getNDeleted();
         nInserted += metrics.getNInserted();
+        keysInserted += metrics.getKeysInserted();
+        keysDeleted += metrics.getKeysDeleted();
         totalTimeQueuedMicros += Microseconds(metrics.getTotalTimeQueuedMicros());
         totalAdmissions += metrics.getTotalAdmissions();
         totalNormalPriorityAdmissions += metrics.getTotalNormalPriorityAdmissions();

@@ -29,7 +29,7 @@ const testCommands = {
 runMongosWriteMetricsTests({
     label: "delete",
     commands: testCommands,
-    validateWriteMetricsFn: (n) => ({
+    validateWriteMetricsFn: (n, keysPerDoc) => ({
         nMatched: 0,
         nUpserted: 0,
         nModified: 0,
@@ -37,6 +37,9 @@ runMongosWriteMetricsTests({
         nInserted: 0,
         nUpdateOps: 0,
         nDeleteOps: 1,
+        // Deleting a document removes one index key per index on the collection.
+        keysInserted: 0,
+        keysDeleted: n * keysPerDoc,
     }),
     validateCmdFn: (result) => assert.eq(result.n, 1, result),
     getQueryStatsFn: getQueryStatsDeleteCmd,

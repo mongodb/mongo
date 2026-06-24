@@ -381,6 +381,15 @@ export function runTokenizationTestsForTopology(
  *   2. Two-phase write (filter doesn't include shard key)
  *   3. Retryable write with _id, non-_id shard key
  *   4. StaleConfig retry
+ *
+ * `validateWriteMetricsFn(nAffected, keysPerDoc)` must return the expected `writes` object for a
+ * single execution, given the number of affected documents and `keysPerDoc` (the number of indexes
+ * on the scenario's collection, i.e. how many index keys are maintained per affected document).
+ * Use both arguments to compute `keysInserted`/`keysDeleted`: a delete removes `nAffected *
+ * keysPerDoc` keys; an indexed-field update inserts and deletes that many. A spec whose writes never
+ * touch an index (e.g. updates of non-indexed fields) legitimately returns `keysInserted: 0,
+ * keysDeleted: 0` regardless of `keysPerDoc` -- note that in the spec so the unused argument reads as
+ * intentional rather than an oversight.
  */
 export function runMongosWriteMetricsTests({
     label,
@@ -396,7 +405,16 @@ export function runMongosWriteMetricsTests({
         let mongos;
         let testDB;
 
-        function assertExecMetrics(entry, {keysExamined, docsExamined, nAffected}) {
+        // keysPerDoc is the number of index keys touched per affected document (i.e. the number of
+        // indexes on the collection), used to compute the expected keysInserted/keysDeleted. It is
+        // required (no default) so every scenario states its collection's index count explicitly --
+        // a silent default would hide a wrong expectation if a collection's index set changed.
+        function assertExecMetrics(entry, {keysExamined, docsExamined, nAffected, keysPerDoc}) {
+            assert.neq(
+                keysPerDoc,
+                undefined,
+                "assertExecMetrics requires keysPerDoc (index count on the collection)",
+            );
             // TODO SERVER-128278 remove special handling for deletes on sharded clusters. On sharded
             // clusters, docsExamined may exceed the expected value, so we have to validate it
             // differently, but we never expect it to be double the expected value.
@@ -415,7 +433,7 @@ export function runMongosWriteMetricsTests({
                 usedDisk: false,
                 fromMultiPlanner: false,
                 fromPlanCache: false,
-                writes: validateWriteMetricsFn(nAffected),
+                writes: validateWriteMetricsFn(nAffected, keysPerDoc),
             });
         }
 
@@ -482,6 +500,8 @@ export function runMongosWriteMetricsTests({
                     keysExamined: 0,
                     docsExamined: totalDocs,
                     nAffected: totalDocs,
+                    // This collection is sharded on {_id: 1}, so it has a single index.
+                    keysPerDoc: 1,
                 });
                 assertExpectedResults({
                     results: entry,
@@ -503,6 +523,8 @@ export function runMongosWriteMetricsTests({
                     keysExamined: docsPerShard,
                     docsExamined: docsPerShard,
                     nAffected: docsPerShard,
+                    // Sharded on {_id: 1}: single index.
+                    keysPerDoc: 1,
                 });
                 assertExpectedResults({
                     results: entry,
@@ -554,8 +576,15 @@ export function runMongosWriteMetricsTests({
                 const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName});
                 assert.eq(entry.key.queryShape.command, label);
                 // The two-phase protocol's write phase targets the document by _id on the owning
-                // shard, so keysExamined=1 (from the _id index) and docsExamined=1.
-                assertExecMetrics(entry, {keysExamined: 1, docsExamined: 1, nAffected: 1});
+                // shard, so keysExamined=1 (from the _id index) and docsExamined=1. The collection
+                // is sharded on {sk: 1}, so it has two indexes (_id and sk) — a delete removes a key
+                // from each.
+                assertExecMetrics(entry, {
+                    keysExamined: 1,
+                    docsExamined: 1,
+                    nAffected: 1,
+                    keysPerDoc: 2,
+                });
                 assertExpectedResults({
                     results: entry,
                     expectedQueryStatsKey: entry.key,
@@ -572,7 +601,12 @@ export function runMongosWriteMetricsTests({
 
                 const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName});
                 assert.eq(entry.key.queryShape.command, label);
-                assertExecMetrics(entry, {keysExamined: 0, docsExamined: 0, nAffected: 0});
+                assertExecMetrics(entry, {
+                    keysExamined: 0,
+                    docsExamined: 0,
+                    nAffected: 0,
+                    keysPerDoc: 2,
+                });
                 assertExpectedResults({
                     results: entry,
                     expectedQueryStatsKey: entry.key,
@@ -646,7 +680,13 @@ export function runMongosWriteMetricsTests({
                 const entries = getQueryStatsFn(mongos, {collName});
                 assert.eq(entries.length, 1, "Expected 1 query stats entry", {entries});
                 assert.eq(entries[0].metrics.execCount, 1);
-                assertExecMetrics(entries[0], {keysExamined: 1, docsExamined: 1, nAffected: 1});
+                // Sharded on {sk: 1}, so two indexes (_id and sk) — a delete removes a key from each.
+                assertExecMetrics(entries[0], {
+                    keysExamined: 1,
+                    docsExamined: 1,
+                    nAffected: 1,
+                    keysPerDoc: 2,
+                });
             });
 
             // TODO SERVER-121325 We double count for this case. Unskip this test case when that
@@ -663,11 +703,7 @@ export function runMongosWriteMetricsTests({
                 validateCmdFn(result);
 
                 let entries = getQueryStatsFn(mongos, {collName});
-                assert.eq(
-                    entries.length,
-                    1,
-                    "Expected 1 entry after initial exec: " + tojson(entries),
-                );
+                assert.eq(entries.length, 1, "Expected 1 entry after initial exec", {entries});
                 assert.eq(entries[0].metrics.execCount, 1);
 
                 // Retry with the same lsid/txnNumber — the server recognises this as
@@ -677,11 +713,7 @@ export function runMongosWriteMetricsTests({
                 assert.eq(retryResult.nModified, 1);
 
                 entries = getQueryStatsFn(mongos, {collName: collName});
-                assert.eq(
-                    entries.length,
-                    1,
-                    "Expected still 1 entry after retry: " + tojson(entries),
-                );
+                assert.eq(entries.length, 1, "Expected still 1 entry after retry", {entries});
                 assert.eq(
                     entries[0].metrics.execCount,
                     1,

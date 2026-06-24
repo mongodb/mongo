@@ -378,6 +378,8 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.nModified = 1;
     additiveMetrics.ndeleted = 0;
     additiveMetrics.ninserted = 0;
+    additiveMetrics.keysInserted = 3;
+    additiveMetrics.keysDeleted = 1;
     additiveMetrics.planningTime = Microseconds(100);
     additiveMetrics.nDocsSampled = 10;
 
@@ -399,6 +401,8 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     cursorMetrics.setNModified(1);
     cursorMetrics.setNDeleted(0);
     cursorMetrics.setNInserted(0);
+    cursorMetrics.setKeysInserted(4);
+    cursorMetrics.setKeysDeleted(2);
     CardinalityEstimationMethods ceMethods1;
     ceMethods1.setHistogram(1);
     ceMethods1.setSampling(1);
@@ -433,6 +437,8 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.nModified, 2);
     ASSERT_EQ(*additiveMetrics.ndeleted, 0);
     ASSERT_EQ(*additiveMetrics.ninserted, 0);
+    ASSERT_EQ(*additiveMetrics.keysInserted, 7);
+    ASSERT_EQ(*additiveMetrics.keysDeleted, 3);
     ASSERT_EQ(*additiveMetrics.totalTimeQueuedMicros, Microseconds(800));
     ASSERT_EQ(*additiveMetrics.totalAdmissions, 7);
     ASSERT_EQ(*additiveMetrics.wasLoadShed, true);

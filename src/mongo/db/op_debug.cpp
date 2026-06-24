@@ -1463,6 +1463,8 @@ CursorMetrics OpDebug::getCursorMetrics(size_t opIndex) const {
     metrics.setNInserted(additiveMetrics.ninserted.value_or(0));
     metrics.setNDeleted(additiveMetrics.ndeleted.value_or(0));
     metrics.setNUpserted(additiveMetrics.nUpserted.value_or(0));
+    metrics.setKeysInserted(additiveMetrics.keysInserted.value_or(0));
+    metrics.setKeysDeleted(additiveMetrics.keysDeleted.value_or(0));
 
     metrics.setPlanningTimeMicros(additiveMetrics.planningTime.value_or(Microseconds(0)).count());
 
@@ -1701,6 +1703,8 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     ninserted = ninserted.value_or(0) + metrics.nInserted;
     ndeleted = ndeleted.value_or(0) + metrics.nDeleted;
     nUpserted = nUpserted.value_or(0) + metrics.nUpserted;
+    keysInserted = keysInserted.value_or(0) + metrics.keysInserted;
+    keysDeleted = keysDeleted.value_or(0) + metrics.keysDeleted;
 
     delinquentAcquisitions = delinquentAcquisitions.value_or(0) + metrics.delinquentAcquisitions;
     totalAcquisitionDelinquency =
@@ -1769,37 +1773,42 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
 
 void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metrics) {
     aggregateDataBearingNodeMetrics(query_stats::DataBearingNodeMetrics{
-        static_cast<uint64_t>(metrics.getKeysExamined()),
-        static_cast<uint64_t>(metrics.getDocsExamined()),
-        static_cast<uint64_t>(metrics.getBytesRead()),
-        Microseconds(metrics.getReadingTimeMicros()),
-        Milliseconds(metrics.getWorkingTimeMillis()),
-        Nanoseconds(metrics.getCpuNanos()),
-        static_cast<uint64_t>(metrics.getDelinquentAcquisitions()),
-        Milliseconds(metrics.getTotalAcquisitionDelinquencyMillis()),
-        Milliseconds(metrics.getMaxAcquisitionDelinquencyMillis()),
-        static_cast<uint64_t>(metrics.getNumInterruptChecks()),
-        Milliseconds(metrics.getOverdueInterruptApproxMaxMillis()),
-        metrics.getHasSortStage(),
-        metrics.getUsedDisk(),
-        metrics.getFromMultiPlanner(),
-        metrics.getFromPlanCache(),
-        static_cast<uint64_t>(metrics.getNMatched()),
-        static_cast<uint64_t>(metrics.getNUpserted()),
-        static_cast<uint64_t>(metrics.getNModified()),
-        static_cast<uint64_t>(metrics.getNDeleted()),
-        static_cast<uint64_t>(metrics.getNInserted()),
-        Microseconds(metrics.getTotalTimeQueuedMicros()),
-        static_cast<uint64_t>(metrics.getTotalAdmissions()),
-        static_cast<uint64_t>(metrics.getTotalNormalPriorityAdmissions()),
-        static_cast<uint64_t>(metrics.getTotalLowPriorityAdmissions()),
-        metrics.getWasLoadShed(),
-        metrics.getWasDeprioritized(),
-        metrics.getWasMarkedNonDeprioritizable(),
-        Microseconds(metrics.getPlanningTimeMicros()),
-        metrics.getCardinalityEstimationMethods(),
-        static_cast<uint64_t>(metrics.getNDocsSampled()),
-        static_cast<uint64_t>(metrics.getClusterPeakTrackedMemBytes())});
+        .keysExamined = static_cast<uint64_t>(metrics.getKeysExamined()),
+        .docsExamined = static_cast<uint64_t>(metrics.getDocsExamined()),
+        .bytesRead = static_cast<uint64_t>(metrics.getBytesRead()),
+        .readingTime = Microseconds(metrics.getReadingTimeMicros()),
+        .clusterWorkingTime = Milliseconds(metrics.getWorkingTimeMillis()),
+        .cpuNanos = Nanoseconds(metrics.getCpuNanos()),
+        .delinquentAcquisitions = static_cast<uint64_t>(metrics.getDelinquentAcquisitions()),
+        .totalAcquisitionDelinquency = Milliseconds(metrics.getTotalAcquisitionDelinquencyMillis()),
+        .maxAcquisitionDelinquency = Milliseconds(metrics.getMaxAcquisitionDelinquencyMillis()),
+        .numInterruptChecks = static_cast<uint64_t>(metrics.getNumInterruptChecks()),
+        .overdueInterruptApproxMax = Milliseconds(metrics.getOverdueInterruptApproxMaxMillis()),
+        .hasSortStage = metrics.getHasSortStage(),
+        .usedDisk = metrics.getUsedDisk(),
+        .fromMultiPlanner = metrics.getFromMultiPlanner(),
+        .fromPlanCache = metrics.getFromPlanCache(),
+        .nMatched = static_cast<uint64_t>(metrics.getNMatched()),
+        .nUpserted = static_cast<uint64_t>(metrics.getNUpserted()),
+        .nModified = static_cast<uint64_t>(metrics.getNModified()),
+        .nDeleted = static_cast<uint64_t>(metrics.getNDeleted()),
+        .nInserted = static_cast<uint64_t>(metrics.getNInserted()),
+        .keysInserted = static_cast<uint64_t>(metrics.getKeysInserted()),
+        .keysDeleted = static_cast<uint64_t>(metrics.getKeysDeleted()),
+        .totalTimeQueuedMicros = Microseconds(metrics.getTotalTimeQueuedMicros()),
+        .totalAdmissions = static_cast<uint64_t>(metrics.getTotalAdmissions()),
+        .totalNormalPriorityAdmissions =
+            static_cast<uint64_t>(metrics.getTotalNormalPriorityAdmissions()),
+        .totalLowPriorityAdmissions =
+            static_cast<uint64_t>(metrics.getTotalLowPriorityAdmissions()),
+        .wasLoadShed = metrics.getWasLoadShed(),
+        .wasDeprioritized = metrics.getWasDeprioritized(),
+        .wasMarkedNonDeprioritizable = metrics.getWasMarkedNonDeprioritizable(),
+        .planningTime = Microseconds(metrics.getPlanningTimeMicros()),
+        .cardinalityEstimationMethods = metrics.getCardinalityEstimationMethods(),
+        .nDocsSampled = static_cast<uint64_t>(metrics.getNDocsSampled()),
+        .clusterPeakTrackedMemBytes =
+            static_cast<uint64_t>(metrics.getClusterPeakTrackedMemBytes())});
 }
 
 void OpDebug::AdditiveMetrics::aggregateStorageStats(const StorageStats& stats) {

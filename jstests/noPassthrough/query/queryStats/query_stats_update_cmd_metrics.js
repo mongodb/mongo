@@ -41,6 +41,9 @@ function testReplacementUpdate(testDB, coll, collName) {
             nInserted: 0,
             nUpdateOps: 1,
             nDeleteOps: 0,
+            // Only the non-indexed field v is modified, so no index keys are touched.
+            keysInserted: 0,
+            keysDeleted: 0,
         },
     });
 }
@@ -68,6 +71,10 @@ function testIdUpdate(testDB, coll, collName) {
             nInserted: 0,
             nUpdateOps: 1,
             nDeleteOps: 0,
+            // The replacement keeps _id unchanged and modifies only non-indexed fields, so no
+            // index keys are touched.
+            keysInserted: 0,
+            keysDeleted: 0,
         },
     });
     assert.commandWorked(coll.remove({_id: 999}));
@@ -95,8 +102,80 @@ function testModifierUpdate(testDB, coll, collName) {
             nInserted: 0,
             nUpdateOps: 1,
             nDeleteOps: 0,
+            // Only non-indexed fields are modified, so no index keys are touched.
+            keysInserted: 0,
+            keysDeleted: 0,
         },
     });
+}
+
+// An update that does not touch any indexed field performs no index maintenance, so keysInserted
+// and keysDeleted are both 0. The collection has only the _id index and the updates never change _id.
+function testNonIndexedFieldUpdate(testDB, coll, collName) {
+    assert.commandWorked(
+        testDB.runCommand({
+            update: collName,
+            updates: [{q: {v: {$lt: 3}}, u: {$set: {notIndexed: true}}, multi: true}],
+            comment: "running non-indexed-field update!!",
+        }),
+    );
+    assertWriteCmdQueryStatsSingleExec(testDB, coll, {
+        command: "update",
+        keysExamined: 0,
+        docsExamined: 8,
+        writes: {
+            nMatched: 2,
+            nUpserted: 0,
+            nModified: 2,
+            nDeleted: 0,
+            nInserted: 0,
+            nUpdateOps: 1,
+            nDeleteOps: 0,
+            // No indexed field changed, so no index keys were inserted or deleted.
+            keysInserted: 0,
+            keysDeleted: 0,
+        },
+    });
+}
+
+// An update that changes a field covered by a secondary index performs index maintenance: the old
+// index key is deleted and the new one is inserted. On a sharded cluster the shard reports these
+// per-shard key counts in its write response and mongos sums them into the router-side entry, so
+// this runs on both the replica-set and sharded suites.
+function testIndexedFieldUpdate(testDB, coll, collName) {
+    // The collection was reset (and any previous index dropped) in beforeEach. Build a secondary
+    // index on the field 'w' and insert a single document carrying it. The index build and the
+    // insert run before the update command, so they don't contribute to the update's metrics.
+    assert.commandWorked(coll.createIndex({w: 1}));
+    assert.commandWorked(coll.insert({_id: 9999, w: 1}));
+    assert.commandWorked(
+        testDB.runCommand({
+            update: collName,
+            // Filter on _id (IDHACK) rather than the mutated field, so the index scan is over the
+            // _id index and the planner doesn't re-examine the {w: 1} index keys we are changing.
+            updates: [{q: {_id: 9999}, u: {$set: {w: 2}}, multi: false}],
+            comment: "running indexed-field update!!",
+        }),
+    );
+    // The _id index targets the single document (keysExamined = docsExamined = 1). Changing the
+    // indexed field w from 1 to 2 deletes the old {w: 1} index key and inserts the new {w: 2} key.
+    assertWriteCmdQueryStatsSingleExec(testDB, coll, {
+        command: "update",
+        keysExamined: 1,
+        docsExamined: 1,
+        writes: {
+            nMatched: 1,
+            nUpserted: 0,
+            nModified: 1,
+            nDeleted: 0,
+            nInserted: 0,
+            nUpdateOps: 1,
+            nDeleteOps: 0,
+            keysInserted: 1,
+            keysDeleted: 1,
+        },
+    });
+    assert.commandWorked(coll.remove({_id: 9999}));
 }
 
 function testPipelineUpdate(testDB, coll, collName) {
@@ -130,6 +209,9 @@ function testPipelineUpdate(testDB, coll, collName) {
             nInserted: 0,
             nUpdateOps: 1,
             nDeleteOps: 0,
+            // Only non-indexed fields are modified, so no index keys are touched.
+            keysInserted: 0,
+            keysDeleted: 0,
         },
     });
 }
@@ -156,6 +238,16 @@ describeWriteCmdQueryStatsReplicaSetTests(
             it("should record pipeline update metrics", function () {
                 const {testDB, coll, collName} = ctxFn();
                 testPipelineUpdate(testDB, coll, collName);
+            });
+
+            it("should record zero key maintenance for a non-indexed-field update", function () {
+                const {testDB, coll, collName} = ctxFn();
+                testNonIndexedFieldUpdate(testDB, coll, collName);
+            });
+
+            it("should record key maintenance for an indexed-field update", function () {
+                const {testDB, coll, collName} = ctxFn();
+                testIndexedFieldUpdate(testDB, coll, collName);
             });
         });
 
@@ -212,5 +304,15 @@ describeWriteCmdQueryStatsShardedTests("query stats update command metrics (shar
             const {testDB, coll, collName} = ctxFn();
             testPipelineUpdate(testDB, coll, collName);
         });
+    });
+
+    it("should record zero key maintenance for a non-indexed-field update", function () {
+        const {testDB, coll, collName} = ctxFn();
+        testNonIndexedFieldUpdate(testDB, coll, collName);
+    });
+
+    it("should record key maintenance for an indexed-field update", function () {
+        const {testDB, coll, collName} = ctxFn();
+        testIndexedFieldUpdate(testDB, coll, collName);
     });
 });

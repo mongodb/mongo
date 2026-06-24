@@ -215,6 +215,8 @@ the metric is computed.
 | `writes.nInserted`                                             | Documents inserted (non-upsert)                                                                   | Zero for reads; for writes, summed from shards                                                            |
 | `writes.nUpdateOps`                                            | Number of update operations in request                                                            | Zero for reads; for writes, number of update ops in client batch                                          |
 | `writes.nDeleteOps`                                            | Number of delete operations in request                                                            | Zero for reads; for writes, number of delete ops in client batch                                          |
+| `writes.keysInserted`                                          | Index keys inserted during write index maintenance                                                | Zero for reads; for writes, summed from shards                                                            |
+| `writes.keysDeleted`                                           | Index keys deleted during write index maintenance                                                 | Zero for reads; for writes, summed from shards                                                            |
 | **Supplemental Metrics**                                       |                                                                                                   |                                                                                                           |
 | Engine type (Bonsai/SBE/Classic)                               | Which query engine was used                                                                       | Always taken from local OpDebug                                                                           |
 
@@ -407,6 +409,8 @@ following way:
             nInserted:  {sum: 0, max: 0, min: 0, sumOfSquares: 0},
             nUpdateOps: {sum: 0, max: 0, min: 0, sumOfSquares: 0},
             nDeleteOps: {sum: 0, max: 0, min: 0, sumOfSquares: 0},
+            keysInserted: {sum: 0, max: 0, min: 0, sumOfSquares: 0},
+            keysDeleted:  {sum: 0, max: 0, min: 0, sumOfSquares: 0},
         },
         firstSeenTimestamp:  ISODate(/* … */),
         latestSeenTimestamp: ISODate(/* … */),
@@ -501,6 +505,12 @@ following way:
 - `metrics.writes.nInserted`: The number of documents inserted (excluding upserts).
 - `metrics.writes.nUpdateOps`: The number of updates in the original update request.
 - `metrics.writes.nDeleteOps`: The number of deletes in the original delete request.
+- `metrics.writes.keysInserted`: The number of index keys inserted as part of index maintenance for
+  the write. On a sharded cluster, the shards report this in their write responses and mongos sums
+  it into the router-side entry, like the other `writes` document counts.
+- `metrics.writes.keysDeleted`: The number of index keys deleted as part of index maintenance for
+  the write. On a sharded cluster, the shards report this in their write responses and mongos sums
+  it into the router-side entry, like the other `writes` document counts.
 
 #### Permissions
 

@@ -201,6 +201,18 @@ struct WritesEntry {
      * Aggregates the total number of delete operations in the delete request.
      */
     AggregatedMetric<uint64_t> nDeleteOps;
+
+    /**
+     * Aggregates the number of index keys inserted as part of index maintenance for the write.
+     * Sourced from the OpDebug additive metrics.
+     */
+    AggregatedMetric<uint64_t> keysInserted;
+
+    /**
+     * Aggregates the number of index keys deleted as part of index maintenance for the write.
+     * Sourced from the OpDebug additive metrics.
+     */
+    AggregatedMetric<uint64_t> keysDeleted;
 };
 
 /**

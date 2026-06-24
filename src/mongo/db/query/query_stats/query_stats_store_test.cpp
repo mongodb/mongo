@@ -1559,6 +1559,8 @@ struct QueryStatsBSONParams {
     BSONObj nModified = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj nUpdateOps = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj nDeleteOps = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObj keysInserted = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObj keysDeleted = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj planningTimeMicros = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     CardinalityEstimationMethods cardinalityEstimationMethods;
     BSONObj nDocsSampled = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
@@ -1654,7 +1656,9 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
             .append("nDeleted", emptyIntMetric)
             .append("nInserted", emptyIntMetric)
             .append("nUpdateOps", params.nUpdateOps)
-            .append("nDeleteOps", params.nDeleteOps);
+            .append("nDeleteOps", params.nDeleteOps)
+            .append("keysInserted", params.keysInserted)
+            .append("keysDeleted", params.keysDeleted);
 
         testBuilder.append("writes", writeSection.obj());
     }
@@ -1725,6 +1729,8 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
             metrics->writesStats.nModified.aggregate(1);
             metrics->writesStats.nUpdateOps.aggregate(1);
             metrics->writesStats.nDeleteOps.aggregate(1);
+            metrics->writesStats.keysInserted.aggregate(2);
+            metrics->writesStats.keysDeleted.aggregate(3);
         }
 
         // With some boolean and write metrics.
@@ -1743,6 +1749,8 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
                     .nModified = intMetricBson(1, 1, 1, 1),
                     .nUpdateOps = intMetricBson(1, 1, 1, 1),
                     .nDeleteOps = intMetricBson(1, 1, 1, 1),
+                    .keysInserted = intMetricBson(2, 2, 2, 4),
+                    .keysDeleted = intMetricBson(3, 3, 3, 9),
                     .peakTrackedMemBytes = intMetricBson(2048, 2048, 2048, 2048LL * 2048),
                     .clusterPeakTrackedMemBytes = intMetricBson(5000, 5000, 5000, 5000LL * 5000),
                 });

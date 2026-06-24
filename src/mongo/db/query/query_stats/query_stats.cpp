@@ -333,6 +333,8 @@ void updateWriteStatistics(WritesEntry& writeEntryToUpdate, const QueryStatsSnap
     writeEntryToUpdate.nInserted.aggregate(snapshot.nInserted);
     writeEntryToUpdate.nUpdateOps.aggregate(snapshot.nUpdateOps);
     writeEntryToUpdate.nDeleteOps.aggregate(snapshot.nDeleteOps);
+    writeEntryToUpdate.keysInserted.aggregate(snapshot.keysInserted);
+    writeEntryToUpdate.keysDeleted.aggregate(snapshot.keysDeleted);
 }
 
 void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
@@ -552,41 +554,46 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
                                   int64_t firstResponseExecutionTime,
                                   const OpDebug::AdditiveMetrics& metrics) {
     QueryStatsSnapshot snapshot{
-        microsecondsToUint64(metrics.executionTime),
-        static_cast<uint64_t>(firstResponseExecutionTime),
-        static_cast<uint64_t>(metrics.nreturned.value_or(0)),
-        static_cast<uint64_t>(metrics.keysExamined.value_or(0)),
-        static_cast<uint64_t>(metrics.docsExamined.value_or(0)),
-        static_cast<uint64_t>(metrics.bytesRead.value_or(0)),
-        metrics.readingTime.value_or(Microseconds(0)).count(),
-        metrics.clusterWorkingTime.value_or(Milliseconds(0)).count(),
-        nanosecondsToInt64(metrics.cpuNanos),
-        metrics.delinquentAcquisitions.value_or(0),
-        metrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
-        metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
-        metrics.numInterruptChecks.value_or(0),
-        metrics.overdueInterruptApproxMax.value_or(Milliseconds(0)).count(),
-        metrics.hasSortStage,
-        metrics.usedDisk,
-        metrics.fromMultiPlanner,
-        metrics.fromPlanCache.value_or(false),
-        metrics.planningTime.value_or(Microseconds(0)).count(),
-        metrics.cardinalityEstimationMethods,
-        static_cast<uint64_t>(metrics.nDocsSampled.value_or(0)),
-        static_cast<uint64_t>(metrics.nMatched.value_or(0)),
-        static_cast<uint64_t>(metrics.nUpserted.value_or(0)),
-        static_cast<uint64_t>(metrics.nModified.value_or(0)),
-        static_cast<uint64_t>(metrics.ndeleted.value_or(0)),
-        static_cast<uint64_t>(metrics.ninserted.value_or(0)),
-        static_cast<uint64_t>(metrics.nUpdateOps.value_or(0)),
-        static_cast<uint64_t>(metrics.nDeleteOps.value_or(0)),
-        metrics.totalTimeQueuedMicros.value_or(Microseconds(0)).count(),
-        static_cast<uint64_t>(metrics.totalAdmissions.value_or(0)),
-        metrics.wasLoadShed.value_or(false),
-        metrics.wasDeprioritized.value_or(false),
-        metrics.wasMarkedNonDeprioritizable.value_or(false),
-        metrics.peakTrackedMemBytes.value_or(0),
-        metrics.clusterPeakTrackedMemBytes.value_or(0)};
+        .queryExecMicros = microsecondsToUint64(metrics.executionTime),
+        .firstResponseExecMicros = static_cast<uint64_t>(firstResponseExecutionTime),
+        .docsReturned = static_cast<uint64_t>(metrics.nreturned.value_or(0)),
+        .keysExamined = static_cast<uint64_t>(metrics.keysExamined.value_or(0)),
+        .docsExamined = static_cast<uint64_t>(metrics.docsExamined.value_or(0)),
+        .bytesRead = static_cast<uint64_t>(metrics.bytesRead.value_or(0)),
+        .readTimeMicros = metrics.readingTime.value_or(Microseconds(0)).count(),
+        .workingTimeMillis = metrics.clusterWorkingTime.value_or(Milliseconds(0)).count(),
+        .cpuNanos = nanosecondsToInt64(metrics.cpuNanos),
+        .delinquentAcquisitions = metrics.delinquentAcquisitions.value_or(0),
+        .totalAcquisitionDelinquencyMillis =
+            metrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
+        .maxAcquisitionDelinquencyMillis =
+            metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
+        .numInterruptChecks = metrics.numInterruptChecks.value_or(0),
+        .overdueInterruptApproxMaxMillis =
+            metrics.overdueInterruptApproxMax.value_or(Milliseconds(0)).count(),
+        .hasSortStage = metrics.hasSortStage,
+        .usedDisk = metrics.usedDisk,
+        .fromMultiPlanner = metrics.fromMultiPlanner,
+        .fromPlanCache = metrics.fromPlanCache.value_or(false),
+        .planningTimeMicros = metrics.planningTime.value_or(Microseconds(0)).count(),
+        .cardinalityEstimationMethods = metrics.cardinalityEstimationMethods,
+        .nDocsSampled = static_cast<uint64_t>(metrics.nDocsSampled.value_or(0)),
+        .nMatched = static_cast<uint64_t>(metrics.nMatched.value_or(0)),
+        .nUpserted = static_cast<uint64_t>(metrics.nUpserted.value_or(0)),
+        .nModified = static_cast<uint64_t>(metrics.nModified.value_or(0)),
+        .nDeleted = static_cast<uint64_t>(metrics.ndeleted.value_or(0)),
+        .nInserted = static_cast<uint64_t>(metrics.ninserted.value_or(0)),
+        .nUpdateOps = static_cast<uint64_t>(metrics.nUpdateOps.value_or(0)),
+        .nDeleteOps = static_cast<uint64_t>(metrics.nDeleteOps.value_or(0)),
+        .keysInserted = static_cast<uint64_t>(metrics.keysInserted.value_or(0)),
+        .keysDeleted = static_cast<uint64_t>(metrics.keysDeleted.value_or(0)),
+        .totalTimeQueuedMicros = metrics.totalTimeQueuedMicros.value_or(Microseconds(0)).count(),
+        .totalAdmissions = static_cast<uint64_t>(metrics.totalAdmissions.value_or(0)),
+        .wasLoadShed = metrics.wasLoadShed.value_or(false),
+        .wasDeprioritized = metrics.wasDeprioritized.value_or(false),
+        .wasMarkedNonDeprioritizable = metrics.wasMarkedNonDeprioritizable.value_or(false),
+        .peakTrackedMemBytes = metrics.peakTrackedMemBytes.value_or(0),
+        .clusterPeakTrackedMemBytes = metrics.clusterPeakTrackedMemBytes.value_or(0)};
 
     return snapshot;
 }

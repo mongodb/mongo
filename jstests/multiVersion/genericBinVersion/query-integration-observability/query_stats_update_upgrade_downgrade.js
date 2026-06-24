@@ -108,6 +108,9 @@ function assertUpdateQueryStatsMetrics(entry) {
             nInserted: 0,
             nUpdateOps: 1,
             nDeleteOps: 0,
+            // The update touches the non-indexed field 'a', so no index keys are maintained.
+            keysInserted: 0,
+            keysDeleted: 0,
         },
     });
     assertExpectedResults({
