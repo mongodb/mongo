@@ -6,6 +6,7 @@
  * Requires featureFlagGetExecutorDeferredEngineChoice and SBE to be enabled.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, describe, it} from "jstests/libs/mochalite.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -18,6 +19,19 @@ assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB(jsTestName());
 if (!checkSbeRestrictedOrFullyEnabled(db)) {
     jsTest.log.info("Skipping test because SBE is disabled");
+    MongoRunner.stopMongod(conn);
+    quit();
+}
+
+// featureFlagSbeEqLookupUnwind is an IFR rollout flag that controls whether $lookup-$unwind runs
+// in SBE. disableUnreleasedIFRFlags disables it even though this test doesn't set it explicitly,
+// which would cause the queries to fall back to classic and prevent the lookupUnwind counters from
+// incrementing despite featureFlagGetExecutorDeferredEngineChoice being on.
+if (!FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwind")) {
+    jsTest.log.info(
+        "Skipping test because featureFlagSbeEqLookupUnwind is disabled " +
+            "(e.g. by disableUnreleasedIFRFlags).",
+    );
     MongoRunner.stopMongod(conn);
     quit();
 }
