@@ -83,9 +83,9 @@ public:
     // 'MethodTable' is a struct of function pointers that serves as the "method table" for
     // a ColumnOp.
     struct MethodTable {
-        using ProcessSingleFn = std::pair<TypeTags, Value> (*)(const ColumnOpFunctorData*,
-                                                               TypeTags,
-                                                               Value);
+        using ProcessSingleFn = value::TagValueOwned (*)(const ColumnOpFunctorData*,
+                                                         TypeTags,
+                                                         Value);
         using ProcessBatchFn =
             void (*)(const ColumnOpFunctorData*, TypeTags, const Value*, TypeTags*, Value*, size_t);
 
@@ -130,17 +130,11 @@ public:
     // callback.
     static_assert(std::is_same_v<FuncT2, std::monostate> || hasGeneralBatchFn);
 
-    static std::pair<TypeTags, Value> processSingleFn(const ColumnOpFunctorData* cofd,
-                                                      TypeTags tag,
-                                                      Value val) {
+    static value::TagValueOwned processSingleFn(const ColumnOpFunctorData* cofd,
+                                                TypeTags tag,
+                                                Value val) {
         const ColumnOpFunctor& cof = *static_cast<const ColumnOpFunctor*>(cofd);
-
-        auto&& result = cof.getSingleFn()(tag, val);
-        if constexpr (std::is_same_v<std::decay_t<decltype(result)>, value::TagValueOwned>) {
-            return result.releaseToRaw();
-        } else {
-            return result;
-        }
+        return cof.getSingleFn()(tag, val);
     }
 
     static void processBatchFn(const ColumnOpFunctorData* cofd,
@@ -155,7 +149,8 @@ public:
             cof.getBatchFn()(inTag, inVals, outTags, outVals, count);
         } else {
             for (size_t i = 0; i < count; ++i) {
-                std::tie(outTags[i], outVals[i]) = processSingleFn(cofd, inTag, inVals[i]);
+                std::tie(outTags[i], outVals[i]) =
+                    processSingleFn(cofd, inTag, inVals[i]).releaseToRaw();
             }
         }
     }
@@ -226,7 +221,7 @@ struct ColumnOp {
     ColumnOp(ColumnOpType opType, const ColumnOpFunctorData* cofd, const MethodTable& methodTable)
         : opType(opType), cofd(cofd), methodTable(methodTable) {}
 
-    std::pair<TypeTags, Value> processSingle(TypeTags tag, Value val) const {
+    value::TagValueOwned processSingle(TypeTags tag, Value val) const {
         return methodTable.processSingleFn(cofd, tag, val);
     }
 
@@ -253,7 +248,7 @@ struct ColumnOp {
             }
             if (chunkSize == 1) {
                 std::tie(outTags[index], outVals[index]) =
-                    processSingle(inTags[index], inVals[index]);
+                    processSingle(inTags[index], inVals[index]).releaseToRaw();
             } else {
                 processBatch(
                     inTags[index], &inVals[index], &outTags[index], &outVals[index], chunkSize);

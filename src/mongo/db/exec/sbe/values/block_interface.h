@@ -435,7 +435,7 @@ public:
     }
 
     std::unique_ptr<ValueBlock> map(const ColumnOp& op) override {
-        auto [tag, val] = op.processSingle(_tag, _val);
+        auto [tag, val] = op.processSingle(_tag, _val).releaseToRaw();
         return std::make_unique<MonoBlock>(_count, tag, val);
     }
 

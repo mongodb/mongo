@@ -92,15 +92,13 @@ std::unique_ptr<ValueBlock> ValueBlock::mapMonotonicFastPath(const ColumnOp& op)
         auto [ubTag, ubVal] = tryUpperBound();
 
         if (lbTag == ubTag && lbTag != value::TypeTags::Nothing) {
-            auto [lbResTag, lbResVal] = op.processSingle(lbTag, lbVal);
-            ValueGuard minGuard(lbResTag, lbResVal);
-            auto [ubResTag, ubResVal] = op.processSingle(ubTag, ubVal);
-            ValueGuard maxGuard(ubResTag, ubResVal);
+            auto minOwned = op.processSingle(lbTag, lbVal);
+            auto maxOwned = op.processSingle(ubTag, ubVal);
 
-            auto [cmpTag, cmpVal] = value::compareValue(lbResTag, lbResVal, ubResTag, ubResVal);
+            auto [cmpTag, cmpVal] = value::compareValue(
+                minOwned.tag(), minOwned.value(), maxOwned.tag(), maxOwned.value());
             if (cmpTag == value::TypeTags::NumberInt32 && cmpVal == 0) {
-                // The MonoBlock constructor assumes ownership of lbResVal
-                auto [resTag, resVal] = copyValue(lbResTag, lbResVal);
+                auto [resTag, resVal] = minOwned.releaseToRaw();
                 return std::make_unique<MonoBlock>(count(), resTag, resVal);
             }
         }
@@ -260,7 +258,8 @@ std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::map(const ColumnOp& op
     size_t numVals = _vals.size();
     if (numVals == 0) {
         // The block has only Nothing values.
-        auto [resultTag, resultValue] = op.processSingle(value::TypeTags::Nothing, 0);
+        auto [resultTag, resultValue] =
+            op.processSingle(value::TypeTags::Nothing, 0).releaseToRaw();
         return std::make_unique<value::MonoBlock>(blockSize, resultTag, resultValue);
     }
 
@@ -278,8 +277,7 @@ std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::map(const ColumnOp& op
     }
 
     // If the block is not dense, we have to get the result for Nothing input(s).
-    auto [nullTag, nullVal] = op.processSingle(value::TypeTags::Nothing, 0);
-    ValueGuard nullGuard(nullTag, nullVal);
+    auto nullOwned = op.processSingle(value::TypeTags::Nothing, 0);
 
     // Then, insert it in the proper places.
     std::vector<TypeTags> mergedTags(blockSize, TypeTags::Nothing);
@@ -292,7 +290,7 @@ std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::map(const ColumnOp& op
             mergedVals[i] = vals[valIdx];
             valIdx++;
         } else {
-            std::tie(mergedTags[i], mergedVals[i]) = sbe::value::copyValue(nullTag, nullVal);
+            std::tie(mergedTags[i], mergedVals[i]) = nullOwned.copy().releaseToRaw();
         }
     }
     blockGuard.reset();
@@ -566,11 +564,11 @@ template value::TagValueView DoubleBlock::at(size_t idx);
 template value::TagValueView BoolBlock::at(size_t idx);
 
 void HeterogeneousBlock::push_back(TypeTags t, Value v) {
-    ValueGuard guard(t, v);
+    TagValueOwned owned{t, v};
 
     _vals.push_back(v);
     _tags.push_back(t);
 
-    guard.reset();
+    owned.disown();
 }
 }  // namespace mongo::sbe::value
