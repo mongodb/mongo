@@ -116,8 +116,13 @@ enum class ExpressionDisabledReason {
  *
  * This is the most general REGISTER_EXPRESSION* macro, which all others should delegate to.
  */
-#define REGISTER_EXPRESSION_CONDITIONALLY(                                                      \
-    key, parser, allowedWithApiStrict, allowedClientType, featureFlag, ...)                     \
+#define REGISTER_EXPRESSION_CONDITIONALLY(key,                                                  \
+                                          parser,                                               \
+                                          allowedWithApiStrict,                                 \
+                                          allowedClientType,                                    \
+                                          featureFlag,                                          \
+                                          shouldOmitDiagnosticInformation,                      \
+                                          ...)                                                  \
     MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                   \
                               ("BeginExpressionRegistration"),                                  \
                               ("EndExpressionRegistration"))                                    \
@@ -136,8 +141,12 @@ enum class ExpressionDisabledReason {
                                           : ExpressionDisabledReason::testCommandsDisabled));   \
             return;                                                                             \
         }                                                                                       \
-        Expression::registerExpression(                                                         \
-            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (featureFlag));    \
+        Expression::registerExpression("$" #key,                                                \
+                                       (parser),                                                \
+                                       (allowedWithApiStrict),                                  \
+                                       (allowedClientType),                                     \
+                                       (featureFlag),                                           \
+                                       (shouldOmitDiagnosticInformation));                      \
     }
 
 /**
@@ -149,12 +158,29 @@ enum class ExpressionDisabledReason {
  * An expression registered this way can be used in any featureCompatibilityVersion and will be
  * considered part of the stable API.
  */
-#define REGISTER_STABLE_EXPRESSION(key, parser)                      \
-    REGISTER_EXPRESSION_CONDITIONALLY(key,                           \
-                                      parser,                        \
-                                      AllowedWithApiStrict::kAlways, \
-                                      AllowedWithClientType::kAny,   \
-                                      nullptr, /* featureFlag */     \
+#define REGISTER_STABLE_EXPRESSION(key, parser)                                      \
+    REGISTER_EXPRESSION_CONDITIONALLY(key,                                           \
+                                      parser,                                        \
+                                      AllowedWithApiStrict::kAlways,                 \
+                                      AllowedWithClientType::kAny,                   \
+                                      nullptr, /* featureFlag */                     \
+                                      false,   /* shouldOmitDiagnosticInformation */ \
+                                      true)
+
+/**
+ * Like REGISTER_STABLE_EXPRESSION, but suppresses the
+ * metrics.operatorCounters.expressions.$KEY serverStatus leaf.
+ *
+ * Currently used by $_internalFleEq and $_internalFleBetween. For feature-flag-gated
+ * expressions use REGISTER_EXPRESSION_WITH_FEATURE_FLAG_NO_METRICS (SERVER-114172).
+ */
+#define REGISTER_STABLE_EXPRESSION_NO_METRICS(key, parser)                           \
+    REGISTER_EXPRESSION_CONDITIONALLY(key,                                           \
+                                      parser,                                        \
+                                      AllowedWithApiStrict::kAlways,                 \
+                                      AllowedWithClientType::kAny,                   \
+                                      nullptr, /* featureFlag */                     \
+                                      true,    /* shouldOmitDiagnosticInformation */ \
                                       true)
 
 /**
@@ -178,10 +204,29 @@ enum class ExpressionDisabledReason {
  * parser and enforce the 'sometimes' behavior during that invocation. No extra validation will be
  * done here.
  */
-#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                         \
-    key, parser, allowedWithApiStrict, allowedClientType, featureFlag) \
-    REGISTER_EXPRESSION_CONDITIONALLY(                                 \
-        key, parser, allowedWithApiStrict, allowedClientType, featureFlag, true)
+#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                                     \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag)             \
+    REGISTER_EXPRESSION_CONDITIONALLY(key,                                         \
+                                      parser,                                      \
+                                      allowedWithApiStrict,                        \
+                                      allowedClientType,                           \
+                                      featureFlag,                                 \
+                                      false, /* shouldOmitDiagnosticInformation */ \
+                                      true)
+
+/**
+ * Like REGISTER_EXPRESSION_WITH_FEATURE_FLAG, but suppresses the
+ * metrics.operatorCounters.expressions.$KEY serverStatus leaf (SERVER-114172).
+ */
+#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG_NO_METRICS(                         \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag)            \
+    REGISTER_EXPRESSION_CONDITIONALLY(key,                                        \
+                                      parser,                                     \
+                                      allowedWithApiStrict,                       \
+                                      allowedClientType,                          \
+                                      featureFlag,                                \
+                                      true, /* shouldOmitDiagnosticInformation */ \
+                                      true)
 
 /**
  * Registers a Parser only if test commands are enabled. Use this if your expression is only used
@@ -189,13 +234,14 @@ enum class ExpressionDisabledReason {
  * should be tied to a permanent FCV (see 'featureFlagBlender'). If the expression does not require
  * a feature flag, a 'nullptr' should be passed.
  */
-#define REGISTER_TEST_EXPRESSION(                                      \
-    key, parser, allowedWithApiStrict, allowedClientType, featureFlag) \
-    REGISTER_EXPRESSION_CONDITIONALLY(key,                             \
-                                      parser,                          \
-                                      allowedWithApiStrict,            \
-                                      allowedClientType,               \
-                                      featureFlag,                     \
+#define REGISTER_TEST_EXPRESSION(                                                  \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag)             \
+    REGISTER_EXPRESSION_CONDITIONALLY(key,                                         \
+                                      parser,                                      \
+                                      allowedWithApiStrict,                        \
+                                      allowedClientType,                           \
+                                      featureFlag,                                 \
+                                      false, /* shouldOmitDiagnosticInformation */ \
                                       getTestCommandsEnabled())
 
 class MONGO_MOD_PUBLIC Expression : public RefCountable {
@@ -363,7 +409,8 @@ public:
                                    Parser parser,
                                    AllowedWithApiStrict allowedWithApiStrict,
                                    AllowedWithClientType allowedWithClientType,
-                                   FeatureFlag* featureFlag);
+                                   FeatureFlag* featureFlag,
+                                   bool shouldOmitDiagnosticInformation = false);
 
     /**
      * Register an expression name as disabled to later improve the error message via
