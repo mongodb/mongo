@@ -356,7 +356,6 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             if (_doc.getPhase() == Phase::kUnset &&
                 _request.getValidationLevel() == ValidationLevelEnum::constraint) {
                 // Only scan on the first execution.
-                // TODO SERVER-125951: skip scan if collection is already at constraint level.
                 uassertStatusOK(noDocumentsViolatingValidator(opCtx,
                                                               _collInfo->nsForTargeting,
                                                               PlacementConcern::kPretendUnsharded,

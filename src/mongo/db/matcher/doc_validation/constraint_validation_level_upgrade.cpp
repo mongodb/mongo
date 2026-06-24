@@ -121,6 +121,12 @@ Status noDocumentsViolatingValidator(OperationContext* opCtx,
         if (!coll.exists()) {
             return Status::OK();
         }
+        // If the collection is already at 'constraint' level, all existing documents must already
+        // conform — the constraint level rejects any write that would violate the validator — so
+        // there is nothing to scan.
+        if (coll.getCollectionPtr()->getValidationLevel() == ValidationLevelEnum::constraint) {
+            return Status::OK();
+        }
         validator = coll.getCollectionPtr()->getCollectionOptions().validator.getOwned();
     }
 

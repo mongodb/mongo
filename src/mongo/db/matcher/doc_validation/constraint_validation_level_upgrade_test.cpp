@@ -231,6 +231,26 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageTruncatesLargeValidator
     ASSERT_STRING_OMITS(status.reason(), longTitle);
 }
 
+TEST_F(ConstraintValidationLevelUpgradeTest, SkipsScanWhenCollectionAlreadyAtConstraintLevel) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
+    auto* opCtx = operationContext();
+
+    CollectionOptions options;
+    options.validator = fromjson("{a: {$exists: true}}");
+    options.validationLevel = ValidationLevelEnum::constraint;
+    options.uuid = UUID::gen();
+    ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
+
+    // The injected runAgg must not be called when the collection is already at constraint level.
+    ASSERT_OK(noDocumentsViolatingValidator(
+        opCtx,
+        nss,
+        PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+        [&](AggregateCommandRequest&, const PrivilegeVector&) -> StatusWith<BSONObj> {
+            MONGO_UNREACHABLE;
+        }));
+}
+
 TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageContainsValidatorAndCollectionHint) {
     const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     auto* opCtx = operationContext();

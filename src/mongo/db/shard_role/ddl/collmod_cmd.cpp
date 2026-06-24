@@ -189,8 +189,6 @@ public:
                                     VersionContext::getDecoration(opCtx), fcvSnapshot));
                 }
                 if (cmd.getValidationLevel() == ValidationLevelEnum::constraint) {
-                    // TODO SERVER-125951: skip scan if collection is already at
-                    // 'constraint' level, since existing docs must already conform.
                     auto& oss = OperationShardingState::get(opCtx);
                     uassertStatusOK(noDocumentsViolatingValidator(
                         opCtx,
