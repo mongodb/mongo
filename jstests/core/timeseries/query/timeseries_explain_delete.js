@@ -10,9 +10,8 @@
  */
 
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getExecutionStages, getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getExecutionStages, getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
@@ -62,8 +61,30 @@ function testDeleteExplain({
     // Verifies the TS_MODIFY stage in the plan.
     const innerDeleteCommand = {delete: coll.getName(), deletes: [singleDeleteOp]};
     const deleteExplainPlanCommand = {explain: innerDeleteCommand, verbosity: "queryPlanner"};
-    let explain = assert.commandWorked(testDB.runCommand(deleteExplainPlanCommand));
-    const deleteStage = getPlanStage(explain.queryPlanner.winningPlan, expectedDeleteStageName);
+
+    let explain;
+    // Accepting to eventually get the expected results since in a scenario where we have more than 1 mongos, the
+    // one in charge may have stale routing information and we're ok to wait for it to refresh.
+    assert.soon(
+        () => {
+            explain = testDB.runCommand(deleteExplainPlanCommand);
+            if (explain.ok) {
+                return true;
+            }
+            assert.contains(
+                explain.code,
+                // TODO: SERVER-114324 is responsible for fixing NamespaceNotSharded being reported
+                // TODO: SERVER-74197 is responsible for fixing StaleConfig being reported
+                [ErrorCodes.StaleConfig, ErrorCodes.NamespaceNotSharded],
+                `Unexpected error while running explain: ${tojson(explain)}`,
+            );
+            return false;
+        },
+        () => `Expected success in running explain ${tojson(explain)}`,
+    );
+
+    let winningPlan = getWinningPlanFromExplain(explain);
+    const deleteStage = getPlanStage(winningPlan, expectedDeleteStageName);
     assert.neq(null, deleteStage, `${expectedDeleteStageName} stage not found in the plan: ${tojson(explain)}`);
     if (expectedDeleteStageName === "TS_MODIFY") {
         assert.eq(expectedOpType, deleteStage.opType, `TS_MODIFY opType is wrong: ${tojson(deleteStage)}`);
@@ -78,19 +99,35 @@ function testDeleteExplain({
             `TS_MODIFY residualFilter is wrong: ${tojson(deleteStage)}`,
         );
     } else {
-        const collScanStage = getPlanStage(explain.queryPlanner.winningPlan, "COLLSCAN");
+        const collScanStage = getPlanStage(winningPlan, "COLLSCAN");
         assert.neq(null, collScanStage, `COLLSCAN stage not found in the plan: ${tojson(explain)}`);
         assert.eq(expectedBucketFilter, collScanStage.filter, `COLLSCAN filter is wrong: ${tojson(collScanStage)}`);
     }
 
     if (expectedUsedIndexName) {
-        const ixscanStage = getPlanStage(explain.queryPlanner.winningPlan, "IXSCAN");
+        const ixscanStage = getPlanStage(winningPlan, "IXSCAN");
         assert.eq(expectedUsedIndexName, ixscanStage.indexName, `Wrong index used: ${tojson(ixscanStage)}`);
     }
 
     // Verifies the TS_MODIFY stage in the execution stats.
     const deleteExplainStatsCommand = {explain: innerDeleteCommand, verbosity: "executionStats"};
-    explain = assert.commandWorked(testDB.runCommand(deleteExplainStatsCommand));
+    assert.soon(
+        () => {
+            explain = testDB.runCommand(deleteExplainStatsCommand);
+            if (explain.ok) {
+                return true;
+            }
+            assert.contains(
+                explain.code,
+                // TODO: SERVER-114324 is responsible for fixing NamespaceNotSharded being reported
+                // TODO: SERVER-74197 is responsible for fixing StaleConfig being reported
+                [ErrorCodes.StaleConfig, ErrorCodes.NamespaceNotSharded],
+                `Unexpected error while running explain: ${tojson(explain)}`,
+            );
+            return false;
+        },
+        () => `Expected success in running explain ${tojson(explain)}`,
+    );
     const execStages = getExecutionStages(explain);
     assert.gt(execStages.length, 0, `No execution stages found: ${tojson(explain)}`);
     assert.eq(
@@ -101,16 +138,20 @@ function testDeleteExplain({
     if (expectedDeleteStageName === "TS_MODIFY") {
         assert.eq(
             expectedNumDeleted,
-            execStages[0].nMeasurementsDeleted,
-            `Got wrong nMeasurementsDeleted: ${tojson(execStages[0])}`,
+            execStages.reduce((accumulator, current) => accumulator + current.nMeasurementsDeleted, 0),
+            `Got wrong nMeasurementsDeleted: ${tojson(explain)}`,
         );
         assert.eq(
             expectedNumUnpacked,
-            execStages[0].nBucketsUnpacked,
-            `Got wrong nBucketsUnpacked: ${tojson(execStages[0])}`,
+            execStages.reduce((accumulator, current) => accumulator + current.nBucketsUnpacked, 0),
+            `Got wrong nBucketsUnpacked: ${tojson(explain)}`,
         );
     } else {
-        assert.eq(expectedNumDeleted, execStages[0].nWouldDelete, `Got wrong nWouldDelete: ${tojson(execStages[0])}`);
+        assert.eq(
+            expectedNumDeleted,
+            execStages.reduce((accumulator, current) => accumulator + current.nWouldDelete, 0),
+            `Got wrong nWouldDelete: ${tojson(explain)}`,
+        );
     }
 
     assert.sameMembers(docs, coll.find().toArray(), "Explain command must not touch documents in the collection");
