@@ -2520,9 +2520,11 @@ class RunPlugin(PluginInterface):
         evergreen_options.add_argument(
             "--enableEvergreenApiTestSelection",
             dest="enable_evergreen_api_test_selection",
-            action=argparse.BooleanOptionalAction,
+            type=lambda v: v.lower() == "true",
+            metavar="{true,false}",
             default=None,
-            help="Enable test selection using the Evergreen API",
+            help="Enable (true) or disable (false) test selection using the Evergreen CLI,"
+            " overriding the Evergreen project configuration.",
         )
 
         benchmark_options = parser.add_argument_group(

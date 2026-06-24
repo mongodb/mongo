@@ -269,7 +269,7 @@ class TestLocalCommandLine(unittest.TestCase):
                 "--variantName=some_variant",
                 "--versionId=some_version_id",
                 "--storageEngine=my_storage_engine",
-                "--enableEvergreenApiTestSelection",
+                "--enableEvergreenApiTestSelection=true",
             ]
         )
 
@@ -398,6 +398,18 @@ class TestParseArgs(unittest.TestCase):
             ],
         )
         self.assertEqual(args["suite_files"], "my_suite1")
+
+    def test_enable_tss_true_parses_to_bool(self):
+        _, args = parse(["run", "--suites=my_suite", "--enableEvergreenApiTestSelection=true"])
+        self.assertIs(args["enable_evergreen_api_test_selection"], True)
+
+    def test_enable_tss_false_parses_to_bool(self):
+        _, args = parse(["run", "--suites=my_suite", "--enableEvergreenApiTestSelection=false"])
+        self.assertIs(args["enable_evergreen_api_test_selection"], False)
+
+    def test_enable_tss_absent_defaults_to_none(self):
+        _, args = parse(["run", "--suites=my_suite"])
+        self.assertIsNone(args["enable_evergreen_api_test_selection"])
 
 
 class TestParseCommandLine(unittest.TestCase):

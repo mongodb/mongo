@@ -86,8 +86,8 @@ build_ci_flags() {
         ci_flags+=" --test_arg=--skipSymbolization"
     fi
 
-    if [ "${enable_evergreen_api_test_selection}" = "true" ]; then
-        ci_flags+=" --test_arg=--enableEvergreenApiTestSelection"
+    if [ -n "${enable_evergreen_api_test_selection}" ]; then
+        ci_flags+=" --test_arg=--enableEvergreenApiTestSelection=${enable_evergreen_api_test_selection}"
     fi
 
     # Split comma separated list of strategies

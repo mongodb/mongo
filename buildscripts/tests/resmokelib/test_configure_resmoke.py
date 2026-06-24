@@ -70,7 +70,7 @@ class TestApplyEvergreenTssProjectConfig(unittest.TestCase):
 
     def test_cli_flag_explicitly_enabled_skips_project_config(self):
         self._set_evergreen_context()
-        _config.ENABLE_EVERGREEN_API_TEST_SELECTION = True  # --enableEvergreenApiTestSelection
+        _config.ENABLE_EVERGREEN_API_TEST_SELECTION = True  # --enableEvergreenApiTestSelection=true
 
         with patch.object(under_test.evergreen_conn, "get_evergreen_api") as mock_api:
             under_test._apply_evergreen_tss_project_config()
@@ -80,7 +80,9 @@ class TestApplyEvergreenTssProjectConfig(unittest.TestCase):
 
     def test_cli_flag_explicitly_disabled_skips_project_config(self):
         self._set_evergreen_context()
-        _config.ENABLE_EVERGREEN_API_TEST_SELECTION = False  # --no-enableEvergreenApiTestSelection
+        _config.ENABLE_EVERGREEN_API_TEST_SELECTION = (
+            False  # --enableEvergreenApiTestSelection=false
+        )
 
         with patch.object(under_test.evergreen_conn, "get_evergreen_api") as mock_api:
             under_test._apply_evergreen_tss_project_config()
