@@ -1412,13 +1412,9 @@ TEST(BSONValidateColumn, BSONColumnBadExtendedSelector) {
     BSONBinData columnData = cb.finalize();
     ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
     /* Change extended selector on a 7 selector to 14 */
-    uint64_t block = ConstDataView((char*)columnData.data + 31) /* first 7 selector */
-                         .read<LittleEndian<uint64_t>>();
-    ASSERT_EQ(7, block & 15);  // Check that we found a 7 selector
-    block = (14 << 4)          /* 14 extended selector */
-        + 7                    /* original selector */
-        + ((block >> 8) << 8); /* original blocks */
-    memcpy((char*)columnData.data + 31, &block, sizeof(block));
+    uint8_t* selectorByte = (uint8_t*)columnData.data + 31; /* first 7 selector */
+    ASSERT_EQ(7, *selectorByte & 15);                       // Check that we found a 7 selector
+    *selectorByte = (14 << 4) | 7; /* 14 extended selector, original selector 7 */
     ASSERT_NOT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
 }
 
