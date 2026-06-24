@@ -96,7 +96,13 @@ GraphLookUpStage::GraphLookUpStage(
       _queue(pExpCtx.get(), &_memoryUsageTracker),
       _visitedDocuments(pExpCtx.get(), &_memoryUsageTracker, "VisitedDocumentsMap"),
       _visitedFromValues(pExpCtx.get(), &_memoryUsageTracker, "VisitedFromValuesSet"),
-      _cache(pExpCtx->getValueComparator()) {}
+      _cache(pExpCtx->getValueComparator()) {
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        _expressionEvalCtx.tracker = &_memoryUsageTracker["expressionEvaluation"];
+    }
+    _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
+}
 
 GraphLookUpStage::~GraphLookUpStage() {
     const SpillingStats& stats = _stats.spillingStats;
@@ -132,6 +138,10 @@ Document GraphLookUpStage::getExplainOutput(const query_shape::SerializationOpti
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
         out["peakTrackedMemBytes"] =
             opts.serializeLiteral(static_cast<long long>(_stats.maxMemoryUsageBytes));
+        if (_expressionEvalCtx.tracker) {
+            out["expressionEvaluationPeakMemoryBytes"] = opts.serializeLiteral(
+                static_cast<long long>(_expressionEvalCtx.tracker->peakTrackedMemoryBytes()));
+        }
     }
 
     return out.freeze();
@@ -274,7 +284,8 @@ void GraphLookUpStage::performSearch() {
     // Make sure _input is set before calling performSearch().
     invariant(_input);
 
-    Value startingValue = _params.startWith->evaluate(*_input, &pExpCtx->variables);
+    Value startingValue =
+        _params.startWith->evaluate(*_input, &pExpCtx->variables, _expressionEvalCtx);
 
     // If _startWith evaluates to an array, treat each value as a separate starting point.
     _queue.clear();

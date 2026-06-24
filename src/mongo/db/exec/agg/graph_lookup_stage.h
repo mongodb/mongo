@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/pipeline/spilling/spillable_deque.h"
@@ -214,6 +215,11 @@ private:
 
     // Tracks memory for _queue and _visited. _cache is allowed to use the remaining memory limit.
     MemoryUsageTracker _memoryUsageTracker;
+
+    // Pre-built context passed to every startWith expression evaluation. tracker points to a
+    // sub-tracker of _memoryUsageTracker ("expressionEvaluation") when expression memory tracking
+    // is enabled, and is null otherwise. Both fields are stable for the stage's lifetime.
+    EvaluationContext _expressionEvalCtx;
 
     // Only used during the breadth-first search, tracks the set of values on the current frontier.
     // Contains documents with two fields: kFrontierValueField with a lookup value and kDepthField

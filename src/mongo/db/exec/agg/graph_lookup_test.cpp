@@ -32,8 +32,14 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/graph_lookup_mock_mongo_interface.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -864,6 +870,148 @@ TEST_F(GraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfConnectFromField
     ASSERT(arrayContains(expCtx, resultsArray, Value(target2)));
     ASSERT(!arrayContains(expCtx, resultsArray, Value(soloDoc)));
     ASSERT(graphLookupStage->getNext().isEOF());
+}
+
+// Expression that records whether it was called with a non-null tracker, and what the limit was.
+// Passed directly as the startWith expression so no REGISTER_TEST_EXPRESSION is needed.
+class MemoryTrackerObservingExpression final : public Expression {
+public:
+    static inline int gEvaluations = 0;
+    static inline int gEvaluationsWithTracker = 0;
+    static inline int64_t gLastTrackerMaxBytes = -1;
+    static inline StringData gLastStageName;
+    static void resetObservations() {
+        gEvaluations = 0;
+        gEvaluationsWithTracker = 0;
+        gLastTrackerMaxBytes = -1;
+        gLastStageName = StringData{};
+    }
+
+    explicit MemoryTrackerObservingExpression(ExpressionContext* expCtx) : Expression(expCtx) {}
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement,
+                                                  const VariablesParseState&) {
+        return make_intrusive<MemoryTrackerObservingExpression>(expCtx);
+    }
+
+    Value evaluate(const Document&, Variables*, const EvaluationContext& ctx) const final {
+        ++gEvaluations;
+        if (ctx.tracker != nullptr) {
+            ++gEvaluationsWithTracker;
+            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
+        }
+        gLastStageName = ctx.stageName;
+        return Value(0);
+    }
+
+    Value serialize(const query_shape::SerializationOptions&) const final {
+        return Value(Document{});
+    }
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<MemoryTrackerObservingExpression>(&expCtx);
+    }
+    void acceptVisitor(ExpressionMutableVisitor*) final {
+        MONGO_UNREACHABLE;
+    }
+    void acceptVisitor(ExpressionConstVisitor*) const final {
+        MONGO_UNREACHABLE;
+    }
+};
+
+struct GraphLookupTestResult {
+    exec::agg::StagePtr stage;
+    boost::intrusive_ptr<exec::agg::MockStage> source;  // must outlive stage
+};
+
+GraphLookupTestResult runGraphLookupWithObservingStartWith(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    MemoryTrackerObservingExpression::resetObservations();
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<GraphLookUpMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+
+    auto observerExpr = make_intrusive<MemoryTrackerObservingExpression>(expCtx.get());
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(expCtx,
+                                                           fromNs,
+                                                           "results",
+                                                           "from",
+                                                           "to",
+                                                           std::move(observerExpr),
+                                                           boost::none,
+                                                           boost::none,
+                                                           boost::none,
+                                                           boost::none);
+    auto inputMock = exec::agg::MockStage::createForTest({Document{{"_id", 0}}}, expCtx);
+    auto stage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
+    while (stage->getNext().isAdvanced()) {
+    }
+    return {stage, inputMock};
+}
+
+TEST_F(GraphLookUpTest, ThreadsMemoryTrackerWhenEvaluatingStartWithExpression) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    runGraphLookupWithObservingStartWith(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluations, 1);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
+}
+
+TEST_F(GraphLookUpTest, DoesNotThreadMemoryTrackerWhenExpressionMemoryTrackingDisabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", false);
+
+    runGraphLookupWithObservingStartWith(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluations, 1);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
+}
+
+TEST_F(GraphLookUpTest, MemoryTrackerLimitReflectsKnob) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+    const long long customLimit = 2 * 1024 * 1024;
+    unittest::ServerParameterGuard knobGuard("internalDocumentSourceGraphLookupMaxMemoryBytes",
+                                             customLimit);
+
+    runGraphLookupWithObservingStartWith(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+}
+
+TEST_F(GraphLookUpTest, StageNameIsSetInEvaluationContext) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    auto [stage, source] = runGraphLookupWithObservingStartWith(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastStageName, "$graphLookup");
+}
+
+TEST_F(GraphLookUpTest, ExplainOutputIncludesExpressionEvaluationPeakMemoryBytesWhenEnabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    auto [stage, source] = runGraphLookupWithObservingStartWith(getExpCtx());
+
+    auto explain = stage->getExplainOutput();
+    ASSERT(!explain.getNestedField("expressionEvaluationPeakMemoryBytes").missing());
+}
+
+TEST_F(GraphLookUpTest, ExplainOutputOmitsExpressionEvaluationPeakMemoryBytesWhenDisabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", false);
+
+    auto [stage, source] = runGraphLookupWithObservingStartWith(getExpCtx());
+
+    auto explain = stage->getExplainOutput();
+    ASSERT(explain.getNestedField("expressionEvaluationPeakMemoryBytes").missing());
 }
 
 }  // namespace

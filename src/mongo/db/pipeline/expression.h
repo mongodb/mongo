@@ -92,6 +92,12 @@ struct EvaluationContext {
      * sub-expressions, so the entire evaluation is accounted against the same tracker.
      */
     SimpleMemoryUsageTracker* tracker = nullptr;
+
+    /**
+     * Name of the aggregation stage that initiated this evaluation. Included in
+     * ExceededMemoryLimit error messages so users can identify which stage caused the failure.
+     */
+    StringData stageName;
 };
 
 /**

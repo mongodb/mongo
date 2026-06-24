@@ -90,6 +90,11 @@ BucketAutoStage::BucketAutoStage(
     for (auto&& accumulationStatement : *_accumulatedFields) {
         _accumulatedFieldMemoryTrackers.push_back(&_memoryTracker[accumulationStatement.fieldName]);
     }
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        _expressionEvalCtx.tracker = &_memoryTracker["expressionEvaluation"];
+    }
+    _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
 }
 
 SortOptions BucketAutoStage::makeSortOptions() {
@@ -142,7 +147,7 @@ Value BucketAutoStage::extractKey(const Document& doc) {
         return Value(BSONNULL);
     }
 
-    Value key = _groupByExpression->evaluate(doc, &pExpCtx->variables);
+    Value key = _groupByExpression->evaluate(doc, &pExpCtx->variables, _expressionEvalCtx);
 
     if (_granularityRounder) {
         uassert(40258,
@@ -178,8 +183,8 @@ void BucketAutoStage::addDocumentToBucket(const std::pair<Value, Document>& entr
         if (accumulator.needsInput()) {
             bool isPositionalAccum = isPositionalAccumulator(accumulator.getOpName());
             auto value = entry.second.getField(AccumulatorN::kFieldNameOutput);
-            auto evaluated = (*_accumulatedFields)[k].expr.argument->evaluate(value.getDocument(),
-                                                                              &pExpCtx->variables);
+            auto evaluated = (*_accumulatedFields)[k].expr.argument->evaluate(
+                value.getDocument(), &pExpCtx->variables, _expressionEvalCtx);
 
             auto prevMemUsage = accumulator.getMemUsage();
             if (isPositionalAccum) {
@@ -274,8 +279,8 @@ boost::optional<BucketAutoStage::Bucket> BucketAutoStage::populateNextBucket() {
     // the group key, but in $bucketAuto there is no single group key per bucket.
     Document emptyDoc;
     for (size_t k = 0; k < _accumulatedFields->size(); ++k) {
-        Value initializerValue =
-            (*_accumulatedFields)[k].expr.initializer->evaluate(emptyDoc, &pExpCtx->variables);
+        Value initializerValue = (*_accumulatedFields)[k].expr.initializer->evaluate(
+            emptyDoc, &pExpCtx->variables, _expressionEvalCtx);
         AccumulatorState& accumulator = *currentBucket._accums[k];
         accumulator.startNewGroup(initializerValue);
         _accumulatedFieldMemoryTrackers[k]->add(accumulator.getMemUsage());
@@ -449,8 +454,11 @@ Document BucketAutoStage::getExplainOutput(const query_shape::SerializationOptio
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
         out["peakTrackedMemBytes"] =
             opts.serializeLiteral(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
+        if (_expressionEvalCtx.tracker) {
+            out["expressionEvaluationPeakMemoryBytes"] = opts.serializeLiteral(
+                static_cast<long long>(_expressionEvalCtx.tracker->peakTrackedMemoryBytes()));
+        }
     }
-
 
     return out.freeze();
 }

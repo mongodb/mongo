@@ -33,6 +33,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/granularity_rounder.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -166,6 +167,11 @@ private:
     DocumentSourceBucketAutoStats _stats;
 
     MemoryUsageTracker _memoryTracker;
+
+    // Pre-built context passed to every expression evaluation. tracker points to a sub-tracker of
+    // _memoryTracker ("expressionEvaluation") when expression memory tracking is enabled, and is
+    // null otherwise. Both fields are stable for the stage's lifetime.
+    EvaluationContext _expressionEvalCtx;
 };
 
 }  // namespace mongo::exec::agg
