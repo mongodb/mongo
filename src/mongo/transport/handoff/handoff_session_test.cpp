@@ -719,6 +719,26 @@ TEST_F(HandoffSessionHandoffMessageValidationTest, SourceMessageRejectsHandoffWi
     ASSERT_EQ(sourceHandoffWithFd(session, msg).getStatus().code(), ErrorCodes::ProtocolError);
 }
 
+/** OP_HANDOFF with an undersized BSON body is rejected. */
+TEST_F(HandoffSessionHandoffMessageValidationTest, SourceMessageRejectsHandoffUndersizedBSONBody) {
+    auto session = makeSession();
+
+    // The minimum BSON object size is 5, so if we send an OP_HANDOFF message with a body of size 4,
+    // it will fail to validate.
+    const int totalLen = sizeof(MSGHEADER::Value) + 4;
+    auto buf = SharedBuffer::allocate(totalLen);
+    MsgData::View view(buf.get());
+    view.setLen(totalLen);
+    view.setId(nextMessageId());
+    view.setResponseToMsgId(0);
+    view.setOperation(dbSessionHandoff);
+    const char justTheInt32SizePrefixSayingSize4[] = {'\x04', '\0', '\0', '\0'};
+    std::ranges::copy(justTheInt32SizePrefixSayingSize4, view.data());
+    Message msg(std::move(buf));
+
+    ASSERT_EQ(sourceHandoffWithFd(session, msg).getStatus().code(), ErrorCodes::ProtocolError);
+}
+
 /**
  * OP_HANDOFF with a BSON length prefix larger than the message body is rejected cleanly, without
  * reading past the buffer. This guards against heap over-reads and is meaningful under ASAN.

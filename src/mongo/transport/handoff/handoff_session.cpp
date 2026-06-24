@@ -97,7 +97,7 @@ std::string toString(HandoffSession::State state) {
 
 HostAndPort toHostAndPort(const SockAddr& sa) {
     // For a unix domain socket, `SockAddr::getPort` will return zero, but the convention with
-    // `HostAndPort` is that unix domain sockets have port -1, which is interpreted as `HostAndPort`
+    // `HostAndPort` is that unix domain sockets have port -1, which is interpreted by `HostAndPort`
     // to mean "no port."
     return HostAndPort(sa.getAddr(), sa.getType() == AF_UNIX ? -1 : sa.getPort());
 }
@@ -429,13 +429,8 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
     }
 
     // The message body contains a BSON document with the serialized s2n state.
-    int bodyDataLen = msg.singleData().dataLen();
-    // The minimum possible BSON object size is 5 bytes.
-    if (bodyDataLen < 5) {
-        return Status(ErrorCodes::ProtocolError, "OP_HANDOFF message body is empty");
-    }
-
-    if (auto status = validateBSON(msg.singleData().data(), bodyDataLen); !status.isOK()) {
+    if (auto status = validateBSON(msg.singleData().data(), msg.singleData().dataLen());
+        !status.isOK()) {
         return Status(ErrorCodes::ProtocolError,
                       fmt::format("OP_HANDOFF message has invalid BSON: {}", status.reason()));
     }
@@ -448,9 +443,7 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
         return e.toStatus();
     }
 
-    ConstDataRange s2nState = handoffMsg.getS2nState();
-    int s2nStateLen = static_cast<int>(s2nState.length());
-    const char* s2nStateData = s2nState.data();
+    const ConstDataRange s2nState = handoffMsg.getS2nState();
 
     // Create, configure, and deserialize the s2n server connection.
     _s2nConnection = s2n_connection_new(S2N_SERVER);
@@ -470,8 +463,8 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
 
     status = s2nCheck(s2n_connection_deserialize(
                           _s2nConnection,
-                          const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(s2nStateData)),
-                          static_cast<uint32_t>(s2nStateLen)),
+                          const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(s2nState.data())),
+                          static_cast<uint32_t>(s2nState.length())),
                       "s2n_connection_deserialize"_sd);
     if (!status.isOK()) {
         return status;
@@ -529,27 +522,26 @@ Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
     // _isShutDown, it must hold a lock on _mutex.
     ConnectionEndpoints newEndpoints;
 
-    struct sockaddr_storage peerAddr;
-    socklen_t peerLen = sizeof(peerAddr);
-    if (_posix.getpeername(clientFd, reinterpret_cast<struct sockaddr*>(&peerAddr), &peerLen) !=
-        0) {
+    sockaddr_storage peerStorage;
+    socklen_t peerLen = sizeof(peerStorage);
+    const auto peerAddr = reinterpret_cast<sockaddr*>(&peerStorage);
+    if (_posix.getpeername(clientFd, peerAddr, &peerLen) != 0) {
         return Status(ErrorCodes::SocketException,
                       fmt::format("getpeername failed after TLS handoff: {}",
                                   errorMessage(lastSocketError())));
     }
-    SockAddr sa(reinterpret_cast<struct sockaddr*>(&peerAddr), peerLen);
-    newEndpoints.remote = toHostAndPort(sa);
+    const SockAddr peerSa(peerAddr, peerLen);
+    newEndpoints.remote = toHostAndPort(peerSa);
 
-    struct sockaddr_storage localAddr;
-    socklen_t localLen = sizeof(localAddr);
-    SockAddr localSa;
-    if (_posix.getsockname(clientFd, reinterpret_cast<struct sockaddr*>(&localAddr), &localLen) !=
-        0) {
+    sockaddr_storage localStorage;
+    socklen_t localLen = sizeof(localStorage);
+    const auto localAddr = reinterpret_cast<sockaddr*>(&localStorage);
+    if (_posix.getsockname(clientFd, localAddr, &localLen) != 0) {
         return Status(ErrorCodes::SocketException,
                       fmt::format("getsockname failed after TLS handoff: {}",
                                   errorMessage(lastSocketError())));
     }
-    localSa = SockAddr(reinterpret_cast<struct sockaddr*>(&localAddr), localLen);
+    const SockAddr localSa(localAddr, localLen);
     newEndpoints.local = toHostAndPort(localSa);
 
     {
@@ -562,7 +554,7 @@ Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
     if (_proxiedSource && clientSourceAuthenticationRestrictionMode == "origin"_sd) {
         _restrictionEnvironment = RestrictionEnvironment(_proxiedSource->address, localSa);
     } else {
-        _restrictionEnvironment = RestrictionEnvironment(sa, localSa);
+        _restrictionEnvironment = RestrictionEnvironment(peerSa, localSa);
     }
 
     return Status::OK();
