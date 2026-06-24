@@ -266,6 +266,9 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         // long-running variants (e.g. TSAN); _readResumeMetrics only needs the latest snapshot.
         const rstOptions = {
             nodes: nodeConfigs,
+            // Use a large oplog so the restart failover modes can't lose a node due to it being too
+            // stale to find a sync source.
+            oplogSize: 1024,
             nodeOptions: {setParameter: {...otelParams, openTelemetryExportIntervalMillis: 5000}},
         };
 
