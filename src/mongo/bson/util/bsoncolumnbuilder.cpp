@@ -320,8 +320,6 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
 
     _validateNoNestedBSONColumn(elem);
 
-    bsoncolumn::assertNotCodeWScope(type);
-
     if ((type != Object && type != Array) || elem.Obj().isEmpty()) {
         // Flush previous sub-object compression when non-object is appended
         if (_is.mode != Mode::kRegular) {

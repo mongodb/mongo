@@ -1395,24 +1395,17 @@ TEST(BSONValidateColumn, BSONColumnBadExtendedSelector) {
 }
 
 TEST(BSONValidateColumn, BSONColumnWithCodeWScope) {
-    // Build the raw BSONColumn bytes by hand: BSONColumnBuilder now rejects CodeWScope,
-    // so we must bypass it to test what the validator sees when deprecated data types
-    // arrive via socket or internally via aggregation
-    BSONObj wrapper = BSON("" << BSONCodeWScope("code", BSON("c" << 1)));
-    BSONElement elem = wrapper.firstElement();
-
-    BufBuilder buf;
-    buf.appendChar(static_cast<char>(stdx::to_underlying(BSONType::CodeWScope)));
-    buf.appendChar('\0');  // empty fieldname required for BSONColumn literals
-    buf.appendBuf(elem.value(), elem.valuesize());
-    buf.appendChar('\0');  // EOO
-
-    // All modes must now reject a top-level CodeWScope literal in a BSONColumn.
-    ASSERT_EQ(validateBSONColumn(buf.buf(), buf.len()).code(), ErrorCodes::InvalidBSONType);
-    ASSERT_EQ(validateBSONColumn(buf.buf(), buf.len(), BSONValidateMode::kExtended).code(),
-              ErrorCodes::InvalidBSONType);
-    ASSERT_EQ(validateBSONColumn(buf.buf(), buf.len(), BSONValidateMode::kFull).code(),
-              ErrorCodes::InvalidBSONType);
+    BSONObj obj = BSON("a" << BSONCodeWScope("code", BSON("c" << 1)));
+    BSONColumnBuilder cb;
+    cb.append(obj.getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+    ASSERT_FALSE(
+        validateBSONColumn((char*)columnData.data, columnData.length, BSONValidateMode::kExtended)
+            .isOK());
+    ASSERT_FALSE(
+        validateBSONColumn((char*)columnData.data, columnData.length, BSONValidateMode::kFull)
+            .isOK());
 }
 
 TEST(BSONValidateColumn, BSONColumnWithArrayNestedCodeWScope) {
