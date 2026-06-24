@@ -269,6 +269,7 @@ class TestLocalCommandLine(unittest.TestCase):
                 "--variantName=some_variant",
                 "--versionId=some_version_id",
                 "--storageEngine=my_storage_engine",
+                "--enableEvergreenApiTestSelection",
             ]
         )
 

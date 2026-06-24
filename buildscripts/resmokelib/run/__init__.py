@@ -1934,13 +1934,6 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
-            "--enableEvergreenApiTestSelection",
-            dest="enable_evergreen_api_test_selection",
-            action="store_true",
-            help="Enable test selection using the Evergreen API",
-        )
-
-        parser.add_argument(
             "--evergreenTestSelectionStrategy",
             dest="test_selection_strategies_array",
             action="append",
@@ -2522,6 +2515,14 @@ class RunPlugin(PluginInterface):
             "--projectConfigPath",
             dest="evg_project_config_path",
             help="Sets the path to evergreen project configuration yaml.",
+        )
+
+        evergreen_options.add_argument(
+            "--enableEvergreenApiTestSelection",
+            dest="enable_evergreen_api_test_selection",
+            action=argparse.BooleanOptionalAction,
+            default=None,
+            help="Enable test selection using the Evergreen API",
         )
 
         benchmark_options = parser.add_argument_group(

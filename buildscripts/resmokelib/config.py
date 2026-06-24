@@ -147,7 +147,7 @@ DEFAULTS = {
     "majority_read_concern": "on",
     "modules": "default",
     "resmoke_modules_path": os.path.join("buildscripts", "resmokeconfig", "resmoke_modules.yml"),
-    "enable_evergreen_api_test_selection": False,
+    "enable_evergreen_api_test_selection": None,
     "test_selection_strategies_array": None,
     "mongo_version_file": None,
     "releases_file": None,
@@ -433,7 +433,7 @@ EXTERNAL_MODULE_SUITE_DIRS = []
 EXTERNAL_MODULE_MATRIX_SUITE_DIRS = []
 
 # if set, enables test selection using the Evergreen API
-ENABLE_EVERGREEN_API_TEST_SELECTION = False
+ENABLE_EVERGREEN_API_TEST_SELECTION = None
 
 # If set, requests Evergreen to use the specified test selection strategies.
 EVERGREEN_TEST_SELECTION_STRATEGY = None

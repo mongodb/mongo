@@ -21,6 +21,22 @@ py_test(
 )
 
 py_test(
+    name = "test_configure_resmoke",
+    srcs = [
+        "__init__.py",
+        "test_configure_resmoke.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:resmoke",
+        dependency(
+            "mock",
+            group = "testing",
+        ),
+    ],
+)
+
+py_test(
     name = "test_parser",
     srcs = [
         "__init__.py",

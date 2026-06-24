@@ -6,6 +6,7 @@ import configparser
 import datetime
 import glob
 import json
+import logging
 import os
 import os.path
 import platform
@@ -34,7 +35,7 @@ from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import multiversionsetupconstants, utils
 from buildscripts.resmokelib.generate_fuzz_config import mongo_fuzzer_configs
 from buildscripts.resmokelib.run import TestRunner
-from buildscripts.resmokelib.utils import autoloader
+from buildscripts.resmokelib.utils import autoloader, evergreen_conn
 from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
 from buildscripts.resmokelib.utils.file_span_exporter import FileSpanExporter
 from buildscripts.resmokelib.utils.otel_id_generator import ResmokeOtelIdGenerator
@@ -58,10 +59,34 @@ def validate_and_update_config(
 
     _validate_options(parser, args)
     _update_config_vars(parser, args, should_configure_otel)
+    _apply_evergreen_tss_project_config()
     _update_symbolizer_secrets()
     _validate_config(parser)
     _set_up_modules()
     _set_logging_config()
+
+
+def _apply_evergreen_tss_project_config():
+    """Override TSS enablement from Evergreen project config, unless it was explicitly set elsewhere."""
+    if not _config.EVERGREEN_TASK_ID or not _config.EVERGREEN_PROJECT_NAME:
+        return
+
+    if not _config.EVERGREEN_PATCH_BUILD:
+        return  # TSS only runs on patch builds; skip the API call on regular tasks
+
+    if _config.ENABLE_EVERGREEN_API_TEST_SELECTION is not None:
+        return  # Explicitly set (e.g. CLI flag or config file); it supersedes project config
+
+    try:
+        evg_api = evergreen_conn.get_evergreen_api()
+        project = evg_api.project_by_id(_config.EVERGREEN_PROJECT_NAME)
+        tss_config = project.json.get("test_selection")
+        if tss_config is not None:
+            _config.ENABLE_EVERGREEN_API_TEST_SELECTION = tss_config.get("allowed", False)
+    except Exception as ex:
+        logging.getLogger(__name__).warning(
+            "Could not fetch Evergreen project config for TSS: %s", ex
+        )
 
 
 def process_feature_flag_file(path: str) -> list[str]:
