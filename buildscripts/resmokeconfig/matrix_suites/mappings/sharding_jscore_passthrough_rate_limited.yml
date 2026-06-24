@@ -1,0 +1,19 @@
+# This suite runs the core jscore passthrough against a sharded cluster with unsharded collections
+# and a simulated rate limiter enabled to reject random requests. Unlike
+# sharded_collections_jscore_passthrough_rate_limited, collections are left unsharded on the primary
+# shard, so this passthrough covers the plain sharding_jscore_passthrough test set (which may include
+# tests excluded from the other rate-limited sharded suites). The purpose is to add coverage for the
+# retryability support in various process-internal clients. With a high maximum retry count, no
+# errors should bubble up to the driver.
+base_suite: sharding_jscore_passthrough_base
+overrides:
+  - "rate_limiter_with_auth.auth_shell_options"
+  - "rate_limiter_with_auth.auth_hooks_sharded"
+  - "rate_limiter_with_auth.fixture_with_auth_sharded"
+eval:
+  - "rate_limiter_with_auth.auth_eval"
+excludes:
+  - "rate_limiter_with_auth.auth_exclude_files"
+  - "rate_limiter_with_auth.auth_exclude_files_core_sharding"
+  - "rate_limiter_with_auth.auth_exclude_files_fle2"
+  - "rate_limiter_with_auth.auth_exclude_tags"

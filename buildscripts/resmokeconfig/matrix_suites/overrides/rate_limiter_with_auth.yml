@@ -55,18 +55,33 @@
     # Internal-client appNames that bypass the ingress rate limiter once authenticated.
     # Sourced from https://github.com/10gen/mongotune/blob/main/crates/mongotune-dynamic-rate-limiting-ingress/src/config.rs#L77-L119
     appNameExemptions: &appNameExemptions >
-      {"appNames":["MongoDB Internal Client",
-                  "NetworkInterfaceTL-ReplNetwork",
-                  "NetworkInterfaceTL-ReplCoordExternNetwork",
-                  "NetworkInterfaceTL-ReplNodeDbWorkerNetwork",
-                  "NetworkInterfaceTL-ReplicaSetMonitor-TaskExecutor",
-                  "NetworkInterfaceTL-HelloMe-TaskExecutor",
+      {"appNames":["OplogFetcher",
+                  "MongoDB Internal Client",
                   "NetworkInterfaceTL-AddShardCoordinator-TaskExecutor",
                   "NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork",
+                  "NetworkInterfaceTL-HelloMe-TaskExecutor",
+                  "NetworkInterfaceTL-Repl",
+                  "NetworkInterfaceTL-Reshard",
                   "NetworkInterfaceTL-StandaloneNetwork",
-                  "NetworkInterfaceTL-ShardingDDLCoordinatorNetwork",
+                  "NetworkInterfaceTL-ShardingCoordinatorNetwork",
+                  "NetworkInterfaceTL-Sharding-Fixed",
+                  "MongoDB Automation Agent",
+                  "mongotune",
+                  "mongot",
+                  "ReplCoordExtern",
                   "InitialSyncer",
+                  "Reshard",
                   "Rollback",
+                  "Cloner",
+                  "MongoDB Automation Agent",
+                  "MongoDB Monitoring Module",
+                  "MongoDB Backup Module",
+                  "MongoDB PIT Restore Module",
+                  "MongoDB CPS Module",
+                  "MongoDB CPS PIT Module",
+                  "MongoDB DB Check Module",
+                  "MongoDB Online Archive Module",
+                  "MongoDB Lifecycle Management Module",
                   "Resmoke-Admin",
                   "Resmoke-Hook"]}
 
@@ -294,5 +309,5 @@
       - uses_map_reduce_internal_merge_pipeline
       # Parallel shell spawns unauthenticated connections.
       - uses_parallel_shell
-      # TODO SERVER-128736: Crash when getMore retry runs after original opCtx is destroyed.
+      # TODO SERVER-129844: Crash when getMore retry runs after original opCtx is destroyed.
       - requires_getmore

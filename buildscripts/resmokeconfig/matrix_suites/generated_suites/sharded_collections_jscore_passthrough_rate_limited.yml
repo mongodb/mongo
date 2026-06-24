@@ -48,16 +48,23 @@ executor:
             activationProbability: 0.25
         featureFlagIngressRateLimiting: true
         ingressRequestRateLimiterApplicationExemptions:
-          "{\"appNames\":[\"MongoDB\
-          \ Internal Client\",\n            \"NetworkInterfaceTL-ReplNetwork\",\n\
-          \            \"NetworkInterfaceTL-ReplCoordExternNetwork\",\n          \
-          \  \"NetworkInterfaceTL-ReplNodeDbWorkerNetwork\",\n            \"NetworkInterfaceTL-ReplicaSetMonitor-TaskExecutor\"\
+          "{\"appNames\":[\"OplogFetcher\"\
+          ,\n            \"MongoDB Internal Client\",\n            \"NetworkInterfaceTL-AddShardCoordinator-TaskExecutor\"\
+          ,\n            \"NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork\"\
           ,\n            \"NetworkInterfaceTL-HelloMe-TaskExecutor\",\n          \
-          \  \"NetworkInterfaceTL-AddShardCoordinator-TaskExecutor\",\n          \
-          \  \"NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork\",\n        \
-          \    \"NetworkInterfaceTL-StandaloneNetwork\",\n            \"NetworkInterfaceTL-ShardingDDLCoordinatorNetwork\"\
-          ,\n            \"InitialSyncer\",\n            \"Rollback\",\n         \
-          \   \"Resmoke-Admin\",\n            \"Resmoke-Hook\"]}\n"
+          \  \"NetworkInterfaceTL-Repl\",\n            \"NetworkInterfaceTL-Reshard\"\
+          ,\n            \"NetworkInterfaceTL-StandaloneNetwork\",\n            \"\
+          NetworkInterfaceTL-ShardingCoordinatorNetwork\",\n            \"NetworkInterfaceTL-Sharding-Fixed\"\
+          ,\n            \"MongoDB Automation Agent\",\n            \"mongotune\"\
+          ,\n            \"mongot\",\n            \"ReplCoordExtern\",\n         \
+          \   \"InitialSyncer\",\n            \"Reshard\",\n            \"Rollback\"\
+          ,\n            \"Cloner\",\n            \"MongoDB Automation Agent\",\n\
+          \            \"MongoDB Monitoring Module\",\n            \"MongoDB Backup\
+          \ Module\",\n            \"MongoDB PIT Restore Module\",\n            \"\
+          MongoDB CPS Module\",\n            \"MongoDB CPS PIT Module\",\n       \
+          \     \"MongoDB DB Check Module\",\n            \"MongoDB Online Archive\
+          \ Module\",\n            \"MongoDB Lifecycle Management Module\",\n    \
+          \        \"Resmoke-Admin\",\n            \"Resmoke-Hook\"]}\n"
         ingressRequestRateLimiterEnabled: true
         internalQueryStatsErrorsAreCommandFatal: true
         internalQueryStatsRateLimit: -1
