@@ -301,7 +301,7 @@ void BackfillCoordinator::markForBackfillAndScheduleIfNeeded(
     auto memoryLimitBytes = internalQuerySettingsBackfillMemoryLimitBytes.load();
     const std::size_t itemSize = sizeof(queryShapeHash) + queryInstance.objsize();
     if (itemSize >= memoryLimitBytes - _state->memoryUsedBytes) {
-        auto prevState = consume_inlock();
+        auto prevState = consume(lock);
         _state->taskScheduled = true;  // The original task is still scheduled.
         auto executor = makeExecutor(opCtx);
         ExecutorFuture<void>{executor}
@@ -467,10 +467,10 @@ void BackfillCoordinator::cancel() {
 
 std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume() {
     std::lock_guard lk{_mutex};
-    return consume_inlock();
+    return consume(lk);
 }
 
-std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume_inlock() {
+std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume(WithLock) {
     auto&& tracker = QuerySettingsUsageTracker::get(getGlobalServiceContext());
     tracker.setBackfillMemoryUsedBytes(0);
     tracker.setBufferedRepresentativeQueries(0);

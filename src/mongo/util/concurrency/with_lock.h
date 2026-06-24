@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -70,28 +71,22 @@ namespace MONGO_MOD_PUB mongo {
  */
 struct WithLock {
     template <typename LatchT>
-    WithLock(std::lock_guard<LatchT> const&) {}
+    explicit(false) WithLock(const std::lock_guard<LatchT>&) {}
 
     template <typename LatchT>
-    WithLock(std::unique_lock<LatchT> const& lock) {
+    explicit(false) WithLock(const std::unique_lock<LatchT>& lock) {
         invariant(lock.owns_lock());
     }
 
-    // Add constructors from any other lock types here.
+    template <bool lockExclusively>
+    explicit(false) WithLock(const WriteRarelyRWMutex::ScopedLock<lockExclusively>& lock) {
+        invariant(lock.owns_lock());
+    }
 
-    // Pass by value is OK.
-    WithLock(WithLock const&) = default;
-    WithLock(WithLock&&) noexcept = default;
+    WithLock(const WithLock&) = default;
+    WithLock(WithLock&&) = default;
 
-    // No assigning WithLocks.
-    void operator=(WithLock const&) = delete;
-    void operator=(WithLock&&) = delete;
-
-    // No moving a lock_guard<> or unique_lock<> in.
-    template <typename Mutex>
-    WithLock(std::lock_guard<std::mutex>&&) = delete;
-    template <typename Mutex>
-    WithLock(std::unique_lock<std::mutex>&&) = delete;
+    void operator=(const WithLock&) = delete;
 
     /*
      * Produces a WithLock without benefit of any actual lock, for use in cases where a lock is not

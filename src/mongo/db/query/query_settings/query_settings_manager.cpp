@@ -226,17 +226,17 @@ VersionedQueryShapeConfigurations QuerySettingsManager::getVersionedQueryShapeCo
         versionedQueryShapeConfigurationsIt->second.queryShapeHashToQueryShapeConfigurationsMap;
     return VersionedQueryShapeConfigurations{
         .queryShapeHashToQueryShapeConfigurationsMap = queryShapeHashToQueryShapeConfigurationsMap,
-        .clusterParameterTime = getClusterParameterTime_inlock(tenantId)};
+        .clusterParameterTime = getClusterParameterTime(readLock, tenantId)};
 }
 
 LogicalTime QuerySettingsManager::getClusterParameterTime(
     const boost::optional<TenantId>& tenantId) const {
     auto readLock = _mutex.readLock();
-    return getClusterParameterTime_inlock(tenantId);
+    return getClusterParameterTime(readLock, tenantId);
 }
 
-LogicalTime QuerySettingsManager::getClusterParameterTime_inlock(
-    const boost::optional<TenantId>& tenantId) const {
+LogicalTime QuerySettingsManager::getClusterParameterTime(
+    WithLock, const boost::optional<TenantId>& tenantId) const {
     auto versionedQueryShapeConfigurationsIt =
         _tenantIdToVersionedQueryShapeConfigurationsMap.find(tenantId);
     if (versionedQueryShapeConfigurationsIt ==

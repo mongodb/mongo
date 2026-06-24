@@ -36,6 +36,7 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/rwmutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
 #include <vector>
@@ -173,7 +174,7 @@ private:
         VersionedQueryShapeConfigurations&& newQueryShapeConfigurations,
         const boost::optional<TenantId>& tenantId);
 
-    LogicalTime getClusterParameterTime_inlock(const boost::optional<TenantId>& tenantId) const;
+    LogicalTime getClusterParameterTime(WithLock, const boost::optional<TenantId>& tenantId) const;
 
     mutable WriteRarelyRWMutex _mutex;
     absl::flat_hash_map<boost::optional<TenantId>, VersionedQueryShapeConfigurations>

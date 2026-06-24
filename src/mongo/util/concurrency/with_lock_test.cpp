@@ -31,6 +31,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <mutex>
@@ -50,11 +51,11 @@ struct Beerp {
         _blerp(lk, i);
     }
     int bleep(char n) {
-        std::lock_guard<std::mutex> lk(_m);
+        std::lock_guard lk(_m);
         return _bloop(lk, n - '0');
     }
     int bleep(int i) {
-        std::unique_lock<std::mutex> lk(_m);
+        std::unique_lock lk(_m);
         return _bloop(lk, i);
     }
 
@@ -75,8 +76,48 @@ TEST(WithLockTest, OverloadSet) {
     ASSERT_EQ(2, b.bleep(2));
 
     std::mutex m;
-    std::lock_guard<std::mutex> lk(m);
+    std::lock_guard lk(m);
     Beerp(lk, 3);
+}
+
+int withLock(WithLock, int i) {
+    return i;
+}
+
+TEST(WithLockTest, WriteRarelyRWMutex) {
+    WriteRarelyRWMutex m;
+    ASSERT_EQ(withLock(m.writeLock(), 1), 1);
+    ASSERT_EQ(withLock(m.readLock(), 2), 2);
+}
+
+int recursiveMoveWithLock(WithLock lk, int i) {
+    return withLock(std::move(lk), i);
+}
+
+int recursiveWithLock(WithLock lk, int i) {
+    return recursiveMoveWithLock(lk, i);
+}
+
+TEST(WithLockTest, RecursiveWithLock) {
+    std::mutex m;
+    ASSERT_EQ(recursiveWithLock(std::lock_guard(m), 1), 1);
+}
+
+constexpr std::string_view kDeathTestExpectedMessage = "lock.owns_lock()";
+
+DEATH_TEST(WithLockDeathTest, UnlockedUniqueLock, kDeathTestExpectedMessage) {
+    std::mutex m;
+    std::unique_lock lk(m);
+    lk.unlock();
+    [[maybe_unused]] WithLock withLock{lk};  // should fail with invariant
+}
+
+DEATH_TEST(WithLockDeathTest, MovedFromWriteRarelyRWMutex, kDeathTestExpectedMessage) {
+    WriteRarelyRWMutex m;
+    auto lk = m.writeLock();
+    // Steal the lock from lk to check the invariant.
+    auto lk2 = std::move(lk);
+    [[maybe_unused]] WithLock withLock{lk};  // should fail with invariant
 }
 
 }  // namespace

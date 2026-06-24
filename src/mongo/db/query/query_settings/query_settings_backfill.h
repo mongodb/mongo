@@ -33,6 +33,7 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -132,7 +133,7 @@ private:
      * Thread safe utillity to return the inner state and replace it with a new one.
      */
     std::unique_ptr<State> consume();
-    std::unique_ptr<State> consume_inlock();
+    std::unique_ptr<State> consume(WithLock);
 
     virtual std::shared_ptr<executor::TaskExecutor> makeExecutor(OperationContext* opCtx) = 0;
     virtual std::unique_ptr<async_rpc::Targeter> makeTargeter(OperationContext* opCtx) = 0;

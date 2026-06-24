@@ -168,9 +168,13 @@ public:
 
         ScopedLock(ScopedLock&& other) noexcept : _rwMutex(std::exchange(other._rwMutex, {})) {}
 
+        bool owns_lock() const {
+            return _rwMutex;
+        }
+
     private:
         ScopedLock() = default;
-        WriteRarelyRWMutex* _rwMutex;
+        WriteRarelyRWMutex* _rwMutex = nullptr;
     };
 
     using ReadLock = ScopedLock<false>;
