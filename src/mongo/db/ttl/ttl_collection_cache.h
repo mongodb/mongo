@@ -5,6 +5,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -62,7 +63,6 @@ public:
         ExpireAfterSecondsType _expireAfterSecondsType;
     };
 
-    // Caller is responsible for ensuring no duplicates are registered.
     void registerTTLInfo(UUID uuid, const Info& info);
     void deregisterTTLIndexByName(UUID uuid, const IndexName& indexName);
     void deregisterTTLClusteredIndex(UUID uuid);
@@ -80,9 +80,9 @@ public:
 
 private:
     /**
-     * Shared implementation for deregistering TTL infos.
+     * Shared implementation for deregistering TTL infos. Callers must hold '_ttlInfosLock'.
      */
-    void _deregisterTTLInfo(UUID uuid, const Info& info);
+    void _deregisterTTLInfo(WithLock, const UUID& uuid, const Info& info);
 
     std::mutex _ttlInfosLock;
     InfoMap _ttlInfos;
