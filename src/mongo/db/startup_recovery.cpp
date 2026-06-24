@@ -103,6 +103,7 @@
 #include "mongo/util/version/releases.h"
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -922,8 +923,6 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
 // Performs collection validation for all collections or one collection in a database.
 // Returns if all collections complete validation and if all collections are valid.
 OfflineValidateResults offlineValidateDb(OperationContext* opCtx, DatabaseName dbName) {
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    databaseHolder->openDb(opCtx, dbName);
     OfflineValidateResults offlineValidateResults;
     if (!gValidateCollectionName.empty()) {
         NamespaceString userNss = NamespaceStringUtil::deserialize(dbName, gValidateCollectionName);
@@ -960,22 +959,25 @@ OfflineValidateResults offlineValidate(OperationContext* opCtx) {
 
     OfflineValidateResults offlineValidateResults;
 
-    if (!gValidateDbName.empty()) {
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    const auto dbNames = std::invoke([opCtx]() -> std::vector<DatabaseName> {
+        if (gValidateDbName.empty()) {
+            return CollectionCatalog::get(opCtx)->getAllDbNames();
+        }
         const boost::optional<TenantId>& tenantId = boost::none;
-        auto userDbName = DatabaseNameUtil::deserialize(
+        return std::vector{DatabaseNameUtil::deserialize(
             tenantId,
             gValidateDbName.data(),
-            SerializationContext(SerializationContext::Source::Catalog));
-        offlineValidateResults = offlineValidateDb(opCtx, userDbName);
-
-    } else {
-        for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
-            const auto [isComplete, isValid] = offlineValidateDb(opCtx, dbName);
-            offlineValidateResults.allValidationComplete =
-                offlineValidateResults.allValidationComplete && isComplete;
-            offlineValidateResults.allResultsValid =
-                offlineValidateResults.allResultsValid && isValid;
-        }
+            SerializationContext(SerializationContext::Source::Catalog))};
+    });
+    for (const auto& dbName : dbNames) {
+        databaseHolder->openDb(opCtx, dbName);
+    }
+    for (const auto& dbName : dbNames) {
+        const auto [isComplete, isValid] = offlineValidateDb(opCtx, dbName);
+        offlineValidateResults.allValidationComplete =
+            offlineValidateResults.allValidationComplete && isComplete;
+        offlineValidateResults.allResultsValid = offlineValidateResults.allResultsValid && isValid;
     }
 
     if (offlineValidateResults.allResultsValid) {

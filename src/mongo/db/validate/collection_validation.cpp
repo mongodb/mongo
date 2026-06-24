@@ -894,13 +894,39 @@ Status validate(OperationContext* opCtx,
     // Repair mode cannot use ignore-prepare because it needs to be able to do writes, and there is
     // no danger of deadlock for this mode anyway since it is only used at startup (or in standalone
     // mode where prepared transactions are prohibited.)
-    auto oldPrepareConflictBehavior =
-        shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior();
-    ON_BLOCK_EXIT([&] {
-        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
-            oldPrepareConflictBehavior);
-    });
+    class SnapshotGuard {
+    public:
+        explicit SnapshotGuard(OperationContext* opCtx)
+            : _opCtx(opCtx),
+              _prepareConflictBehavior(
+                  shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior()) {
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+            _readSource = ru.getTimestampReadSource();
+            _readTimestamp = _readSource == RecoveryUnit::ReadSource::kProvided
+                ? ru.getPointInTimeReadTimestamp()
+                : boost::none;
+        }
+        ~SnapshotGuard() {
+            auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
+            ru.abandonSnapshot();
+            if (ru.getTimestampReadSource() != _readSource) {
+                ru.setTimestampReadSource(_readSource, _readTimestamp);
+            }
+            ru.setPrepareConflictBehavior(_prepareConflictBehavior);
+        }
+
+        PrepareConflictBehavior getPrepareConflictBehavior() const {
+            return _prepareConflictBehavior;
+        }
+
+    private:
+        OperationContext* _opCtx;
+        PrepareConflictBehavior _prepareConflictBehavior;
+        RecoveryUnit::ReadSource _readSource;
+        boost::optional<Timestamp> _readTimestamp;
+    };
+
+    SnapshotGuard snapshotGuard(opCtx);
 
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
@@ -920,7 +946,7 @@ Status validate(OperationContext* opCtx,
 
     if (validateState.fixErrors()) {
         // Note: cannot set PrepareConflictBehavior here, since the validate command with repair
-        // needs kIngnoreConflictsAllowWrites, but validate repair at startup cannot set that here
+        // needs kIgnoreConflictsAllowWrites, but validate repair at startup cannot set that here
         // due to an already active WriteUnitOfWork.  The prepare conflict behavior for validate
         // command with repair is set in the command code prior to this point.
         invariant(!validateState.isBackground());
@@ -931,7 +957,7 @@ Status validate(OperationContext* opCtx,
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
     } else {
         // isBackground().
-        invariant(oldPrepareConflictBehavior == PrepareConflictBehavior::kEnforce);
+        invariant(snapshotGuard.getPrepareConflictBehavior() == PrepareConflictBehavior::kEnforce);
     }
 
     if (!opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
