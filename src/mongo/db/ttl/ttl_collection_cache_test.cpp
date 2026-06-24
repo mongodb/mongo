@@ -133,6 +133,74 @@ TEST(TTLCollectionCacheTest, Basic) {
     EXPECT_EQ(infos.size(), 0U);
 }
 
+// Test that registering the same TTL index more than once does not create duplicate infos.
+// This guards against SERVER-129760, where repeatedly creating and dropping the same TTL index
+// caused the TTL job to run multiple times within a single cycle.
+TEST(TTLCollectionCacheTest, RegisterSameIndexTwiceDoesNotDuplicate) {
+    TTLCollectionCache cache;
+    EXPECT_EQ(cache.getTTLInfos().size(), 0);
+
+    auto uuid = UUID::gen();
+    auto infoInvalid = TTLCollectionCache::Info{
+        "collA_ttl_1", TTLCollectionCache::Info::ExpireAfterSecondsType::kInvalid};
+    auto infoInt = TTLCollectionCache::Info{
+        "collA_ttl_1", TTLCollectionCache::Info::ExpireAfterSecondsType::kInt};
+
+    cache.registerTTLInfo(uuid, infoInvalid);
+    // Re-registering the same index name replaces the existing info rather than duplicating it.
+    cache.registerTTLInfo(uuid, infoInt);
+
+    auto infos = cache.getTTLInfos();
+    EXPECT_EQ(infos.size(), 1U);
+    ASSERT_TRUE(infos.contains(uuid));
+    ASSERT_EQ(infos[uuid].size(), 1U);
+    EXPECT_EQ(infos[uuid][0].getIndexName(), "collA_ttl_1");
+    // The most recent registration's expireAfterSecondsType wins.
+    EXPECT_FALSE(infos[uuid][0].isExpireAfterSecondsInvalid());
+}
+
+// Test that registering a clustered TTL info more than once does not create duplicate infos.
+TEST(TTLCollectionCacheTest, RegisterSameClusteredIndexTwiceDoesNotDuplicate) {
+    TTLCollectionCache cache;
+    EXPECT_EQ(cache.getTTLInfos().size(), 0);
+
+    auto uuid = UUID::gen();
+    auto infoClustered = TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}};
+
+    cache.registerTTLInfo(uuid, infoClustered);
+    cache.registerTTLInfo(uuid, infoClustered);
+
+    auto infos = cache.getTTLInfos();
+    EXPECT_EQ(infos.size(), 1U);
+    ASSERT_TRUE(infos.contains(uuid));
+    ASSERT_EQ(infos[uuid].size(), 1U);
+    EXPECT_TRUE(infos[uuid][0].isClustered());
+}
+
+// Test that registering distinct TTL indexes on the same UUID keeps all of them.
+TEST(TTLCollectionCacheTest, RegisterDistinctIndexesKeepsAll) {
+    TTLCollectionCache cache;
+    EXPECT_EQ(cache.getTTLInfos().size(), 0);
+
+    auto uuid = UUID::gen();
+    auto infoIndex1 = TTLCollectionCache::Info{
+        "collA_ttl_1", TTLCollectionCache::Info::ExpireAfterSecondsType::kInt};
+    auto infoIndex2 = TTLCollectionCache::Info{
+        "collA_ttl_2", TTLCollectionCache::Info::ExpireAfterSecondsType::kInt};
+    auto infoClustered = TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}};
+
+    cache.registerTTLInfo(uuid, infoIndex1);
+    cache.registerTTLInfo(uuid, infoIndex2);
+    cache.registerTTLInfo(uuid, infoClustered);
+    // Re-registering an existing index should not affect the others.
+    cache.registerTTLInfo(uuid, infoIndex1);
+
+    auto infos = cache.getTTLInfos();
+    EXPECT_EQ(infos.size(), 1U);
+    ASSERT_TRUE(infos.contains(uuid));
+    ASSERT_EQ(infos[uuid].size(), 3U);
+}
+
 TEST(TTLCollectionCacheTest, DeregisterUntrackedUUIDDoesNotThrow) {
     TTLCollectionCache cache;
     EXPECT_EQ(cache.getTTLInfos().size(), 0);

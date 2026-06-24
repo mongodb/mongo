@@ -88,7 +88,6 @@ public:
         ExpireAfterSecondsType _expireAfterSecondsType;
     };
 
-    // Caller is responsible for ensuring no duplicates are registered.
     void registerTTLInfo(UUID uuid, const Info& info);
     void deregisterTTLIndexByName(UUID uuid, const IndexName& indexName);
     void deregisterTTLClusteredIndex(UUID uuid);
@@ -109,6 +108,7 @@ private:
      * Shared implementation for deregistering TTL infos.
      */
     void _deregisterTTLInfo(UUID uuid, const Info& info);
+    void _deregisterTTLInfo_inlock(UUID uuid, const Info& info);
 
     std::mutex _ttlInfosLock;
     InfoMap _ttlInfos;
