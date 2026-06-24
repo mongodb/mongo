@@ -89,6 +89,12 @@ public:
                   "StubPersistenceProvider::shouldUseReplicatedRecordIds() method not implemented");
     }
 
+    bool shouldUseClusteredCollectionOplogFastPath() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::shouldUseClusteredCollectionOplogFastPath() method not "
+                  "implemented");
+    }
+
     bool shouldUseReplicatedTruncates() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::shouldUseReplicatedTruncates() method not implemented");

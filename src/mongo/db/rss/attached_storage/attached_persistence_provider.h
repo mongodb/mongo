@@ -81,6 +81,12 @@ public:
     bool shouldUseReplicatedRecordIds() const override;
 
     /**
+     * Attached storage gates the clustered-on-_id oplog apply fast path behind the FCV-gated
+     * featureFlagClusteredCollectionOplogApplyFastPath, so the provider does not mandate it.
+     */
+    bool shouldUseClusteredCollectionOplogFastPath() const override;
+
+    /**
      * Attached storage uses unreplicated truncates.
      */
     bool shouldUseReplicatedTruncates() const override;

@@ -54,6 +54,13 @@ feature_flags:
         cpp_varname: gFeatureFlagRecordIdsReplicated
         default: false
         fcv_gated: true
+    featureFlagClusteredCollectionOplogApplyFastPath:
+        description: >-
+            Enable bypassing the query system on oplog application for clustered-on-_id
+            collections by deriving the RecordId directly from the _id field.
+        cpp_varname: gFeatureFlagClusteredCollectionOplogApplyFastPath
+        default: false
+        fcv_gated: true
     featureFlagStreams:
         description: "Enable support for streams"
         cpp_varname: gFeatureFlagStreams

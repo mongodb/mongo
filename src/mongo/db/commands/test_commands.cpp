@@ -416,6 +416,7 @@ public:
     BOOL_FIELD_BUILDER_FN(shouldDisableTransactionUpdateCoalescing)          \
     BOOL_FIELD_BUILDER_FN(shouldStepDownForShutdown)                         \
     BOOL_FIELD_BUILDER_FN(usesSchemaEpochs)                                  \
+    BOOL_FIELD_BUILDER_FN(shouldUseClusteredCollectionOplogFastPath)         \
     BOOL_FIELD_BUILDER_FN(shouldUseOplogWritesForFlowControlSampling)        \
     BOOL_FIELD_BUILDER_FN(shouldUseReplicatedCatalogIdentifiers)             \
     BOOL_FIELD_BUILDER_FN(shouldUseReplicatedFastCount)                      \

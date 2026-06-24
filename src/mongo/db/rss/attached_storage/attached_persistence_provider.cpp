@@ -99,6 +99,10 @@ bool AttachedPersistenceProvider::shouldUseReplicatedRecordIds() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::shouldUseClusteredCollectionOplogFastPath() const {
+    return false;
+}
+
 bool AttachedPersistenceProvider::shouldUseReplicatedTruncates() const {
     return false;
 }

@@ -66,6 +66,7 @@ namespace repl {
 // Forward declaration so we can call this under test. updateObjectByRid is defined
 // at namespace-scope inside oplog.cpp but isn't exposed via oplog.h.
 UpdateResult updateObjectByRid(OperationContext* opCtx,
+                               RecordId rid,
                                const OplogEntry& op,
                                CollectionAcquisition& coll,
                                OpCounters* opCounters,
@@ -875,6 +876,7 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
     // Without pre-validation, this will fail on hitting the bad BSON type 0x77. With validation,
     // we'll get an InvalidBSON status.
     ASSERT_THROWS_CODE(updateObjectByRid(_opCtx.get(),
+                                         rid,
                                          op,
                                          coll,
                                          &globalOpCounters(),

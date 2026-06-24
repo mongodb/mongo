@@ -64,6 +64,7 @@
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
@@ -106,6 +107,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -1735,6 +1737,7 @@ void logOplogConstraintViolation(OperationContext* opCtx,
 }
 
 UpdateResult updateObjectByRid(OperationContext* opCtx,
+                               RecordId rid,
                                const OplogEntry& op,
                                CollectionAcquisition& coll,
                                OpCounters* opCounters,
@@ -1772,8 +1775,6 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                 0ULL,  /* numMatched */
                 BSONObj::kEmptyObject /* upsertedObject */};
     }
-
-    auto rid = *op.getDurableReplOperation().getRecordId();
 
     auto cursor = collPtr.get()->getCursor(opCtx);
     boost::optional<Record> record = cursor->seekExact(rid);
@@ -1926,6 +1927,7 @@ UpdateResult updateObject(OperationContext* opCtx,
 }
 
 DeleteResult deleteObjectByRid(OperationContext* opCtx,
+                               RecordId rid,
                                const OplogEntry& op,
                                CollectionAcquisition& coll,
                                OpCounters* opCounters,
@@ -1956,7 +1958,6 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
     }
 
     DeleteResult result;
-    auto rid = *op.getDurableReplOperation().getRecordId();
 
     Snapshotted<BSONObj> preImage;
     bool foundPreImage = collPtr->findDoc(opCtx, rid, &preImage);
@@ -2089,6 +2090,78 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
         result.requestedPreImage = std::move(preImage.value());
     }
     return result;
+}
+
+// Computes the RecordId to operate on for the oplog apply update/delete fast path, or boost::none
+// if the operation must go through the query path.
+//
+// For collections clustered on _id, the RecordId is deterministically derivable from the _id field,
+// so we can bypass the query system on oplog application by deriving the RecordId and operating on
+// the record store directly, exactly as the recordIdsReplicated fast path does. This covers both
+// user clustered collections and time-series bucket collections (which are internally clustered on
+// _id). The result is identical to the query path.
+//
+// The fast path is enabled by default on persistence providers that derive RecordIds
+// deterministically across nodes, and otherwise gated behind an FCV-gated feature flag.
+//
+// A replicated RecordId from the oplog entry ('opRid') always wins. Otherwise, for an eligible
+// clustered collection, the RecordId is derived from _id. 'opRid' itself is never modified: it must
+// stay 'boost::none' for clustered collections (they are not recordIdsReplicated and their oplog
+// entries carry no "rid" field) so the consistency tassert in applyOperation_inlock holds.
+//
+// Upsert oplog entries are excluded. The fast path suppresses upsert (it sets
+// request.setUpsert(false)) and treats a missing record as fatal, but an upsert legitimately
+// targets a possibly-nonexistent document. Clustered collections can receive upsert update oplog
+// entries (e.g. config.transactions, whose updates are generated with upsert:true in
+// session_update_tracker.cpp), so those must keep going through the upsert-aware query path.
+// TODO SERVER-118695: once the by-rid path supports upsert requests, the fast path can handle these
+// entries instead of falling back to the query path.
+boost::optional<RecordId> computeEffectiveRid(OperationContext* opCtx,
+                                              const OplogEntry& op,
+                                              OpTypeEnum opType,
+                                              OplogApplication::Mode mode,
+                                              const CollectionPtr& collection,
+                                              const boost::optional<RecordId>& opRid) {
+    if (opRid.has_value()) {
+        return opRid;
+    }
+    if (!collection || mode == OplogApplication::Mode::kApplyOpsCmd ||
+        op.getUpsert().value_or(false) ||
+        (opType != OpTypeEnum::kUpdate && opType != OpTypeEnum::kDelete) ||
+        !clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
+        return boost::none;
+    }
+
+    const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    const bool clusteredFastPathEnabled = provider.shouldUseClusteredCollectionOplogFastPath() ||
+        gFeatureFlagClusteredCollectionOplogApplyFastPath.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (!clusteredFastPathEnabled) {
+        return boost::none;
+    }
+
+    // For updates the _id lives in 'o2'; for deletes it lives in 'o' (the query selector).
+    const BSONElement idElem = (opType == OpTypeEnum::kUpdate)
+        ? (op.getObject2() ? op.getObject2()->getField("_id"_sd) : BSONElement())
+        : op.getObject().getField("_id"_sd);
+    // A well formed update (o2) or delete (o) oplog entry always carries _id, so this is only true
+    // for a corrupt entry. In that case we skip deriving the rid and fall through to the query
+    // path. That path uasserts on the missing _id (NoSuchKey, logging the entry) at the
+    // update/delete gates, so the anomaly is still surfaced.
+    if (idElem.eoo()) {
+        return boost::none;
+    }
+
+    // Mirror record_id_helpers::keyForDoc(): apply the collection's default collation before
+    // building the RecordId KeyString, matching what the query path does. keyForElem() accepts any
+    // _id BSON type, so there is no separate malformed case.
+    if (const CollatorInterface* collator = collection->getDefaultCollator()) {
+        BSONObjBuilder keyBuilder;
+        CollationIndexKey::collationAwareIndexKeyAppend(idElem, collator, &keyBuilder);
+        return record_id_helpers::keyForElem(keyBuilder.done().firstElement());
+    }
+    return record_id_helpers::keyForElem(idElem);
 }
 
 // @return failure status if an update should have happened and the document DNE.
@@ -2239,6 +2312,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
     if (opRid.has_value()) {
         tassert(7835000, "The RecordId in an oplog entry cannot be Null", !opRid->isNull());
     }
+
+    // For clustered-on-_id collections we can derive the RecordId from _id and use the by-rid fast
+    // path instead of the query system. See computeEffectiveRid() for the full rationale and
+    // gating.
+    const boost::optional<RecordId> effectiveRid =
+        computeEffectiveRid(opCtx, op, opType, mode, collection, opRid);
 
     BSONObj o = op.getObject();
 
@@ -2625,7 +2704,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
             tassert(7834905,
                     "Oplog entries with upsert:true are not allowed to also contain a RecordId",
                     !upsertOplogEntry || !opRid.has_value());
-            const bool upsert = (alwaysUpsert && !opRid.has_value()) || upsertOplogEntry;
+            // When we have a deterministically derivable RecordId (either replicated or derived
+            // from _id for clustered collections), we never upconvert to an upsert: the fast path
+            // locates the document by RecordId and a missing document is treated as an error.
+            const bool upsert = (alwaysUpsert && !effectiveRid.has_value()) || upsertOplogEntry;
             auto request = UpdateRequest();
             request.setNamespaceString(requestNss);
             request.setQuery(updateCriteria);
@@ -2709,10 +2791,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
 
                     UpdateResult ur = [&]() {
-                        if (opRid.has_value()) {
+                        if (effectiveRid.has_value()) {
                             // TODO SERVER-118695 Support upsert requests
                             request.setUpsert(false);
                             return updateObjectByRid(opCtx,
+                                                     *effectiveRid,
                                                      op,
                                                      collectionAcquisition,
                                                      opCountersToUse,
@@ -2897,11 +2980,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         request.setReturnDeleted(true);
                     }
 
-                    // If an oplog entry has a recordId, we can bypass the query system and fetch
-                    // and delete the document using the storage and collection APIs.
+                    // If we have a RecordId (replicated, or derived from _id for clustered
+                    // collections), we can bypass the query system and fetch and delete the
+                    // document using the storage and collection APIs.
                     DeleteResult result;
-                    if (opRid.has_value()) {
+                    if (effectiveRid.has_value()) {
                         result = deleteObjectByRid(opCtx,
+                                                   *effectiveRid,
                                                    op,
                                                    collectionAcquisition,
                                                    opCountersToUse,

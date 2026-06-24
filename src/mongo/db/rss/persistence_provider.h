@@ -107,6 +107,14 @@ public:
     virtual bool shouldUseReplicatedRecordIds() const = 0;
 
     /**
+     * If true, oplog application for clustered-on-_id collections may bypass the query system by
+     * deriving the RecordId directly from the _id field. The RecordId of a clustered-on-_id
+     * collection is deterministically derivable from _id, so this produces an identical result to
+     * the query path while avoiding the executor.
+     */
+    virtual bool shouldUseClusteredCollectionOplogFastPath() const = 0;
+
+    /**
      * If true, expired documents should be removed using replicated truncates.
      */
     virtual bool shouldUseReplicatedTruncates() const = 0;
