@@ -280,5 +280,33 @@ TEST_F(ExpressionJavascriptTest,
     ASSERT_THROWS_CODE(
         expr->evaluate(Document{BSON("val" << 1)}, getVariables()), AssertionException, 31292);
 }
+
+// Test if the JsExecution being a decoration on the
+// OperationContext which can be re-used for multiple pipeline executions. The query code must not
+// assume that a single OperationContext is only ever associated with a single pipeline.
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitReusesOperationContextAcrossPipelines) {
+    internalQueryMaxJsEmitBytes.store(100 * 1024 * 1024);
+
+    // Share a single OperationContext across the ExpressionContext of each pipeline.
+    auto* opCtx = getExpCtxRaw()->getOperationContext();
+
+    auto evaluateJsEmit = [&](StringData func, const Document& root) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(opCtx));
+        expCtx->setMongoProcessInterface(std::make_shared<StandaloneProcessInterface>(nullptr));
+        auto bsonExpr = BSON("expr" << BSON("this" << "$$ROOT"
+                                                   << "eval" << func));
+        auto expr = ExpressionInternalJsEmit::parse(
+            expCtx.get(), bsonExpr.firstElement(), expCtx->variablesParseState);
+        return expr->evaluate(root, &expCtx->variables);
+    };
+
+    Value firstResult = evaluateJsEmit("function() {emit(this.a, 1); emit(this.b, 1)};",
+                                       Document{BSON("a" << 3 << "b" << 6)});
+    ASSERT_VALUE_EQ(firstResult,
+                    Value(BSON_ARRAY(BSON("k" << 3 << "v" << 1) << BSON("k" << 6 << "v" << 1))));
+
+    Value secondResult = evaluateJsEmit("function() {emit(this.c, 2)};", Document{BSON("c" << 9)});
+    ASSERT_VALUE_EQ(secondResult, Value(BSON_ARRAY(BSON("k" << 9 << "v" << 2))));
+}
 }  // namespace
 }  // namespace mongo
