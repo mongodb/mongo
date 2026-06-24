@@ -358,6 +358,7 @@ class PrefixReadTestCase {
 
     _buildWorkItems(events, clusterTimes) {
         const items = [];
+        let lastStartIdx = -1;
         for (const ts of clusterTimes) {
             const startIdx = events.findIndex(
                 (rec) => bsonWoCompare(rec.changeEvent.clusterTime, ts) >= 0,
@@ -366,6 +367,15 @@ class PrefixReadTestCase {
                 startIdx >= 0,
                 `No event found with clusterTime >= ${tojson(ts)}, but ts is within event range`,
             );
+
+            // Skip cluster times that map to the same event window as the previous item.
+            // Many consecutive oplog entries can fall between the same two change events
+            // (e.g. noop/metadata operations), producing identical resume windows. Testing
+            // one representative per unique startIdx is sufficient.
+            if (startIdx === lastStartIdx) {
+                continue;
+            }
+            lastStartIdx = startIdx;
 
             const expected = events
                 .slice(startIdx, startIdx + this._limit)
