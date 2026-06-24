@@ -220,7 +220,7 @@ public:
                             "Cannot create a collection with an encrypted field with query type "
                             "substringPreview unless featureFlagQETextSearchPreview is enabled",
                             !hasQueryType(cmd.getEncryptedFields().get(),
-                                          QueryTypeEnum::SubstringPreview));
+                                          QueryTypeEnum::SubstringPreviewDeprecated));
                     uassert(9783416,
                             "Cannot create a collection with an encrypted field with query type "
                             "suffixPreview unless featureFlagQETextSearchPreview is enabled",
@@ -264,6 +264,23 @@ public:
                             "type suffixPreview, as it is deprecated",
                             !hasQueryType(cmd.getEncryptedFields().get(),
                                           QueryTypeEnum::SuffixPreviewDeprecated));
+                }
+
+
+                if (!gFeatureFlagQESubstringSearch.isEnabledUseLastLTSFCVWhenUninitialized(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    uassert(
+                        12860000,
+                        "Cannot create a collection with an encrypted field with query type "
+                        "substring unless featureFlagQESubstringSearch is enabled (must be on FCV "
+                        ">= 9.0)",
+                        !hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::Substring));
+                } else {
+                    // TODO SERVER-129158 Block SubstringPreviewDeprecated here once libmongocrypt
+                    // supports the "substring" query type name.
+                    EncryptionInformationHelpers::checkSubstringParameterLimitsNotExceeded(
+                        cmd.getEncryptedFields().get());
                 }
             }
 

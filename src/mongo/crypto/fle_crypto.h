@@ -1069,6 +1069,24 @@ public:
     static void checkTagLimitsAndStorageNotExceeded(const EncryptedFieldConfig& ef);
 
     /**
+     * Limits for substring parameters.
+     */
+    static constexpr int32_t kSubstringLowerBoundMin = 2;
+    static constexpr int32_t kSubstringUpperBoundMax = 6;
+    static constexpr int32_t kSubstringMaxLengthMax = 50;
+
+    /**
+     * checkSubstringParameterLimitsNotExceeded throws if any of the following conditions are met:
+     *    1. There exists a substring field in EncryptedFieldConfig with strMinQueryLength
+     *       less than kSubstringLowerBoundMin.
+     *    2. There exists a substring field in EncryptedFieldConfig with strMaxQueryLength
+     *       greater than kSubstringUpperBoundMax.
+     *    3. There exists a substring field in EncryptedFieldConfig with strMaxLength
+     *       greater than kSubstringMaxLengthMax.
+     */
+    static void checkSubstringParameterLimitsNotExceeded(const EncryptedFieldConfig& ef);
+
+    /**
      * Soft limits for substringPreview parameters. These can be bypassed
      * through setParameter fleDisableSubstringPreviewParameterLimits.
      */

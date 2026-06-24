@@ -834,6 +834,29 @@ private:
             catalog::forEachCollectionFromAllDbs(opCtx, MODE_IS, checkForPrefixSuffixQueryType);
         }
 
+        if (gFeatureFlagQESubstringSearch.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
+            auto checkForSubstringQueryType = [](const Collection* collection) {
+                const auto& encryptedFields =
+                    collection->getCollectionOptions().encryptedFieldConfig;
+                if (encryptedFields &&
+                    (hasQueryTypeMatching(encryptedFields.get(), [](QueryTypeEnum qt) {
+                        return qt == QueryTypeEnum::Substring;
+                    }))) {
+                    uasserted(ErrorCodes::CannotDowngrade,
+                              fmt::format(
+                                  "Collection {} (UUID: {}) has an encrypted field with query type "
+                                  "substring, which "
+                                  "is not compatible with the target FCV. Please drop this "
+                                  "collection before trying to downgrade FCV.",
+                                  collection->ns().toStringForErrorMsg(),
+                                  collection->uuid().toString()));
+                }
+                return true;
+            };
+            catalog::forEachCollectionFromAllDbs(opCtx, MODE_IS, checkForSubstringQueryType);
+        }
+
         if (feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS
                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
             BSONObj shardIdentityBSON;

@@ -100,7 +100,7 @@ inline FLE2PayloadParams toFLE2PayloadParams(const FLE2InsertUpdatePayloadV2& iu
         r.expectedTypes.push_back(QueryTypeEnum::Range);
     } else if (const auto& tsts = iup.getTextSearchTokenSets(); tsts.has_value()) {
         if (!tsts->getSubstringTokenSets().empty()) {
-            r.expectedTypes.push_back(QueryTypeEnum::SubstringPreview);
+            r.expectedTypes.push_back(QueryTypeEnum::Substring);
         }
         if (!tsts->getSuffixTokenSets().empty()) {
             r.expectedTypes.push_back(QueryTypeEnum::Suffix);

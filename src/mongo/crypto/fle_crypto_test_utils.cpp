@@ -52,7 +52,8 @@ EncryptedFieldHelper::EncryptedFieldHelper(EncryptedField fieldSchema) {
             case QueryTypeEnum::Range:
                 _algorithm = Fle2AlgorithmInt::kRange;
                 break;
-            case QueryTypeEnum::SubstringPreview:
+            case QueryTypeEnum::SubstringPreviewDeprecated:
+            case QueryTypeEnum::Substring:
             case QueryTypeEnum::SuffixPreviewDeprecated:
             case QueryTypeEnum::Suffix:
             case QueryTypeEnum::PrefixPreviewDeprecated:
@@ -130,7 +131,8 @@ std::vector<char> EncryptedFieldHelper::generatePlaceholder(BSONElement value,
             auto lb = qtc.getStrMinQueryLength().value();
             auto ub = qtc.getStrMaxQueryLength().value();
             switch (qtc.getQueryType()) {
-                case QueryTypeEnum::SubstringPreview: {
+                case QueryTypeEnum::SubstringPreviewDeprecated:
+                case QueryTypeEnum::Substring: {
                     auto mlen = qtc.getStrMaxLength().value();
                     spec.setSubstringSpec(FLE2SubstringInsertSpec(mlen, ub, lb));
                     break;
@@ -260,7 +262,7 @@ EncryptedFieldHelper EncryptedFieldHelper::makeSubstring(std::string_view path,
                                                          boost::optional<int64_t> contention) {
     auto res =
         makeSuffix(path, type, indexKeyId, lb, ub, caseSensitive, diacriticSensitive, contention);
-    res._queries.back().setQueryType(QueryTypeEnum::SubstringPreview);
+    res._queries.back().setQueryType(QueryTypeEnum::Substring);
     res._queries.back().setStrMaxLength(mlen);
     res._ef.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{res._queries});
     return res;

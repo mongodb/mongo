@@ -497,7 +497,8 @@ void validateTextSearchIndex(BSONType fieldType,
             "strMinQueryLength cannot be greater than strMaxQueryLength",
             query.getStrMinQueryLength().value() <= query.getStrMaxQueryLength().value());
 
-    if (query.getQueryType() == QueryTypeEnum::SubstringPreview) {
+    if (query.getQueryType() == QueryTypeEnum::Substring ||
+        query.getQueryType() == QueryTypeEnum::SubstringPreviewDeprecated) {
         uassert(9783407,
                 fmt::format("strMaxLength parameter is required for {} query type of field {}",
                             qTypeStr,
@@ -634,7 +635,8 @@ void validateEncryptedField(const EncryptedField* field) {
                 validateRangeIndex(fieldType, field->getPath(), encryptedIndex);
                 break;
             }
-            case QueryTypeEnum::SubstringPreview:
+            case QueryTypeEnum::SubstringPreviewDeprecated:
+            case QueryTypeEnum::Substring:
             case QueryTypeEnum::SuffixPreviewDeprecated:
             case QueryTypeEnum::Suffix:
             case QueryTypeEnum::PrefixPreviewDeprecated:

@@ -88,6 +88,9 @@ structs:
             range:
                 type: exactInt64
                 default: 0
+            substring:
+                type: exactInt64
+                default: 0
             substringPreview:
                 type: exactInt64
                 default: 0

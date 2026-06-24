@@ -40,7 +40,7 @@
 
 namespace mongo {
 namespace {
-// Like hasQueryType, but a payload's token variant maps to the GA query type (Suffix/Prefix) while
+// Like hasQueryType, but a payload's token variant maps to the GA String query type while
 // a field created before the GA types existed carries the deprecated preview variant. Accept
 // either: getAndValidateSchema blocks deprecated schemas once featureFlagQEPrefixSuffixSearch is
 // on, so a deprecated type only reaches here while the field is still legitimately operational.
@@ -48,6 +48,9 @@ bool hasQueryTypeOrPreview(const EncryptedField& field, QueryTypeEnum t) {
     return hasQueryTypeMatching(field, [&](QueryTypeEnum qt) {
         if (qt == t) {
             return true;
+        }
+        if (t == QueryTypeEnum::Substring) {
+            return qt == QueryTypeEnum::SubstringPreviewDeprecated;
         }
         if (t == QueryTypeEnum::Suffix) {
             return qt == QueryTypeEnum::SuffixPreviewDeprecated;
@@ -91,7 +94,7 @@ FLE2PayloadParams::FLE2PayloadParams(const ParsedFindTextSearchPayload& p) {
     } else if (p.suffixTokens) {
         expectedTypes = {QueryTypeEnum::Suffix};
     } else if (p.substringTokens) {
-        expectedTypes = {QueryTypeEnum::SubstringPreview};
+        expectedTypes = {QueryTypeEnum::Substring};
     } else {
         // $encStrNormalizedEq (exact tokens) has no dedicated QueryType; EFC validation enforces
         // that contention, caseSensitive, and diacriticSensitive are identical across every text

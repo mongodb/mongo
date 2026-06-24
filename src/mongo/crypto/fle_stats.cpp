@@ -154,7 +154,10 @@ void FLEStatusSection::updateIndexTypeStats(const EncryptedFieldConfig& efc, boo
                 case QueryTypeEnum::RangePreviewDeprecated:
                     deltas.setRangePreview(delta);
                     break;
-                case QueryTypeEnum::SubstringPreview:
+                case QueryTypeEnum::Substring:
+                    deltas.setSubstring(delta);
+                    break;
+                case QueryTypeEnum::SubstringPreviewDeprecated:
                     deltas.setSubstringPreview(delta);
                     break;
                 case QueryTypeEnum::Suffix:

@@ -1208,7 +1208,7 @@ TEST(FLECollectionOptions, Text_ExtraFields) {
                     "path": "firstName",
                     "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
                     "bsonType": "string",
-                    "queries": {"queryType": "substringPreview", sparsity:1}
+                    "queries": {"queryType": "substring", sparsity:1}
                 }
             ]
         }})")));
@@ -1220,7 +1220,7 @@ TEST(FLECollectionOptions, Text_ExtraFields) {
                     "path": "firstName",
                     "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
                     "bsonType": "string",
-                    "queries": {"queryType": "substringPreview", min:1}
+                    "queries": {"queryType": "substring", min:1}
                 }
             ]
         }})")));
@@ -1232,7 +1232,7 @@ TEST(FLECollectionOptions, Text_ExtraFields) {
                     "path": "firstName",
                     "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
                     "bsonType": "string",
-                    "queries": {"queryType": "substringPreview", max:1}
+                    "queries": {"queryType": "substring", max:1}
                 }
             ]
         }})")));
@@ -1244,7 +1244,7 @@ TEST(FLECollectionOptions, Text_ExtraFields) {
                 "path": "firstName",
                 "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
                 "bsonType": "string",
-                "queries": {"queryType": "substringPreview", trimFactor:1}
+                "queries": {"queryType": "substring", trimFactor:1}
             }
         ]
     }})")));
@@ -1256,7 +1256,7 @@ TEST(FLECollectionOptions, Text_ExtraFields) {
                     "path": "firstName",
                     "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
                     "bsonType": "string",
-                    "queries": {"queryType": "substringPreview", precision:1}
+                    "queries": {"queryType": "substring", precision:1}
                 }
             ]
         }})")));

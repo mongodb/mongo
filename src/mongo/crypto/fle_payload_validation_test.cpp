@@ -223,9 +223,15 @@ TEST(FLEPayloadValidation, MultipleExpectedTypes) {
 }
 
 TEST(FLEPayloadValidation, AcceptsDeprecatedPreviewVariant) {
-    // A field created with the deprecated suffixPreview/prefixPreview type must accept a payload
-    // generated for the GA suffix/prefix query type, so pre-upgrade preview collections stay
-    // operational (getAndValidateSchema blocks them once the GA feature flag is on).
+    // A field created with the deprecated {substring/suffix/prefix}Preview type must accept a
+    // payload generated for the GA substring/suffix/prefix query type, so pre-upgrade preview
+    // collections stay operational (getAndValidateSchema blocks them once the GA feature flag is
+    // on).
+    auto substringPreview =
+        fieldWith("encrypted", {textQtc(QueryTypeEnum::SubstringPreviewDeprecated, 4)});
+    validatePayloadAgainstQueryTypeConfig(
+        "encrypted", substringPreview, sampled(QueryTypeEnum::Substring));
+
     auto suffixPreview =
         fieldWith("encrypted", {textQtc(QueryTypeEnum::SuffixPreviewDeprecated, 4)});
     validatePayloadAgainstQueryTypeConfig(

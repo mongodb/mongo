@@ -369,6 +369,11 @@ feature_flags:
         cpp_varname: gFeatureFlagContinuousInternodeValidationPerDocument
         default: false
         fcv_gated: true
+    featureFlagQESubstringSearch:
+        description: "Queryable Encryption encrypted substring search support"
+        cpp_varname: gFeatureFlagQESubstringSearch
+        default: false
+        fcv_gated: true
 
 server_parameters:
     allowDirectSystemBucketsAccess:

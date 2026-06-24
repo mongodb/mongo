@@ -143,6 +143,7 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
         int64_t suffix = 0;
         int64_t prefix = 0;
         int64_t rangePreview = 0;
+        int64_t substring = 0;
         int64_t substringPreview = 0;
         int64_t suffixPreview = 0;
         int64_t prefixPreview = 0;
@@ -157,6 +158,7 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
         ASSERT_EQ(actual.getSuffix(), expected.suffix);
         ASSERT_EQ(actual.getPrefix(), expected.prefix);
         ASSERT_EQ(actual.getRangePreview(), expected.rangePreview);
+        ASSERT_EQ(actual.getSubstring(), expected.substring);
         ASSERT_EQ(actual.getSubstringPreview(), expected.substringPreview);
         ASSERT_EQ(actual.getSuffixPreview(), expected.suffixPreview);
         ASSERT_EQ(actual.getPrefixPreview(), expected.prefixPreview);
@@ -225,6 +227,15 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
     expected.range++;
     expected.rangePreview++;
     expected.substringPreview++;
+    assertCounters(expected);
+
+    auto efcSubstring = buildConfig({{"substring", 2}});
+    instance->updateStatsOnRegisterCollection(nss, efcSubstring);
+    expected.substring++;
+    assertCounters(expected);
+
+    instance->updateStatsOnDeregisterCollection(nss, efcSubstring);
+    expected.substring--;
     assertCounters(expected);
 
     auto efc3 = buildConfig({{"suffixPreview", 1}, {"multi", 1}});

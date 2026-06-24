@@ -56,12 +56,13 @@ enums:
         values:
             Equality: "equality"
             Range: "range"
-            SubstringPreview: "substringPreview"
+            Substring: "substring"
             Suffix: "suffix"
             Prefix: "prefix"
             # Deprecated preview types cannot be removed because collections that use them would
             # break on upgrade.
             RangePreviewDeprecated: "rangePreview"
+            SubstringPreviewDeprecated: "substringPreview"
             SuffixPreviewDeprecated: "suffixPreview"
             PrefixPreviewDeprecated: "prefixPreview"
 

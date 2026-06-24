@@ -62,6 +62,7 @@ static void accumulateStats(FLEIndexTypeStats& left, const FLEIndexTypeStats& ri
     left.setSuffix(left.getSuffix() + right.getSuffix());
     left.setPrefix(left.getPrefix() + right.getPrefix());
     left.setRangePreview(left.getRangePreview() + right.getRangePreview());
+    left.setSubstring(left.getSubstring() + right.getSubstring());
     left.setSubstringPreview(left.getSubstringPreview() + right.getSubstringPreview());
     left.setSuffixPreview(left.getSuffixPreview() + right.getSuffixPreview());
     left.setPrefixPreview(left.getPrefixPreview() + right.getPrefixPreview());

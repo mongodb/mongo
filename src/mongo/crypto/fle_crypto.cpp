@@ -3636,7 +3636,8 @@ void EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
         } else if (isFLE2TextQueryType(qtype)) {
             int32_t ub = qtc.getStrMaxQueryLength().get();
             int32_t lb = qtc.getStrMinQueryLength().get();
-            if (qtype == QueryTypeEnum::SubstringPreview) {
+            if (qtype == QueryTypeEnum::Substring ||
+                qtype == QueryTypeEnum::SubstringPreviewDeprecated) {
                 return maxTagsForSubstring(
                     lb, ub, static_cast<uint32_t>(qtc.getStrMaxLength().get()));
             }
@@ -3696,6 +3697,46 @@ void EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
         shouldOverrideTotalTagOverheadLimit || totalTagStorage <= BSONObjMaxUserSize);
 }
 
+void EncryptionInformationHelpers::checkSubstringParameterLimitsNotExceeded(
+    const EncryptedFieldConfig& ef) {
+    static_assert(kSubstringLowerBoundMin <= kSubstringUpperBoundMax);
+    static_assert(kSubstringUpperBoundMax <= kSubstringMaxLengthMax);
+
+    auto checkOneQueryType = [](const EncryptedField& field, const QueryTypeConfig& qtc) {
+        if (qtc.getQueryType() != QueryTypeEnum::Substring) {
+            return false;
+        }
+        int32_t ub = qtc.getStrMaxQueryLength().get();
+        int32_t lb = qtc.getStrMinQueryLength().get();
+        int32_t max = qtc.getStrMaxLength().get();
+        auto path = field.getPath();
+        uassert(12860001,
+                fmt::format("strMinQueryLength ({}) must be >= {} for substring query "
+                            "type of field {}.",
+                            lb,
+                            kSubstringLowerBoundMin,
+                            path),
+                lb >= kSubstringLowerBoundMin);
+        uassert(12860002,
+                fmt::format("strMaxQueryLength ({}) must be <= {} for substring query "
+                            "type of field {}.",
+                            ub,
+                            kSubstringUpperBoundMax,
+                            path),
+                ub <= kSubstringUpperBoundMax);
+        uassert(12860003,
+                fmt::format("strMaxLength ({}) must be <= {} for substring query "
+                            "type of field {}.",
+                            max,
+                            kSubstringMaxLengthMax,
+                            path),
+                max <= kSubstringMaxLengthMax);
+        return false;
+    };
+
+    visitQueryTypeConfigs(ef, checkOneQueryType);
+}
+
 void EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceeded(
     const EncryptedFieldConfig& ef) {
     static_assert(kSubstringPreviewLowerBoundMin <= kSubstringPreviewUpperBoundMax);
@@ -3713,7 +3754,7 @@ void EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceed
     }
 
     auto checkOneQueryType = [](const EncryptedField& field, const QueryTypeConfig& qtc) {
-        if (qtc.getQueryType() != QueryTypeEnum::SubstringPreview) {
+        if (qtc.getQueryType() != QueryTypeEnum::SubstringPreviewDeprecated) {
             return false;
         }
         int32_t ub = qtc.getStrMaxQueryLength().get();
@@ -3729,7 +3770,7 @@ void EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceed
                             bypassMsg),
                 lb >= kSubstringPreviewLowerBoundMin);
         uassert(10453201,
-                fmt::format("strMaxQueryLength ({}) must be >= {} for substringPreview query "
+                fmt::format("strMaxQueryLength ({}) must be <= {} for substringPreview query "
                             "type of field {}. {}",
                             ub,
                             kSubstringPreviewUpperBoundMax,
@@ -3737,7 +3778,7 @@ void EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceed
                             bypassMsg),
                 ub <= kSubstringPreviewUpperBoundMax);
         uassert(10453202,
-                fmt::format("strMaxLength ({}) must be >= {} for substringPreview query "
+                fmt::format("strMaxLength ({}) must be <= {} for substringPreview query "
                             "type of field {}. {}",
                             max,
                             kSubstringPreviewMaxLengthMax,

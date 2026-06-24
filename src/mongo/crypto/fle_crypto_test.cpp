@@ -1951,7 +1951,7 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
         auto element = doc.firstElement();
         auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
-        if (type == QueryTypeEnum::SubstringPreview) {
+        if (type == QueryTypeEnum::Substring) {
             tsts.getSubstringTokenSets().push_back({});
             auto& ts = tsts.getSubstringTokenSets().back();
             auto edcDataDerivedToken = EDCTextSubstringDerivedFromDataToken::deriveFrom(
@@ -2063,7 +2063,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
 
     const size_t tagCount = 1 + substrs.size() + suffixes.size() + prefixes.size();
 
-    generateTextTokenSetsForIUPV2(iupayload, substrs, QueryTypeEnum::SubstringPreview);
+    generateTextTokenSetsForIUPV2(iupayload, substrs, QueryTypeEnum::Substring);
     generateTextTokenSetsForIUPV2(iupayload, suffixes, QueryTypeEnum::Suffix);
     generateTextTokenSetsForIUPV2(iupayload, prefixes, QueryTypeEnum::Prefix);
 
@@ -2169,8 +2169,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
 
     EDCServerPayloadInfo payload;
     auto& iupayload = payload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
-    generateTextTokenSetsForIUPV2(
-        iupayload, {"s", "ss", "sss", "ssss"}, QueryTypeEnum::SubstringPreview);
+    generateTextTokenSetsForIUPV2(iupayload, {"s", "ss", "sss", "ssss"}, QueryTypeEnum::Substring);
     payload.counts = std::vector<uint64_t>(5);
 
     std::vector<PrfBlock> tags = EDCServerCollection::generateTagsForTextSearch(payload);
@@ -2222,7 +2221,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
         tmpPayload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
         generateTextTokenSetsForIUPV2(tmpPayload.payload,
                                       std::vector<std::string_view>(84000, "s"sv),
-                                      QueryTypeEnum::SubstringPreview);
+                                      QueryTypeEnum::Substring);
         tmpPayload.counts = std::vector<uint64_t>(84001);
         auto tmpTags = EDCServerCollection::generateTagsForTextSearch(tmpPayload);
         ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue::fromUnencrypted(
@@ -2236,7 +2235,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
         tmpPayload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
         generateTextTokenSetsForIUPV2(tmpPayload.payload,
                                       std::vector<std::string_view>(42000, "s"sv),
-                                      QueryTypeEnum::SubstringPreview);
+                                      QueryTypeEnum::Substring);
         generateTextTokenSetsForIUPV2(
             tmpPayload.payload, std::vector<std::string_view>(42000, "s"sv), QueryTypeEnum::Suffix);
         tmpPayload.counts = std::vector<uint64_t>(84001);
@@ -2252,7 +2251,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
         tmpPayload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
         generateTextTokenSetsForIUPV2(tmpPayload.payload,
                                       std::vector<std::string_view>(28000, "s"sv),
-                                      QueryTypeEnum::SubstringPreview);
+                                      QueryTypeEnum::Substring);
         generateTextTokenSetsForIUPV2(
             tmpPayload.payload, std::vector<std::string_view>(28000, "s"sv), QueryTypeEnum::Suffix);
         generateTextTokenSetsForIUPV2(
@@ -2518,7 +2517,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagLimitsForTextSearch) {
         for (auto& qt : qtc) {
             auto lb = qt.getStrMinQueryLength().get();
             auto ub = qt.getStrMaxQueryLength().get();
-            actual += ((qt.getQueryType() == QueryTypeEnum::SubstringPreview)
+            actual += ((qt.getQueryType() == QueryTypeEnum::Substring)
                            ? maxTagsForSubstring(lb, ub, qt.getStrMaxLength().get())
                            : maxTagsForSuffixOrPrefix(lb, ub));
         }
@@ -2543,26 +2542,26 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagLimitsForTextSearch) {
 
     // substring field under limit
     std::vector<QueryTypeConfig> qtc = {
-        makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 10, 100, 900)};
+        makeTextQueryTypeConfig(QueryTypeEnum::Substring, 10, 100, 900)};
     assertExpectedMaxTags(qtc, 76987);
     doOneFieldTest(qtc, {});
 
     // substring field at limit
-    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 1, 83'999);
+    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::Substring, 1, 1, 83'999);
     assertExpectedMaxTags(qtc, 84'000);
     doOneFieldTest(qtc, {});
 
-    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 2, 42'000);
+    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::Substring, 1, 2, 42'000);
     assertExpectedMaxTags(qtc, 84'000);
     doOneFieldTest(qtc, {});
 
     // substring field over limit
-    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 10, 100, 1000);
+    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::Substring, 10, 100, 1000);
     assertExpectedMaxTags(qtc, 86'087);
     doOneFieldTest(qtc, 10384602);
 
     // overflow uint32_t
-    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, INT32_MAX, INT32_MAX);
+    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::Substring, 1, INT32_MAX, INT32_MAX);
     doOneFieldTest(qtc, 10384601);
 
     for (auto qtype : {QueryTypeEnum::Suffix, QueryTypeEnum::Prefix}) {
@@ -2688,12 +2687,12 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagStorageLimits) {
 
     // substring above total tag storage limit
     efc.setFields(makeEncryptedFields(
-        37, "string"sv, {makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400)}));
+        37, "string"sv, {makeTextQueryTypeConfig(QueryTypeEnum::Substring, 2, 10, 400)}));
     doMultipleFieldsTest(efc, 10431800);
 
     // substring within total tag storage limit
     efc.setFields(makeEncryptedFields(
-        36, "string"sv, {makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400)}));
+        36, "string"sv, {makeTextQueryTypeConfig(QueryTypeEnum::Substring, 2, 10, 400)}));
     doMultipleFieldsTest(efc, {});
 
     // prefix above total tag storage limit
@@ -2735,7 +2734,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagStorageLimits) {
     // mixture of substring, suffix, and prefix above total tag storage limit
     std::vector<EncryptedField> fields;
     auto substringFields = makeEncryptedFields(
-        36, "string"sv, {makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400)});
+        36, "string"sv, {makeTextQueryTypeConfig(QueryTypeEnum::Substring, 2, 10, 400)});
     auto prefixFields = makeEncryptedFields(
         15, "string"sv, {makeTextQueryTypeConfig(QueryTypeEnum::Prefix, 9, 109, {})});
     auto suffixFields = makeEncryptedFields(
@@ -2758,7 +2757,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagStorageLimits) {
 
     // mixture of substring, equality, and range above total tag storage limit
     substringFields = makeEncryptedFields(
-        14, "string"sv, {makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400)});
+        14, "string"sv, {makeTextQueryTypeConfig(QueryTypeEnum::Substring, 2, 10, 400)});
     auto equalityFields = makeEncryptedFields(6785, "string"sv, {makeEqualityQueryTypeConfig()});
     auto rangeFields = makeEncryptedFields(
         6800, "int"sv, {makeRangeQueryTypeConfigInt32(1, 1000, boost::none, 1)});
@@ -2779,9 +2778,51 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagStorageLimits) {
     doMultipleFieldsTest(efc, {});
 }
 
+TEST_F(ServiceContextTest, EncryptionInformation_TestSubstringParameterLimits) {
+    auto makeQueryTypeConfig = [](int32_t lb, int32_t ub, int32_t mlen) {
+        QueryTypeConfig qtc{QueryTypeEnum::Substring};
+        qtc.setStrMinQueryLength(lb);
+        qtc.setStrMaxQueryLength(ub);
+        qtc.setStrMaxLength(mlen);
+        return qtc;
+    };
+    auto doOneFieldTest = [](const std::vector<QueryTypeConfig>& qtc, boost::optional<int> error) {
+        EncryptedFieldConfig efc;
+        EncryptedField field{UUID::gen(), "field"};
+        field.setBsonType("string"_sd);
+        field.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{qtc});
+        efc.setFields({field});
+        if (error) {
+            ASSERT_THROWS_CODE(
+                EncryptionInformationHelpers::checkSubstringParameterLimitsNotExceeded(efc),
+                DBException,
+                *error);
+        } else {
+            ASSERT_DOES_NOT_THROW(
+                EncryptionInformationHelpers::checkSubstringParameterLimitsNotExceeded(efc));
+        }
+    };
+
+    // substring max length over upper limit
+    std::vector<QueryTypeConfig> qtc = {makeQueryTypeConfig(2, 6, 900)};
+    doOneFieldTest(qtc, 12860003);
+
+    // substring max query length over upper limit
+    qtc[0] = makeQueryTypeConfig(2, 60, 50);
+    doOneFieldTest(qtc, 12860002);
+
+    // substring min query length below lower limit
+    qtc[0] = makeQueryTypeConfig(1, 6, 50);
+    doOneFieldTest(qtc, 12860001);
+
+    // substring params all within limits
+    qtc[0] = makeQueryTypeConfig(2, 6, 50);
+    doOneFieldTest(qtc, {});
+}
+
 TEST_F(ServiceContextTest, EncryptionInformation_TestSubstringPreviewParameterLimits) {
     auto makeQueryTypeConfig = [](int32_t lb, int32_t ub, int32_t mlen) {
-        QueryTypeConfig qtc{QueryTypeEnum::SubstringPreview};
+        QueryTypeConfig qtc{QueryTypeEnum::SubstringPreviewDeprecated};
         qtc.setStrMinQueryLength(lb);
         qtc.setStrMaxQueryLength(ub);
         qtc.setStrMaxLength(mlen);
@@ -2804,19 +2845,19 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestSubstringPreviewParameterLi
         }
     };
 
-    // substring max length over upper limit
+    // substringPreview max length over upper limit
     std::vector<QueryTypeConfig> qtc = {makeQueryTypeConfig(2, 10, 900)};
     doOneFieldTest(qtc, 10453202);
 
-    // substring max query length over upper limit
+    // substringPreview max query length over upper limit
     qtc[0] = makeQueryTypeConfig(2, 60, 60);
     doOneFieldTest(qtc, 10453201);
 
-    // substring min query length below lower limit
+    // substringPreview min query length below lower limit
     qtc[0] = makeQueryTypeConfig(1, 10, 60);
     doOneFieldTest(qtc, 10453200);
 
-    // substring params all within limtis
+    // substringPreview params all within limits
     qtc[0] = makeQueryTypeConfig(2, 10, 60);
     doOneFieldTest(qtc, {});
 }

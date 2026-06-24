@@ -352,23 +352,23 @@ TEST(FLEValidationUtils, parseQueryTypeConfig) {
 
     // Substring
     BSONObj tooLowStrMaxLengthSubstr =
-        BSON("queryType" << "substringPreview" << "strMaxLength" << -1 << "strMinQueryLength" << 2
-                         << "strMaxQueryLength" << 10 << "caseSensitive" << true
+        BSON("queryType" << "substring" << "strMaxLength" << -1 << "strMinQueryLength" << 2
+                         << "strMaxQueryLength" << 6 << "caseSensitive" << true
                          << "diacriticSensitive" << false);
     ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMaxLengthSubstr,
                                               IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj tooLowStrMinQueryLengthSubstr =
-        BSON("queryType" << "substringPreview" << "strMaxLength" << 250 << "strMinQueryLength" << -1
-                         << "strMaxQueryLength" << 10 << "caseSensitive" << true
+        BSON("queryType" << "substring" << "strMaxLength" << 250 << "strMinQueryLength" << -1
+                         << "strMaxQueryLength" << 6 << "caseSensitive" << true
                          << "diacriticSensitive" << false);
     ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMinQueryLengthSubstr,
                                               IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj tooLowStrMaxQueryLengthSubstr =
-        BSON("queryType" << "substringPreview" << "strMaxLength" << 250 << "strMinQueryLength" << 2
+        BSON("queryType" << "substring" << "strMaxLength" << 250 << "strMinQueryLength" << 2
                          << "strMaxQueryLength" << -1 << "caseSensitive" << true
                          << "diacriticSensitive" << false);
     ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMaxQueryLengthSubstr,
@@ -376,8 +376,8 @@ TEST(FLEValidationUtils, parseQueryTypeConfig) {
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj validSubstringConfig =
-        BSON("queryType" << "substringPreview" << "strMaxLength" << 250 << "strMinQueryLength" << 2
-                         << "strMaxQueryLength" << 10 << "caseSensitive" << true
+        BSON("queryType" << "substring" << "strMaxLength" << 250 << "strMinQueryLength" << 2
+                         << "strMaxQueryLength" << 6 << "caseSensitive" << true
                          << "diacriticSensitive" << false);
     ASSERT_DOES_NOT_THROW(
         QueryTypeConfig::parse(validSubstringConfig, IDLParserContext{"parseQueryTypeConfigTest"}));
@@ -424,8 +424,15 @@ TEST(FLEValidationUtils, parseQueryTypeConfig) {
     ASSERT_DOES_NOT_THROW(
         QueryTypeConfig::parse(validSuffixConfig, IDLParserContext{"parseQueryTypeConfigTest"}));
 
-    // Deprecated "suffixPreview" and "prefixPreview" strings should still parse for backwards
-    // compatibility with existing collections.
+    // Deprecated "substringPreview", "suffixPreview" and "prefixPreview" strings should still parse
+    // for backwards compatibility with existing collections.
+    BSONObj deprecatedSubstringConfig =
+        BSON("queryType" << "substringPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength"
+                         << 10 << "caseSensitive" << true << "diacriticSensitive" << false);
+    auto parsedSubstring = QueryTypeConfig::parse(deprecatedSubstringConfig,
+                                                  IDLParserContext{"parseQueryTypeConfigTest"});
+    ASSERT_EQ(parsedSubstring.getQueryType(), QueryTypeEnum::SubstringPreviewDeprecated);
+
     BSONObj deprecatedSuffixConfig =
         BSON("queryType" << "suffixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << 10
                          << "caseSensitive" << true << "diacriticSensitive" << false);
@@ -537,7 +544,7 @@ QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
 }
 
 TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
-    QueryTypeConfig qtc = validateTextSearchIndexCommonTests(QueryTypeEnum::SubstringPreview);
+    QueryTypeConfig qtc = validateTextSearchIndexCommonTests(QueryTypeEnum::Substring);
 
     // Missing max length
     qtc.setStrMaxLength(boost::none);
@@ -547,7 +554,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
                        9783407);
     // max query length > max length
     qtc.setStrMaxLength(5);
-    qtc.setStrMaxQueryLength(10);
+    qtc.setStrMaxQueryLength(6);
     qtc.setStrMinQueryLength(2);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
                            BSONType::string, "foo"sv, qtc, boost::none, boost::none, boost::none),
@@ -556,7 +563,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
     // Make sure valid configuration passes.
     qtc.setStrMaxLength(400);
     qtc.setStrMinQueryLength(2);
-    qtc.setStrMaxQueryLength(10);
+    qtc.setStrMaxQueryLength(6);
     ASSERT_DOES_NOT_THROW(validateTextSearchIndex(
         BSONType::string, "foo", qtc, boost::none, boost::none, boost::none));
 }

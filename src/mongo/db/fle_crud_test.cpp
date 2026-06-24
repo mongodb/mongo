@@ -1942,8 +1942,16 @@ EncryptedFieldConfig QETextSearchCrudTest::getEFC() {
     std::vector<QueryTypeConfig> qtcs;
     for (const auto& schema : _schemas) {
         QueryTypeConfig qtc;
-        qtc.setQueryType(schema.type);
-        if (schema.type == QueryTypeEnum::SubstringPreview) {
+        // Use the deprecated "Preview" query type name when building the EFC that gets
+        // passed to libmongocrypt, since libmongocrypt does not yet recognize the new name.
+        // TODO SERVER-129158 Remove this mapping once libmongocrypt supports "substring".
+        auto mongocryptType = schema.type;
+        if (mongocryptType == QueryTypeEnum::Substring) {
+            mongocryptType = QueryTypeEnum::SubstringPreviewDeprecated;
+        }
+        qtc.setQueryType(mongocryptType);
+        if (schema.type == QueryTypeEnum::Substring ||
+            schema.type == QueryTypeEnum::SubstringPreviewDeprecated) {
             qtc.setStrMaxLength(schema.mlen);
         }
         qtc.setStrMinQueryLength(schema.lb);
@@ -1970,7 +1978,8 @@ BSONObj QETextSearchCrudTest::generateInsertSpec(BSONElement value) {
     spec.setDiacriticFold(_schemas[0].diacf);
     for (const auto& schema : _schemas) {
         switch (schema.type) {
-            case QueryTypeEnum::SubstringPreview:
+            case QueryTypeEnum::SubstringPreviewDeprecated:
+            case QueryTypeEnum::Substring:
                 spec.setSubstringSpec(FLE2SubstringInsertSpec(schema.mlen, schema.ub, schema.lb));
                 break;
             case QueryTypeEnum::SuffixPreviewDeprecated:
@@ -2034,7 +2043,8 @@ PrfBlock QETextSearchCrudTest::getTestESCDataToken(BSONElement element,
             .asPrfBlock();
     }
     switch (*type) {
-        case QueryTypeEnum::SubstringPreview: {
+        case QueryTypeEnum::SubstringPreviewDeprecated:
+        case QueryTypeEnum::Substring: {
             auto escTextToken = ESCTextSubstringToken::deriveFrom(escToken);
             return ESCTextSubstringDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element))
                 .asPrfBlock();
@@ -2066,7 +2076,8 @@ PrfBlock QETextSearchCrudTest::getTestEDCDataToken(BSONElement element,
             .asPrfBlock();
     }
     switch (*type) {
-        case QueryTypeEnum::SubstringPreview: {
+        case QueryTypeEnum::SubstringPreviewDeprecated:
+        case QueryTypeEnum::Substring: {
             auto edcTextToken = EDCTextSubstringToken::deriveFrom(edcToken);
             return EDCTextSubstringDerivedFromDataToken::deriveFrom(edcTextToken, toCDR(element))
                 .asPrfBlock();
@@ -2099,7 +2110,8 @@ ESCTwiceDerivedTagToken QETextSearchCrudTest::getTestESCTwiceDerivedToken(
                          .asPrfBlock();
     } else {
         switch (*type) {
-            case QueryTypeEnum::SubstringPreview: {
+            case QueryTypeEnum::SubstringPreviewDeprecated:
+            case QueryTypeEnum::Substring: {
                 cfTokenBlk =
                     ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
                         ESCTextSubstringDerivedFromDataToken{dataTokenBlk}, 0)
@@ -2139,7 +2151,8 @@ EDCTwiceDerivedToken QETextSearchCrudTest::getTestEDCTwiceDerivedToken(
                          .asPrfBlock();
     } else {
         switch (*type) {
-            case QueryTypeEnum::SubstringPreview: {
+            case QueryTypeEnum::SubstringPreviewDeprecated:
+            case QueryTypeEnum::Substring: {
                 cfTokenBlk =
                     EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
                         EDCTextSubstringDerivedFromDataToken{dataTokenBlk}, 0)
@@ -2258,7 +2271,8 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
 
     auto queryTypeToIndex = [](QueryTypeEnum qt) -> uint8_t {
         switch (qt) {
-            case QueryTypeEnum::SubstringPreview:
+            case QueryTypeEnum::SubstringPreviewDeprecated:
+            case QueryTypeEnum::Substring:
                 return 0;
             case QueryTypeEnum::SuffixPreviewDeprecated:
             case QueryTypeEnum::Suffix:
@@ -2284,7 +2298,8 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
             uint32_t msize;
             stdx::unordered_set<std::string> affixes;
             switch (schema.type) {
-                case QueryTypeEnum::SubstringPreview:
+                case QueryTypeEnum::SubstringPreviewDeprecated:
+                case QueryTypeEnum::Substring:
                     msize =
                         msizeForSubstring(unfoldedStr.size(), schema.lb, schema.ub, schema.mlen);
                     affixes = getExpectedSubstrings(unicodeFoldedStr, schema.lb, schema.ub);
@@ -2317,8 +2332,7 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
         verifyESCEntriesForString(exactStr, count);
     }
 
-    for (auto qt :
-         {QueryTypeEnum::SubstringPreview, QueryTypeEnum::Suffix, QueryTypeEnum::Prefix}) {
+    for (auto qt : {QueryTypeEnum::Substring, QueryTypeEnum::Suffix, QueryTypeEnum::Prefix}) {
         auto qt_index = queryTypeToIndex(qt);
         for (const auto& [exactStr, count] : paddingCounts[qt_index]) {
             verifyESCEntriesForString(exactStr, count, qt, true /*padding*/);
@@ -2346,7 +2360,7 @@ void QETextSearchCrudTest::doInsertsAndVerifyExpectations(
 }
 
 TEST_F(QETextSearchCrudTest, BasicSubstring) {
-    addSchema({.type = QueryTypeEnum::SubstringPreview,
+    addSchema({.type = QueryTypeEnum::Substring,
                .lb = 10,
                .ub = 100,
                .mlen = 1000,
@@ -2372,7 +2386,7 @@ TEST_F(QETextSearchCrudTest, BasicPrefixAndSuffix) {
 }
 
 TEST_F(QETextSearchCrudTest, RepeatingSubstring) {
-    addSchema({.type = QueryTypeEnum::SubstringPreview,
+    addSchema({.type = QueryTypeEnum::Substring,
                .lb = 10,
                .ub = 100,
                .mlen = 1000,
@@ -2393,7 +2407,7 @@ TEST_F(QETextSearchCrudTest, FoldAsciiSuffix) {
 }
 
 TEST_F(QETextSearchCrudTest, UnicodeSubstring) {
-    addSchema({.type = QueryTypeEnum::SubstringPreview,
+    addSchema({.type = QueryTypeEnum::Substring,
                .lb = 1,
                .ub = 5,
                .mlen = 1000,
@@ -2403,7 +2417,7 @@ TEST_F(QETextSearchCrudTest, UnicodeSubstring) {
 }
 
 TEST_F(QETextSearchCrudTest, FoldUnicodeSubstring) {
-    addSchema({.type = QueryTypeEnum::SubstringPreview,
+    addSchema({.type = QueryTypeEnum::Substring,
                .lb = 3,
                .ub = 5,
                .mlen = 1000,
@@ -2415,7 +2429,7 @@ TEST_F(QETextSearchCrudTest, FoldUnicodeSubstring) {
 }
 
 TEST_F(QETextSearchCrudTest, BasicSubstringMultipleInserts) {
-    addSchema({.type = QueryTypeEnum::SubstringPreview,
+    addSchema({.type = QueryTypeEnum::Substring,
                .lb = 10,
                .ub = 100,
                .mlen = 1000,
@@ -2463,9 +2477,9 @@ TEST_F(QETextSearchCrudTest, BasicPrefixAndSuffixMultipleInserts) {
 // Test insert update payloads containing text search token sets ('b') with embedded encryptedTokens
 // of invalid length in the exact/substring/prefix/suffix token sets are rejected.
 TEST_F(QETextSearchCrudTest, InsertPayloadHasInvalidExactEncryptedTokensForTextSearch) {
-    addSchema({.type = QueryTypeEnum::SubstringPreview,
+    addSchema({.type = QueryTypeEnum::Substring,
                .lb = 2,
-               .ub = 10,
+               .ub = 6,
                .mlen = 400,
                .casef = false,
                .diacf = false});
@@ -2499,9 +2513,9 @@ TEST_F(QETextSearchCrudTest, InsertPayloadHasInvalidExactEncryptedTokensForTextS
 }
 
 TEST_F(QETextSearchCrudTest, InsertPayloadHasInvalidSubstringEncryptedTokensForTextSearch) {
-    addSchema({.type = QueryTypeEnum::SubstringPreview,
+    addSchema({.type = QueryTypeEnum::Substring,
                .lb = 2,
-               .ub = 10,
+               .ub = 6,
                .mlen = 400,
                .casef = false,
                .diacf = false});
