@@ -305,7 +305,7 @@ TEST(ValidateResultsTest, MergeIsCommutative) {
     ValidateResults ba = makeB();
     ba.merge(makeA());
 
-    auto getLong = [](const ValidateResults& vr, StringData field) {
+    auto getLong = [](const ValidateResults& vr, std::string_view field) {
         BSONObjBuilder bob;
         vr.appendToResultObj(&bob, /*debugging=*/true);
         return bob.done().getField(field).safeNumberLong();

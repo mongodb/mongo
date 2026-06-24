@@ -37,9 +37,6 @@ MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
-/** mongo::StringData is a legacy alias for std::string_view. */
-using StringData = std::string_view;
-
 inline namespace literals {
 constexpr std::string_view operator""_sd(const char* ptr, std::size_t len) noexcept {
     return std::literals::string_view_literals::operator""sv(ptr, len);

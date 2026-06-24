@@ -364,7 +364,7 @@ void WasmtimeImplScope::rename(const char* from, const char* to) {
     uasserted(11605400, "Hit unsuported MozJS WASM scope rename");
 }
 
-bool WasmtimeImplScope::exec(StringData code,
+bool WasmtimeImplScope::exec(std::string_view code,
                              const std::string& name,
                              bool printResult,
                              bool reportError,

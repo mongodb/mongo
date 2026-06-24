@@ -263,7 +263,7 @@ std::string eq(std::string field, std::string rhs) {
 
 // Builds an EncryptedFieldConfig with a single range-indexed field at `path` and the given
 // contention, for exercising the EFC-aware validation path through validateRanges.
-EncryptedFieldConfig rangeEfc(StringData path, int64_t contention) {
+EncryptedFieldConfig rangeEfc(std::string_view path, int64_t contention) {
     QueryTypeConfig qtc;
     qtc.setQueryType(QueryTypeEnum::Range);
     qtc.setContention(contention);

@@ -42,7 +42,7 @@ using ::mongo::otel::metrics::MetricNames;
 using ::mongo::otel::metrics::OtelMetricsCapturer;
 
 // Read a counter from the global serverStatus tree at `dottedPath` (rooted under "metrics.").
-long long readServerStatusMetric(StringData dottedPath) {
+long long readServerStatusMetric(std::string_view dottedPath) {
     BSONObjBuilder bob;
     globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
     BSONObj root = bob.obj();

@@ -114,7 +114,7 @@ struct CleanupGuard {
 
 Status setNonBlocking(POSIXInterface& posix,
                       int fd,
-                      StringData nameForErrorDiagnostic,
+                      std::string_view nameForErrorDiagnostic,
                       ErrorCodes::Error errorCode) {
     const int flags = posix.fcntl(fd, F_GETFL);
     if (flags == -1) {

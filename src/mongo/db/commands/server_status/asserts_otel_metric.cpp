@@ -46,7 +46,7 @@ namespace mongo {
 namespace {
 
 // Adding a new AssertionKind triggers a -Wswitch warning here, which we treat as an error.
-StringData kindToAttributeValue(AssertionKind kind) {
+std::string_view kindToAttributeValue(AssertionKind kind) {
     switch (kind) {
         case AssertionKind::kRegular:
             return "regular"_sd;
@@ -60,7 +60,7 @@ StringData kindToAttributeValue(AssertionKind kind) {
     MONGO_UNREACHABLE_TASSERT(12846000);
 }
 
-constexpr std::array<StringData, 4> kKindAttributeValues = {
+constexpr std::array<std::string_view, 4> kKindAttributeValues = {
     "regular"_sd,
     "msg"_sd,
     "user"_sd,
@@ -74,14 +74,16 @@ constexpr std::array<StringData, 4> kKindAttributeValues = {
 // TODO (SERVER-129133): extend with a `command` attribute (the design discussion's
 // "(c)" approach). That requires threading the running command through the assertion path plus a
 // runtime knob to toggle the higher-cardinality variant.
-auto& gAssertsCounter = otel::metrics::MetricsService::instance().createInt64Counter<StringData>(
-    otel::metrics::MetricNames::kAsserts,
-    "Number of assertion failures",
-    otel::metrics::MetricUnit::kEvents,
-    otel::metrics::AttributeDefinition<StringData>{
-        .name = "kind",
-        .values = std::vector<StringData>(kKindAttributeValues.begin(), kKindAttributeValues.end()),
-    });
+auto& gAssertsCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
+        otel::metrics::MetricNames::kAsserts,
+        "Number of assertion failures",
+        otel::metrics::MetricUnit::kEvents,
+        otel::metrics::AttributeDefinition<std::string_view>{
+            .name = "kind",
+            .values = std::vector<std::string_view>(kKindAttributeValues.begin(),
+                                                    kKindAttributeValues.end()),
+        });
 
 // Installs the observer that mirrors legacy AssertionCount increments into `gAssertsCounter`. The
 // lambda is `noexcept` and wraps `add()` in a try/catch so an OTel-side failure cannot corrupt the

@@ -58,10 +58,10 @@ public:
 
     struct Entry {
         Op op;
-        StringData fieldName;  // Points into referenceObj
-        index_t stateIdx;      // kScalar: index into decoder states
-        BSONType type;         // kEnterSubObj/kExitSubObj: sub-object type
-        bool allowEmpty;       // kEnterSubObj/kExitSubObj: whether empty subobj is valid
+        std::string_view fieldName;  // Points into referenceObj
+        index_t stateIdx;            // kScalar: index into decoder states
+        BSONType type;               // kEnterSubObj/kExitSubObj: sub-object type
+        bool allowEmpty;             // kEnterSubObj/kExitSubObj: whether empty subobj is valid
     };
 
     /**

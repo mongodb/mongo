@@ -358,7 +358,7 @@ TEST_F(EngineSelectionPlanFixture, LuAllFlagsEnabledSelectsSbeForAllCombinations
         Strategy::kDynamicIndexedLoopJoin,
     };
 
-    auto runCombination = [&](StringData label,
+    auto runCombination = [&](std::string_view label,
                               std::unique_ptr<QuerySolutionNode> dataAccessNode,
                               Strategy strategy) {
         const auto* dan = dataAccessNode.get();

@@ -76,7 +76,7 @@ std::unique_ptr<InMatchExpression> rewriteExprInMatchExpression(
     // Create $in MatchExpression.
     // setEqualitiesArray takes the backing BSONObj by value and inObj is owned — no external
     // storage needed.
-    auto inMatch = std::make_unique<InMatchExpression>(StringData(fieldPath));
+    auto inMatch = std::make_unique<InMatchExpression>(std::string_view(fieldPath));
     uassertStatusOK(inMatch->setEqualitiesArray(inArray));
 
     return inMatch;

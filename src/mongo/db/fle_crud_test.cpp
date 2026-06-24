@@ -1563,7 +1563,7 @@ TEST_F(FleCrudTest, validateIndexKeyInvalid) {
 namespace {
 // Build an FLE2 insert payload BSON for a single text-search field. The payload is wrapped in
 // BinData(Encrypt) with the kFLE2InsertUpdatePayloadV2 type byte so downstream parsing succeeds.
-BSONObj makeTextInsertPayload(StringData path, const UUID& keyId, int64_t contentionFactor) {
+BSONObj makeTextInsertPayload(std::string_view path, const UUID& keyId, int64_t contentionFactor) {
     auto bogusEncryptedTokens =
         StateCollectionTokensV2({{}}, boost::none, boost::none).encrypt({{}});
     FLE2InsertUpdatePayloadV2 payload({},
@@ -1588,7 +1588,7 @@ BSONObj makeTextInsertPayload(StringData path, const UUID& keyId, int64_t conten
     return builder.obj();
 }
 
-EncryptedFieldConfig makeTextEfcSingleField(StringData path,
+EncryptedFieldConfig makeTextEfcSingleField(std::string_view path,
                                             const UUID& keyId,
                                             int64_t contention) {
     QueryTypeConfig qtc;

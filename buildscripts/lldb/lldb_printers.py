@@ -42,7 +42,7 @@ def __lldb_init_module(debugger, *_args):
         "type summary add -x '^mongo::StatusWith<.+>$' -F lldb_printers.StatusWithPrinter"
     )
 
-    debugger.HandleCommand("type summary add mongo::StringData -F lldb_printers.StringDataPrinter")
+    # mongo::StringData has been removed; rely on the built-in std::string_view printer instead.
     debugger.HandleCommand(
         "type summary add mongo::NamespaceString -F lldb_printers.ToStringPrinter"
     )
@@ -108,16 +108,6 @@ def StatusWithPrinter(valobj, *_args):
         return "StatusWith(OK, {})".format(valobj.GetChildMemberWithName("_t").children[0])
     rep = StatusPrinter(status)
     return rep.replace("Status", "StatusWith", 1)
-
-
-def StringDataPrinter(valobj, *_args):
-    """Print StringData value."""
-    ptr = valobj.GetChildMemberWithName("_data").GetValueAsUnsigned()
-    if ptr == 0:
-        return "nullptr"
-
-    size1 = valobj.GetChildMemberWithName("_size").GetValueAsUnsigned(0)
-    return '"{}"'.format(valobj.GetProcess().ReadMemory(ptr, size1, lldb.SBError()).decode("utf-8"))
 
 
 def read_memory_as_hex(process, address, size):

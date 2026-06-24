@@ -85,7 +85,7 @@ Status OpenTelemetryTracingSamplingServerParameter::set(const BSONElement& newVa
 }
 
 Status OpenTelemetryTracingSamplingServerParameter::setFromString(
-    StringData str, const boost::optional<TenantId>&) {
+    std::string_view str, const boost::optional<TenantId>&) {
     try {
         return applySamplingConfig(fromjson(str));
     } catch (const DBException& ex) {
@@ -95,7 +95,7 @@ Status OpenTelemetryTracingSamplingServerParameter::setFromString(
 
 void OpenTelemetryTracingSamplingServerParameter::append(OperationContext*,
                                                          BSONObjBuilder* bob,
-                                                         StringData name,
+                                                         std::string_view name,
                                                          const boost::optional<TenantId>&) {
     auto config = TracingSampler::get().getConfig();
 

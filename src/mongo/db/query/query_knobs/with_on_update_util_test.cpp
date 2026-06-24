@@ -54,12 +54,12 @@ public:
 
     void append(OperationContext*,
                 BSONObjBuilder* b,
-                StringData name,
+                std::string_view name,
                 const boost::optional<TenantId>&) override {
         *b << name << _data.get();
     }
 
-    Status setFromString(StringData str, const boost::optional<TenantId>&) override {
+    Status setFromString(std::string_view str, const boost::optional<TenantId>&) override {
         // _data = value triggers WithOnUpdateHook::operator=, which uasserts on hook error.
         _data = std::stoi(std::string(str));
         return Status::OK();

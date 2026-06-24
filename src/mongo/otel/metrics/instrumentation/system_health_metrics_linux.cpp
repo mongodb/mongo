@@ -62,10 +62,10 @@ using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
 using otel::metrics::ReportingPolicy;
 
-constexpr StringData kProcStatPath = "/proc/stat"_sd;
-constexpr StringData kProcFileNrPath = "/proc/sys/fs/file-nr"_sd;
+constexpr std::string_view kProcStatPath = "/proc/stat"_sd;
+constexpr std::string_view kProcFileNrPath = "/proc/sys/fs/file-nr"_sd;
 
-const std::vector<StringData> kStatKeys{"cpu"_sd, "procs_running"_sd, "procs_blocked"_sd};
+const std::vector<std::string_view> kStatKeys{"cpu"_sd, "procs_running"_sd, "procs_blocked"_sd};
 
 struct SystemHealthOtelMetricsState {
     std::unique_ptr<SystemHealthMetrics> metrics;
@@ -75,7 +75,7 @@ struct SystemHealthOtelMetricsState {
 const auto getSystemHealthOtelMetricsState =
     ServiceContext::declareDecoration<SystemHealthOtelMetricsState>();
 
-const AttributeDefinition<StringData> kCpuModeAttr{
+const AttributeDefinition<std::string_view> kCpuModeAttr{
     .name = "mode",
     .values = {"user"_sd,
                "nice"_sd,
@@ -96,12 +96,12 @@ MONGO_FAIL_POINT_DEFINE(failCollectSystemHealthSnapshot);
 class SystemHealthMetrics::Impl {
 public:
     Impl()
-        : _cpuTime(MetricsService::instance().createInt64Counter<StringData>(
+        : _cpuTime(MetricsService::instance().createInt64Counter<std::string_view>(
               MetricNames::kCpuTime,
               "Total CPU time since boot, by mode",
               MetricUnit::kMilliseconds,
               kCpuModeAttr)),
-          _cpuUtilization(MetricsService::instance().createDoubleGauge<StringData>(
+          _cpuUtilization(MetricsService::instance().createDoubleGauge<std::string_view>(
               MetricNames::kCpuUtilization,
               "Per-mode CPU utilization across all modes, summing to 1.0 when utilization is "
               "positive",
@@ -131,14 +131,14 @@ public:
 
     void updateCpuTime(const SystemHealthSnapshot& snap) {
         struct ModeDelta {
-            StringData mode;
+            std::string_view mode;
             int64_t delta;
         };
         std::array<ModeDelta, 10> modes;
         size_t n = 0;
         int64_t totalDelta = 0;
 
-        auto record = [&](StringData mode, int64_t& prev, int64_t current) {
+        auto record = [&](std::string_view mode, int64_t& prev, int64_t current) {
             int64_t delta = std::max<int64_t>(current - std::exchange(prev, current), 0);
             modes[n++] = {mode, delta};
             totalDelta += delta;
@@ -174,8 +174,8 @@ public:
     }
 
 private:
-    Counter<int64_t, StringData>& _cpuTime;
-    Gauge<double, StringData>& _cpuUtilization;
+    Counter<int64_t, std::string_view>& _cpuTime;
+    Gauge<double, std::string_view>& _cpuUtilization;
     Gauge<int64_t>& _threadActive;
     Gauge<int64_t>& _threadQueued;
     Gauge<int64_t>& _fdOpen;

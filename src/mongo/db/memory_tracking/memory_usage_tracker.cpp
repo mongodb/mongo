@@ -195,7 +195,7 @@ void DeduplicatorReporter::add(int64_t bytesDiff, int64_t recordsDiff) {
     }
 }
 
-void SimpleMemoryUsageTracker::assertWithinMemoryLimit(StringData name) const {
+void SimpleMemoryUsageTracker::assertWithinMemoryLimit(std::string_view name) const {
     if (withinMemoryLimit()) {
         return;
     }

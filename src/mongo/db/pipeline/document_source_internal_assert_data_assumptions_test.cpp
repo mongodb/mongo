@@ -65,7 +65,7 @@ TEST_F(DocumentSourceInternalAssertDataAssumptionsTest, SerializeWithRedaction) 
 
     query_shape::SerializationOptions opts;
     opts.transformIdentifiers = true;
-    opts.transformIdentifiersCallback = [](StringData s) -> std::string {
+    opts.transformIdentifiersCallback = [](std::string_view s) -> std::string {
         return "HASH(" + std::string{s} + ")";
     };
 

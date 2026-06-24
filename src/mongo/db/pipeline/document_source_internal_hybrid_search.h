@@ -58,7 +58,7 @@ namespace mongo {
  */
 class DocumentSourceInternalHybridSearch final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalHybridSearch"_sd;
+    static constexpr std::string_view kStageName = "$_internalHybridSearch"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
@@ -66,7 +66,7 @@ public:
     DocumentSourceInternalHybridSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {}
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

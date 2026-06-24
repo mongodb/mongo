@@ -89,7 +89,7 @@ void failWeightsValidationWithPipelineSuggestions(
 void failWeightsValidationWithPipelineSuggestions(
     const std::vector<std::string>& unmatchedPipelines,
     const std::vector<std::string>& invalidWeights,
-    StringData stageName);
+    std::string_view stageName);
 
 /**
  * Returns no error if the BSON pipeline is a selection pipeline. A selection pipeline only

@@ -47,7 +47,7 @@ TracingSamplerImpl::TracingSamplerImpl(TickSource* tickSource) : _tickSource(tic
     samplerState.update(std::make_shared<const SamplerState>());
 }
 
-bool TracingSamplerImpl::shouldSample(StringData spanName, double sampleValue) {
+bool TracingSamplerImpl::shouldSample(std::string_view spanName, double sampleValue) {
     samplerState.refreshSnapshot(snapshot);
     auto samplingFactor = snapshot->samplingFactorMap.find(spanName);
     if (samplingFactor == snapshot->samplingFactorMap.end()) {
@@ -132,14 +132,15 @@ namespace {
 
 class FunctionSampler : public TracingSampler {
 public:
-    explicit FunctionSampler(unique_function<bool(StringData, double)> fn) : _fn(std::move(fn)) {}
+    explicit FunctionSampler(unique_function<bool(std::string_view, double)> fn)
+        : _fn(std::move(fn)) {}
 
-    bool shouldSample(StringData spanName, double sampleValue) override {
+    bool shouldSample(std::string_view spanName, double sampleValue) override {
         return _fn(spanName, sampleValue);
     }
 
 private:
-    unique_function<bool(StringData, double)> _fn;
+    unique_function<bool(std::string_view, double)> _fn;
 };
 
 std::unique_ptr<TracingSampler>& globalSampler() {
@@ -169,7 +170,8 @@ private:
     std::unique_ptr<TracingSampler> _previous;
 };
 
-ScopedSamplerOverride setTraceSamplingFnForTest(unique_function<bool(StringData, double)> fn) {
+ScopedSamplerOverride setTraceSamplingFnForTest(
+    unique_function<bool(std::string_view, double)> fn) {
     return std::make_unique<SamplerOverrideImpl>(std::make_unique<FunctionSampler>(std::move(fn)));
 }
 

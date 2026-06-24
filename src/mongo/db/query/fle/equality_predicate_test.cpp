@@ -90,7 +90,7 @@ protected:
             (v.numeric() && _exprTags.contains(v.coerceToInt()));
     }
 
-    std::vector<PrfBlock> generateTags(BSONValue payload, StringData) const override {
+    std::vector<PrfBlock> generateTags(BSONValue payload, std::string_view) const override {
         return visit(OverloadedVisitor{
                          [&](BSONElement p) {
                              ASSERT(p.isNumber());  // Only accept numbers as mock FFPs.

@@ -75,14 +75,14 @@ QueryTypeConfig textQtc(QueryTypeEnum qt, int64_t contention) {
     return q;
 }
 
-EncryptedField fieldWith(StringData path, QueryTypeConfig qtc) {
+EncryptedField fieldWith(std::string_view path, QueryTypeConfig qtc) {
     EncryptedField ef(UUID::gen(), std::string{path});
     ef.setBsonType("int"_sd);
     ef.setQueries(QueriesVariant{std::move(qtc)});
     return ef;
 }
 
-EncryptedField fieldWith(StringData path, std::vector<QueryTypeConfig> qtcs) {
+EncryptedField fieldWith(std::string_view path, std::vector<QueryTypeConfig> qtcs) {
     EncryptedField ef(UUID::gen(), std::string{path});
     ef.setBsonType("string"_sd);
     ef.setQueries(QueriesVariant{std::move(qtcs)});

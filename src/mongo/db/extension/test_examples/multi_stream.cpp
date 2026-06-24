@@ -44,28 +44,28 @@ using StreamType = sdk::ExecAggStageResultsAndMetadataSource::StreamType;
 
 namespace {
 
-constexpr StringData kByShardField = "byShard"_sd;
-constexpr StringData kMetaField = "meta"_sd;
-constexpr StringData kNumMetaField = "numMeta"_sd;
-constexpr StringData kNumDocsField = "numDocs"_sd;
-constexpr StringData kAddStreamTypeField = "addStreamTypeField"_sd;
-constexpr StringData kSortPatternField = "sortPattern"_sd;
-constexpr StringData kMergePipelineField = "mergePipeline"_sd;
+constexpr std::string_view kByShardField = "byShard"_sd;
+constexpr std::string_view kMetaField = "meta"_sd;
+constexpr std::string_view kNumMetaField = "numMeta"_sd;
+constexpr std::string_view kNumDocsField = "numDocs"_sd;
+constexpr std::string_view kAddStreamTypeField = "addStreamTypeField"_sd;
+constexpr std::string_view kSortPatternField = "sortPattern"_sd;
+constexpr std::string_view kMergePipelineField = "mergePipeline"_sd;
 
 // DRM wrapper / metadata field names.
-constexpr StringData kSourceField = "source"_sd;
-constexpr StringData kMetadataField = "metadata"_sd;
-constexpr StringData kAsField = "as"_sd;
-constexpr StringData kSearchMetaName = "SEARCH_META"_sd;
+constexpr std::string_view kSourceField = "source"_sd;
+constexpr std::string_view kMetadataField = "metadata"_sd;
+constexpr std::string_view kAsField = "as"_sd;
+constexpr std::string_view kSearchMetaName = "SEARCH_META"_sd;
 
 // Emitted document field names.
-constexpr StringData kScoreField = "score"_sd;
-constexpr StringData kSortKeyField = "$sortKey"_sd;
-constexpr StringData kSearchScoreField = "$searchScore"_sd;
-constexpr StringData kStreamTypeField = "_streamType"_sd;
+constexpr std::string_view kScoreField = "score"_sd;
+constexpr std::string_view kSortKeyField = "$sortKey"_sd;
+constexpr std::string_view kSearchScoreField = "$searchScore"_sd;
+constexpr std::string_view kStreamTypeField = "_streamType"_sd;
 
 // True if 'field' is present at the top level or inside any per-shard override.
-bool fieldPresentInAnyShard(const BSONObj& args, StringData field) {
+bool fieldPresentInAnyShard(const BSONObj& args, std::string_view field) {
     if (args.hasField(field)) {
         return true;
     }

@@ -130,7 +130,7 @@ std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayl
         expCtx, fieldpath, std::move(serverZerosTokens));
 }
 
-std::vector<PrfBlock> RangePredicate::generateTags(BSONValue payload, StringData path) const {
+std::vector<PrfBlock> RangePredicate::generateTags(BSONValue payload, std::string_view path) const {
     auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(
         payload, path, _rewriter->getEncryptedFieldConfigForValidation());
     std::vector<PrfBlock> tags;

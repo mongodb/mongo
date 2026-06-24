@@ -36,6 +36,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <string_view>
 
 #include <s2n.h>
 
@@ -137,7 +138,7 @@ public:
      */
     void stopAcceptingSessions() override;
 
-    StringData getNameForLogging() const override;
+    std::string_view getNameForLogging() const override;
 
     /** unimplemented: returns nullptr */
     ReactorHandle getReactor(WhichReactor which) override;

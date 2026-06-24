@@ -48,7 +48,8 @@ REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionEncStrNormalizedEq,
                                                    TextSearchPredicate,
                                                    gFeatureFlagQETextSearchPreview);
 
-std::vector<PrfBlock> TextSearchPredicate::generateTags(BSONValue payload, StringData path) const {
+std::vector<PrfBlock> TextSearchPredicate::generateTags(BSONValue payload,
+                                                        std::string_view path) const {
     ParsedFindTextSearchPayload tokens = parseFindPayload<ParsedFindTextSearchPayload>(
         payload, path, _rewriter->getEncryptedFieldConfigForValidation());
     return readTags(_rewriter->getTagQueryInterface(),

@@ -41,8 +41,11 @@ InterleavedSchema::InterleavedSchema(const BSONObj& referenceObj, BSONType rootT
     _scalarCount = scalarIdx;
 }
 
-void InterleavedSchema::_discover(
-    const BSONObj& obj, StringData fieldName, BSONType type, bool allowEmpty, index_t& scalarIdx) {
+void InterleavedSchema::_discover(const BSONObj& obj,
+                                  std::string_view fieldName,
+                                  BSONType type,
+                                  bool allowEmpty,
+                                  index_t& scalarIdx) {
     _entries.push_back({Op::kEnterSubObj, fieldName, 0, type, allowEmpty});
 
     for (auto&& elem : obj) {

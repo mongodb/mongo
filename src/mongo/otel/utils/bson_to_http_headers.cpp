@@ -35,8 +35,8 @@
 namespace mongo::otel {
 
 namespace {
-bool isHttpHeaderStringValid(StringData s) {
-    return s.find_first_of("\r\n"_sd) == StringData::npos;
+bool isHttpHeaderStringValid(std::string_view s) {
+    return s.find_first_of("\r\n"_sd) == std::string_view::npos;
 }
 }  // namespace
 

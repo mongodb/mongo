@@ -42,7 +42,9 @@
 
 namespace mongo::exec::agg {
 namespace {
-Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType expectedType) {
+Value assertFieldHasType(const Document& fullDoc,
+                         std::string_view fieldName,
+                         BSONType expectedType) {
     auto val = fullDoc[fieldName];
     uassert(12840700,
             str::stream() << "failed to look up post image after change: expected \"" << fieldName
@@ -127,7 +129,7 @@ boost::optional<UUID> getCollectionUUID(const Document& updateOp, bool shouldMat
 }  // namespace
 
 ChangeStreamUpdateLookupStage::ChangeStreamUpdateLookupStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor)
     : Stage(stageName, pExpCtx),

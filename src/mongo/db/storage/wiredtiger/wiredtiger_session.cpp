@@ -104,7 +104,7 @@ void WiredTigerSession::_openCursor(WT_SESSION* session,
                                     std::string_view uri,
                                     const char* config,
                                     WT_CURSOR** cursorOut) {
-    // TODO SERVER-128957: Dangerous assumption of null-terminated StringData.
+    // TODO SERVER-128957: Dangerous assumption of null-terminated std::string_view.
     const char* uriData = uri.data();
 
     // TODO: SERVER-110391 Add an invariant here to catch stale sessions.

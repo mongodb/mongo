@@ -60,7 +60,7 @@ struct ShapeTestCase {
     boost::optional<PlanShapeCounter> expected;
 };
 
-StringData counterToStr(boost::optional<PlanShapeCounter> counter) {
+std::string_view counterToStr(boost::optional<PlanShapeCounter> counter) {
     return counter ? toStringData(*counter) : "none";
 }
 
@@ -303,7 +303,7 @@ public:
     }
 
     // The nodes the matcher ignores, paired with a name for failure messages.
-    std::vector<std::pair<StringData, NodeWrapper>> makeIgnoredWrappers() {
+    std::vector<std::pair<std::string_view, NodeWrapper>> makeIgnoredWrappers() {
         return {
             {"LIMIT"_sd,
              [this](std::unique_ptr<QuerySolutionNode> child) {

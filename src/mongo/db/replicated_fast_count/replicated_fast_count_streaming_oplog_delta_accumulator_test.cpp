@@ -146,7 +146,9 @@ protected:
 
     // Builds a container op (ci/cu/cd) oplog BSON. `containerIdent` is written to the top-level
     // `container` field that Layer 1 reads to decide whether to skip the entry.
-    BSONObj makeContainerOpBson(Timestamp ts, StringData opStr, StringData containerIdent) {
+    BSONObj makeContainerOpBson(Timestamp ts,
+                                std::string_view opStr,
+                                std::string_view containerIdent) {
         BSONObjBuilder b;
         b.append("op", opStr);
         b.append("ns", collA.nss.ns_forTest());
@@ -163,7 +165,7 @@ protected:
     // Builds a raw CRUD oplog BSON with explicit control over which fields are present and what
     // shape `m` and `sz` take. Used to exercise the Layer 2 fall-through branches.
     BSONObj makeRawCrudBson(Timestamp ts,
-                            StringData opStr,
+                            std::string_view opStr,
                             const NamespaceString& nss,
                             boost::optional<UUID> uuid,
                             boost::optional<BSONObj> mField) {

@@ -94,7 +94,7 @@ protected:
         return !v.getDocument().getField("encrypt").missing();
     }
 
-    std::vector<PrfBlock> generateTags(fle::BSONValue, StringData) const override {
+    std::vector<PrfBlock> generateTags(fle::BSONValue, std::string_view) const override {
         // In some cases, we may have an empty nss, which implies that the query rewriter was
         // instantiated for an unencrypted collection. This can only happen in an aggregate command
         // when FLE2 queries are using along with unencrypted collections in a $lookup.
@@ -190,7 +190,7 @@ protected:
         return !v.getDocument().getField("foo").missing();
     }
 
-    std::vector<PrfBlock> generateTags(fle::BSONValue payload, StringData) const override {
+    std::vector<PrfBlock> generateTags(fle::BSONValue payload, std::string_view) const override {
         return {};
     };
 
@@ -267,7 +267,7 @@ protected:
         return v.getString() == kPayloadText;
     }
 
-    std::vector<PrfBlock> generateTags(fle::BSONValue payload, StringData) const override {
+    std::vector<PrfBlock> generateTags(fle::BSONValue payload, std::string_view) const override {
         /**
          * If we are in _forceCollScanOnAggAsMatchRewrite, we want text predicates to artifically
          * trigger a failure to generate tags for our testing. Note, this only happens when

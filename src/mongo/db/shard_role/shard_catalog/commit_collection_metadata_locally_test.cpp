@@ -181,7 +181,7 @@ protected:
         }
     }
 
-    long long countCommandOplogEntries(StringData commandField, const NamespaceString& nss) {
+    long long countCommandOplogEntries(std::string_view commandField, const NamespaceString& nss) {
         const std::string objField = "o." + std::string{commandField};
         return findLocalDocs(NamespaceString::kRsOplogNamespace,
                              BSON("op" << "c" << objField << nss.coll()))

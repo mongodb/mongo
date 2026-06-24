@@ -91,7 +91,7 @@ DurableOplogEntryParams makeBaseParams(const NamespaceString& nss,
 }
 
 // Builds a container-insert ReplOperation suitable for nesting inside an applyOps entry.
-ReplOperation makeContainerInsertReplOp(StringData ident, int64_t key, BSONBinData value) {
+ReplOperation makeContainerInsertReplOp(std::string_view ident, int64_t key, BSONBinData value) {
     ContainerInsertOplogEntryO o;
     o.setKey(ContainerKey(key));
     o.setValue(ContainerVal(std::span<const char>{static_cast<const char*>(value.data),

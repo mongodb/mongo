@@ -368,7 +368,7 @@ public:
                          int indexOffset) const final;
 
     int64_t setIndexIsMultikey(OperationContext* opCtx,
-                               StringData indexName,
+                               std::string_view indexName,
                                const MultikeyPaths& multikeyPaths,
                                int indexOffset) const final;
 
@@ -431,7 +431,7 @@ private:
      * control mechanism for multikey metadata updates.
      */
     int64_t _setIndexIsMultikeyWithSharedAccess(OperationContext* opCtx,
-                                                StringData indexName,
+                                                std::string_view indexName,
                                                 const MultikeyPaths& multikeyPaths,
                                                 int indexOffset) const;
 
@@ -442,7 +442,7 @@ private:
      * metadata atomically as part of the transaction.
      */
     int64_t _setIndexIsMultikeyWithExclusiveAccess(OperationContext* opCtx,
-                                                   StringData indexName,
+                                                   std::string_view indexName,
                                                    const MultikeyPaths& multikeyPaths,
                                                    int indexOffset);
 

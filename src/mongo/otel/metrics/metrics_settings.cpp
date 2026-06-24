@@ -59,7 +59,7 @@ Status OpenTelemetryMetricsHttpExportHeaders::set(const BSONElement& newValueEle
 }
 
 Status OpenTelemetryMetricsHttpExportHeaders::setFromString(
-    StringData s, const boost::optional<TenantId>& tenant) {
+    std::string_view s, const boost::optional<TenantId>& tenant) {
     try {
         auto b = BSON("v" << fromjson(s));
         return set(b.firstElement(), tenant);

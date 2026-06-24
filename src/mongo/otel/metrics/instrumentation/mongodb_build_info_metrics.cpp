@@ -49,39 +49,48 @@ using otel::metrics::MetricUnit;
 void installMongoDBBuildInfoMetrics() {
     const auto& vii = VersionInfoInterface::instance();
 
-    const StringData name = serverGlobalParams.binaryName;
+    const std::string_view name = serverGlobalParams.binaryName;
     const std::string instanceId = ProcessId::getCurrent().toString();
-    const StringData version = vii.version();
-    const StringData gitVersion = vii.gitVersion();
+    const std::string_view version = vii.version();
+    const std::string_view gitVersion = vii.gitVersion();
 
-    const StringData kDesc = "`Server` build info (always 1; see label for build information)";
+    const std::string_view kDesc =
+        "`Server` build info (always 1; see label for build information)";
 
     if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
-        auto& gauge =
-            MetricsService::instance()
-                .createInt64Gauge<StringData, StringData, StringData, StringData>(
-                    MetricNames::kMongoDBBuildInfo,
-                    std::string(kDesc),
-                    MetricUnit::kState,
-                    AttributeDefinition<StringData>{"name", {name}},
-                    AttributeDefinition<StringData>{"instance_id", {StringData(instanceId)}},
-                    AttributeDefinition<StringData>{"version", {version}},
-                    AttributeDefinition<StringData>{"git_version", {gitVersion}});
-        gauge.set(1, {name, StringData(instanceId), version, gitVersion});
+        auto& gauge = MetricsService::instance()
+                          .createInt64Gauge<std::string_view,
+                                            std::string_view,
+                                            std::string_view,
+                                            std::string_view>(
+                              MetricNames::kMongoDBBuildInfo,
+                              std::string(kDesc),
+                              MetricUnit::kState,
+                              AttributeDefinition<std::string_view>{"name", {name}},
+                              AttributeDefinition<std::string_view>{"instance_id",
+                                                                    {std::string_view(instanceId)}},
+                              AttributeDefinition<std::string_view>{"version", {version}},
+                              AttributeDefinition<std::string_view>{"git_version", {gitVersion}});
+        gauge.set(1, {name, std::string_view(instanceId), version, gitVersion});
     } else {
-        const StringData storageEngine = storageGlobalParams.engine;
+        const std::string_view storageEngine = storageGlobalParams.engine;
         auto& gauge =
             MetricsService::instance()
-                .createInt64Gauge<StringData, StringData, StringData, StringData, StringData>(
+                .createInt64Gauge<std::string_view,
+                                  std::string_view,
+                                  std::string_view,
+                                  std::string_view,
+                                  std::string_view>(
                     MetricNames::kMongoDBBuildInfo,
                     std::string(kDesc),
                     MetricUnit::kState,
-                    AttributeDefinition<StringData>{"name", {name}},
-                    AttributeDefinition<StringData>{"instance_id", {StringData(instanceId)}},
-                    AttributeDefinition<StringData>{"version", {version}},
-                    AttributeDefinition<StringData>{"git_version", {gitVersion}},
-                    AttributeDefinition<StringData>{"storage_engine", {storageEngine}});
-        gauge.set(1, {name, StringData(instanceId), version, gitVersion, storageEngine});
+                    AttributeDefinition<std::string_view>{"name", {name}},
+                    AttributeDefinition<std::string_view>{"instance_id",
+                                                          {std::string_view(instanceId)}},
+                    AttributeDefinition<std::string_view>{"version", {version}},
+                    AttributeDefinition<std::string_view>{"git_version", {gitVersion}},
+                    AttributeDefinition<std::string_view>{"storage_engine", {storageEngine}});
+        gauge.set(1, {name, std::string_view(instanceId), version, gitVersion, storageEngine});
     }
 }
 

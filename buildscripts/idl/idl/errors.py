@@ -520,7 +520,7 @@ class ParserContext(object):
 
     def add_no_string_data_error(self, location, ast_type, ast_parent):
         # type: (common.SourceLocation, str, str) -> None
-        """Add an error about using StringData for cpp_type."""
+        """Add an error about using std::string_view for cpp_type."""
         self._add_error(
             location,
             ERROR_ID_NO_STRINGDATA,

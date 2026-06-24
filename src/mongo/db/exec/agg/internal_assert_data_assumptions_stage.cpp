@@ -60,7 +60,7 @@ REGISTER_AGG_STAGE_MAPPING(internalAssertDataAssumptionsStage,
                            documentSourceInternalAssertDataAssumptionsToStageFn);
 
 InternalAssertDataAssumptionsStage::InternalAssertDataAssumptionsStage(
-    StringData stageName,
+    std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::set<FieldPath> nonArrayPaths)
     : Stage(stageName, expCtx), _nonArrayPaths(std::move(nonArrayPaths)) {}

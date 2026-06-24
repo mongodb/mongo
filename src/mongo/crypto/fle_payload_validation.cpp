@@ -103,7 +103,7 @@ FLE2PayloadParams::FLE2PayloadParams(const ParsedFindTextSearchPayload& p) {
     }
 }
 
-void validatePayloadAgainstQueryTypeConfig(StringData fieldPath,
+void validatePayloadAgainstQueryTypeConfig(std::string_view fieldPath,
                                            const EncryptedField& field,
                                            const FLE2PayloadParams& params) {
     QueryTypeConfig qtc;

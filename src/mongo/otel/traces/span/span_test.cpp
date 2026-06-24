@@ -48,7 +48,7 @@ protected:
     unittest::ServerParameterGuard _samplingFlagController{"featureFlagOtelTraceSampling", true};
     // Approve all spans by default so tests not focused on sampling still export their spans.
     ScopedSamplerOverride _samplerGuard =
-        setTraceSamplingFnForTest([](StringData, double) { return true; });
+        setTraceSamplingFnForTest([](std::string_view, double) { return true; });
 };
 
 TEST_F(SpanTest, NoOpCtxStartSpan) {
@@ -270,7 +270,7 @@ TEST_F(SpanTest, StartIfExistingTraceParentIfTraceParent) {
 }
 
 TEST_F(SpanTest, SamplingFlagDisabledDropsRootSpan) {
-    auto guard = setTraceSamplingFnForTest([](StringData, double) { return true; });
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; });
     unittest::ServerParameterGuard flagController("featureFlagOtelTraceSampling", false);
 
     auto opCtx = makeOperationContext();
@@ -281,7 +281,7 @@ TEST_F(SpanTest, SamplingFlagDisabledDropsRootSpan) {
 }
 
 TEST_F(SpanTest, TracingFlagDisabledDropsRootSpan) {
-    auto guard = setTraceSamplingFnForTest([](StringData, double) { return true; });
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; });
     unittest::ServerParameterGuard flagController("featureFlagTracing", false);
 
     auto opCtx = makeOperationContext();
@@ -292,7 +292,7 @@ TEST_F(SpanTest, TracingFlagDisabledDropsRootSpan) {
 }
 
 TEST_F(SpanTest, SamplingFlagEnabledSamplerReturnsTrueExportsSpan) {
-    auto guard = setTraceSamplingFnForTest([](StringData, double) { return true; });
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; });
 
     auto opCtx = makeOperationContext();
     {
@@ -302,7 +302,7 @@ TEST_F(SpanTest, SamplingFlagEnabledSamplerReturnsTrueExportsSpan) {
 }
 
 TEST_F(SpanTest, SamplingFlagEnabledSamplerReturnsFalseDropsSpan) {
-    auto guard = setTraceSamplingFnForTest([](StringData, double) { return false; });
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; });
 
     auto opCtx = makeOperationContext();
     {
@@ -312,7 +312,7 @@ TEST_F(SpanTest, SamplingFlagEnabledSamplerReturnsFalseDropsSpan) {
 }
 
 TEST_F(SpanTest, SamplingDroppedRootMeansChildHasNoParentAndIsAlsoDropped) {
-    auto guard = setTraceSamplingFnForTest([](StringData, double) { return false; });
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; });
 
     auto opCtx = makeOperationContext();
     {
@@ -330,7 +330,7 @@ TEST_F(SpanTest, SamplingFlagEnabledChildOfRealParentAlwaysExported) {
         // Sampler approves only name1; name2 is rejected. The child span must still
         // be created because it has a real OTel parent context and bypasses the sampler.
         auto guard = setTraceSamplingFnForTest(
-            [&](StringData name, double) { return name == span_names::kTest1.getName(); });
+            [&](std::string_view name, double) { return name == span_names::kTest1.getName(); });
         auto rootSpan = Span::start(opCtx.get(), span_names::kTest1);
         auto childSpan = Span::start(opCtx.get(), span_names::kTest2);
     }

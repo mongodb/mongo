@@ -330,7 +330,7 @@ bool MozJSScriptEngine::_parseFunctionSource(std::string_view raw,
     return true;
 }
 
-bool MozJSScriptEngine::exec(StringData code, const std::string& name) {
+bool MozJSScriptEngine::exec(std::string_view code, const std::string& name) {
     JS::CompileOptions co(_cx);
     co.setFileAndLine(name.c_str(), 1);
 

@@ -40,7 +40,7 @@ namespace mongo::exec::agg {
  */
 class InternalHybridSearchStage final : public Stage {
 public:
-    InternalHybridSearchStage(StringData stageName,
+    InternalHybridSearchStage(std::string_view stageName,
                               const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     bool isEOF() const final {

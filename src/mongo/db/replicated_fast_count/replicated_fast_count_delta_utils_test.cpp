@@ -2149,8 +2149,8 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionWithPreExistingWritesFai
 // CRUD entry. This test guards against future drift if either function's predicates change.
 TEST(FastCountEligibilityParityTest, NonStoreNamespacesAgreeWithCanonical) {
     struct TestCase {
-        StringData db;
-        StringData coll;
+        std::string_view db;
+        std::string_view coll;
     };
     const std::vector<TestCase> cases{
         // Eligible user collections.

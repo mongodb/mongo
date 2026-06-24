@@ -628,7 +628,7 @@ public:
      * path-level multikey information, returns 1 if the index metadata changed and 0 otherwise.
      */
     virtual int64_t setIndexIsMultikey(OperationContext* opCtx,
-                                       StringData indexName,
+                                       std::string_view indexName,
                                        const MultikeyPaths& multikeyPaths,
                                        int indexOffset = -1) const = 0;
 

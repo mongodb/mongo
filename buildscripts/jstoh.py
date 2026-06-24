@@ -50,7 +50,7 @@ def jsToHeader(target, source):
         # symbols aren't exported w/o this
         h.append("extern const JSFile %s;" % objname)
         h.append(
-            'const JSFile %s = { "%s", StringData(%s, sizeof(%s) - 1) };'
+            'const JSFile %s = { "%s", std::string_view(%s, sizeof(%s) - 1) };'
             % (objname, module_name, stringname, stringname)
         )
 

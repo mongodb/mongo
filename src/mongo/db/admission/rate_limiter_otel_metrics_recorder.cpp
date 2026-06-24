@@ -183,7 +183,7 @@ int64_t RateLimiterOtelMetricsRecorder::currentQueueDepth() const {
 PeriodicRunner::JobAnchor RateLimiterOtelMetricsRecorder::installOtelMetrics(
     PeriodicRunner* runner,
     Milliseconds period,
-    StringData name,
+    std::string_view name,
     std::function<double()> sampleAvailableTokens) {
     invariant(runner);
     auto anchor = runner->makeJob(PeriodicRunner::PeriodicJob(

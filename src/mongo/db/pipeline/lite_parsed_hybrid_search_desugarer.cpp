@@ -87,7 +87,7 @@ std::vector<std::string> namesOf(
 void appendInputPipeline(StageSpecs perPipeline,
                          bool isFirst,
                          const NamespaceString& nss,
-                         StringData userCollName,
+                         std::string_view userCollName,
                          StageSpecs& out) {
     if (isFirst) {
         for (auto& s : perPipeline) {

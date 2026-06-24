@@ -3801,7 +3801,7 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(Cons
 }
 
 namespace {
-const EncryptedField& findFieldByPath(const EncryptedFieldConfig& efc, StringData path) {
+const EncryptedField& findFieldByPath(const EncryptedFieldConfig& efc, std::string_view path) {
     for (const auto& f : efc.getFields()) {
         if (f.getPath() == path) {
             return f;
@@ -3812,15 +3812,19 @@ const EncryptedField& findFieldByPath(const EncryptedFieldConfig& efc, StringDat
 }  // namespace
 
 ParsedFindEqualityPayload::ParsedFindEqualityPayload(
-    BSONElement fleFindPayload, StringData path, boost::optional<const EncryptedFieldConfig&> efc)
+    BSONElement fleFindPayload,
+    std::string_view path,
+    boost::optional<const EncryptedFieldConfig&> efc)
     : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload), path, efc) {}
 
 ParsedFindEqualityPayload::ParsedFindEqualityPayload(
-    const Value& fleFindPayload, StringData path, boost::optional<const EncryptedFieldConfig&> efc)
+    const Value& fleFindPayload,
+    std::string_view path,
+    boost::optional<const EncryptedFieldConfig&> efc)
     : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload), path, efc) {}
 
 ParsedFindEqualityPayload::ParsedFindEqualityPayload(
-    ConstDataRange cdr, StringData path, boost::optional<const EncryptedFieldConfig&> efc) {
+    ConstDataRange cdr, std::string_view path, boost::optional<const EncryptedFieldConfig&> efc) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
 
@@ -3844,17 +3848,17 @@ ParsedFindEqualityPayload::ParsedFindEqualityPayload(
 }
 
 ParsedFindRangePayload::ParsedFindRangePayload(BSONElement fleFindPayload,
-                                               StringData path,
+                                               std::string_view path,
                                                boost::optional<const EncryptedFieldConfig&> efc)
     : ParsedFindRangePayload(binDataToCDR(fleFindPayload), path, efc) {}
 
 ParsedFindRangePayload::ParsedFindRangePayload(const Value& fleFindPayload,
-                                               StringData path,
+                                               std::string_view path,
                                                boost::optional<const EncryptedFieldConfig&> efc)
     : ParsedFindRangePayload(binDataToCDR(fleFindPayload), path, efc) {}
 
 ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr,
-                                               StringData path,
+                                               std::string_view path,
                                                boost::optional<const EncryptedFieldConfig&> efc) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
@@ -3895,17 +3899,21 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr,
 }
 
 ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(
-    BSONElement fleFindPayload, StringData path, boost::optional<const EncryptedFieldConfig&> efc) {
+    BSONElement fleFindPayload,
+    std::string_view path,
+    boost::optional<const EncryptedFieldConfig&> efc) {
     // We should never parse a BSONElement payload since we don't support match expressions.
     MONGO_UNREACHABLE_TASSERT(10112804);
 };
 
 ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(
-    const Value& fleFindPayload, StringData path, boost::optional<const EncryptedFieldConfig&> efc)
+    const Value& fleFindPayload,
+    std::string_view path,
+    boost::optional<const EncryptedFieldConfig&> efc)
     : ParsedFindTextSearchPayload(binDataToCDR(fleFindPayload), path, efc) {}
 
 ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(
-    ConstDataRange cdr, StringData path, boost::optional<const EncryptedFieldConfig&> efc) {
+    ConstDataRange cdr, std::string_view path, boost::optional<const EncryptedFieldConfig&> efc) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
     uassert(10112800,

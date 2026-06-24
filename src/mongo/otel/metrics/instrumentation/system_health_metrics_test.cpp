@@ -73,9 +73,12 @@ TEST_F(SystemHealthOtelMetricsTest, FirstUpdateSetsMetricsCorrectly) {
 
     _metrics.update(snap);
 
-    ASSERT_EQ(1000, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"user"_sd}));
-    ASSERT_EQ(500, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"system"_sd}));
-    ASSERT_EQ(200, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"iowait"_sd}));
+    ASSERT_EQ(1000,
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"_sd}));
+    ASSERT_EQ(500,
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"_sd}));
+    ASSERT_EQ(200,
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"_sd}));
     ASSERT_EQ(4, _capturer.readInt64Gauge(MetricNames::kThreadActive));
     ASSERT_EQ(1, _capturer.readInt64Gauge(MetricNames::kThreadQueued));
     ASSERT_EQ(512, _capturer.readInt64Gauge(MetricNames::kFdOpen));
@@ -101,9 +104,12 @@ TEST_F(SystemHealthOtelMetricsTest, SecondUpdateUpdatesMetricsCorrectly) {
     _metrics.update(second);
 
     // Counters accumulate deltas: first=1000/500/200, delta=300/150/50.
-    ASSERT_EQ(1300, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"user"_sd}));
-    ASSERT_EQ(650, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"system"_sd}));
-    ASSERT_EQ(250, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"iowait"_sd}));
+    ASSERT_EQ(1300,
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"_sd}));
+    ASSERT_EQ(650,
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"_sd}));
+    ASSERT_EQ(250,
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"_sd}));
 
     ASSERT_EQ(5, _capturer.readInt64Gauge(MetricNames::kThreadActive));
     ASSERT_EQ(3, _capturer.readInt64Gauge(MetricNames::kThreadQueued));
@@ -130,13 +136,16 @@ TEST_F(SystemHealthOtelMetricsTest, NegativeDeltaOnWrapIsSkipped) {
     _metrics.update(low);
 
     // Negative deltas are skipped; counters retain the value from before the reset.
-    ASSERT_EQ(5000, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"user"_sd}));
-    ASSERT_EQ(2000, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"system"_sd}));
-    ASSERT_EQ(800, _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {"iowait"_sd}));
+    ASSERT_EQ(5000,
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"_sd}));
+    ASSERT_EQ(2000,
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"_sd}));
+    ASSERT_EQ(800,
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"_sd}));
 }
 
 struct CPUModeField {
-    StringData mode;
+    std::string_view mode;
     int64_t SystemHealthSnapshot::* field;
 };
 
@@ -170,13 +179,13 @@ TEST_F(SystemHealthOtelMetricsTest, CpuTimeDeltaAllFields) {
     for (const auto& c : kCpuModeFields) {
         SCOPED_TRACE(fmt::format("mode={}", c.mode));
         EXPECT_EQ(second.*c.field,
-                  _capturer.readInt64Counter<StringData>(MetricNames::kCpuTime, {c.mode}));
+                  _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {c.mode}));
     }
 }
 
 TEST_F(SystemHealthOtelMetricsTest, CpuUtilization) {
     struct Case {
-        StringData name;
+        std::string_view name;
         std::array<int64_t, 10> deltas;
         std::array<double, 10> expectedRatios;
     };
@@ -207,8 +216,8 @@ TEST_F(SystemHealthOtelMetricsTest, CpuUtilization) {
 
         for (size_t i = 0; i < c.expectedRatios.size(); ++i) {
             EXPECT_DOUBLE_EQ(c.expectedRatios[i],
-                             _capturer.readDoubleGauge<StringData>(MetricNames::kCpuUtilization,
-                                                                   {kCpuModeFields[i].mode}));
+                             _capturer.readDoubleGauge<std::string_view>(
+                                 MetricNames::kCpuUtilization, {kCpuModeFields[i].mode}));
         }
     }
 }

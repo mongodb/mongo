@@ -290,7 +290,7 @@ TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitReusesOperationContextA
     // Share a single OperationContext across the ExpressionContext of each pipeline.
     auto* opCtx = getExpCtxRaw()->getOperationContext();
 
-    auto evaluateJsEmit = [&](StringData func, const Document& root) {
+    auto evaluateJsEmit = [&](std::string_view func, const Document& root) {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(opCtx));
         expCtx->setMongoProcessInterface(std::make_shared<StandaloneProcessInterface>(nullptr));
         auto bsonExpr = BSON("expr" << BSON("this" << "$$ROOT"

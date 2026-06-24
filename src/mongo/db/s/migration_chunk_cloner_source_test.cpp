@@ -419,7 +419,7 @@ public:
     }
 
     int64_t setIndexIsMultikey(OperationContext* opCtx,
-                               StringData indexName,
+                               std::string_view indexName,
                                const MultikeyPaths& multikeyPaths,
                                int indexOffset = -1) const override {
         return _coll->setIndexIsMultikey(opCtx, indexName, multikeyPaths, indexOffset);

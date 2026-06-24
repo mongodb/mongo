@@ -102,7 +102,7 @@ public:
      */
     PeriodicRunner::JobAnchor installOtelMetrics(PeriodicRunner* runner,
                                                  Milliseconds period,
-                                                 StringData name,
+                                                 std::string_view name,
                                                  std::function<double()> sampleAvailableTokens);
 
 private:

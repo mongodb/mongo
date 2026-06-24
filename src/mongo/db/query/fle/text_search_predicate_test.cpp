@@ -83,7 +83,7 @@ protected:
         return _exprTags.contains(v.coerceToString());
     }
 
-    std::vector<PrfBlock> generateTags(BSONValue payload, StringData) const override {
+    std::vector<PrfBlock> generateTags(BSONValue payload, std::string_view) const override {
         return visit(OverloadedVisitor{[&](BSONElement p) {
                                            // We will never generateTags for a MatchExpression for
                                            // any encrypted text search.
@@ -127,7 +127,7 @@ public:
 
 
 protected:
-    std::vector<PrfBlock> generateTags(BSONValue payload, StringData) const override {
+    std::vector<PrfBlock> generateTags(BSONValue payload, std::string_view) const override {
         return visit(OverloadedVisitor{[&](BSONElement p) {
                                            // We will never generateTags for a MatchExpression for
                                            // any encrypted text search.

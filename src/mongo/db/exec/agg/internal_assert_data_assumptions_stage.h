@@ -43,7 +43,7 @@ namespace mongo::exec::agg {
 
 class InternalAssertDataAssumptionsStage final : public Stage {
 public:
-    InternalAssertDataAssumptionsStage(StringData stageName,
+    InternalAssertDataAssumptionsStage(std::string_view stageName,
                                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                        std::set<FieldPath> nonArrayPaths);
 

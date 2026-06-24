@@ -42,7 +42,7 @@ namespace {
 
 struct Registry {
 public:
-    SpanName& insert(StringData name, SampledByDefault sampledByDefault) {
+    SpanName& insert(std::string_view name, SampledByDefault sampledByDefault) {
         return _spans.emplace_back(SpanName::passkeyForNetworkingAndObservabilityOnly,
                                    _names.emplace_back(name),
                                    sampledByDefault);
@@ -61,7 +61,7 @@ auto syncGlobalRegistry() {
 
 }  // namespace
 
-const SpanName& registerCommandSpanName(StringData name, SampledByDefault sampledByDefault) {
+const SpanName& registerCommandSpanName(std::string_view name, SampledByDefault sampledByDefault) {
     return syncGlobalRegistry()->insert(name, sampledByDefault);
 }
 

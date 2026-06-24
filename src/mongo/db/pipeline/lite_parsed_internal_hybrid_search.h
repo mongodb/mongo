@@ -51,7 +51,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalHybridSearch);
 class LiteParsedInternalHybridSearch final
     : public LiteParsedDocumentSourceDefault<LiteParsedInternalHybridSearch> {
 public:
-    static constexpr StringData kStageName = "$_internalHybridSearch"_sd;
+    static constexpr std::string_view kStageName = "$_internalHybridSearch"_sd;
 
     // Used by the desugarer, which synthesizes the (empty) spec itself.
     LiteParsedInternalHybridSearch()

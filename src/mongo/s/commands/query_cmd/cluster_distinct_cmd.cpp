@@ -598,7 +598,7 @@ public:
             BSONObjBuilder b(32);
             DecimalCounter<unsigned> n;
             for (auto&& obj : all) {
-                b.appendAs(obj.firstElement(), StringData{n});
+                b.appendAs(obj.firstElement(), std::string_view{n});
                 ++n;
             }
 

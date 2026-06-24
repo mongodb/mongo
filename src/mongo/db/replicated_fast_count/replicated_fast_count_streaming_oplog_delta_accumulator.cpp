@@ -84,7 +84,7 @@ struct ScanFields {
 // enforces the SERVER-125723 invariant that no entries carry a `tid` field.
 ScanFields extractScanFields(const BSONObj& raw) {
     ScanFields v;
-    // Dispatch on field-name length first, then on bytes. Avoids StringData operator==
+    // Dispatch on field-name length first, then on bytes. Avoids std::string_view operator==
     // (length + memcmp) per BSON field. Fields outside our set hit the default case in O(1).
     for (const auto& elem : raw) {
         const auto fname = elem.fieldNameStringData();
@@ -128,7 +128,7 @@ ScanFields extractScanFields(const BSONObj& raw) {
     return v;
 }
 
-bool isFastCountStoreCollName(StringData coll) {
+bool isFastCountStoreCollName(std::string_view coll) {
     return coll == NamespaceString::kReplicatedFastCountStore ||
         coll == NamespaceString::kReplicatedFastCountStoreTimestamps;
 }
@@ -140,7 +140,7 @@ bool nsIsFastCountStore(BSONElement nsElem) {
         return false;
     }
     const auto ns = nsElem.valueStringData();
-    constexpr StringData kConfigDot = "config."_sd;
+    constexpr std::string_view kConfigDot = "config."_sd;
     if (!ns.starts_with(kConfigDot)) {
         return false;
     }

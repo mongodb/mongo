@@ -77,7 +77,7 @@ constexpr size_t kProxyPeekSize = transport::kProxyV1Signature.size();
  * Given an s2n return code, returns OK on S2N_SUCCESS or an InternalError with the s2n error
  * message on S2N_FAILURE.
  */
-Status s2nCheck(int result, StringData op) {
+Status s2nCheck(int result, std::string_view op) {
     if (result == S2N_SUCCESS) {
         return Status::OK();
     }
@@ -129,7 +129,7 @@ Status pollForRead(POSIXInterface& posix, int fd, int timeoutMs) {
     return Status::OK();
 }
 
-Status setBlocking(POSIXInterface& posix, int fd, StringData nameForErrorDiagnostic) {
+Status setBlocking(POSIXInterface& posix, int fd, std::string_view nameForErrorDiagnostic) {
     const int flags = posix.fcntl(fd, F_GETFL);
     if (flags == -1) {
         return Status(ErrorCodes::SocketException,
@@ -707,7 +707,7 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
         uassertStatusOK(_syncRead(proxyBuf.data() + kProxyV2FixedHeaderSize, addrLen));
     }
 
-    StringData proxyData(proxyBuf.data(), proxyBuf.size());
+    std::string_view proxyData(proxyBuf.data(), proxyBuf.size());
     auto results = transport::parseProxyProtocolHeader(proxyData, /*isProxyUnixSock=*/true);
     uassert(ErrorCodes::ProtocolError,
             "Failed to parse PROXY v2 header on proxy UDS",

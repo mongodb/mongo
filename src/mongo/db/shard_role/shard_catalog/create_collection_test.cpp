@@ -947,29 +947,30 @@ TEST_F(CreateCollectionTest, FixedBucketingIdempotentRecreateOmittedInheritsStor
 
     // firstCreateValue: value passed on first create (boost::none = omit, defaults to true).
     // expectedStored: value expected after both creates.
-    auto checkIdempotentRecreate =
-        [&](StringData collName, boost::optional<bool> firstCreateValue, bool expectedStored) {
-            NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", collName);
-            auto opCtx = makeOpCtx();
+    auto checkIdempotentRecreate = [&](std::string_view collName,
+                                       boost::optional<bool> firstCreateValue,
+                                       bool expectedStored) {
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", collName);
+        auto opCtx = makeOpCtx();
 
-            CollectionOptions options;
-            options.timeseries = TimeseriesOptions("ts");
-            if (firstCreateValue.has_value()) {
-                options.timeseries->setFixedBucketing(*firstCreateValue);
-            }
-            ASSERT_OK(createCollection(opCtx.get(), nss, options, /*idIndex=*/boost::none));
+        CollectionOptions options;
+        options.timeseries = TimeseriesOptions("ts");
+        if (firstCreateValue.has_value()) {
+            options.timeseries->setFixedBucketing(*firstCreateValue);
+        }
+        ASSERT_OK(createCollection(opCtx.get(), nss, options, /*idIndex=*/boost::none));
 
-            // Re-create omitting fixedBucketing: must succeed and leave stored value unchanged.
-            CollectionOptions optionsAgain;
-            optionsAgain.timeseries = TimeseriesOptions("ts");
-            ASSERT_OK(createCollection(opCtx.get(), nss, optionsAgain, /*idIndex=*/boost::none));
+        // Re-create omitting fixedBucketing: must succeed and leave stored value unchanged.
+        CollectionOptions optionsAgain;
+        optionsAgain.timeseries = TimeseriesOptions("ts");
+        ASSERT_OK(createCollection(opCtx.get(), nss, optionsAgain, /*idIndex=*/boost::none));
 
-            const auto storedOptions = getCollectionOptions(opCtx.get(), nss);
-            ASSERT_TRUE(storedOptions.timeseries.has_value());
-            const auto storedFixedBucketing = storedOptions.timeseries->getFixedBucketing();
-            ASSERT_TRUE(storedFixedBucketing.has_value());
-            ASSERT_EQ(static_cast<bool>(storedFixedBucketing), expectedStored);
-        };
+        const auto storedOptions = getCollectionOptions(opCtx.get(), nss);
+        ASSERT_TRUE(storedOptions.timeseries.has_value());
+        const auto storedFixedBucketing = storedOptions.timeseries->getFixedBucketing();
+        ASSERT_TRUE(storedFixedBucketing.has_value());
+        ASSERT_EQ(static_cast<bool>(storedFixedBucketing), expectedStored);
+    };
 
     // omit first create (defaults to true), omit re-create => stays true
     checkIdempotentRecreate("fixedBucketingRecreateOmitOmit", boost::none, true);

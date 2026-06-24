@@ -48,6 +48,7 @@
 #include <algorithm>
 #include <deque>
 #include <initializer_list>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -879,12 +880,12 @@ public:
     static inline int gEvaluations = 0;
     static inline int gEvaluationsWithTracker = 0;
     static inline int64_t gLastTrackerMaxBytes = -1;
-    static inline StringData gLastStageName;
+    static inline std::string_view gLastStageName;
     static void resetObservations() {
         gEvaluations = 0;
         gEvaluationsWithTracker = 0;
         gLastTrackerMaxBytes = -1;
-        gLastStageName = StringData{};
+        gLastStageName = std::string_view{};
     }
 
     explicit MemoryTrackerObservingExpression(ExpressionContext* expCtx) : Expression(expCtx) {}

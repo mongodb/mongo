@@ -59,7 +59,7 @@ public:
      * Returns whether the span identified by `spanName` should start a trace, given a
      * sampling roll in [0, 1].
      */
-    virtual bool shouldSample(StringData spanName, double sampleValue) = 0;
+    virtual bool shouldSample(std::string_view spanName, double sampleValue) = 0;
 
     /** Applies a new sampling configuration. Production implementations should override this. */
     virtual void updateConfig(const SamplingConfig& config) {}
@@ -102,7 +102,7 @@ public:
      * Determines if the span should start a trace given the combination of config, default sampled
      * spans, and sampleValue.
      */
-    bool shouldSample(StringData spanName, double sampleValue) override;
+    bool shouldSample(std::string_view spanName, double sampleValue) override;
     void updateConfig(const SamplingConfig& config) override;
     SamplingConfig getConfig() const override;
     void sampleByDefault(SpanName name) override;
@@ -132,6 +132,6 @@ using ScopedSamplerOverride = std::unique_ptr<SamplerOverride>;
  * Returns a guard that restores the previous sampler on destruction. This is not thread-safe.
  */
 [[nodiscard]] MONGO_MOD_PUBLIC ScopedSamplerOverride
-setTraceSamplingFnForTest(unique_function<bool(StringData, double)> fn);
+setTraceSamplingFnForTest(unique_function<bool(std::string_view, double)> fn);
 
 }  // namespace mongo::otel::traces

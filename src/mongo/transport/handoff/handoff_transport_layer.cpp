@@ -184,7 +184,7 @@ void HandoffTransportLayer::shutdown() {
     LOGV2(12779303, "HandoffTransportLayer shut down");
 }
 
-StringData HandoffTransportLayer::getNameForLogging() const {
+std::string_view HandoffTransportLayer::getNameForLogging() const {
     return "HandoffTransportLayer"_sd;
 }
 

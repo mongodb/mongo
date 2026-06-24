@@ -420,7 +420,7 @@ public:
     }
 
     int64_t setIndexIsMultikey(OperationContext* opCtx,
-                               StringData indexName,
+                               std::string_view indexName,
                                const MultikeyPaths& multikeyPaths,
                                int indexOffset) const override {
         MONGO_UNREACHABLE;

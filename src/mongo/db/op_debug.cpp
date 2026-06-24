@@ -162,7 +162,7 @@ void addSpillingStats(const absl::flat_hash_map<PlanSummaryStats::SpillingStage,
     }
 }
 
-StringData getPlanRankerMethodName(PlanRankerMethod method) {
+std::string_view getPlanRankerMethodName(PlanRankerMethod method) {
     switch (method) {
         case PlanRankerMethod::kMultiPlanner:
             return "mp"_sd;

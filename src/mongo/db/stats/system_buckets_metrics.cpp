@@ -88,8 +88,8 @@ void SystemBucketsMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
     const bool isRouter = opCtx->getService()->role().hasExclusively(ClusterRole::RouterServer);
     if (!isInternal) {
         // Only count external commands
-        StringData appName;
-        StringData driverName;
+        std::string_view appName;
+        std::string_view driverName;
         if (auto clientMetadata = ClientMetadata::get(opCtx->getClient())) {
             appName = clientMetadata->getApplicationName();
             driverName = clientMetadata->getDriverName();

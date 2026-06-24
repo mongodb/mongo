@@ -83,7 +83,7 @@ public:
  */
 class DocumentSourceInternalAssertDataAssumptions final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalAssertDataAssumptions"_sd;
+    static constexpr std::string_view kStageName = "$_internalAssertDataAssumptions"_sd;
 
     /**
      * Creates a DocumentSourceInternalAssertDataAssumptions from a BSONElement specification.
@@ -101,7 +101,7 @@ public:
     DocumentSourceInternalAssertDataAssumptions(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, std::set<FieldPath> nonArrayPaths);
 
-    StringData getSourceName() const final {
+    std::string_view getSourceName() const final {
         return kStageName;
     }
 

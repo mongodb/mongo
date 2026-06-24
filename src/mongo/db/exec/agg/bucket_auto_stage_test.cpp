@@ -42,6 +42,8 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -52,12 +54,12 @@ public:
     static inline int gEvaluations = 0;
     static inline int gEvaluationsWithTracker = 0;
     static inline int64_t gLastTrackerMaxBytes = -1;
-    static inline StringData gLastStageName;
+    static inline std::string_view gLastStageName;
     static void resetObservations() {
         gEvaluations = 0;
         gEvaluationsWithTracker = 0;
         gLastTrackerMaxBytes = -1;
-        gLastStageName = StringData{};
+        gLastStageName = std::string_view{};
     }
 
     explicit MemoryTrackerObservingExpression(ExpressionContext* expCtx) : Expression(expCtx) {}

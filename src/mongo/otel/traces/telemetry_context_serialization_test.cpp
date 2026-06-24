@@ -57,7 +57,7 @@ protected:
     unittest::ServerParameterGuard _featureFlagSamplingController{"featureFlagOtelTraceSampling",
                                                                   true};
     ScopedSamplerOverride _samplerGuard =
-        setTraceSamplingFnForTest([](StringData, double) { return true; });
+        setTraceSamplingFnForTest([](std::string_view, double) { return true; });
 };
 
 BSONObj serializeTraceContextOnly(const std::shared_ptr<TelemetryContext>& context) {

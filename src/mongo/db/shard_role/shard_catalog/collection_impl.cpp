@@ -1746,7 +1746,7 @@ int64_t CollectionImpl::_setIndexIsMultikeyInMetadata(
 }
 
 int64_t CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
-                                           StringData indexName,
+                                           std::string_view indexName,
                                            const MultikeyPaths& multikeyPaths,
                                            int indexOffset) const {
     if (CollectionCatalog::isWritableCollection(opCtx, this)) {
@@ -1777,7 +1777,7 @@ int64_t CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
 }
 
 int64_t CollectionImpl::_setIndexIsMultikeyWithSharedAccess(OperationContext* opCtx,
-                                                            StringData indexName,
+                                                            std::string_view indexName,
                                                             const MultikeyPaths& multikeyPaths,
                                                             int indexOffset) const {
     const auto offset = _getIndexOffsetForMultikeyUpdate(indexName, indexOffset);
@@ -1891,7 +1891,7 @@ int64_t CollectionImpl::_setIndexIsMultikeyWithSharedAccess(OperationContext* op
 }
 
 int64_t CollectionImpl::_setIndexIsMultikeyWithExclusiveAccess(OperationContext* opCtx,
-                                                               StringData indexName,
+                                                               std::string_view indexName,
                                                                const MultikeyPaths& multikeyPaths,
                                                                int indexOffset) {
     const auto offset = _getIndexOffsetForMultikeyUpdate(indexName, indexOffset);

@@ -56,7 +56,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalAssertDataAssumption
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalAssertDataAssumptions,
                             DocumentSourceInternalAssertDataAssumptions::id);
 
-constexpr StringData DocumentSourceInternalAssertDataAssumptions::kStageName;
+constexpr std::string_view DocumentSourceInternalAssertDataAssumptions::kStageName;
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalAssertDataAssumptions::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
