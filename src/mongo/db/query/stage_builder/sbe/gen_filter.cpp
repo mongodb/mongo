@@ -973,7 +973,7 @@ public:
 
             for (auto&& r : regexes) {
                 auto [pcreRegexTag, pcreRegexVal] =
-                    sbe::makeNewPcreRegex(r->getString(), r->getFlags());
+                    sbe::makeNewPcreRegex(r->getString(), r->getFlags()).releaseToRaw();
                 pcreArr->push_back_raw(pcreRegexTag, pcreRegexVal);
 
                 auto [regexSetTag, regexSetVal] =
@@ -1595,7 +1595,7 @@ SbExpr generateRegexExpr(StageBuilderState& state,
             return compiledRegexSlot;
         } else {
             auto [compiledRegexTag, compiledRegexVal] =
-                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags());
+                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags()).releaseToRaw();
             return b.makeConstant(compiledRegexTag, compiledRegexVal);
         }
     }();

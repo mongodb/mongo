@@ -169,8 +169,8 @@ public:
         }
 
         if (auto slotId = getSlotId(*compiledRegexParam)) {
-            auto&& [compiledRegexTag, compiledRegexVal] =
-                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags());
+            auto [compiledRegexTag, compiledRegexVal] =
+                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags()).releaseToRaw();
             bindParam(*slotId, true /*owned*/, compiledRegexTag, compiledRegexVal);
         }
     }

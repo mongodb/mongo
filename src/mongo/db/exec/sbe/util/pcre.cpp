@@ -38,10 +38,7 @@
 #include <string_view>
 
 namespace mongo::sbe {
-using TypeTags = value::TypeTags;
-using Value = value::Value;
-
-std::pair<TypeTags, Value> makeNewPcreRegex(std::string_view pattern, std::string_view options) {
+value::TagValueOwned makeNewPcreRegex(std::string_view pattern, std::string_view options) {
     auto regex = std::make_unique<pcre::Regex>(
         std::string{pattern},
         pcre_util::flagsToOptions(options),
@@ -50,6 +47,7 @@ std::pair<TypeTags, Value> makeNewPcreRegex(std::string_view pattern, std::strin
             .matchLimit = static_cast<uint32_t>(internalQueryRegexMatchLimit.loadRelaxed())});
 
     uassert(5073402, str::stream() << "Invalid Regex: " << errorMessage(regex->error()), *regex);
-    return {TypeTags::pcreRegex, value::bitcastFrom<pcre::Regex*>(regex.release())};
+    return value::TagValueOwned(value::TypeTags::pcreRegex,
+                                value::bitcastFrom<pcre::Regex*>(regex.release()));
 }
 }  // namespace mongo::sbe

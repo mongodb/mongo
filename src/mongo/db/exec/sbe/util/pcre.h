@@ -35,6 +35,5 @@
 #include <string_view>
 
 namespace mongo::sbe {
-std::pair<value::TypeTags, value::Value> makeNewPcreRegex(std::string_view pattern,
-                                                          std::string_view options);
+value::TagValueOwned makeNewPcreRegex(std::string_view pattern, std::string_view options);
 }  // namespace mongo::sbe

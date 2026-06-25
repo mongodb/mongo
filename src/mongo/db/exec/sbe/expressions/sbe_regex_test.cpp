@@ -161,13 +161,13 @@ TEST_F(SBERegexTest, ComputesRegexMatch) {
         EFn::kRegexMatch, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*regexExpr);
 
-    auto [regexTag, regexVal] = makeNewPcreRegex("line", "");
+    auto [regexTag, regexVal] = makeNewPcreRegex("line", "").releaseToRaw();
     auto [inputTag, inputVal] = value::makeNewString("Many lines of code");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
     runAndAssertMatchExpression(compiledExpr.get(), true);
 
-    std::tie(regexTag, regexVal) = makeNewPcreRegex("link", "");
+    std::tie(regexTag, regexVal) = makeNewPcreRegex("link", "").releaseToRaw();
     std::tie(inputTag, inputVal) = value::makeNewString("Example text");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
@@ -183,13 +183,13 @@ TEST_F(SBERegexTest, ComputesRegexFind) {
         EFn::kRegexFind, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*regexExpr);
 
-    auto [regexTag, regexVal] = makeNewPcreRegex("line", "");
+    auto [regexTag, regexVal] = makeNewPcreRegex("line", "").releaseToRaw();
     auto [inputTag, inputVal] = value::makeNewString("Many lines of code");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
     runAndAssertFindExpression(compiledExpr.get(), "line", 5);
 
-    std::tie(regexTag, regexVal) = makeNewPcreRegex("line", "i");
+    std::tie(regexTag, regexVal) = makeNewPcreRegex("line", "i").releaseToRaw();
     std::tie(inputTag, inputVal) = value::makeNewString("Many LINES of code");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
@@ -212,7 +212,7 @@ TEST_F(SBERegexTest, ComputesRegexFindAll) {
     addMatchResult(arrayView, "line", 4);
     addMatchResult(arrayView, "line", 16);
 
-    auto [regexTag, regexVal] = makeNewPcreRegex("line", "");
+    auto [regexTag, regexVal] = makeNewPcreRegex("line", "").releaseToRaw();
     auto [inputTag, inputVal] = value::makeNewString("One line or two lines of code");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
@@ -232,7 +232,7 @@ TEST_F(SBERegexTest, RegexFindAllEmptyMatchOnEmptyInput) {
     auto arrayView = value::getArrayView(expectedArr.value());
     addMatchResult(arrayView, /*matchStr*/ "", /*idx*/ 0);
 
-    auto [regexTag, regexVal] = makeNewPcreRegex("a*", "");
+    auto [regexTag, regexVal] = makeNewPcreRegex("a*", "").releaseToRaw();
     auto [inputTag, inputVal] = value::makeNewString("");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
@@ -252,7 +252,7 @@ TEST_F(SBERegexTest, RegexFindAllEndAnchorOnNonEmptyInput) {
     auto arrayView = value::getArrayView(expectedArr.value());
     addMatchResult(arrayView, /*matchStr*/ "", /*idx*/ 5);
 
-    auto [regexTag, regexVal] = makeNewPcreRegex("$", "");
+    auto [regexTag, regexVal] = makeNewPcreRegex("$", "").releaseToRaw();
     auto [inputTag, inputVal] = value::makeNewString("hello");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);

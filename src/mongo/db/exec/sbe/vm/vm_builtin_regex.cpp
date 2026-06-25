@@ -145,8 +145,7 @@ value::TagValueMaybeOwned ByteCode::builtinRegexCompile(ArityType arity) {
         return value::TagValueMaybeOwned::nothing();
     }
 
-    auto [pcreTag, pcreValue] = makeNewPcreRegex(pattern, options);
-    return {true, pcreTag, pcreValue};
+    return makeNewPcreRegex(pattern, options);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinRegexMatch(ArityType arity) {
