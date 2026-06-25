@@ -44,6 +44,7 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace mongo::otel::traces {
 
@@ -60,6 +61,13 @@ public:
      * sampling roll in [0, 1].
      */
     virtual bool shouldSample(std::string_view spanName, double sampleValue) = 0;
+
+    /** Returns whether a trace initiated externally from this server should be continued on this
+     * server.
+     */
+    virtual bool shouldAcceptExternalTrace() const {
+        return false;
+    };
 
     /** Applies a new internal sampling configuration. */
     virtual void updateInternalConfig(const SamplingParameters& defaultSpans,
@@ -81,6 +89,8 @@ public:
 
 /** Stores the current state of a sampler. */
 struct MONGO_MOD_PUBLIC SamplerState {
+    using RateLimiter = std::shared_ptr<admission::RateLimiter>;
+
     /** Maps span name to its sampling factor. Absence is equivalent to a factor of 0.0. */
     using SamplingFactorMap = StringMap<double>;
 
@@ -88,10 +98,11 @@ struct MONGO_MOD_PUBLIC SamplerState {
      * Maps span name to its rate limiter. Each limiter is a shared_ptr so that _rebuild can copy
      * existing limiters into a fresh map without resetting their token buckets.
      */
-    using RateLimiterMap = StringMap<std::shared_ptr<admission::RateLimiter>>;
+    using RateLimiterMap = StringMap<RateLimiter>;
 
     SamplingFactorMap samplingFactorMap;
     RateLimiterMap rateLimiterMap;
+    RateLimiter externalRateLimiter;
 };
 
 /**
@@ -107,6 +118,7 @@ public:
      * spans, and sampleValue.
      */
     bool shouldSample(std::string_view spanName, double sampleValue) override;
+    bool shouldAcceptExternalTrace() const override;
     void updateInternalConfig(const SamplingParameters& defaultSpans,
                               const StringMap<SamplingParameters>& perSpanOverrides) override;
     void updateExternalConfig(RateLimitParams rateLimits) override;
@@ -116,6 +128,9 @@ public:
 private:
     /** Rebuilds _samplingFactors from _defaultSampledSpanNames and _samplingConfig. */
     void _rebuild(WithLock);
+
+    static VersionedValue<const SamplerState> _samplerState;
+    static thread_local VersionedValue<const SamplerState>::Snapshot _snapshot;
 
     TickSource* _tickSource;
 

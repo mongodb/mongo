@@ -31,8 +31,12 @@
 
 #include "mongo/otel/traces/sampler/sampling_config.h"
 #include "mongo/otel/traces/span/span_names.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::otel::traces {
 namespace {
@@ -271,6 +275,95 @@ TEST(SamplerTest, DefaultAndPerSpanRateLimitersEnforceIndependentBudgets) {
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest2.getName(), 0.0));
 }
 
+TEST(SamplerTest, ExternalSpanSamplesWithoutSpanRegistration) {
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    // isExternal=true bypasses span name registration and sampling factor checks entirely.
+    EXPECT_TRUE(sampler.shouldAcceptExternalTrace());
+}
+
+TEST(SamplerTest, ExternalSpanBlocksAfterTokensExhausted) {
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    sampler.updateExternalConfig({.refillRate = 1.0, .maxTokens = 1});
+    EXPECT_TRUE(sampler.shouldAcceptExternalTrace());
+    EXPECT_FALSE(sampler.shouldAcceptExternalTrace());
+}
+
+TEST(SamplerTest, ExternalAndInternalRateLimitersAreIndependent) {
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0, .rateLimits = {.maxTokens = 1}},
+                                 {});
+    sampler.updateExternalConfig({.maxTokens = 1});
+    sampler.sampleByDefault(span_names::kTest1);
+
+    // Consuming the external token does not affect the internal token.
+    EXPECT_TRUE(sampler.shouldAcceptExternalTrace());
+    EXPECT_FALSE(sampler.shouldAcceptExternalTrace());
+    EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
+    EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
+}
+
+TEST(SamplerTest, UpdateExternalConfigChangesRateLimit) {
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    sampler.updateExternalConfig({.refillRate = 1.0, .maxTokens = 2});
+    EXPECT_TRUE(sampler.shouldAcceptExternalTrace());
+    EXPECT_TRUE(sampler.shouldAcceptExternalTrace());
+    EXPECT_FALSE(sampler.shouldAcceptExternalTrace());
+}
+
+TEST(SamplerTest, GetExternalConfigReturnsCurrentValues) {
+    TracingSamplerImpl sampler;
+    sampler.updateExternalConfig({.refillRate = 5.0, .maxTokens = 20});
+    auto externalRateLimits = sampler.getConfig().externalRateLimits;
+    EXPECT_DOUBLE_EQ(externalRateLimits.refillRate, 5.0);
+    EXPECT_EQ(externalRateLimits.maxTokens, 20);
+}
+
+TEST(SamplerTest, ExternalRateLimiterPreservedAfterRebuild) {
+    TickSourceMock<Milliseconds> clock;
+    TracingSamplerImpl sampler(&clock);
+    sampler.updateExternalConfig({.refillRate = 1.0, .maxTokens = 2});
+
+    // Consume one of two external tokens.
+    EXPECT_TRUE(sampler.shouldAcceptExternalTrace());
+
+    // Trigger a rebuild; the external rate limiter shared_ptr is reused, not recreated.
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0}, {});
+
+    // One token remains after the rebuild.
+    EXPECT_TRUE(sampler.shouldAcceptExternalTrace());
+    EXPECT_FALSE(sampler.shouldAcceptExternalTrace());
+}
+
+TEST(SamplerTest, ConcurrentAccessTest) {
+    unittest::ThreadAssertionMonitor monitor;
+    monitor
+        .spawnController([&] {
+            TracingSamplerImpl sampler;
+            sampler.sampleByDefault(span_names::kTest1);
+            sampler.updateInternalConfig(SamplingParameters{.factor = 1.0}, {});
+
+            std::vector<stdx::thread> threads;
+            auto launchThread = [&](auto f) {
+                threads.push_back(monitor.spawn([f = std::move(f)] { f(); }));
+            };
+
+            launchThread(
+                [&] { sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {}); });
+            launchThread([&] { sampler.sampleByDefault(span_names::kTest2); });
+            launchThread([&] { sampler.shouldSample(span_names::kTest1.getName(), 0.3); });
+            launchThread([&] { sampler.shouldAcceptExternalTrace(); });
+            launchThread(
+                [&] { sampler.updateExternalConfig({.refillRate = 2.5, .maxTokens = 15}); });
+
+            for (auto& t : threads)
+                t.join();
+        })
+        .join();
+}
 
 }  // namespace
 }  // namespace mongo::otel::traces

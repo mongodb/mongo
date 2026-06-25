@@ -34,23 +34,33 @@
 #include "mongo/util/tick_source.h"
 
 namespace mongo::otel::traces {
-namespace {
-VersionedValue<const SamplerState> samplerState;
-thread_local auto snapshot = samplerState.makeSnapshot();
-}  // namespace
 
+VersionedValue<const SamplerState> TracingSamplerImpl::_samplerState;
+thread_local VersionedValue<const SamplerState>::Snapshot TracingSamplerImpl::_snapshot =
+    TracingSamplerImpl::_samplerState.makeSnapshot();
 
 using SamplingFactorMap = SamplerState::SamplingFactorMap;
 using RateLimiterMap = SamplerState::RateLimiterMap;
 
 TracingSamplerImpl::TracingSamplerImpl(TickSource* tickSource) : _tickSource(tickSource) {
-    samplerState.update(std::make_shared<const SamplerState>());
+    auto& externalRateLimitParams = _samplingConfig.externalRateLimits;
+    auto externalBurstCapacitySecs =
+        externalRateLimitParams.maxTokens / externalRateLimitParams.refillRate;
+
+    _samplerState.update(std::make_shared<const SamplerState>(
+        SamplerState::SamplingFactorMap{},
+        SamplerState::RateLimiterMap{},
+        std::make_shared<admission::RateLimiter>(externalRateLimitParams.refillRate,
+                                                 externalBurstCapacitySecs,
+                                                 0 /* maxQueueDepth */,
+                                                 "external",
+                                                 tickSource)));
 }
 
 bool TracingSamplerImpl::shouldSample(std::string_view spanName, double sampleValue) {
-    samplerState.refreshSnapshot(snapshot);
-    auto samplingFactor = snapshot->samplingFactorMap.find(spanName);
-    if (samplingFactor == snapshot->samplingFactorMap.end()) {
+    _samplerState.refreshSnapshot(_snapshot);
+    auto samplingFactor = _snapshot->samplingFactorMap.find(spanName);
+    if (samplingFactor == _snapshot->samplingFactorMap.end()) {
         return false;
     }
 
@@ -58,12 +68,17 @@ bool TracingSamplerImpl::shouldSample(std::string_view spanName, double sampleVa
         return false;
     }
 
-    auto rateLimiter = snapshot->rateLimiterMap.find(spanName);
-    if (rateLimiter == snapshot->rateLimiterMap.end()) {
+    auto rateLimiter = _snapshot->rateLimiterMap.find(spanName);
+    if (rateLimiter == _snapshot->rateLimiterMap.end()) {
         return false;
     }
 
     return rateLimiter->second->tryAcquireToken(1);
+}
+
+bool TracingSamplerImpl::shouldAcceptExternalTrace() const {
+    _samplerState.refreshSnapshot(_snapshot);
+    return _snapshot->externalRateLimiter->tryAcquireToken(1);
 }
 
 void TracingSamplerImpl::updateInternalConfig(
@@ -79,7 +94,11 @@ void TracingSamplerImpl::updateExternalConfig(RateLimitParams rateLimits) {
     invariant(rateLimits.maxTokens > 0);
     std::lock_guard lk(_mutex);
     _samplingConfig.externalRateLimits = rateLimits;
-    // TODO(SERVER-129287): Update the external rate limiter params too.
+    auto burstCapacitySecs = rateLimits.maxTokens / rateLimits.refillRate;
+    auto currentSnapshot = _samplerState.makeSnapshot();
+    invariant(currentSnapshot->externalRateLimiter);
+    currentSnapshot->externalRateLimiter->updateRateParameters(rateLimits.refillRate,
+                                                               burstCapacitySecs);
 }
 
 SamplingConfig TracingSamplerImpl::getConfig() const {
@@ -97,7 +116,7 @@ void TracingSamplerImpl::sampleByDefault(SpanName name) {
 void TracingSamplerImpl::_rebuild(WithLock) {
     SamplingFactorMap newSamplingFactors;
     RateLimiterMap newRateLimiters;
-    auto oldSnapshot = samplerState.makeSnapshot();
+    auto oldSnapshot = _samplerState.makeSnapshot();
 
     auto setSamplingFactorAndRateLimits = [&](std::string_view name, SamplingParameters params) {
         double refillRate = params.rateLimits.refillRate;
@@ -132,8 +151,11 @@ void TracingSamplerImpl::_rebuild(WithLock) {
     for (const auto& [name, params] : _samplingConfig.perSpanOverrides) {
         setSamplingFactorAndRateLimits(name, params);
     }
-    samplerState.update(std::make_shared<const SamplerState>(std::move(newSamplingFactors),
-                                                             std::move(newRateLimiters)));
+
+    auto externalRateLimiter = oldSnapshot->externalRateLimiter;
+    invariant(externalRateLimiter);
+    _samplerState.update(std::make_shared<const SamplerState>(
+        std::move(newSamplingFactors), std::move(newRateLimiters), std::move(externalRateLimiter)));
 }
 
 namespace {
