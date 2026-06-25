@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_rank_fusion.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -48,6 +49,22 @@ namespace {
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 class DocumentSourceRankFusionTest : service_context_test::WithSetupTransportLayer,
                                      public AggregationContextFixture {
+protected:
+    // Tests that exercise validation errors (or that just want the production LiteParsed
+    // path) should funnel through this helper instead of calling createFromBson directly.
+    std::list<boost::intrusive_ptr<DocumentSource>> parseRankFusionStage(
+        BSONObj spec, const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr) {
+        auto ctx = expCtx ? expCtx : getExpCtx();
+        auto nss = ctx->getNamespaceString();
+        auto liteParsed =
+            LiteParsedRankFusion::parse(nss,
+                                        spec.firstElement(),
+                                        LiteParserOptions{.ifrContext = ctx->getIfrContext(),
+                                                          .opCtx = ctx->getOperationContext()});
+        liteParsed->validate();
+        return DocumentSourceRankFusion::createFromBson(spec.firstElement(), ctx);
+    }
+
 private:
     unittest::ServerParameterGuard featureFlagController1{"featureFlagRankFusionBasic", true};
     unittest::ServerParameterGuard featureFlagController2{"featureFlagRankFusionFull", true};
@@ -342,9 +359,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNotRankedPipeline) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9191100);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108702);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedRankFusionPipeline) {
@@ -369,9 +384,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedRankFusionPipeline) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       10473002);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108701);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfScoreStageInInputPipeline) {
@@ -380,6 +393,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfScoreStageInInputPipeline) {
             input: {
                 pipelines: {
                     agatha: [
+                        { $sort: {author: 1} },
                         { $score: {
                             score: 10
                         } }
@@ -389,9 +403,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfScoreStageInInputPipeline) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       10614800);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108703);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedScoreFusionPipeline) {
@@ -405,9 +417,10 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedScoreFusionPipeline) {
                                 pipelines: {
                                     agatha: [
                                         { $match : { author : "Agatha Christie" } },
-                                        { $score: {author: 1} }
+                                        { $score: {score: 1} }
                                     ]
-                                }
+                                },
+                                normalization: "none"
                             }
                         } }
                     ]
@@ -416,9 +429,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedScoreFusionPipeline) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       10473002);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108701);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyPipeline) {
@@ -432,9 +443,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyPipeline) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9834300);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108700);
 }
 
 TEST_F(DocumentSourceRankFusionTest,
@@ -842,9 +851,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchMetaUsed) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9191103);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108704);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchStoredSourceUsed) {
@@ -874,9 +881,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchStoredSourceUsed) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9191103);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108704);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
@@ -905,9 +910,11 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9191103);
+    // $_internalSearchMongotRemote is an internal-only stage (produced by desugaring $search) and
+    // is not registered with the lite-parse stage registry, so lite-parse rejects it as an
+    // unrecognized stage name. This still satisfies the test's intent: $rankFusion does not
+    // accept this stage in an input pipeline.
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 40324);
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithNotAllowed) {
@@ -950,9 +957,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithNotAllowed) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), expCtx),
-                       AssertionException,
-                       9191103);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec, expCtx), AssertionException, 12108704);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
@@ -999,9 +1004,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), expCtx),
-                       AssertionException,
-                       9191103);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec, expCtx), AssertionException, 12108704);
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDistanceField) {
@@ -1311,9 +1314,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfGeoNearIncludeLocs) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9191103);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108704);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfGeoNearDistanceField) {
@@ -1341,9 +1342,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfGeoNearDistanceField) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9191103);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108704);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfIncludeProject) {
@@ -1365,9 +1364,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfIncludeProject) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9191103);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108704);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfCombinationIsNotObject) {
@@ -3691,9 +3688,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameEmpty) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       15998);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 15998);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameDuplicated) {
@@ -3724,9 +3719,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameDuplicated) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9921000);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108714);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
@@ -3784,9 +3777,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameContainsDot) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       16412);
+    ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 16412);
 }
 
 TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {

@@ -34,6 +34,7 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/lite_parsed_score_fusion.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -52,6 +53,23 @@ class DocumentSourceScoreFusionTest : service_context_test::WithSetupTransportLa
                                       public AggregationContextFixture {
 public:
     DocumentSourceScoreFusionTest() {}
+
+protected:
+    // Mirrors the production code path: lite-parse validation runs before createFromBson.
+    // Tests that exercise validation errors (or that just want the production LiteParsed path)
+    // should funnel through this helper instead of calling createFromBson directly.
+    std::list<boost::intrusive_ptr<DocumentSource>> parseScoreFusionStage(
+        BSONObj spec, const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr) {
+        auto ctx = expCtx ? expCtx : getExpCtx();
+        auto nss = ctx->getNamespaceString();
+        auto liteParsed =
+            LiteParsedScoreFusion::parse(nss,
+                                         spec.firstElement(),
+                                         LiteParserOptions{.ifrContext = ctx->getIfrContext(),
+                                                           .opCtx = ctx->getOperationContext()});
+        liteParsed->validate();
+        return DocumentSourceScoreFusion::createFromBson(spec.firstElement(), ctx);
+    }
 
 private:
     unittest::ServerParameterGuard scoreFusionFlag{"featureFlagSearchHybridScoringFull", true};
@@ -958,9 +976,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipeline) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402500);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108712);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithFirstPipelineValid) {
@@ -981,9 +997,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithFirstPipeline
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402500);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108712);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithSecondPipelineValid) {
@@ -1004,9 +1018,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithSecondPipelin
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402500);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108712);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedRankFusionPipeline) {
@@ -1032,9 +1044,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedRankFusionPipeline) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       10473003);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108711);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedScoreFusionPipeline) {
@@ -1061,9 +1071,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedScoreFusionPipeline) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       10473003);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108711);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyPipeline) {
@@ -1078,9 +1086,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyPipeline) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402503);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108710);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckSinglePipelineTextMatchAllowed) {
@@ -3560,9 +3566,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchMetaUsed) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402502);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108713);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
@@ -3593,9 +3597,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402502);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108713);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
@@ -3625,9 +3627,11 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402502);
+    // $_internalSearchMongotRemote is an internal-only stage (produced by desugaring $search) and
+    // is not registered with the lite-parse stage registry, so lite-parse rejects it as an
+    // unrecognized stage name. This still satisfies the test's intent: $scoreFusion does not
+    // accept this stage in an input pipeline.
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 40324);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionWithNotAllowed) {
@@ -3673,9 +3677,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionWithNotAllowed) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), expCtx),
-                       AssertionException,
-                       9402502);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec, expCtx), AssertionException, 12108713);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
@@ -3725,9 +3727,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), expCtx),
-                       AssertionException,
-                       9402502);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec, expCtx), AssertionException, 12108713);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
@@ -3750,9 +3750,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402502);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108713);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameDuplicated) {
@@ -3784,9 +3782,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameDuplicated) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402203);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108715);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
@@ -3846,9 +3842,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameContainsDot) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       16412);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 16412);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, QueryShapeDebugString) {
@@ -4409,9 +4403,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfGeoNearPipeline) {
          }
      })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9402500);
+    ASSERT_THROWS_CODE(parseScoreFusionStage(spec), AssertionException, 12108712);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPipeline) {

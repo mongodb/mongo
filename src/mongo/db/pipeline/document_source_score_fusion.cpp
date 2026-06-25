@@ -31,8 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/extension/host/extension_search_server_status.h"
-#include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
@@ -41,7 +39,6 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/score_fusion_pipeline_builder.h"
-#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 
@@ -84,98 +81,37 @@ REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(scoreFusion,
  * $score stage. A scored pipeline must also be a 'selection pipeline', which means no stage can
  * modify the documents in any way. Only stages that retrieve, limit, or order documents are
  * allowed.
+ *
+ * Input pipeline validation happens during the explicit validation phase at lite-parse time
+ * (LiteParsedScoreFusion::validate()) before parsing into a `Pipeline` object.
  */
-static void scoreFusionBsonPipelineValidator(const std::vector<BSONObj>& pipeline,
-                                             boost::intrusive_ptr<ExpressionContext> expCtx) {
-    static const std::string scorePipelineMsg =
-        "All subpipelines to the $scoreFusion stage must begin with one of $search, "
-        "$vectorSearch, or have a custom $score in the pipeline.";
-    uassert(9402503,
-            str::stream() << "$scoreFusion input pipeline cannot be empty. " << scorePipelineMsg,
-            !pipeline.empty());
-
-    uassert(10473003,
-            "$scoreFusion input pipeline has a nested hybrid search stage "
-            "($rankFusion/$scoreFusion). " +
-                scorePipelineMsg,
-            !hybrid_scoring_util::isHybridSearchPipeline(pipeline));
-
-    auto scoredPipelineStatus = hybrid_scoring_util::isScoredPipeline(pipeline, expCtx);
-    if (!scoredPipelineStatus.isOK()) {
-        uasserted(9402500, scorePipelineMsg + " " + scoredPipelineStatus.reason());
-    }
-
-    auto selectionPipelineStatus = hybrid_scoring_util::isSelectionPipeline(pipeline);
-    if (!selectionPipelineStatus.isOK()) {
-        uasserted(9402502,
-                  selectionPipelineStatus.reason() +
-                      " Only stages that retrieve, limit, or order documents are allowed.");
-    }
-}
-
-/**
- * Validate that each pipeline is a valid scored selection pipeline. Returns a pair of the map of
- * the input pipeline names to pipeline objects and a map of pipeline names to score paths.
- */
-std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateScoredSelectionPipelines(
+std::map<std::string, std::unique_ptr<Pipeline>> parseScoredSelectionPipelines(
     const ScoreFusionSpec& spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    // TODO SERVER-117661: Implement support for extension $vectorSearch stages in
+    // scoreFusion pipelines.
+
     // It's important to use an ordered map here, so that we get stability in the desugaring =>
     // stability in the query shape.
     std::map<std::string, std::unique_ptr<Pipeline>> inputPipelines;
     for (const auto& innerPipelineBsonElem : spec.getInput().getPipelines()) {
         auto bsonPipeline = parsePipelineFromBSON(innerPipelineBsonElem);
-        // Ensure that all pipelines are valid scored selection pipelines.
-        scoreFusionBsonPipelineValidator(bsonPipeline, pExpCtx);
-
-        LiteParsedPipeline liteParsedPipeline =
-            LiteParsedPipeline(pExpCtx->getNamespaceString(),
-                               bsonPipeline,
-                               false,
-                               LiteParserOptions{.ifrContext = pExpCtx->getIfrContext()});
-
-        // If featureFlagExtensionsInsideHybridSearch is not enabled, perform IFR kickback
-        // for any input pipeline that has an extension $vectorSearch or $search stage.
-        auto ifrCtx = pExpCtx->getIfrContext();
-        auto hybridSearchFlagEnabled = ifrCtx &&
-            ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
-        if (!hybridSearchFlagEnabled) {
-            // TODO SERVER-117661: Implement support for extension $vectorSearch stages in
-            // scoreFusion pipelines.
-            search_helpers::throwIfrKickbackIfNecessary(
-                liteParsedPipeline.hasExtensionVectorSearchStage(),
-                feature_flags::gFeatureFlagVectorSearchExtension,
-                vector_search_metrics::inHybridSearchKickbackRetryCount,
-                "$vectorSearch-as-an-extension is not allowed in a $scoreFusion pipeline.");
-
-            search_helpers::throwIfrKickbackIfNecessary(
-                liteParsedPipeline.hasExtensionSearchStage(),
-                feature_flags::gFeatureFlagSearchExtension,
-                search_metrics::inHybridSearchKickbackRetryCount,
-                "$search-as-an-extension is not allowed in a $scoreFusion pipeline.");
-        }
-
+        LiteParsedPipeline liteParsedPipeline(
+            pExpCtx->getNamespaceString(),
+            bsonPipeline,
+            false,
+            LiteParserOptions{.ifrContext = pExpCtx->getIfrContext()});
         auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, pExpCtx);
 
+        // Post-condition sanity check: LiteParsedScoreFusion::validate() already asserted the
+        // input pipeline produces score metadata; confirm the fully-parsed pipeline agrees.
         tassert(
             10535800,
             "The metadata dependency tracker determined $scoreFusion input pipeline does not "
             "generate score metadata, despite the input pipeline stages being previously validated "
             "as such.",
-            (*pipeline).generatesMetadataType(DocumentMetadataFields::kScore));
+            pipeline->generatesMetadataType(DocumentMetadataFields::kScore));
 
-        // Validate pipeline name.
-        auto inputName = innerPipelineBsonElem.fieldName();
-        uassertStatusOKWithContext(
-            FieldPath::validateFieldName(inputName),
-            "$scoreFusion pipeline names must follow the naming rules of field path expressions.");
-        uassert(9402203,
-                str::stream()
-                    << "$scoreFusion pipeline names must be unique, but found duplicate name '"
-                    << inputName << "'.",
-                !inputPipelines.contains(inputName));
-
-        // Input pipeline has been validated; save it in the resulting maps.
-        inputPipelines[inputName] = std::move(pipeline);
+        inputPipelines[innerPipelineBsonElem.fieldName()] = std::move(pipeline);
     }
     return inputPipelines;
 }
@@ -206,7 +142,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
 
     auto spec = ScoreFusionSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
 
-    const auto& inputPipelines = parseAndValidateScoredSelectionPipelines(spec, pExpCtx);
+    const auto& inputPipelines = parseScoredSelectionPipelines(spec, pExpCtx);
 
     StringMap<double> weights;
     // If ScoreFusionCombinationSpec has no value (no weights specified), no work to do.
