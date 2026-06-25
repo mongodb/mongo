@@ -29,6 +29,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/matcher/expression_expr.h"
+#include "mongo/db/matcher/match_expression_walker.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -49,16 +51,50 @@
 namespace mongo::rule_based_rewrites::pipeline {
 namespace {
 /**
- * Verifies whether or not a $group is able to swap with a succeeding $match stage. While ordinarily
- * $group can swap with a $match, it cannot if the following $match has exactly one field as the
- * $group key and either:
- *     (1) an $exists predicate on _id
- *     (2) a $type predicate on _id
+ * Validates the $expr predicates within a MatchExpression can be swapped with $group safely. If
+ * there's an $expr predicate that depends on the _id field we cannot swap: $group places null and
+ * missing in the same bucket, and numerics that compare equal (e.g. Int(1) and Long(1)) share a
+ * bucket, so the _id value may differ from the source field.
+ */
+bool validateExprMatchExpressionsForSwapWithGroup(const MatchExpression& expr) {
+    struct ExprValidator : SelectiveMatchExpressionVisitorBase<true> {
+        using SelectiveMatchExpressionVisitorBase<true>::visit;
+
+        void visit(const ExprMatchExpression* expr) override {
+            if (!isValid || expression::isIndependentOfConst(*expr, idFields)) {
+                return;
+            }
+            isValid = false;
+        }
+
+        const OrderedPathSet idFields{"_id"};
+        bool isValid{true};
+    };
+
+    ExprValidator visitor;
+    MatchExpressionWalker walker{&visitor, nullptr, nullptr};
+    tree_walker::walk<true, MatchExpression>(&expr, &walker);
+    return visitor.isValid;
+}
+
+/**
+ * Verifies whether or not a $group is able to swap with a succeeding $match stage.
+ * The swap is allowable because $group reports the _id fields as renames.
+ * Example:
+ *   {$group: {_id: "$x"}}
+ * Reports that $group simply renames x -> _id.
  *
- * For $exists, every document will have an _id field following such a $group stage, including those
- * whose group key was missing before the $group. As an example, the following optimization would be
- * incorrect as the post-optimization pipeline would handle documents that had nullish _id fields
- * differently. Thus, given such a $group and $match, this function would return false.
+ * Most $match predicates on the _id field can therefore be pushed down. This function guards
+ * against pushdown of $match which contains predicates sensitive to the $group bucketing behaviour.
+ * $group places null and missing in the same bucket, and numerics that compare equal (e.g. Int(1)
+ * and Long(1)) share a bucket, so the _id value may differ from the source field.
+ *
+ * This affects $exists checks (since after $group we always have null), $type checks, $expr which
+ * distinguishes null/missing and can contain other unsafe expressions.
+ *
+ * As an example, the following optimization would be incorrect as the post-optimization pipeline
+ * would handle documents that had nullish _id fields differently. Thus, given such a $group and
+ * $match, this function would return false.
  *   {$group: {_id: "$x"}}
  *   {$match: {_id: {$exists: true}}
  * ---->
@@ -72,6 +108,10 @@ namespace {
  * stage, meaning documents that are regarded unequally in the $match stage are equated in the
  * $group stage. This leads to varied results depending on the order of the $match and $group.
  * Type predicates are incorrect to push ahead regardless of _id spec.
+ *
+ * For $expr, we allow only certain $expr shapes. Any $expr that is not explicitly allowed is
+ * disallowed (so we don't have to prove that arbitrary complex expressions depending on `_id` are
+ * safe to swap before $group).
  */
 bool groupMatchSwapVerified(const DocumentSourceMatch& nextMatch,
                             const DocumentSourceGroup& thisGroup) {
@@ -90,6 +130,10 @@ bool groupMatchSwapVerified(const DocumentSourceMatch& nextMatch,
     if (expression::hasPredicateOnPaths(*(nextMatch.getMatchExpression()),
                                         MatchExpression::MatchType::TYPE_OPERATOR,
                                         idFields)) {
+        return false;
+    }
+
+    if (!validateExprMatchExpressionsForSwapWithGroup(*nextMatch.getMatchExpression())) {
         return false;
     }
 
