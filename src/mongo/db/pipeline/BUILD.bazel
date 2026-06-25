@@ -1700,6 +1700,21 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "document_source_internal_document_results_and_metadata_bm",
+    srcs = [
+        "document_source_internal_document_results_and_metadata_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":expression_context_for_test",
+        ":pipeline",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/shard_role:service_context_non_d",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "percentile_algo_bm",
     srcs = ["percentile_algo_bm_fixture.cpp"],
     tags = ["query_bm"],
