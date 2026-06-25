@@ -66,10 +66,20 @@ bool TracingSamplerImpl::shouldSample(std::string_view spanName, double sampleVa
     return rateLimiter->second->tryAcquireToken(1);
 }
 
-void TracingSamplerImpl::updateConfig(const SamplingConfig& config) {
+void TracingSamplerImpl::updateInternalConfig(
+    const SamplingParameters& defaultSpans, const StringMap<SamplingParameters>& perSpanOverrides) {
     std::lock_guard lk(_mutex);
-    _samplingConfig = config;
+    _samplingConfig.defaultSpans = defaultSpans;
+    _samplingConfig.perSpanOverrides = perSpanOverrides;
     _rebuild(lk);
+}
+
+void TracingSamplerImpl::updateExternalConfig(RateLimitParams rateLimits) {
+    invariant(rateLimits.refillRate > 0);
+    invariant(rateLimits.maxTokens > 0);
+    std::lock_guard lk(_mutex);
+    _samplingConfig.externalRateLimits = rateLimits;
+    // TODO(SERVER-129287): Update the external rate limiter params too.
 }
 
 SamplingConfig TracingSamplerImpl::getConfig() const {
@@ -89,40 +99,38 @@ void TracingSamplerImpl::_rebuild(WithLock) {
     RateLimiterMap newRateLimiters;
     auto oldSnapshot = samplerState.makeSnapshot();
 
-    auto setSamplingFactorAndRateLimits =
-        [&](std::string_view name, double factor, double refillRate, int maxTokens) {
-            newSamplingFactors[name] = factor;
+    auto setSamplingFactorAndRateLimits = [&](std::string_view name, SamplingParameters params) {
+        double refillRate = params.rateLimits.refillRate;
+        int maxTokens = params.rateLimits.maxTokens;
 
-            invariant(refillRate > 0, fmt::format("Invalid refillRate for {} span", name));
-            invariant(maxTokens > 0, fmt::format("Invalid maxTokens for {} span", name));
-            double burstCapacitySecs = maxTokens / refillRate;
-            if (auto it = oldSnapshot->rateLimiterMap.find(name);
-                it != oldSnapshot->rateLimiterMap.end()) {
-                // Update the existing rate limiter and copy it into the new map.
-                it->second->updateRateParameters(refillRate, burstCapacitySecs);
-                newRateLimiters[name] = it->second;
-            } else {
-                // Rate limiter didn't exist so create a new one with the correct parameters.
-                newRateLimiters[name] =
-                    std::make_shared<admission::RateLimiter>(refillRate,
-                                                             burstCapacitySecs,
-                                                             0 /* maxQueueDepth */,
-                                                             std::string(name),
-                                                             _tickSource);
-            }
-        };
+        newSamplingFactors[name] = params.factor;
+
+        invariant(refillRate > 0, fmt::format("Invalid refillRate for {} span", name));
+        invariant(maxTokens > 0, fmt::format("Invalid maxTokens for {} span", name));
+        double burstCapacitySecs = maxTokens / refillRate;
+        if (auto it = oldSnapshot->rateLimiterMap.find(name);
+            it != oldSnapshot->rateLimiterMap.end()) {
+            // Update the existing rate limiter and copy it into the new map.
+            it->second->updateRateParameters(refillRate, burstCapacitySecs);
+            newRateLimiters[name] = it->second;
+        } else {
+            // Rate limiter didn't exist so create a new one with the correct parameters.
+            newRateLimiters[name] = std::make_shared<admission::RateLimiter>(refillRate,
+                                                                             burstCapacitySecs,
+                                                                             0 /* maxQueueDepth */,
+                                                                             std::string(name),
+                                                                             _tickSource);
+        }
+    };
 
     for (const auto& name : _defaultSampledSpanNames) {
-        setSamplingFactorAndRateLimits(name,
-                                       _samplingConfig.defaultSpans.factor,
-                                       _samplingConfig.defaultSpans.refillRate,
-                                       _samplingConfig.defaultSpans.maxTokens);
+        setSamplingFactorAndRateLimits(name, _samplingConfig.defaultSpans);
     }
 
     // Per-span overrides intentionally overwrite the default-seeded entries above, and also
     // apply to spans that were never registered via sampleByDefault.
     for (const auto& [name, params] : _samplingConfig.perSpanOverrides) {
-        setSamplingFactorAndRateLimits(name, params.factor, params.refillRate, params.maxTokens);
+        setSamplingFactorAndRateLimits(name, params);
     }
     samplerState.update(std::make_shared<const SamplerState>(std::move(newSamplingFactors),
                                                              std::move(newRateLimiters)));

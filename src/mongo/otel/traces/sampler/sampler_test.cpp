@@ -39,20 +39,20 @@ namespace {
 
 TEST(SamplerTest, UnregisteredSpanIsNeverSampled) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 1.0}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0}, {});
     EXPECT_FALSE(sampler.shouldSample("unknown.span", 0.0));
 }
 
 TEST(SamplerTest, SeedBelowFactorSamples) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 0.5}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {});
     sampler.sampleByDefault(span_names::kTest1);
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.3));
 }
 
 TEST(SamplerTest, SeedEqualToFactorDrops) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 0.5}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {});
     sampler.sampleByDefault(span_names::kTest1);
     // sampleValue < factor, so equality is not sampled.
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.5));
@@ -60,7 +60,7 @@ TEST(SamplerTest, SeedEqualToFactorDrops) {
 
 TEST(SamplerTest, SeedAboveFactorDrops) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 0.5}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {});
     sampler.sampleByDefault(span_names::kTest1);
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.7));
 }
@@ -69,16 +69,16 @@ TEST(SamplerTest, UpdateConfigChangesDecisionsImmediately) {
     TracingSamplerImpl sampler;
     sampler.sampleByDefault(span_names::kTest1);
 
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 0.5}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {});
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.3));
 
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 0.1}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.1}, {});
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.3));
 }
 
 TEST(SamplerTest, RegisterSpanMakesItSampleable) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 1.0}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0}, {});
 
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest2.getName(), 0.0));
 
@@ -89,7 +89,7 @@ TEST(SamplerTest, RegisterSpanMakesItSampleable) {
 
 TEST(SamplerTest, RegisteredSpanUsesCurrentDefaultFactor) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 0.5}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {});
     sampler.sampleByDefault(span_names::kTest1);
 
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.3));
@@ -98,14 +98,14 @@ TEST(SamplerTest, RegisteredSpanUsesCurrentDefaultFactor) {
 
 TEST(SamplerTest, ZeroFactorDropsAllRegisteredSpans) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 0.0}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.0}, {});
     sampler.sampleByDefault(span_names::kTest1);
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
 }
 
 TEST(SamplerTest, OneFactorSamplesAllRegisteredSpans) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 1.0}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0}, {});
     sampler.sampleByDefault(span_names::kTest1);
     // Any value in [0, 1) is strictly less than 1.0.
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.999));
@@ -113,7 +113,7 @@ TEST(SamplerTest, OneFactorSamplesAllRegisteredSpans) {
 
 TEST(SamplerTest, DuplicateRegistrationHasNoEffect) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 0.5}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {});
     sampler.sampleByDefault(span_names::kTest1);
     sampler.sampleByDefault(span_names::kTest1);
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.3));
@@ -122,7 +122,7 @@ TEST(SamplerTest, DuplicateRegistrationHasNoEffect) {
 
 TEST(SamplerTest, MultipleSpansAreIndependentlySampled) {
     TracingSamplerImpl sampler;
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 0.5}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.5}, {});
     sampler.sampleByDefault(span_names::kTest1);
     sampler.sampleByDefault(span_names::kTest2);
 
@@ -135,7 +135,8 @@ TEST(SamplerTest, MultipleSpansAreIndependentlySampled) {
 TEST(SamplerTest, RateLimiterBlocksAfterTokensExhausted) {
     TickSourceMock<Milliseconds> clock;
     TracingSamplerImpl sampler(&clock);
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 1.0, .maxTokens = 1}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0, .rateLimits = {.maxTokens = 1}},
+                                 {});
     sampler.sampleByDefault(span_names::kTest1);
     // First call consumes the single default token.
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
@@ -146,7 +147,8 @@ TEST(SamplerTest, RateLimiterBlocksAfterTokensExhausted) {
 TEST(SamplerTest, RateLimitersAreIndependentPerSpan) {
     TickSourceMock<Milliseconds> clock;
     TracingSamplerImpl sampler(&clock);
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 1.0, .maxTokens = 1}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0, .rateLimits = {.maxTokens = 1}},
+                                 {});
     sampler.sampleByDefault(span_names::kTest1);
     sampler.sampleByDefault(span_names::kTest2);
     // Each span gets its own token bucket; consuming kTest1's token does not drain kTest2's.
@@ -160,14 +162,15 @@ TEST(SamplerTest, ApplyRateLimitParamsClampsBurstOnExistingLimiter) {
     TickSourceMock<Milliseconds> clock;
     TracingSamplerImpl sampler(&clock);
     // Create limiter with 1000-token bucket.
-    sampler.updateConfig(
-        SamplingConfig{.defaultSpans = {.factor = 1.0, .refillRate = 1000.0, .maxTokens = 1000}});
+    sampler.updateInternalConfig(
+        SamplingParameters{.factor = 1.0, .rateLimits = {.refillRate = 1000.0, .maxTokens = 1000}},
+        {});
     sampler.sampleByDefault(span_names::kTest1);
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
     // Reduce the existing limiter to a 1-token burst. BasicTokenBucket::reset preserves available
     // tokens but clamps them to the new burstSize (1), so exactly 1 more token can be consumed.
-    sampler.updateConfig(
-        SamplingConfig{.defaultSpans = {.factor = 1.0, .refillRate = 1.0, .maxTokens = 1}});
+    sampler.updateInternalConfig(
+        SamplingParameters{.factor = 1.0, .rateLimits = {.refillRate = 1.0, .maxTokens = 1}}, {});
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
 }
@@ -175,8 +178,9 @@ TEST(SamplerTest, ApplyRateLimitParamsClampsBurstOnExistingLimiter) {
 TEST(SamplerTest, RateLimiterWithLargerBurstSize) {
     TickSourceMock<Milliseconds> clock;
     TracingSamplerImpl sampler(&clock);
-    sampler.updateConfig(
-        SamplingConfig{.defaultSpans = {.factor = 1.0, .refillRate = 1000.0, .maxTokens = 1000}});
+    sampler.updateInternalConfig(
+        SamplingParameters{.factor = 1.0, .rateLimits = {.refillRate = 1000.0, .maxTokens = 1000}},
+        {});
     sampler.sampleByDefault(span_names::kTest3);
     for (int i = 0; i < 1000; ++i) {
         EXPECT_TRUE(sampler.shouldSample(span_names::kTest3.getName(), 0.0));
@@ -187,9 +191,8 @@ TEST(SamplerTest, PerSpanOverrideBeatsDefault) {
     TracingSamplerImpl sampler;
     sampler.sampleByDefault(span_names::kTest1);
     // Default is 0.0 (would never sample), but override for kTest1 is 1.0.
-    sampler.updateConfig(SamplingConfig{
-        .defaultSpans = {.factor = 0.0},
-        .perSpanOverrides = {{std::string(span_names::kTest1.getName()), {.factor = 1.0}}}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.0},
+                                 {{std::string(span_names::kTest1.getName()), {.factor = 1.0}}});
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.5));
 }
 
@@ -198,9 +201,8 @@ TEST(SamplerTest, PerSpanOverrideOnlyAffectsNamedSpan) {
     sampler.sampleByDefault(span_names::kTest1);
     sampler.sampleByDefault(span_names::kTest2);
     // Override only kTest1; kTest2 stays at default=0.0.
-    sampler.updateConfig(SamplingConfig{
-        .defaultSpans = {.factor = 0.0},
-        .perSpanOverrides = {{std::string(span_names::kTest1.getName()), {.factor = 1.0}}}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.0},
+                                 {{std::string(span_names::kTest1.getName()), {.factor = 1.0}}});
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.5));
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest2.getName(), 0.5));
 }
@@ -208,22 +210,20 @@ TEST(SamplerTest, PerSpanOverrideOnlyAffectsNamedSpan) {
 TEST(SamplerTest, UpdateConfigWithNewOverrideTakesEffectImmediately) {
     TracingSamplerImpl sampler;
     sampler.sampleByDefault(span_names::kTest1);
-    sampler.updateConfig(SamplingConfig{.defaultSpans = {.factor = 1.0}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0}, {});
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.5));
 
     // Add a per-span override that suppresses kTest1.
-    sampler.updateConfig(SamplingConfig{
-        .defaultSpans = {.factor = 1.0},
-        .perSpanOverrides = {{std::string(span_names::kTest1.getName()), {.factor = 0.0}}}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 1.0},
+                                 {{std::string(span_names::kTest1.getName()), {.factor = 0.0}}});
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
 }
 
 TEST(SamplerTest, OverrideOnUnregisteredSpanIsApplied) {
     TracingSamplerImpl sampler;
     // kTest1 is never registered via sampleByDefault.
-    sampler.updateConfig(SamplingConfig{
-        .defaultSpans = {.factor = 0.0},
-        .perSpanOverrides = {{std::string(span_names::kTest1.getName()), {.factor = 1.0}}}});
+    sampler.updateInternalConfig(SamplingParameters{.factor = 0.0},
+                                 {{std::string(span_names::kTest1.getName()), {.factor = 1.0}}});
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.5));
 }
 
@@ -231,10 +231,10 @@ TEST(SamplerTest, PerSpanOverrideUsesItsOwnRateLimits) {
     TickSourceMock<Milliseconds> clock;
     TracingSamplerImpl sampler(&clock);
     sampler.sampleByDefault(span_names::kTest1);
-    sampler.updateConfig(
-        SamplingConfig{.defaultSpans = {.factor = 1.0, .refillRate = 1000.0, .maxTokens = 1000},
-                       .perSpanOverrides = {{std::string(span_names::kTest1.getName()),
-                                             {.factor = 1.0, .refillRate = 1.0, .maxTokens = 1}}}});
+    sampler.updateInternalConfig(
+        SamplingParameters{.factor = 1.0, .rateLimits = {.refillRate = 1000.0, .maxTokens = 1000}},
+        {{std::string(span_names::kTest1.getName()),
+          {.factor = 1.0, .rateLimits = {.refillRate = 1.0, .maxTokens = 1}}}});
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
     EXPECT_FALSE(sampler.shouldSample(span_names::kTest1.getName(), 0.0));
 }
@@ -246,12 +246,12 @@ TEST(SamplerTest, DefaultAndPerSpanRateLimitersEnforceIndependentBudgets) {
     // kTest1 and kTest2 have per-span overrides with 5 and 10 tokens respectively.
     // The clock is frozen throughout, so no tokens are refilled.
     sampler.sampleByDefault(span_names::kTest3);
-    sampler.updateConfig(SamplingConfig{
-        .defaultSpans = {.factor = 1.0, .refillRate = 1.0, .maxTokens = 2},
-        .perSpanOverrides = {{std::string(span_names::kTest1.getName()),
-                              {.factor = 1.0, .refillRate = 1.0, .maxTokens = 5}},
-                             {std::string(span_names::kTest2.getName()),
-                              {.factor = 1.0, .refillRate = 1.0, .maxTokens = 10}}}});
+    sampler.updateInternalConfig(
+        SamplingParameters{.factor = 1.0, .rateLimits = {.refillRate = 1.0, .maxTokens = 2}},
+        {{std::string(span_names::kTest1.getName()),
+          {.factor = 1.0, .rateLimits = {.refillRate = 1.0, .maxTokens = 5}}},
+         {std::string(span_names::kTest2.getName()),
+          {.factor = 1.0, .rateLimits = {.refillRate = 1.0, .maxTokens = 10}}}});
 
     // Default rate limiter (kTest3): exactly 2 tokens.
     EXPECT_TRUE(sampler.shouldSample(span_names::kTest3.getName(), 0.0));

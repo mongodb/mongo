@@ -50,6 +50,15 @@ structs:
                 validator:
                     gt: 0
 
+    OpenTelemetryTracingExternalConfig:
+        description: "Specifies the configuration used for traces that were externally sampled"
+        strict: false
+        fields:
+            tokenBucketRateLimit:
+                description: The rate limit to apply to accepting an external trace.
+                type: OpenTelemetryTracingTokenBucketRateLimit
+                default: true
+
     OpenTelemetryTracingSamplingStrategy:
         description: "Describes how a set of spans should be sampled, e.g., the sampling rate."
         strict: false
@@ -120,5 +129,15 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: OpenTelemetryTracingSamplingServerParameter
+            override_set: true
+        redact: false
+
+    openTelemetryExternalTracing:
+        description: >-
+            Configuration for traces that were externally sampled (i.e. started on a separate server
+            node). This should be an OpenTelemetryTracingExternalConfig BSON document.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: OpenTelemetryExternalTracingServerParameter
             override_set: true
         redact: false

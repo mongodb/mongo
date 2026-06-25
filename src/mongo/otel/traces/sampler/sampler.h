@@ -61,8 +61,12 @@ public:
      */
     virtual bool shouldSample(std::string_view spanName, double sampleValue) = 0;
 
-    /** Applies a new sampling configuration. Production implementations should override this. */
-    virtual void updateConfig(const SamplingConfig& config) {}
+    /** Applies a new internal sampling configuration. */
+    virtual void updateInternalConfig(const SamplingParameters& defaultSpans,
+                                      const StringMap<SamplingParameters>& perSpanOverrides) {}
+
+    /** Applies a new rate limit configuration for externally-sampled traces. */
+    virtual void updateExternalConfig(RateLimitParams rateLimits) {}
 
     /** Returns the current sampling configuration. */
     virtual SamplingConfig getConfig() const {
@@ -103,7 +107,9 @@ public:
      * spans, and sampleValue.
      */
     bool shouldSample(std::string_view spanName, double sampleValue) override;
-    void updateConfig(const SamplingConfig& config) override;
+    void updateInternalConfig(const SamplingParameters& defaultSpans,
+                              const StringMap<SamplingParameters>& perSpanOverrides) override;
+    void updateExternalConfig(RateLimitParams rateLimits) override;
     SamplingConfig getConfig() const override;
     void sampleByDefault(SpanName name) override;
 

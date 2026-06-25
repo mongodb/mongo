@@ -43,6 +43,7 @@ namespace {
 using mongo::unittest::match::StatusIsOK;
 using ::testing::AllOf;
 using ::testing::ElementsAre;
+using ::testing::FieldsAre;
 using ::testing::Not;
 using ::testing::Pair;
 
@@ -52,7 +53,8 @@ public:
                                                       ServerParameterType::kRuntimeOnly};
 
     void setUp() override {
-        TracingSampler::get().updateConfig(SamplingConfig{});
+        TracingSampler::get().updateInternalConfig(SamplingParameters{},
+                                                   StringMap<SamplingParameters>{});
     }
 
     Status setDefaultFactor(double factor) {
@@ -144,8 +146,8 @@ TEST_F(TraceSamplingParametersTest, SetFromStringWithInvalidJsonFails) {
 
 TEST_F(TraceSamplingParametersTest, SetRateLimitUpdatesGlobalSampler) {
     ASSERT_OK(setRateLimit(2.0, 5));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.refillRate, 2.0);
-    EXPECT_EQ(TracingSampler::get().getConfig().defaultSpans.maxTokens, 5);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.rateLimits.refillRate, 2.0);
+    EXPECT_EQ(TracingSampler::get().getConfig().defaultSpans.rateLimits.maxTokens, 5);
 }
 
 TEST_F(TraceSamplingParametersTest, AppendReflectsCurrentRateLimit) {
@@ -163,14 +165,14 @@ TEST_F(TraceSamplingParametersTest, SetFromStringWithRateLimitUpdatesGlobalSampl
     ASSERT_OK(param.setFromString(
         R"({"defaultSampling": {"tokenBucketRateLimit": {"refillRate": 4.0, "maxTokens": 20}}})",
         /*tenantId=*/boost::none));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.refillRate, 4.0);
-    EXPECT_EQ(TracingSampler::get().getConfig().defaultSpans.maxTokens, 20);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.rateLimits.refillRate, 4.0);
+    EXPECT_EQ(TracingSampler::get().getConfig().defaultSpans.rateLimits.maxTokens, 20);
 }
 
 TEST_F(TraceSamplingParametersTest, SetFromStringWithEmptyJsonUsesRateLimitDefaults) {
     ASSERT_OK(param.setFromString("{}", /*tenantId=*/boost::none));
-    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.refillRate, 1.0);
-    EXPECT_EQ(TracingSampler::get().getConfig().defaultSpans.maxTokens, 10);
+    EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.rateLimits.refillRate, 1.0);
+    EXPECT_EQ(TracingSampler::get().getConfig().defaultSpans.rateLimits.maxTokens, 10);
 }
 
 TEST_F(TraceSamplingParametersTest, SetUpdatesBothFactorAndRateLimit) {
@@ -182,8 +184,8 @@ TEST_F(TraceSamplingParametersTest, SetUpdatesBothFactorAndRateLimit) {
 
     auto config = TracingSampler::get().getConfig();
     EXPECT_DOUBLE_EQ(config.defaultSpans.factor, 0.5);
-    EXPECT_DOUBLE_EQ(config.defaultSpans.refillRate, 2.0);
-    EXPECT_EQ(config.defaultSpans.maxTokens, 5);
+    EXPECT_DOUBLE_EQ(config.defaultSpans.rateLimits.refillRate, 2.0);
+    EXPECT_EQ(config.defaultSpans.rateLimits.maxTokens, 5);
 }
 
 TEST_F(TraceSamplingParametersTest, SetWithNegativeRefillRateFails) {
@@ -264,10 +266,10 @@ TEST_F(TraceSamplingParametersTest, ErrorWhenSpanSelectionIsMissing) {
 }
 
 MATCHER_P(HasRefillRate, rate, "") {
-    return arg.refillRate == rate;
+    return arg.rateLimits.refillRate == rate;
 }
 MATCHER_P(HasMaxTokens, tokens, "") {
-    return arg.maxTokens == tokens;
+    return arg.rateLimits.maxTokens == tokens;
 }
 
 TEST_F(TraceSamplingParametersTest, SetWithSamplesArrayUpdatesPerSpanRateLimits) {
@@ -340,6 +342,90 @@ TEST_F(TraceSamplingParametersTest, AppendRoundTripsPerSpanRateLimits) {
     ASSERT_FALSE(span2.eoo());
     EXPECT_DOUBLE_EQ(span2["samplingStrategy"]["tokenBucketRateLimit"]["refillRate"].Double(), 5.0);
     EXPECT_EQ(span2["samplingStrategy"]["tokenBucketRateLimit"]["maxTokens"].Int(), 25);
+}
+
+class TraceExternalTracingParametersTest : public unittest::Test {
+public:
+    OpenTelemetryExternalTracingServerParameter param{"openTelemetryExternalTracing",
+                                                      ServerParameterType::kRuntimeOnly};
+
+    void setUp() override {
+        TracingSampler::get().updateExternalConfig({kDefaultRefillRate, kDefaultMaxTokens});
+    }
+
+    Status setRateLimit(double refillRate, int maxTokens) {
+        auto storage =
+            BSON("v" << BSON("tokenBucketRateLimit"
+                             << BSON("refillRate" << refillRate << "maxTokens" << maxTokens)));
+        return param.set(storage.firstElement(), /*tenantId=*/boost::none);
+    }
+
+    RateLimitParams readExternalRateLimit(const BSONObj& result) {
+        auto rl = result["openTelemetryExternalTracing"]["tokenBucketRateLimit"];
+        return {rl["refillRate"].Double(), rl["maxTokens"].Int()};
+    }
+};
+
+TEST_F(TraceExternalTracingParametersTest, SetUpdatesGlobalSampler) {
+    ASSERT_OK(setRateLimit(2.0, 5));
+    EXPECT_THAT(TracingSampler::get().getConfig().externalRateLimits, FieldsAre(2.0, 5));
+}
+
+TEST_F(TraceExternalTracingParametersTest, AppendReflectsCurrentState) {
+    ASSERT_OK(setRateLimit(3.0, 7));
+
+    BSONObjBuilder bob;
+    param.append(nullptr, &bob, "openTelemetryExternalTracing"_sd, /*tenantId=*/boost::none);
+
+    EXPECT_THAT(readExternalRateLimit(bob.obj()), FieldsAre(3.0, 7));
+}
+
+TEST_F(TraceExternalTracingParametersTest, AppendAfterMultipleSetsReflectsLastValue) {
+    ASSERT_OK(setRateLimit(2.0, 5));
+    ASSERT_OK(setRateLimit(4.0, 15));
+
+    BSONObjBuilder bob;
+    param.append(nullptr, &bob, "openTelemetryExternalTracing"_sd, /*tenantId=*/boost::none);
+
+    EXPECT_THAT(readExternalRateLimit(bob.obj()), FieldsAre(4.0, 15));
+}
+
+TEST_F(TraceExternalTracingParametersTest, NonObjectElementFails) {
+    auto storage = BSON("v" << 42);
+    EXPECT_THAT(param.set(storage.firstElement(), /*tenantId=*/boost::none), Not(StatusIsOK()));
+}
+
+TEST_F(TraceExternalTracingParametersTest, SetFromStringWithValidJsonUpdatesGlobalSampler) {
+    ASSERT_OK(
+        param.setFromString(R"({"tokenBucketRateLimit": {"refillRate": 5.0, "maxTokens": 20}})",
+                            /*tenantId=*/boost::none));
+    EXPECT_THAT(TracingSampler::get().getConfig().externalRateLimits, FieldsAre(5.0, 20));
+}
+
+TEST_F(TraceExternalTracingParametersTest, SetFromStringWithEmptyJsonUsesDefaults) {
+    ASSERT_OK(param.setFromString("{}", /*tenantId=*/boost::none));
+    EXPECT_THAT(TracingSampler::get().getConfig().externalRateLimits,
+                FieldsAre(kDefaultRefillRate, kDefaultMaxTokens));
+}
+
+TEST_F(TraceExternalTracingParametersTest, SetFromStringWithInvalidJsonFails) {
+    EXPECT_THAT(param.setFromString("not valid json", /*tenantId=*/boost::none), Not(StatusIsOK()));
+}
+
+TEST_F(TraceExternalTracingParametersTest, SetWithNegativeRefillRateFails) {
+    EXPECT_THAT(setRateLimit(-1.0, 10), Not(StatusIsOK()));
+}
+
+TEST_F(TraceExternalTracingParametersTest, SetWithZeroRefillRateFails) {
+    EXPECT_THAT(setRateLimit(0.0, 10), Not(StatusIsOK()));
+}
+
+TEST_F(TraceExternalTracingParametersTest, SetWithNegativeMaxTokensFails) {
+    EXPECT_THAT(setRateLimit(1.0, -1), Not(StatusIsOK()));
+}
+
+TEST_F(TraceExternalTracingParametersTest, SetWithZeroMaxTokensFails) {
+    EXPECT_THAT(setRateLimit(1.0, 0), Not(StatusIsOK()));
 }
 
 }  // namespace
