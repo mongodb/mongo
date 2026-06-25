@@ -105,6 +105,10 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
                         remember: false,
                     });
                 });
+                // Wait for this secondary to complete initial sync before stopping the next.
+                // Otherwise both secondaries can get stuck waiting for the primary's stable
+                // timestamp to advance while the primary no longer has a majority.
+                rs.awaitSecondaryNodes(rs.timeoutMS, [rs.nodes[id]]);
             }
 
             const primaryId = rs.getNodeId(rs.getPrimary());
