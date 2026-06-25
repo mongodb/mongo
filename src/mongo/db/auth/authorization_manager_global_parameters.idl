@@ -62,3 +62,20 @@ server_parameters:
         cpp_varname: useInternalAuthzForX509
         default: false
         redact: false
+
+    enableInternalAuthzFallback:
+        description: >-
+            No-op on master: this parameter is accepted for compatibility with backported branches
+            but has no effect. On master, whether internal authorization is used instead of an
+            external authorization backend as the fallback for OIDC, AWS and X.509 authenticated
+            users (and whether the authenticatedMechanism field is included in usersInfo) is
+            governed solely by the relevant enterprise feature flag. On
+            backported branches this parameter defaults to false so that the feature is opt-in:
+            when set to true (and the feature flag is enabled) the external authorization fallback
+            is replaced by internal authorization and the authenticatedMechanism field is included
+            in usersInfo.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableInternalAuthzFallback
+        default: false
+        redact: false
