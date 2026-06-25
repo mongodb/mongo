@@ -29,13 +29,17 @@
 
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <limits>
+#include <string>
 #include <string_view>
 
 #include <absl/strings/string_view.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {
@@ -195,12 +199,17 @@ void DeduplicatorReporter::add(int64_t bytesDiff, int64_t recordsDiff) {
     }
 }
 
-void SimpleMemoryUsageTracker::assertWithinMemoryLimit(std::string_view name) const {
+void SimpleMemoryUsageTracker::assertWithinMemoryLimit(std::string_view name,
+                                                       std::string_view stageName) const {
     if (withinMemoryLimit()) {
         return;
     }
     str::stream msg;
-    msg << name << " needs too much memory. Needs: " << _inUseTrackedMemoryBytes
+    msg << name << " needs too much memory.";
+    if (!stageName.empty()) {
+        msg << " Stage: " << stageName << ".";
+    }
+    msg << " Needs: " << _inUseTrackedMemoryBytes
         << " bytes. Local memory limit: " << _maxAllowedMemoryUsageBytes << " bytes.";
     int level = 1;
     for (const SimpleMemoryUsageTracker* current = _base; current; current = current->_base) {
@@ -212,7 +221,9 @@ void SimpleMemoryUsageTracker::assertWithinMemoryLimit(std::string_view name) co
             msg << " Global memory limit: " << current->maxAllowedMemoryUsageBytes() << " bytes.";
         }
     }
-    uasserted(ErrorCodes::ExceededMemoryLimit, msg);
+    std::string errmsg = msg;
+    LOGV2_ERROR(12932700, "Query exceeded the memory limit", "error"_attr = errmsg);
+    uasserted(ErrorCodes::ExceededMemoryLimit, errmsg);
 }
 
 }  // namespace mongo

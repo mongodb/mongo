@@ -30,8 +30,10 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -547,6 +549,58 @@ TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitOmitsGlobalLimitWhenNo
         ASSERT_STRING_CONTAINS(ex.reason(), "100");
         ASSERT_STRING_OMITS(ex.reason(), "Global memory limit");
     }
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitIncludesStageNameWhenProvided) {
+    SimpleMemoryUsageTracker tracker{100};
+    tracker.add(200);
+    try {
+        tracker.assertWithinMemoryLimit("$testExpr", "$group");
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$testExpr");
+        ASSERT_STRING_CONTAINS(ex.reason(), "Stage: $group");
+    }
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitOmitsStageNameWhenNotProvided) {
+    SimpleMemoryUsageTracker tracker{100};
+    tracker.add(200);
+    try {
+        tracker.assertWithinMemoryLimit("$testExpr");
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_OMITS(ex.reason(), "Stage:");
+    }
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitLogsErrorWhenOverLimit) {
+    unittest::LogCaptureGuard logs{};
+    SimpleMemoryUsageTracker tracker{100};
+    tracker.add(200);
+    ASSERT_THROWS_CODE(tracker.assertWithinMemoryLimit("$testExpr", "$group"),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+    logs.stop();
+    bool foundLog = false;
+    for (const auto& line : logs.getBSON()) {
+        if (line["id"].numberLong() == 12932700) {
+            foundLog = true;
+            ASSERT_STRING_CONTAINS(line["attr"].Obj()["error"].String(), "Stage: $group");
+        }
+    }
+    ASSERT(foundLog);
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitDoesNotLogWhenUnderLimit) {
+    unittest::LogCaptureGuard logs{};
+    SimpleMemoryUsageTracker tracker{1000};
+    tracker.add(500);
+    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit("$testExpr", "$group"));
+    logs.stop();
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12932700)), 0);
 }
 
 }  // namespace

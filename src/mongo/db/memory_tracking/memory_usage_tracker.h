@@ -88,9 +88,9 @@ public:
 
     /**
      * Throws ExceededMemoryLimit if the current usage exceeds the limit, including a
-     * name, current usage, and limit in the error message.
+     * name, stageName (optional), current usage, and limit in the error message.
      */
-    void assertWithinMemoryLimit(std::string_view name) const;
+    void assertWithinMemoryLimit(std::string_view name, std::string_view stageName = {}) const;
 
     /**
      * Returns a new SimpleMemoryUsageTracker. The copy constructor for this class is purposefully

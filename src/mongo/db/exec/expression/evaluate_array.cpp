@@ -493,7 +493,7 @@ Value evaluate(const ExpressionSortArray& expr,
             const size_t sz = key.objsize() + sizeof(int);
             keyBytes += sz;
             ctx.tracker->add(sz);
-            ctx.tracker->assertWithinMemoryLimit(ExpressionSortArray::kName);
+            ctx.tracker->assertWithinMemoryLimit(ExpressionSortArray::kName, ctx.stageName);
         }
         keysAndIdx.emplace_back(std::move(key), i);
     }
