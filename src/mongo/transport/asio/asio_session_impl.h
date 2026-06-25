@@ -152,8 +152,7 @@ protected:
     const std::shared_ptr<SSLManagerInterface>& getSSLManager() const;
     /** Constructs a SSL socket required to initiate SSL handshake for egress connections. */
     Status buildSSLSocket(const HostAndPort& target) override;
-    Future<void> handshakeSSLForEgress(const HostAndPort& target,
-                                       const ReactorHandle& reactor) override;
+    Future<void> handshakeSSLForEgress(const HostAndPort& target) override;
 #endif
 
     GenericSocket& getSocket() override;

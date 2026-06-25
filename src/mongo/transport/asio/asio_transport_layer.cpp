@@ -53,6 +53,7 @@
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/active_exception_witness.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/executor_stats.h"
 #include "mongo/util/net/hostandport.h"
@@ -392,6 +393,16 @@ AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
                                        std::unique_ptr<SessionManager> sessionManager)
     : _ingressReactor(std::make_shared<AsioReactor>()),
       _egressReactor(std::make_shared<AsioReactor>()),
+      _tlsHandshakePool([] {
+          ThreadPool::Options opts;
+          opts.poolName = "TLSHandshakePool";
+          opts.threadNamePrefix = "TLSHandshake";
+          opts.minThreads = 1;
+          opts.maxThreads = 1;
+          auto pool = std::make_shared<ThreadPool>(std::move(opts));
+          pool->startup();
+          return pool;
+      }()),
       _listenerInterfaceMainPort(
           std::make_unique<ListenerInterface>(_mutex, std::make_shared<AsioReactor>(), this)),
       _listenerInterfacePriorityPort(
@@ -991,7 +1002,7 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
 #endif
 
         Date_t timeBefore = Date_t::now();
-        auto sslStatus = session->handshakeSSLForEgress(peer, nullptr).getNoThrow();
+        auto sslStatus = session->handshakeSSLForEgress(peer).getNoThrow();
         Date_t timeAfter = Date_t::now();
 
         if (timeAfter - timeBefore > kSlowOperationThreshold) {
@@ -1265,8 +1276,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                     return sslStatus;
                 }
                 Date_t timeBefore = Date_t::now();
-                return connector->session
-                    ->handshakeSSLForEgress(connector->peer, connector->reactor)
+                return connector->session->handshakeSSLForEgress(connector->peer)
                     .then([connector, timeBefore, connectionMetrics] {
                         const auto duration = Date_t::now() - timeBefore;
                         LOGV2_DEBUG(9484012,
@@ -1530,6 +1540,9 @@ void AsioTransportLayer::shutdown() {
 
     _timerService->stop();
 
+    _tlsHandshakePool->shutdown();
+    _tlsHandshakePool->join();
+
     if (_sessionManager) {
         LOGV2(4784923, "Shutting down the ASIO transport SessionManager");
         if (!_sessionManager->shutdown(kSessionShutdownTimeout)) {
@@ -1565,6 +1578,10 @@ void AsioTransportLayer::stopAcceptingSessionsWithLock(std::unique_lock<std::mut
 
 void AsioTransportLayer::stopAcceptingSessions() {
     stopAcceptingSessionsWithLock(std::unique_lock(_mutex));
+}
+
+ExecutorPtr AsioTransportLayer::tlsHandshakePool() const {
+    return _tlsHandshakePool;
 }
 
 ReactorHandle AsioTransportLayer::getReactor(WhichReactor which) {

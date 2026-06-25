@@ -476,8 +476,7 @@ Status CommonAsioSession::buildSSLSocket(const HostAndPort& target) {
     return Status::OK();
 }
 
-Future<void> CommonAsioSession::handshakeSSLForEgress(const HostAndPort& target,
-                                                      const ReactorHandle& reactor) {
+Future<void> CommonAsioSession::handshakeSSLForEgress(const HostAndPort& target) {
     invariant(_sslSocket, "SSL Socket expected to be built");
     auto doHandshake = [&] {
         if (_blockingMode == sync) {
@@ -488,18 +487,26 @@ Future<void> CommonAsioSession::handshakeSSLForEgress(const HostAndPort& target,
             return _sslSocket->async_handshake(asio::ssl::stream_base::client, UseFuture{});
         }
     };
-    return doHandshake().then([this, target, reactor] {
-        _ranHandshake = true;
+    auto tlsPool = _tl->tlsHandshakePool();
+    return doHandshake()
+        .thenRunOn(tlsPool)
+        .then([this, target, tlsPool] {
+            _ranHandshake = true;
 
-        return getSSLManager()
-            ->parseAndValidatePeerCertificate(
-                _sslSocket->native_handle(), _sslSocket->get_sni(), target.host(), target, reactor)
-            .then([this](SSLPeerInfo info) {
-                auto& sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
-                tassert(10355701, "SSLPeerInfo is not empty during egress handshake", !sslPeerInfo);
-                sslPeerInfo = std::make_shared<SSLPeerInfo>(info);
-            });
-    });
+            return getSSLManager()
+                ->parseAndValidatePeerCertificate(_sslSocket->native_handle(),
+                                                  _sslSocket->get_sni(),
+                                                  target.host(),
+                                                  target,
+                                                  tlsPool)
+                .then([this](SSLPeerInfo info) {
+                    auto& sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
+                    tassert(
+                        10355701, "SSLPeerInfo is not empty during egress handshake", !sslPeerInfo);
+                    sslPeerInfo = std::make_shared<SSLPeerInfo>(info);
+                });
+        })
+        .unsafeToInlineFuture();
 }
 #endif
 

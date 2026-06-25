@@ -91,8 +91,7 @@ protected:
      * Instructs the Session to initiate an SSL handshake. Returns a Future that is emplaced once
      * the handshake is complete, or when some error has arisen.
      */
-    virtual Future<void> handshakeSSLForEgress(const HostAndPort& target,
-                                               const ReactorHandle& reactor) = 0;
+    virtual Future<void> handshakeSSLForEgress(const HostAndPort& target) = 0;
 #endif
 
     /** Returns the ASIO socket underlying this Session. */

@@ -141,6 +141,7 @@ mongo_cc_library(
         "//src/mongo/util:executor_stats",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/concurrency:thread_pool",
         "//src/mongo/util/net:ssl_manager",
         "//src/mongo/util/options_parser",
         "//src/third_party/asio",

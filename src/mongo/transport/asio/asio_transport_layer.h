@@ -37,6 +37,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
@@ -254,6 +255,8 @@ public:
 
     std::vector<std::pair<SockAddr, int>> getListenerSocketBacklogQueueDepths() const;
 
+    ExecutorPtr tlsHandshakePool() const;
+
 #ifdef __linux__
     BatonHandle makeBaton(OperationContext* opCtx) const override;
 #endif
@@ -329,6 +332,7 @@ private:
     // it.
     std::shared_ptr<AsioReactor> _ingressReactor;
     std::shared_ptr<AsioReactor> _egressReactor;
+    std::shared_ptr<ThreadPool> _tlsHandshakePool;
 
 #ifdef MONGO_CONFIG_SSL
     synchronized_value<std::shared_ptr<const SSLConnectionContext>> _sslContext;
