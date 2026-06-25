@@ -460,7 +460,6 @@ const skippedStages = [
     "$_internalChangeStreamUnwindTransaction",
 
     // Stages on the admin DB or run with aggregate: 1.
-    "$listQueryKnobs",
     "$listMqlEntities",
     "$documents",
     "$currentOp",
