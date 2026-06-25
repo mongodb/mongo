@@ -596,11 +596,14 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
     // trial phase is done, ensuring the yield fires inside the sampling executor.
     hangBeforeCBRSamplingGenerateSample.pauseWhileSet(_opCtx);
 
-    if (boost::optional<SamplingTechniqueEnum> testOnlySamplingMode =
-            getTestOnlySamplingModeIfSet()) {
+    if (internalQuerySamplingBySequentialScan.load()) {
         // This is only used for testing purposes when a repeatable sample is needed.
-        _usedSamplingTechnique = testOnlySamplingMode.value();
-        generateSampleForTesting(testOnlySamplingMode.value());
+        _usedSamplingTechnique = SamplingTechniqueEnum::kSeqScan;
+        generateSampleForTesting(SamplingTechniqueEnum::kSeqScan);
+    } else if (internalQuerySamplingByStrides.load()) {
+        // This is only used for testing purposes when a repeatable sample is needed.
+        _usedSamplingTechnique = SamplingTechniqueEnum::kStrides;
+        generateSampleForTesting(SamplingTechniqueEnum::kStrides);
     } else if (_sampleSize >= _collectionCard.toDouble()) {
         // If the required sample is larger than the collection, the sample is generated from all
         // the documents on the collection.
@@ -626,18 +629,6 @@ void SamplingEstimatorImpl::generateSampleForTesting(SamplingTechniqueEnum techn
             "generateSampleForTesting only supports kSeqScan and kStrides",
             technique == SamplingTechniqueEnum::kSeqScan ||
                 technique == SamplingTechniqueEnum::kStrides);
-
-    // First check if there's a persistent sample.
-    auto tryLoadStatus = tryLoadPersistentSample(technique);
-    if (tryLoadStatus.isOK()) {
-        return;
-    }
-    if (tryLoadStatus.code() != ErrorCodes::NoSuchKey) {
-        LOGV2_WARNING(12871300,
-                      "Persistent sample not usable; falling back to on-the-fly sampling",
-                      "nss"_attr = _nss.toStringForErrorMsg(),
-                      "error"_attr = tryLoadStatus);
-    }
 
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
@@ -731,21 +722,6 @@ void SamplingEstimatorImpl::generateSampleForTesting(SamplingTechniqueEnum techn
                         sbe::DebugPrinter{}.print(plan.first.get()->debugPrint(debugPrintInfo)));
     }
     executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
-}
-
-boost::optional<SamplingTechniqueEnum> SamplingEstimatorImpl::getTestOnlySamplingModeIfSet() {
-    // internalQuerySamplingBySequentialScan overrides internalQuerySamplingByStrides if both are
-    // set
-    if (internalQuerySamplingBySequentialScan.load()) {
-        // This is only used for testing purposes when a repeatable sample is needed.
-        return SamplingTechniqueEnum::kSeqScan;
-    } else if (internalQuerySamplingByStrides.load()) {
-        // This is only used for testing purposes when a repeatable sample is needed.
-        return SamplingTechniqueEnum::kStrides;
-    }
-
-    // Neither knob is set, so not in test only sampling mode
-    return boost::none;
 }
 
 namespace {

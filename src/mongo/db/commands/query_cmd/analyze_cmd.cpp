@@ -51,7 +51,6 @@
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
 #include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
@@ -172,8 +171,8 @@ void runSampleMode(OperationContext* opCtx,
             str::stream() << "Must provide samplingMethod when using mode 'sample'",
             samplingMethodOpt);
 
-    SamplingCEMethodEnum requestedSamplingMethod = samplingMethodOpt.value();
-    boost::optional<ce::SamplingTechniqueEnum> actualSamplingMethod;
+    SamplingCEMethodEnum samplingMethod = samplingMethodOpt.value();
+
     boost::optional<UUID> collUUID;
     BSONArrayBuilder docsArr;
     size_t sampleSize;
@@ -207,13 +206,13 @@ void runSampleMode(OperationContext* opCtx,
                 qkc.getConfidenceInterval(), qkc.getSamplingMarginOfError());
         }
 
-        if (requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt) {
+        if (samplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt) {
             numChunksOpt = internalQueryNumChunksForChunkBasedSampling.load();
         }
 
         tassert(12433003,
                 "numChunks must be set for chunk-based sampling",
-                !(requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt));
+                !(samplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt));
 
         MultipleCollectionAccessor collections(coll);
 
@@ -226,7 +225,7 @@ void runSampleMode(OperationContext* opCtx,
                                             nss,
                                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             sampleSize,
-                                            requestedSamplingMethod,
+                                            samplingMethod,
                                             numChunksOpt,
                                             numRecords,
                                             nullptr /*customerQueryExpCtx*/,
@@ -238,31 +237,12 @@ void runSampleMode(OperationContext* opCtx,
         for (const auto& doc : sample) {
             docsArr.append(doc);
         }
-
-        // Store the sampling method that was actually used (which may differ from
-        // requestedSamplingMethod when test-only knobs like internalQuerySamplingBySequentialScan
-        // are enabled).
-        actualSamplingMethod = estimator.getSamplingMetadata().technique;
     }
 
     tassert(12433002, "collUUID must be initialized by end of sampling block", collUUID);
-    tassert(
-        12873101, "collUUID must be initialized by end of sampling block", actualSamplingMethod);
 
-    // A full collection scan is performed whenever sample size is >= collection size regardless
-    // of requested sampling method, so the value persisted in the sample doc should still reflect
-    // the requested method in this case. Otherwise it should reflect the actual method used.
-    ce::SamplingTechniqueEnum samplingMethodToPersist =
-        *actualSamplingMethod == ce::SamplingTechniqueEnum::kFullCollScan
-        ? samplingMethodToTechnique(requestedSamplingMethod)
-        : *actualSamplingMethod;
-
-    if (samplingMethodToPersist != ce::SamplingTechniqueEnum::kChunk) {
-        numChunksOpt = boost::none;
-    }
-
-    std::string docId =
-        ce::buildPersistentSampleId(*collUUID, samplingMethodToPersist, sampleSize, numChunksOpt);
+    std::string docId = ce::buildPersistentSampleId(
+        *collUUID, samplingMethodToTechnique(samplingMethod), sampleSize, numChunksOpt);
 
     // Build the sample document using IDL field name constants to guarantee the stored document
     // matches the schema expected by PersistentSampleLoader.
@@ -275,8 +255,8 @@ void runSampleMode(OperationContext* opCtx,
     sampleDocBuilder.append(ce::PersistentSampleDoc::kSampleSizeFieldName,
                             static_cast<long long>(sampleSize));
     sampleDocBuilder.append(ce::PersistentSampleDoc::kSamplingMethodFieldName,
-                            idlSerialize(samplingMethodToPersist));
-    if (samplingMethodToPersist == ce::SamplingTechniqueEnum::kChunk) {
+                            idlSerialize(samplingMethodToTechnique(samplingMethod)));
+    if (samplingMethod == SamplingCEMethodEnum::kChunk) {
         sampleDocBuilder.append(ce::PersistentSampleDoc::kNumChunksFieldName, *numChunksOpt);
     }
     sampleDocBuilder.append(ce::PersistentSampleDoc::kDocsFieldName, docsArr.arr());
