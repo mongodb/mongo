@@ -1384,6 +1384,10 @@ public:
         }
     }
 
+    void push_back_raw(std::string_view name, std::pair<TypeTags, Value> val) {
+        push_back_raw(name, val.first, val.second);
+    }
+
     TagValueView getField(std::string_view field) {
         for (size_t idx = 0; idx < _typeTags.size(); ++idx) {
             if (_names[idx] == field) {

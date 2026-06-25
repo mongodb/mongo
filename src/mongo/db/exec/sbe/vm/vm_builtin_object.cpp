@@ -57,9 +57,8 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
         restrictFieldsSet.emplace(value::getStringView(field.tag, field.value));
     }
 
-    auto [tag, val] = value::makeNewObject();
-    auto obj = value::getObjectView(val);
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned result{value::makeNewObject()};
+    auto obj = value::getObjectView(result.value());
 
     if (inObj.tag == value::TypeTags::bsonObject) {
         auto be = value::bitcastTo<const char*>(inObj.value);
@@ -90,8 +89,7 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
         }
     }
 
-    guard.reset();
-    return {true, tag, val};
+    return std::move(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
@@ -114,9 +112,8 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
         keepFieldsSet.emplace(value::getStringView(field.tag, field.value));
     }
 
-    auto [tag, val] = value::makeNewObject();
-    auto obj = value::getObjectView(val);
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned result{value::makeNewObject()};
+    auto obj = value::getObjectView(result.value());
 
     if (inObj.tag == value::TypeTags::bsonObject) {
         auto be = value::bitcastTo<const char*>(inObj.value);
@@ -147,8 +144,7 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
         }
     }
 
-    guard.reset();
-    return {true, tag, val};
+    return std::move(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
@@ -178,9 +174,8 @@ value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
         }
     }
 
-    auto [tag, val] = value::makeNewObject();
-    auto obj = value::getObjectView(val);
-    value::ValueGuard guard{tag, val};
+    value::TagValueOwned result{value::makeNewObject()};
+    auto obj = value::getObjectView(result.value());
 
     if (typeTags.size()) {
         obj->reserve(typeTags.size());
@@ -190,8 +185,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
         }
     }
 
-    guard.reset();
-    return {true, tag, val};
+    return std::move(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinNewBsonObj(ArityType arity) {
@@ -217,25 +211,23 @@ value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
     auto fieldView = viewFromStack(1);
     // Move the incoming accumulator state from the stack. Given that we are now the owner of the
     // state we are free to do any in-place update as we see fit.
-    auto [tagAgg, valAgg] = moveRawOwnedFromStack(0);
-
-    value::ValueGuard guard{tagAgg, valAgg};
+    value::TagValueOwned aggState{moveRawOwnedFromStack(0)};
     // Create a new object if it does not exist yet.
-    if (tagAgg == value::TypeTags::Nothing) {
-        std::tie(tagAgg, valAgg) = value::makeNewObject();
+    if (aggState.tag() == value::TypeTags::Nothing) {
+        aggState = value::TagValueOwned{value::makeNewObject()};
     }
 
-    tassert(11086807, "Unexpected type of Agg parameter", tagAgg == value::TypeTags::Object);
+    tassert(
+        11086807, "Unexpected type of Agg parameter", aggState.tag() == value::TypeTags::Object);
 
     // If our field is nothing or null or it's not an object, return the accumulator state.
     if (fieldView.tag == value::TypeTags::Nothing || fieldView.tag == value::TypeTags::Null ||
         (fieldView.tag != value::TypeTags::Object &&
          fieldView.tag != value::TypeTags::bsonObject)) {
-        guard.reset();
-        return {true, tagAgg, valAgg};
+        return std::move(aggState);
     }
 
-    auto obj = value::getObjectView(valAgg);
+    auto obj = value::getObjectView(aggState.value());
 
     StringMap<value::TagValueView> currObjMap;
     for (auto currObjEnum = value::ObjectEnumerator{fieldView.tag, fieldView.value};
@@ -272,8 +264,7 @@ value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
         }
     }
 
-    guard.reset();
-    return {true, tagAgg, valAgg};
+    return std::move(aggState);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinBsonSize(ArityType arity) {
@@ -301,39 +292,33 @@ value::TagValueMaybeOwned ByteCode::builtinObjectToArray(ArityType arity) {
         return value::TagValueMaybeOwned::nothing();
     }
 
-    auto [arrTag, arrVal] = value::makeNewArray();
-    value::ValueGuard arrGuard{arrTag, arrVal};
-    auto array = value::getArrayView(arrVal);
+    value::TagValueOwned arr{value::makeNewArray()};
+    auto array = value::getArrayView(arr.value());
 
     value::ObjectEnumerator objectEnumerator(obj.tag, obj.value);
     while (!objectEnumerator.atEnd()) {
         // get key
         auto fieldName = objectEnumerator.getFieldName();
-        auto [keyTag, keyVal] = value::makeNewString(fieldName);
-        value::ValueGuard keyGuard{keyTag, keyVal};
+        value::TagValueOwned key{value::makeNewString(fieldName)};
 
         // get value
         auto [valueTag, valueVal] = objectEnumerator.getViewOfValue();
-        auto [valueCopyTag, valueCopyVal] = value::copyValue(valueTag, valueVal);
+        value::TagValueOwned valueCopy{value::copyValue(valueTag, valueVal)};
 
         // create a new obejct
-        auto [elemTag, elemVal] = value::makeNewObject();
-        value::ValueGuard elemGuard{elemTag, elemVal};
-        auto elemObj = value::getObjectView(elemVal);
+        value::TagValueOwned elem{value::makeNewObject()};
+        auto elemObj = value::getObjectView(elem.value());
 
         // insert key and value to the object
-        elemObj->push_back_raw("k"sv, keyTag, keyVal);
-        keyGuard.reset();
-        elemObj->push_back_raw("v"sv, valueCopyTag, valueCopyVal);
+        elemObj->push_back_raw("k"sv, key.releaseToRaw());
+        elemObj->push_back_raw("v"sv, valueCopy.releaseToRaw());
 
         // insert the object to array
-        array->push_back_raw(elemTag, elemVal);
-        elemGuard.reset();
+        array->push_back(std::move(elem));
 
         objectEnumerator.advance();
     }
-    arrGuard.reset();
-    return {true, arrTag, arrVal};
+    return std::move(arr);
 }
 
 }  // namespace vm
