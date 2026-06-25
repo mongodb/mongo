@@ -325,6 +325,10 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
         result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
     }
     uassertStatusOK(result.getStatus());
+    // Detect any stale emit() calls made during this invocation. In the invokeMap path,
+    // _drainEmitToCallback() is called explicitly. For regular invocations the buffer
+    // should be empty; draining here will throw (via the callback) if emit() was misused.
+    _drainEmitToCallback();
     if (!ignoreReturn) {
         BSONObj wrapped = result.getValue();
         BSONElement retVal = wrapped["__returnValue"];
@@ -347,17 +351,17 @@ void WasmtimeImplScope::injectNative(const char* field, NativeFunction func, voi
             "Only 'emit' function can be injected",
             std::string_view(field) == "emit");
 
+    // injectNative is called exactly once per $_internalJsEmit evaluation. The old pattern
+    // of calling it twice (once to set up, once with data=nullptr to invalidate a stack
+    // pointer) no longer applies: emitFromJS reads state via EmitStateGuard::get() instead.
+    // Re-injection with the same function is allowed (scope reuse across evaluations);
+    // injecting a different function is always a bug.
+    tassert(9712402,
+            "injectNative(emit) must not replace an active emit callback with a different function",
+            !_emitCallback || _emitCallback == func);
+
     _emitCallback = func;
     _emitCallbackData = data;
-
-    // evaluate_javascript.cpp calls injectNative a second time with data=nullptr to
-    // invalidate the emitState pointer after the map function returns. That call must NOT
-    // trigger a fresh setupEmit: the buffer is already drained, and setupEmit allocates
-    // ~117 MB of WASM linear memory — repeated calls accumulate heap pressure and can
-    // exhaust the store limit (CannotLeaveComponent trap).
-    if (!data) {
-        return;
-    }
 
     // Margin lets WASM buffer one over-limit doc so the host's EmitState sees
     // it during drain and can throw, instead of WASM silently dropping it.

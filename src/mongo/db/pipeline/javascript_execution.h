@@ -118,14 +118,6 @@ public:
         return _scope->createFunction(funcCode.c_str());
     };
 
-    /**
-     * Injects the given function 'emitFn' as a native JS function named 'emit', callable from
-     * user-defined functions.
-     */
-    void injectEmit(NativeFunction emitFn, void* data) {
-        _scope->injectNative("emit", emitFn, data);
-    }
-
     Scope* getScope() {
         return _scope.get();
     }
@@ -135,7 +127,6 @@ private:
     std::unique_ptr<Scope> _scope;
     bool _storedProceduresLoaded = false;
     int _fnCallTimeoutMillis;
-
     Value doCallFunction(ScriptingFunction func,
                          const BSONObj& params,
                          const BSONObj& thisObj,
