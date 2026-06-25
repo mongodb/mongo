@@ -60,6 +60,14 @@ jsTestLog(
 );
 stopServerReplication(staleSecondary);
 
+jsTestLog("Doing a write on the config server to advance it beyond the stale secondary");
+assert.commandWorked(
+    configPrimary.adminCommand({
+        appendOplogNote: 1,
+        data: {msg: "dummy write to advance cluster time"},
+    }),
+);
+
 // ---------------------------------------------------------------------------
 // Step 3: Isolate the config primary's RSM so the only reachable member is the stale secondary.
 // _flushShardRegistry on the primary then drives an internal find on config.shards via the
