@@ -98,6 +98,18 @@ function listCollectionEntry(db, name) {
     return entries[0];
 }
 
+// Return a copy of 'options' with FCV-unstable fields removed when running in an FCV upgrade/downgrade suite.
+//
+// NOTE: 'fixedBucketing' is removed during FCV downgrades, and re-added and set to 'false' during FCV upgrade.
+// TODO(SERVER-128768): Remove once 9.0 becomes last LTS.
+function normalizeOptionsForFCVSuite(options) {
+    const normalized = Object.extend({}, options, true /* deep */);
+    if (TestData.isRunningFCVUpgradeDowngradeSuite && normalized.timeseries) {
+        delete normalized.timeseries.fixedBucketing;
+    }
+    return normalized;
+}
+
 function recreateFromOptions(db, name, reportedOptions, label) {
     assert.commandWorked(
         db.runCommand({create: name, ...reportedOptions}),
@@ -127,7 +139,7 @@ describe("ListCollectionsCreateRoundtrip", function () {
 
             // 2. Snapshot listCollections output.
             const initialEntry = listCollectionEntry(testDb, collName);
-            const reportedOptions = initialEntry.options;
+            const reportedOptions = normalizeOptionsForFCVSuite(initialEntry.options);
             jsTest.log.info(`listCollections snapshot for '${collName}'`, {entry: initialEntry});
 
             // 3. Re-create using the options returned by listCollections. Must succeed — create is
@@ -142,8 +154,8 @@ describe("ListCollectionsCreateRoundtrip", function () {
                 `Type diverged after first recreate for '${collName}'`,
             );
             assert.docEq(
-                initialEntry.options,
-                secondEntry.options,
+                reportedOptions,
+                normalizeOptionsForFCVSuite(secondEntry.options),
                 `Options diverged after first recreate for '${collName}'`,
             );
 
@@ -157,8 +169,8 @@ describe("ListCollectionsCreateRoundtrip", function () {
                 `Type diverged after second recreate for '${collName}'`,
             );
             assert.docEq(
-                initialEntry.options,
-                thirdEntry.options,
+                reportedOptions,
+                normalizeOptionsForFCVSuite(thirdEntry.options),
                 `Options diverged after second recreate for '${collName}'`,
             );
         });
