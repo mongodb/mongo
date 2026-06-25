@@ -95,7 +95,7 @@ public:
     boost::optional<BSONObj> additionalFilter;
     boost::optional<FieldPath> depthField;
     boost::optional<long long> maxDepth;
-    // TODO SERVER-127884 Remove the LPP from StageParams once the LP->DS->exec pipeline translation
+    // TODO SERVER-127906 Remove the LPP from StageParams once the LP->DS->exec pipeline translation
     // bridges the subpipeline across phase boundaries properly.
     // Set at lite-parse time; carries the view pipeline (nullopt for regular collections)
     // to DocumentSourceGraphLookUp::createFromStageParams.
