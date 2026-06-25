@@ -332,6 +332,11 @@ public:
         return otel::traces::Span::start(telemetryCtx, otel::traces::span_names::kTest1);
     }
 
+    template <typename Collector>
+    auto launchCollector(const std::shared_ptr<Collector>& collector) {
+        return collector->launch(scopedExecutor(), makeSpanForCollector(), []() {});
+    }
+
 private:
     std::shared_ptr<ThreadPool> _executorForCancellation;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _taskExecutor;

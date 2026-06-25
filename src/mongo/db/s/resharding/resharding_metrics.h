@@ -241,6 +241,18 @@ public:
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
     void onSearchIndexAbort();
 
+    void onPreApplyVerificationSuccess();
+    void onPreApplyVerificationFailure();
+    void onPreApplyVerificationSkipped();
+    void onPreApplyVerificationTimedOut();
+    void onPreApplyVerificationRetry();
+    void onPreCommitVerificationSuccess();
+    void onPreCommitVerificationFailure();
+    void onPreCommitVerificationSkipped();
+    void onPreCommitVerificationTimedOut();
+    void onPreCommitDonorVerificationRetry();
+    void onPreCommitRecipientVerificationRetry();
+
     ReshardingCumulativeMetrics::AnyState getState() const {
         return _state.load();
     }

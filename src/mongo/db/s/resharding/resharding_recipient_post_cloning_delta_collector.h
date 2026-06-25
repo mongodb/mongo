@@ -39,6 +39,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 
+#include <functional>
 #include <map>
 #include <memory>
 
@@ -65,11 +66,14 @@ public:
      * with an empty map if no fetch was needed.
      */
     SharedSemiFuture<std::map<ShardId, int64_t>> launch(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor, otel::traces::Span span);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        otel::traces::Span span,
+        std::function<void()> onRetry);
 
 private:
     ExecutorFuture<std::map<ShardId, int64_t>> _run(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::function<void()> onRetry);
 
     const ReshardingCoordinatorDocument _coordinatorDoc;
     const std::shared_ptr<ReshardingCoordinatorExternalState> _externalState;

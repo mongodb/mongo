@@ -1556,7 +1556,8 @@ ReshardingCoordinator::_fetchNumDocumentsToCloneFromDonors(
                                });
                        });
                })
-        .onTransientError([](const Status& status) {
+        .onTransientError([this](const Status& status) {
+            _metrics->onPreApplyVerificationRetry();
             LOGV2(1003571,
                   "Resharding coordinator encountered transient error while fetching the number of "
                   "documents to copy from donor shards",
@@ -1605,12 +1606,19 @@ ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
 
             if (!swDocsToCopy.isOK()) {
                 _ctHolder->cancelDocumentFetch();
+                const auto& status = swDocsToCopy.getStatus();
 
                 LOGV2(12042401,
                       "Skipping cloning verification: documentsToCopy fetch from donor "
                       "shards timed out or failed",
                       "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                      "error"_attr = swDocsToCopy.getStatus());
+                      "error"_attr = status);
+
+                if (status == ErrorCodes::ExceededTimeLimit) {
+                    _metrics->onPreApplyVerificationTimedOut();
+                } else {
+                    _metrics->onPreApplyVerificationSkipped();
+                }
                 return false;
             }
 
@@ -1626,6 +1634,7 @@ ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
                       "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                       "expectedSize"_attr = donorShards.size(),
                       "actualSize"_attr = documentsToCopy.size());
+                _metrics->onPreApplyVerificationSkipped();
                 return false;
             }
 
@@ -1648,8 +1657,14 @@ ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
                 .thenRunOn(**executor)
                 .then([this, executor] {
                     auto opCtx = _makeOperationContext();
-                    _reshardingCoordinatorExternalState->verifyClonedCollection(
-                        opCtx.get(), **executor, _ctHolder->getAbortToken(), _coordinatorDoc);
+                    try {
+                        _reshardingCoordinatorExternalState->verifyClonedCollection(
+                            opCtx.get(), **executor, _ctHolder->getAbortToken(), _coordinatorDoc);
+                        _metrics->onPreApplyVerificationSuccess();
+                    } catch (...) {
+                        _metrics->onPreApplyVerificationFailure();
+                        throw;
+                    }
                     LOGV2(9858412,
                           "Verification before applying completed",
                           "reshardingUUID"_attr = _metadata.getReshardingUUID());
@@ -1918,6 +1933,7 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
         LOGV2(12042402,
               "Skipping final collection verification because cloning verification was incomplete",
               "reshardingUUID"_attr = _metadata.getReshardingUUID());
+        _metrics->onPreCommitVerificationSkipped();
         return coordinatorDocChangedOnDisk;
     }
 
@@ -1958,6 +1974,7 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
                 "did not complete before the deadline",
                 "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                 "error"_attr = redact(ex.toString()));
+            _metrics->onPreCommitVerificationTimedOut();
         } else {
             LOGV2_WARNING(
                 12178803,
@@ -1965,6 +1982,7 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
                 "skipping resharding verification",
                 "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                 "error"_attr = redact(ex.toString()));
+            _metrics->onPreCommitVerificationSkipped();
         }
     }
 
@@ -1973,11 +1991,16 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
         try {
             _reshardingCoordinatorExternalState->verifyFinalCollection(opCtx.get(),
                                                                        coordinatorDocChangedOnDisk);
+            _metrics->onPreCommitVerificationSuccess();
         } catch (const ExceptionFor<ErrorCodes::ReshardingValidationIncompleteData>& ex) {
             LOGV2_WARNING(1091841,
                           "Failed to verify the temporary resharding collection after reaching "
                           "strict consistency",
                           "error"_attr = redact(ex.toString()));
+            _metrics->onPreCommitVerificationSkipped();
+        } catch (...) {
+            _metrics->onPreCommitVerificationFailure();
+            throw;
         }
     }
 
@@ -2471,7 +2494,8 @@ void ReshardingCoordinator::_launchDonorPostCloningDeltaCollector(
     _donorDeltaFuture = _donorDeltaCollector->launch(
         executor,
         _startSpan(telemetryCtx,
-                   otel::traces::span_names::kReshardingCoordinatorDonorPostCloningDeltaCollector));
+                   otel::traces::span_names::kReshardingCoordinatorDonorPostCloningDeltaCollector),
+        [metrics = _metrics.get()] { metrics->onPreCommitDonorVerificationRetry(); });
 }
 
 void ReshardingCoordinator::_launchRecipientDeltaCollector(
@@ -2494,7 +2518,8 @@ void ReshardingCoordinator::_launchRecipientDeltaCollector(
         executor,
         _startSpan(
             telemetryCtx,
-            otel::traces::span_names::kReshardingCoordinatorRecipientPostCloningDeltaCollector));
+            otel::traces::span_names::kReshardingCoordinatorRecipientPostCloningDeltaCollector),
+        [metrics = _metrics.get()] { metrics->onPreCommitRecipientVerificationRetry(); });
 }
 
 void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& nss) {

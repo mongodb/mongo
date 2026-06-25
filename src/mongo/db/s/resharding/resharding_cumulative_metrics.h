@@ -130,6 +130,18 @@ public:
 
     void onSearchIndexAbort();
 
+    void onPreApplyVerificationSuccess();
+    void onPreApplyVerificationFailure();
+    void onPreApplyVerificationSkipped();
+    void onPreApplyVerificationTimedOut();
+    void onPreApplyVerificationRetry();
+    void onPreCommitVerificationSuccess();
+    void onPreCommitVerificationFailure();
+    void onPreCommitVerificationSkipped();
+    void onPreCommitVerificationTimedOut();
+    void onPreCommitDonorVerificationRetry();
+    void onPreCommitRecipientVerificationRetry();
+
     template <typename T>
     void onStateTransition(boost::optional<T> before, boost::optional<T> after) {
         _stateTracker.onStateTransition(before, after);
@@ -232,6 +244,18 @@ private:
     AtomicWord<int64_t> _countSameKeyCancelled{0};
 
     AtomicWord<int64_t> _countSearchIndexAborts{0};
+
+    AtomicWord<int64_t> _countPreApplyVerificationSucceeded{0};
+    AtomicWord<int64_t> _countPreApplyVerificationFailed{0};
+    AtomicWord<int64_t> _countPreApplyVerificationSkipped{0};
+    AtomicWord<int64_t> _countPreApplyVerificationTimedOut{0};
+    AtomicWord<int64_t> _countPreApplyVerificationRetried{0};
+    AtomicWord<int64_t> _countPreCommitVerificationSucceeded{0};
+    AtomicWord<int64_t> _countPreCommitVerificationFailed{0};
+    AtomicWord<int64_t> _countPreCommitVerificationSkipped{0};
+    AtomicWord<int64_t> _countPreCommitVerificationTimedOut{0};
+    AtomicWord<int64_t> _countPreCommitDonorVerificationRetried{0};
+    AtomicWord<int64_t> _countPreCommitRecipientVerificationRetried{0};
 
     std::set<UUID> _activeReshardingOperations;
     std::mutex _activeReshardingOperationsMutex;

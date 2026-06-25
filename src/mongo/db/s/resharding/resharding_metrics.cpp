@@ -378,6 +378,50 @@ void ReshardingMetrics::onSearchIndexAbort() {
     _cumulativeMetrics->onSearchIndexAbort();
 }
 
+void ReshardingMetrics::onPreApplyVerificationSuccess() {
+    getCumulativeMetrics()->onPreApplyVerificationSuccess();
+}
+
+void ReshardingMetrics::onPreApplyVerificationFailure() {
+    getCumulativeMetrics()->onPreApplyVerificationFailure();
+}
+
+void ReshardingMetrics::onPreApplyVerificationSkipped() {
+    getCumulativeMetrics()->onPreApplyVerificationSkipped();
+}
+
+void ReshardingMetrics::onPreApplyVerificationTimedOut() {
+    getCumulativeMetrics()->onPreApplyVerificationTimedOut();
+}
+
+void ReshardingMetrics::onPreApplyVerificationRetry() {
+    getCumulativeMetrics()->onPreApplyVerificationRetry();
+}
+
+void ReshardingMetrics::onPreCommitVerificationSuccess() {
+    getCumulativeMetrics()->onPreCommitVerificationSuccess();
+}
+
+void ReshardingMetrics::onPreCommitVerificationFailure() {
+    getCumulativeMetrics()->onPreCommitVerificationFailure();
+}
+
+void ReshardingMetrics::onPreCommitVerificationSkipped() {
+    getCumulativeMetrics()->onPreCommitVerificationSkipped();
+}
+
+void ReshardingMetrics::onPreCommitVerificationTimedOut() {
+    getCumulativeMetrics()->onPreCommitVerificationTimedOut();
+}
+
+void ReshardingMetrics::onPreCommitDonorVerificationRetry() {
+    getCumulativeMetrics()->onPreCommitDonorVerificationRetry();
+}
+
+void ReshardingMetrics::onPreCommitRecipientVerificationRetry() {
+    getCumulativeMetrics()->onPreCommitRecipientVerificationRetry();
+}
+
 void ReshardingMetrics::onInsertApplied() {
     _insertsApplied.fetchAndAdd(1);
     getCumulativeMetrics()->onInsertApplied();

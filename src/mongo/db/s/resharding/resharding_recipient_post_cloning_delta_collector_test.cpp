@@ -108,7 +108,7 @@ TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest, SkipsFetchWhenNotInBloc
     auto doc = makeDoc(CoordinatorStateEnum::kCommitting, {ShardId("shard0")});
     auto collector = makeCollector(doc, externalState, abortSource.token());
 
-    auto future = collector->launch(scopedExecutor(), makeSpanForCollector());
+    auto future = launchCollector(collector);
 
     auto result = future.get();
     ASSERT_TRUE(result.empty());
@@ -124,7 +124,7 @@ TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest, SkipsFetchWhenDocuments
                        true /* documentsFinalAlreadySet */);
     auto collector = makeCollector(doc, externalState, abortSource.token());
 
-    auto future = collector->launch(scopedExecutor(), makeSpanForCollector());
+    auto future = launchCollector(collector);
 
     auto result = future.get();
     ASSERT_TRUE(result.empty());
@@ -140,7 +140,7 @@ TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest, FetchesDeltaSuccessfull
     auto doc = makeDoc(CoordinatorStateEnum::kBlockingWrites, {shard0, shard1});
     auto collector = makeCollector(doc, externalState, abortSource.token());
 
-    auto future = collector->launch(scopedExecutor(), makeSpanForCollector());
+    auto future = launchCollector(collector);
 
     auto result = future.get();
     ASSERT_EQ(result.size(), 2U);
@@ -158,10 +158,13 @@ TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest,
     auto doc = makeDoc(CoordinatorStateEnum::kBlockingWrites, {shard0});
     auto collector = makeCollector(doc, externalState, abortSource.token());
 
-    auto future = collector->launch(scopedExecutor(), makeSpanForCollector());
+    int retryCount = 0;
+    auto future = collector->launch(
+        scopedExecutor(), makeSpanForCollector(), [&retryCount] { ++retryCount; });
 
     auto result = future.get();
     ASSERT_EQ(externalState->callCount(), 2);
+    ASSERT_EQ(retryCount, 1);
     ASSERT_EQ(result.size(), 1U);
     ASSERT_EQ(result.at(shard0), 10);
 }
@@ -172,12 +175,15 @@ TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest, UnrecoverableErrorPropa
     auto doc = makeDoc(CoordinatorStateEnum::kBlockingWrites, {ShardId("shard0")});
     auto collector = makeCollector(doc, externalState, abortSource.token());
 
-    auto future = collector->launch(scopedExecutor(), makeSpanForCollector());
+    int retryCount = 0;
+    auto future = collector->launch(
+        scopedExecutor(), makeSpanForCollector(), [&retryCount] { ++retryCount; });
 
     auto status = future.getNoThrow();
     ASSERT_EQ(status.getStatus().code(), ErrorCodes::InternalError);
     // A non-retryable error must not trigger any retry: exactly one call expected.
     ASSERT_EQ(externalState->callCount(), 1);
+    ASSERT_EQ(retryCount, 0);
 }
 
 TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest,
@@ -187,7 +193,7 @@ TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest,
     auto doc = makeDoc(CoordinatorStateEnum::kBlockingWrites, {ShardId("shard0")});
     auto collector = makeCollector(doc, blockingState, abortSource.token());
 
-    auto future = collector->launch(scopedExecutor(), makeSpanForCollector());
+    auto future = launchCollector(collector);
 
     // Wait until getDocumentsDeltaFromRecipients is actually blocking before cancelling.
     blockingState->waitUntilEntered();

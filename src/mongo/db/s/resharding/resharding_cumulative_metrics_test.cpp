@@ -1076,5 +1076,58 @@ TEST_F(ReshardingCumulativeMetricsTest, OldestActiveContainsDiagnosticMetricsNoA
     ASSERT_EQ(section.getField("recipientChangeStreamMonitorLagMillis").Long(), -1);
 }
 
+TEST_F(ReshardingCumulativeMetricsTest, ReportContainsPreApplyVerificationCounts) {
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    auto before = getCumulativeMetricsReportForSection(kRoot);
+    ASSERT_EQ(before.getIntField("countPreApplyVerificationSucceeded"), 0);
+    ASSERT_EQ(before.getIntField("countPreApplyVerificationFailed"), 0);
+    ASSERT_EQ(before.getIntField("countPreApplyVerificationSkipped"), 0);
+    ASSERT_EQ(before.getIntField("countPreApplyVerificationTimedOut"), 0);
+    ASSERT_EQ(before.getIntField("countPreApplyVerificationRetried"), 0);
+
+    _reshardingCumulativeMetrics->onPreApplyVerificationSuccess();
+    _reshardingCumulativeMetrics->onPreApplyVerificationFailure();
+    _reshardingCumulativeMetrics->onPreApplyVerificationSkipped();
+    _reshardingCumulativeMetrics->onPreApplyVerificationTimedOut();
+    _reshardingCumulativeMetrics->onPreApplyVerificationRetry();
+
+    auto after = getCumulativeMetricsReportForSection(kRoot);
+    ASSERT_EQ(after.getIntField("countPreApplyVerificationSucceeded"), 1);
+    ASSERT_EQ(after.getIntField("countPreApplyVerificationFailed"), 1);
+    ASSERT_EQ(after.getIntField("countPreApplyVerificationSkipped"), 1);
+    ASSERT_EQ(after.getIntField("countPreApplyVerificationTimedOut"), 1);
+    ASSERT_EQ(after.getIntField("countPreApplyVerificationRetried"), 1);
+}
+
+TEST_F(ReshardingCumulativeMetricsTest, ReportContainsPreCommitVerificationCounts) {
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    auto before = getCumulativeMetricsReportForSection(kRoot);
+    ASSERT_EQ(before.getIntField("countPreCommitVerificationSucceeded"), 0);
+    ASSERT_EQ(before.getIntField("countPreCommitVerificationFailed"), 0);
+    ASSERT_EQ(before.getIntField("countPreCommitVerificationSkipped"), 0);
+    ASSERT_EQ(before.getIntField("countPreCommitVerificationTimedOut"), 0);
+    ASSERT_EQ(before.getIntField("countPreCommitDonorVerificationRetried"), 0);
+    ASSERT_EQ(before.getIntField("countPreCommitRecipientVerificationRetried"), 0);
+
+    _reshardingCumulativeMetrics->onPreCommitVerificationSuccess();
+    _reshardingCumulativeMetrics->onPreCommitVerificationFailure();
+    _reshardingCumulativeMetrics->onPreCommitVerificationSkipped();
+    _reshardingCumulativeMetrics->onPreCommitVerificationTimedOut();
+    _reshardingCumulativeMetrics->onPreCommitDonorVerificationRetry();
+    _reshardingCumulativeMetrics->onPreCommitRecipientVerificationRetry();
+
+    auto after = getCumulativeMetricsReportForSection(kRoot);
+    ASSERT_EQ(after.getIntField("countPreCommitVerificationSucceeded"), 1);
+    ASSERT_EQ(after.getIntField("countPreCommitVerificationFailed"), 1);
+    ASSERT_EQ(after.getIntField("countPreCommitVerificationSkipped"), 1);
+    ASSERT_EQ(after.getIntField("countPreCommitVerificationTimedOut"), 1);
+    ASSERT_EQ(after.getIntField("countPreCommitDonorVerificationRetried"), 1);
+    ASSERT_EQ(after.getIntField("countPreCommitRecipientVerificationRetried"), 1);
+}
+
 }  // namespace
 }  // namespace mongo

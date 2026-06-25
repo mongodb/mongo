@@ -49,18 +49,21 @@ ReshardingRecipientPostCloningDeltaCollector::ReshardingRecipientPostCloningDelt
       _cancelableOpCtxFactory(std::move(cancelableOpCtxFactory)) {}
 
 SharedSemiFuture<std::map<ShardId, int64_t>> ReshardingRecipientPostCloningDeltaCollector::launch(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, otel::traces::Span span) {
-    _run(executor).getAsync([self = shared_from_this(), span = std::move(span)](
-                                StatusWith<std::map<ShardId, int64_t>> sw) mutable {
-        auto localSpan = std::move(span);
-        self->_completionPromise.setFrom(std::move(sw));
-    });
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    otel::traces::Span span,
+    std::function<void()> onRetry) {
+    _run(executor, std::move(onRetry))
+        .getAsync([self = shared_from_this(),
+                   span = std::move(span)](StatusWith<std::map<ShardId, int64_t>> sw) mutable {
+            auto localSpan = std::move(span);
+            self->_completionPromise.setFrom(std::move(sw));
+        });
 
     return _completionPromise.getFuture();
 }
 
 ExecutorFuture<std::map<ShardId, int64_t>> ReshardingRecipientPostCloningDeltaCollector::_run(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, std::function<void()> onRetry) {
     // Don't re-fetch if the delta was already persisted (e.g. after a resume). We only need to
     // check 'documentsFinal' on the first entry because it will either be set on all entries or
     // on none of them.
@@ -92,7 +95,8 @@ ExecutorFuture<std::map<ShardId, int64_t>> ReshardingRecipientPostCloningDeltaCo
                                _coordinatorDoc.getRecipientShards()));
                    });
            })
-        .onTransientError([](const Status& status) {
+        .onTransientError([onRetry](const Status& status) {
+            onRetry();
             LOGV2(12735301,
                   "Resharding coordinator encountered transient error while fetching the final "
                   "number of documents from recipient shards",

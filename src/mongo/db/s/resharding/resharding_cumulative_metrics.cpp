@@ -265,6 +265,19 @@ void ReshardingCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) con
     root.append(kCountCanceled, _countCancelled.load());
     root.append(kLastOpEndingChunkImbalance, _lastOpEndingChunkImbalance.load());
     root.append(kCountSearchIndexAborts, _countSearchIndexAborts.load());
+    root.append(kCountPreApplyVerificationSucceeded, _countPreApplyVerificationSucceeded.load());
+    root.append(kCountPreApplyVerificationFailed, _countPreApplyVerificationFailed.load());
+    root.append(kCountPreApplyVerificationSkipped, _countPreApplyVerificationSkipped.load());
+    root.append(kCountPreApplyVerificationTimedOut, _countPreApplyVerificationTimedOut.load());
+    root.append(kCountPreApplyVerificationRetried, _countPreApplyVerificationRetried.load());
+    root.append(kCountPreCommitVerificationSucceeded, _countPreCommitVerificationSucceeded.load());
+    root.append(kCountPreCommitVerificationFailed, _countPreCommitVerificationFailed.load());
+    root.append(kCountPreCommitVerificationSkipped, _countPreCommitVerificationSkipped.load());
+    root.append(kCountPreCommitVerificationTimedOut, _countPreCommitVerificationTimedOut.load());
+    root.append(kCountPreCommitDonorVerificationRetried,
+                _countPreCommitDonorVerificationRetried.load());
+    root.append(kCountPreCommitRecipientVerificationRetried,
+                _countPreCommitRecipientVerificationRetried.load());
 
     if (_rootSectionName == kResharding) {
         root.append(kCountSameKeyStarted, _countSameKeyStarted.load());
@@ -479,6 +492,50 @@ void ReshardingCumulativeMetrics::onWriteToStashedCollections() {
 
 void ReshardingCumulativeMetrics::onSearchIndexAbort() {
     _countSearchIndexAborts.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreApplyVerificationSuccess() {
+    _countPreApplyVerificationSucceeded.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreApplyVerificationFailure() {
+    _countPreApplyVerificationFailed.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreApplyVerificationSkipped() {
+    _countPreApplyVerificationSkipped.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreApplyVerificationTimedOut() {
+    _countPreApplyVerificationTimedOut.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreApplyVerificationRetry() {
+    _countPreApplyVerificationRetried.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreCommitVerificationSuccess() {
+    _countPreCommitVerificationSucceeded.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreCommitVerificationFailure() {
+    _countPreCommitVerificationFailed.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreCommitVerificationSkipped() {
+    _countPreCommitVerificationSkipped.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreCommitVerificationTimedOut() {
+    _countPreCommitVerificationTimedOut.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreCommitDonorVerificationRetry() {
+    _countPreCommitDonorVerificationRetried.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onPreCommitRecipientVerificationRetry() {
+    _countPreCommitRecipientVerificationRetried.fetchAndAdd(1);
 }
 
 void ReshardingCumulativeMetrics::onCloningRemoteBatchRetrieval(Milliseconds elapsed) {

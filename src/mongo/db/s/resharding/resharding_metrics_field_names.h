@@ -117,6 +117,20 @@ constexpr auto kBlockingWritesToMonitorCompletionSecs = "blockingWritesToMonitor
 constexpr auto kStrictConsistencyToMonitorCompletionSecs =
     "strictConsistencyToMonitorCompletionSecs";
 
+// Cumulative verification metrics — pre-apply (cloning) and pre-commit (final) tracked separately.
+constexpr auto kCountPreApplyVerificationSucceeded = "countPreApplyVerificationSucceeded";
+constexpr auto kCountPreApplyVerificationFailed = "countPreApplyVerificationFailed";
+constexpr auto kCountPreApplyVerificationSkipped = "countPreApplyVerificationSkipped";
+constexpr auto kCountPreApplyVerificationTimedOut = "countPreApplyVerificationTimedOut";
+constexpr auto kCountPreApplyVerificationRetried = "countPreApplyVerificationRetried";
+constexpr auto kCountPreCommitVerificationSucceeded = "countPreCommitVerificationSucceeded";
+constexpr auto kCountPreCommitVerificationFailed = "countPreCommitVerificationFailed";
+constexpr auto kCountPreCommitVerificationSkipped = "countPreCommitVerificationSkipped";
+constexpr auto kCountPreCommitVerificationTimedOut = "countPreCommitVerificationTimedOut";
+constexpr auto kCountPreCommitDonorVerificationRetried = "countPreCommitDonorVerificationRetried";
+constexpr auto kCountPreCommitRecipientVerificationRetried =
+    "countPreCommitRecipientVerificationRetried";
+
 // serverStatus oldestActive diagnostic fields (milliseconds, role-prefixed).
 // Donor fields.
 constexpr auto kDonorChangeStreamMonitorLagMillis = "donorChangeStreamMonitorLagMillis";
