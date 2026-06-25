@@ -1573,6 +1573,8 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) 
 
 TEST_F(TransactionCoordinatorTest,
        CoordinatorTerminatedWithUnexpectedErrorBeforeDurablyWritingDecision) {
+    unittest::LogCaptureGuard logs;
+
     // Create the coordinator.
     auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
     auto coordinator = std::make_shared<TransactionCoordinator>(
@@ -1592,6 +1594,8 @@ TEST_F(TransactionCoordinatorTest,
     ASSERT_THROWS_CODE(coordinator->onCompletion().get(), DBException, ErrorCodes::InternalError);
     coordinator->shutdown();
     executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
+    ASSERT_GT(logs.countBSONContainingSubset(BSON("id" << 12111100)), 0);
 }
 
 using TransactionCoordinatorTestDeathTest = TransactionCoordinatorTest;
