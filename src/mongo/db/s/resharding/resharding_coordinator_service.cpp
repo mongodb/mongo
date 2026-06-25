@@ -163,4 +163,14 @@ void ReshardingCoordinatorService::abortAllReshardCollection(
     }
 }
 
+void ReshardingCoordinatorService::stepDown_forTest() {
+    LOGV2(12755408, "Performing resharding coordinator service stepdown for test");
+    onStepDown();
+}
+
+void ReshardingCoordinatorService::stepUp_forTest() {
+    LOGV2(12755409, "Performing resharding coordinator service stepup for test");
+    onStepUp_forTest();
+}
+
 }  // namespace mongo

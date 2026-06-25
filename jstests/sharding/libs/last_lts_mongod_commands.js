@@ -53,6 +53,7 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_shardsvrReshardingDonorFetchFinalCollectionStats",
     "_shardsvrReshardingRecipientFetchFinalCollectionStats",
     "_shardsvrReshardingDonorStartChangeStreamsMonitor",
+    "_shardsvrReshardingStepDown",
     "startTrafficRecording",
     "stopTrafficRecording",
     "_shardsvrCheckCanConnectToConfigServer",

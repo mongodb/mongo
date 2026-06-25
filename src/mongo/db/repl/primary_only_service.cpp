@@ -55,6 +55,7 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -386,6 +387,35 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
 }
 
 void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
+    auto newTerm = stepUpOpTime.getTerm();
+    {
+        std::lock_guard lk(_mutex);
+        if (_state == State::kShutdown) {
+            return;
+        }
+        invariant(newTerm > _term,
+                  str::stream() << "term " << newTerm << " is not greater than " << _term);
+    }
+
+    _doStepUp(newTerm, stepUpOpTime);
+}
+
+void PrimaryOnlyService::onStepUp_forTest() {
+    tassert(12755400,
+            "stepDown_forTest can only be used in tests",
+            TestingProctor::instance().isEnabled());
+
+    auto opTime = repl::ReplicationCoordinator::get(_serviceContext)->getMyLastAppliedOpTime();
+    long long currentTerm = ([&] {
+        std::lock_guard lk(_mutex);
+        return _term;
+    })();
+
+    // Just pass the current term to avoid clashing with the real step up.
+    _doStepUp(currentTerm, opTime);
+}
+
+void PrimaryOnlyService::_doStepUp(long long newTerm, const OpTime& majorityWaitOpTime) {
     SimpleBSONObjUnorderedMap<ActiveInstance> savedInstances;
     invariant(_getHasExecutor());
     auto newThenOldScopedExecutor =
@@ -397,9 +427,6 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
         return;
     }
 
-    auto newTerm = stepUpOpTime.getTerm();
-    invariant(newTerm > _term,
-              str::stream() << "term " << newTerm << " is not greater than " << _term);
     _term = newTerm;
     _setState(State::kRebuilding, lk);
     _source = CancellationSource();
@@ -443,12 +470,12 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
                 2,
                 "Waiting on first write of the new term to be majority committed",
                 "service"_attr = getServiceName(),
-                "stepUpOpTime"_attr = stepUpOpTime);
+                "stepUpOpTime"_attr = majorityWaitOpTime);
     // Capture this term's token so the continuation doesn't re-read `_source` on the
     // executor thread; a subsequent `onStepUp` can reassign `_source` concurrently.
     auto sourceToken = _source.token();
     WaitForMajorityService::get(_serviceContext)
-        .waitUntilMajorityForWrite(stepUpOpTime, sourceToken)
+        .waitUntilMajorityForWrite(majorityWaitOpTime, sourceToken)
         .thenRunOn(**newScopedExecutor)
         .then([this, newScopedExecutor, newTerm, sourceToken] {
             // Note that checking both the state and the term are optimizations and are

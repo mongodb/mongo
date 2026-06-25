@@ -166,6 +166,7 @@ const allCommands = {
     _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: isAnInternalCommand},
     _shardsvrReshardingRecipientFetchFinalCollectionStats: {skip: isAnInternalCommand},
     _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: isAnInternalCommand},
+    _shardsvrReshardingStepDown: {skip: isAnInternalCommand},
     _shardsvrUpgradeDowngradeViewlessTimeseries: {skip: isAnInternalCommand},
     _shardsvrTimeseriesUpgradeDowngradePrepare: {skip: isAnInternalCommand},
     _shardsvrTimeseriesUpgradeDowngradeCommit: {skip: isAnInternalCommand},

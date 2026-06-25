@@ -117,6 +117,9 @@ public:
         return getAllInstances(opCtx);
     }
 
+    MONGO_MOD_PRIVATE void stepDown_forTest();
+    MONGO_MOD_PRIVATE void stepUp_forTest();
+
 private:
     ServiceContext* _serviceContext;
 };

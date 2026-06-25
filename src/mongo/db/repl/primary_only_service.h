@@ -327,6 +327,12 @@ public:
 
     void waitForStateNotRebuilding_forTest(OperationContext* opCtx);
 
+    /**
+     * Test-only step-up that bypasses the term-monotonicity invariant. Use when simulating a
+     * step-down/step-up cycle without a real replica-set election (so the term doesn't advance).
+     */
+    MONGO_MOD_PUBLIC void onStepUp_forTest();
+
 protected:
     /**
      * Allows OpCtxs created on PrimaryOnlyService threads to remain uninterrupted, even if the
@@ -532,6 +538,16 @@ private:
      * Updates `_state` with `newState` and notifies waiters on `_stateChangeCV`.
      */
     void _setState(State newState, WithLock);
+
+    /**
+     * Performs stepup logic. This includes:
+     *  - waiting for old instances to complete/terminate.
+     *  - creating new set of instances and associated variables like cancel tokens and executors.
+     *
+     * The majorityWaitOpTime is the time to wait for before proceeding to read the backing state
+     * documents and rebuild the instances.
+     */
+    void _doStepUp(long long newTerm, const OpTime& majorityWaitOpTime);
 
     ServiceContext* const _serviceContext;
 

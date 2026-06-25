@@ -278,6 +278,16 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::cons
         _serviceContext);
 }
 
+void ReshardingDonorService::stepDown_forTest() {
+    LOGV2(12755406, "Performing resharding donor service stepdown for test");
+    onStepDown();
+}
+
+void ReshardingDonorService::stepUp_forTest() {
+    LOGV2(12755407, "Performing resharding donor service stepup for test");
+    onStepUp_forTest();
+}
+
 ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     const ReshardingDonorService* donorService,
     const ReshardingDonorDocument& donorDoc,

@@ -104,6 +104,9 @@ public:
     MONGO_MOD_PRIVATE std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) override;
 
+    MONGO_MOD_PRIVATE void stepDown_forTest();
+    MONGO_MOD_PRIVATE void stepUp_forTest();
+
 private:
     ServiceContext* _serviceContext;
 };

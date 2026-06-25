@@ -296,6 +296,16 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::
         _serviceContext);
 }
 
+void ReshardingRecipientService::stepDown_forTest() {
+    LOGV2(12755404, "Performing resharding recipient service stepdown for test");
+    onStepDown();
+}
+
+void ReshardingRecipientService::stepUp_forTest() {
+    LOGV2(12755405, "Performing resharding recipient service stepup for test");
+    onStepUp_forTest();
+}
+
 ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
     const ReshardingRecipientService* recipientService,
     const ReshardingRecipientDocument& recipientDoc,
@@ -2041,7 +2051,7 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
         shard_role_details::getRecoveryUnit(opCtx.get())
             ->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
                 std::lock_guard<std::mutex> lk(_mutex);
-                _completionPromise.emplaceValue();
+                ensureFulfilledPromise(lk, _completionPromise);
             });
 
         deleteObjects(opCtx.get(),

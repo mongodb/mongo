@@ -35,6 +35,17 @@ imports:
     - "mongo/db/sharding_environment/sharding_types.idl"
 
 commands:
+    _shardsvrReshardingStepDown:
+        command_name: _shardsvrReshardingStepDown
+        cpp_name: ShardsvrReshardingStepDown
+        description:
+            "Test-only internal command to step down and step up all resharding
+            PrimaryOnlyServices on this shard. Steps down in order: coordinator,
+            donor, recipient; then steps up in the same order."
+        namespace: ignored
+        api_version: ""
+        strict: false
+
     testReshardCloneCollection:
         command_name: testReshardCloneCollection
         description: "The 'testReshardCloneCollection' command."

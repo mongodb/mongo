@@ -38,10 +38,15 @@
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
+#include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_test_commands_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/vector_clock/vector_clock_metadata_hook.h"
@@ -70,6 +75,89 @@
 
 namespace mongo {
 namespace {
+
+class ShardsvrReshardingStepDownCommand final
+    : public TypedCommand<ShardsvrReshardingStepDownCommand> {
+public:
+    using Request = ShardsvrReshardingStepDown;
+
+    std::string help() const override {
+        return "Test-only command to step down and step up all resharding PrimaryOnlyServices "
+               "on this shard. Steps down in order: coordinator, donor, recipient; then steps "
+               "up in the same order.";
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "_shardsvrReshardingStepDown can only run on a shard server",
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
+
+            auto* registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+
+            auto* donorService = static_cast<ReshardingDonorService*>(
+                registry->lookupServiceByName(ReshardingDonorService::kServiceName));
+            uassert(12755401, "resharding donor service does not exist", donorService);
+
+            auto* recipientService = static_cast<ReshardingRecipientService*>(
+                registry->lookupServiceByName(ReshardingRecipientService::kServiceName));
+            uassert(12755402, "resharding recipient service does not exist", recipientService);
+
+            ReshardingCoordinatorService* coordinatorService = nullptr;
+            if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                coordinatorService = static_cast<ReshardingCoordinatorService*>(
+                    registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName));
+                uassert(
+                    12755403, "resharding coordinator service does not exist", coordinatorService);
+            }
+
+            // Try to mimic order in registerPrimaryOnlyServices in mongod_main.cpp.
+            if (coordinatorService) {
+                coordinatorService->stepDown_forTest();
+            }
+
+            donorService->stepDown_forTest();
+            recipientService->stepDown_forTest();
+
+            if (coordinatorService) {
+                coordinatorService->stepUp_forTest();
+            }
+
+            donorService->stepUp_forTest();
+            recipientService->stepUp_forTest();
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName());
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
+        }
+    };
+};
+MONGO_REGISTER_COMMAND(ShardsvrReshardingStepDownCommand).testOnly().forShard();
 
 class ReshardingCloneCollectionTestCommand final
     : public TypedCommand<ReshardingCloneCollectionTestCommand> {

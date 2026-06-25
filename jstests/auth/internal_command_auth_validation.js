@@ -766,6 +766,10 @@ const internalCommandsMap = {
             cloneTimestamp: Timestamp(),
         },
     },
+    _shardsvrReshardingStepDown: {
+        testname: "_shardsvrReshardingStepDown",
+        command: {_shardsvrReshardingStepDown: 1},
+    },
     _shardsvrReshardingOperationTime: {
         testname: "_shardsvrReshardingOperationTime",
         command: {

@@ -89,6 +89,9 @@ public:
     MONGO_MOD_NEEDS_REPLACEMENT void abortAllReshardCollection(
         OperationContext* opCtx, ReshardingCoordinator::AbortRequest abortRequest);
 
+    MONGO_MOD_PRIVATE void stepDown_forTest();
+    MONGO_MOD_PRIVATE void stepUp_forTest();
+
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
