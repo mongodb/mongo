@@ -443,189 +443,555 @@ using ExpressionMutableVisitor = ExpressionVisitor<false>;
 using ExpressionConstVisitor = ExpressionVisitor<true>;
 
 /**
- * This class provides null implementations for all visit methods so that a derived class can
- * override visit method(s) only for interested 'Expression' types. For example, if one wants
- * to visit only 'ExpressionFieldPath', one can override only void visit(const
- * ExpressionFieldPath*).
+ * Uses CRTP (Curiously Recurring Template Pattern) to provide default implementations for all
+ * visit methods. A derived class can:
+ *  - Override specific visit methods for the expression types it cares about.
+ *  - Optionally provide a visitDefault method to handle all visit calls not overridden by the
+ *    derived class. If visitDefault is absent, such visits are no-ops.
  *
- * struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase {
+ * Example without visitDefault (visits not overridden in the derived class are no-ops):
+ *
+ * struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase<FieldPathVisitor> {
  *     // To avoid overloaded-virtual warnings.
- *     using SelectiveConstExpressionVisitorBase::visit;
+ *     using SelectiveConstExpressionVisitorBase<FieldPathVisitor>::visit;
  *
  *     void visit(const ExpressionFieldPath* expr) final {
  *         // logic for what to do with an ExpressionFieldPath.
  *     }
  * };
+ *
+ * Example with visitDefault (visitDefault runs for any type not overridden in the derived class):
+ *
+ * struct AddWithDefaultVisitor : public SelectiveConstExpressionVisitorBase<AddWithDefaultVisitor>
+ * { using SelectiveConstExpressionVisitorBase<AddWithDefaultVisitor>::visit;
+ *
+ *     template <typename T>
+ *     void visitDefault(const T* expr) {
+ *         // logic for what to do with expr by default.
+ *     }
+ *
+ *     void visit(const ExpressionAdd* expr) final {
+ *         // logic for what to do with an ExpressionAdd.
+ *     }
+ * };
  */
+template <typename Derived>
 struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
-    void visit(const ExpressionConstant*) override {}
-    void visit(const ExpressionAbs*) override {}
-    void visit(const ExpressionAdd*) override {}
-    void visit(const ExpressionAllElementsTrue*) override {}
-    void visit(const ExpressionAnd*) override {}
-    void visit(const ExpressionAnyElementTrue*) override {}
-    void visit(const ExpressionArray*) override {}
-    void visit(const ExpressionArrayElemAt*) override {}
-    void visit(const ExpressionBitAnd*) override {}
-    void visit(const ExpressionBitOr*) override {}
-    void visit(const ExpressionBitXor*) override {}
-    void visit(const ExpressionBitNot*) override {}
-    void visit(const ExpressionFirst*) override {}
-    void visit(const ExpressionLast*) override {}
-    void visit(const ExpressionObjectToArray*) override {}
-    void visit(const ExpressionArrayToObject*) override {}
-    void visit(const ExpressionBsonSize*) override {}
-    void visit(const ExpressionCeil*) override {}
-    void visit(const ExpressionCompare*) override {}
-    void visit(const ExpressionConcat*) override {}
-    void visit(const ExpressionConcatArrays*) override {}
-    void visit(const ExpressionCond*) override {}
-    void visit(const ExpressionDateDiff*) override {}
-    void visit(const ExpressionDateFromString*) override {}
-    void visit(const ExpressionDateFromParts*) override {}
-    void visit(const ExpressionDateToParts*) override {}
-    void visit(const ExpressionDateToString*) override {}
-    void visit(const ExpressionDateTrunc*) override {}
-    void visit(const ExpressionDivide*) override {}
-    void visit(const ExpressionExp*) override {}
-    void visit(const ExpressionFieldPath*) override {}
-    void visit(const ExpressionFilter*) override {}
-    void visit(const ExpressionFloor*) override {}
-    void visit(const ExpressionIfNull*) override {}
-    void visit(const ExpressionIn*) override {}
-    void visit(const ExpressionIndexOfArray*) override {}
-    void visit(const ExpressionIndexOfBytes*) override {}
-    void visit(const ExpressionIndexOfCP*) override {}
-    void visit(const ExpressionIsNumber*) override {}
-    void visit(const ExpressionLet*) override {}
-    void visit(const ExpressionLn*) override {}
-    void visit(const ExpressionLog*) override {}
-    void visit(const ExpressionLog10*) override {}
-    void visit(const ExpressionInternalFLEBetween*) override {}
-    void visit(const ExpressionInternalFLEEqual*) override {}
-    void visit(const ExpressionEncStrStartsWith*) override {}
-    void visit(const ExpressionEncStrEndsWith*) override {}
-    void visit(const ExpressionEncStrContains*) override {}
-    void visit(const ExpressionEncStrNormalizedEq*) override {}
-    void visit(const ExpressionInternalRawSortKey*) override {}
-    void visit(const ExpressionMap*) override {}
-    void visit(const ExpressionMeta*) override {}
-    void visit(const ExpressionMod*) override {}
-    void visit(const ExpressionMultiply*) override {}
-    void visit(const ExpressionNot*) override {}
-    void visit(const ExpressionObject*) override {}
-    void visit(const ExpressionOr*) override {}
-    void visit(const ExpressionPow*) override {}
-    void visit(const ExpressionRange*) override {}
-    void visit(const ExpressionReduce*) override {}
-    void visit(const ExpressionReplaceOne*) override {}
-    void visit(const ExpressionReplaceAll*) override {}
-    void visit(const ExpressionSetDifference*) override {}
-    void visit(const ExpressionSetEquals*) override {}
-    void visit(const ExpressionSetIntersection*) override {}
-    void visit(const ExpressionSetIsSubset*) override {}
-    void visit(const ExpressionSetUnion*) override {}
-    void visit(const ExpressionSimilarityDotProduct*) override {}
-    void visit(const ExpressionSimilarityCosine*) override {}
-    void visit(const ExpressionSimilarityEuclidean*) override {}
-    void visit(const ExpressionSize*) override {}
-    void visit(const ExpressionReverseArray*) override {}
-    void visit(const ExpressionSortArray*) override {}
-    void visit(const ExpressionTopN*) override {}
-    void visit(const ExpressionTop*) override {}
-    void visit(const ExpressionBottomN*) override {}
-    void visit(const ExpressionBottom*) override {}
-    void visit(const ExpressionSlice*) override {}
-    void visit(const ExpressionIsArray*) override {}
-    void visit(const ExpressionInternalFindAllValuesAtPath*) override {}
-    void visit(const ExpressionRound*) override {}
-    void visit(const ExpressionSplit*) override {}
-    void visit(const ExpressionSqrt*) override {}
-    void visit(const ExpressionStrcasecmp*) override {}
-    void visit(const ExpressionSubstrBytes*) override {}
-    void visit(const ExpressionSubstrCP*) override {}
-    void visit(const ExpressionStrLenBytes*) override {}
-    void visit(const ExpressionBinarySize*) override {}
-    void visit(const ExpressionStrLenCP*) override {}
-    void visit(const ExpressionSubtract*) override {}
-    void visit(const ExpressionSubtype*) override {}
-    void visit(const ExpressionSwitch*) override {}
-    void visit(const ExpressionTestApiVersion*) override {}
-    void visit(const ExpressionToLower*) override {}
-    void visit(const ExpressionToUpper*) override {}
-    void visit(const ExpressionTrim*) override {}
-    void visit(const ExpressionTrunc*) override {}
-    void visit(const ExpressionType*) override {}
-    void visit(const ExpressionZip*) override {}
-    void visit(const ExpressionConvert*) override {}
-    void visit(const ExpressionRegexFind*) override {}
-    void visit(const ExpressionRegexFindAll*) override {}
-    void visit(const ExpressionRegexMatch*) override {}
-    void visit(const ExpressionCosine*) override {}
-    void visit(const ExpressionSine*) override {}
-    void visit(const ExpressionTangent*) override {}
-    void visit(const ExpressionArcCosine*) override {}
-    void visit(const ExpressionArcSine*) override {}
-    void visit(const ExpressionArcTangent*) override {}
-    void visit(const ExpressionArcTangent2*) override {}
-    void visit(const ExpressionHyperbolicArcTangent*) override {}
-    void visit(const ExpressionHyperbolicArcCosine*) override {}
-    void visit(const ExpressionHyperbolicArcSine*) override {}
-    void visit(const ExpressionHyperbolicTangent*) override {}
-    void visit(const ExpressionHyperbolicCosine*) override {}
-    void visit(const ExpressionHyperbolicSine*) override {}
-    void visit(const ExpressionDegreesToRadians*) override {}
-    void visit(const ExpressionRadiansToDegrees*) override {}
-    void visit(const ExpressionDayOfMonth*) override {}
-    void visit(const ExpressionDayOfWeek*) override {}
-    void visit(const ExpressionDayOfYear*) override {}
-    void visit(const ExpressionHour*) override {}
-    void visit(const ExpressionMillisecond*) override {}
-    void visit(const ExpressionMinute*) override {}
-    void visit(const ExpressionMonth*) override {}
-    void visit(const ExpressionSecond*) override {}
-    void visit(const ExpressionWeek*) override {}
-    void visit(const ExpressionIsoWeekYear*) override {}
-    void visit(const ExpressionIsoDayOfWeek*) override {}
-    void visit(const ExpressionIsoWeek*) override {}
-    void visit(const ExpressionYear*) override {}
-    void visit(const ExpressionFromAccumulator<AccumulatorAvg>*) override {}
-    void visit(const ExpressionFromAccumulator<AccumulatorMax>*) override {}
-    void visit(const ExpressionFromAccumulator<AccumulatorMin>*) override {}
-    void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>*) override {}
-    void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>*) override {}
-    void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>*) override {}
-    void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>*) override {}
-    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>*) override {}
-    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>*) override {}
-    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>*) override {}
-    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>*) override {}
-    void visit(const ExpressionFromAccumulator<AccumulatorSum>*) override {}
-    void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>*) override {}
-    void visit(const ExpressionTests::Testable*) override {}
-    void visit(const ExpressionInternalJsEmit*) override {}
-    void visit(const ExpressionInternalFindSlice*) override {}
-    void visit(const ExpressionInternalFindPositional*) override {}
-    void visit(const ExpressionInternalFindElemMatch*) override {}
-    void visit(const ExpressionFunction*) override {}
-    void visit(const ExpressionRandom*) override {}
-    void visit(const ExpressionCurrentDate*) override {}
-    void visit(const ExpressionToHashedIndexKey*) override {}
-    void visit(const ExpressionDateAdd*) override {}
-    void visit(const ExpressionDateSubtract*) override {}
-    void visit(const ExpressionGetField*) override {}
-    void visit(const ExpressionSetField*) override {}
-    void visit(const ExpressionTsSecond*) override {}
-    void visit(const ExpressionTsIncrement*) override {}
-    void visit(const ExpressionInternalOwningShard*) override {}
-    void visit(const ExpressionInternalIndexKey*) override {}
-    void visit(const ExpressionInternalKeyStringValue*) override {}
-    void visit(const ExpressionCreateUUID*) override {}
-    void visit(const ExpressionCreateObjectId*) override {}
-    void visit(const ExpressionTestFeatureFlagLatest*) override {}
-    void visit(const ExpressionTestFeatureFlagLastLTS*) override {}
-    void visit(const ExpressionSerializeEJSON*) override {}
-    void visit(const ExpressionDeserializeEJSON*) override {}
-    void visit(const ExpressionHash*) override {}
+    void visit(const ExpressionConstant* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionAbs* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionAdd* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionAllElementsTrue* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionAnd* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionAnyElementTrue* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionArray* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionArrayElemAt* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionBitAnd* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionBitOr* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionBitXor* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionBitNot* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFirst* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionLast* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionObjectToArray* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionArrayToObject* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionBsonSize* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionCeil* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionCompare* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionConcat* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionConcatArrays* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionCond* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDateDiff* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDateFromString* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDateFromParts* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDateToParts* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDateToString* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDateTrunc* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDivide* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionExp* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFieldPath* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFilter* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFloor* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIfNull* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIn* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIndexOfArray* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIndexOfBytes* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIndexOfCP* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIsNumber* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionLet* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionLn* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionLog* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionLog10* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalFLEBetween* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalFLEEqual* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionEncStrStartsWith* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionEncStrEndsWith* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionEncStrContains* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionEncStrNormalizedEq* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalRawSortKey* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionMap* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionMeta* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionMod* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionMultiply* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionNot* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionObject* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionOr* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionPow* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionRange* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionReduce* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionReplaceOne* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionReplaceAll* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSetDifference* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSetEquals* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSetIntersection* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSetIsSubset* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSetUnion* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSimilarityDotProduct* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSimilarityCosine* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSimilarityEuclidean* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSize* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionReverseArray* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSortArray* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTopN* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTop* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionBottomN* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionBottom* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSlice* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIsArray* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalFindAllValuesAtPath* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionRound* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSplit* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSqrt* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionStrcasecmp* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSubstrBytes* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSubstrCP* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionStrLenBytes* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionBinarySize* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionStrLenCP* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSubtract* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSubtype* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSwitch* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTestApiVersion* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionToLower* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionToUpper* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTrim* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTrunc* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionType* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionZip* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionConvert* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionRegexFind* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionRegexFindAll* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionRegexMatch* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionCosine* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSine* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTangent* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionArcCosine* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionArcSine* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionArcTangent* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionArcTangent2* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionHyperbolicArcTangent* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionHyperbolicArcCosine* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionHyperbolicArcSine* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionHyperbolicTangent* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionHyperbolicCosine* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionHyperbolicSine* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDegreesToRadians* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionRadiansToDegrees* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDayOfMonth* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDayOfWeek* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDayOfYear* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionHour* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionMillisecond* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionMinute* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionMonth* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSecond* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionWeek* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIsoWeekYear* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIsoDayOfWeek* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionIsoWeek* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionYear* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTests::Testable* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalJsEmit* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalFindSlice* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalFindPositional* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalFindElemMatch* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionFunction* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionRandom* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionCurrentDate* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionToHashedIndexKey* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDateAdd* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDateSubtract* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionGetField* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSetField* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTsSecond* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTsIncrement* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalOwningShard* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalIndexKey* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionInternalKeyStringValue* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionCreateUUID* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionCreateObjectId* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTestFeatureFlagLatest* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionTestFeatureFlagLastLTS* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionSerializeEJSON* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionDeserializeEJSON* expr) override {
+        doDefault(expr);
+    }
+    void visit(const ExpressionHash* expr) override {
+        doDefault(expr);
+    }
+
+private:
+    template <typename T>
+    void doDefault(T* expr) {
+        if constexpr (requires { static_cast<Derived&>(*this).visitDefault(expr); }) {
+            static_cast<Derived&>(*this).visitDefault(expr);
+        }
+    }
 };
+
 }  // namespace mongo

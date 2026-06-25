@@ -2165,18 +2165,31 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfTypePredic
 
 /* ----- GROUP & MATCH : Expr queries ----- */
 
-// Verify that $match with $expr using $eq on _id field does not swap before $group, even though the
-// filter could theoretically be pushed down.
-TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchOnExprIfFilteringOnID) {
+// Verify that $match with $expr using $eq on _id field swaps before $group.
+TEST_F(PipelineOptimizationTest, GroupShouldSwapWithMatchOnExprIfEqOnID) {
     std::string inputPipe =
         "[{$group: {_id: '$a'}}, "
         " {$match: {$expr: {$eq: ['$_id', 4]}}}]";
     std::string outputPipe =
-        "[{$group: {_id: '$a', $willBeMerged: false}},"
-        " {$match: {$and: [{$expr: {$eq: ['$_id', {$const: 4}]}}, {_id: {$_internalExprEq: 4}}]}}]";
+        "[{$match: {$and: [{$expr: {$eq: ['$a', {$const: 4}]}}, {a: {$_internalExprEq: 4}}]}},"
+        " {$group: {_id: '$a', $willBeMerged: false}}]";
     std::string serializedPipe =
-        "[{$group: {_id: '$a', $willBeMerged: false}}, "
-        " {$match: {$expr: {$eq: ['$_id', 4]}}}]";
+        "[{$match: {$expr: {$eq: ['$a', {$const: 4}]}}}, "
+        " {$group: {_id: '$a', $willBeMerged: false}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST_F(PipelineOptimizationTest, GroupShouldSwapWithMatchOnExprIfEqOnIDReverse) {
+    std::string inputPipe =
+        "[{$group: {_id: '$a'}}, "
+        " {$match: {$expr: {$eq: [4, '$_id']}}}]";
+    std::string outputPipe =
+        "[{$match: {$and: [{$expr: {$eq: [{$const: 4}, '$a']}}, {a: {$_internalExprEq: 4}}]}},"
+        " {$group: {_id: '$a', $willBeMerged: false}}]";
+    std::string serializedPipe =
+        "[{$match: {$expr: {$eq: [{$const: 4}, '$a']}}}, "
+        " {$group: {_id: '$a', $willBeMerged: false}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
@@ -2196,16 +2209,15 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchOnExprIfNotFiltering
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
-// Verify that $match with $expr using comparison operators on _id field does not swap before
-// $group, even when comparing to constants.
-TEST_F(PipelineOptimizationTest, GroupShouldNotSwapMatchWithExprComparisonOnIdField) {
+// Verify that $match with $expr using comparison operators on _id field swaps before $group.
+TEST_F(PipelineOptimizationTest, GroupShouldSwapMatchWithExprComparisonOnIdField) {
     std::string inputPipe =
         "[{$group: {_id: '$a'}}, "
         " {$match: {$expr: {$gte: ['$_id', 4]}}}]";
     std::string outputPipe =
-        "[{$group: {_id: '$a', $willBeMerged: false}},"
-        " {$match: {$and: [{$expr: {$gte: ['$_id', {$const: 4}]}}, "
-        "   {_id: {$_internalExprGte: 4}}]}}]";
+        "[{$match: {$and: [{$expr: {$gte: ['$a', {$const: 4}]}}, "
+        "   {a: {$_internalExprGte: 4}}]}},"
+        " {$group: {_id: '$a', $willBeMerged: false}}]";
 
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
@@ -2224,15 +2236,16 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapMatchWithExprComparisonToNull
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-// Verify that $match with $expr using $in operator on _id field does not swap before $group, even
-// with constant arrays.
-TEST_F(PipelineOptimizationTest, GroupShouldNotSwapMatchWithExprInOperatorOnIdField) {
+// Verify that $match with $expr using $in operator on _id field with non-null constants swaps
+// before $group. The $in against a constant non-null array is safe: no null/missing conflation
+// can change the membership result.
+TEST_F(PipelineOptimizationTest, GroupShouldSwapMatchWithExprInOperatorOnIdField) {
     std::string inputPipe =
         "[{$group: {_id: '$a'}}, "
         " {$match: {$expr: {$in: ['$_id', [3,4]]}}}]";
     std::string outputPipe =
-        "[{$group: {_id: '$a', $willBeMerged: false}},"
-        " {$match: {$and: [{_id: {$in: [3, 4]}}, {$expr: {$in: ['$_id', {$const: [3, 4]}]}}]}}]";
+        "[{$match: {$and: [{a: {$in: [3, 4]}}, {$expr: {$in: ['$a', {$const: [3, 4]}]}}]}},"
+        " {$group: {_id: '$a', $willBeMerged: false}}]";
 
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
@@ -2251,16 +2264,15 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapMatchWithExprEqNullOnSubfield
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
-// Verify that $match with $expr using $eq on a subfield of compound _id does not swap before
-// $group.
-TEST_F(PipelineOptimizationTest, GroupShouldNotSwapMatchWithExprEqOnSubfieldOfCompoundId) {
+// Verify that $match with $expr using $eq on a subfield of compound _id swaps before $group.
+TEST_F(PipelineOptimizationTest, GroupShouldSwapMatchWithExprEqOnSubfieldOfCompoundId) {
     std::string inputPipe =
         "[{$group : {_id: {a: '$a', b: '$b'}}}, "
         " {$match: {$expr: {$eq: ['$_id.a', 4]}}}]";
     std::string outputPipe =
-        "[{$group: {_id: {a: '$a', b: '$b'}, $willBeMerged: false}}, "
-        " {$match: {$and: [{$expr: {$eq: ['$_id.a', {$const: 4}]}},"
-        "   {'_id.a':  {$_internalExprEq: 4}}]}}]";
+        "[{$match: {$and: [{$expr: {$eq: ['$a', {$const: 4}]}},"
+        "   {'a':  {$_internalExprEq: 4}}]}},"
+        " {$group: {_id: {a: '$a', b: '$b'}, $willBeMerged: false}}]";
 
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
@@ -2316,7 +2328,7 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapMatchWithCompoundOrContaining
     std::string outputPipe =
         "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {$or: [{$and: [{$expr: {$eq: ['$_id', {$const: null}]}}, {_id: "
-        "{$_internalExprEq: null}}]}, {_id: {$gt: 70}}]}}]";
+        "   {$_internalExprEq: null}}]}, {_id: {$gt: 70}}]}}]";
 
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
@@ -2354,8 +2366,8 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapMatchWithExprTypeCheckOnCompo
         " {$match: {$or: [{'_id.a' : 4}, {$expr: {$eq: ['int', {$type: '$_id.b'}]}}]}}]";
     std::string outputPipe =
         "[{$group : {_id: {a: '$a', b: '$b'}, $willBeMerged: false}}, "
-        " {$match: {$or: [{'_id.a': {$eq: 4}}, {$expr: {$eq: [{$const: 'int'}, {$type: "
-        "['$_id.b']}]}}]}}]";
+        " {$match: {$or: [{'_id.a': {$eq: 4}}, {$expr: {$eq: [{$const: 'int'},"
+        "   {$type: ['$_id.b']}]}}]}}]";
 
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
