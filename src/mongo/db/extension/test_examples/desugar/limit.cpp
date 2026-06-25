@@ -73,15 +73,13 @@ public:
           _stageBson(stageBson.getOwned()) {}
 
     mongo::BSONObj serialize() const override {
-        // Need to override otherwise the default implementation would return an inaccurate object
-        // like so: {$extensionLimit: {$extensionLimit: 3}}.
+        // Need to override otherwise default wraps twice: {$extensionLimit: {$extensionLimit: 3}}.
         return _stageBson;
     }
 
     mongo::BSONObj explain(const sdk::QueryExecutionContextHandle&,
                            ::MongoExtensionExplainVerbosity verbosity) const override {
-        // Need to override otherwise the default implementation would return an inaccurate object
-        // like so: {$extensionLimit: {$extensionLimit: 3}}.
+        // Need to override otherwise default wraps twice: {$extensionLimit: {$extensionLimit: 3}}.
         return _stageBson;
     }
 
@@ -135,8 +133,7 @@ public:
     }
 
     mongo::BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
-        // Need to override otherwise the default implementation would return an inaccurate object
-        // like so: {$extensionLimit: {$extensionLimit: 3}}.
+        // Need to override otherwise default wraps twice: {$extensionLimit: {$extensionLimit: 3}}.
         return _stageBson;
     }
 

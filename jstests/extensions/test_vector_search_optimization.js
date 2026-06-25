@@ -40,9 +40,7 @@ const verifySortOptimizationApplied = (
 ) => {
     const pipelineWithSort = [stage, ...interveningStages, ...sortStages];
 
-    // Use explain to get the optimized pipeline structure
     const explainOutput = coll.explain("queryPlanner").aggregate(pipelineWithSort);
-    // Check for $sort in both regular stages and splitPipeline (for sharded clusters)
     const sortFound =
         getStageFromSplitPipeline(explainOutput, "$sort") != null ||
         getAggPlanStages(explainOutput, "$sort").length > 0;
@@ -314,7 +312,7 @@ testPipelineSuffixBounds();
 
 // Verify that the stages introduced by desugaring ($replaceRoot for storedSource:true and
 // $_internalSearchIdLookup for storedSource:false) do not perturb suffix bounds. We cannot rely
-// purely on reading the visitor source for this — run a representative subset of cases with each
+// purely on reading the visitor source for this; run a representative subset of cases with each
 // desugared form.
 {
     const storedSourceStage = buildTestVectorSearchOptStage({storedSource: true});
@@ -485,6 +483,20 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
     assert(
         !getStageFromSplitPipeline(explain, "$extensionLimit"),
         "Expected $extensionLimit to be erased for desugared pipeline (storedSource:true), but " +
+            "found it in: " +
+            tojson(explain),
+    );
+}
+
+// Verify eraseExtensionLimit fires for storedSource:false. After desugaring,
+// the pipeline is [$testVectorSearch, $_internalSearchIdLookup, $extensionLimit],
+// so $extensionLimit is at nthNextStage(2) and should be erased.
+{
+    const pipeline = [buildTestVectorSearchOptStage({storedSource: false}), {$extensionLimit: 3}];
+    const explain = coll.explain("queryPlanner").aggregate(pipeline);
+    assert(
+        !getStageFromSplitPipeline(explain, "$extensionLimit"),
+        "Expected $extensionLimit to be erased for desugared pipeline (storedSource:false), but " +
             "found it in: " +
             tojson(explain),
     );

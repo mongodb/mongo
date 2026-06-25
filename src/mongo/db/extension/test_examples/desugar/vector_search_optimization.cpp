@@ -112,6 +112,14 @@ public:
             return ctx->hasAtLeastNNextStages(2) &&
                 ctx->getNthNextStage(2)->getName() == "$extensionLimit";
         }
+        if (ruleName == "eraseVectorSearchAt1") {
+            return ctx->hasAtLeastNNextStages(1) &&
+                ctx->getNthNextStage(1)->getName() == "$testVectorSearch";
+        }
+        if (ruleName == "eraseVectorSearchAt2") {
+            return ctx->hasAtLeastNNextStages(2) &&
+                ctx->getNthNextStage(2)->getName() == "$testVectorSearch";
+        }
         return ruleName == "noopInPlace" || ruleName == "applyPipelineBounds";
     }
 
@@ -122,6 +130,12 @@ public:
             return ctx->eraseNthNext(1);
         }
         if (ruleName == "eraseExtensionLimit") {
+            return ctx->eraseNthNext(2);
+        }
+        if (ruleName == "eraseVectorSearchAt1") {
+            return ctx->eraseNthNext(1);
+        }
+        if (ruleName == "eraseVectorSearchAt2") {
             return ctx->eraseNthNext(2);
         }
         // In-Place Rule Transforms
@@ -278,6 +292,8 @@ public:
         std::vector<PipelineRewriteRule> rules{
             {"eraseStage", kPipelineRewriteRuleTagReordering},
             {"eraseExtensionLimit", kPipelineRewriteRuleTagReordering},
+            {"eraseVectorSearchAt1", kPipelineRewriteRuleTagReordering},
+            {"eraseVectorSearchAt2", kPipelineRewriteRuleTagReordering},
             {"noopInPlace", kPipelineRewriteRuleTagInPlace},
             {"applyPipelineBounds", kPipelineRewriteRuleTagInPlace},
         };

@@ -576,7 +576,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceExtensionOptimizable::clone(
 
 DocumentSourceContainer::iterator DocumentSourceExtensionOptimizable::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    // The REDUDNANT_SORT_REMOVAL rule takes care of $extensionVectorSearch's desired $sort
+    // The REDUNDANT_SORT_REMOVAL rule takes care of $extensionVectorSearch's desired $sort
     // optimization.
     if (!feature_flags::gFeatureFlagExtensionsOptimizations.isEnabled()) {
         _limit = search_helpers::setVectorSearchLimitForOptimization(itr, container, _limit);
