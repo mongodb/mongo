@@ -111,3 +111,6 @@ filters:
   - "oplog_truncation_util.js":
     approvers:
       - 10gen/server-oplog
+  - "os_helpers.js":
+    approvers:
+      - 10gen/server-security
