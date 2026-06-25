@@ -51,6 +51,7 @@
 
 namespace mongo::exec::agg {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using LookupResult = SingleDocumentLookupExecutor::LookupResult;
 
@@ -284,7 +285,7 @@ TEST_F(ExpressLookupTest, IdLookupUsesCollectionDefaultCollation) {
         exec.performLookup(make_intrusive<ExpressionContextForTest>(operationContext(), ciNss),
                            ciNss,
                            boost::none,
-                           Document{{"_id", "ABC"_sd}},
+                           Document{{"_id", "ABC"sv}},
                            boost::none);
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(result.document->toBson(), BSON("_id" << "abc"));

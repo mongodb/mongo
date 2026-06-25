@@ -1751,7 +1751,7 @@ TEST_F(LiteParsedRankFusionDesugarerTest, DesugarContainsInternalHybridSearchLas
     const NamespaceString& nss = getExpCtx()->getNamespaceString();
     auto lprf = parseRankFusion(nss, spec);
     auto desugared =
-        lite_parsed_hybrid_search_desugarer::desugarRankFusion(*lprf, nss, "pipeline_test"_sd);
+        lite_parsed_hybrid_search_desugarer::desugarRankFusion(*lprf, nss, "pipeline_test"sv);
     ASSERT_FALSE(desugared.empty());
     ASSERT_EQ(desugared.back()->getParseTimeName(), "$_internalHybridSearch");
 }

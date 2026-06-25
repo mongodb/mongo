@@ -37,6 +37,7 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo::query_shape {
+using namespace std::literals::string_view_literals;
 
 // This enum is not compatible with the QUERY_UTIL_NAMED_ENUM_DEFINE util since the "virtual" type
 // conflicts with the C++ keyword "virtual". Instead, we manually define the enum and the
@@ -54,19 +55,19 @@ enum class CollectionType {
 static std::string_view toStringData(CollectionType type) {
     switch (type) {
         case CollectionType::kUnknown:
-            return "unknown"_sd;
+            return "unknown"sv;
         case CollectionType::kCollection:
-            return "collection"_sd;
+            return "collection"sv;
         case CollectionType::kView:
-            return "view"_sd;
+            return "view"sv;
         case CollectionType::kTimeseries:
-            return "timeseries"_sd;
+            return "timeseries"sv;
         case CollectionType::kChangeStream:
-            return "changeStream"_sd;
+            return "changeStream"sv;
         case CollectionType::kVirtual:
-            return "virtual"_sd;
+            return "virtual"sv;
         case CollectionType::kNonExistent:
-            return "nonExistent"_sd;
+            return "nonExistent"sv;
         default:
             MONGO_UNREACHABLE_TASSERT(7804900);
     }

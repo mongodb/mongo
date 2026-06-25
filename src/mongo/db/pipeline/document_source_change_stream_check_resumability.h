@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -52,6 +51,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamCheckResumability);
 using ChangeStreamCheckResumabilityLiteParsed =
@@ -80,7 +80,7 @@ using ChangeStreamCheckResumabilityLiteParsed =
  */
 class DocumentSourceChangeStreamCheckResumability : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr std::string_view kStageName = "$_internalChangeStreamCheckResumability"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamCheckResumability"sv;
 
     std::string_view getSourceName() const override;
 

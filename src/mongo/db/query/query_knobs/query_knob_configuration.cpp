@@ -38,12 +38,13 @@
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
 // Source labels emitted for each knob in 'serializeForExplain'.
-constexpr std::string_view kSetParameterSource = "setParameter"_sd;
-constexpr std::string_view kQuerySettingsSource = "querySettings"_sd;
+constexpr std::string_view kSetParameterSource = "setParameter"sv;
+constexpr std::string_view kQuerySettingsSource = "querySettings"sv;
 
 /**
  * Returns a new snapshot initialized from the current global knob values, with any supported
@@ -79,8 +80,8 @@ BSONObj QueryKnobConfiguration::serializeForExplain() const {
     BSONObjBuilder bob;
     auto append = [&](const auto& entry, std::string_view source) {
         BSONObjBuilder sub(bob.subobjStart(entry.wireName));
-        entry.toBSON(sub, "value"_sd, _snapshot.getValue(entry.id));
-        sub.append("source"_sd, source);
+        entry.toBSON(sub, "value"sv, _snapshot.getValue(entry.id));
+        sub.append("source"sv, source);
     };
     for (const auto& entry : QueryKnobRegistry::instance().entries()) {
         switch (_snapshot.getSource(entry.id)) {

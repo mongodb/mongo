@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class SessionCatalogMigration {
 public:
-    static constexpr std::string_view kSessionMigrateOplogTag = "$sessionMigrateInfo"_sd;
+    static constexpr std::string_view kSessionMigrateOplogTag = "$sessionMigrateInfo"sv;
     static const BSONObj kSessionOplogTag;
 };
 }  // namespace mongo

@@ -35,13 +35,14 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * A dummy class for other tests to inherit from to customize the behavior of any of the virtual
  * methods from DocumentSource without having to implement all of them.
  */
 class DocumentSourceTestOptimizations : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalTestOptimizations"_sd;
+    static constexpr std::string_view kStageName = "$_internalTestOptimizations"sv;
     DocumentSourceTestOptimizations(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx) {}
     ~DocumentSourceTestOptimizations() override = default;

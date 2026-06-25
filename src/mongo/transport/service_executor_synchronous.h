@@ -49,6 +49,7 @@ namespace mongo::transport {
 #define TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE 0
 
 namespace service_executor_synchronous_detail {
+using namespace std::literals::string_view_literals;
 
 /**
  * Provides common functionality for ServiceExecutorSynchronous and ServiceExecutorInline.
@@ -72,7 +73,7 @@ public:
     void appendStats(BSONObjBuilder* bob) const override;
 
     std::string_view getName() const override {
-        return "ServiceExecutorSynchronous"_sd;
+        return "ServiceExecutorSynchronous"sv;
     }
 
 protected:

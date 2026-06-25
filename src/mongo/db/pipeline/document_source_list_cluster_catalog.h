@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -60,8 +59,9 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListClusterCatalog);
  * Lists any collection in the catalog and their related sharding informations.
  */
 namespace DocumentSourceListClusterCatalog {
+using namespace std::literals::string_view_literals;
 
-static constexpr std::string_view kStageName = "$listClusterCatalog"_sd;
+static constexpr std::string_view kStageName = "$listClusterCatalog"sv;
 
 class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
 public:

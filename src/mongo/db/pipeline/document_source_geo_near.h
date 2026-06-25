@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -56,6 +55,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(GeoNear);
 class GeoNearLiteParsed final : public LiteParsedDocumentSourceDefault<GeoNearLiteParsed> {
@@ -83,7 +83,7 @@ public:
     bool isSelectionStage() const final {
         if (_originalBson.type() == BSONType::object) {
             auto specObj = _originalBson.Obj();
-            if (specObj.hasField("distanceField"_sd) || specObj.hasField("includeLocs"_sd)) {
+            if (specObj.hasField("distanceField"sv) || specObj.hasField("includeLocs"sv)) {
                 return false;
             }
         }
@@ -93,11 +93,11 @@ public:
 
 class DocumentSourceGeoNear : public DocumentSource {
 public:
-    static constexpr std::string_view kKeyFieldName = "key"_sd;
-    static constexpr std::string_view kStageName = "$geoNear"_sd;
-    static constexpr std::string_view kDistanceFieldFieldName = "distanceField"_sd;
-    static constexpr std::string_view kIncludeLocsFieldName = "includeLocs"_sd;
-    static constexpr std::string_view kNearFieldName = "near"_sd;
+    static constexpr std::string_view kKeyFieldName = "key"sv;
+    static constexpr std::string_view kStageName = "$geoNear"sv;
+    static constexpr std::string_view kDistanceFieldFieldName = "distanceField"sv;
+    static constexpr std::string_view kIncludeLocsFieldName = "includeLocs"sv;
+    static constexpr std::string_view kNearFieldName = "near"sv;
 
     /**
      * Only exposed for testing.

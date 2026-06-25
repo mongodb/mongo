@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -64,6 +63,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 struct CursorSharedState {
     // The underlying query plan which feeds this pipeline. Must be destroyed while holding the
@@ -88,7 +88,7 @@ struct CursorSharedState {
  */
 class DocumentSourceCursor : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$cursor"_sd;
+    static constexpr std::string_view kStageName = "$cursor"sv;
 
     /**
      * Indicates whether or not this is a count-like operation. If the operation is count-like,
@@ -203,9 +203,9 @@ private:
     static constexpr std::string_view toString(CursorType type) {
         switch (type) {
             case CursorType::kRegular:
-                return "regular"_sd;
+                return "regular"sv;
             case CursorType::kEmptyDocuments:
-                return "emptyDocuments"_sd;
+                return "emptyDocuments"sv;
         }
         MONGO_UNREACHABLE;
     }

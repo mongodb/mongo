@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -52,6 +51,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+using namespace std::literals::string_view_literals;
 
 class LookUpStageParams : public DefaultStageParams {
 public:
@@ -128,7 +128,7 @@ private:
 
 class LiteParsedLookUp final : public LiteParsedDocumentSourceNestedPipelines<LiteParsedLookUp> {
 public:
-    static constexpr std::string_view kStageName = "$lookup"_sd;
+    static constexpr std::string_view kStageName = "$lookup"sv;
 
     static std::unique_ptr<LiteParsedLookUp> parse(const NamespaceString& nss,
                                                    const BSONElement& spec,

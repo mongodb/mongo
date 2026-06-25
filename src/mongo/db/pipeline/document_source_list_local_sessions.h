@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/privilege.h"
@@ -61,6 +60,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListLocalSessions);
 
@@ -76,7 +76,7 @@ std::vector<SHA256Block> listSessionsUsersToDigests(const std::vector<ListSessio
  */
 class DocumentSourceListLocalSessions final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$listLocalSessions"_sd;
+    static constexpr std::string_view kStageName = "$listLocalSessions"sv;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

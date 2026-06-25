@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -49,6 +48,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Spools the inputs received from the child in a buffer. This is an eager spool: initially, on each
@@ -61,7 +61,7 @@ namespace mongo {
  */
 class SpoolStage final : public PlanStage {
 public:
-    static constexpr std::string_view kStageType = "SPOOL"_sd;
+    static constexpr std::string_view kStageType = "SPOOL"sv;
 
     SpoolStage(ExpressionContext* expCtx, WorkingSet* ws, std::unique_ptr<PlanStage> child);
 

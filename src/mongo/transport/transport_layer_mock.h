@@ -56,6 +56,7 @@
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC transport {
+using namespace std::literals::string_view_literals;
 
 /**
  * This TransportLayerMock is a noop TransportLayer implementation.
@@ -97,7 +98,7 @@ public:
     }
 
     std::string_view getNameForLogging() const override {
-        return "mock"_sd;
+        return "mock"sv;
     }
 
     TransportProtocol getTransportProtocol() const override {

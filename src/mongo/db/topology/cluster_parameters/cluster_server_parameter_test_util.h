@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
@@ -60,9 +59,10 @@
 
 namespace mongo {
 namespace cluster_server_parameter_test_util {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kCSPTest = "cspTest"_sd;
-constexpr auto kConfigDB = "config"_sd;
+constexpr auto kCSPTest = "cspTest"sv;
+constexpr auto kConfigDB = "config"sv;
 const auto kNilCPT = LogicalTime::kUninitialized;
 
 class ClusterServerParameterTestBase : public ServiceContextMongoDTest {
@@ -96,9 +96,9 @@ public:
     static constexpr auto kInitialIntValue = 123;
     static constexpr auto kInitialTenantIntValue = 456;
     static constexpr auto kDefaultIntValue = 42;
-    static constexpr auto kInitialStrValue = "initialState"_sd;
-    static constexpr auto kInitialTenantStrValue = "initialStateTenant"_sd;
-    static constexpr auto kDefaultStrValue = ""_sd;
+    static constexpr auto kInitialStrValue = "initialState"sv;
+    static constexpr auto kInitialTenantStrValue = "initialStateTenant"sv;
+    static constexpr auto kDefaultStrValue = ""sv;
 
     static const TenantId kTenantId;
 

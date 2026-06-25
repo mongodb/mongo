@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -64,6 +63,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Return type of the 'rewriteGroupAsTransformOnFirstDocument' function. See the function
@@ -255,8 +255,8 @@ protected:
     std::shared_ptr<GroupProcessor> _groupProcessor;
 
 private:
-    static constexpr std::string_view kDoingMergeSpecField = "$doingMerge"_sd;
-    static constexpr std::string_view kWillBeMergedSpecField = "$willBeMerged"_sd;
+    static constexpr std::string_view kDoingMergeSpecField = "$doingMerge"sv;
+    static constexpr std::string_view kWillBeMergedSpecField = "$willBeMerged"sv;
 
     /**
      * Returns true if 'dottedPath' is one of the group keys present in '_idExpressions'.

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/operation_metrics_registry.h"
@@ -52,6 +51,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>

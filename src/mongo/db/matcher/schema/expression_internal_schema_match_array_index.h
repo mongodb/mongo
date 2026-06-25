@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -51,13 +50,14 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Matches arrays based on whether or not a specific element in the array matches a sub-expression.
  */
 class InternalSchemaMatchArrayIndexMatchExpression final : public ArrayMatchingMatchExpression {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaMatchArrayIndex"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaMatchArrayIndex"sv;
     static constexpr int kNumChildren = 1;
 
     InternalSchemaMatchArrayIndexMatchExpression(

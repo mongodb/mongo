@@ -37,7 +37,7 @@ using namespace std::literals::string_view_literals;
 InterleavedSchema::InterleavedSchema(const BSONObj& referenceObj, BSONType rootType, bool arrays)
     : _arrays(arrays) {
     index_t scalarIdx = 0;
-    _discover(referenceObj, ""_sd, rootType, referenceObj.isEmpty(), scalarIdx);
+    _discover(referenceObj, ""sv, rootType, referenceObj.isEmpty(), scalarIdx);
     _scalarCount = scalarIdx;
 }
 

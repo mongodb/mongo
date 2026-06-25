@@ -38,13 +38,14 @@
 #include <memory>
 
 namespace mongo::crypto::test {
+using namespace std::literals::string_view_literals;
 
 class JWKManagerTest : public unittest::Test {
 public:
     void setUp() override {
         _clock = std::make_unique<ClockSourceMock>();
         auto uniqueFetcher =
-            std::make_unique<MockJWKSFetcher>(_clock.get(), BSON("keys"_sd << BSONArray()));
+            std::make_unique<MockJWKSFetcher>(_clock.get(), BSON("keys"sv << BSONArray()));
         _jwksFetcher = uniqueFetcher.get();
         _jwkManager = std::make_unique<JWKManager>(std::move(uniqueFetcher));
     }

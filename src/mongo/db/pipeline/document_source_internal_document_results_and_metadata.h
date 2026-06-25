@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -49,6 +48,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * The $_internalDocumentResultsAndMetadata stage wraps a source stage that emits two separate
@@ -80,7 +80,7 @@ namespace mongo {
  */
 class DocumentSourceInternalDocumentResultsAndMetadata final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalDocumentResultsAndMetadata"_sd;
+    static constexpr std::string_view kStageName = "$_internalDocumentResultsAndMetadata"sv;
 
     // Sort pattern for merge-sorting the document results stream across shards, and the
     // merge pipeline for the metadata stream on the router. Provided by the configured

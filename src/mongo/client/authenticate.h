@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/credential.h"
@@ -58,13 +57,14 @@ class BSONObj;
 class MongoURI;
 
 namespace MONGO_MOD_PUBLIC auth {
+using namespace std::literals::string_view_literals;
 
 using RunCommandHook = std::function<Future<BSONObj>(OpMsgRequest request)>;
 
-constexpr auto kSaslSupportedMechanisms = "saslSupportedMechs"_sd;
-constexpr auto kSpeculativeAuthenticate = "speculativeAuthenticate"_sd;
-constexpr auto kClusterAuthenticate = "clusterAuthenticate"_sd;
-constexpr auto kAuthenticateCommand = "authenticate"_sd;
+constexpr auto kSaslSupportedMechanisms = "saslSupportedMechs"sv;
+constexpr auto kSpeculativeAuthenticate = "speculativeAuthenticate"sv;
+constexpr auto kClusterAuthenticate = "clusterAuthenticate"sv;
+constexpr auto kAuthenticateCommand = "authenticate"sv;
 
 /**
  * On replication step down, should the current connection be killed or left open.

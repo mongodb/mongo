@@ -51,6 +51,7 @@
 #include <boost/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Interface for implementing retry behavior. Allows user to specify exactly how much time we
@@ -662,7 +663,7 @@ private:
  *         [](const TargetingMetadata& targetingMetadata) -> RetryStrategy::Result<std::string_view>
  * {
  *             // on success.
- *             return "value"_sd;
+ *             return "value"sv;
  *             // on failure. Target is the host and port on which the request was performed.
  *             return {status, target, errorLabels};
  *         }

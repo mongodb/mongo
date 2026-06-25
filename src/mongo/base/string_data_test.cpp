@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/config.h"  // IWYU pragma: keep

@@ -38,13 +38,14 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Adds "spillWiredTiger" to the results of db.serverStatus().
  */
 class SpillWiredTigerServerStatusSection : public ServerStatusSection {
 public:
-    static constexpr std::string_view kServerStatusSectionName = "spillWiredTiger"_sd;
+    static constexpr std::string_view kServerStatusSectionName = "spillWiredTiger"sv;
 
     using ServerStatusSection::ServerStatusSection;
     bool includeByDefault() const override;

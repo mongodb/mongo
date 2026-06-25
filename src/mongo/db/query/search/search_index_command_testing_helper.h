@@ -59,11 +59,12 @@
 namespace mongo {
 
 namespace search_index_testing_helper {
+using namespace std::literals::string_view_literals;
 
-constexpr std::string_view kListCommand = "$listSearchIndexes"_sd;
-constexpr std::string_view kCreateCommand = "createSearchIndexes"_sd;
-constexpr std::string_view kUpdateCommand = "updateSearchIndex"_sd;
-constexpr std::string_view kDropCommand = "dropSearchIndex"_sd;
+constexpr std::string_view kListCommand = "$listSearchIndexes"sv;
+constexpr std::string_view kCreateCommand = "createSearchIndexes"sv;
+constexpr std::string_view kUpdateCommand = "updateSearchIndex"sv;
+constexpr std::string_view kDropCommand = "dropSearchIndex"sv;
 // In production sharded clusters, search index commands are received by the router which forwards
 // them to the SearchIndexManagement service (Envoy) which are then routed to MMS and stored in the
 // control plane DB. The mongots makes regular calls to the control plane to get the updated set of

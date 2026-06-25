@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_connection.h"
@@ -67,6 +66,7 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 class CollectionClonerTest;
 
@@ -78,8 +78,8 @@ inline const int kProgressMeterCheckInterval = 128;
 class CollectionCloner final : public InitialSyncBaseCloner {
 public:
     struct Stats {
-        static constexpr std::string_view kDocumentsToCopyFieldName = "documentsToCopy"_sd;
-        static constexpr std::string_view kDocumentsCopiedFieldName = "documentsCopied"_sd;
+        static constexpr std::string_view kDocumentsToCopyFieldName = "documentsToCopy"sv;
+        static constexpr std::string_view kDocumentsCopiedFieldName = "documentsCopied"sv;
 
         NamespaceString nss;
         Date_t start;

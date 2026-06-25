@@ -42,6 +42,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * The following expressions will be used to validate enabling feature flags on the latest or
  * lastLTS FCV and are only enabled in tests. The expressions are registered behind
@@ -72,7 +73,7 @@ private:
 
 class ExpressionTestFeatureFlagLatest final : public ExpressionTestFeatureFlags {
 public:
-    static constexpr std::string_view kName = "$_testFeatureFlagLatest"_sd;
+    static constexpr std::string_view kName = "$_testFeatureFlagLatest"sv;
 
     ExpressionTestFeatureFlagLatest(ExpressionContext* const expCtx)
         : ExpressionTestFeatureFlags(expCtx, kName) {};
@@ -96,7 +97,7 @@ public:
 
 class ExpressionTestFeatureFlagLastLTS final : public ExpressionTestFeatureFlags {
 public:
-    static constexpr std::string_view kName = "$_testFeatureFlagLastLTS"_sd;
+    static constexpr std::string_view kName = "$_testFeatureFlagLastLTS"sv;
 
     ExpressionTestFeatureFlagLastLTS(ExpressionContext* const expCtx)
         : ExpressionTestFeatureFlags(expCtx, kName) {};

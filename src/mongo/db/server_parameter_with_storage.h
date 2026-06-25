@@ -39,7 +39,6 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -66,11 +65,12 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace MONGO_MOD_PUB idl_server_parameter_bounds {
 // Predicate rules for bounds conditions
 struct GT {
-    static constexpr inline std::string_view description = "greater than"_sd;
+    static constexpr inline std::string_view description = "greater than"sv;
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a > b;
@@ -78,7 +78,7 @@ struct GT {
 };
 
 struct LT {
-    static constexpr inline std::string_view description = "less than"_sd;
+    static constexpr inline std::string_view description = "less than"sv;
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a < b;
@@ -86,7 +86,7 @@ struct LT {
 };
 
 struct GTE {
-    static constexpr inline std::string_view description = "greater than or equal to"_sd;
+    static constexpr inline std::string_view description = "greater than or equal to"sv;
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a >= b;
@@ -94,7 +94,7 @@ struct GTE {
 };
 
 struct LTE {
-    static constexpr inline std::string_view description = "less than or equal to"_sd;
+    static constexpr inline std::string_view description = "less than or equal to"sv;
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a <= b;
@@ -366,7 +366,7 @@ public:
         if (isRedact()) {
             b->append(name, "###");
         } else if constexpr (paramType == SPT::kClusterWide) {
-            b->append("_id"_sd, name);
+            b->append("_id"sv, name);
             b->appendElementsUnique(getValue(tenantId).toBSON());
         } else {
             b->append(name, getValue(tenantId));

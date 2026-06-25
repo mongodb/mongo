@@ -53,6 +53,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListCatalog);
 
@@ -64,7 +65,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListCatalog);
  */
 class DocumentSourceListCatalog final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$listCatalog"_sd;
+    static constexpr std::string_view kStageName = "$listCatalog"sv;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

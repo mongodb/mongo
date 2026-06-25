@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -59,6 +58,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Match);
 class MatchLiteParsed final : public LiteParsedDocumentSourceDefault<MatchLiteParsed> {
@@ -112,7 +112,7 @@ public:
 
     ~DocumentSourceMatch() override = default;
 
-    static constexpr std::string_view kStageName = "$match"_sd;
+    static constexpr std::string_view kStageName = "$match"sv;
     /**
      * Convenience method for creating a $match stage.
      */

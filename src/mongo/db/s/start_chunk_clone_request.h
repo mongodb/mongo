@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -51,6 +50,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class BSONObjBuilder;
 template <typename T>
@@ -62,7 +62,7 @@ class StatusWith;
 class StartChunkCloneRequest {
 public:
     static constexpr auto kSupportsCriticalSectionDuringCatchUp =
-        "supportsCriticalSectionDuringCatchUp"_sd;
+        "supportsCriticalSectionDuringCatchUp"sv;
 
     /**
      * Parses the input command and produces a request corresponding to its arguments.

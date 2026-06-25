@@ -44,6 +44,7 @@
 #include <string_view>
 
 namespace mongo::fle {
+using namespace std::literals::string_view_literals;
 
 using TagMap = std::map<std::pair<std::string_view, int>, std::vector<PrfBlock>>;
 using StrTagMap = std::map<std::pair<std::string_view, std::string_view>, std::vector<PrfBlock>>;
@@ -78,7 +79,7 @@ public:
 private:
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
     EncryptedCollScanMode _mode{EncryptedCollScanMode::kUseIfNeeded};
-    NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("mock"_sd);
+    NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("mock"sv);
     boost::optional<NamespaceString> _mockOptionalNss;
 };
 
@@ -118,7 +119,7 @@ public:
     void assertRewriteForOp(const EncryptedPredicate& pred,
                             BSONElement rhs,
                             std::vector<PrfBlock> allTags) {
-        auto inputExpr = T("age"_sd, rhs);
+        auto inputExpr = T("age"sv, rhs);
         assertRewriteToTags(pred, &inputExpr, toBSONArray(std::move(allTags)));
     }
 

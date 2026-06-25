@@ -60,6 +60,7 @@ class ServiceContext;
 class ServiceEntryPoint;
 
 namespace transport {
+using namespace std::literals::string_view_literals;
 
 // Simulates reads and writes that always return 1 byte and fail with EAGAIN
 extern FailPoint asioTransportLayerShortOpportunisticReadWrite;
@@ -214,7 +215,7 @@ public:
     void appendStatsForFTDC(BSONObjBuilder& bob) const override;
 
     std::string_view getNameForLogging() const override {
-        return "asio"_sd;
+        return "asio"sv;
     }
 
     TransportProtocol getTransportProtocol() const override {

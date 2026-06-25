@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -51,6 +50,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamOplogMatch);
 using ChangeStreamOplogMatchLiteParsed =
@@ -62,7 +62,7 @@ using ChangeStreamOplogMatchLiteParsed =
  */
 class DocumentSourceChangeStreamOplogMatch final : public DocumentSourceInternalChangeStreamMatch {
 public:
-    static constexpr std::string_view kStageName = "$_internalChangeStreamOplogMatch"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamOplogMatch"sv;
 
     DocumentSourceChangeStreamOplogMatch(Timestamp clusterTime,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,

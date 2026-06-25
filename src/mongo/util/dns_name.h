@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
@@ -52,6 +51,7 @@ MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace dns {
+using namespace std::literals::string_view_literals;
 
 /**
  * A `dns::HostName` represents a DNS Hostname in a form which is suitable for programatic
@@ -355,7 +355,7 @@ private:
         std::for_each(
             rbegin(_nameComponents), rend(_nameComponents), [&sep, &os](const auto& component) {
                 os << sep << component;
-                sep = "."_sd;
+                sep = "."sv;
             });
     }
 

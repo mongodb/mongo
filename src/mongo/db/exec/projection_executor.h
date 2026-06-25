@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -56,6 +55,7 @@
 #include <fmt/format.h>
 
 namespace mongo::projection_executor {
+using namespace std::literals::string_view_literals;
 /**
  * A ProjectionExecutor is responsible for parsing and executing a $project. It represents either an
  * inclusion or exclusion projection. This is the common interface between the two types of
@@ -69,7 +69,7 @@ public:
      * The name of an internal variable to bind a projection post image to, which is used by the
      * '_rootReplacementExpression' to replace the content of the transformed document.
      */
-    static constexpr std::string_view kProjectionPostImageVarName{"INTERNAL_PROJ_POST_IMAGE"_sd};
+    static constexpr std::string_view kProjectionPostImageVarName{"INTERNAL_PROJ_POST_IMAGE"sv};
 
     /**
      * Optimize any expressions contained within this projection.

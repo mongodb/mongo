@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -47,6 +46,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * InternalExprComparisonMatchExpression consists of comparison expressions with similar semantics
@@ -104,7 +104,7 @@ public:
 class InternalExprEqMatchExpression final
     : public InternalExprComparisonMatchExpression<InternalExprEqMatchExpression> {
 public:
-    static constexpr std::string_view kName = "$_internalExprEq"_sd;
+    static constexpr std::string_view kName = "$_internalExprEq"sv;
 
     InternalExprEqMatchExpression(boost::optional<std::string_view> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprEqMatchExpression>(
@@ -122,7 +122,7 @@ public:
 class InternalExprGTMatchExpression final
     : public InternalExprComparisonMatchExpression<InternalExprGTMatchExpression> {
 public:
-    static constexpr std::string_view kName = "$_internalExprGt"_sd;
+    static constexpr std::string_view kName = "$_internalExprGt"sv;
 
     InternalExprGTMatchExpression(boost::optional<std::string_view> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprGTMatchExpression>(
@@ -141,7 +141,7 @@ public:
 class InternalExprGTEMatchExpression final
     : public InternalExprComparisonMatchExpression<InternalExprGTEMatchExpression> {
 public:
-    static constexpr std::string_view kName = "$_internalExprGte"_sd;
+    static constexpr std::string_view kName = "$_internalExprGte"sv;
 
     InternalExprGTEMatchExpression(boost::optional<std::string_view> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprGTEMatchExpression>(
@@ -159,7 +159,7 @@ public:
 class InternalExprLTMatchExpression final
     : public InternalExprComparisonMatchExpression<InternalExprLTMatchExpression> {
 public:
-    static constexpr std::string_view kName = "$_internalExprLt"_sd;
+    static constexpr std::string_view kName = "$_internalExprLt"sv;
 
     InternalExprLTMatchExpression(boost::optional<std::string_view> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprLTMatchExpression>(
@@ -177,7 +177,7 @@ public:
 class InternalExprLTEMatchExpression final
     : public InternalExprComparisonMatchExpression<InternalExprLTEMatchExpression> {
 public:
-    static constexpr std::string_view kName = "$_internalExprLte"_sd;
+    static constexpr std::string_view kName = "$_internalExprLte"sv;
 
     InternalExprLTEMatchExpression(boost::optional<std::string_view> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprLTEMatchExpression>(

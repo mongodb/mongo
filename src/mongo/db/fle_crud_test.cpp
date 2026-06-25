@@ -1599,7 +1599,7 @@ EncryptedFieldConfig makeTextEfcSingleField(std::string_view path,
     qtc.setCaseSensitive(true);
     qtc.setDiacriticSensitive(true);
     EncryptedField ef(keyId, std::string{path});
-    ef.setBsonType("string"_sd);
+    ef.setBsonType("string"sv);
     ef.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{std::move(qtc)});
     EncryptedFieldConfig efc({std::move(ef)});
     efc.setEscCollection(std::string{"enxcol_.coll.esc"});
@@ -1612,10 +1612,10 @@ EncryptedFieldConfig makeTextEfcSingleField(std::string_view path,
 TEST_F(FleCrudTest, validateTextSearchInsertContentionExceedsMax) {
     unittest::ServerParameterGuard ffctrl{"featureFlagQETextSearchPreview", true};
     const UUID keyId = UUID::gen();
-    auto efc = makeTextEfcSingleField("encrypted"_sd, keyId, 1 /* contention */);
+    auto efc = makeTextEfcSingleField("encrypted"sv, keyId, 1 /* contention */);
     auto fields = efc.getFields();
 
-    auto doc = makeTextInsertPayload("encrypted"_sd, keyId, 100 /* sampled c */);
+    auto doc = makeTextInsertPayload("encrypted"sv, keyId, 100 /* sampled c */);
     auto payload = EDCServerCollection::getEncryptedFieldInfo(doc);
     ASSERT_THROWS_CODE(
         validateInsertUpdatePayloads(_opCtx.get(), fields, payload), DBException, 9188700);
@@ -1624,10 +1624,10 @@ TEST_F(FleCrudTest, validateTextSearchInsertContentionExceedsMax) {
 TEST_F(FleCrudTest, validateTextSearchInsertValidContention) {
     unittest::ServerParameterGuard ffctrl{"featureFlagQETextSearchPreview", true};
     const UUID keyId = UUID::gen();
-    auto efc = makeTextEfcSingleField("encrypted"_sd, keyId, 1 /* contention */);
+    auto efc = makeTextEfcSingleField("encrypted"sv, keyId, 1 /* contention */);
     auto fields = efc.getFields();
 
-    auto doc = makeTextInsertPayload("encrypted"_sd, keyId, 1 /* sampled c */);
+    auto doc = makeTextInsertPayload("encrypted"sv, keyId, 1 /* sampled c */);
     auto payload = EDCServerCollection::getEncryptedFieldInfo(doc);
     validateInsertUpdatePayloads(_opCtx.get(), fields, payload);
 }

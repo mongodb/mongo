@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_attr.h"
@@ -74,6 +73,7 @@ template <typename It>
 auto mapLog(It begin, It end);
 
 namespace detail {
+using namespace std::literals::string_view_literals;
 
 template <template <class...> class Template, typename... Args>
 struct IsInstantiationOf : std::false_type {};
@@ -402,8 +402,8 @@ public:
                 if constexpr (std::is_same_v<V, CustomAttributeValue&&>) {
                     if (val.BSONAppend) {
                         BSONObjBuilder objBuilder;
-                        val.BSONAppend(objBuilder, ""_sd);
-                        builder.append(objBuilder.done().getField(""_sd));
+                        val.BSONAppend(objBuilder, ""sv);
+                        builder.append(objBuilder.done().getField(""sv));
                     } else if (val.BSONSerialize) {
                         BSONObjBuilder objBuilder;
                         val.BSONSerialize(objBuilder);
@@ -461,8 +461,8 @@ public:
                             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                     } else if (val.BSONAppend) {
                         BSONObjBuilder objBuilder;
-                        val.BSONAppend(objBuilder, ""_sd);
-                        objBuilder.done().getField(""_sd).jsonStringBuffer(
+                        val.BSONAppend(objBuilder, ""sv);
+                        objBuilder.done().getField(""sv).jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, false, false, 0, buffer);
                     } else {
                         val.toBSONArray().jsonStringBuffer(
@@ -491,7 +491,7 @@ public:
                 append(mapValue(item));
             }
 
-            separator = ", "_sd;
+            separator = ", "sv;
         }
         buffer.push_back(')');
     }
@@ -555,7 +555,7 @@ public:
 
     // Text Format: (elem1: val1, elem2: val2, ..., elemN: valN)
     void serialize(fmt::memory_buffer& buffer) const {
-        std::string_view separator = ""_sd;
+        std::string_view separator = ""sv;
         buffer.push_back('(');
         for (auto it = _begin; it != _end; ++it) {
             const auto& item = *it;
@@ -576,9 +576,9 @@ public:
                             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                     } else if (val.BSONAppend) {
                         BSONObjBuilder objBuilder;
-                        val.BSONAppend(objBuilder, ""_sd);
+                        val.BSONAppend(objBuilder, ""sv);
                         fmt::format_to(std::back_inserter(buffer), "{}: ", key);
-                        objBuilder.done().getField(""_sd).jsonStringBuffer(
+                        objBuilder.done().getField(""sv).jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, false, false, 0, buffer);
                     } else {
                         fmt::format_to(std::back_inserter(buffer), "{}: ", key);
@@ -610,7 +610,7 @@ public:
                 append(key, mapValue(item.second));
             }
 
-            separator = ", "_sd;
+            separator = ", "sv;
         }
         buffer.push_back(')');
     }

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
@@ -45,13 +44,14 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::replicated_fast_count {
+using namespace std::literals::string_view_literals;
 
 // BSON field names used as the on-disk encoding of fast count records. These are shared between
 // the `SizeCountStore`, `SizeCountTimestampStore`, and `ReplicatedFastCountManager`.
-inline constexpr std::string_view kMetadataKey = "meta"_sd;
-inline constexpr std::string_view kSizeKey = "sz"_sd;
-inline constexpr std::string_view kCountKey = "ct"_sd;
-inline constexpr std::string_view kValidAsOfKey = "valid-as-of"_sd;
+inline constexpr std::string_view kMetadataKey = "meta"sv;
+inline constexpr std::string_view kSizeKey = "sz"sv;
+inline constexpr std::string_view kCountKey = "ct"sv;
+inline constexpr std::string_view kValidAsOfKey = "valid-as-of"sv;
 
 /**
  * Acquires the replicated fast count collection for read access.

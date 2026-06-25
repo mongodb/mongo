@@ -72,6 +72,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
     // like a BSONObj string, but without a NUL terminator.
@@ -1417,7 +1418,7 @@ TEST(BSONValidateColumn, BSONColumnNestedInBSONDocRejectedAllModes) {
     auto innerBuf = makeNestedColumnBinary();
 
     BSONObjBuilder outerBuilder;
-    outerBuilder.appendBinData("col"_sd, innerBuf.size(), BinDataType::Column, innerBuf.data());
+    outerBuilder.appendBinData("col"sv, innerBuf.size(), BinDataType::Column, innerBuf.data());
     BSONObj outerObj = outerBuilder.obj();
 
     for (auto mode : {BSONValidateModeEnum::kDefault,

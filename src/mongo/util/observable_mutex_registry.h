@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
@@ -40,6 +39,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * The registry keeps track of all registered instances of `ObservableMutex` and provides an
@@ -47,18 +47,18 @@ namespace mongo {
  */
 class MONGO_MOD_PUBLIC ObservableMutexRegistry {
 public:
-    static constexpr auto kTotalAcquisitionsFieldName = "total"_sd;
-    static constexpr auto kTotalContentionsFieldName = "contentions"_sd;
-    static constexpr auto kTotalWaitCyclesFieldName = "waitCycles"_sd;
-    static constexpr auto kExclusiveFieldName = "exclusive"_sd;
-    static constexpr auto kSharedFieldName = "shared"_sd;
-    static constexpr auto kMutexFieldName = "mutexes"_sd;
-    static constexpr auto kIdFieldName = "id"_sd;
-    static constexpr auto kRegisteredFieldName = "registered"_sd;
-    static constexpr auto kInstanceLabelFieldName = "instanceLabel"_sd;
+    static constexpr auto kTotalAcquisitionsFieldName = "total"sv;
+    static constexpr auto kTotalContentionsFieldName = "contentions"sv;
+    static constexpr auto kTotalWaitCyclesFieldName = "waitCycles"sv;
+    static constexpr auto kExclusiveFieldName = "exclusive"sv;
+    static constexpr auto kSharedFieldName = "shared"sv;
+    static constexpr auto kMutexFieldName = "mutexes"sv;
+    static constexpr auto kIdFieldName = "id"sv;
+    static constexpr auto kRegisteredFieldName = "registered"sv;
+    static constexpr auto kInstanceLabelFieldName = "instanceLabel"sv;
 
-    static constexpr auto kRegistrationMutexTag = "ObservableMutexRegistry::_registrationMutex"_sd;
-    static constexpr auto kCollectionMutexTag = "ObservableMutexRegistry::_collectionMutex"_sd;
+    static constexpr auto kRegistrationMutexTag = "ObservableMutexRegistry::_registrationMutex"sv;
+    static constexpr auto kCollectionMutexTag = "ObservableMutexRegistry::_collectionMutex"sv;
 
     struct StatsRecord {
         MutexStats data;

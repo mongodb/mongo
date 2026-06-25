@@ -42,6 +42,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ExpressionInternalOwningShard final
     : public ExpressionFixedArity<ExpressionInternalOwningShard, 1> {
@@ -136,7 +137,7 @@ public:
 class ExpressionInternalIndexKey final : public Expression {
 public:
     static constexpr const char* const opName = "$_internalIndexKey";
-    static constexpr auto kIndexSpecKeyField = "key"_sd;
+    static constexpr auto kIndexSpecKeyField = "key"sv;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement bsonExpr,
@@ -183,8 +184,8 @@ public:
 private:
     static constexpr size_t _kDocExpr = 0;
     static constexpr size_t _kSpecExpr = 1;
-    constexpr static auto kDocField = "doc"_sd;
-    constexpr static auto kSpecField = "spec"_sd;
+    constexpr static auto kDocField = "doc"sv;
+    constexpr static auto kSpecField = "spec"sv;
 
     boost::intrusive_ptr<Expression> _doc;
     boost::intrusive_ptr<Expression> _spec;

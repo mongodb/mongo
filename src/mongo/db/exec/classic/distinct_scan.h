@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/orphan_chunk_skipper.h"
 #include "mongo/db/exec/classic/plan_stage.h"
@@ -57,6 +56,7 @@
 #include <utility>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class IndexAccessMethod;
 class IndexDescriptor;
@@ -139,7 +139,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr std::string_view kStageType = "DISTINCT_SCAN"_sd;
+    static constexpr std::string_view kStageType = "DISTINCT_SCAN"sv;
 
 protected:
     void doSaveStateRequiresIndex() final;

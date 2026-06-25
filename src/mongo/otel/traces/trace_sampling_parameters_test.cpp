@@ -34,11 +34,14 @@
 #include "mongo/otel/traces/trace_sampling_parameters_gen.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/optional.hpp>
 #include <gmock/gmock.h>
 
 namespace mongo::otel::traces {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using mongo::unittest::match::StatusIsOK;
 using ::testing::AllOf;
@@ -97,7 +100,7 @@ TEST_F(TraceSamplingParametersTest, AppendReflectsCurrentSamplerState) {
     ASSERT_OK(setDefaultFactor(0.75));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
 
     EXPECT_DOUBLE_EQ(readDefaultFactor(bob.obj()), 0.75);
 }
@@ -107,7 +110,7 @@ TEST_F(TraceSamplingParametersTest, AppendAfterMultipleSetsReflectsLastValue) {
     ASSERT_OK(setDefaultFactor(0.9));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
 
     EXPECT_DOUBLE_EQ(readDefaultFactor(bob.obj()), 0.9);
     EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.factor, 0.9);
@@ -154,7 +157,7 @@ TEST_F(TraceSamplingParametersTest, AppendReflectsCurrentRateLimit) {
     ASSERT_OK(setRateLimit(3.0, 7));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
     auto result = bob.obj();
 
     EXPECT_DOUBLE_EQ(readRefillRate(result), 3.0);
@@ -227,7 +230,7 @@ TEST_F(TraceSamplingParametersTest, AppendRoundTripsSamples) {
     ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
     auto result = bob.obj();
 
     EXPECT_DOUBLE_EQ(readDefaultFactor(result), 0.3);
@@ -319,7 +322,7 @@ TEST_F(TraceSamplingParametersTest, AppendRoundTripsPerSpanRateLimits) {
     ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
     auto result = bob.obj();
 
     auto samples = result["openTelemetryTracingSampling"]["samples"].Array();
@@ -375,7 +378,7 @@ TEST_F(TraceExternalTracingParametersTest, AppendReflectsCurrentState) {
     ASSERT_OK(setRateLimit(3.0, 7));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryExternalTracing"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryExternalTracing"sv, /*tenantId=*/boost::none);
 
     EXPECT_THAT(readExternalRateLimit(bob.obj()), FieldsAre(3.0, 7));
 }
@@ -385,7 +388,7 @@ TEST_F(TraceExternalTracingParametersTest, AppendAfterMultipleSetsReflectsLastVa
     ASSERT_OK(setRateLimit(4.0, 15));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryExternalTracing"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryExternalTracing"sv, /*tenantId=*/boost::none);
 
     EXPECT_THAT(readExternalRateLimit(bob.obj()), FieldsAre(4.0, 15));
 }

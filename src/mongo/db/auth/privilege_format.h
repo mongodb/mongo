@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/modules.h"
@@ -49,13 +48,14 @@ enum class PrivilegeFormat {
 };
 
 namespace auth {
+using namespace std::literals::string_view_literals;
 
 /**
  * Proxy for PrivilegeFormat to parse into and out of IDL formats.
  */
 class ParsedPrivilegeFormat {
 public:
-    static constexpr std::string_view kAsUserFragment = "asUserFragment"_sd;
+    static constexpr std::string_view kAsUserFragment = "asUserFragment"sv;
 
     static PrivilegeFormat fromBool(bool fmt) {
         return fmt ? PrivilegeFormat::kShowSeparate : PrivilegeFormat::kOmit;

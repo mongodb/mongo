@@ -29,7 +29,6 @@
 
 #include "mongo/crypto/fle_payload_validation.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/encryption_fields_validation.h"
@@ -37,12 +36,14 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
 #include <variant>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 using QueriesVariant = std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>;
 
@@ -77,14 +78,14 @@ QueryTypeConfig textQtc(QueryTypeEnum qt, int64_t contention) {
 
 EncryptedField fieldWith(std::string_view path, QueryTypeConfig qtc) {
     EncryptedField ef(UUID::gen(), std::string{path});
-    ef.setBsonType("int"_sd);
+    ef.setBsonType("int"sv);
     ef.setQueries(QueriesVariant{std::move(qtc)});
     return ef;
 }
 
 EncryptedField fieldWith(std::string_view path, std::vector<QueryTypeConfig> qtcs) {
     EncryptedField ef(UUID::gen(), std::string{path});
-    ef.setBsonType("string"_sd);
+    ef.setBsonType("string"sv);
     ef.setQueries(QueriesVariant{std::move(qtcs)});
     return ef;
 }
@@ -117,7 +118,7 @@ TEST(FLEPayloadValidation, QueryTypeMismatchThrows) {
 
 TEST(FLEPayloadValidation, NoQueriesThrows) {
     EncryptedField field(UUID::gen(), "encrypted");
-    field.setBsonType("int"_sd);
+    field.setBsonType("int"sv);
     ASSERT_THROWS_CODE(
         validatePayloadAgainstQueryTypeConfig("encrypted", field, sampled(QueryTypeEnum::Equality)),
         DBException,

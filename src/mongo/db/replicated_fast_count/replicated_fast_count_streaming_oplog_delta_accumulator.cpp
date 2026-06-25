@@ -43,6 +43,7 @@
 
 namespace mongo::replicated_fast_count {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // ---------- Layer 1 / Layer 2 fast-scan support ----------
 //
@@ -119,7 +120,7 @@ ScanFields extractScanFields(const BSONObj& raw) {
                 }
                 break;
             case 9:
-                if (fname == "container"_sd) {
+                if (fname == "container"sv) {
                     v.container = elem;
                 }
                 break;
@@ -140,7 +141,7 @@ bool nsIsFastCountStore(BSONElement nsElem) {
         return false;
     }
     const auto ns = nsElem.valueStringData();
-    constexpr std::string_view kConfigDot = "config."_sd;
+    constexpr std::string_view kConfigDot = "config."sv;
     if (!ns.starts_with(kConfigDot)) {
         return false;
     }
@@ -164,12 +165,12 @@ CommandKind classifyCommand(BSONElement oElem, const BSONObj& raw) {
         return CommandKind::kMalformed;
     }
     const auto first = oElem.Obj().firstElement().fieldNameStringData();
-    if (first == "applyOps"_sd)
+    if (first == "applyOps"sv)
         return CommandKind::kApplyOps;
-    if (first == "commitTransaction"_sd)
+    if (first == "commitTransaction"sv)
         return CommandKind::kCommitTransaction;
-    if (first == "create"_sd || first == "drop"_sd || first == "truncateRange"_sd ||
-        first == "importCollection"_sd) {
+    if (first == "create"sv || first == "drop"sv || first == "truncateRange"sv ||
+        first == "importCollection"sv) {
         return CommandKind::kInterestingOther;
     }
     // Anything else falls into the "produces no delta" bucket. This covers known no-delta
@@ -338,13 +339,13 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCo
     // itself contributes zero deltas. TxnDeltaBuffer also returns 0 in this case (after clearing
     // any active chain). Caller's `!isTrackingChain()` gate guarantees no chain to clear, so we
     // just record 0 (counted as processed, ts advances).
-    if (oObj.getField("prepare"_sd).trueValue()) {
+    if (oObj.getField("prepare"sv).trueValue()) {
         return {FastApplyOpsOutcome::kProcessed, 0};
     }
     // Partial-transaction members must go through Layer 3: one OplogEntry::parse to seed the
     // chain in TxnDeltaBuffer, after which subsequent chain entries flow through Layer 3 because
     // `isTrackingChain()` returns true.
-    if (oObj.getField("partialTxn"_sd).trueValue()) {
+    if (oObj.getField("partialTxn"sv).trueValue()) {
         return {FastApplyOpsOutcome::kFallThrough};
     }
 

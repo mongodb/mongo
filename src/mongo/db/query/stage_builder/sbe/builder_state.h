@@ -49,10 +49,11 @@ class InList;
 }
 
 namespace stage_builder {
+using namespace std::literals::string_view_literals;
 struct Environment;
 struct PlanStageStaticData;
 
-static constexpr auto kNothingEnvSlotName = "nothing"_sd;
+static constexpr auto kNothingEnvSlotName = "nothing"sv;
 
 /**
  * Common parameters to SBE stage builder functions extracted into separate class to simplify

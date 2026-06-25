@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log_truncation.h"
 #include "mongo/util/modules.h"
 
@@ -37,28 +36,29 @@
 #include <string_view>
 
 namespace mongo::logv2::constants {
+using namespace std::literals::string_view_literals;
 
 // Used in data structures to indicate number of attributes to store without having to allocate
 // memory.
 constexpr size_t kNumStaticAttrs = 16;
 
 // Field names used in the JSON and BSON formatter
-constexpr std::string_view kTimestampFieldName = "t"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kSeverityFieldName = "s"_sd;
-constexpr std::string_view kComponentFieldName = "c"_sd;
-constexpr std::string_view kServiceFieldName = "svc"_sd;
-constexpr std::string_view kContextFieldName = "ctx"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kIdFieldName = "id"_sd;
-constexpr std::string_view kMessageFieldName = "msg"_sd;
-constexpr std::string_view kAttributesFieldName = "attr"_sd;
-constexpr std::string_view kTruncatedFieldName = "truncated"_sd;
-constexpr std::string_view kOmittedFieldName = "omitted"_sd;
-constexpr std::string_view kTruncatedSizeFieldName = "size"_sd;
-constexpr std::string_view kTagsFieldName = "tags"_sd;
-constexpr std::string_view kTenantFieldName = "tenant"_sd;
+constexpr std::string_view kTimestampFieldName = "t"sv;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kSeverityFieldName = "s"sv;
+constexpr std::string_view kComponentFieldName = "c"sv;
+constexpr std::string_view kServiceFieldName = "svc"sv;
+constexpr std::string_view kContextFieldName = "ctx"sv;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kIdFieldName = "id"sv;
+constexpr std::string_view kMessageFieldName = "msg"sv;
+constexpr std::string_view kAttributesFieldName = "attr"sv;
+constexpr std::string_view kTruncatedFieldName = "truncated"sv;
+constexpr std::string_view kOmittedFieldName = "omitted"sv;
+constexpr std::string_view kTruncatedSizeFieldName = "size"sv;
+constexpr std::string_view kTagsFieldName = "tags"sv;
+constexpr std::string_view kTenantFieldName = "tenant"sv;
 
 // String to be used when logging empty boost::optional with the text formatter
-constexpr std::string_view kNullOptionalString = "(nothing)"_sd;
+constexpr std::string_view kNullOptionalString = "(nothing)"sv;
 
 constexpr LogTruncation kDefaultTruncation = LogTruncation::Enabled;
 MONGO_MOD_NEEDS_REPLACEMENT constexpr int32_t kDefaultMaxAttributeOutputSizeKB = 10;

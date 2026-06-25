@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -39,9 +38,10 @@
 #include <string_view>
 
 namespace mongo::query_settings::query_framework {
+using namespace std::literals::string_view_literals;
 
-constexpr std::string_view kClassic = "classic"_sd;
-constexpr std::string_view kSbe = "sbe"_sd;
+constexpr std::string_view kClassic = "classic"sv;
+constexpr std::string_view kSbe = "sbe"sv;
 
 /**
  * Serializes the internal `QueryFrameworkControlEnum` values to the appropiate

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -62,6 +61,7 @@
 
 namespace mongo {
 namespace doc_diff {
+using namespace std::literals::string_view_literals;
 using Diff = BSONObj;
 
 /**
@@ -71,14 +71,14 @@ enum DiffType : uint8_t { kDocument, kArray };
 
 // Below are string constants used in the diff format.
 // TODO SERVER-115821 remove external dependencies on these constants.
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kArrayHeader = "a"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kDeleteSectionFieldName = "d"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kInsertSectionFieldName = "i"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kUpdateSectionFieldName = "u"_sd;
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kBinarySectionFieldName = "b"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kArrayHeader = "a"sv;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kDeleteSectionFieldName = "d"sv;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kInsertSectionFieldName = "i"sv;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kUpdateSectionFieldName = "u"sv;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kBinarySectionFieldName = "b"sv;
 MONGO_MOD_NEEDS_REPLACEMENT constexpr char kSubDiffSectionFieldPrefix = 's';
 // 'l' for length.
-constexpr std::string_view kResizeSectionFieldName = "l"_sd;
+constexpr std::string_view kResizeSectionFieldName = "l"sv;
 
 // Below are constants used for computation of Diff size. Note that the computed size is supposed to
 // be an approximate value.

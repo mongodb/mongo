@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
@@ -53,13 +52,14 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_stats {
+using namespace std::literals::string_view_literals;
 
 /**
  * Struct representing the aggregate command's unique arguments which should be included in the
  * query stats key.
  */
 struct AggCmdComponents : public SpecificKeyComponents {
-    static constexpr std::string_view kOtherNssFieldName = "otherNss"_sd;
+    static constexpr std::string_view kOtherNssFieldName = "otherNss"sv;
 
     AggCmdComponents(const AggregateCommandRequest&,
                      stdx::unordered_set<NamespaceString> involvedNamespaces,

@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -73,6 +72,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 struct LookUpSharedState {
     // TODO SERVER-107976: Move 'pipeline' and 'execPipeline' entirely into the 'LookUpStage' class.
@@ -110,12 +110,12 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceLookUp final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$lookup"_sd;
-    static constexpr std::string_view kFromField = "from"_sd;
-    static constexpr std::string_view kLocalField = "localField"_sd;
-    static constexpr std::string_view kForeignField = "foreignField"_sd;
-    static constexpr std::string_view kPipelineField = "pipeline"_sd;
-    static constexpr std::string_view kAsField = "as"_sd;
+    static constexpr std::string_view kStageName = "$lookup"sv;
+    static constexpr std::string_view kFromField = "from"sv;
+    static constexpr std::string_view kLocalField = "localField"sv;
+    static constexpr std::string_view kForeignField = "foreignField"sv;
+    static constexpr std::string_view kPipelineField = "pipeline"sv;
+    static constexpr std::string_view kAsField = "as"sv;
 
     /**
      * Copy constructor used for clone().

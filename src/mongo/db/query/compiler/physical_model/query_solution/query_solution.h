@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -81,6 +80,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class GeoNearExpression;
 
@@ -1133,7 +1133,7 @@ struct ProjectionNodeDefault final : ProjectionNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
-        return "DEFAULT"_sd;
+        return "DEFAULT"sv;
     }
 };
 
@@ -1155,7 +1155,7 @@ struct ProjectionNodeCovered final : ProjectionNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
-        return "COVERED_ONE_INDEX"_sd;
+        return "COVERED_ONE_INDEX"sv;
     }
 
     // This is the key pattern of the index supplying our covered data. We can pre-compute which
@@ -1176,7 +1176,7 @@ struct ProjectionNodeSimple final : ProjectionNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
-        return "SIMPLE_DOC"_sd;
+        return "SIMPLE_DOC"sv;
     }
 };
 
@@ -1286,7 +1286,7 @@ struct SortNodeDefault final : public SortNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view sortImplementationTypeToString() const override {
-        return "DEFAULT"_sd;
+        return "DEFAULT"sv;
     }
 };
 
@@ -1306,7 +1306,7 @@ struct SortNodeSimple final : public SortNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view sortImplementationTypeToString() const override {
-        return "SIMPLE"_sd;
+        return "SIMPLE"sv;
     }
 };
 

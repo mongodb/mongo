@@ -33,6 +33,7 @@
 #include "mongo/util/modules.h"
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Representation of a name of a role in a MongoDB system.
@@ -41,8 +42,8 @@ namespace MONGO_MOD_PUBLIC mongo {
  */
 class RoleName : public AuthName<RoleName> {
 public:
-    static constexpr auto kName = "RoleName"_sd;
-    static constexpr auto kFieldName = "role"_sd;
+    static constexpr auto kName = "RoleName"sv;
+    static constexpr auto kFieldName = "role"sv;
 
     using AuthName::AuthName;
 

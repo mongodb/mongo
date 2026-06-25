@@ -29,12 +29,12 @@
 
 #include "mongo/otel/traces/span/span_names.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <deque>
 #include <string>
+#include <string_view>
 
 namespace mongo::otel::traces {
 

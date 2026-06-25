@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -48,6 +47,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * MatchExpression for $_internalSchemaXor keyword. Returns true only if exactly
@@ -55,7 +55,7 @@ namespace mongo {
  */
 class InternalSchemaXorMatchExpression final : public ListOfMatchExpression {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaXor"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaXor"sv;
 
     InternalSchemaXorMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(INTERNAL_SCHEMA_XOR, std::move(annotation), {}) {}

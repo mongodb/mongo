@@ -5575,7 +5575,7 @@ ExpressionEncTextSearch::ExpressionEncTextSearch(ExpressionContext* const expCtx
             // initiate _evaluatorV2 with the zerosTokens.
             // Pass empty string and boost::none to skip validation, since validation already
             // happened in the rewrite layer and we have no schema context here.
-            auto tokens = ParsedFindTextSearchPayload(value, ""_sd, boost::none);
+            auto tokens = ParsedFindTextSearchPayload(value, ""sv, boost::none);
             _evaluatorV2 = EncryptedPredicateEvaluatorV2(
                 {ServerZerosEncryptionToken::deriveFrom(tokens.server)});
         } else {

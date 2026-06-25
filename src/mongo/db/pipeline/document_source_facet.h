@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -69,6 +68,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class BSONElement;
 class ExpressionContext;
@@ -118,8 +118,8 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Facet);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceFacet final : public DocumentSource {
 public:
-    MONGO_MOD_NEEDS_REPLACEMENT static constexpr std::string_view kStageName = "$facet"_sd;
-    static constexpr std::string_view kTeeConsumerStageName = "$internalFacetTeeConsumer"_sd;
+    MONGO_MOD_NEEDS_REPLACEMENT static constexpr std::string_view kStageName = "$facet"sv;
+    static constexpr std::string_view kTeeConsumerStageName = "$internalFacetTeeConsumer"sv;
     struct FacetPipeline {
         FacetPipeline(std::string name, std::unique_ptr<Pipeline> pipeline)
             : name(std::move(name)), pipeline(std::move(pipeline)) {}

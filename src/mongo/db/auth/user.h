@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
@@ -67,6 +66,7 @@
 
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Represents the properties required to request a UserHandle.
@@ -159,7 +159,7 @@ public:
         if (authMechanism) {
             uassert(ErrorCodes::BadValue,
                     "User name must be provided with an authenticated mechanism",
-                    this->name.getUser() != ""_sd);
+                    !this->name.getUser().empty());
             authenticatedMechanism = std::string(*authMechanism);
         }
     }
@@ -187,7 +187,7 @@ public:
         }
         uassert(ErrorCodes::BadValue,
                 "User name must be provided with an authenticated mechanism",
-                name.getUser() != ""_sd);
+                !name.getUser().empty());
         authenticatedMechanism = std::string{mechanism};
     }
 
@@ -245,11 +245,11 @@ public:
     using UserId = std::vector<std::uint8_t>;
     constexpr static auto kSHA1FieldName = auth::kMechanismScramSha1;
     constexpr static auto kSHA256FieldName = auth::kMechanismScramSha256;
-    constexpr static auto kExternalFieldName = "external"_sd;
-    constexpr static auto kIterationCountFieldName = "iterationCount"_sd;
-    constexpr static auto kSaltFieldName = "salt"_sd;
-    constexpr static auto kServerKeyFieldName = "serverKey"_sd;
-    constexpr static auto kStoredKeyFieldName = "storedKey"_sd;
+    constexpr static auto kExternalFieldName = "external"sv;
+    constexpr static auto kIterationCountFieldName = "iterationCount"sv;
+    constexpr static auto kSaltFieldName = "salt"sv;
+    constexpr static auto kServerKeyFieldName = "serverKey"sv;
+    constexpr static auto kStoredKeyFieldName = "storedKey"sv;
 
     template <typename HashBlock>
     struct SCRAMCredentials {

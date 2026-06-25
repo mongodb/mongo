@@ -31,7 +31,6 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/multi_plan_rate_limiter.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
@@ -56,6 +55,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 extern FailPoint sleepWhileMultiplanning;
 
@@ -71,7 +71,7 @@ extern FailPoint sleepWhileMultiplanning;
  */
 class MultiPlanStage final : public RequiresCollectionStage {
 public:
-    static constexpr std::string_view kStageType = "MULTI_PLAN"_sd;
+    static constexpr std::string_view kStageType = "MULTI_PLAN"sv;
 
     struct EstimationResult {
         // The total cost of all plans (sum of plan costs).

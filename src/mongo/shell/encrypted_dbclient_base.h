@@ -33,7 +33,6 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/secure_allocator.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -98,6 +97,7 @@
 #include <js/Value.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 constexpr std::size_t kEncryptedDBCacheSize = 50;
 
@@ -105,24 +105,24 @@ constexpr uint8_t kIntentToEncryptBit = 0x00;
 constexpr uint8_t kDeterministicEncryptionBit = 0x01;
 constexpr uint8_t kRandomEncryptionBit = 0x02;
 
-static constexpr auto kExplain = "explain"_sd;
+static constexpr auto kExplain = "explain"sv;
 
-constexpr std::array<std::string_view, 16> kEncryptedCommands = {"aggregate"_sd,
-                                                                 "count"_sd,
-                                                                 "delete"_sd,
-                                                                 "distinct"_sd,
+constexpr std::array<std::string_view, 16> kEncryptedCommands = {"aggregate"sv,
+                                                                 "count"sv,
+                                                                 "delete"sv,
+                                                                 "distinct"sv,
                                                                  kExplain,
-                                                                 "find"_sd,
-                                                                 "findandmodify"_sd,
-                                                                 "findAndModify"_sd,
-                                                                 "getMore"_sd,
-                                                                 "insert"_sd,
-                                                                 "update"_sd,
-                                                                 "create"_sd,
-                                                                 "createIndexes"_sd,
-                                                                 "collMod"_sd,
-                                                                 "bulkWrite"_sd,
-                                                                 "_getCompactionTokens"_sd};
+                                                                 "find"sv,
+                                                                 "findandmodify"sv,
+                                                                 "findAndModify"sv,
+                                                                 "getMore"sv,
+                                                                 "insert"sv,
+                                                                 "update"sv,
+                                                                 "create"sv,
+                                                                 "createIndexes"sv,
+                                                                 "collMod"sv,
+                                                                 "bulkWrite"sv,
+                                                                 "_getCompactionTokens"sv};
 
 class EncryptedDBClientBase : public DBClientBase,
                               public mozjs::EncryptionCallbacks,

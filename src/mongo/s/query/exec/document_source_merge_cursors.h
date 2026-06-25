@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -60,6 +59,7 @@
 
 // TODO SERVER-111290: Remove 'CheckMetadataConsistencyCmd' dependency on this header.
 namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(MergeCursors);
 
@@ -75,7 +75,7 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(MergeCursors);
  */
 class DocumentSourceMergeCursors : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$mergeCursors"_sd;
+    static constexpr std::string_view kStageName = "$mergeCursors"sv;
 
     /**
      * Parses a serialized version of this stage.

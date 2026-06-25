@@ -38,6 +38,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * SetMetadataTransformation applies a transformation that sets metadata on the document without
@@ -93,7 +94,7 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(SetMetadata);
  */
 class DocumentSourceSetMetadata final {
 public:
-    static constexpr std::string_view kStageName = "$setMetadata"_sd;
+    static constexpr std::string_view kStageName = "$setMetadata"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);

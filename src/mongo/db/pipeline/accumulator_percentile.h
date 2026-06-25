@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -53,16 +52,17 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * Accumulator for computing $percentile.
  */
 class AccumulatorPercentile : public AccumulatorState {
 public:
-    static constexpr auto kApproximate = "approximate"_sd;
-    static constexpr auto kContinuous = "continuous"_sd;
-    static constexpr auto kDiscrete = "discrete"_sd;
+    static constexpr auto kApproximate = "approximate"sv;
+    static constexpr auto kContinuous = "continuous"sv;
+    static constexpr auto kDiscrete = "discrete"sv;
 
-    static constexpr auto kName = "$percentile"_sd;
+    static constexpr auto kName = "$percentile"sv;
     const char* getOpName() const override {
         return kName.data();
     }
@@ -155,7 +155,7 @@ protected:
  */
 class AccumulatorMedian : public AccumulatorPercentile {
 public:
-    static constexpr auto kName = "$median"_sd;
+    static constexpr auto kName = "$median"sv;
     const char* getOpName() const final {
         return kName.data();
     }

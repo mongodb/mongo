@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
@@ -58,19 +57,20 @@ private:
 };
 
 namespace ident {
+using namespace std::literals::string_view_literals;
 // Hardcoded idents should follow a "internal-camelCase" format. kSizeStore and kMdbCatalog
 // predate this convention so they don't follow it, but future additions should.
 
 // The size storer and catalog have hardcoded idents as we need to be able to open them before we
 // can look up idents in the catalog.
-constexpr inline std::string_view kSizeStorer = "sizeStorer"_sd;
-constexpr inline std::string_view kMdbCatalog = "_mdb_catalog"_sd;
+constexpr inline std::string_view kSizeStorer = "sizeStorer"sv;
+constexpr inline std::string_view kMdbCatalog = "_mdb_catalog"sv;
 
 // Replicated fast count use hardcoded idents to avoid consulting the catalog when checking for
 // existence on stepup.
-constexpr inline std::string_view kFastCountMetadataStore = "internal-fastCountMetadataStore"_sd;
+constexpr inline std::string_view kFastCountMetadataStore = "internal-fastCountMetadataStore"sv;
 constexpr inline std::string_view kFastCountMetadataStoreTimestamps =
-    "internal-fastCountMetadataStoreTimestamps"_sd;
+    "internal-fastCountMetadataStoreTimestamps"sv;
 
 /**
  * By default, a storage engine table is uniquely identified by an 'ident' that comes in 1 of 4
@@ -107,7 +107,7 @@ std::string generateNewIndexIdent(
  * Generates a unique ident tagged with an 'internal-' prefix. Returns an ident in the form of
  * 'internal-<identStem><unique identifier>'.
  */
-std::string generateNewInternalIdent(std::string_view identStem = ""_sd);
+std::string generateNewInternalIdent(std::string_view identStem = ""sv);
 
 /**
  * Returns an ident in the form of 'internal-<identStem>-<indexUniqueTag>' or
@@ -148,7 +148,7 @@ bool isCollectionOrIndexIdent(std::string_view ident);
 /**
  * True if the ident contains the 'internal-<identStem>' prefix.
  */
-bool isInternalIdent(std::string_view ident, std::string_view identStem = ""_sd);
+bool isInternalIdent(std::string_view ident, std::string_view identStem = ""sv);
 
 /**
  * Returns true if the ident is for one of the replicated fastcount containers.

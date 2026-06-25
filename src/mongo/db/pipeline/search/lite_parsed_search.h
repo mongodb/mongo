@@ -35,9 +35,10 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-static constexpr std::string_view kReturnStoredSourceFieldName = "returnStoredSource"_sd;
-static constexpr std::string_view kScoreDetailsFieldName = "scoreDetails"_sd;
+static constexpr std::string_view kReturnStoredSourceFieldName = "returnStoredSource"sv;
+static constexpr std::string_view kScoreDetailsFieldName = "scoreDetails"sv;
 
 /**
  * A 'LiteParsed' representation of a search stage. This is the parent class for the

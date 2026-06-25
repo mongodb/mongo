@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -46,6 +45,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class CollatorInterface;
 
@@ -72,7 +72,7 @@ public:
      */
     struct ElemMatchContext {
         ArrayMatchingMatchExpression* innermostParentElemMatch{nullptr};
-        std::string_view fullPathToParentElemMatch{""_sd};
+        std::string_view fullPathToParentElemMatch{""sv};
     };
 
     /**

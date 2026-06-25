@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -59,13 +58,13 @@
  *   the arr_ field; in the example above, this would be MyColors_EnumString::arr_.
  */
 
-#define QUERY_UTIL_NAMED_ENUM_DEFINE(ENUM_, LIST_)                                         \
-    namespace ENUM_##EnumString {                                                          \
-        constexpr std::string_view arr_[] = {LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_)}; \
-    }                                                                                      \
-    enum class ENUM_ { LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_) };                         \
-    constexpr std::string_view toStringData(ENUM_ v_) {                                    \
-        return ENUM_##EnumString::arr_[static_cast<size_t>(v_)];                           \
+#define QUERY_UTIL_NAMED_ENUM_DEFINE(ENUM_, LIST_)                                                 \
+    namespace ENUM_##EnumString {                                                                  \
+        inline constexpr std::string_view arr_[] = {LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_STR_)}; \
+    }                                                                                              \
+    enum class ENUM_ { LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_) };                                 \
+    constexpr std::string_view toStringData(ENUM_ v_) {                                            \
+        return ENUM_##EnumString::arr_[static_cast<size_t>(v_)];                                   \
     }
 #define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_(x) x,
-#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_(x) #x ""_sd,
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_STR_(x) #x,

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/classic/delete_stage.h"
@@ -67,6 +66,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 struct TimeseriesModifyParams {
     TimeseriesModifyParams(const DeleteStageParams* deleteParams)
@@ -140,7 +140,7 @@ struct TimeseriesModifyParams {
  */
 class TimeseriesModifyStage : public RequiresWritableCollectionStage {
 public:
-    static constexpr std::string_view kStageType = "TS_MODIFY"_sd;
+    static constexpr std::string_view kStageType = "TS_MODIFY"sv;
 
     TimeseriesModifyStage(ExpressionContext* expCtx,
                           TimeseriesModifyParams&& params,

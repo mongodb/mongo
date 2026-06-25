@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -42,6 +41,7 @@
 
 namespace mongo::transport::grpc::util {
 namespace constants {
+using namespace std::literals::string_view_literals;
 /**
  * Wire version constant corresponding to the first wire version that supports using gRPC.
  */
@@ -58,10 +58,10 @@ static constexpr auto kUnauthenticatedCommandStreamMethodName =
 extern const std::string kClusterMaxWireVersionKey;
 
 // Client-provided metadata keys.
-static constexpr std::string_view kAuthenticationTokenKey = "authorization"_sd;
-static constexpr std::string_view kClientIdKey = "mongodb-clientid"_sd;
-static constexpr std::string_view kClientMetadataKey = "mongodb-client"_sd;
-static constexpr std::string_view kWireVersionKey = "mongodb-wireversion"_sd;
+static constexpr std::string_view kAuthenticationTokenKey = "authorization"sv;
+static constexpr std::string_view kClientIdKey = "mongodb-clientid"sv;
+static constexpr std::string_view kClientMetadataKey = "mongodb-client"sv;
+static constexpr std::string_view kWireVersionKey = "mongodb-wireversion"sv;
 }  // namespace constants
 
 /**

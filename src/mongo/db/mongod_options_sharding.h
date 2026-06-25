@@ -35,10 +35,11 @@
 #include <string>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 inline Status validateShardingClusterRoleSetting(const std::string& value) {
-    if (!(str::equalCaseInsensitive(value, "configsvr"_sd) ||
-          str::equalCaseInsensitive(value, "shardsvr"_sd))) {
+    if (!(str::equalCaseInsensitive(value, "configsvr"sv) ||
+          str::equalCaseInsensitive(value, "shardsvr"sv))) {
         return {ErrorCodes::BadValue,
                 "sharding.clusterRole must be one of 'configsvr' or 'shardsvr'"};
     }
@@ -47,8 +48,8 @@ inline Status validateShardingClusterRoleSetting(const std::string& value) {
 }
 
 inline Status validateMaintenanceModeSetting(const std::string& value) {
-    constexpr auto kReplicaSet = "replicaSet"_sd;
-    constexpr auto kStandalone = "standalone"_sd;
+    constexpr auto kReplicaSet = "replicaSet"sv;
+    constexpr auto kStandalone = "standalone"sv;
     if (kStandalone != value && kReplicaSet != value) {
         return {ErrorCodes::BadValue,
                 "maintenanceMode must be one of 'replicaSet' or 'standalone'"};

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -42,6 +41,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * This PlanStage is the analog of DocumentSourceInternalUnpackBucket, but in the PlanStage layer.
  * It fetches a bucket from it's child as an owned BSONObj and uses the BucketUnpacker to
@@ -49,7 +49,7 @@ namespace mongo {
  */
 class UnpackTimeseriesBucket final : public PlanStage {
 public:
-    static constexpr std::string_view kStageType = "UNPACK_BUCKET"_sd;
+    static constexpr std::string_view kStageType = "UNPACK_BUCKET"sv;
 
     UnpackTimeseriesBucket(ExpressionContext* expCtx,
                            WorkingSet* ws,

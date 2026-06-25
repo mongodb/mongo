@@ -46,6 +46,7 @@
 
 namespace mongo::transport {
 namespace MONGO_MOD_PARENT_PRIVATE grpc {
+using namespace std::literals::string_view_literals;
 
 /**
  * Base type for all gRPC services, allowing type-specific shutdown and stringifying logic for each
@@ -99,7 +100,7 @@ public:
     ~CommandService() override = default;
 
     std::string_view name() const override {
-        return "mongodb.CommandService"_sd;
+        return "mongodb.CommandService"sv;
     }
 
     void shutdown() override;

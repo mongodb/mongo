@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/util/modules.h"
@@ -44,6 +43,7 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class BSONObj;
 class BSONObjBuilder;
@@ -54,7 +54,7 @@ class BSONObjBuilder;
  */
 class LogicalTime {
 public:
-    static constexpr std::string_view kOperationTimeFieldName = "operationTime"_sd;
+    static constexpr std::string_view kOperationTimeFieldName = "operationTime"sv;
 
 
     /** An uninitialized value of LogicalTime. Default constructed. */

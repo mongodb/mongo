@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -84,6 +83,7 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Merge);
 
@@ -94,7 +94,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Merge);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMerge final : public DocumentSourceWriter {
 public:
-    static constexpr std::string_view kStageName = "$merge"_sd;
+    static constexpr std::string_view kStageName = "$merge"sv;
     static constexpr auto kDefaultWhenMatched = MergeStrategyDescriptor::WhenMatched::kMerge;
     static constexpr auto kDefaultWhenNotMatched = MergeStrategyDescriptor::WhenNotMatched::kInsert;
 

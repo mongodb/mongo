@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
@@ -63,6 +62,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 using QueryShapeConfigurationMap = stdx::unordered_map<query_shape::QueryShapeHash,
                                                        query_settings::QueryShapeConfiguration,
                                                        QueryShapeHashHasher>;
@@ -74,7 +74,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(QuerySettings);
  */
 class DocumentSourceQuerySettings final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$querySettings"_sd;
+    static constexpr std::string_view kStageName = "$querySettings"sv;
     static const Id& id;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

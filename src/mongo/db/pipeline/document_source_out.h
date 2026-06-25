@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -76,6 +75,7 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Out);
 
@@ -84,7 +84,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Out);
  */
 class DocumentSourceOut final : public DocumentSourceWriter {
 public:
-    static constexpr std::string_view kStageName = "$out"_sd;
+    static constexpr std::string_view kStageName = "$out"sv;
 
     /**
      * A "lite parsed" $out stage is similar to other stages involving foreign collections except in

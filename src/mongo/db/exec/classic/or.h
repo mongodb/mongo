@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -44,6 +43,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This stage outputs the union of its children. It optionally deduplicates on RecordId.
@@ -74,7 +74,7 @@ public:
         return _memoryTracker;
     }
 
-    static constexpr std::string_view kStageType = "OR"_sd;
+    static constexpr std::string_view kStageType = "OR"sv;
 
 private:
     // Not owned by us.

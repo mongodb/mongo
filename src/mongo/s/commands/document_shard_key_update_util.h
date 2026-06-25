@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -64,16 +63,17 @@ class TaskExecutor;
  * Set of functions used to update a document's shard key.
  */
 namespace documentShardKeyUpdateUtil {
+using namespace std::literals::string_view_literals;
 
 static constexpr std::string_view kDuplicateKeyErrorContext =
     "Failed to update document's shard key "
     "field. There is either an orphan for this document or _id for this collection is not "
-    "globally unique."_sd;
+    "globally unique."sv;
 
 static constexpr std::string_view kNonDuplicateKeyErrorContext =
     "Update operation was converted into a "
     "distributed transaction because the document being updated would move shards and that "
-    "transaction failed."_sd;
+    "transaction failed."sv;
 
 /**
  * TODO SERVER-67429 Remove this function.

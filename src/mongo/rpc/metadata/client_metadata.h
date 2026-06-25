@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,11 +45,12 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 class Client;
 class OperationContext;
 
-constexpr auto kMetadataDocumentName = "client"_sd;
+constexpr auto kMetadataDocumentName = "client"sv;
 
 /**
  * The ClientMetadata class is responsible for parsing the client metadata document that is received

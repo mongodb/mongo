@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/exchange_stage.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -49,10 +48,11 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class DocumentSourceExchange final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalExchange"_sd;
+    static constexpr std::string_view kStageName = "$_internalExchange"sv;
 
     /**
      * Create an Exchange consumer. 'resourceYielder' is so the exchange may temporarily yield

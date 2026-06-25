@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -54,6 +53,7 @@
 
 namespace MONGO_MOD_PUB mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 /**
  * Every Replica Set member has several views under which it can respond.  The Split Horizon class
@@ -66,7 +66,7 @@ namespace repl {
  */
 class SplitHorizon {
 public:
-    static constexpr auto kDefaultHorizon = "__default"_sd;
+    static constexpr auto kDefaultHorizon = "__default"sv;
 
     using ForwardMapping = StringMap<HostAndPort>;
     using ReverseHostOnlyMapping = std::map<std::string, std::string>;

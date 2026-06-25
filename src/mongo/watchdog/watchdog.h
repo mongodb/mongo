@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
@@ -48,6 +47,7 @@
 #include <boost/filesystem/path.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 class OperationContext;
 class ServiceContext;
@@ -96,8 +96,8 @@ public:
  */
 class DirectoryCheck : public WatchdogCheck {
 public:
-    static constexpr std::string_view kProbeFileName = "watchdog_probe_"_sd;
-    static constexpr std::string_view kProbeFileNameExt = ".txt"_sd;
+    static constexpr std::string_view kProbeFileName = "watchdog_probe_"sv;
+    static constexpr std::string_view kProbeFileNameExt = ".txt"sv;
 
 public:
     DirectoryCheck(const boost::filesystem::path& directory) : _directory(directory) {}

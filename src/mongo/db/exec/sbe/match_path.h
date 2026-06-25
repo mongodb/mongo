@@ -36,6 +36,7 @@
 #include <string_view>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 /**
  * The sbe::MatchPath class is used by SBE to represent field paths for MatchExpressions. This class
@@ -69,7 +70,7 @@ public:
     }
 
     std::string_view getPart(FieldIndex i) const {
-        return FieldRef::numParts() == 0 && i == 0 ? ""_sd : FieldRef::getPart(i);
+        return FieldRef::numParts() == 0 && i == 0 ? ""sv : FieldRef::getPart(i);
     }
 
     std::string_view operator[](int index) const {
@@ -77,12 +78,12 @@ public:
     }
 
     bool equalsDottedField(std::string_view other) const {
-        return FieldRef::numParts() == 0 ? other == ""_sd : FieldRef::equalsDottedField(other);
+        return FieldRef::numParts() == 0 ? other == ""sv : FieldRef::equalsDottedField(other);
     }
 
     std::string_view dottedField(FieldIndex offsetFromStart = 0) const {
         if (FieldRef::numParts() == 0) {
-            return (offsetFromStart == 0) ? ""_sd : std::string_view();
+            return (offsetFromStart == 0) ? ""sv : std::string_view();
         }
 
         return FieldRef::dottedField(offsetFromStart);
@@ -90,14 +91,14 @@ public:
 
     std::string_view dottedSubstring(FieldIndex startPart, FieldIndex endPart) const {
         if (!FieldRef::numParts()) {
-            return (startPart == 0 && endPart == 1) ? ""_sd : std::string_view();
+            return (startPart == 0 && endPart == 1) ? ""sv : std::string_view();
         }
 
         return FieldRef::dottedSubstring(startPart, endPart);
     }
 
     bool isPathComponentEmpty(FieldIndex i) const {
-        return getPart(i) == ""_sd;
+        return getPart(i) == ""sv;
     }
 
     bool hasEmptyPathComponents() const {

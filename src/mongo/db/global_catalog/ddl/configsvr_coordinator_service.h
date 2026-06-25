@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -44,13 +43,14 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ConfigsvrCoordinator;
 
 class MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinatorService final
     : public repl::PrimaryOnlyService {
 public:
-    static constexpr std::string_view kServiceName = "ConfigsvrCoordinatorService"_sd;
+    static constexpr std::string_view kServiceName = "ConfigsvrCoordinatorService"sv;
 
     explicit ConfigsvrCoordinatorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext) {}

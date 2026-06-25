@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/util/modules.h"
@@ -45,6 +44,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 inline Status validateUpdateReturn(const std::string& value) {
     if (value != "pre" && value != "post") {
@@ -59,13 +59,13 @@ inline Status validateUpdateReturn(const std::string& value) {
  */
 class MONGO_MOD_NEEDS_REPLACEMENT BulkWriteReplyItem {
 public:
-    static constexpr auto kCodeFieldName = "code"_sd;
-    static constexpr auto kErrmsgFieldName = "errmsg"_sd;
-    static constexpr auto kIdxFieldName = "idx"_sd;
-    static constexpr auto kNFieldName = "n"_sd;
-    static constexpr auto kNModifiedFieldName = "nModified"_sd;
-    static constexpr auto kOkFieldName = "ok"_sd;
-    static constexpr auto kUpsertedFieldName = "upserted"_sd;
+    static constexpr auto kCodeFieldName = "code"sv;
+    static constexpr auto kErrmsgFieldName = "errmsg"sv;
+    static constexpr auto kIdxFieldName = "idx"sv;
+    static constexpr auto kNFieldName = "n"sv;
+    static constexpr auto kNModifiedFieldName = "nModified"sv;
+    static constexpr auto kOkFieldName = "ok"sv;
+    static constexpr auto kUpsertedFieldName = "upserted"sv;
 
     BulkWriteReplyItem();
     BulkWriteReplyItem(std::int32_t idx, Status status = Status::OK());

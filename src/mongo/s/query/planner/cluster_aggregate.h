@@ -53,6 +53,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class OperationContext;
 class ShardId;
@@ -105,7 +106,7 @@ public:
         const PrivilegeVector& privileges,
         boost::optional<ExplainOptions::Verbosity> verbosity,
         BSONObjBuilder* result,
-        std::string_view comment = "ClusterAggregate::runAggregate"_sd,
+        std::string_view comment = "ClusterAggregate::runAggregate"sv,
         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
 
     /**
@@ -118,7 +119,7 @@ public:
         const PrivilegeVector& privileges,
         boost::optional<ExplainOptions::Verbosity> verbosity,
         BSONObjBuilder* result,
-        std::string_view comment = "ClusterAggregate::runAggregate"_sd,
+        std::string_view comment = "ClusterAggregate::runAggregate"sv,
         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
 
     /**

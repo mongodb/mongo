@@ -283,6 +283,7 @@ DateStringBuffer& DateStringBuffer::ctime(Date_t date) {
 }
 
 namespace {
+using namespace std::literals::string_view_literals;
 
 #if defined(_WIN32)
 
@@ -396,7 +397,7 @@ ParsedTm parseTm(std::string_view dateString) {
             ([+-]) (\d{2}) :? (\d{2})
         )
         $
-    )re"_sd};
+    )re"sv};
     auto m = re.match(dateString);
     iassert(ErrorCodes::BadValue, fmt::format("failed match \'{}\'", dateString), m.rc() >= 0);
     ParsedTm result{};

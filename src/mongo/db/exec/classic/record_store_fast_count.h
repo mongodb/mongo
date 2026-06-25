@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -43,6 +42,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements "fast count" by asking the underlying RecordStore for its number of records, applying
@@ -51,7 +51,7 @@ namespace mongo {
  */
 class RecordStoreFastCountStage final : public RequiresCollectionStage {
 public:
-    static constexpr std::string_view kStageType = "RECORD_STORE_FAST_COUNT"_sd;
+    static constexpr std::string_view kStageType = "RECORD_STORE_FAST_COUNT"sv;
 
     RecordStoreFastCountStage(ExpressionContext* expCtx,
                               CollectionAcquisition collection,

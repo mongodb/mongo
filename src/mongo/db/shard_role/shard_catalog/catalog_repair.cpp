@@ -102,6 +102,7 @@ bool identHandler(StorageEngine* engine,
 }  // namespace
 
 namespace catalog_repair {
+using namespace std::literals::string_view_literals;
 
 /**
  * This method reconciles differences between idents the KVEngine is aware of and the
@@ -244,8 +245,8 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
                             "metadata"_attr = md->toBSON(),
                             "lastShutdownState"_attr =
                                 (lastShutdownState == StorageEngine::LastShutdownState::kClean
-                                     ? "clean"_sd
-                                     : "unclean"_sd));
+                                     ? "clean"sv
+                                     : "unclean"sv));
                 return {ErrorCodes::DataCorruptionDetected,
                         str::stream()
                             << "Expected index ident is missing from the catalog entry, "

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -59,6 +58,7 @@
 #include <sys/types.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * The structure represents how data is laid out in an encrypted payload.
@@ -130,7 +130,7 @@ private:
 
 class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpression> {
 public:
-    static constexpr std::string_view kName = "$type"_sd;
+    static constexpr std::string_view kName = "$type"sv;
 
     TypeMatchExpression(boost::optional<std::string_view> path,
                         MatcherTypeSet typeSet,
@@ -184,7 +184,7 @@ private:
 class InternalSchemaTypeExpression final
     : public TypeMatchExpressionBase<InternalSchemaTypeExpression> {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaType"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaType"sv;
 
     InternalSchemaTypeExpression(boost::optional<std::string_view> path,
                                  MatcherTypeSet typeSet,
@@ -219,7 +219,7 @@ public:
 
 class InternalSchemaBinDataSubTypeExpression final : public LeafMatchExpression {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaBinDataSubType"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaBinDataSubType"sv;
 
     InternalSchemaBinDataSubTypeExpression(boost::optional<std::string_view> path,
                                            BinDataType binDataSubType,
@@ -303,7 +303,7 @@ private:
 class InternalSchemaBinDataEncryptedTypeExpression final
     : public TypeMatchExpressionBase<InternalSchemaBinDataEncryptedTypeExpression> {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaBinDataEncryptedType"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaBinDataEncryptedType"sv;
 
     InternalSchemaBinDataEncryptedTypeExpression(boost::optional<std::string_view> path,
                                                  MatcherTypeSet typeSet,
@@ -348,7 +348,7 @@ public:
 class InternalSchemaBinDataFLE2EncryptedTypeExpression final
     : public TypeMatchExpressionBase<InternalSchemaBinDataFLE2EncryptedTypeExpression> {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaBinDataFLE2EncryptedType"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaBinDataFLE2EncryptedType"sv;
 
     InternalSchemaBinDataFLE2EncryptedTypeExpression(
         boost::optional<std::string_view> path,

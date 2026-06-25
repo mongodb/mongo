@@ -37,6 +37,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * The 'DocumentSourceInternalProjection' class (internal stage name '$_internalProjection') is used
  * to push aggregation pipeline $project and $addFields stages down to SBE. Both of these are
@@ -45,7 +46,7 @@ namespace mongo {
  */
 class DocumentSourceInternalProjection final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageNameInternal = "$_internalProjection"_sd;
+    static constexpr std::string_view kStageNameInternal = "$_internalProjection"sv;
 
     DocumentSourceInternalProjection(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                      DocumentSourceInternalProjectionSpec spec);

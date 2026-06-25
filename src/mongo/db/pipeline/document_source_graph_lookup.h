@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -68,6 +67,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 struct GraphLookUpParams {
     NamespaceString from;
@@ -84,7 +84,7 @@ struct GraphLookUpParams {
 
 class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$graphLookup"_sd;
+    static constexpr std::string_view kStageName = "$graphLookup"sv;
 
     DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp&,
                               const boost::intrusive_ptr<ExpressionContext>&);

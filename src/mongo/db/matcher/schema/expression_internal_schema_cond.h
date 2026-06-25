@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_arity.h"
@@ -43,6 +42,7 @@
 #include <utility>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * A MatchExpression that represents the ternary "conditional" operator.
@@ -50,7 +50,7 @@ namespace mongo {
 class InternalSchemaCondMatchExpression final
     : public FixedArityMatchExpression<InternalSchemaCondMatchExpression, 3> {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaCond"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaCond"sv;
 
     explicit InternalSchemaCondMatchExpression(
         std::array<std::unique_ptr<MatchExpression>, 3> expressions,

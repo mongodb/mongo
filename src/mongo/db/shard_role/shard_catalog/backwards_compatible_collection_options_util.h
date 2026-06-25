@@ -31,7 +31,6 @@
 
 // TODO SERVER-92265 evaluate getting rid of this file
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/util/modules.h"
 

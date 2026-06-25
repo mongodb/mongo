@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/optime.h"
@@ -46,19 +45,20 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
-static constexpr std::string_view kErrorLabelsFieldName = "errorLabels"_sd;
-static constexpr std::string_view kRetryAfterMSFieldName = "retryAfterMS"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr std::string_view kErrorLabelsFieldName = "errorLabels"sv;
+static constexpr std::string_view kRetryAfterMSFieldName = "retryAfterMS"sv;
 namespace ErrorLabel {
 // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
-constexpr inline auto kTransientTransaction = "TransientTransactionError"_sd;
-constexpr inline auto kRetryableWrite = "RetryableWriteError"_sd;
-constexpr inline auto kNonResumableChangeStream = "NonResumableChangeStreamError"_sd;
-constexpr inline auto kResumableChangeStream = "ResumableChangeStreamError"_sd;
-constexpr inline auto kNoWritesPerformed = "NoWritesPerformed"_sd;
-constexpr inline auto kStreamProcessorRetryableError = "StreamProcessorRetryableError"_sd;
-constexpr inline auto kStreamProcessorUserError = "StreamProcessorUserError"_sd;
-constexpr inline auto kSystemOverloadedError = "SystemOverloadedError"_sd;
-constexpr inline auto kRetryableError = "RetryableError"_sd;
+constexpr inline auto kTransientTransaction = "TransientTransactionError"sv;
+constexpr inline auto kRetryableWrite = "RetryableWriteError"sv;
+constexpr inline auto kNonResumableChangeStream = "NonResumableChangeStreamError"sv;
+constexpr inline auto kResumableChangeStream = "ResumableChangeStreamError"sv;
+constexpr inline auto kNoWritesPerformed = "NoWritesPerformed"sv;
+constexpr inline auto kStreamProcessorRetryableError = "StreamProcessorRetryableError"sv;
+constexpr inline auto kStreamProcessorUserError = "StreamProcessorUserError"sv;
+constexpr inline auto kSystemOverloadedError = "SystemOverloadedError"sv;
+constexpr inline auto kRetryableError = "RetryableError"sv;
 
 }  // namespace ErrorLabel
 

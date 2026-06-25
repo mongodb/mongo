@@ -2154,17 +2154,17 @@ TEST(FastCountEligibilityParityTest, NonStoreNamespacesAgreeWithCanonical) {
     };
     const std::vector<TestCase> cases{
         // Eligible user collections.
-        {"mydb"_sd, "users"_sd},
-        {"app"_sd, "events"_sd},
+        {"mydb"sv, "users"sv},
+        {"app"sv, "events"sv},
         // Ineligible: local DB.
-        {"local"_sd, "oplog.rs"_sd},
-        {"local"_sd, "replset.minvalid"_sd},
-        {"local"_sd, "anything"_sd},
+        {"local"sv, "oplog.rs"sv},
+        {"local"sv, "replset.minvalid"sv},
+        {"local"sv, "anything"sv},
         // Ineligible: server configuration collection (admin.system.version).
-        {"admin"_sd, "system.version"_sd},
+        {"admin"sv, "system.version"sv},
         // Ineligible: system.profile in any user DB.
-        {"mydb"_sd, "system.profile"_sd},
-        {"app"_sd, "system.profile"_sd},
+        {"mydb"sv, "system.profile"sv},
+        {"app"sv, "system.profile"sv},
     };
 
     for (const auto& c : cases) {

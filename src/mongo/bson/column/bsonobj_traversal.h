@@ -41,6 +41,7 @@
 #include <boost/container/small_vector.hpp>
 
 namespace mongo::bsoncolumn {
+using namespace std::literals::string_view_literals;
 /**
  * Helper class to perform recursion over a BSONObj. Two functions are provided:
  *
@@ -63,9 +64,9 @@ public:
 
     bool traverse(const BSONObj& obj) {
         if (_recurseIntoArrays) {
-            return _traverseIntoArrays(""_sd, obj, _rootType);
+            return _traverseIntoArrays(""sv, obj, _rootType);
         } else {
-            return _traverseNoArrays(""_sd, obj, _rootType);
+            return _traverseNoArrays(""sv, obj, _rootType);
         }
     }
 

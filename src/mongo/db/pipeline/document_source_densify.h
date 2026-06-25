@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -63,6 +62,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Densify);
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalDensify);
@@ -235,12 +235,12 @@ private:
 };
 class RangeStatement {
 public:
-    static constexpr std::string_view kArgUnit = "unit"_sd;
-    static constexpr std::string_view kArgBounds = "bounds"_sd;
-    static constexpr std::string_view kArgStep = "step"_sd;
+    static constexpr std::string_view kArgUnit = "unit"sv;
+    static constexpr std::string_view kArgBounds = "bounds"sv;
+    static constexpr std::string_view kArgStep = "step"sv;
 
-    static constexpr std::string_view kValFull = "full"_sd;
-    static constexpr std::string_view kValPartition = "partition"_sd;
+    static constexpr std::string_view kValFull = "full"sv;
+    static constexpr std::string_view kValPartition = "partition"sv;
 
     struct Full {};
     struct Partition {};
@@ -288,7 +288,7 @@ private:
 };
 
 namespace document_source_densify {
-constexpr std::string_view kStageName = "$densify"_sd;
+constexpr std::string_view kStageName = "$densify"sv;
 
 /**
  * The 'internal' parameter specifies whether or not we create a sort stage that is required for
@@ -316,10 +316,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> create(
 
 class DocumentSourceInternalDensify final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalDensify"_sd;
-    static constexpr std::string_view kPartitionByFieldsFieldName = "partitionByFields"_sd;
-    static constexpr std::string_view kFieldFieldName = "field"_sd;
-    static constexpr std::string_view kRangeFieldName = "range"_sd;
+    static constexpr std::string_view kStageName = "$_internalDensify"sv;
+    static constexpr std::string_view kPartitionByFieldsFieldName = "partitionByFields"sv;
+    static constexpr std::string_view kFieldFieldName = "field"sv;
+    static constexpr std::string_view kRangeFieldName = "range"sv;
 
     DocumentSourceInternalDensify(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                   FieldPath field,

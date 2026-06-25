@@ -48,6 +48,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::fle {
+using namespace std::literals::string_view_literals;
 /**
  * Rewrite for the encrypted range index, which expects a comparison operator expression.
  */
@@ -68,12 +69,12 @@ protected:
     // Pass empty string and boost::none to skip validation; this is just a structural check and the
     // ParsedFindRangePayload is scoped within this function so it doesn't need strict validation.
     virtual bool isStub(BSONElement elt) const {
-        auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(elt, ""_sd, boost::none);
+        auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(elt, ""sv, boost::none);
         return parsedPayload.isStub();
     }
 
     virtual bool isStub(Value elt) const {
-        auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(elt, ""_sd, boost::none);
+        auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(elt, ""sv, boost::none);
         return parsedPayload.isStub();
     }
 

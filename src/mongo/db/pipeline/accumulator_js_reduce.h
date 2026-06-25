@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -52,10 +51,11 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class AccumulatorInternalJsReduce final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$_internalJsReduce"_sd;
+    static constexpr auto kName = "$_internalJsReduce"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -90,7 +90,7 @@ private:
 
 class AccumulatorJs final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$accumulator"_sd;
+    static constexpr auto kName = "$accumulator"sv;
 
     const char* getOpName() const final {
         return kName.data();

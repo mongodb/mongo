@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_rename_collection_gen.h"
@@ -59,11 +58,12 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class MONGO_MOD_NEEDS_REPLACEMENT RenameCollectionParticipantService final
     : public repl::PrimaryOnlyService {
 public:
-    static constexpr std::string_view kServiceName = "RenameCollectionParticipantService"_sd;
+    static constexpr std::string_view kServiceName = "RenameCollectionParticipantService"sv;
 
     explicit RenameCollectionParticipantService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext) {}

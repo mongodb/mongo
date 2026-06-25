@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -46,6 +45,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Reads from N children, each of which must have a valid RecordId. Uses a hash table to intersect
@@ -81,7 +81,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr std::string_view kStageType = "AND_HASH"_sd;
+    static constexpr std::string_view kStageType = "AND_HASH"sv;
 
 private:
     static const size_t kLookAheadWorks;

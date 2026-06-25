@@ -49,6 +49,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Parameters produced by LiteParsedGraphLookUp::getStageParams() and consumed by
@@ -108,7 +109,7 @@ public:
 class LiteParsedGraphLookUp final
     : public LiteParsedDocumentSourceNestedPipelines<LiteParsedGraphLookUp> {
 public:
-    static constexpr std::string_view kStageName = "$graphLookup"_sd;
+    static constexpr std::string_view kStageName = "$graphLookup"sv;
 
     static std::unique_ptr<LiteParsedGraphLookUp> parse(const NamespaceString& nss,
                                                         const BSONElement& spec,

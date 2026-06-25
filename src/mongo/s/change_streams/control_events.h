@@ -36,12 +36,13 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Indicates that a chunk of a collection was moved from one shard to another.
  */
 struct MONGO_MOD_NEEDS_REPLACEMENT MoveChunkControlEvent {
-    static constexpr auto opType = "moveChunk"_sd;
+    static constexpr auto opType = "moveChunk"sv;
 
     static MoveChunkControlEvent createFromDocument(const Document& event);
 
@@ -57,7 +58,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT MoveChunkControlEvent {
  * Indicates that a database got assigned a new primary shard.
  */
 struct MONGO_MOD_PRIVATE MovePrimaryControlEvent {
-    static constexpr auto opType = "movePrimary"_sd;
+    static constexpr auto opType = "movePrimary"sv;
 
     static MovePrimaryControlEvent createFromDocument(const Document& event);
 
@@ -76,7 +77,7 @@ struct MONGO_MOD_PRIVATE MovePrimaryControlEvent {
  * v2 reader cannot operate anymore, and so on.
  */
 struct MONGO_MOD_PRIVATE NamespacePlacementChangedControlEvent {
-    static constexpr auto opType = "namespacePlacementChanged"_sd;
+    static constexpr auto opType = "namespacePlacementChanged"sv;
 
     static NamespacePlacementChangedControlEvent createFromDocument(const Document& event);
 
@@ -91,7 +92,7 @@ struct MONGO_MOD_PRIVATE NamespacePlacementChangedControlEvent {
  * 'config.databases' collection.
  */
 struct MONGO_MOD_PRIVATE DatabaseCreatedControlEvent {
-    static constexpr auto opType = "insert"_sd;
+    static constexpr auto opType = "insert"sv;
 
     static DatabaseCreatedControlEvent createFromDocument(const Document& event);
 

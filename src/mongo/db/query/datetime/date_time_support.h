@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -61,12 +60,13 @@ struct _timelib_tzinfo;
  * TODO SERVER-114888: Remove external dependencies on this module.
  */
 namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Default format values for date-times, e.g. for $dateToString aggregations.
  */
-static constexpr std::string_view kIsoFormatStringZ = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
-static constexpr std::string_view kIsoFormatStringNonZ = "%Y-%m-%dT%H:%M:%S.%L"_sd;
+static constexpr std::string_view kIsoFormatStringZ = "%Y-%m-%dT%H:%M:%S.%LZ"sv;
+static constexpr std::string_view kIsoFormatStringNonZ = "%Y-%m-%dT%H:%M:%S.%L"sv;
 
 /**
  * A set of standard measures of time used to express a length of time interval.

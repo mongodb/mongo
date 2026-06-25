@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -54,6 +53,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Represents a single item in an index. An index item simply consists of a key
@@ -80,7 +80,7 @@ struct IndexKeyEntry {
     }
 
     void serialize(BSONObjBuilder* builder) const {
-        builder->append("key"_sd, key);
+        builder->append("key"sv, key);
         loc.serializeToken("RecordId", builder);
     }
 

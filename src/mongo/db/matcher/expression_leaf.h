@@ -31,7 +31,6 @@
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -65,6 +64,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class CollatorInterface;
 
@@ -309,7 +309,7 @@ public:
 
 class MONGO_MOD_NEEDS_REPLACEMENT EqualityMatchExpression final : public ComparisonMatchExpression {
 public:
-    static constexpr std::string_view kName = "$eq"_sd;
+    static constexpr std::string_view kName = "$eq"sv;
 
     EqualityMatchExpression(boost::optional<std::string_view> path,
                             Value rhs,
@@ -355,7 +355,7 @@ public:
 
 class MONGO_MOD_NEEDS_REPLACEMENT LTEMatchExpression final : public ComparisonMatchExpression {
 public:
-    static constexpr std::string_view kName = "$lte"_sd;
+    static constexpr std::string_view kName = "$lte"sv;
 
     LTEMatchExpression(boost::optional<std::string_view> path,
                        Value rhs,
@@ -399,7 +399,7 @@ public:
 
 class LTMatchExpression final : public ComparisonMatchExpression {
 public:
-    static constexpr std::string_view kName = "$lt"_sd;
+    static constexpr std::string_view kName = "$lt"sv;
 
     LTMatchExpression(boost::optional<std::string_view> path,
                       Value rhs,
@@ -447,7 +447,7 @@ public:
 
 class GTMatchExpression final : public ComparisonMatchExpression {
 public:
-    static constexpr std::string_view kName = "$gt"_sd;
+    static constexpr std::string_view kName = "$gt"sv;
 
     GTMatchExpression(boost::optional<std::string_view> path,
                       Value rhs,
@@ -496,7 +496,7 @@ public:
 
 class GTEMatchExpression final : public ComparisonMatchExpression {
 public:
-    static constexpr std::string_view kName = "$gte"_sd;
+    static constexpr std::string_view kName = "$gte"sv;
 
     GTEMatchExpression(boost::optional<std::string_view> path,
                        Value rhs,

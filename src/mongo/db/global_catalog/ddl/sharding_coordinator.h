@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
@@ -79,6 +78,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinatorMetadata
 extractShardingCoordinatorMetadata(const BSONObj& coorDoc);
@@ -98,7 +98,7 @@ enum class MONGO_MOD_PRIVATE CoordinatorGenericPhase : std::int32_t {
  */
 class MONGO_MOD_PRIVATE CoordinatorStateDoc {
 public:
-    static constexpr auto kIdFieldName = "_id"_sd;
+    static constexpr auto kIdFieldName = "_id"sv;
 
     virtual ~CoordinatorStateDoc() = default;
     virtual const ShardingCoordinatorMetadata& getShardingCoordinatorMetadata() const = 0;

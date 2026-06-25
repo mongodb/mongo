@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -43,13 +42,14 @@ class BSONObjBuilder;
 class OperationContext;
 
 namespace repl {
+using namespace std::literals::string_view_literals;
 namespace apply_ops_command_info_details {
 bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd);
 }  // namespace apply_ops_command_info_details
 
 class ApplyOps {
 public:
-    static constexpr std::string_view kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
+    static constexpr std::string_view kOplogApplicationModeFieldName = "oplogApplicationMode"sv;
 
     /**
      * Extracts CRUD operations from an applyOps oplog entry. Throws UserException on error.

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -60,6 +59,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListSessions);
 
@@ -83,7 +83,7 @@ public:
         return make_intrusive<std::decay_t<decltype(*this)>>(*this, newExpCtx);
     }
 
-    static constexpr std::string_view kStageName = "$listSessions"_sd;
+    static constexpr std::string_view kStageName = "$listSessions"sv;
 
     static const Id& id;
 

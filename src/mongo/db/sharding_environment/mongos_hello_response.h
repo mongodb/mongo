@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/modules.h"
@@ -40,6 +39,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class BSONObj;
 class BSONObjBuilder;
@@ -51,10 +51,10 @@ class BSONObjBuilder;
  */
 class MONGO_MOD_NEEDS_REPLACEMENT MongosHelloResponse {
 public:
-    static constexpr std::string_view kTopologyVersionFieldName = "topologyVersion"_sd;
-    static constexpr std::string_view kIsMasterFieldName = "ismaster"_sd;
-    static constexpr std::string_view kIsWritablePrimaryFieldName = "isWritablePrimary"_sd;
-    static constexpr std::string_view kMsgFieldName = "msg"_sd;
+    static constexpr std::string_view kTopologyVersionFieldName = "topologyVersion"sv;
+    static constexpr std::string_view kIsMasterFieldName = "ismaster"sv;
+    static constexpr std::string_view kIsWritablePrimaryFieldName = "isWritablePrimary"sv;
+    static constexpr std::string_view kMsgFieldName = "msg"sv;
 
     /**
      * Explicit constructor that sets the _topologyVersion field.

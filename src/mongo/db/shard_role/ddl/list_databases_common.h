@@ -50,7 +50,8 @@
 namespace mongo {
 
 namespace MONGO_MOD_PARENT_PRIVATE list_databases {
-constexpr auto kName = "name"_sd;
+using namespace std::literals::string_view_literals;
+constexpr auto kName = "name"sv;
 
 template <class CommandType>
 std::unique_ptr<MatchExpression> getFilter(CommandType cmd,

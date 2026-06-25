@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/data_range.h"
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/hash_block.h"
 #include "mongo/util/make_array_type.h"
 #include "mongo/util/modules.h"
@@ -41,6 +40,7 @@
 #include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * A Traits type for adapting HashBlock to sha512 hashes.
@@ -48,7 +48,7 @@ namespace MONGO_MOD_PUBLIC mongo {
 struct SHA512BlockTraits {
     using HashType = MakeArrayType<std::uint8_t, 64, SHA512BlockTraits>;
 
-    static constexpr std::string_view name = "SHA512Block"_sd;
+    static constexpr std::string_view name = "SHA512Block"sv;
 
     static HashType computeHash(std::initializer_list<ConstDataRange> input);
 

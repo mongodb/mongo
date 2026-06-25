@@ -36,6 +36,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This class is a base class for accumulators that are applied only in window functions. Some
@@ -78,7 +79,7 @@ private:
 
 class AccumulatorCovarianceSamp final : public AccumulatorCovariance {
 public:
-    static constexpr auto kName = "$covarianceSamp"_sd;
+    static constexpr auto kName = "$covarianceSamp"sv;
 
     explicit AccumulatorCovarianceSamp(ExpressionContext* const expCtx)
         : AccumulatorCovariance(expCtx, true) {}
@@ -86,7 +87,7 @@ public:
 
 class AccumulatorCovariancePop final : public AccumulatorCovariance {
 public:
-    static constexpr auto kName = "$covariancePop"_sd;
+    static constexpr auto kName = "$covariancePop"sv;
 
     explicit AccumulatorCovariancePop(ExpressionContext* const expCtx)
         : AccumulatorCovariance(expCtx, false) {}
@@ -117,7 +118,7 @@ protected:
 
 class AccumulatorRank : public AccumulatorRankBase {
 public:
-    static constexpr auto kName = "$rank"_sd;
+    static constexpr auto kName = "$rank"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -138,7 +139,7 @@ private:
 
 class AccumulatorDocumentNumber : public AccumulatorRankBase {
 public:
-    static constexpr auto kName = "$documentNumber"_sd;
+    static constexpr auto kName = "$documentNumber"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -156,7 +157,7 @@ public:
 
 class AccumulatorDenseRank : public AccumulatorRankBase {
 public:
-    static constexpr auto kName = "$denseRank"_sd;
+    static constexpr auto kName = "$denseRank"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -174,7 +175,7 @@ public:
 
 class AccumulatorIntegral : public AccumulatorForWindowFunctions {
 public:
-    static constexpr auto kName = "$integral"_sd;
+    static constexpr auto kName = "$integral"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -193,7 +194,7 @@ private:
 
 class AccumulatorLocf : public AccumulatorForWindowFunctions {
 public:
-    static constexpr auto kName = "$locf"_sd;
+    static constexpr auto kName = "$locf"sv;
 
     const char* getOpName() const final {
         return kName.data();

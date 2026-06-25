@@ -44,6 +44,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * A cache for the intermediate steps of the SCRAM-SHA-1 computation.
@@ -98,7 +99,7 @@ public:
         auto foundSecret = _hostToSecrets.find(target);
         if (foundSecret == _hostToSecrets.end()) {
             ++_stats.misses;
-            logCacheEvent("miss (secret not found)"_sd);
+            logCacheEvent("miss (secret not found)"sv);
             return {};
         }
 
@@ -108,11 +109,11 @@ public:
         const auto& foundPresecrets = foundSecret->second.first;
         if (foundPresecrets == presecrets) {
             ++_stats.hits;
-            logCacheEvent("hit"_sd);
+            logCacheEvent("hit"sv);
             return foundSecret->second.second;
         } else {
             ++_stats.misses;
-            logCacheEvent("miss (stale cached secret)"_sd);
+            logCacheEvent("miss (stale cached secret)"sv);
             return {};
         }
     }
@@ -135,9 +136,9 @@ public:
         // We have fresher presecrets and secrets.
         if (!insertionSuccessful) {
             it->second = std::move(cacheRecord);
-            logCacheEvent("overwrite"_sd);
+            logCacheEvent("overwrite"sv);
         } else {
-            logCacheEvent("insertion"_sd);
+            logCacheEvent("insertion"sv);
         }
     }
 

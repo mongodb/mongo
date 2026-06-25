@@ -38,12 +38,13 @@
 namespace mongo {
 namespace change_stream_constants {
 namespace stage_names {
+using namespace std::literals::string_view_literals;
 static constexpr std::string_view kEnsureResumeTokenPresent =
-    "$_internalChangeStreamEnsureResumeTokenPresent"_sd;
+    "$_internalChangeStreamEnsureResumeTokenPresent"sv;
 static constexpr std::string_view kHandleTopologyChange =
-    "$_internalChangeStreamHandleTopologyChange"_sd;
+    "$_internalChangeStreamHandleTopologyChange"sv;
 static constexpr std::string_view kHandleTopologyChangeV2 =
-    "$_internalChangeStreamHandleTopologyChangeV2"_sd;
+    "$_internalChangeStreamHandleTopologyChangeV2"sv;
 }  // namespace stage_names
 
 static const BSONObj kSortSpec = BSON("_id._data" << 1);

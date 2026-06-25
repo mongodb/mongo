@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -43,9 +42,10 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo::timeseries {
+using namespace std::literals::string_view_literals;
 
 // TODO SERVER-101896 remove this constant once 9.0 becomes last LTS and all timeseries are viewless
-inline constexpr std::string_view kIsTimeseriesNamespaceFieldName = "isTimeseriesNamespace"_sd;
+inline constexpr std::string_view kIsTimeseriesNamespaceFieldName = "isTimeseriesNamespace"sv;
 
 /**
  * Returns a command object with time-series view namespace translated to bucket namespace.

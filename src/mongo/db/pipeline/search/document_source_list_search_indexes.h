@@ -38,6 +38,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListSearchIndexes);
 
@@ -45,9 +46,9 @@ class DocumentSourceListSearchIndexesSpec;
 
 class DocumentSourceListSearchIndexes final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$listSearchIndexes"_sd;
-    static constexpr std::string_view kCursorFieldName = "cursor"_sd;
-    static constexpr std::string_view kFirstBatchFieldName = "firstBatch"_sd;
+    static constexpr std::string_view kStageName = "$listSearchIndexes"sv;
+    static constexpr std::string_view kCursorFieldName = "cursor"sv;
+    static constexpr std::string_view kFirstBatchFieldName = "firstBatch"sv;
 
     /**
      * A 'LiteParsed' representation of the $listSearchIndexes stage.

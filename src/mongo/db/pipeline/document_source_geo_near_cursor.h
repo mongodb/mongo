@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -47,6 +46,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Like DocumentSourceCursor, this stage returns Documents from BSONObjs produced by a PlanExecutor,
@@ -57,7 +57,7 @@ public:
     /**
      * The name of this stage.
      */
-    static constexpr std::string_view kStageName = "$geoNearCursor"_sd;
+    static constexpr std::string_view kStageName = "$geoNearCursor"sv;
 
     /**
      * Create a new DocumentSourceGeoNearCursor. If specified, 'distanceMultiplier' must be

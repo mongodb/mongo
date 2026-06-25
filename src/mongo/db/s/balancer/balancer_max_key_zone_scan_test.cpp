@@ -38,6 +38,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const std::string kCollKeyField = "coll." + std::string{CollectionType::kKeyPatternFieldName};
 
@@ -114,9 +115,9 @@ TEST(BalancerMaxKeyZoneScanTest, PipelineLookupJoinsCollectionsOnNamespace) {
               NamespaceString::kConfigsvrCollectionsNamespace.coll());
     ASSERT_EQ(lookup.getStringField("localField"), TagsType::ns());
     ASSERT_EQ(lookup.getStringField("foreignField"), CollectionType::kNssFieldName);
-    ASSERT_EQ(lookup.getStringField("as"), "coll"_sd);
+    ASSERT_EQ(lookup.getStringField("as"), "coll"sv);
     // $unwind drops tags whose collection did not join.
-    ASSERT_EQ(pipeline[1].getStringField("$unwind"), "$coll"_sd);
+    ASSERT_EQ(pipeline[1].getStringField("$unwind"), "$coll"sv);
 }
 
 TEST(BalancerMaxKeyZoneScanTest, PipelineMatchKeepsOnlyCompoundShardKeys) {

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -57,6 +56,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalComputeGeoNearDistance);
 
@@ -66,11 +66,11 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalComputeGeoNearDistance);
  */
 class DocumentSourceInternalGeoNearDistance final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalComputeGeoNearDistance"_sd;
-    static constexpr std::string_view kNearFieldName = "near"_sd;
-    static constexpr std::string_view kKeyFieldName = "key"_sd;
-    static constexpr std::string_view kDistanceFieldFieldName = "distanceField"_sd;
-    static constexpr std::string_view kDistanceMultiplierFieldName = "distanceMultiplier"_sd;
+    static constexpr std::string_view kStageName = "$_internalComputeGeoNearDistance"sv;
+    static constexpr std::string_view kNearFieldName = "near"sv;
+    static constexpr std::string_view kKeyFieldName = "key"sv;
+    static constexpr std::string_view kDistanceFieldFieldName = "distanceField"sv;
+    static constexpr std::string_view kDistanceMultiplierFieldName = "distanceMultiplier"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -59,6 +58,7 @@
 #endif
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 struct Point;
 struct Circle;
@@ -268,13 +268,13 @@ enum CRS {
 inline std::string_view crsName(CRS crs) {
     switch (crs) {
         case UNSET:
-            return "UNSET"_sd;
+            return "UNSET"sv;
         case FLAT:
-            return "FLAT"_sd;
+            return "FLAT"sv;
         case SPHERE:
-            return "SPHERE"_sd;
+            return "SPHERE"sv;
         case STRICT_SPHERE:
-            return "STRICT_SPHERE"_sd;
+            return "STRICT_SPHERE"sv;
     }
     MONGO_UNREACHABLE;
 }

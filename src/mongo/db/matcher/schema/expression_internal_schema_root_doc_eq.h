@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +50,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * MatchExpression for $_internalSchemaRootDocEq, which matches the root document with the
@@ -62,7 +62,7 @@ namespace mongo {
  */
 class InternalSchemaRootDocEqMatchExpression final : public MatchExpression {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaRootDocEq"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaRootDocEq"sv;
 
     /**
      * Constructs a new match expression, taking ownership of 'rhs'.

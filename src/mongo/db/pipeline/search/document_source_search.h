@@ -43,6 +43,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Search);
 class SearchLiteParsed final : public LiteParsedSearchStage<SearchLiteParsed> {
@@ -92,7 +93,7 @@ public:
  */
 class DocumentSourceSearch final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$search"_sd;
+    static constexpr std::string_view kStageName = "$search"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

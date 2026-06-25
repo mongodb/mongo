@@ -60,6 +60,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -469,7 +470,7 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
     // will not modify through it, it's just a C-style convention.
     auto status =
         s2nCheck(s2n_connection_set_config(_s2nConnection, const_cast<s2n_config*>(_s2nConfig)),
-                 "s2n_connection_set_config"_sd);
+                 "s2n_connection_set_config"sv);
     if (!status.isOK()) {
         return status;
     }
@@ -478,19 +479,19 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
                           _s2nConnection,
                           const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(s2nState.data())),
                           static_cast<uint32_t>(s2nState.length())),
-                      "s2n_connection_deserialize"_sd);
+                      "s2n_connection_deserialize"sv);
     if (!status.isOK()) {
         return status;
     }
 
     // Self-service blinding: s2n returns errors immediately instead of sleeping.
     status = s2nCheck(s2n_connection_set_blinding(_s2nConnection, S2N_SELF_SERVICE_BLINDING),
-                      "s2n_connection_set_blinding"_sd);
+                      "s2n_connection_set_blinding"sv);
     if (!status.isOK()) {
         return status;
     }
 
-    status = s2nCheck(s2n_connection_set_fd(_s2nConnection, clientFd), "s2n_connection_set_fd"_sd);
+    status = s2nCheck(s2n_connection_set_fd(_s2nConnection, clientFd), "s2n_connection_set_fd"sv);
     if (!status.isOK()) {
         return status;
     }
@@ -569,7 +570,7 @@ Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
 
     // Don't need to lock the mutex here, because _restrictionEnvironment is never accessed from
     // another thread.
-    if (_proxiedSource && clientSourceAuthenticationRestrictionMode == "origin"_sd) {
+    if (_proxiedSource && clientSourceAuthenticationRestrictionMode == "origin"sv) {
         _restrictionEnvironment = RestrictionEnvironment(_proxiedSource->address, localSa);
     } else {
         _restrictionEnvironment = RestrictionEnvironment(peerSa, localSa);

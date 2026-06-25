@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -54,6 +53,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Match expression that matches documents whose properties meet certain requirements based on field
@@ -122,7 +122,7 @@ public:
      */
     using PatternSchema = std::pair<Pattern, std::unique_ptr<ExpressionWithPlaceholder>>;
 
-    static constexpr std::string_view kName = "$_internalSchemaAllowedProperties"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaAllowedProperties"sv;
 
     explicit InternalSchemaAllowedPropertiesMatchExpression(
         StringDataSet properties,

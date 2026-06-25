@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/jwks_fetcher_impl.h"
 #include "mongo/util/clock_source.h"
 
 #include <string_view>
 
 namespace mongo::crypto {
+using namespace std::literals::string_view_literals;
 
 /**
  * Mock JWKS fetcher.
@@ -44,7 +44,7 @@ namespace mongo::crypto {
  */
 class MockJWKSFetcher : public JWKSFetcherImpl {
 public:
-    static constexpr std::string_view kMockIssuer = "https://localhost/issuer/mock"_sd;
+    static constexpr std::string_view kMockIssuer = "https://localhost/issuer/mock"sv;
 
     MockJWKSFetcher(ClockSource* clock, BSONObj keys)
         : JWKSFetcherImpl(clock, kMockIssuer), _keys(std::move(keys)) {}

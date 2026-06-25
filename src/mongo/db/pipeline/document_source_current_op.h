@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -63,6 +62,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(CurrentOp);
 
@@ -75,7 +75,7 @@ public:
     using UserMode = MongoProcessInterface::CurrentOpUserMode;
     using CursorMode = MongoProcessInterface::CurrentOpCursorMode;
 
-    static constexpr std::string_view kStageName = "$currentOp"_sd;
+    static constexpr std::string_view kStageName = "$currentOp"sv;
 
     static constexpr ConnMode kDefaultConnMode = ConnMode::kExcludeIdle;
     static constexpr SessionMode kDefaultSessionMode = SessionMode::kIncludeIdle;

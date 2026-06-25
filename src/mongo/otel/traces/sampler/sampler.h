@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/otel/traces/sampler/sampling_config.h"
 #include "mongo/otel/traces/span/span_names.h"
@@ -44,6 +43,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 namespace mongo::otel::traces {
 

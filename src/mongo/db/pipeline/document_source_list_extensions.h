@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -51,6 +50,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListExtensions);
 
@@ -59,7 +59,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListExtensions);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceListExtensions final {
 public:
-    static constexpr std::string_view kStageName = "$listExtensions"_sd;
+    static constexpr std::string_view kStageName = "$listExtensions"sv;
 
     class LiteParsed : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

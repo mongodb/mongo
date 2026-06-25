@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/data_range.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -80,6 +79,7 @@
 MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace idl {
 
@@ -256,7 +256,7 @@ void handleMissingRequiredFields(const auto& hasMembers,
         for (size_t i = 0; i < meta.size(); ++i) {
             auto&& [name, required] = meta[i];
             if (required && !hasMembers.get(reqIdx++)) {
-                msg += std::exchange(sep, ", "_sd);
+                msg += std::exchange(sep, ", "sv);
                 msg += name;
             }
         }
@@ -367,9 +367,9 @@ public:
     /**
      * String constants for well-known IDL fields.
      */
-    static constexpr auto kOpMsgDollarDB = "$db"_sd;
-    static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
-    static constexpr auto kTenantIdField = "$tenant"_sd;
+    static constexpr auto kOpMsgDollarDB = "$db"sv;
+    static constexpr auto kOpMsgDollarDBDefault = "admin"sv;
+    static constexpr auto kTenantIdField = "$tenant"sv;
 
     explicit IDLParserContext(std::string_view fieldName)
         : IDLParserContext{fieldName,

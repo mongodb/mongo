@@ -35,8 +35,9 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-static constexpr auto kDefaultTimeseriesCollectionCompressor = "zstd"_sd;
+static constexpr auto kDefaultTimeseriesCollectionCompressor = "zstd"sv;
 
 /**
  * Each Collection is backed by a RecordStore in the storage layer. Translates 'CollectionOptions'

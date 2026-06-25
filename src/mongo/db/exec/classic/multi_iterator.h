@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -45,6 +44,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Iterates over a collection using multiple underlying RecordCursors.
@@ -78,7 +78,7 @@ public:
         return STAGE_MULTI_ITERATOR;
     }
 
-    static constexpr std::string_view kStageType = "MULTI_ITERATOR"_sd;
+    static constexpr std::string_view kStageType = "MULTI_ITERATOR"sv;
 
 protected:
     void doSaveStateRequiresCollection() final;

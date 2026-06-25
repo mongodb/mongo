@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -39,11 +38,12 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * Metadata for external data source.
  */
 struct MONGO_MOD_NEEDS_REPLACEMENT ExternalDataSourceMetadata {
-    static constexpr auto kUrlProtocolFile = "file://"_sd;
+    static constexpr auto kUrlProtocolFile = "file://"sv;
 
     ExternalDataSourceMetadata(std::string_view urlStr,
                                StorageTypeEnum storageTypeEnum,

@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -94,6 +93,7 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class AuthorizationContract;
 class Command;
@@ -346,7 +346,7 @@ struct CommandHelpers {
                                    Command* command,
                                    bool allowTransactionsOnConfigDatabase);
 
-    static constexpr std::string_view kHelpFieldName = "help"_sd;
+    static constexpr std::string_view kHelpFieldName = "help"sv;
 
     /**
      * Checks if the command passed in is in the list of failCommands defined in the fail point.

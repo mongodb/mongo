@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
@@ -47,11 +46,12 @@
 #include <wiredtiger.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class WiredTigerHarnessHelper final : public RecordStoreHarnessHelper {
 public:
-    WiredTigerHarnessHelper() : WiredTigerHarnessHelper(Options::ReplicationEnabled, ""_sd) {}
-    WiredTigerHarnessHelper(Options options) : WiredTigerHarnessHelper(options, ""_sd) {}
+    WiredTigerHarnessHelper() : WiredTigerHarnessHelper(Options::ReplicationEnabled, ""sv) {}
+    WiredTigerHarnessHelper(Options options) : WiredTigerHarnessHelper(options, ""sv) {}
     WiredTigerHarnessHelper(std::string_view extraStrings)
         : WiredTigerHarnessHelper(Options::ReplicationEnabled, extraStrings) {}
 

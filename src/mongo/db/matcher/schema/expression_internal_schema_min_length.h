@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
@@ -45,6 +44,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class InternalSchemaMinLengthMatchExpression final : public InternalSchemaStrLengthMatchExpression {
 
@@ -55,7 +55,7 @@ public:
         : InternalSchemaStrLengthMatchExpression(MatchType::INTERNAL_SCHEMA_MIN_LENGTH,
                                                  path,
                                                  strLen,
-                                                 "$_internalSchemaMinLength"_sd,
+                                                 "$_internalSchemaMinLength"sv,
                                                  std::move(annotation)) {}
 
     Validator getComparator() const final {

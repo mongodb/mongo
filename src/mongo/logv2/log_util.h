@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
@@ -42,12 +41,13 @@
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC logv2 {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kServerLogTag = "server"_sd;
-constexpr auto kAuditLogTag = "audit"_sd;
+constexpr auto kServerLogTag = "server"sv;
+constexpr auto kAuditLogTag = "audit"sv;
 
 #ifdef _WIN32
-constexpr auto kWindowsNUL = "nul"_sd;
+constexpr auto kWindowsNUL = "nul"sv;
 #endif
 
 using LogRotateCallback =

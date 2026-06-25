@@ -40,6 +40,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo::transport::grpc {
+using namespace std::literals::string_view_literals;
 
 /**
  * Wraps the gRPC Server and Client implementations. This abstraction layer aims to hide
@@ -108,7 +109,7 @@ public:
         boost::optional<std::string> authToken = boost::none) = 0;
 
     std::string_view getNameForLogging() const override {
-        return "gRPC"_sd;
+        return "gRPC"sv;
     }
 
     TransportProtocol getTransportProtocol() const override {

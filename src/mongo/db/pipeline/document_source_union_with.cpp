@@ -72,6 +72,7 @@
 
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
     UnionWithStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -529,7 +530,7 @@ Value DocumentSourceUnionWith::legacyUnionWithSerialize(
         }
         // Strip $mergeCursors if present (injected by mongos post-dispatch; invalid on re-parse).
         const bool hasMergeCursors = !_sharedState->_pipeline->getSources().empty() &&
-            _sharedState->_pipeline->getSources().front()->getSourceName() == "$mergeCursors"_sd;
+            _sharedState->_pipeline->getSources().front()->getSourceName() == "$mergeCursors"sv;
         if (hasMergeCursors) {
             spec["pipeline"] =
                 Value(pipeline_factory::makePipeline(_userPipeline,
@@ -708,7 +709,7 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
         }
         // Strip $mergeCursors if present (injected by mongos post-dispatch; invalid on re-parse).
         const bool hasMergeCursors = !_sharedState->_pipeline->getSources().empty() &&
-            _sharedState->_pipeline->getSources().front()->getSourceName() == "$mergeCursors"_sd;
+            _sharedState->_pipeline->getSources().front()->getSourceName() == "$mergeCursors"sv;
         if (hasMergeCursors) {
             // Re-parse from user pipeline to get the clean optimized form without $mergeCursors.
             // TODO SERVER-94227: we don't need to do any validation as part of this parsing pass.

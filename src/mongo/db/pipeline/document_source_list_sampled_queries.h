@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
@@ -70,6 +69,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceListSampledQueriesToStageFn
     const boost::intrusive_ptr<DocumentSource>& documentSource);
 
 namespace analyze_shard_key {
+using namespace std::literals::string_view_literals;
 
 // TODO: SERVER-105521 Remove this struct as both the '_pipeline' and '_execPipeline' are used only
 // in ListSampledQueriesStage (assuming 'detachSourceFromOperationContext()' and
@@ -83,7 +83,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListSampledQueries);
 
 class DocumentSourceListSampledQueries final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$listSampledQueries"_sd;
+    static constexpr std::string_view kStageName = "$listSampledQueries"sv;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

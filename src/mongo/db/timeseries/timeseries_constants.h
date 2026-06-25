@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/shard_role/ddl/create_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
@@ -39,30 +38,31 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo::timeseries {
+using namespace std::literals::string_view_literals;
 
 // These are hard-coded constants in the bucket schema.
-static constexpr std::string_view kBucketIdFieldName = "_id"_sd;
-static constexpr std::string_view kBucketDataFieldName = "data"_sd;
-static constexpr std::string_view kBucketMetaFieldName = "meta"_sd;
-static constexpr std::string_view kBucketControlClosedFieldName = "closed"_sd;
-static constexpr std::string_view kBucketControlFieldName = "control"_sd;
-static constexpr std::string_view kBucketControlVersionFieldName = "version"_sd;
-static constexpr std::string_view kBucketControlCountFieldName = "count"_sd;
-static constexpr std::string_view kBucketControlMinFieldName = "min"_sd;
-static constexpr std::string_view kBucketControlMaxFieldName = "max"_sd;
-static constexpr std::string_view kControlMaxFieldNamePrefix = "control.max."_sd;
-static constexpr std::string_view kControlMinFieldNamePrefix = "control.min."_sd;
-static constexpr std::string_view kDataFieldNamePrefix = "data."_sd;
-static constexpr std::string_view kControlFieldNamePrefix = "control."_sd;
+static constexpr std::string_view kBucketIdFieldName = "_id"sv;
+static constexpr std::string_view kBucketDataFieldName = "data"sv;
+static constexpr std::string_view kBucketMetaFieldName = "meta"sv;
+static constexpr std::string_view kBucketControlClosedFieldName = "closed"sv;
+static constexpr std::string_view kBucketControlFieldName = "control"sv;
+static constexpr std::string_view kBucketControlVersionFieldName = "version"sv;
+static constexpr std::string_view kBucketControlCountFieldName = "count"sv;
+static constexpr std::string_view kBucketControlMinFieldName = "min"sv;
+static constexpr std::string_view kBucketControlMaxFieldName = "max"sv;
+static constexpr std::string_view kControlMaxFieldNamePrefix = "control.max."sv;
+static constexpr std::string_view kControlMinFieldNamePrefix = "control.min."sv;
+static constexpr std::string_view kDataFieldNamePrefix = "data."sv;
+static constexpr std::string_view kControlFieldNamePrefix = "control."sv;
 
 // These are hard-coded field names in create collection for time-series collections.
-static constexpr std::string_view kTimeFieldName = "timeField"_sd;
-static constexpr std::string_view kMetaFieldName = "metaField"_sd;
+static constexpr std::string_view kTimeFieldName = "timeField"sv;
+static constexpr std::string_view kMetaFieldName = "metaField"sv;
 
 // These are hard-coded field names in index specs.
-static constexpr std::string_view kKeyFieldName = "key"_sd;
-static constexpr std::string_view kOriginalSpecFieldName = "originalSpec"_sd;
-static constexpr std::string_view kPartialFilterExpressionFieldName = "partialFilterExpression"_sd;
+static constexpr std::string_view kKeyFieldName = "key"sv;
+static constexpr std::string_view kOriginalSpecFieldName = "originalSpec"sv;
+static constexpr std::string_view kPartialFilterExpressionFieldName = "partialFilterExpression"sv;
 
 // There are 3 versions of buckets. The first is uncompressed, the second is compressed
 // and has its records sorted on time, and the third is compressed and does not have its
@@ -78,14 +78,14 @@ static constexpr int kTimeseriesControlLatestVersion = kTimeseriesControlCompres
 static constexpr int kTimeseriesControlMinVersion = kTimeseriesControlUncompressedVersion;
 
 // These are hard-coded control object subfields.
-static constexpr std::string_view kControlVersionPath = "control.version"_sd;
-static constexpr std::string_view kControlClosedPath = "control.closed"_sd;
+static constexpr std::string_view kControlVersionPath = "control.version"sv;
+static constexpr std::string_view kControlClosedPath = "control.closed"sv;
 
 // DocDiff: constexpr versions of doc_diff::kSubDiffSectionFieldPrefix + bucket field names.
-static constexpr std::string_view kDataFieldNameDocDiff = "sdata"_sd;
-static constexpr std::string_view kControlFieldNameDocDiff = "scontrol"_sd;
-static constexpr std::string_view kMinFieldNameDocDiff = "smin"_sd;
-static constexpr std::string_view kMaxFieldNameDocDiff = "smax"_sd;
+static constexpr std::string_view kDataFieldNameDocDiff = "sdata"sv;
+static constexpr std::string_view kControlFieldNameDocDiff = "scontrol"sv;
+static constexpr std::string_view kMinFieldNameDocDiff = "smin"sv;
+static constexpr std::string_view kMaxFieldNameDocDiff = "smax"sv;
 
 // Error code used to signal $out that it is attempting to create a legacy timeseries temp
 // collection when viewless timeseries is enabled. $out catches this and retries with the

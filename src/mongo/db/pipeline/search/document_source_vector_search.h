@@ -46,6 +46,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(VectorSearch);
 class VectorSearchLiteParsed final : public LiteParsedSearchStage<VectorSearchLiteParsed> {
@@ -119,13 +120,13 @@ private:
 class DocumentSourceVectorSearch : public DocumentSource {
 public:
     const BSONObj kSortSpec = BSON("$vectorSearchScore" << -1);
-    static constexpr std::string_view kStageName = "$vectorSearch"_sd;
-    static constexpr std::string_view kLimitFieldName = "limit"_sd;
-    static constexpr std::string_view kFilterFieldName = "filter"_sd;
-    static constexpr std::string_view kIndexFieldName = "index"_sd;
-    static constexpr std::string_view kNumCandidatesFieldName = "numCandidates"_sd;
-    static constexpr std::string_view kViewFieldName = "view"_sd;
-    static constexpr std::string_view kReturnStoredSourceFieldName = "returnStoredSource"_sd;
+    static constexpr std::string_view kStageName = "$vectorSearch"sv;
+    static constexpr std::string_view kLimitFieldName = "limit"sv;
+    static constexpr std::string_view kFilterFieldName = "filter"sv;
+    static constexpr std::string_view kIndexFieldName = "index"sv;
+    static constexpr std::string_view kNumCandidatesFieldName = "numCandidates"sv;
+    static constexpr std::string_view kViewFieldName = "view"sv;
+    static constexpr std::string_view kReturnStoredSourceFieldName = "returnStoredSource"sv;
 
     DocumentSourceVectorSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,

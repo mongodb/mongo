@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -54,6 +53,7 @@
  * they do not look at the structure of the documents themselves, just combine other things
  */
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ListOfMatchExpression : public MatchExpression {
 public:
@@ -138,7 +138,7 @@ private:
 
 class MONGO_MOD_NEEDS_REPLACEMENT AndMatchExpression : public ListOfMatchExpression {
 public:
-    static constexpr std::string_view kName = "$and"_sd;
+    static constexpr std::string_view kName = "$and"sv;
 
     AndMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(AND, std::move(annotation), {}) {}
@@ -181,7 +181,7 @@ public:
 
 class OrMatchExpression : public ListOfMatchExpression {
 public:
-    static constexpr std::string_view kName = "$or"_sd;
+    static constexpr std::string_view kName = "$or"sv;
 
     OrMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(OR, std::move(annotation), {}) {}
@@ -224,7 +224,7 @@ public:
 
 class NorMatchExpression : public ListOfMatchExpression {
 public:
-    static constexpr std::string_view kName = "$nor"_sd;
+    static constexpr std::string_view kName = "$nor"sv;
 
     NorMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(NOR, std::move(annotation), {}) {}

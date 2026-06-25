@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
@@ -43,6 +42,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUB mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This class represents the "provenance" (ie. original source) of a read or write concern.
@@ -90,11 +90,11 @@ class ReadWriteConcernProvenance : public ReadWriteConcernProvenanceBase {
 public:
     using Source = ReadWriteConcernProvenanceSourceEnum;
 
-    static constexpr std::string_view kClientSupplied = "clientSupplied"_sd;
-    static constexpr std::string_view kImplicitDefault = "implicitDefault"_sd;
-    static constexpr std::string_view kCustomDefault = "customDefault"_sd;
-    static constexpr std::string_view kGetLastErrorDefaults = "getLastErrorDefaults"_sd;
-    static constexpr std::string_view kInternalWriteDefault = "internalWriteDefault"_sd;
+    static constexpr std::string_view kClientSupplied = "clientSupplied"sv;
+    static constexpr std::string_view kImplicitDefault = "implicitDefault"sv;
+    static constexpr std::string_view kCustomDefault = "customDefault"sv;
+    static constexpr std::string_view kGetLastErrorDefaults = "getLastErrorDefaults"sv;
+    static constexpr std::string_view kInternalWriteDefault = "internalWriteDefault"sv;
 
     ReadWriteConcernProvenance() = default;
 

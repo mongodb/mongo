@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -48,6 +47,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Score);
 class ScoreLiteParsed final : public LiteParsedDocumentSourceDefault<ScoreLiteParsed> {
@@ -93,7 +93,7 @@ public:
  */
 class DocumentSourceScore final {
 public:
-    static constexpr std::string_view kStageName = "$score"_sd;
+    static constexpr std::string_view kStageName = "$score"sv;
 
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

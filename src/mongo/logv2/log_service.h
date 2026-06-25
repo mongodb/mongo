@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -39,6 +38,7 @@
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC logv2 {
+using namespace std::literals::string_view_literals;
 
 /** Describes the service (i.e. shard/router) a log line is associated with. */
 enum class LogService {
@@ -93,11 +93,11 @@ inline std::string_view getNameForLog(LogService logService) {
         // whenever we don't have a logService, emit "-"
         case LogService::unknown:
         case LogService::none:
-            return "-"_sd;
+            return "-"sv;
         case LogService::shard:
-            return "S"_sd;
+            return "S"sv;
         case LogService::router:
-            return "R"_sd;
+            return "R"sv;
         case LogService::defer:
             MONGO_UNREACHABLE;
     }

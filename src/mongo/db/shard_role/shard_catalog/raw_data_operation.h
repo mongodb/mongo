@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
@@ -38,8 +37,9 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-MONGO_MOD_NEEDS_REPLACEMENT constexpr inline auto kRawDataFieldName = "rawData"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr inline auto kRawDataFieldName = "rawData"sv;
 
 /**
  * Returns a settable boolean indicating whether the given operation context is performing a "raw

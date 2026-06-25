@@ -40,6 +40,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * The $scoreFusion stage is syntactic sugar for generating an output of scored results by combining
@@ -60,7 +61,7 @@ namespace mongo {
  */
 class DocumentSourceScoreFusion final {
 public:
-    static constexpr std::string_view kStageName = "$scoreFusion"_sd;
+    static constexpr std::string_view kStageName = "$scoreFusion"sv;
 
     /**
      * Returns a list of stages to execute hybrid scoring with score fusion.

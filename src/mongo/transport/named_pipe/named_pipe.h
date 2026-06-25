@@ -43,13 +43,14 @@
 #include <string>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 #ifndef _WIN32
-static constexpr auto kDefaultPipePath = "/tmp/"_sd;
+static constexpr auto kDefaultPipePath = "/tmp/"sv;
 #else
 // "//./pipe/" is the required path start of all named pipes on Windows, where "//." is the
 // abbreviation for the local server name and "/pipe" is a literal. (These also work with
 // Windows-native backslashes instead of forward slashes.
-static constexpr auto kDefaultPipePath = "//./pipe/"_sd;
+static constexpr auto kDefaultPipePath = "//./pipe/"sv;
 #endif
 
 class NamedPipeOutput {

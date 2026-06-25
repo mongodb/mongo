@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/agg/sort_stage.h"
 #include "mongo/db/exec/agg/stage.h"
@@ -50,6 +49,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Sample);
 class SampleLiteParsed final : public LiteParsedDocumentSourceDefault<SampleLiteParsed> {
@@ -75,7 +75,7 @@ public:
 
 class DocumentSourceSample final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$sample"_sd;
+    static constexpr std::string_view kStageName = "$sample"sv;
 
     std::string_view getSourceName() const final {
         return kStageName;

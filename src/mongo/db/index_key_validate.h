@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
@@ -51,6 +50,7 @@
 
 MONGO_MOD_PUBLIC;
 namespace mongo::index_key_validate {
+using namespace std::literals::string_view_literals;
 
 // TTL indexes with 'expireAfterSeconds' are repaired with this duration, which is chosen to be
 // the largest possible value for the 'safeInt' type that can be returned in the listIndexes
@@ -66,7 +66,7 @@ constexpr auto kExpireAfterSecondsForInactiveTTLIndex =
 extern const std::map<std::string_view, std::set<IndexType>> kAllowedFieldNames;
 
 const constexpr std::string_view kDeprecatedFieldNames[] = {
-    "_id"_sd, "bucketSize"_sd, IndexDescriptor::kNamespaceFieldName};
+    "_id"sv, "bucketSize"sv, IndexDescriptor::kNamespaceFieldName};
 
 /**
  * Like 'allowedFieldNames', but removes deprecated fields specified in kDeprecatedFieldNames.

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters_gen.h"
@@ -46,6 +45,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Decorates operation context with methods to retrieve apiVersion, apiStrict, and
@@ -54,9 +54,9 @@ namespace MONGO_MOD_PUBLIC mongo {
 class APIParameters {
 
 public:
-    static constexpr std::string_view kAPIVersionFieldName = "apiVersion"_sd;
-    static constexpr std::string_view kAPIStrictFieldName = "apiStrict"_sd;
-    static constexpr std::string_view kAPIDeprecationErrorsFieldName = "apiDeprecationErrors"_sd;
+    static constexpr std::string_view kAPIVersionFieldName = "apiVersion"sv;
+    static constexpr std::string_view kAPIStrictFieldName = "apiStrict"sv;
+    static constexpr std::string_view kAPIDeprecationErrorsFieldName = "apiDeprecationErrors"sv;
 
     static const OperationContext::Decoration<APIParameters> get;
     static APIParameters fromClient(const APIParametersFromClient& apiParamsFromClient);

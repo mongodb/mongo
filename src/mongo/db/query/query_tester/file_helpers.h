@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <filesystem>
@@ -53,7 +52,8 @@
 #include "mongo/bson/bsonelement.h"
 
 namespace mongo::query_tester {
-static constexpr auto kFeatureExtractorDir = "/home/ubuntu/feature-extractor"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr auto kFeatureExtractorDir = "/home/ubuntu/feature-extractor"sv;
 static constexpr auto kShellMaxLen = std::numeric_limits<size_t>::max();
 static constexpr Milliseconds kShellTimeout = Hours{1};
 

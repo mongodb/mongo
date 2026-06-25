@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -54,6 +53,7 @@
 #include <s2cellid.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * An internal $geoWithin Match expression that has the same semantics as $geoWithin but is only
@@ -78,9 +78,9 @@ namespace mongo {
  */
 class InternalBucketGeoWithinMatchExpression final : public MatchExpression {
 public:
-    static constexpr std::string_view kName = "$_internalBucketGeoWithin"_sd;
-    static constexpr std::string_view kWithinRegion = "withinRegion"_sd;
-    static constexpr std::string_view kField = "field"_sd;
+    static constexpr std::string_view kName = "$_internalBucketGeoWithin"sv;
+    static constexpr std::string_view kWithinRegion = "withinRegion"sv;
+    static constexpr std::string_view kField = "field"sv;
 
     InternalBucketGeoWithinMatchExpression(
         std::shared_ptr<GeometryContainer> container,

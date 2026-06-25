@@ -58,6 +58,7 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class JournalListener;
 class KVBackupBlock;
@@ -74,8 +75,8 @@ struct StorageGlobalParams;
 
 // StorageEngine constants
 const NamespaceString kCatalogInfoNamespace = NamespaceString(DatabaseName::kMdbCatalog);
-const auto kResumableIndexIdentStem = "resumable-index-build-"_sd;
-const auto kIndexBuildIdentStem = "indexBuild"_sd;
+const auto kResumableIndexIdentStem = "resumable-index-build-"sv;
+const auto kIndexBuildIdentStem = "indexBuild"sv;
 
 /**
  * The StorageEngine class is the top level interface for creating a new storage engine. All

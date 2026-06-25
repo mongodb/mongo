@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -55,6 +54,7 @@
 
 namespace mongo {
 namespace write_ops {
+using namespace std::literals::string_view_literals;
 
 // Conservative per array element overhead. This value was calculated as 1 byte (element type) + 5
 // bytes (max string encoding of the array index encoded as string and the maximum key is 99999) + 1
@@ -247,10 +247,10 @@ private:
  */
 class MONGO_MOD_PUBLIC WriteError {
 public:
-    static constexpr auto kIndexFieldName = "index"_sd;
-    static constexpr auto kCodeFieldName = "code"_sd;
-    static constexpr auto kErrmsgFieldName = "errmsg"_sd;
-    static constexpr auto kErrInfoFieldName = "errInfo"_sd;
+    static constexpr auto kIndexFieldName = "index"sv;
+    static constexpr auto kCodeFieldName = "code"sv;
+    static constexpr auto kErrmsgFieldName = "errmsg"sv;
+    static constexpr auto kErrInfoFieldName = "errInfo"sv;
 
     static WriteError parse(const BSONObj& obj);
     BSONObj serialize() const;

@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/agg/change_stream_update_lookup_stage.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
@@ -40,8 +39,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+
 namespace mongo::exec::agg {
 namespace {
+using namespace std::literals::string_view_literals;
 Value assertFieldHasType(const Document& fullDoc,
                          std::string_view fieldName,
                          BSONType expectedType) {
@@ -60,8 +62,8 @@ NamespaceString parseNss(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     auto namespaceObject =
         assertFieldHasType(inputDoc, DocumentSourceChangeStream::kNamespaceField, BSONType::object)
             .getDocument();
-    auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::string);
-    auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::string);
+    auto dbName = assertFieldHasType(namespaceObject, "db"sv, BSONType::string);
+    auto collectionName = assertFieldHasType(namespaceObject, "coll"sv, BSONType::string);
     NamespaceString nss(NamespaceStringUtil::deserialize(expCtx->getNamespaceString().tenantId(),
                                                          dbName.getStringData(),
                                                          collectionName.getStringData(),

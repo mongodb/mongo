@@ -54,8 +54,9 @@
 #include <boost/optional.hpp>
 
 namespace mongo::transport::grpc {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kStreamsSubsectionFieldName = "streams"_sd;
+constexpr auto kStreamsSubsectionFieldName = "streams"sv;
 
 class Client : public std::enable_shared_from_this<Client> {
 public:

@@ -46,6 +46,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This expression takes in a JavaScript function and a "this" reference, and returns an array of
@@ -53,7 +54,7 @@ namespace mongo {
  */
 class ExpressionInternalJsEmit final : public Expression {
 public:
-    static constexpr auto kExpressionName = "$_internalJsEmit"_sd;
+    static constexpr auto kExpressionName = "$_internalJsEmit"sv;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,

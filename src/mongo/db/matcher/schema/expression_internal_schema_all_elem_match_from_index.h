@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -50,6 +49,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * A match expression similar to $elemMatch, but only matches arrays for which every element
  * matches the sub-expression.
@@ -57,7 +57,7 @@ namespace mongo {
 class InternalSchemaAllElemMatchFromIndexMatchExpression final
     : public ArrayMatchingMatchExpression {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaAllElemMatchFromIndex"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaAllElemMatchFromIndex"sv;
     static constexpr int kNumChildren = 1;
 
     InternalSchemaAllElemMatchFromIndexMatchExpression(

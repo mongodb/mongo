@@ -420,7 +420,7 @@ public:
                              rpc::ReplyBuilderInterface* reply) {
             sharding::router::CollectionRouter router(opCtx, _ns);
             router.routeWithRoutingContext(
-                verbosity ? "explain distinct"_sd : definition()->getName(),
+                verbosity ? "explain distinct"sv : definition()->getName(),
                 [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                     auto outputBuilder = reply->getBodyBuilder();
                     outputBuilder.resetToEmpty();
@@ -607,7 +607,7 @@ public:
             if (!opCtx->inMultiDocumentTransaction() &&
                 repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
                 outputBuilder.append(
-                    "atClusterTime"_sd,
+                    "atClusterTime"sv,
                     repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()->asTimestamp());
             }
 

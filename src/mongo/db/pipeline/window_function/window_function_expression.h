@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -128,6 +127,7 @@ class PartitionIterator;
 
 
 namespace mongo::window_function {
+using namespace std::literals::string_view_literals;
 
 /**
  * A window-function expression describes how to compute a single output value in a
@@ -147,7 +147,7 @@ namespace mongo::window_function {
  */
 class Expression : public RefCountable {
 public:
-    static constexpr std::string_view kWindowArg = "window"_sd;
+    static constexpr std::string_view kWindowArg = "window"sv;
     /**
      * Parses a single window-function expression. One of the BSONObj's keys is the function
      * name, and the other (optional) key is 'window': for example, the whole BSONObj might be
@@ -550,10 +550,10 @@ private:
 
 class ExpressionExpMovingAvg : public Expression {
 public:
-    static constexpr std::string_view kAccName = "$expMovingAvg"_sd;
-    static constexpr std::string_view kInputArg = "input"_sd;
-    static constexpr std::string_view kNArg = "N"_sd;
-    static constexpr std::string_view kAlphaArg = "alpha"_sd;
+    static constexpr std::string_view kAccName = "$expMovingAvg"sv;
+    static constexpr std::string_view kInputArg = "input"sv;
+    static constexpr std::string_view kNArg = "N"sv;
+    static constexpr std::string_view kAlphaArg = "alpha"sv;
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx);
@@ -621,8 +621,8 @@ protected:
 
 class ExpressionWithUnit : public Expression {
 public:
-    static constexpr std::string_view kArgInput = "input"_sd;
-    static constexpr std::string_view kArgUnit = "unit"_sd;
+    static constexpr std::string_view kArgInput = "input"sv;
+    static constexpr std::string_view kArgUnit = "unit"sv;
 
     ExpressionWithUnit(ExpressionContext* expCtx,
                        std::string accumulatorName,
@@ -706,7 +706,7 @@ protected:
 
 class ExpressionDerivative : public ExpressionWithUnit {
 public:
-    static constexpr std::string_view kName = "$derivative"_sd;
+    static constexpr std::string_view kName = "$derivative"sv;
     ExpressionDerivative(ExpressionContext* expCtx,
                          boost::intrusive_ptr<::mongo::Expression> input,
                          WindowBounds bounds,
@@ -731,7 +731,7 @@ public:
             auto argName = arg.fieldNameStringData();
             if (argName == kWindowArg) {
                 bounds = WindowBounds::parse(arg, sortBy, expCtx);
-            } else if (argName == "$derivative"_sd) {
+            } else if (argName == "$derivative"sv) {
                 derivativeArgs = arg;
             } else {
                 uasserted(ErrorCodes::FailedToParse,
@@ -810,7 +810,7 @@ public:
                         "There can be only one 'window' field for $integral",
                         bounds == boost::none);
                 bounds = WindowBounds::parse(arg, sortBy, expCtx);
-            } else if (argName == "$integral"_sd) {
+            } else if (argName == "$integral"sv) {
                 integralArgs = arg;
             } else {
                 uasserted(ErrorCodes::FailedToParse,
@@ -857,7 +857,7 @@ public:
 
 class ExpressionLinearFill : public Expression {
 public:
-    static constexpr std::string_view kName = "$linearFill"_sd;
+    static constexpr std::string_view kName = "$linearFill"sv;
     ExpressionLinearFill(ExpressionContext* expCtx,
                          std::string accumulatorName,
                          boost::intrusive_ptr<::mongo::Expression> input,
@@ -986,10 +986,10 @@ public:
 
 class ExpressionMinMaxScaler : public Expression {
 public:
-    static constexpr std::string_view kWindowFnName = "$minMaxScaler"_sd;
-    static constexpr std::string_view kInputArg = "input"_sd;
-    static constexpr std::string_view kMinArg = "min"_sd;
-    static constexpr std::string_view kMaxArg = "max"_sd;
+    static constexpr std::string_view kWindowFnName = "$minMaxScaler"sv;
+    static constexpr std::string_view kInputArg = "input"sv;
+    static constexpr std::string_view kMinArg = "min"sv;
+    static constexpr std::string_view kMaxArg = "max"sv;
 
     ExpressionMinMaxScaler(ExpressionContext* expCtx,
                            boost::intrusive_ptr<::mongo::Expression> input,

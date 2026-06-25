@@ -40,6 +40,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Bucket);
 
@@ -48,7 +49,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Bucket);
  */
 class DocumentSourceBucket final {
 public:
-    static constexpr std::string_view kStageName = "$bucket"_sd;
+    static constexpr std::string_view kStageName = "$bucket"sv;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
@@ -44,6 +43,7 @@
 
 
 namespace mongo::stats {
+using namespace std::literals::string_view_literals;
 using StatsPathString = std::pair<NamespaceString, std::string>;
 using StatsCacheVal = std::shared_ptr<const CEHistogram>;
 
@@ -62,7 +62,7 @@ public:
 
     virtual ~StatsCacheLoader() {}
 
-    static constexpr std::string_view kStatsPrefix = "system.statistics"_sd;
+    static constexpr std::string_view kStatsPrefix = "system.statistics"sv;
 };
 
 }  // namespace mongo::stats

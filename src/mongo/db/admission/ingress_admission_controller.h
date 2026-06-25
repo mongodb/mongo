@@ -38,11 +38,12 @@
 #include <memory>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class MONGO_MOD_PUBLIC IngressAdmissionController {
 public:
-    static constexpr auto kNormalPriorityName = "normalPriority"_sd;
-    static constexpr auto kExemptPriorityName = "exempt"_sd;
+    static constexpr auto kNormalPriorityName = "normalPriority"sv;
+    static constexpr auto kExemptPriorityName = "exempt"sv;
     /**
      * Returns the reference to IngressAdmissionController associated with the operation's service
      * context.

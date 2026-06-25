@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_num_array_items.h"
@@ -44,6 +43,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * MatchExpression for $_internalSchemaMinItems keyword. Takes an integer argument that indicates
@@ -58,7 +58,7 @@ public:
         : InternalSchemaNumArrayItemsMatchExpression(INTERNAL_SCHEMA_MIN_ITEMS,
                                                      path,
                                                      numItems,
-                                                     "$_internalSchemaMinItems"_sd,
+                                                     "$_internalSchemaMinItems"sv,
                                                      std::move(annotation)) {}
 
     std::unique_ptr<MatchExpression> clone() const final {

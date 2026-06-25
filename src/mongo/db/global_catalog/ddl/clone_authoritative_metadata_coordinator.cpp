@@ -46,6 +46,8 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
@@ -144,7 +146,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneConfigSystemSessions(
     const auto& nss = NamespaceString::kLogicalSessionsNamespace;
     try {
         DDLLockManager::ScopedCollectionDDLLock collLock(
-            opCtx, nss, "cloneAuthoritativeMetadata"_sd, MODE_X);
+            opCtx, nss, "cloneAuthoritativeMetadata"sv, MODE_X);
 
         _convertShardRefsInNamespaceMetadataInGlobalCatalog(opCtx, nss);
 

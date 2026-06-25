@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,6 +45,7 @@
 
 namespace mongo {
 namespace test {
+using namespace std::literals::string_view_literals;
 
 const std::string& getGlobalSCSP();
 const std::string& getGlobalSWO();
@@ -108,11 +108,11 @@ public:
     void serialize(BSONObjBuilder* builder) const {
         std::lock_guard<std::mutex> lg(_mutex);
         if (_id.is_initialized()) {
-            builder->append("_id"_sd, _id.get());
+            builder->append("_id"sv, _id.get());
         }
-        builder->append("clusterParameterTime"_sd, _clusterParameterTime.asTimestamp());
-        builder->append("strData"_sd, _strData);
-        builder->append("intData"_sd, _intData);
+        builder->append("clusterParameterTime"sv, _clusterParameterTime.asTimestamp());
+        builder->append("strData"sv, _strData);
+        builder->append("intData"sv, _intData);
     }
 
     BSONObj toBSON() const {

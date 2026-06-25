@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic.h"
@@ -54,6 +53,7 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace secure_allocator_details {
 
@@ -109,7 +109,7 @@ struct TraitNamedDomain {
         const auto contains = [&](std::string_view dt) {
             return std::find(dsmd.begin(), dsmd.end(), dt) != dsmd.end();
         };
-        static const bool ret = !(contains("*"_sd) || contains(NameTrait::DomainType));
+        static const bool ret = !(contains("*"sv) || contains(NameTrait::DomainType));
         return ret;
     }
 };
@@ -382,7 +382,7 @@ struct SecureAllocatorDefaultDomainTrait {
 };
 
 struct SecureAllocatorAuthDomainTrait {
-    static constexpr std::string_view DomainType = "auth"_sd;
+    static constexpr std::string_view DomainType = "auth"sv;
 };
 
 using SecureAllocatorAuthDomain = SecureAllocatorDomain<

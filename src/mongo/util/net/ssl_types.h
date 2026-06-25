@@ -40,13 +40,14 @@
 #include <string_view>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
-constexpr std::string_view kOID_CommonName = "2.5.4.3"_sd;
-constexpr std::string_view kOID_CountryName = "2.5.4.6"_sd;
-constexpr std::string_view kOID_LocalityName = "2.5.4.7"_sd;
-constexpr std::string_view kOID_StateName = "2.5.4.8"_sd;
-constexpr std::string_view kOID_OName = "2.5.4.10"_sd;
-constexpr std::string_view kOID_OUName = "2.5.4.11"_sd;
+constexpr std::string_view kOID_CommonName = "2.5.4.3"sv;
+constexpr std::string_view kOID_CountryName = "2.5.4.6"sv;
+constexpr std::string_view kOID_LocalityName = "2.5.4.7"sv;
+constexpr std::string_view kOID_StateName = "2.5.4.8"sv;
+constexpr std::string_view kOID_OName = "2.5.4.10"sv;
+constexpr std::string_view kOID_OUName = "2.5.4.11"sv;
 
 /**
  * Represents a structed X509 certificate subject name.

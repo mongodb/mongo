@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -45,13 +44,14 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
+using namespace std::literals::string_view_literals;
 using QueryShapeConfigurationMap = stdx::unordered_map<query_shape::QueryShapeHash,
                                                        query_settings::QueryShapeConfiguration,
                                                        QueryShapeHashHasher>;
 
 class QuerySettingsStage final : public Stage {
 public:
-    static constexpr std::string_view kDebugQueryShapeFieldName = "debugQueryShape"_sd;
+    static constexpr std::string_view kDebugQueryShapeFieldName = "debugQueryShape"sv;
 
     /**
      * The possible states of the stage. First we are reading all the 'config.representativeQueries'

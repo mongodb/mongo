@@ -41,6 +41,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This RankFusionPipelineBuilder class stores the builder methods to build the desugared stages for
@@ -56,15 +57,15 @@ public:
     // One field object that holds all internal intermediate variables during desugar,
     // like each input pipeline's individual score or scoreDetails.
     static constexpr std::string_view kRankFusionInternalFieldsName =
-        "_internal_rankFusion_internal_fields"_sd;
+        "_internal_rankFusion_internal_fields"sv;
 
     // One field object to encapsulate the unmodified user's doc from the queried collection.
-    static constexpr std::string_view kRankFusionDocsFieldName = "_internal_rankFusion_docs"_sd;
+    static constexpr std::string_view kRankFusionDocsFieldName = "_internal_rankFusion_docs"sv;
 
     // Description that gets set as part of $rankFusion's scoreDetails metadata.
     static constexpr std::string_view kRankFusionScoreDetailsDescription =
         "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / "
-        "(60 + rank))) across input pipelines from which this document is output, from:"_sd;
+        "(60 + rank))) across input pipelines from which this document is output, from:"sv;
 
     // For now, the rankConstant is always 60.
     static constexpr double kRankConstant = 60;

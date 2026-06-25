@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
@@ -74,6 +73,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Sort);
 class SortLiteParsed final : public LiteParsedDocumentSourceDefault<SortLiteParsed> {
@@ -106,11 +106,11 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalBoundedSort);
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceSort final : public DocumentSource {
 public:
-    static constexpr std::string_view kMin = "min"_sd;
-    static constexpr std::string_view kMax = "max"_sd;
-    static constexpr std::string_view kOffset = "offsetSeconds"_sd;
-    static constexpr std::string_view kInternalLimit = "$_internalLimit"_sd;
-    static constexpr std::string_view kInternalOutputSortKey = "$_internalOutputSortKeyMetadata"_sd;
+    static constexpr std::string_view kMin = "min"sv;
+    static constexpr std::string_view kMax = "max"sv;
+    static constexpr std::string_view kOffset = "offsetSeconds"sv;
+    static constexpr std::string_view kInternalLimit = "$_internalLimit"sv;
+    static constexpr std::string_view kInternalOutputSortKey = "$_internalOutputSortKeyMetadata"sv;
 
     struct SortStageOptions {
         uint64_t limit = 0;
@@ -139,7 +139,7 @@ public:
 
     using TimeSorterInterface = BoundedSorterInterface<SortableDate, Document>;
 
-    static constexpr std::string_view kStageName = "$sort"_sd;
+    static constexpr std::string_view kStageName = "$sort"sv;
 
     /**
      * Parses a $sort stage from the user-supplied BSON.

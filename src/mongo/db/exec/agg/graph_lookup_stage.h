@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/stage.h"
@@ -57,6 +56,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
+using namespace std::literals::string_view_literals;
 
 /**
  * This class handles the execution part of the graph lookup aggregation stage and
@@ -97,8 +97,8 @@ public:
                                   query_shape::SerializationOptions{}) const final;
 
 private:
-    static constexpr std::string_view kFrontierValueField = "f"_sd;
-    static constexpr std::string_view kDepthField = "d"_sd;
+    static constexpr std::string_view kFrontierValueField = "f"sv;
+    static constexpr std::string_view kDepthField = "d"sv;
 
     GetNextResult doGetNext() final;
 

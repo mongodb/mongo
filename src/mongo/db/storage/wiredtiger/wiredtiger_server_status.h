@@ -38,6 +38,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class WiredTigerKVEngine;
 
@@ -46,7 +47,7 @@ class WiredTigerKVEngine;
  */
 class WiredTigerServerStatusSection : public ServerStatusSection {
 public:
-    static constexpr std::string_view kServerStatusSectionName = "wiredTiger"_sd;
+    static constexpr std::string_view kServerStatusSectionName = "wiredTiger"sv;
 
     using ServerStatusSection::ServerStatusSection;
     bool includeByDefault() const override;

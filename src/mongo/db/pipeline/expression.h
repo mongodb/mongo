@@ -37,7 +37,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -78,6 +77,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 constexpr size_t kMaxArgumentCountForSwitchAndSetExprForSbe = 100;
 
 class BSONElement;
@@ -2912,7 +2912,7 @@ private:
  */
 class ExpressionInternalRawSortKey final : public Expression {
 public:
-    static constexpr std::string_view kName = "$_internalSortKey"_sd;
+    static constexpr std::string_view kName = "$_internalSortKey"sv;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext*,
                                                   BSONElement,
@@ -3725,7 +3725,7 @@ protected:
 
 class ExpressionSimilarityDotProduct final : public ExpressionVectorSimilarity {
 public:
-    static constexpr auto kName = "$similarityDotProduct"_sd;
+    static constexpr auto kName = "$similarityDotProduct"sv;
 
     ExpressionSimilarityDotProduct(ExpressionContext* const expCtx,
                                    bool score,
@@ -3760,7 +3760,7 @@ public:
 
 class ExpressionSimilarityCosine final : public ExpressionVectorSimilarity {
 public:
-    static constexpr auto kName = "$similarityCosine"_sd;
+    static constexpr auto kName = "$similarityCosine"sv;
 
     ExpressionSimilarityCosine(ExpressionContext* const expCtx,
                                bool score,
@@ -3794,7 +3794,7 @@ public:
 
 class ExpressionSimilarityEuclidean final : public ExpressionVectorSimilarity {
 public:
-    static constexpr auto kName = "$similarityEuclidean"_sd;
+    static constexpr auto kName = "$similarityEuclidean"sv;
 
     ExpressionSimilarityEuclidean(ExpressionContext* const expCtx,
                                   bool score,
@@ -3886,7 +3886,7 @@ public:
 
 class ExpressionSortArray final : public Expression {
 public:
-    static constexpr auto kName = "$sortArray"_sd;
+    static constexpr auto kName = "$sortArray"sv;
     ExpressionSortArray(ExpressionContext* const expCtx,
                         boost::intrusive_ptr<Expression> input,
                         const PatternValueCmp& sortBy)
@@ -3963,7 +3963,7 @@ public:
 
 class ExpressionTopN final : public Expression {
 public:
-    static constexpr auto kName = "$topN"_sd;
+    static constexpr auto kName = "$topN"sv;
 
     ExpressionTopN(ExpressionContext* const expCtx,
                    boost::intrusive_ptr<Expression> n,
@@ -4019,7 +4019,7 @@ private:
 
 class ExpressionTop final : public Expression {
 public:
-    static constexpr auto kName = "$top"_sd;
+    static constexpr auto kName = "$top"sv;
 
     ExpressionTop(ExpressionContext* const expCtx,
                   boost::intrusive_ptr<Expression> input,
@@ -4068,7 +4068,7 @@ private:
 
 class ExpressionBottomN final : public Expression {
 public:
-    static constexpr auto kName = "$bottomN"_sd;
+    static constexpr auto kName = "$bottomN"sv;
 
     ExpressionBottomN(ExpressionContext* const expCtx,
                       boost::intrusive_ptr<Expression> n,
@@ -4124,7 +4124,7 @@ private:
 
 class ExpressionBottom final : public Expression {
 public:
-    static constexpr auto kName = "$bottom"_sd;
+    static constexpr auto kName = "$bottom"sv;
 
     ExpressionBottom(ExpressionContext* const expCtx,
                      boost::intrusive_ptr<Expression> input,
@@ -5103,17 +5103,17 @@ enum class BinDataFormat {
 static std::string_view toStringData(BinDataFormat type) {
     switch (type) {
         case BinDataFormat::kAuto:
-            return "auto"_sd;
+            return "auto"sv;
         case BinDataFormat::kBase64:
-            return "base64"_sd;
+            return "base64"sv;
         case BinDataFormat::kBase64Url:
-            return "base64url"_sd;
+            return "base64url"sv;
         case BinDataFormat::kHex:
-            return "hex"_sd;
+            return "hex"sv;
         case BinDataFormat::kUtf8:
-            return "utf8"_sd;
+            return "utf8"sv;
         case BinDataFormat::kUuid:
-            return "uuid"_sd;
+            return "uuid"sv;
         default:
             MONGO_UNREACHABLE_TASSERT(4341123);
     }
@@ -5889,7 +5889,7 @@ public:
             &expCtx, cloneChild(_kField, expCtx), cloneChild(_kInput, expCtx));
     }
 
-    static constexpr auto kExpressionName = "$getField"_sd;
+    static constexpr auto kExpressionName = "$getField"sv;
 
 private:
     static constexpr size_t _kField = 0;
@@ -5954,7 +5954,7 @@ public:
                                                   cloneChild(_kValue, expCtx));
     }
 
-    static constexpr auto kExpressionName = "$setField"_sd;
+    static constexpr auto kExpressionName = "$setField"sv;
 
 private:
     /**
@@ -6387,13 +6387,13 @@ public:
     const Expression* getOnError() const;
 
 private:
-    static constexpr std::string_view _kInput = "input"_sd;
+    static constexpr std::string_view _kInput = "input"sv;
     static constexpr int _kInputIdx = 0;
 
-    static constexpr std::string_view _kRelaxed = "relaxed"_sd;
+    static constexpr std::string_view _kRelaxed = "relaxed"sv;
     static constexpr int _kRelaxedIdx = 1;
 
-    static constexpr std::string_view _kOnError = "onError"_sd;
+    static constexpr std::string_view _kOnError = "onError"sv;
     static constexpr int _kOnErrorIdx = 2;
 };
 
@@ -6431,10 +6431,10 @@ public:
     const Expression* getOnError() const;
 
 private:
-    static constexpr std::string_view _kInput = "input"_sd;
+    static constexpr std::string_view _kInput = "input"sv;
     static constexpr int _kInputIdx = 0;
 
-    static constexpr std::string_view _kOnError = "onError"_sd;
+    static constexpr std::string_view _kOnError = "onError"sv;
     static constexpr int _kOnErrorIdx = 1;
 };
 
@@ -6448,8 +6448,8 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(HashAlgorithm, HASH_ALGORITHM);
 
 class ExpressionHash final : public Expression {
 public:
-    static constexpr std::string_view kInput = "input"_sd;
-    static constexpr std::string_view kAlgorithm = "algorithm"_sd;
+    static constexpr std::string_view kInput = "input"sv;
+    static constexpr std::string_view kAlgorithm = "algorithm"sv;
 
     explicit ExpressionHash(ExpressionContext* expCtx,
                             boost::intrusive_ptr<Expression> input,

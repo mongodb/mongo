@@ -48,6 +48,7 @@
 
 namespace mongo {
 namespace transport {
+using namespace std::literals::string_view_literals;
 
 /**
  * The reserved service executor emulates a thread per connection.
@@ -77,7 +78,7 @@ public:
     std::unique_ptr<TaskRunner> makeTaskRunner() override;
 
     std::string_view getName() const override {
-        return "ServiceExecutorReserved"_sd;
+        return "ServiceExecutorReserved"sv;
     }
 
 private:

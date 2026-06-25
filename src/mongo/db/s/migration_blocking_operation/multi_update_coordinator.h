@@ -38,12 +38,13 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class MultiUpdateCoordinatorInstance;
 
 class MONGO_MOD_PUBLIC MultiUpdateCoordinatorService : public repl::PrimaryOnlyService {
 public:
-    static constexpr std::string_view kServiceName = "MultiUpdateCoordinatorService"_sd;
+    static constexpr std::string_view kServiceName = "MultiUpdateCoordinatorService"sv;
 
     friend MultiUpdateCoordinatorInstance;
 

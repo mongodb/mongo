@@ -39,8 +39,9 @@
 #include <variant>
 
 namespace mongo::docs_needed_bounds {
-static constexpr auto kNeedAllName = "NeedAll"_sd;
-static constexpr auto kUnknownName = "Unknown"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr auto kNeedAllName = "NeedAll"sv;
+static constexpr auto kUnknownName = "Unknown"sv;
 
 struct NeedAll {
     // Nothing

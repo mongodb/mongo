@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -63,6 +62,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 class BSONObj;
 
 class FieldIterator;
@@ -115,24 +115,24 @@ public:
         const Document& rhs;
     };
 
-    static constexpr std::string_view metaFieldTextScore = "$textScore"_sd;
-    static constexpr std::string_view metaFieldRandVal = "$randVal"_sd;
-    static constexpr std::string_view metaFieldSortKey = "$sortKey"_sd;
-    static constexpr std::string_view metaFieldGeoNearDistance = "$dis"_sd;
-    static constexpr std::string_view metaFieldGeoNearPoint = "$pt"_sd;
-    static constexpr std::string_view metaFieldSearchScore = "$searchScore"_sd;
-    static constexpr std::string_view metaFieldSearchHighlights = "$searchHighlights"_sd;
-    static constexpr std::string_view metaFieldSearchScoreDetails = "$searchScoreDetails"_sd;
-    static constexpr std::string_view metaFieldSearchRootDocumentId = "$searchRootDocumentId"_sd;
-    static constexpr std::string_view metaFieldSearchSortValues = "$searchSortValues"_sd;
-    static constexpr std::string_view metaFieldIndexKey = "$indexKey"_sd;
-    static constexpr std::string_view metaFieldVectorSearchScore = "$vectorSearchScore"_sd;
-    static constexpr std::string_view metaFieldSearchSequenceToken = "$searchSequenceToken"_sd;
-    static constexpr std::string_view metaFieldScore = "$score"_sd;
-    static constexpr std::string_view metaFieldScoreDetails = "$scoreDetails"_sd;
-    static constexpr std::string_view metaFieldStream = "$stream"_sd;
+    static constexpr std::string_view metaFieldTextScore = "$textScore"sv;
+    static constexpr std::string_view metaFieldRandVal = "$randVal"sv;
+    static constexpr std::string_view metaFieldSortKey = "$sortKey"sv;
+    static constexpr std::string_view metaFieldGeoNearDistance = "$dis"sv;
+    static constexpr std::string_view metaFieldGeoNearPoint = "$pt"sv;
+    static constexpr std::string_view metaFieldSearchScore = "$searchScore"sv;
+    static constexpr std::string_view metaFieldSearchHighlights = "$searchHighlights"sv;
+    static constexpr std::string_view metaFieldSearchScoreDetails = "$searchScoreDetails"sv;
+    static constexpr std::string_view metaFieldSearchRootDocumentId = "$searchRootDocumentId"sv;
+    static constexpr std::string_view metaFieldSearchSortValues = "$searchSortValues"sv;
+    static constexpr std::string_view metaFieldIndexKey = "$indexKey"sv;
+    static constexpr std::string_view metaFieldVectorSearchScore = "$vectorSearchScore"sv;
+    static constexpr std::string_view metaFieldSearchSequenceToken = "$searchSequenceToken"sv;
+    static constexpr std::string_view metaFieldScore = "$score"sv;
+    static constexpr std::string_view metaFieldScoreDetails = "$scoreDetails"sv;
+    static constexpr std::string_view metaFieldStream = "$stream"sv;
     static constexpr std::string_view metaFieldChangeStreamControlEvent =
-        "$changeStreamControlEvent"_sd;
+        "$changeStreamControlEvent"sv;
     static constexpr std::array kAllMetadataFields = {metaFieldTextScore,
                                                       metaFieldRandVal,
                                                       metaFieldSortKey,

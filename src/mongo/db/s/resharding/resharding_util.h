@@ -32,7 +32,6 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -88,6 +87,7 @@
 
 namespace mongo {
 namespace resharding {
+using namespace std::literals::string_view_literals;
 
 inline const Status kUserAbortReason{ErrorCodes::ReshardCollectionAborted,
                                      "resharding aborted by user"};
@@ -100,8 +100,8 @@ inline const Status kQuiesceAbortReason{ErrorCodes::ReshardCollectionQuiescing,
 
 enum MONGO_MOD_PUBLIC AbortType { kAbortWithQuiesce, kAbortSkipQuiesce };
 
-MONGO_MOD_NEEDS_REPLACEMENT constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
-constexpr auto kReshardProgressMarkOpLogType = "reshardProgressMark"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr auto kReshardFinalOpLogType = "reshardFinalOp"sv;
+constexpr auto kReshardProgressMarkOpLogType = "reshardProgressMark"sv;
 static const auto kReshardErrorMaxBytes = 2000;
 
 const WriteConcernOptions kMajorityWriteConcern{

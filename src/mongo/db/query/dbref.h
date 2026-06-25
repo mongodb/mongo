@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
 
 namespace mongo {
 namespace dbref {
+using namespace std::literals::string_view_literals;
 
-constexpr std::string_view kDbFieldName = "$db"_sd;
-constexpr std::string_view kIdFieldName = "$id"_sd;
-constexpr std::string_view kRefFieldName = "$ref"_sd;
+constexpr std::string_view kDbFieldName = "$db"sv;
+constexpr std::string_view kIdFieldName = "$id"sv;
+constexpr std::string_view kRefFieldName = "$ref"sv;
 
 }  // namespace dbref
 }  // namespace mongo

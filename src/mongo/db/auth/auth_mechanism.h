@@ -30,23 +30,23 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC auth {
+using namespace std::literals::string_view_literals;
 
 /** Wire-protocol names for supported authentication mechanisms. */
-constexpr auto kMechanismMongoX509 = "MONGODB-X509"_sd;
-constexpr auto kMechanismSaslPlain = "PLAIN"_sd;
-constexpr auto kMechanismGSSAPI = "GSSAPI"_sd;
-constexpr auto kMechanismScramSha1 = "SCRAM-SHA-1"_sd;
-constexpr auto kMechanismScramSha256 = "SCRAM-SHA-256"_sd;
-constexpr auto kMechanismMongoAWS = "MONGODB-AWS"_sd;
-constexpr auto kMechanismMongoOIDC = "MONGODB-OIDC"_sd;
-constexpr auto kMechanismMongoDbCr = "MONGODB-CR"_sd;
+constexpr auto kMechanismMongoX509 = "MONGODB-X509"sv;
+constexpr auto kMechanismSaslPlain = "PLAIN"sv;
+constexpr auto kMechanismGSSAPI = "GSSAPI"sv;
+constexpr auto kMechanismScramSha1 = "SCRAM-SHA-1"sv;
+constexpr auto kMechanismScramSha256 = "SCRAM-SHA-256"sv;
+constexpr auto kMechanismMongoAWS = "MONGODB-AWS"sv;
+constexpr auto kMechanismMongoOIDC = "MONGODB-OIDC"sv;
+constexpr auto kMechanismMongoDbCr = "MONGODB-CR"sv;
 constexpr auto kInternalAuthFallbackMechanism = kMechanismScramSha1;
 
 /** Typed enum of supported authentication mechanisms. */

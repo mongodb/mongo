@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -49,6 +48,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamInjectControlEvents);
 using ChangeStreamInjectControlEventsLiteParsed =
@@ -63,12 +63,12 @@ using ChangeStreamInjectControlEventsLiteParsed =
 class DocumentSourceChangeStreamInjectControlEvents final
     : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr std::string_view kStageName = "$_internalChangeStreamInjectControlEvents"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamInjectControlEvents"sv;
 
     // Constants for action types that this stage can perform.
-    static constexpr std::string_view kActionNameInjectControlEvent = "injectControlEvent"_sd;
+    static constexpr std::string_view kActionNameInjectControlEvent = "injectControlEvent"sv;
     static constexpr std::string_view kActionNameTransformToControlEvent =
-        "transformToControlEvent"_sd;
+        "transformToControlEvent"sv;
 
     enum class Action {
         // Consumes the matching change event, transforms the event into a control one, and emits

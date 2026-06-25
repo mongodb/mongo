@@ -40,6 +40,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * The $rankFusion stage is syntactic sugar for generating an output of ranked results by combining
@@ -63,7 +64,7 @@ namespace mongo {
  */
 class DocumentSourceRankFusion final {
 public:
-    static constexpr std::string_view kStageName = "$rankFusion"_sd;
+    static constexpr std::string_view kStageName = "$rankFusion"sv;
 
     /**
      * Returns a list of stages to execute hybrid scoring with rank fusion.

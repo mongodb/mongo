@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
@@ -52,6 +51,7 @@
 #include <utility>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class WorkingSet;
 
@@ -126,7 +126,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr std::string_view kStageType = "COUNT_SCAN"_sd;
+    static constexpr std::string_view kStageType = "COUNT_SCAN"sv;
 
 protected:
     void doSaveStateRequiresIndex() final;

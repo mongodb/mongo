@@ -40,7 +40,6 @@ commentStartToken = //##
 #pragma once
 
 #include <array>
-#include "mongo/base/string_data.h"
 #include <fmt/format.h>
 #include <string_view>
 #include <utility>
@@ -98,6 +97,7 @@ k$(transition)_$(underscores(first))_To_$(underscores(second))//#slurp
 //#end def
 
 namespace mongo::multiversion {
+using namespace std::literals::string_view_literals;
 /* <%
 fcvs = self.getVar('fcvs')
 last_lts, last_continuous, latest = self.getVar('last_lts'), self.getVar('last_continuous'), self.getVar('latest')
@@ -194,7 +194,7 @@ inline constexpr size_t kSince_$underscores(Version('4.0')) = ${bisect_left(fcvs
 // Last LTS was "$last_lts".
 inline constexpr size_t kSinceLastLTS = ${bisect_left(fcvs, latest) - bisect_left(fcvs, last_lts)};
 
-inline constexpr std::string_view kParameterName = "featureCompatibilityVersion"_sd;
+inline constexpr std::string_view kParameterName = "featureCompatibilityVersion"sv;
 
 class GenericFCV {
 //#def define_fcv_alias(id, v):
@@ -243,10 +243,10 @@ public:
  */
 inline constexpr std::array extendedFCVTable {
     // The table's entries must appear in the same order in which the enums were defined.
-    std::pair{FeatureCompatibilityVersion::kInvalid, "invalid"_sd},
-    std::pair{FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior, "unset"_sd},
+    std::pair{FeatureCompatibilityVersion::kInvalid, "invalid"sv},
+    std::pair{FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior, "unset"sv},
 //#for fcv, fcv_string in fcv_list:
-    std::pair{FeatureCompatibilityVersion::$fcv, "$fcv_string"_sd},
+    std::pair{FeatureCompatibilityVersion::$fcv, "$fcv_string"sv},
 //#end for
 };
 

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/update/document_diff_serialization.h"
@@ -46,7 +45,8 @@
  */
 MONGO_MOD_PUBLIC;
 namespace mongo::update_oplog_entry {
-static inline constexpr std::string_view kDiffObjectFieldName = "diff"_sd;
+using namespace std::literals::string_view_literals;
+static inline constexpr std::string_view kDiffObjectFieldName = "diff"sv;
 
 constexpr size_t kSizeOfDeltaOplogEntryMetadata = 15;
 

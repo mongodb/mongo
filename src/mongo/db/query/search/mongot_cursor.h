@@ -38,38 +38,39 @@
 
 namespace mongo {
 namespace MONGO_MOD_PUB mongot_cursor {
+using namespace std::literals::string_view_literals;
 inline auto makeRetryOnNetworkErrorPolicy() {
     return [retried = false](const Status& st) mutable {
         return std::exchange(retried, true) ? false : ErrorCodes::isNetworkError(st);
     };
 }
 
-static constexpr std::string_view kSearchField = "search"_sd;
-static constexpr std::string_view kVectorSearchCmd = "vectorSearch"_sd;
-static constexpr std::string_view kCollectionUuidField = "collectionUUID"_sd;
-static constexpr std::string_view kQueryField = "query"_sd;
-static constexpr std::string_view kViewNameField = "viewName"_sd;
-static constexpr std::string_view kExplainField = "explain"_sd;
-static constexpr std::string_view kVerbosityField = "verbosity"_sd;
-static constexpr std::string_view kIntermediateField = "intermediate"_sd;
-static constexpr std::string_view kCursorOptionsField = "cursorOptions"_sd;
-static constexpr std::string_view kDocsRequestedField = "docsRequested"_sd;
-static constexpr std::string_view kBatchSizeField = "batchSize"_sd;
-static constexpr std::string_view kRequiresSearchSequenceToken = "requiresSearchSequenceToken"_sd;
-static constexpr std::string_view kReturnStoredSourceArg = "returnStoredSource"_sd;
-static constexpr std::string_view kReturnScopeArg = "returnScope"_sd;
-static constexpr std::string_view kSlowQueryLogFieldName = "slowQueryLog"_sd;
-static constexpr std::string_view kScoreDetailsFieldName = "scoreDetails"_sd;
-static constexpr std::string_view kSearchRootDocumentIdFieldName = "searchRootDocumentId"_sd;
-static constexpr std::string_view kOptimizationFlagsField = "optimizationFlags"_sd;
-static constexpr std::string_view kOmitSearchDocumentResultsField = "omitSearchDocumentResults"_sd;
+static constexpr std::string_view kSearchField = "search"sv;
+static constexpr std::string_view kVectorSearchCmd = "vectorSearch"sv;
+static constexpr std::string_view kCollectionUuidField = "collectionUUID"sv;
+static constexpr std::string_view kQueryField = "query"sv;
+static constexpr std::string_view kViewNameField = "viewName"sv;
+static constexpr std::string_view kExplainField = "explain"sv;
+static constexpr std::string_view kVerbosityField = "verbosity"sv;
+static constexpr std::string_view kIntermediateField = "intermediate"sv;
+static constexpr std::string_view kCursorOptionsField = "cursorOptions"sv;
+static constexpr std::string_view kDocsRequestedField = "docsRequested"sv;
+static constexpr std::string_view kBatchSizeField = "batchSize"sv;
+static constexpr std::string_view kRequiresSearchSequenceToken = "requiresSearchSequenceToken"sv;
+static constexpr std::string_view kReturnStoredSourceArg = "returnStoredSource"sv;
+static constexpr std::string_view kReturnScopeArg = "returnScope"sv;
+static constexpr std::string_view kSlowQueryLogFieldName = "slowQueryLog"sv;
+static constexpr std::string_view kScoreDetailsFieldName = "scoreDetails"sv;
+static constexpr std::string_view kSearchRootDocumentIdFieldName = "searchRootDocumentId"sv;
+static constexpr std::string_view kOptimizationFlagsField = "optimizationFlags"sv;
+static constexpr std::string_view kOmitSearchDocumentResultsField = "omitSearchDocumentResults"sv;
 
 static constexpr long long kMinimumMongotBatchSize = 10;
 static constexpr long long kDefaultMongotBatchSize = 101;
 
 // Default sort spec is to sort decreasing by search score.
 static const BSONObj kSortSpec = BSON("$searchScore" << -1);
-static constexpr std::string_view kSearchSortValuesFieldPrefix = "$searchSortValues."_sd;
+static constexpr std::string_view kSearchSortValuesFieldPrefix = "$searchSortValues."sv;
 
 /**
  * Set of OptimizationFlags that can be passed in a mongot search request

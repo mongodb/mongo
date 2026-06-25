@@ -41,6 +41,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This ScoreFusionPipelineBuilder class stores the builder methods to build the desugared stages
@@ -56,10 +57,10 @@ public:
     // One field object that holds all internal intermediate variables during desugar,
     // like each input pipeline's individual score or scoreDetails.
     static constexpr std::string_view kScoreFusionInternalFieldsName =
-        "_internal_scoreFusion_internal_fields"_sd;
+        "_internal_scoreFusion_internal_fields"sv;
 
     // One field object to encapsulate the unmodified user's doc from the queried collection.
-    static constexpr std::string_view kScoreFusionDocsFieldName = "_internal_scoreFusion_docs"_sd;
+    static constexpr std::string_view kScoreFusionDocsFieldName = "_internal_scoreFusion_docs"sv;
 
     // Description that gets set as part of $scoreFusion's scoreDetails metadata.
     static constexpr std::string_view kScoreFusionScoreDetailsDescription =

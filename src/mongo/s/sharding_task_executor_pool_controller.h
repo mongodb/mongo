@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"
@@ -58,6 +57,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ShardRegistry;
 
@@ -101,11 +101,11 @@ public:
     friend std::string_view matchingStrategyToString(MatchingStrategy strategy) {
         switch (strategy) {
             case ShardingTaskExecutorPoolController::MatchingStrategy::kMatchPrimaryNode:
-                return "matchPrimaryNode"_sd;
+                return "matchPrimaryNode"sv;
             case ShardingTaskExecutorPoolController::MatchingStrategy::kMatchBusiestNode:
-                return "matchBusiestNode"_sd;
+                return "matchBusiestNode"sv;
             case ShardingTaskExecutorPoolController::MatchingStrategy::kDisabled:
-                return "disabled"_sd;
+                return "disabled"sv;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -173,7 +173,7 @@ public:
     size_t maxConnections() const override;
 
     std::string_view name() const override {
-        return "ShardingTaskExecutorPoolController"_sd;
+        return "ShardingTaskExecutorPoolController"sv;
     }
 
     void updateConnectionPoolStats(executor::ConnectionPoolStats* cps) const override;

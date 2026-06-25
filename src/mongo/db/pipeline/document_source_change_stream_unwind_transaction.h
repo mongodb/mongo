@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -56,6 +55,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamUnwindTransaction);
 using ChangeStreamUnwindTransactionLiteParsed =
@@ -72,7 +72,7 @@ using ChangeStreamUnwindTransactionLiteParsed =
 class DocumentSourceChangeStreamUnwindTransaction final
     : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr std::string_view kStageName = "$_internalChangeStreamUnwindTransaction"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamUnwindTransaction"sv;
 
     DocumentSourceChangeStreamUnwindTransaction(
         BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);

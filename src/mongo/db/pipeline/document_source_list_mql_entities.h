@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -55,6 +54,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListMqlEntities);
 
@@ -101,8 +101,8 @@ public:
         }
     };
 
-    static constexpr std::string_view kStageName = "$listMqlEntities"_sd;
-    static constexpr std::string_view kEntityTypeFieldName = "entityType"_sd;
+    static constexpr std::string_view kStageName = "$listMqlEntities"sv;
+    static constexpr std::string_view kEntityTypeFieldName = "entityType"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);

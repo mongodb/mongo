@@ -28,7 +28,6 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/util/modules.h"
@@ -39,6 +38,7 @@
 
 namespace mongo {
 namespace process_health {
+using namespace std::literals::string_view_literals;
 
 enum class MONGO_MOD_PUBLIC Severity { kOk, kFailure };
 static const std::string_view SeverityStrings[] = {"kOk", "kFailure"};
@@ -60,10 +60,10 @@ public:
 
     // Constructs a resolved status (no fault detected).
     explicit HealthCheckStatus(FaultFacetType type)
-        : _type(type), _severity(Severity::kOk), _description("resolved"_sd) {}
+        : _type(type), _severity(Severity::kOk), _description("resolved"sv) {}
 
     explicit HealthCheckStatus(HealthObserverTypeEnum type)
-        : _type(toFaultFacetType(type)), _severity(Severity::kOk), _description("resolved"_sd) {}
+        : _type(toFaultFacetType(type)), _severity(Severity::kOk), _description("resolved"sv) {}
 
     HealthCheckStatus(const HealthCheckStatus&) = default;
     HealthCheckStatus& operator=(const HealthCheckStatus&) = default;

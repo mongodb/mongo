@@ -36,8 +36,9 @@
 #include <string_view>
 
 namespace mongo::hybrid_scoring_util {
+using namespace std::literals::string_view_literals;
 
-static constexpr std::string_view kIsHybridSearchFlagFieldName = "$_internalIsHybridSearch"_sd;
+static constexpr std::string_view kIsHybridSearchFlagFieldName = "$_internalIsHybridSearch"sv;
 
 /**
  * Checks if this stage is a $score stage, where it has been desugared to $setMetadata with the meta

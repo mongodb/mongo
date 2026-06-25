@@ -39,13 +39,14 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class LegacyStrictGenerator : private ExtendedCanonicalV200Generator {
 public:
     using ExtendedCanonicalV200Generator::writeBool;
     using ExtendedCanonicalV200Generator::writeNull;
 
     void writeUndefined(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({ "$undefined" : true })"_sd);
+        appendTo(buffer, R"({ "$undefined" : true })"sv);
     }
 
     void writeString(fmt::memory_buffer& buffer, std::string_view str) const {
@@ -69,12 +70,12 @@ public:
             val <= std::numeric_limits<double>::max())
             fmt::format_to(std::back_inserter(buffer), R"({:.16g})", val);
         else if (std::isnan(val))
-            appendTo(buffer, "NaN"_sd);
+            appendTo(buffer, "NaN"sv);
         else if (std::isinf(val)) {
             if (val > 0)
-                appendTo(buffer, "Infinity"_sd);
+                appendTo(buffer, "Infinity"sv);
             else
-                appendTo(buffer, "-Infinity"_sd);
+                appendTo(buffer, "-Infinity"sv);
         } else {
             StringBuilder ss;
             ss << "Number " << val << " cannot be represented in JSON";
@@ -84,11 +85,11 @@ public:
 
     void writeDecimal128(fmt::memory_buffer& buffer, Decimal128 val) const {
         if (val.isNaN())
-            appendTo(buffer, R"({ "$numberDecimal" : "NaN" })"_sd);
+            appendTo(buffer, R"({ "$numberDecimal" : "NaN" })"sv);
         else if (val.isInfinite())
             fmt::format_to(std::back_inserter(buffer),
                            R"({{ "$numberDecimal" : "{}" }})",
-                           val.isNegative() ? "-Infinity"_sd : "Infinity"_sd);
+                           val.isNegative() ? "-Infinity"sv : "Infinity"sv);
         else {
             fmt::format_to(
                 std::back_inserter(buffer), R"({{ "$numberDecimal" : "{}" }})", val.toString());
@@ -157,11 +158,11 @@ public:
     }
 
     void writeMinKey(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({ "$minKey" : 1 })"_sd);
+        appendTo(buffer, R"({ "$minKey" : 1 })"sv);
     }
 
     void writeMaxKey(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({ "$maxKey" : 1 })"_sd);
+        appendTo(buffer, R"({ "$maxKey" : 1 })"sv);
     }
 
     void writePadding(fmt::memory_buffer& buffer) const {

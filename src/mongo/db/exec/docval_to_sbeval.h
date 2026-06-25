@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::sbe::value {
+using namespace std::literals::string_view_literals;
 
 /**
  * Helper function for converting mongo::Value to SBE Value. Caller owns the SBE Value returned.
@@ -42,7 +43,7 @@ namespace mongo::sbe::value {
 inline std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const ::mongo::Value& val) {
     // TODO SERVER-73443: Rationalize Document Value to SBE Value Conversion.
     BSONObjBuilder bob;
-    val.addToBsonObj(&bob, ""_sd);
+    val.addToBsonObj(&bob, ""sv);
     auto obj = bob.done();
     auto be = obj.objdata();
     auto end = be + obj.objsize();

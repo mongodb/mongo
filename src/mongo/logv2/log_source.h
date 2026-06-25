@@ -50,6 +50,7 @@
 #include <boost/move/utility_core.hpp>
 
 namespace mongo::logv2 {
+using namespace std::literals::string_view_literals;
 
 // Custom logging source that automatically add our set of attributes
 class LogSource : public boost::log::sources::
@@ -81,7 +82,7 @@ public:
                                }));
         add_attribute_unlocked(attributes::threadName(),
                                boost::log::attributes::make_function([isShutdown]() {
-                                   return isShutdown ? "shutdown"_sd : getThreadName();
+                                   return isShutdown ? "shutdown"sv : getThreadName();
                                }));
     }
 

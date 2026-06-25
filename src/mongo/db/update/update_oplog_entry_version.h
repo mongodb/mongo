@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-static inline constexpr std::string_view kUpdateOplogEntryVersionFieldName = "$v"_sd;
+static inline constexpr std::string_view kUpdateOplogEntryVersionFieldName = "$v"sv;
 
 /**
  * There are multiple types of 'u' (update) oplog entries. The type of an entry is indicated using

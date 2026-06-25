@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -61,8 +60,9 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ShardedDataDistribution);
  * for a particular collection.
  */
 namespace DocumentSourceShardedDataDistribution {
+using namespace std::literals::string_view_literals;
 
-static constexpr std::string_view kStageName = "$shardedDataDistribution"_sd;
+static constexpr std::string_view kStageName = "$shardedDataDistribution"sv;
 
 class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
 public:

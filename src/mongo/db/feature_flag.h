@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
@@ -45,6 +44,7 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class IncrementalFeatureRolloutContext;
 
 class MONGO_MOD_OPEN FeatureFlag {
@@ -367,7 +367,7 @@ public:
     IncrementalRolloutFeatureFlag(std::string_view flagName,
                                   RolloutPhase phase,
                                   bool value,
-                                  std::string_view serializeOnOutgoingRequestsVersion = ""_sd);
+                                  std::string_view serializeOnOutgoingRequestsVersion = ""sv);
 
     /**
      * Returns true if the feature is currently enabled, false otherwise. Also increments the

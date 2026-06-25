@@ -93,6 +93,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 /**
  * Mock OpObserver that tracks dropped collections and databases.
@@ -1414,7 +1415,7 @@ protected:
     static BSONObj makeOpts(boost::optional<bool> fixedBucketing = boost::none,
                             boost::optional<BucketGranularityEnum> granularity = boost::none) {
         TimeseriesOptions ts{"t" /* timeField */};
-        ts.setMetaField("m"_sd);
+        ts.setMetaField("m"sv);
         ts.setGranularity(granularity);
         ts.setFixedBucketing(fixedBucketing ? OptionalBool(*fixedBucketing) : OptionalBool{});
 

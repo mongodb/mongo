@@ -41,6 +41,7 @@
 
 namespace mongo::replicated_fast_count {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class StreamingOplogDeltaAccumulatorTest : public CatalogTestFixture {
 protected:
@@ -428,7 +429,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ContainerOpOnUserIdent_Advan
     // ci/cu/cd targeting a non-fast-count ident are still counted-no-delta (ts advances).
     const Timestamp ts{1, 1};
     const auto result =
-        runAccumulatorRaw({makeContainerOpBson(ts, "ci"_sd, "collection-user-ident"_sd)});
+        runAccumulatorRaw({makeContainerOpBson(ts, "ci"sv, "collection-user-ident"sv)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -440,7 +441,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     // checkpoint store itself). The container field stores the ident string, not the namespace.
     const Timestamp ts{1, 1};
     const auto result =
-        runAccumulatorRaw({makeContainerOpBson(ts, "ci"_sd, ident::kFastCountMetadataStore)});
+        runAccumulatorRaw({makeContainerOpBson(ts, "ci"sv, ident::kFastCountMetadataStore)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
 }
@@ -461,7 +462,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudMissingM_NoDeltas) {
     // CRUD entry without `m` size metadata is treated as no-delta. ts still advances.
     const Timestamp ts{1, 1};
     const auto result = runAccumulatorRaw(
-        {makeRawCrudBson(ts, "i"_sd, collA.nss, collA.uuid, /*mField=*/boost::none)});
+        {makeRawCrudBson(ts, "i"sv, collA.nss, collA.uuid, /*mField=*/boost::none)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -473,7 +474,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudIneligibleNamespace_NoDe
         NamespaceString::createNamespaceString_forTest("local", "rs.oplog.rs.archive");
     const Timestamp ts{1, 1};
     const auto result =
-        runAccumulatorRaw({makeRawCrudBson(ts, "i"_sd, localNss, UUID::gen(), BSON("sz" << 10))});
+        runAccumulatorRaw({makeRawCrudBson(ts, "i"sv, localNss, UUID::gen(), BSON("sz" << 10))});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }

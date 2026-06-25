@@ -71,6 +71,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the find command for a router.
@@ -81,7 +82,7 @@ public:
     using TC = TypedCommand<ClusterFindCmdBase<Impl>>;
     using Request = typename Impl::Request;
 
-    static constexpr std::string_view kTermField = "term"_sd;
+    static constexpr std::string_view kTermField = "term"sv;
 
     ClusterFindCmdBase() : TC(Impl::kCommandName) {}
 
@@ -330,7 +331,7 @@ public:
 
             try {
                 sharding::router::CollectionRouter router(opCtx, ns());
-                router.routeWithRoutingContext("explain find"_sd, findBodyFn);
+                router.routeWithRoutingContext("explain find"sv, findBodyFn);
 
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 auto bodyBuilder = result->getBodyBuilder();

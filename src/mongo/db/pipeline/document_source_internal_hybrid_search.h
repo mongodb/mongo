@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -40,12 +39,14 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Parse-time DocumentSource for the internal-only $_internalHybridSearch marker that the
@@ -58,7 +59,7 @@ namespace mongo {
  */
 class DocumentSourceInternalHybridSearch final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalHybridSearch"_sd;
+    static constexpr std::string_view kStageName = "$_internalHybridSearch"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);

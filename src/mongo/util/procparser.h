@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -51,6 +50,7 @@ namespace MONGO_MOD_PUB mongo {
 class BSONObjBuilder;
 
 namespace procparser {
+using namespace std::literals::string_view_literals;
 
 enum class FileNrKey {
     kFileHandlesInUse,
@@ -117,8 +117,8 @@ Status parseProcVMStatFile(std::string_view filename,
                            const std::vector<std::string_view>& keys,
                            BSONObjBuilder* builder);
 
-static const std::string_view kFileHandlesInUseKey = "sys_file_handles_in_use"_sd;
-static const std::string_view kMaxFileHandlesKey = "sys_max_file_handles"_sd;
+static const std::string_view kFileHandlesInUseKey = "sys_file_handles_in_use"sv;
+static const std::string_view kMaxFileHandlesKey = "sys_max_file_handles"sv;
 
 /**
  * Read from file, and write the specified keys in builder.
@@ -271,8 +271,8 @@ Status parseProcVMStat(const std::vector<std::string_view>& keys,
                        std::string_view data,
                        BSONObjBuilder* builder);
 
-static const std::string_view kPressureSomeTime = "some"_sd;
-static const std::string_view kPressureFullTime = "full"_sd;
+static const std::string_view kPressureSomeTime = "some"sv;
+static const std::string_view kPressureFullTime = "full"sv;
 
 /**
  * Read a string matching /proc/pressure/<cpu|io|memory> format and write the specified keys in

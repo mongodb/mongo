@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -51,6 +50,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(FindAndModifyImageLookup);
 
@@ -66,9 +66,9 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(FindAndModifyImageLookup);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceFindAndModifyImageLookup : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalFindAndModifyImageLookup"_sd;
+    static constexpr std::string_view kStageName = "$_internalFindAndModifyImageLookup"sv;
     static constexpr std::string_view kIncludeCommitTransactionTimestampFieldName =
-        "includeCommitTransactionTimestamp"_sd;
+        "includeCommitTransactionTimestamp"sv;
 
     static boost::intrusive_ptr<DocumentSourceFindAndModifyImageLookup> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

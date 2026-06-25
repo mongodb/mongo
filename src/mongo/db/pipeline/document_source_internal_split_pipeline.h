@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -49,6 +48,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalSplitPipeline);
 
@@ -63,7 +63,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalSplitPipeline);
  */
 class DocumentSourceInternalSplitPipeline final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalSplitPipeline"_sd;
+    static constexpr std::string_view kStageName = "$_internalSplitPipeline"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);

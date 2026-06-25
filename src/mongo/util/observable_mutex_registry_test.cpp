@@ -36,6 +36,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class DummyMutex {
 public:
@@ -274,7 +275,7 @@ TEST_F(ObservableMutexRegistryReportTest, ListAllWithInstanceLabel) {
     TaggedStats statsA0 = {"A", {{3, 2, 500}, {1, 0, 17}}};
     TaggedStats statsA1 = {"A", {{5, 1, 200}, {4, 2, 50}}};
 
-    auto mutexA0 = makeMutexAndAddToRegistry(statsA0, "my-pool"_sd);
+    auto mutexA0 = makeMutexAndAddToRegistry(statsA0, "my-pool"sv);
     auto mutexA1 = makeMutexAndAddToRegistry(statsA1);
 
     auto dummyTimestamp = Date_t::now();

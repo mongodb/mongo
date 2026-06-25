@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -42,10 +41,11 @@
 #include <vector>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer::common_utils {
+using namespace std::literals::string_view_literals;
 
 // Prefix for the flat scalar group keys (e.g. "__hs_<p>_score") used in the desugared $group's
 // per-pipeline accumulators and in the subsequent $replaceRoot's wrapper object.
-inline constexpr std::string_view kHsFlatFieldPrefix = "__hs_"_sd;
+inline constexpr std::string_view kHsFlatFieldPrefix = "__hs_"sv;
 
 // Parses a synthesized BSONObj stage into an owned LPDS at namespace `nss`. Not for use with
 // stages that hold nested LiteParsedPipelines -- use buildUnionWithLPDS for $unionWith.

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -53,6 +52,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * A DocumentSourceSequentialDocumentCache manages an underlying SequentialDocumentCache. If the
@@ -65,7 +65,7 @@ namespace mongo {
 class DocumentSourceSequentialDocumentCache final : public DocumentSource {
 public:
     using SequentialDocumentCachePtr = std::shared_ptr<SequentialDocumentCache>;
-    static constexpr std::string_view kStageName = "$sequentialCache"_sd;
+    static constexpr std::string_view kStageName = "$sequentialCache"sv;
 
     std::string_view getSourceName() const final {
         return DocumentSourceSequentialDocumentCache::kStageName;

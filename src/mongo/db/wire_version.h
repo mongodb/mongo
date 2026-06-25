@@ -45,6 +45,7 @@
 #include <boost/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * The 'WireVersion' captures all "protocol events" the write protocol went through.  A
@@ -182,9 +183,9 @@ public:
                 WireVersionInfo::appendToBSON(wireVersionInfo, &builder);
             };
 
-            appendWireVersion("incomingExternalClient"_sd, spec.incomingExternalClient);
-            appendWireVersion("incomingInternalClient"_sd, spec.incomingInternalClient);
-            appendWireVersion("outgoing"_sd, spec.outgoing);
+            appendWireVersion("incomingExternalClient"sv, spec.incomingExternalClient);
+            appendWireVersion("incomingInternalClient"sv, spec.incomingInternalClient);
+            appendWireVersion("outgoing"sv, spec.outgoing);
 
             bob->append("isInternalClient", spec.isInternalClient);
         }

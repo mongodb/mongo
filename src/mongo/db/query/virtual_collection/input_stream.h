@@ -40,6 +40,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * This template class provides a standardized input facility over StreamableInput or SeekableInput.
  *
@@ -63,7 +64,7 @@ public:
         uassert(
             ErrorCodes::FileNotOpen,
             fmt::format("Named pipe still not open for read after exhausting retries. Error: {}",
-                        getLastSystemErrorMessageFormatted("open"_sd, InputT::getAbsolutePath())),
+                        getLastSystemErrorMessageFormatted("open"sv, InputT::getAbsolutePath())),
             InputT::isOpen());
     }
 

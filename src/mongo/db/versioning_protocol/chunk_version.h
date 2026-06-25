@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +50,7 @@
 #include <absl/hash/hash.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * The most-significant component of the shard versioning protocol (collection epoch/timestamp).
@@ -146,7 +146,7 @@ public:
      * The name for the chunk version information field, which ddl operations use to send only
      * the placement information. String is shardVersion for compatibility with previous versions.
      */
-    static constexpr std::string_view kChunkVersionField = "shardVersion"_sd;
+    static constexpr std::string_view kChunkVersionField = "shardVersion"sv;
 
     ChunkVersion(CollectionGeneration geneneration, CollectionPlacement placement)
         : CollectionGeneration(geneneration), CollectionPlacement(placement) {}

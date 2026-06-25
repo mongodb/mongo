@@ -39,14 +39,14 @@
 /**
  * This header is separated from assert_util.h so that the low-level
  * dependencies of assert_util.h (e.g. mongo/base/status_with.h,
- * mongo/base/status.h, mongo/base/string_data.h) can use the `invariant` macro
+ * mongo/base/status.h) can use the `invariant` macro
  * without causing a circular include chain. It should never be included
  * directly in any other files.
  *
  *     [assert_util.h]
  *     |    |
  *     |    v
- *     |    [string_data.h, etc]
+ *     |    [status.h, etc]
  *     |    |
  *     v    v
  *     [assert_util_core.h]
@@ -56,7 +56,6 @@
 // IWYU pragma: friend "mongo/base/checked_cast.h"
 // IWYU pragma: friend "mongo/base/status.h"
 // IWYU pragma: friend "mongo/base/status_with.h"
-// IWYU pragma: friend "mongo/base/string_data.h"
 // IWYU pragma: friend "mongo/util/intrusive_counter.h"
 
 namespace MONGO_MOD_PUB mongo {

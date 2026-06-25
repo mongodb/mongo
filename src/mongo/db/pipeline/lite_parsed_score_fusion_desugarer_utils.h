@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
@@ -44,6 +43,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer::score_fusion_utils {
+using namespace std::literals::string_view_literals;
 
 inline constexpr std::string_view kInternalFieldsName =
     ScoreFusionPipelineBuilder::kScoreFusionInternalFieldsName;
@@ -53,7 +53,7 @@ inline constexpr std::string_view kScoreDetailsDescription =
 
 // Per-pipeline scoreDetails scalar field suffix used in the desugared $group output (and the
 // matching $replaceRoot wrapper). For $scoreFusion the per-pipeline scalar is "<p>_rawScore".
-inline constexpr std::string_view kDetailsScalarSuffix = "_rawScore"_sd;
+inline constexpr std::string_view kDetailsScalarSuffix = "_rawScore"sv;
 
 // Validation/translation of normalization + combination spec.
 class ScoreFusionScoringOptions {

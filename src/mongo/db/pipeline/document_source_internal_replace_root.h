@@ -36,6 +36,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Represents a $replaceRoot pipeline stage that can be translated to SBE instead of executing as a
@@ -43,7 +44,7 @@ namespace mongo {
  */
 class DocumentSourceInternalReplaceRoot final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageNameInternal = "$_internalReplaceRoot"_sd;
+    static constexpr std::string_view kStageNameInternal = "$_internalReplaceRoot"sv;
 
     DocumentSourceInternalReplaceRoot(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                       boost::intrusive_ptr<Expression> newRoot)

@@ -520,12 +520,12 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
             Status{ResolvedNamespace{expectedBackingNs, expectedBackingNs, viewPipeline, BSONObj()},
-                   "It was a view!"_sd});
+                   "It was a view!"sv});
     });
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
             Status{ResolvedNamespace{expectedBackingNs, expectedBackingNs, viewPipeline, BSONObj()},
-                   "It was a view!"_sd});
+                   "It was a view!"sv});
     });
 
     // That error should be incorporated, then we should target both shards. The results should be

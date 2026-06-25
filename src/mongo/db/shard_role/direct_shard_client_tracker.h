@@ -37,6 +37,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Tracks the number of external clients on the shard port of a mongod.
@@ -46,8 +47,8 @@ class MONGO_MOD_PUBLIC DirectShardClientTracker {
     DirectShardClientTracker& operator=(const DirectShardClientTracker&) = delete;
 
 public:
-    static constexpr std::string_view kCurrentFieldName = "current"_sd;
-    static constexpr std::string_view kCreatedFieldName = "totalCreated"_sd;
+    static constexpr std::string_view kCurrentFieldName = "current"sv;
+    static constexpr std::string_view kCreatedFieldName = "totalCreated"sv;
 
     DirectShardClientTracker() = default;
     ~DirectShardClientTracker() = default;

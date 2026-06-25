@@ -34,6 +34,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Collects metrics for FTDC collections. Users will call `onCompletingCollection` upon collecting
@@ -54,9 +55,9 @@ namespace mongo {
  */
 class FTDCCollectionMetrics {
 public:
-    static constexpr auto kCollectionsCountTag = "collections"_sd;
-    static constexpr auto kCollectionsDurationTag = "durationMicros"_sd;
-    static constexpr auto kCollectionsStalledTag = "delayed"_sd;
+    static constexpr auto kCollectionsCountTag = "collections"sv;
+    static constexpr auto kCollectionsDurationTag = "durationMicros"sv;
+    static constexpr auto kCollectionsStalledTag = "delayed"sv;
 
     FTDCCollectionMetrics() {
         _reset();

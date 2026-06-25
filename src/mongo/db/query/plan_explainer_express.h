@@ -40,6 +40,7 @@
 
 namespace mongo {
 namespace express {
+using namespace std::literals::string_view_literals;
 class IteratorStats {
 public:
     const std::string& stageName() const {
@@ -100,10 +101,10 @@ public:
 
     void appendDataAccessStats(BSONObjBuilder& builder) const {
         if (!_indexKeyPattern.empty()) {
-            builder.append("keyPattern"_sd, _indexKeyPattern);
+            builder.append("keyPattern"sv, _indexKeyPattern);
         }
         if (!_indexName.empty()) {
-            builder.append("indexName"_sd, _indexName);
+            builder.append("indexName"sv, _indexName);
         }
     }
 

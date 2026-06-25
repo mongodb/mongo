@@ -299,7 +299,6 @@ filegroup(
     name = "idl_headers",
     srcs = [
         "//src/mongo/base:data_range.h",
-        "//src/mongo/base:string_data.h",
         "//src/mongo/bson:bsonobj.h",
         "//src/mongo/bson:bsonobjbuilder.h",
         "//src/mongo/bson:simple_bsonobj_comparator.h",

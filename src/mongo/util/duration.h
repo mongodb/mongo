@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/overflow_arithmetic.h"
@@ -52,6 +51,7 @@
 #include <fmt/format.h>
 
 namespace MONGO_MOD_PUB mongo {
+using namespace std::literals::string_view_literals;
 
 class BSONObj;
 template <typename Allocator>
@@ -150,37 +150,37 @@ class Duration {
 public:
     static constexpr std::string_view unit_short() {
         if constexpr (std::is_same_v<Duration, Nanoseconds>) {
-            return "ns"_sd;
+            return "ns"sv;
         } else if constexpr (std::is_same_v<Duration, Microseconds>) {
-            return "\xce\xbcs"_sd;
+            return "\xce\xbcs"sv;
         } else if constexpr (std::is_same_v<Duration, Milliseconds>) {
-            return "ms"_sd;
+            return "ms"sv;
         } else if constexpr (std::is_same_v<Duration, Seconds>) {
-            return "s"_sd;
+            return "s"sv;
         } else if constexpr (std::is_same_v<Duration, Minutes>) {
-            return "min"_sd;
+            return "min"sv;
         } else if constexpr (std::is_same_v<Duration, Hours>) {
-            return "hr"_sd;
+            return "hr"sv;
         } else if constexpr (std::is_same_v<Duration, Days>) {
-            return "d"_sd;
+            return "d"sv;
         }
         return std::string_view{};
     }
     static constexpr std::string_view mongoUnitSuffix() {
         if constexpr (std::is_same_v<Duration, Nanoseconds>) {
-            return "Nanos"_sd;
+            return "Nanos"sv;
         } else if constexpr (std::is_same_v<Duration, Microseconds>) {
-            return "Micros"_sd;
+            return "Micros"sv;
         } else if constexpr (std::is_same_v<Duration, Milliseconds>) {
-            return "Millis"_sd;
+            return "Millis"sv;
         } else if constexpr (std::is_same_v<Duration, Seconds>) {
-            return "Seconds"_sd;
+            return "Seconds"sv;
         } else if constexpr (std::is_same_v<Duration, Minutes>) {
-            return "Minutes"_sd;
+            return "Minutes"sv;
         } else if constexpr (std::is_same_v<Duration, Hours>) {
-            return "Hours"_sd;
+            return "Hours"sv;
         } else if constexpr (std::is_same_v<Duration, Days>) {
-            return "Days"_sd;
+            return "Days"sv;
         }
         return std::string_view{};
     }

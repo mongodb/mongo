@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/unordered_fields_bsonelement_comparator.h"
@@ -53,6 +52,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Matches arrays whose elements are all unique. When comparing elements,
@@ -62,7 +62,7 @@ namespace mongo {
  */
 class InternalSchemaUniqueItemsMatchExpression final : public ArrayMatchingMatchExpression {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaUniqueItems"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaUniqueItems"sv;
 
     explicit InternalSchemaUniqueItemsMatchExpression(
         boost::optional<std::string_view> path, clonable_ptr<ErrorAnnotation> annotation = nullptr)

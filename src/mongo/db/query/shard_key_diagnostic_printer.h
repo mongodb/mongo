@@ -40,6 +40,7 @@
 #include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
+using namespace std::literals::string_view_literals;
 
 constexpr inline std::string_view kOmitForUnshardedCollectionMsg{
     "omitted: collection isn't sharded"};
@@ -79,12 +80,12 @@ struct MultipleShardKeysDiagnosticPrinter {
     auto format(auto& fc) const {
         auto out = fc.out();
         out = fmt::format_to(out, "{{");
-        auto sep = ""_sd;
+        auto sep = ""sv;
         for (const auto& [ns, shardKey] : namespaceToShardKeyMap) {
             out = fmt::format_to(
                 out,
                 "{}'{}': {{'shardKeyPattern': {}}}",
-                std::exchange(sep, ", "_sd),
+                std::exchange(sep, ", "sv),
                 NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault()),
                 shardKey.has_value() ? shardKey.value().toString()
                                      : kOmitForUnshardedCollectionMsg);

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -43,6 +42,7 @@
 #include <type_traits>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * An InlinedStorage is a simplified version of `absl::InlinedVector`, and optimized for performance
  * and minimal overhead. It has the capability to inline a maximum of 'inlinedCapacity' elements of
@@ -219,7 +219,7 @@ public:
         os << "[";
         for (auto& e : storage) {
             os << sep << e;
-            sep = ", "_sd;
+            sep = ", "sv;
         }
         os << "]";
         return os;

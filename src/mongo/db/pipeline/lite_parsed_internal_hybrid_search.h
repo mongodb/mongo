@@ -40,6 +40,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalHybridSearch);
 
@@ -51,7 +52,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalHybridSearch);
 class LiteParsedInternalHybridSearch final
     : public LiteParsedDocumentSourceDefault<LiteParsedInternalHybridSearch> {
 public:
-    static constexpr std::string_view kStageName = "$_internalHybridSearch"_sd;
+    static constexpr std::string_view kStageName = "$_internalHybridSearch"sv;
 
     // Used by the desugarer, which synthesizes the (empty) spec itself.
     LiteParsedInternalHybridSearch()
@@ -79,7 +80,7 @@ public:
 
     Constraints constraints() const override {
         return {.canRunOnTimeseries = false,
-                .timeseriesUnsupportedStageName = "$rankFusion/$scoreFusion"_sd};
+                .timeseriesUnsupportedStageName = "$rankFusion/$scoreFusion"sv};
     }
 
     FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {

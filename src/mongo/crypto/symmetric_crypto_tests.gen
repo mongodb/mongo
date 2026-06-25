@@ -39,43 +39,43 @@
 // cmp plaintext.bin plaintext-decrypted.bin && echo "Decrypted file matches"
 
 // echo "TEST_F(AESTestVectors, CTRTestCase_Random_$count) {"
-// echo "    auto key = \"$(<key.hex)\"_sd;"
-// echo "    auto iv = \"$(<iv.hex)\"_sd;"
+// echo "    auto key = \"$(<key.hex)\"sv;"
+// echo "    auto iv = \"$(<iv.hex)\"sv;"
 
 // echo -n "    auto plaintext="
 // xxd -p plaintext.bin | while read r ; do
 //     echo ""
 //     echo -n "        \"$r\""
 // done
-// echo "_sd;"
+// echo "sv;"
 
 // echo -n "    auto ciphertext="
 // xxd -p ciphertext.bin | while read r ; do
 //     echo ""
 //     echo -n "        \"$r\""
 // done
-// echo "_sd;"
+// echo "sv;"
 // echo '    evaluate(CTRTestVector(key, plaintext, iv, ciphertext));'
 // echo '}'
 
 
 TEST_F(AESTestVectors, CTRTestCase_Random_90) {
-    auto key = "2078bf7187b8792860071c205a9ad88fc285232780f4ac4d77be9146b63c6ec9"_sd;
-    auto iv = "185405c26aca39e507a2c71572b209df"_sd;
+    auto key = "2078bf7187b8792860071c205a9ad88fc285232780f4ac4d77be9146b63c6ec9"sv;
+    auto iv = "185405c26aca39e507a2c71572b209df"sv;
     auto plaintext=
         "d3e88a3f39bf4788a325e4b9ba829e0a768a66e66b03940c50e6fd92f0fd"
         "85be4742f183c69891fc337ea5f9f8680c86827098277e8a32e8899eb639"
-        "7fc93b94627c38e36815b6a2869a8f41f2e7d4369f8831c8b07a3d39197d"_sd;
+        "7fc93b94627c38e36815b6a2869a8f41f2e7d4369f8831c8b07a3d39197d"sv;
     auto ciphertext=
         "e36455d10b5884911f5a5bdb4519148ca7a754fd4b54b31ecf8afaaea522"
         "f1e0cc917f49bb4869307c19bf9862171905e644fccbebbd764f0015fd36"
-        "2ed33bae74811b7773987e129a3b58d339324a5415467baaacb25b4d3cc1"_sd;
+        "2ed33bae74811b7773987e129a3b58d339324a5415467baaacb25b4d3cc1"sv;
     evaluate(CTRTestVector(key, plaintext, iv, ciphertext));
 }
 
 TEST_F(AESTestVectors, CTRTestCase_Random_1059) {
-    auto key = "faf3ca75c08501664fb9c7fcf78f291fc4a63dc58c179c12c1b70c3b644f71f0"_sd;
-    auto iv = "9413b67c240bb84e94b7bbb716a97ea3"_sd;
+    auto key = "faf3ca75c08501664fb9c7fcf78f291fc4a63dc58c179c12c1b70c3b644f71f0"sv;
+    auto iv = "9413b67c240bb84e94b7bbb716a97ea3"sv;
     auto plaintext=
         "bc561491a030e785b570bc787c0728cb123f1604ec27075c1beae9f71077"
         "23e381ecb2275047db59627d7859e48aafd7fc856a7167c25657d751963b"
@@ -112,7 +112,7 @@ TEST_F(AESTestVectors, CTRTestCase_Random_1059) {
         "79d6b32c5a78d539d79e165f2b2321959aed1778a335288bf96f41645622"
         "ae3f74653c3d83442e7e1268c6fbbc037a9f3a3eb1746666078a20a156ed"
         "09abafd21c0d5d7449d73a44fb617e69c94429c2aba68ad51d56c0e1dcca"
-        "a7e6d778da948e5ff7"_sd;
+        "a7e6d778da948e5ff7"sv;
     auto ciphertext=
         "e21d884cd383819d07e3b08df52fe31567ee7ffbf7c496d44b262eba1e6c"
         "5f94c692ad53cc07b77d04605d8e337f3e99cf96ecbcb277d7f7c8c372fe"
@@ -149,13 +149,13 @@ TEST_F(AESTestVectors, CTRTestCase_Random_1059) {
         "7848cf9d38a471ce7ede75b585fea4fc30ff1ed36c3e0e33a11c9e0be3b6"
         "fa069a6fe0094159a105abc7eb283ed47be88bddfffe3b5132ea4acd5fcb"
         "4fc3c5ff51a883af5e8c52f3f1a09fdcceec1115070187dd0bacce093b94"
-        "1f1e63ea1941b1a9f1"_sd;
+        "1f1e63ea1941b1a9f1"sv;
     evaluate(CTRTestVector(key, plaintext, iv, ciphertext));
 }
 
 TEST_F(AESTestVectors, CTRTestCase_Random_3888) {
-    auto key = "b17c259ad25e022595d44b91cc1ff933d657ebf90e6e0316754eee085d6014ff"_sd;
-    auto iv = "3fb363e376719096eca5de9976353d45"_sd;
+    auto key = "b17c259ad25e022595d44b91cc1ff933d657ebf90e6e0316754eee085d6014ff"sv;
+    auto iv = "3fb363e376719096eca5de9976353d45"sv;
     auto plaintext=
         "1615bf789eaea0d98adf1fc47826389080a0a6f8b0edb8d5a54b2501151d"
         "cd931a4ead010391255baa9a880825a8537ca452db906082951523123fa5"
@@ -286,7 +286,7 @@ TEST_F(AESTestVectors, CTRTestCase_Random_3888) {
         "053289a5ca4f4be0f799f0b21cc2558e195724ee95fc44855d5c8eb32798"
         "b0ef7ec48e05882ddf4e4817cee79cbb451bdd2c720298eb925b1f010702"
         "0bc10f42553928d79905fdce432fbbbcf1c635e7083302e1d0d5bb4fbc5f"
-        "2f6169cde7957377aecab747fb5fbc2c4cfa"_sd;
+        "2f6169cde7957377aecab747fb5fbc2c4cfa"sv;
     auto ciphertext=
         "999264c56b6cd5f1b6c01834e39a2abdc31a4b73fde183ede01d5506184d"
         "cd6fdfba2d2ac17cd54bca45d6f7800f695cca8f1e365f33bc6fee82c7f6"
@@ -417,13 +417,13 @@ TEST_F(AESTestVectors, CTRTestCase_Random_3888) {
         "4af153a773945bbb293d8e5c6603684f24a8dfdea742e07ff312f912fa96"
         "1863d8a665ca68a7875be7a09ee5920bf442767fbcd245b5300e1479f8b0"
         "82ca2e3adffa4680fd1adea93ea83ecba4d6deca41d07573ed2098862dd3"
-        "185d651d42c1420de3f64f15c7f246a06fbc"_sd;
+        "185d651d42c1420de3f64f15c7f246a06fbc"sv;
     evaluate(CTRTestVector(key, plaintext, iv, ciphertext));
 }
 
 TEST_F(AESTestVectors, CTRTestCase_Random_7947) {
-    auto key = "2b4d77ac012fb25b6034b5850fab4f577c913dfc28cf2601e39de65af1416ac0"_sd;
-    auto iv = "f684a68b0f6d2b789c36980c851a68fb"_sd;
+    auto key = "2b4d77ac012fb25b6034b5850fab4f577c913dfc28cf2601e39de65af1416ac0"sv;
+    auto iv = "f684a68b0f6d2b789c36980c851a68fb"sv;
     auto plaintext=
         "a84508fe1b1d4875fac49abe872dfb2a787be6dc7c2ffd4670c9c581de29"
         "607f0f28d8b9ceb40f715629d5b2bc3b29debb1618eef61c15a7be137279"
@@ -689,7 +689,7 @@ TEST_F(AESTestVectors, CTRTestCase_Random_7947) {
         "b112e38e3e3e24cf6788568f4c24f21fce0718268b8dd0dbf913c1f456ea"
         "e6c5a1d8e7a05a7e8355d4a4c209dda8531f4ad1a69ea08929a26b440fa1"
         "053422640b4efc9734ae1a765f33c8294839114c41e08d51d14b3a7ffd3f"
-        "044e835d7c8beb9f4d18998116d313417f53c35a4481d8bcb63bf9"_sd;
+        "044e835d7c8beb9f4d18998116d313417f53c35a4481d8bcb63bf9"sv;
     auto ciphertext=
         "46dc2772fca0ea4141e6d8bd96050bc8a4255c379f7395a759f635245561"
         "c13d72cb9d3df53d62940bd3aea68968da46484cd2b06b46e4ced198ee15"
@@ -955,13 +955,13 @@ TEST_F(AESTestVectors, CTRTestCase_Random_7947) {
         "70d2af6853e4acd516ebd6b8b0b52a8d328d1b66e1f70b4e297c9781b19c"
         "862d2750e428fbcbf0919a1eebc328901285f69eaaad3fb3e47c1c8af113"
         "e689b4a25054507ebe2c75fbd470ff327c1ef9352f46135a8fb6fda673ee"
-        "69f9897e9b461ecd204d825f9496b2db9a762bcb92b229f1053bfc"_sd;
+        "69f9897e9b461ecd204d825f9496b2db9a762bcb92b229f1053bfc"sv;
     evaluate(CTRTestVector(key, plaintext, iv, ciphertext));
 }
 
 TEST_F(AESTestVectors, CTRTestCase_Random_3680) {
-    auto key = "55422355f63923d0414bed1c388a62843c7c15a5fe6273196397609ba0f27b17"_sd;
-    auto iv = "79f67e77c9e7e85b9f55b0dacfe9664a"_sd;
+    auto key = "55422355f63923d0414bed1c388a62843c7c15a5fe6273196397609ba0f27b17"sv;
+    auto iv = "79f67e77c9e7e85b9f55b0dacfe9664a"sv;
     auto plaintext=
         "b58ddbc300dca87aabd47950449c15f3956bab13b606e107e6ffeddf2a57"
         "95169e5475318af9e87ef0283b805fec779d91210f04c57108c1a71e54a0"
@@ -1085,7 +1085,7 @@ TEST_F(AESTestVectors, CTRTestCase_Random_3680) {
         "3e1ae0cabd30113cdea7be108a9517254abbaeb0132cae6573c3a6f1ce69"
         "e43e0c125ebeb176bea1966475f56f6e5d63f522425245a68c6fe5ee4261"
         "b0c4ea9fcc988066b56a1ee8999916eade6365a74bb1503bbe9c1ddd0bf4"
-        "8045d5252acf0483ddf921b24374d64fc9338aae"_sd;
+        "8045d5252acf0483ddf921b24374d64fc9338aae"sv;
     auto ciphertext=
         "85cd30b31ea93b3d084ef95285182ba09898bb9e57ae08cd3d52790baab3"
         "2db17739ffdd0704d4e2decc892a6e6f95e3ff2836c0d496e37100097e78"
@@ -1209,13 +1209,13 @@ TEST_F(AESTestVectors, CTRTestCase_Random_3680) {
         "ba73ebd539420f201aebd741eaa3c8476796beae0eb62ef65bbb70b8241a"
         "c9183849403d9e6c2d52ecf65a37e8f34d13cb5eea57fdc7f29ebdbb5533"
         "bb3f49298eeb6c35e0a7304a16228b7fccd7f030c31eccfef4bf30a075e2"
-        "e8c90d8aa709c30bae918a75fb44edec0ded7558"_sd;
+        "e8c90d8aa709c30bae918a75fb44edec0ded7558"sv;
     evaluate(CTRTestVector(key, plaintext, iv, ciphertext));
 }
 
 TEST_F(AESTestVectors, CTRTestCase_Random_4279) {
-    auto key = "6b8c0f66aa8368d85ebea3f026c4156c6e03c99e1653544e4b70197b58471dc3"_sd;
-    auto iv = "82cdc6e69b5f76a38934a55dcfeb8a32"_sd;
+    auto key = "6b8c0f66aa8368d85ebea3f026c4156c6e03c99e1653544e4b70197b58471dc3"sv;
+    auto iv = "82cdc6e69b5f76a38934a55dcfeb8a32"sv;
     auto plaintext=
         "acc85e82cde76c80933faf718bece574526937d2b967b4e0c65f01ca4da7"
         "45f3787a47963c4b0276ec219294e9c8e6af26141435709e5952c58bb707"
@@ -1359,7 +1359,7 @@ TEST_F(AESTestVectors, CTRTestCase_Random_4279) {
         "d65b852af40340af90ca3bfef328bcd41dc1e9fd239de4c7a4be4777964a"
         "f44a56995670f35aae229d1fa448add5df40f17365eba5939e3c0b888f83"
         "29d5093c90690265d31bffb06f04f1d81aead9ab1daec68c739ba146ba29"
-        "3be6558677121b9ac7bd86bcde842f0d6db0dd"_sd;
+        "3be6558677121b9ac7bd86bcde842f0d6db0dd"sv;
     auto ciphertext=
         "0ab994062b3c47ee0f1a5d48f0aa73cf7ec75e1bbd4c274519d79af36838"
         "45d6c0bcfa0955093bd2caf2955afec03b898809d95ab33f18a2aad47aa9"
@@ -1503,13 +1503,13 @@ TEST_F(AESTestVectors, CTRTestCase_Random_4279) {
         "68838b001e4019fe197ca7ae37b531ae80c05683639be1b5ca2c1d491906"
         "3709db10133d81d55f81bf9c61324779db5027c5bc862851d86da70954e2"
         "0e209d0183075e86e997f70676e5c141343e1df54f135ccbce52cf70373e"
-        "de05a81d2f453057010b3eca4331318957c347"_sd;
+        "de05a81d2f453057010b3eca4331318957c347"sv;
     evaluate(CTRTestVector(key, plaintext, iv, ciphertext));
 }
 
 TEST_F(AESTestVectors, CTRTestCase_Random_5137) {
-    auto key = "00bc9d80def09a90abe5d6021887525bac85e3937823c4c161feda853366974c"_sd;
-    auto iv = "b2a56b7bf421f1cddcea634d8a9c1035"_sd;
+    auto key = "00bc9d80def09a90abe5d6021887525bac85e3937823c4c161feda853366974c"sv;
+    auto iv = "b2a56b7bf421f1cddcea634d8a9c1035"sv;
     auto plaintext=
         "979923cc8f2754c6a14a262328bde87c0dda74829f05a274aa30b577e6d1"
         "f59d9f99d0a0fbb12432655b0a0db7709b6dce1b6647970366afd385bf57"
@@ -1682,7 +1682,7 @@ TEST_F(AESTestVectors, CTRTestCase_Random_5137) {
         "9410819372260f3bd0ab6faf39b6d4eca130b4d4111da816bb3058479ffe"
         "4e623a6d36103163016fc16c70659b0aa24305b3100e0890f791619986cc"
         "9cc21d985644c95f8a845c8c41e5814767b67605947b434c0fe97e29a913"
-        "3781d2bf7aff0e"_sd;
+        "3781d2bf7aff0e"sv;
     auto ciphertext=
         "03adeafa83b034d333c37405f58bf4428f96aac8b645a385121d6e7b8e8f"
         "a0ecbb9fc8f8e0d85c8b22708141be63dc4e559619c771317de2a1e0c1ac"
@@ -1855,13 +1855,13 @@ TEST_F(AESTestVectors, CTRTestCase_Random_5137) {
         "a0be5a3f9b75ed326eae9db9df3168b1830324bb4d5d88a6fae558b622c5"
         "a7668a1403f3c6778563cdb320faf6cbe8a1e9a200ad55b8138bc0690cf4"
         "895979cce0f9e9fc5272e161b9070ed1b628d705ec3b42679d9552c03b23"
-        "66294efc1549c5"_sd;
+        "66294efc1549c5"sv;
     evaluate(CTRTestVector(key, plaintext, iv, ciphertext));
 }
 
 TEST_F(AESTestVectors, CTRTestCase_Random_5467) {
-    auto key = "ae24d76cfa1a99afa0f7d0292aaadc6fa444fb8c43403705c3bf78e4adaa0496"_sd;
-    auto iv = "311d7ee0b4854324fb2ca70a84c0727a"_sd;
+    auto key = "ae24d76cfa1a99afa0f7d0292aaadc6fa444fb8c43403705c3bf78e4adaa0496"sv;
+    auto iv = "311d7ee0b4854324fb2ca70a84c0727a"sv;
     auto plaintext=
         "e3532e5ae2e5021988de72746c8c93e4c387ea6df6d86a10e897d490901b"
         "039b4dab19a6d8a3442d800285aa76f83f46a849675563ed29725cb50cb4"
@@ -2045,7 +2045,7 @@ TEST_F(AESTestVectors, CTRTestCase_Random_5467) {
         "3511ec56ef5a5424ddffa86fa68819a9bd54c8b8a26452bad8ead3e1e96a"
         "05891f0df8a4c6ad798c6704f958abdf7dd525c52a64c19fe726e908022c"
         "f71f99276a4d5cdd32d86af55065aadd6de55657ba2f7606aa3656b3f2b6"
-        "6a2972f6e42704"_sd;
+        "6a2972f6e42704"sv;
     auto ciphertext=
         "e1ae5647c70105340d68e6cd9e86cf7809755fb604f88beaab43a65a4b64"
         "e9f0b6b9e0cba6243b7c712e620cd020b36fdc9407f4299191a0ff4de362"
@@ -2229,13 +2229,13 @@ TEST_F(AESTestVectors, CTRTestCase_Random_5467) {
         "d3b560e25d859044b03a370854b8473bc8739e90e28dcd875700316cdce6"
         "473c910d4b90cf65526dd7fb9f333f0f0e6ccb46d754e9c97f71cb5c0bd6"
         "e5eee7418d71c69f0afae9a2788f4bfab8bb97c663c3771b48ed225a641d"
-        "c472707dab9ba2"_sd;
+        "c472707dab9ba2"sv;
     evaluate(CTRTestVector(key, plaintext, iv, ciphertext));
 }
 
 TEST_F(AESTestVectors, CTRTestCase_Random_51723) {
-    auto key = "a07e83479348c9e7ee9237833616d7a4e0c658f7e15a3185758c0479b0631e02"_sd;
-    auto iv = "77a0b4a15411cd43e5460df5c37e1a9b"_sd;
+    auto key = "a07e83479348c9e7ee9237833616d7a4e0c658f7e15a3185758c0479b0631e02"sv;
+    auto iv = "77a0b4a15411cd43e5460df5c37e1a9b"sv;
     auto plaintext=
         "9a4aaa26f712e1f93b327076a24e656c292e8b0d348c4e1339436962dd93"
         "cc9c45c206257ebd8ed3137fdbfb28050cca3c6c01f6557467858d213617"
@@ -3961,7 +3961,7 @@ TEST_F(AESTestVectors, CTRTestCase_Random_51723) {
         "10a169e58606c901cb5a3ad3f496ead224cdb018419808fd0b837b2b65c2"
         "02ba171e400247016ec0ddf0b254a045f8d78c480e0b7f10ae74c09a331d"
         "788f61d14c3390c917b4bea1d043da1c441b0f861cac1ccd3f5081f24982"
-        "652256"_sd;
+        "652256"sv;
     auto ciphertext=
         "ef87003526ae6e89d0ca3dea5fa142f04f330a61536ca6f788db6da75718"
         "0d87e588f7125fe487bfcd43972647471a3cb3a118b59dc7e31858c71298"
@@ -5687,6 +5687,6 @@ TEST_F(AESTestVectors, CTRTestCase_Random_51723) {
         "9451b743c6305a3f2758fc3d723c66fb18877c432d8dac32e7ae29018673"
         "1999ccd831835ea6d0d443d0050a14b6b2816688dbdac6297f024ce9e74e"
         "82570ac7c88457c7a418036f200f30e616825292bd68d55a0821ba2feab8"
-        "d8ad68"_sd;
+        "d8ad68"sv;
     evaluate(CTRTestVector(key, plaintext, iv, ciphertext));
 }

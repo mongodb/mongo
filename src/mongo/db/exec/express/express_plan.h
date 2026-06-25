@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
@@ -77,6 +76,7 @@
 namespace mongo {
 
 namespace express {
+using namespace std::literals::string_view_literals;
 
 /**
  * We encountered a situation where the record referenced by the index entry is gone. Check whether
@@ -326,9 +326,9 @@ public:
         _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
 
         _stats = stats;
-        _stats->setStageName("EXPRESS_IXSCAN"_sd);
+        _stats->setStageName("EXPRESS_IXSCAN"sv);
         _stats->setIndexName(IndexConstants::kIdIndexName);
-        _stats->setIndexKeyPattern("{ _id: 1 }"_sd);
+        _stats->setIndexKeyPattern("{ _id: 1 }"sv);
     }
 
     template <class Continuation>
@@ -488,7 +488,7 @@ public:
         _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
 
         _stats = stats;
-        _stats->setStageName("EXPRESS_CLUSTERED_IXSCAN"_sd);
+        _stats->setStageName("EXPRESS_CLUSTERED_IXSCAN"sv);
     }
 
     template <class Continuation>
@@ -656,7 +656,7 @@ public:
         _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
 
         _stats = stats;
-        _stats->setStageName("EXPRESS_IXSCAN"_sd);
+        _stats->setStageName("EXPRESS_IXSCAN"sv);
         _stats->setIndexName(_indexName);
         _stats->setIndexKeyPattern(
             KeyPattern::toString(_indexCatalogEntry->descriptor()->keyPattern()));
@@ -889,7 +889,7 @@ const FieldRef idFieldRef(idFieldName);
 
 class UpdateOperation {
 public:
-    static constexpr std::string_view name = "update"_sd;
+    static constexpr std::string_view name = "update"sv;
 
     UpdateOperation(UpdateDriver* updateDriver,
                     bool isUserInitiatedWrite,
@@ -1050,7 +1050,7 @@ public:
             });
     }
 
-    static constexpr std::string_view name = "delete"_sd;
+    static constexpr std::string_view name = "delete"sv;
 
 private:
     StmtId _stmtId;
@@ -1088,7 +1088,7 @@ public:
         }
     }
 
-    static constexpr std::string_view name = "delete"_sd;
+    static constexpr std::string_view name = "delete"sv;
 
 private:
     bool _returnDeleted;
@@ -1098,7 +1098,7 @@ private:
 
 class NoWriteOperation {
 public:
-    static constexpr std::string_view name = "nowriteop"_sd;
+    static constexpr std::string_view name = "nowriteop"sv;
 
     void open(WriteOperationStats*) {}
 

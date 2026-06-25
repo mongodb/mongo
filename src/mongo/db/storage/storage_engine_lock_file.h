@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 
@@ -42,8 +41,9 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-MONGO_MOD_FILE_PRIVATE constexpr std::string_view kLockFileBasename = "mongod.lock"_sd;
+MONGO_MOD_FILE_PRIVATE constexpr std::string_view kLockFileBasename = "mongod.lock"sv;
 
 class MONGO_MOD_PUBLIC StorageEngineLockFile {
     StorageEngineLockFile(const StorageEngineLockFile&) = delete;

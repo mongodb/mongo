@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_set.h"
@@ -63,6 +62,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 class AuthorizationSession;
 class Client;
@@ -117,14 +117,14 @@ public:
 
     virtual ~AuthorizationManager() = default;
 
-    static constexpr std::string_view USERID_FIELD_NAME = "userId"_sd;
-    static constexpr std::string_view USER_NAME_FIELD_NAME = "user"_sd;
-    static constexpr std::string_view USER_DB_FIELD_NAME = "db"_sd;
-    static constexpr std::string_view ROLE_NAME_FIELD_NAME = "role"_sd;
-    static constexpr std::string_view ROLE_DB_FIELD_NAME = "db"_sd;
-    static constexpr std::string_view PASSWORD_FIELD_NAME = "pwd"_sd;
-    static constexpr std::string_view V1_USER_NAME_FIELD_NAME = "user"_sd;
-    static constexpr std::string_view V1_USER_SOURCE_FIELD_NAME = "userSource"_sd;
+    static constexpr std::string_view USERID_FIELD_NAME = "userId"sv;
+    static constexpr std::string_view USER_NAME_FIELD_NAME = "user"sv;
+    static constexpr std::string_view USER_DB_FIELD_NAME = "db"sv;
+    static constexpr std::string_view ROLE_NAME_FIELD_NAME = "role"sv;
+    static constexpr std::string_view ROLE_DB_FIELD_NAME = "db"sv;
+    static constexpr std::string_view PASSWORD_FIELD_NAME = "pwd"sv;
+    static constexpr std::string_view V1_USER_NAME_FIELD_NAME = "user"sv;
+    static constexpr std::string_view V1_USER_SOURCE_FIELD_NAME = "userSource"sv;
 
     /**
      * Status to be returned when authentication fails. Being consistent about our returned Status
@@ -141,7 +141,7 @@ public:
     /**
      * Name of the field in the auth schema version document containing the current schema version.
      */
-    static constexpr std::string_view schemaVersionFieldName = "currentVersion"_sd;
+    static constexpr std::string_view schemaVersionFieldName = "currentVersion"sv;
 
     /**
      * Auth schema version for MongoDB 3.0 SCRAM only mode.

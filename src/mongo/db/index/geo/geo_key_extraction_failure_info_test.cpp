@@ -31,15 +31,17 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kErrInfoFieldNameForTest = "errInfo"_sd;
+constexpr auto kErrInfoFieldNameForTest = "errInfo"sv;
 const BSONObj kFailingElement = BSON("type" << "Point" << "coordinates" << BSON_ARRAY("bad" << 0));
 
 TEST(GeoKeyExtractionFailureInfo, SerializeNestsFieldsUnderErrInfo) {

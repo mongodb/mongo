@@ -668,7 +668,7 @@ public:
             auto inRequest = OpMsgRequest::parse(in(), client);
             const BSONObj& body = inRequest.body;
             const auto& [cmd, firstElement] = body.firstElement();
-            if (cmd != "getMore"_sd)
+            if (cmd != "getMore"sv)
                 return boost::none;
             return inRequest;
         } catch (const DBException& e) {

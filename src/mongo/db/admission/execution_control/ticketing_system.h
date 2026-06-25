@@ -50,6 +50,7 @@
 namespace mongo {
 namespace admission {
 namespace MONGO_MOD_PUBLIC execution_control {
+using namespace std::literals::string_view_literals;
 
 enum class ExecutionControlConcurrencyAdjustmentAlgorithmEnum;
 
@@ -70,11 +71,11 @@ class MONGO_MOD_PUBLIC TicketingSystem {
 public:
     static constexpr auto kDefaultConcurrentTransactionsValue = 128;
     static constexpr auto kUnsetLowPriorityConcurrentTransactionsValue = -1;
-    static constexpr auto kExemptPriorityName = "exempt"_sd;
-    static constexpr auto kLowPriorityName = "lowPriority"_sd;
-    static constexpr auto kNormalPriorityName = "normalPriority"_sd;
-    static constexpr auto kNonDeprioritizableName = "nonDeprioritizable"_sd;
-    static constexpr auto kDeprioritizableName = "deprioritizable"_sd;
+    static constexpr auto kExemptPriorityName = "exempt"sv;
+    static constexpr auto kLowPriorityName = "lowPriority"sv;
+    static constexpr auto kNormalPriorityName = "normalPriority"sv;
+    static constexpr auto kNonDeprioritizableName = "nonDeprioritizable"sv;
+    static constexpr auto kDeprioritizableName = "deprioritizable"sv;
 
     struct RWTicketHolder {
         std::unique_ptr<TicketHolder> read;

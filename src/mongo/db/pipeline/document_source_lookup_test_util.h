@@ -42,6 +42,7 @@
 
 namespace mongo {
 namespace test {
+using namespace std::literals::string_view_literals;
 /**
  * A mock 'MongoProcessInterface' which allows mocking a foreign pipeline. If
  * 'removeLeadingQueryStages' is true then any $match, $sort or $project fields at the start of
@@ -90,7 +91,7 @@ boost::intrusive_ptr<DocumentSourceLookUp> makeLookUpFromJson(
     std::string_view json, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 BSONObj sequentialCacheStageObj(
-    std::string_view status = "kBuilding"_sd,
+    std::string_view status = "kBuilding"sv,
     long long maxSizeBytes = loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes));
 
 boost::intrusive_ptr<mongo::exec::agg::LookUpStage> buildLookUpStage(

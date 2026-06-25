@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -43,6 +42,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * All hybrid search stages are implemented as a desugared list of other non-hybrid search stages.
@@ -139,7 +139,7 @@ private:
     // Prefix applied to flat field names in the $group stage output. Because $group cannot
     // output dotted-path field names, all accumulated per-pipeline values are stored under
     // "__hs_"-prefixed flat names so they can later be referenced.
-    static constexpr std::string_view kHsFlatFieldPrefix = "__hs_"_sd;
+    static constexpr std::string_view kHsFlatFieldPrefix = "__hs_"sv;
 
     /**
      * Build a $group and $replaceRoot that aggregate scores across input pipelines and restore

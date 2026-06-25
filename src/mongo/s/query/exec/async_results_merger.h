@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/namespace_string.h"
@@ -74,6 +73,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class CursorResponse;
 
@@ -105,7 +105,7 @@ class AsyncResultsMerger : public std::enable_shared_from_this<AsyncResultsMerge
 public:
     // When mongos has to do a merge in order to return results to the client in the correct sort
     // order, it requests a sortKey meta-projection using this field name.
-    static constexpr std::string_view kSortKeyField = "$sortKey"_sd;
+    static constexpr std::string_view kSortKeyField = "$sortKey"sv;
 
     // The expected sort key pattern when 'compareWholeSortKey' is true.
     static const BSONObj kWholeSortKeySortPattern;

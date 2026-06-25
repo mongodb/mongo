@@ -41,13 +41,14 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class ExtendedCanonicalV200Generator {
 public:
     void writeNull(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, "null"_sd);
+        appendTo(buffer, "null"sv);
     }
     void writeUndefined(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({"$undefined":true})"_sd);
+        appendTo(buffer, R"({"$undefined":true})"sv);
     }
 
     void writeString(fmt::memory_buffer& buffer, std::string_view str) const {
@@ -58,9 +59,9 @@ public:
 
     void writeBool(fmt::memory_buffer& buffer, bool val) const {
         if (val)
-            appendTo(buffer, "true"_sd);
+            appendTo(buffer, "true"sv);
         else
-            appendTo(buffer, "false"_sd);
+            appendTo(buffer, "false"sv);
     }
 
     void writeInt32(fmt::memory_buffer& buffer, int32_t val) const {
@@ -77,12 +78,12 @@ public:
             fmt::format_to(
                 std::back_inserter(buffer), FMT_COMPILE(R"({{"$numberDouble":"{}"}})"), val);
         else if (std::isnan(val))
-            appendTo(buffer, R"({"$numberDouble":"NaN"})"_sd);
+            appendTo(buffer, R"({"$numberDouble":"NaN"})"sv);
         else if (std::isinf(val)) {
             if (val > 0)
-                appendTo(buffer, R"({"$numberDouble":"Infinity"})"_sd);
+                appendTo(buffer, R"({"$numberDouble":"Infinity"})"sv);
             else
-                appendTo(buffer, R"({"$numberDouble":"-Infinity"})"_sd);
+                appendTo(buffer, R"({"$numberDouble":"-Infinity"})"sv);
         } else {
             StringBuilder ss;
             ss << "Number " << val << " cannot be represented in JSON";
@@ -92,7 +93,7 @@ public:
 
     void writeDecimal128(fmt::memory_buffer& buffer, Decimal128 val) const {
         if (val.isNaN())
-            appendTo(buffer, R"({"$numberDecimal":"NaN"})"_sd);
+            appendTo(buffer, R"({"$numberDecimal":"NaN"})"sv);
         else if (val.isInfinite())
             fmt::format_to(std::back_inserter(buffer),
                            FMT_COMPILE(R"({{"$numberDecimal":"{}"}})"),
@@ -112,7 +113,7 @@ public:
 
     void writeDBRef(fmt::memory_buffer& buffer, std::string_view ref, OID id) const {
         // Collection names can unfortunately contain control characters that need to be escaped
-        appendTo(buffer, R"({"$ref":")"_sd);
+        appendTo(buffer, R"({"$ref":")"sv);
         str::escapeForJSON(buffer, ref);
 
         // OID is a hex string and does not need to be escaped
@@ -171,7 +172,7 @@ public:
                 static_cast<uint8_t>(data[14]),
                 static_cast<uint8_t>(data[15]));
         } else {
-            appendTo(buffer, R"({"$binary":{"base64":")"_sd);
+            appendTo(buffer, R"({"$binary":{"base64":")"sv);
             base64::encode(buffer, data);
             fmt::format_to(
                 std::back_inserter(buffer), FMT_COMPILE(R"(","subType":"{:x}"}}}})"), type);
@@ -181,38 +182,38 @@ public:
     void writeRegex(fmt::memory_buffer& buffer,
                     std::string_view pattern,
                     std::string_view options) const {
-        appendTo(buffer, R"({"$regularExpression":{"pattern":")"_sd);
+        appendTo(buffer, R"({"$regularExpression":{"pattern":")"sv);
         str::escapeForJSON(buffer, pattern);
-        appendTo(buffer, R"(","options":")"_sd);
+        appendTo(buffer, R"(","options":")"sv);
         str::escapeForJSON(buffer, options);
-        appendTo(buffer, R"("}})"_sd);
+        appendTo(buffer, R"("}})"sv);
     }
 
     void writeSymbol(fmt::memory_buffer& buffer, std::string_view symbol) const {
-        appendTo(buffer, R"({"$symbol":")"_sd);
+        appendTo(buffer, R"({"$symbol":")"sv);
         str::escapeForJSON(buffer, symbol);
-        appendTo(buffer, R"("})"_sd);
+        appendTo(buffer, R"("})"sv);
     }
 
     void writeCode(fmt::memory_buffer& buffer, std::string_view code) const {
-        appendTo(buffer, R"({"$code":")"_sd);
+        appendTo(buffer, R"({"$code":")"sv);
         str::escapeForJSON(buffer, code);
-        appendTo(buffer, R"("})"_sd);
+        appendTo(buffer, R"("})"sv);
     }
     void writeCodeWithScope(fmt::memory_buffer& buffer,
                             std::string_view code,
                             BSONObj const& scope) const {
-        appendTo(buffer, R"({"$code":")"_sd);
+        appendTo(buffer, R"({"$code":")"sv);
         str::escapeForJSON(buffer, code);
-        appendTo(buffer, R"(","$scope":)"_sd);
+        appendTo(buffer, R"(","$scope":)"sv);
         scope.jsonStringGenerator(*this, 0, false, buffer);
-        appendTo(buffer, R"(})"_sd);
+        appendTo(buffer, R"(})"sv);
     }
     void writeMinKey(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({"$minKey":1})"_sd);
+        appendTo(buffer, R"({"$minKey":1})"sv);
     }
     void writeMaxKey(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({"$maxKey":1})"_sd);
+        appendTo(buffer, R"({"$maxKey":1})"sv);
     }
     void writePadding(fmt::memory_buffer& buffer) const {}
 

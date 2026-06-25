@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -58,6 +57,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalListCollections);
 
@@ -68,7 +68,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalListCollections);
  */
 class DocumentSourceInternalListCollections final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalListCollections"_sd;
+    static constexpr std::string_view kStageName = "$_internalListCollections"sv;
 
     DocumentSourceInternalListCollections(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 

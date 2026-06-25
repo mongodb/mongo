@@ -37,6 +37,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * These tests are for CodeFragment::appendAccessVal.  In particular, testing that the
  * values of the SlotAccessors being appended are passed through and deserialized correctly.
@@ -81,14 +82,14 @@ DEATH_TEST(SBEVMBytecodeValidationDeathTest,
 }
 
 TEST(CodeFragmentTest, AggCollMinMalformedCollation) {
-    auto [accTag, accVal] = sbe::value::makeNewString("accumulate me"_sd);
+    auto [accTag, accVal] = sbe::value::makeNewString("accumulate me"sv);
     sbe::value::OwnedValueAccessor accAccessor;
     accAccessor.reset(accTag, accVal);
 
     sbe::vm::CodeFragment fragment;
     fragment.appendMoveVal(&accAccessor);
     fragment.appendConstVal(sbe::value::TypeTags::Nothing, sbe::value::Value{0});
-    sbe::value::TagValueOwned field{sbe::value::makeNewString("fieldName"_sd)};
+    sbe::value::TagValueOwned field{sbe::value::makeNewString("fieldName"sv)};
     fragment.appendConstVal(field.tag(), field.value());
     fragment.appendCollMin();
 
@@ -97,18 +98,18 @@ TEST(CodeFragmentTest, AggCollMinMalformedCollation) {
 
     ASSERT(res.owned());
     ASSERT(sbe::value::isString(res.tag()));
-    ASSERT_EQ(sbe::value::getStringView(res.tag(), res.value()), "accumulate me"_sd);
+    ASSERT_EQ(sbe::value::getStringView(res.tag(), res.value()), "accumulate me"sv);
 }
 
 TEST(CodeFragmentTest, AggCollMaxMalformedCollation) {
-    auto [accTag, accVal] = sbe::value::makeNewString("accumulate me"_sd);
+    auto [accTag, accVal] = sbe::value::makeNewString("accumulate me"sv);
     sbe::value::OwnedValueAccessor accAccessor;
     accAccessor.reset(accTag, accVal);
 
     sbe::vm::CodeFragment fragment;
     fragment.appendMoveVal(&accAccessor);
     fragment.appendConstVal(sbe::value::TypeTags::Nothing, sbe::value::Value{0});
-    sbe::value::TagValueOwned field{sbe::value::makeNewString("fieldName"_sd)};
+    sbe::value::TagValueOwned field{sbe::value::makeNewString("fieldName"sv)};
     fragment.appendConstVal(field.tag(), field.value());
     fragment.appendCollMax();
 
@@ -117,7 +118,7 @@ TEST(CodeFragmentTest, AggCollMaxMalformedCollation) {
 
     ASSERT(res.owned());
     ASSERT(sbe::value::isString(res.tag()));
-    ASSERT_EQ(sbe::value::getStringView(res.tag(), res.value()), "accumulate me"_sd);
+    ASSERT_EQ(sbe::value::getStringView(res.tag(), res.value()), "accumulate me"sv);
 }
 
 DEATH_TEST(SBEVMBytecodeValidationDeathTest,

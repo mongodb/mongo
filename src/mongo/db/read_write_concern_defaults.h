@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
@@ -54,6 +53,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUB mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Class to manage Read Concern and Write Concern (RWC) defaults.
@@ -72,7 +72,7 @@ public:
     static constexpr std::string_view writeConcernFieldName = WriteConcern::kWriteConcernField;
 
     // The _id of the persisted default read/write concern document.
-    static constexpr std::string_view kPersistedDocumentId = "ReadWriteConcernDefaults"_sd;
+    static constexpr std::string_view kPersistedDocumentId = "ReadWriteConcernDefaults"sv;
 
     static boost::optional<ReadWriteConcernDefaults>& getDecoration(Service* service);
 

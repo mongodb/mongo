@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/change_stream_reader_context.h"
@@ -42,6 +41,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Indicates if and how the change event fetching can proceed.
@@ -57,9 +57,9 @@ enum class MONGO_MOD_PUBLIC ShardTargeterDecision {
 MONGO_MOD_NEEDS_REPLACEMENT inline std::string_view toString(ShardTargeterDecision decision) {
     switch (decision) {
         case ShardTargeterDecision::kContinue:
-            return "continue"_sd;
+            return "continue"sv;
         case ShardTargeterDecision::kSwitchToV1:
-            return "switchToV1"_sd;
+            return "switchToV1"sv;
     }
     MONGO_UNREACHABLE_TASSERT(10657560);
 }

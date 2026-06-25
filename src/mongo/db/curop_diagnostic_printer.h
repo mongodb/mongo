@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 
@@ -45,14 +44,15 @@
  */
 
 namespace mongo::diagnostic_printers {
+using namespace std::literals::string_view_literals;
 
 constexpr inline auto kOmitUnsupportedCurOpMsg =
-    "omitted: this CurOp does not support diagnostic printing"_sd;
-constexpr inline auto kOmitUnrecognizedCommandMsg = "omitted: unrecognized command"_sd;
+    "omitted: this CurOp does not support diagnostic printing"sv;
+constexpr inline auto kOmitUnrecognizedCommandMsg = "omitted: unrecognized command"sv;
 constexpr inline auto kOmitUnsupportedCommandMsg =
-    "omitted: command does not support diagnostic printing"_sd;
-constexpr inline auto kOpCtxIsNullMsg = "opCtx is null"_sd;
-constexpr inline auto kCurOpIsNullMsg = "the opCtx's curOp is null"_sd;
+    "omitted: command does not support diagnostic printing"sv;
+constexpr inline auto kOpCtxIsNullMsg = "opCtx is null"sv;
+constexpr inline auto kCurOpIsNullMsg = "the opCtx's curOp is null"sv;
 
 /**
  * Indicates if the operation associated with 'opCtx' is ineligible for diagnostic logging. If the
@@ -72,8 +72,8 @@ public:
 
         Info info = _gatherInfo();
         out = fmt::format_to(out, "{{");
-        auto field = [&, sep = ""_sd](std::string_view name, const auto& value) mutable {
-            out = fmt::format_to(out, "{}'{}': {}", std::exchange(sep, ", "_sd), name, value);
+        auto field = [&, sep = ""sv](std::string_view name, const auto& value) mutable {
+            out = fmt::format_to(out, "{}'{}': {}", std::exchange(sep, ", "sv), name, value);
         };
         field("currentOp", info.opDebug);
         field("opDescription", info.opDesc);

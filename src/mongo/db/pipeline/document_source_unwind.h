@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/agg/unwind_processor.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -59,12 +58,13 @@
 
 // TODO SERVER-116044: Remove external dependencies on this header.
 namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Unwind);
 
 class DocumentSourceUnwind final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$unwind"_sd;
+    static constexpr std::string_view kStageName = "$unwind"sv;
 
     // virtuals from DocumentSource
     std::string_view getSourceName() const final;

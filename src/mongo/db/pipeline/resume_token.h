@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -48,6 +47,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 struct ResumeTokenData {
     /*
@@ -148,8 +148,8 @@ std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
  */
 class MONGO_MOD_PUBLIC ResumeToken {
 public:
-    constexpr static std::string_view kDataFieldName = "_data"_sd;
-    constexpr static std::string_view kTypeBitsFieldName = "_typeBits"_sd;
+    constexpr static std::string_view kDataFieldName = "_data"sv;
+    constexpr static std::string_view kTypeBitsFieldName = "_typeBits"sv;
 
     /**
      * Parse a resume token from a BSON object; used as an interface to the IDL parser.

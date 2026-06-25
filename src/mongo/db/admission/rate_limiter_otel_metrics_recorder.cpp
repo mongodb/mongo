@@ -29,7 +29,6 @@
 
 #include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_service.h"
@@ -37,6 +36,7 @@
 #include "mongo/util/moving_average.h"
 
 #include <algorithm>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>

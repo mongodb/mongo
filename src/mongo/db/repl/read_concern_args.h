@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -54,10 +53,11 @@
 
 namespace mongo {
 namespace repl {
+using namespace std::literals::string_view_literals;
 
 class MONGO_MOD_PUB ReadConcernArgs {
 public:
-    static constexpr std::string_view kReadConcernFieldName = "readConcern"_sd;
+    static constexpr std::string_view kReadConcernFieldName = "readConcern"sv;
     static constexpr std::string_view kAfterOpTimeFieldName = ReadConcernIdl::kAfterOpTimeFieldName;
     static constexpr std::string_view kAfterClusterTimeFieldName =
         ReadConcernIdl::kAfterClusterTimeFieldName;

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_all_indices_stage.h"
@@ -57,6 +56,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class OperationContext;
 
@@ -118,7 +118,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr std::string_view kStageType = "SUBPLAN"_sd;
+    static constexpr std::string_view kStageType = "SUBPLAN"sv;
 
     /**
      * Selects a plan using subplanning. First uses the query planning results from

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/role_name.h"
@@ -44,6 +43,7 @@
 
 namespace mongo {
 namespace auth {
+using namespace std::literals::string_view_literals;
 
 /**
  * Wraps the usersInfo and rolesInfo command args.
@@ -169,7 +169,7 @@ public:
     }
 
 private:
-    static constexpr std::string_view kForAllDBs = "forAllDBs"_sd;
+    static constexpr std::string_view kForAllDBs = "forAllDBs"sv;
 
     struct AllOnCurrentDB {};
     struct AllForAllDBs {};

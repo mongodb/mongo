@@ -43,6 +43,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport {
+using namespace std::literals::string_view_literals;
 
 using ListeningSocket = HandoffListenerThread::ListeningSocket;
 
@@ -185,7 +186,7 @@ void HandoffTransportLayer::shutdown() {
 }
 
 std::string_view HandoffTransportLayer::getNameForLogging() const {
-    return "HandoffTransportLayer"_sd;
+    return "HandoffTransportLayer"sv;
 }
 
 ReactorHandle HandoffTransportLayer::getReactor(WhichReactor) {

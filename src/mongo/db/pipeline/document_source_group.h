@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -47,6 +46,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Group);
 
@@ -56,7 +56,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Group);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceGroup final : public DocumentSourceGroupBase {
 public:
-    static constexpr std::string_view kStageName = "$group"_sd;
+    static constexpr std::string_view kStageName = "$group"sv;
 
     std::string_view getSourceName() const final;
 

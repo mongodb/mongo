@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/lock_manager/fast_list_based_map.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
@@ -39,6 +38,7 @@
 #include <functional>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 

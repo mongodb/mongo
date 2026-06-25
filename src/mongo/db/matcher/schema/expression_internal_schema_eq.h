@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/unordered_fields_bsonelement_comparator.h"
@@ -50,6 +49,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * MatchExpression for $_internalSchemaEq, which behaves similar to $eq except:
@@ -61,7 +61,7 @@ namespace mongo {
  */
 class InternalSchemaEqMatchExpression final : public LeafMatchExpression {
 public:
-    static constexpr std::string_view kName = "$_internalSchemaEq"_sd;
+    static constexpr std::string_view kName = "$_internalSchemaEq"sv;
 
     InternalSchemaEqMatchExpression(boost::optional<std::string_view> path,
                                     BSONElement rhs,

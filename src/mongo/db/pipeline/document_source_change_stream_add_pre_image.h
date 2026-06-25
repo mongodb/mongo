@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -54,6 +53,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamAddPreImage);
 using ChangeStreamAddPreImageLiteParsed =
@@ -67,7 +67,7 @@ using ChangeStreamAddPreImageLiteParsed =
  */
 class DocumentSourceChangeStreamAddPreImage final : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr std::string_view kStageName = "$_internalChangeStreamAddPreImage"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamAddPreImage"sv;
     static constexpr std::string_view kFullDocumentBeforeChangeFieldName =
         DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
     static constexpr std::string_view kPreImageIdFieldName =

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
@@ -54,6 +53,7 @@ namespace mongo {
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Documents);
 
 namespace DocumentSourceDocuments {
+using namespace std::literals::string_view_literals;
 class LiteParsed : public LiteParsedDocumentSourceDefault<LiteParsed> {
 public:
     static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
@@ -90,7 +90,7 @@ public:
 };
 
 const inline std::string kGenFieldName = "_tempDocumentsField";
-constexpr inline std::string_view kStageName = "$documents"_sd;
+constexpr inline std::string_view kStageName = "$documents"sv;
 
 std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -52,12 +51,13 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Redact);
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceRedact final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$redact"_sd;
+    static constexpr std::string_view kStageName = "$redact"sv;
     std::string_view getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize();
 

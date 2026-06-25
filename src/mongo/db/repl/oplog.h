@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
@@ -102,6 +101,7 @@ public:
 };
 
 namespace repl {
+using namespace std::literals::string_view_literals;
 namespace internal {
 MONGO_MOD_NEEDS_REPLACEMENT Status
 insertDocumentsForOplog(OperationContext* opCtx,
@@ -199,14 +199,14 @@ using IncrementOpsAppliedStatsFn = std::function<void(int64_t)>;
  */
 class OplogApplication {
 public:
-    static constexpr std::string_view kInitialSyncOplogApplicationMode = "InitialSync"_sd;
+    static constexpr std::string_view kInitialSyncOplogApplicationMode = "InitialSync"sv;
     // This only being used in 'applyOps' command when sent by client.
-    static constexpr std::string_view kRecoveringOplogApplicationMode = "Recovering"_sd;
-    static constexpr std::string_view kStableRecoveringOplogApplicationMode = "StableRecovering"_sd;
+    static constexpr std::string_view kRecoveringOplogApplicationMode = "Recovering"sv;
+    static constexpr std::string_view kStableRecoveringOplogApplicationMode = "StableRecovering"sv;
     static constexpr std::string_view kUnstableRecoveringOplogApplicationMode =
-        "UnstableRecovering"_sd;
-    static constexpr std::string_view kSecondaryOplogApplicationMode = "Secondary"_sd;
-    static constexpr std::string_view kApplyOpsCmdOplogApplicationMode = "ApplyOps"_sd;
+        "UnstableRecovering"sv;
+    static constexpr std::string_view kSecondaryOplogApplicationMode = "Secondary"sv;
+    static constexpr std::string_view kApplyOpsCmdOplogApplicationMode = "ApplyOps"sv;
 
     enum class Mode {
         // Used during the oplog application phase of the initial sync process.

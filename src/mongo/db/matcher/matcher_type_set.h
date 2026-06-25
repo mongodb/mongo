@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +50,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using findBSONTypeAliasFun = std::function<boost::optional<BSONType>(std::string_view)>;
 
@@ -60,7 +60,7 @@ using findBSONTypeAliasFun = std::function<boost::optional<BSONType>(std::string
  * and so on).
  */
 struct MatcherTypeSet {
-    static constexpr std::string_view kMatchesAllNumbersAlias = "number"_sd;
+    static constexpr std::string_view kMatchesAllNumbersAlias = "number"sv;
 
     // Maps from the set of JSON Schema primitive types to the corresponding BSON types. Excludes
     // "number" since this alias maps to a set of BSON types, and "integer" since it is not

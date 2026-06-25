@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -64,6 +63,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListCachedAndActiveUsers);
 
@@ -73,7 +73,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListCachedAndActiveUsers);
  */
 class DocumentSourceListCachedAndActiveUsers final {
 public:
-    static constexpr std::string_view kStageName = "$listCachedAndActiveUsers"_sd;
+    static constexpr std::string_view kStageName = "$listCachedAndActiveUsers"sv;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

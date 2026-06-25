@@ -39,6 +39,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 // Helper that's used to make tests easier to write (and read). Not all tests have been changed
 // to use this, but see the block hashagg unit test for an example.
 struct CopyableValueBlock {
@@ -205,8 +206,8 @@ static TypedValues makeInterestingValues() {
     vals.push_back(makeBool(false));
     vals.push_back(makeBool(true));
 
-    vals.push_back(value::makeNewString("regular string"_sd));  // StringBig
-    vals.push_back(value::makeNewString("tinystr"_sd));         // StringSmall
+    vals.push_back(value::makeNewString("regular string"sv));  // StringBig
+    vals.push_back(value::makeNewString("tinystr"sv));         // StringSmall
 
     vals.push_back(makeDecimal("-1234.5678"));
     vals.push_back(makeDecimal("1234.5678"));

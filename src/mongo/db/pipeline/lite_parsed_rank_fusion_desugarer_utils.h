@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -41,6 +40,7 @@
 #include <vector>
 
 namespace mongo::lite_parsed_hybrid_search_desugarer::rank_fusion_utils {
+using namespace std::literals::string_view_literals;
 
 inline constexpr int kRankConstant = RankFusionPipelineBuilder::kRankConstant;
 inline constexpr std::string_view kInternalFieldsName =
@@ -51,7 +51,7 @@ inline constexpr std::string_view kScoreDetailsDescription =
 
 // Per-pipeline scoreDetails scalar field suffix used in the desugared $group output (and the
 // matching $replaceRoot wrapper). For $rankFusion the per-pipeline scalar is "<p>_rank".
-inline constexpr std::string_view kDetailsScalarSuffix = "_rank"_sd;
+inline constexpr std::string_view kDetailsScalarSuffix = "_rank"sv;
 
 // {$_internalSetWindowFields: {sortBy: {order: 1},
 //                              output: {<INTERNAL_FIELDS>.<p>_rank: {$rank: {}}}}}

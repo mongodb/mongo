@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -58,17 +57,18 @@
 namespace mongo {
 
 namespace address_restriction_detail {
+using namespace std::literals::string_view_literals;
 
 struct ClientSource {
-    static constexpr auto label = "Client source "_sd;
-    static constexpr auto field = "clientSource"_sd;
+    static constexpr auto label = "Client source "sv;
+    static constexpr auto field = "clientSource"sv;
     static auto addr(const RestrictionEnvironment& environment) {
         return environment.getClientSource();
     }
 };
 struct ServerAddress {
-    static constexpr auto label = "Server address "_sd;
-    static constexpr auto const field = "serverAddress"_sd;
+    static constexpr auto label = "Server address "sv;
+    static constexpr auto const field = "serverAddress"sv;
     static auto addr(const RestrictionEnvironment& environment) {
         return environment.getServerAddress();
     }

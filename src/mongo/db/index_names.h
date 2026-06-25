@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class BSONObj;
 
@@ -107,8 +107,8 @@ public:
  * Contain utilities to work with wildcard fields used for Wildcard indexes.
  */
 struct MONGO_MOD_PUBLIC WildcardNames {
-    static constexpr std::string_view WILDCARD_FIELD_NAME = "$**"_sd;
-    static constexpr std::string_view WILDCARD_FIELD_NAME_SUFFIX = ".$**"_sd;
+    static constexpr std::string_view WILDCARD_FIELD_NAME = "$**"sv;
+    static constexpr std::string_view WILDCARD_FIELD_NAME_SUFFIX = ".$**"sv;
 
     inline static bool isWildcardFieldName(std::string_view fieldName) {
         return fieldName == WILDCARD_FIELD_NAME || fieldName.ends_with(WILDCARD_FIELD_NAME_SUFFIX);

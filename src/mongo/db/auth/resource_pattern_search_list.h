@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
@@ -41,6 +40,7 @@
 #include <string_view>
 
 namespace mongo::auth {
+using namespace std::literals::string_view_literals;
 /**
  * A ResourcePatternSearchList represents up to kMaxResourcePatternLookups elements
  * of ResourcePattern objects representing the breakdown of the target ResourcePattern
@@ -87,7 +87,7 @@ namespace mongo::auth {
  */
 class ResourcePatternSearchList {
 private:
-    static constexpr std::string_view kSystemBucketsPrefix = "system.buckets."_sd;
+    static constexpr std::string_view kSystemBucketsPrefix = "system.buckets."sv;
     static constexpr std::size_t kMaxResourcePatternLookups = 10;
     using ListType = std::array<ResourcePattern, kMaxResourcePatternLookups>;
 

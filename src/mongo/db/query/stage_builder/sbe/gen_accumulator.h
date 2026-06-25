@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
@@ -42,7 +41,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder {
-const std::string_view kAccumulatorCountName = "$count"_sd;
+using namespace std::literals::string_view_literals;
+const std::string_view kAccumulatorCountName = "$count"sv;
 
 class PlanStageSlots;
 

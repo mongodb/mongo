@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -61,6 +60,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ChunkType;
 class CollectionType;
@@ -93,7 +93,7 @@ public:
 
     // Identifier of the config.shardRemovalLog document about the latest removeShard operation
     // committed on the cluster.
-    static constexpr auto kLatestShardRemovalLogId = "latestShardRemovalLog"_sd;
+    static constexpr auto kLatestShardRemovalLogId = "latestShardRemovalLog"sv;
 
     virtual ~ShardingCatalogClient() = default;
 

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/util/modules.h"
@@ -37,6 +36,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Represents options passed to the explain command (aside from the command which is being explained
@@ -50,7 +50,7 @@ public:
      */
     using Verbosity = explain::VerbosityEnum;
 
-    static constexpr std::string_view kVerbosityName = "verbosity"_sd;
+    static constexpr std::string_view kVerbosityName = "verbosity"sv;
 
     /**
      * Converts an explain verbosity to its string representation.

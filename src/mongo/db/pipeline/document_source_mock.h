@@ -51,6 +51,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * A mock DocumentSource which is useful for testing. In addition to re-spooling documents like
@@ -58,7 +59,7 @@ namespace mongo {
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMock : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$mock"_sd;
+    static constexpr std::string_view kStageName = "$mock"sv;
 
     static boost::intrusive_ptr<DocumentSourceMock> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);

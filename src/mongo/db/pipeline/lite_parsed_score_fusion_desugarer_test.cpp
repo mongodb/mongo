@@ -2147,7 +2147,7 @@ TEST_F(LiteParsedScoreFusionDesugarerTest, DesugarContainsInternalHybridSearchLa
     const NamespaceString& nss = getExpCtx()->getNamespaceString();
     auto lpsf = parseScoreFusion(nss, spec);
     auto desugared =
-        lite_parsed_hybrid_search_desugarer::desugarScoreFusion(*lpsf, nss, "pipeline_test"_sd);
+        lite_parsed_hybrid_search_desugarer::desugarScoreFusion(*lpsf, nss, "pipeline_test"sv);
     ASSERT_FALSE(desugared.empty());
     ASSERT_EQ(desugared.back()->getParseTimeName(), "$_internalHybridSearch");
 }

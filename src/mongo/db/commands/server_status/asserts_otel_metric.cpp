@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/init.h"
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_unit.h"
@@ -38,33 +37,35 @@
 #include "mongo/util/assert_util.h"
 
 #include <array>
+#include <string_view>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // Adding a new AssertionKind triggers a -Wswitch warning here, which we treat as an error.
 std::string_view kindToAttributeValue(AssertionKind kind) {
     switch (kind) {
         case AssertionKind::kRegular:
-            return "regular"_sd;
+            return "regular"sv;
         case AssertionKind::kMsg:
-            return "msg"_sd;
+            return "msg"sv;
         case AssertionKind::kUser:
-            return "user"_sd;
+            return "user"sv;
         case AssertionKind::kTripwire:
-            return "tripwire"_sd;
+            return "tripwire"sv;
     }
     MONGO_UNREACHABLE_TASSERT(12846000);
 }
 
 constexpr std::array<std::string_view, 4> kKindAttributeValues = {
-    "regular"_sd,
-    "msg"_sd,
-    "user"_sd,
-    "tripwire"_sd,
+    "regular"sv,
+    "msg"sv,
+    "user"sv,
+    "tripwire"sv,
 };
 
 // Single OTel counter that mirrors the per-type counters under `serverStatus.asserts.{kind}`. The

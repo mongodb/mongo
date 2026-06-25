@@ -22,13 +22,13 @@ cat IV.bin S.bin T.bin >C.bin
 
 cat <<EOF
     // clang-format off
-    vector.ad = "$(xxd -c 10000 -p AD.bin)"_sd;
-    vector.c = "$(xxd -c 10000 -p C.bin)"_sd;
-    vector.iv = "$(xxd -c 10000 -p IV.bin)"_sd;
-    vector.ke = "$(xxd -c 10000 -p Ke.bin)"_sd;
-    vector.km = "$(xxd -c 10000 -p Km.bin)"_sd;
-    vector.m = "$(xxd -c 10000 -p M.bin)"_sd;
-    vector.s = "$(xxd -c 10000 -p S.bin)"_sd;
-    vector.t = "$(xxd -c 10000 -p T.bin)"_sd;
+    vector.ad = "$(xxd -c 10000 -p AD.bin)"sv;
+    vector.c = "$(xxd -c 10000 -p C.bin)"sv;
+    vector.iv = "$(xxd -c 10000 -p IV.bin)"sv;
+    vector.ke = "$(xxd -c 10000 -p Ke.bin)"sv;
+    vector.km = "$(xxd -c 10000 -p Km.bin)"sv;
+    vector.m = "$(xxd -c 10000 -p M.bin)"sv;
+    vector.s = "$(xxd -c 10000 -p S.bin)"sv;
+    vector.t = "$(xxd -c 10000 -p T.bin)"sv;
     // clang-format on
 EOF

@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,14 +55,15 @@
 
 namespace mongo {
 namespace MONGO_MOD_PUBLIC scram {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kServerKeyConst = "Server Key"_sd;
-constexpr auto kClientKeyConst = "Client Key"_sd;
+constexpr auto kServerKeyConst = "Server Key"sv;
+constexpr auto kClientKeyConst = "Client Key"sv;
 
-constexpr auto kIterationCountFieldName = "iterationCount"_sd;
-constexpr auto kSaltFieldName = "salt"_sd;
-constexpr auto kStoredKeyFieldName = "storedKey"_sd;
-constexpr auto kServerKeyFieldName = "serverKey"_sd;
+constexpr auto kIterationCountFieldName = "iterationCount"sv;
+constexpr auto kSaltFieldName = "salt"sv;
+constexpr auto kStoredKeyFieldName = "storedKey"sv;
+constexpr auto kServerKeyFieldName = "serverKey"sv;
 
 const int kIterationCountMinimum = 4096;
 

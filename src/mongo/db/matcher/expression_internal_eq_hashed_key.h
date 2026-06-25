@@ -36,6 +36,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * An internal match expression node which represents a field path's hash being equal to the given
@@ -46,7 +47,7 @@ namespace mongo {
  */
 class InternalEqHashedKey : public ComparisonMatchExpressionBase {
 public:
-    static constexpr std::string_view kName = "$_internalEqHash"_sd;
+    static constexpr std::string_view kName = "$_internalEqHash"sv;
 
     InternalEqHashedKey(boost::optional<std::string_view> path, long long hashVal)
         : ComparisonMatchExpressionBase(MatchType::INTERNAL_EQ_HASHED_KEY,

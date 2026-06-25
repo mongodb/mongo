@@ -40,8 +40,9 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-inline constexpr auto kWiredTigerEngineName = "wiredTiger"_sd;
+inline constexpr auto kWiredTigerEngineName = "wiredTiger"sv;
 
 class BSONObjBuilder;
 class OperationContext;
@@ -99,8 +100,8 @@ private:
     WiredTigerUtil();
 
 public:
-    static constexpr std::string_view kConfigStringField = "configString"_sd;
-    static constexpr std::string_view kTableUriPrefix = "table:"_sd;
+    static constexpr std::string_view kConfigStringField = "configString"sv;
+    static constexpr std::string_view kTableUriPrefix = "table:"sv;
     static constexpr double memoryThresholdPercentage = 0.8;
 
     static std::string buildTableUri(std::string_view ident);

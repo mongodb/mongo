@@ -33,6 +33,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 /**
  * A stage visitor that accumulates the storage-related statistics inside itself when used for
  * walking over the SBE AST.
@@ -70,19 +71,19 @@ public:
 protected:
     void visit(const sbe::PlanStage* root) override {
         auto stats = root->getCommonStats();
-        if (stats->stageType == "fetch"_sd) {
+        if (stats->stageType == "fetch"sv) {
             collectionSeeks += stats->advances;
-        } else if (stats->stageType == "scan"_sd) {
+        } else if (stats->stageType == "scan"sv) {
             collectionScans += stats->opens;
-        } else if (stats->stageType == "ixseek"_sd || stats->stageType == "ixscan"_sd) {
+        } else if (stats->stageType == "ixseek"sv || stats->stageType == "ixscan"sv) {
             auto indexScanStage = checked_cast<const SimpleIndexScanStage*>(root);
             indexesUsed.push_back(indexScanStage->getIndexName());
-            if (stats->stageType == "ixseek"_sd) {
+            if (stats->stageType == "ixseek"sv) {
                 indexSeeks += stats->opens;
-            } else if (stats->stageType == "ixscan"_sd) {
+            } else if (stats->stageType == "ixscan"sv) {
                 indexScans += stats->opens;
             }
-        } else if (stats->stageType == "ixscan_generic"_sd) {
+        } else if (stats->stageType == "ixscan_generic"sv) {
             auto indexScanStage = checked_cast<const GenericIndexScanStage*>(root);
             indexesUsed.push_back(indexScanStage->getIndexName());
             indexSeeks += stats->opens;

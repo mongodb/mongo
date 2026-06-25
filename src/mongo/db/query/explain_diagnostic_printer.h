@@ -39,6 +39,7 @@
 #include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
+using namespace std::literals::string_view_literals;
 
 /*
  * Computes a diagnostic string containing explain information about the current operation for use
@@ -48,7 +49,7 @@ namespace mongo::diagnostic_printers {
  * of these diagnostics is done lazily during failure handling.
  */
 struct ExplainDiagnosticPrinter {
-    static constexpr std::string_view kNoExecOpMsg = "omitted: no executor"_sd;
+    static constexpr std::string_view kNoExecOpMsg = "omitted: no executor"sv;
 
     auto format(auto& fc) const {
         auto out = fc.out();

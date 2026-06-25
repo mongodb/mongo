@@ -28,7 +28,6 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +47,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This class is used to represent the shard version of a collection. Objects of this class can be
@@ -63,7 +63,7 @@ public:
      * The name for the shard version information field, which shard-aware commands should include
      * if they want to convey shard version.
      */
-    static constexpr std::string_view kShardVersionField = "shardVersion"_sd;
+    static constexpr std::string_view kShardVersionField = "shardVersion"sv;
 
     ShardVersion() : _chunkVersion(ChunkVersion()) {}
 

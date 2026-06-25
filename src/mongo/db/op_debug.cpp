@@ -53,6 +53,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 std::string_view getProtoString(int op) {
     if (op == dbMsg) {
         return "op_msg";
@@ -165,11 +166,11 @@ void addSpillingStats(const absl::flat_hash_map<PlanSummaryStats::SpillingStage,
 std::string_view getPlanRankerMethodName(PlanRankerMethod method) {
     switch (method) {
         case PlanRankerMethod::kMultiPlanner:
-            return "mp"_sd;
+            return "mp"sv;
         case PlanRankerMethod::kCostBasedRanker:
-            return "cbr"_sd;
+            return "cbr"sv;
         case PlanRankerMethod::kNone:
-            return "none"_sd;
+            return "none"sv;
         default:
             MONGO_UNREACHABLE;
     }

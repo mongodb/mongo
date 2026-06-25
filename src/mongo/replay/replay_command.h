@@ -40,9 +40,10 @@
 #include <string>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class ReplayCommand {
 public:
-    static constexpr auto kEventFieldName = "event"_sd;
+    static constexpr auto kEventFieldName = "event"sv;
 
     explicit ReplayCommand(TrafficReaderPacket packet) : _packet(std::move(packet)) {}
     /*

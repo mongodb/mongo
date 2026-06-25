@@ -63,14 +63,15 @@ using RemoteExplainVector = std::vector<BSONObj>;
 
 extern FailPoint searchReturnEofImmediately;
 namespace search_helpers {
+using namespace std::literals::string_view_literals;
 
-static constexpr std::string_view kViewFieldName = "view"_sd;
-static constexpr std::string_view kProtocolStoredFieldsName = "storedSource"_sd;
+static constexpr std::string_view kViewFieldName = "view"sv;
+static constexpr std::string_view kProtocolStoredFieldsName = "storedSource"sv;
 // The stage name of the extension's executable agg stage. IMPORTANT - if this changes in any of the
 // search extensions, we must change it here or else the metrics will not be reported correctly.
-static constexpr std::string_view kExtensionVectorSearchStageName = "$_extensionVectorSearch"_sd;
-static constexpr std::string_view kExtensionSearchStageName = "$_extensionSearch"_sd;
-static constexpr std::string_view kExtensionSearchMetaStageName = "$_extensionSearchMeta"_sd;
+static constexpr std::string_view kExtensionVectorSearchStageName = "$_extensionVectorSearch"sv;
+static constexpr std::string_view kExtensionSearchStageName = "$_extensionSearch"sv;
+static constexpr std::string_view kExtensionSearchMetaStageName = "$_extensionSearchMeta"sv;
 
 /**
  * Consult mongot to get planning information for sharded search queries, used to configure the

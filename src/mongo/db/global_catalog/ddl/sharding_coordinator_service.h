@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state.h"
@@ -58,6 +57,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ShardingCoordinator;
 
@@ -66,7 +66,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinatorService final
       public DDLLockManager::Recoverable,
       public ActiveMigrationsRegistry::Recoverable {
 public:
-    static constexpr std::string_view kServiceName = "ShardingCoordinator"_sd;
+    static constexpr std::string_view kServiceName = "ShardingCoordinator"sv;
 
     explicit ShardingCoordinatorService(
         ServiceContext* serviceContext,

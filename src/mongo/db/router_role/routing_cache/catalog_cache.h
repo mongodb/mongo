@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
@@ -61,6 +60,7 @@
 #include <boost/smart_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ComparableDatabaseVersion;
 
@@ -355,7 +355,7 @@ public:
                  std::shared_ptr<CatalogCacheLoader> collectionCacheLoader,
                  bool cascadeDatabaseCacheLoaderShutdown = true,
                  bool cascadeCollectionCacheLoaderShutdown = true,
-                 std::string_view kind = ""_sd);
+                 std::string_view kind = ""sv);
 
     /**
      * Constructs a CatalogCache using a single cache loader for both database and collection
@@ -363,7 +363,7 @@ public:
      */
     CatalogCache(ServiceContext* service,
                  std::shared_ptr<CatalogCacheLoader> cacheLoader,
-                 std::string_view kind = ""_sd);
+                 std::string_view kind = ""sv);
 
     virtual ~CatalogCache();
 

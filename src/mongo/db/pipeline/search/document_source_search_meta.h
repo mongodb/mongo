@@ -37,6 +37,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(SearchMeta);
 
@@ -46,7 +47,7 @@ DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(SearchMeta);
  */
 class DocumentSourceSearchMeta final : public DocumentSourceInternalSearchMongotRemote {
 public:
-    static constexpr std::string_view kStageName = "$searchMeta"_sd;
+    static constexpr std::string_view kStageName = "$searchMeta"sv;
 
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);

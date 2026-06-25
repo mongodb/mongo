@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/modules.h"
@@ -39,6 +38,7 @@
 #include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
+using namespace std::literals::string_view_literals;
 
 /**
  * Diagnostic printer for QueryPlannerParams. For example, it includes indexes considered during
@@ -55,10 +55,10 @@ struct QueryPlannerParamsPrinter {
                                  info.exists,
                                  info.stats.isTimeseries);
 
-            auto sep = ""_sd;
+            auto sep = ""sv;
             std::for_each(info.indexes.begin(), info.indexes.end(), [&](const IndexEntry& ie) {
                 out = fmt::format_to(
-                    out, "{}\"{}\"", std::exchange(sep, ", "_sd), redact(getIndexEntryStr(ie)));
+                    out, "{}\"{}\"", std::exchange(sep, ", "sv), redact(getIndexEntryStr(ie)));
             });
             out = fmt::format_to(out, "]}}");
         };

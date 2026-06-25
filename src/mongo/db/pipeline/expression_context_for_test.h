@@ -43,6 +43,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * An ExpressionContext with a default OperationContext that can have state (like the resolved
@@ -63,7 +64,7 @@ public:
      */
     ExpressionContextForTest()
         : ExpressionContextForTest(
-              NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd)) {}
+              NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv)) {}
     /**
      * If there is a global ServiceContext available, this constructor will adopt it. Otherwise, it
      * will internally create an owned QueryTestServiceContext. Similarly, if an OperationContext
@@ -116,7 +117,7 @@ public:
      */
     ExpressionContextForTest(OperationContext* opCtx)
         : ExpressionContextForTest(
-              opCtx, NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd)) {}
+              opCtx, NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv)) {}
 
     /**
      * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will

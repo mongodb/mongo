@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -46,6 +45,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This class is used to represent a specific version of a Database.
@@ -61,7 +61,7 @@ public:
      * The name for the database version information field, which shard-aware commands should
      * include if they want to convey database version.
      */
-    static constexpr std::string_view kDatabaseVersionField = "databaseVersion"_sd;
+    static constexpr std::string_view kDatabaseVersionField = "databaseVersion"sv;
 
     using DatabaseVersionBase::getTimestamp;
 

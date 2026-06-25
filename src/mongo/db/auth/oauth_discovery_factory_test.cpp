@@ -202,7 +202,7 @@ TEST_F(OAuthDiscoveryFactoryFixture, EndpointMayBeInsecureLocalhostUnderTest) {
         // The issuer must continue to match the requested issuer (RFC 8414 §3.3), so changing it to
         // localhost while requesting https://idp.example is covered separately by
         // LocalhostIssuerMatchesUnderTest.
-        if (field.fieldName() == "issuer"_sd) {
+        if (field.fieldName() == "issuer"sv) {
             continue;
         }
 
@@ -231,8 +231,8 @@ TEST_F(OAuthDiscoveryFactoryFixture, LocalhostIssuerMatchesUnderTest) {
     // A localhost issuer is permitted under test as long as the returned metadata issuer matches
     // the requested issuer.
     OAuthAuthorizationServerMetadata metadata;
-    metadata.setIssuer("http://localhost:9000"_sd);
-    metadata.setJwksUri("http://localhost:9000/jwks"_sd);
+    metadata.setIssuer("http://localhost:9000"sv);
+    metadata.setJwksUri("http://localhost:9000/jwks"sv);
 
     std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
     client->expect(
@@ -262,7 +262,7 @@ TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryIssuerMatchesWithTrailingSlashMism
     // A trailing slash difference between the requested issuer and the returned metadata issuer is
     // tolerated; the comparison normalizes a single trailing slash on each side.
     OAuthAuthorizationServerMetadata metadata;
-    metadata.setIssuer("https://idp.example/"_sd);
+    metadata.setIssuer("https://idp.example/"sv);
     metadata.setJwksUri(kJWKSUri);
 
     std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();

@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authentication_metrics.h"
@@ -54,6 +53,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class Client;
 
@@ -252,20 +252,20 @@ public:
     friend constexpr std::string_view toString(StepType step) {
         switch (step) {
             case StepType::kSaslSupportedMechanisms:
-                return "SaslSupportedMechanisms"_sd;
+                return "SaslSupportedMechanisms"sv;
             case StepType::kSaslStart:
-                return "SaslStart"_sd;
+                return "SaslStart"sv;
             case StepType::kSaslContinue:
-                return "SaslContinue"_sd;
+                return "SaslContinue"sv;
             case StepType::kAuthenticate:
-                return "Authenticate"_sd;
+                return "Authenticate"sv;
             case StepType::kSpeculativeSaslStart:
-                return "SpeculativeSaslStart"_sd;
+                return "SpeculativeSaslStart"sv;
             case StepType::kSpeculativeAuthenticate:
-                return "SpeculativeAuthenticate"_sd;
+                return "SpeculativeAuthenticate"sv;
         }
 
-        return "Unknown"_sd;
+        return "Unknown"sv;
     }
 
 private:

@@ -2395,7 +2395,7 @@ TEST_F(ServiceContextTest, FLE_EDC_RangeParamtersFlow_Find) {
 
     auto result = client.encryptPlaceholders(obj, markedDoc, keyVault);
 
-    auto rangePayload = ParsedFindRangePayload(result.firstElement(), ""_sd, boost::none);
+    auto rangePayload = ParsedFindRangePayload(result.firstElement(), ""sv, boost::none);
 
     ASSERT_EQ(rangePayload.precision.get(), 4);
     ASSERT_EQ(rangePayload.trimFactor.get(), 5);
@@ -2789,7 +2789,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestSubstringParameterLimits) {
     auto doOneFieldTest = [](const std::vector<QueryTypeConfig>& qtc, boost::optional<int> error) {
         EncryptedFieldConfig efc;
         EncryptedField field{UUID::gen(), "field"};
-        field.setBsonType("string"_sd);
+        field.setBsonType("string"sv);
         field.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{qtc});
         efc.setFields({field});
         if (error) {

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -44,6 +43,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * TrialStage runs a specified 'trial' plan for a given number of iterations, tracking the number of
@@ -63,7 +63,7 @@ namespace mongo {
  */
 class TrialStage final : public PlanStage {
 public:
-    static constexpr std::string_view kStageType = "TRIAL"_sd;
+    static constexpr std::string_view kStageType = "TRIAL"sv;
 
     /**
      * Constructor. Both 'trialPlan' and 'backupPlan' must be non-nullptr; 'maxTrialEWorks' must be

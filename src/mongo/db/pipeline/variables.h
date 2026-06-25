@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -51,6 +50,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class Expression;
 class ExpressionContext;
 class VariablesParseState;
@@ -118,14 +118,14 @@ public:
     static constexpr auto kIsMapReduceId = Id(-7);
     static constexpr auto kUserRolesId = Id(-8);
 
-    static constexpr std::string_view kRootName = "ROOT"_sd;
-    static constexpr std::string_view kRemoveName = "REMOVE"_sd;
-    static constexpr std::string_view kNowName = "NOW"_sd;
-    static constexpr std::string_view kClusterTimeName = "CLUSTER_TIME"_sd;
-    static constexpr std::string_view kJsScopeName = "JS_SCOPE"_sd;
-    static constexpr std::string_view kIsMapReduceName = "IS_MR"_sd;
-    static constexpr std::string_view kSearchMetaName = "SEARCH_META"_sd;
-    static constexpr std::string_view kUserRolesName = "USER_ROLES"_sd;
+    static constexpr std::string_view kRootName = "ROOT"sv;
+    static constexpr std::string_view kRemoveName = "REMOVE"sv;
+    static constexpr std::string_view kNowName = "NOW"sv;
+    static constexpr std::string_view kClusterTimeName = "CLUSTER_TIME"sv;
+    static constexpr std::string_view kJsScopeName = "JS_SCOPE"sv;
+    static constexpr std::string_view kIsMapReduceName = "IS_MR"sv;
+    static constexpr std::string_view kSearchMetaName = "SEARCH_META"sv;
+    static constexpr std::string_view kUserRolesName = "USER_ROLES"sv;
 
     // Map from builtin var name to reserved id number.
     static const StringMap<Id> kBuiltinVarNameToId;

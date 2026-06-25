@@ -45,286 +45,278 @@
      *  state of the server, which needs to be recovered/consulted at startup. Each document in    \
      *  this namespace should have its _id set to some string, which meaningfully describes what   \
      *  it represents. For example, 'shardIdentity' and 'featureCompatibilityVersion'. */          \
-    X(kServerConfigurationNamespace, DatabaseName::kAdmin, "system.version"_sd)                    \
+    X(kServerConfigurationNamespace, DatabaseName::kAdmin, "system.version")                       \
                                                                                                    \
     /*  Namespace for storing the logical sessions information */                                  \
-    X(kLogicalSessionsNamespace, DatabaseName::kConfig, "system.sessions"_sd)                      \
+    X(kLogicalSessionsNamespace, DatabaseName::kConfig, "system.sessions")                         \
                                                                                                    \
     /*  Namespace for storing databases information */                                             \
-    X(kConfigDatabasesNamespace, DatabaseName::kConfig, "databases"_sd)                            \
+    X(kConfigDatabasesNamespace, DatabaseName::kConfig, "databases")                               \
                                                                                                    \
     /*  Namespace for storing the transaction information for each session */                      \
-    X(kSessionTransactionsTableNamespace, DatabaseName::kConfig, "transactions"_sd)                \
+    X(kSessionTransactionsTableNamespace, DatabaseName::kConfig, "transactions")                   \
                                                                                                    \
     /*  Name for a shard's collections metadata collection, each document of which indicates the   \
      *  state of a specific collection */                                                          \
-    X(kShardConfigCollectionsNamespace, DatabaseName::kConfig, "cache.collections"_sd)             \
+    X(kShardConfigCollectionsNamespace, DatabaseName::kConfig, "cache.collections")                \
                                                                                                    \
     /*  Name for a shard's non-authoritative databases metadata collection, each document of       \
      * which indicates the state of a specific database. */                                        \
-    X(kConfigCacheDatabasesNamespace, DatabaseName::kConfig, "cache.databases"_sd)                 \
+    X(kConfigCacheDatabasesNamespace, DatabaseName::kConfig, "cache.databases")                    \
                                                                                                    \
     /*  Name for a shard's authoritative databases metadata collection, each document of which     \
      * indicates the state of a specific database. */                                              \
-    X(kConfigShardCatalogDatabasesNamespace, DatabaseName::kConfig, "shard.catalog.databases"_sd)  \
+    X(kConfigShardCatalogDatabasesNamespace, DatabaseName::kConfig, "shard.catalog.databases")     \
                                                                                                    \
     /*  Name for a shard's authoritative collections metadata collection, each document of which   \
      *  indicates the state of a specific collection. */                                           \
-    X(kConfigShardCatalogCollectionsNamespace,                                                     \
-      DatabaseName::kConfig,                                                                       \
-      "shard.catalog.collections"_sd)                                                              \
+    X(kConfigShardCatalogCollectionsNamespace, DatabaseName::kConfig, "shard.catalog.collections") \
                                                                                                    \
     /*  Name for a shard's authoritative chunks metadata collection, each document of which        \
      * indicates the state of a specific chunk. */                                                 \
-    X(kConfigShardCatalogChunksNamespace, DatabaseName::kConfig, "shard.catalog.chunks"_sd)        \
+    X(kConfigShardCatalogChunksNamespace, DatabaseName::kConfig, "shard.catalog.chunks")           \
                                                                                                    \
     /*  Namespace for storing keys for signing and validating cluster times created by             \
      * the cluster that this node is in. */                                                        \
-    X(kKeysCollectionNamespace, DatabaseName::kAdmin, "system.keys"_sd)                            \
+    X(kKeysCollectionNamespace, DatabaseName::kAdmin, "system.keys")                               \
                                                                                                    \
     /*  Namespace for storing keys for validating cluster times created by other clusters. */      \
-    X(kExternalKeysCollectionNamespace, DatabaseName::kConfig, "external_validation_keys"_sd)      \
+    X(kExternalKeysCollectionNamespace, DatabaseName::kConfig, "external_validation_keys")         \
                                                                                                    \
     /*  Namespace of the oplog collection. */                                                      \
-    X(kRsOplogNamespace, DatabaseName::kLocal, "oplog.rs"_sd)                                      \
+    X(kRsOplogNamespace, DatabaseName::kLocal, "oplog.rs")                                         \
                                                                                                    \
     /*  Namespace for storing the persisted state of transaction coordinators. */                  \
-    X(kTransactionCoordinatorsNamespace, DatabaseName::kConfig, "transaction_coordinators"_sd)     \
+    X(kTransactionCoordinatorsNamespace, DatabaseName::kConfig, "transaction_coordinators")        \
                                                                                                    \
     /*  Namespace for storing the persisted state of migration coordinators. */                    \
-    X(kMigrationCoordinatorsNamespace, DatabaseName::kConfig, "migrationCoordinators"_sd)          \
+    X(kMigrationCoordinatorsNamespace, DatabaseName::kConfig, "migrationCoordinators")             \
                                                                                                    \
     /*  Namespace for storing the persisted state of migration recipients. */                      \
-    X(kMigrationRecipientsNamespace, DatabaseName::kConfig, "migrationRecipients"_sd)              \
+    X(kMigrationRecipientsNamespace, DatabaseName::kConfig, "migrationRecipients")                 \
                                                                                                    \
     /*  Namespace for replica set configuration settings. */                                       \
-    X(kSystemReplSetNamespace, DatabaseName::kLocal, "system.replset"_sd)                          \
+    X(kSystemReplSetNamespace, DatabaseName::kLocal, "system.replset")                             \
                                                                                                    \
     /*  Namespace for storing the last replica set election vote. */                               \
-    X(kLastVoteNamespace, DatabaseName::kLocal, "replset.election"_sd)                             \
+    X(kLastVoteNamespace, DatabaseName::kLocal, "replset.election")                                \
                                                                                                    \
     /*  Namespace for index build entries. */                                                      \
-    X(kIndexBuildEntryNamespace, DatabaseName::kConfig, "system.indexBuilds"_sd)                   \
+    X(kIndexBuildEntryNamespace, DatabaseName::kConfig, "system.indexBuilds")                      \
                                                                                                    \
     /*  Namespace for pending range deletions. */                                                  \
-    X(kRangeDeletionNamespace, DatabaseName::kConfig, "rangeDeletions"_sd)                         \
+    X(kRangeDeletionNamespace, DatabaseName::kConfig, "rangeDeletions")                            \
                                                                                                    \
     /*  Namespace containing pending range deletions snapshots for rename operations. */           \
-    X(kRangeDeletionForRenameNamespace, DatabaseName::kConfig, "rangeDeletionsForRename"_sd)       \
+    X(kRangeDeletionForRenameNamespace, DatabaseName::kConfig, "rangeDeletionsForRename")          \
                                                                                                    \
     /*  Namespace for the max-key orphan detection scan state document, replicated within the      \
      *  shard replica set. */                                                                      \
-    X(kConfigMaxKeyOrphanScanStateNamespace, DatabaseName::kConfig, "maxKeyOrphanScanState"_sd)    \
+    X(kConfigMaxKeyOrphanScanStateNamespace, DatabaseName::kConfig, "maxKeyOrphanScanState")       \
                                                                                                    \
     /*  Namespace for the max-key zone detection scan state document, replicated within the        \
      *  config-server replica set. */                                                              \
-    X(kConfigMaxKeyZoneScanStateNamespace, DatabaseName::kConfig, "maxKeyZoneScanState"_sd)        \
+    X(kConfigMaxKeyZoneScanStateNamespace, DatabaseName::kConfig, "maxKeyZoneScanState")           \
                                                                                                    \
     /*  Namespace for the coordinator's resharding operation state. */                             \
-    X(kConfigReshardingOperationsNamespace, DatabaseName::kConfig, "reshardingOperations"_sd)      \
+    X(kConfigReshardingOperationsNamespace, DatabaseName::kConfig, "reshardingOperations")         \
                                                                                                    \
     /*  Namespace for the donor shard's local resharding operation state. */                       \
     X(kDonorReshardingOperationsNamespace,                                                         \
       DatabaseName::kConfig,                                                                       \
-      "localReshardingOperations.donor"_sd)                                                        \
+      "localReshardingOperations.donor")                                                           \
                                                                                                    \
     /*  Namespace for the recipient shard's local resharding operation state. */                   \
     X(kRecipientReshardingOperationsNamespace,                                                     \
       DatabaseName::kConfig,                                                                       \
-      "localReshardingOperations.recipient"_sd)                                                    \
+      "localReshardingOperations.recipient")                                                       \
                                                                                                    \
     /*  Namespace for the recipient shard's local resharding operation resume data. */             \
     X(kRecipientReshardingResumeDataNamespace,                                                     \
       DatabaseName::kConfig,                                                                       \
-      "localReshardingResumeData.recipient"_sd)                                                    \
+      "localReshardingResumeData.recipient")                                                       \
                                                                                                    \
     /*  Namespace for persisting sharding DDL coordinators state documents */                      \
     X(kShardingDDLCoordinatorsNamespace,                                                           \
       DatabaseName::kConfig,                                                                       \
-      "system.sharding_ddl_coordinators"_sd)                                                       \
+      "system.sharding_ddl_coordinators")                                                          \
                                                                                                    \
     /*  Namespace for storing MultiUpdateCoordinator state documents. */                           \
     X(kMultiUpdateCoordinatorsNamespace,                                                           \
       DatabaseName::kConfig,                                                                       \
-      "localMigrationBlockingOperations.multiUpdateCoordinators"_sd)                               \
+      "localMigrationBlockingOperations.multiUpdateCoordinators")                                  \
                                                                                                    \
     /*  Namespace for persisting sharding DDL rename participant state documents */                \
-    X(kShardingRenameParticipantsNamespace, DatabaseName::kConfig, "localRenameParticipants"_sd)   \
+    X(kShardingRenameParticipantsNamespace, DatabaseName::kConfig, "localRenameParticipants")      \
                                                                                                    \
     /*  Namespace for balancer settings and default read and write concerns. */                    \
-    X(kConfigSettingsNamespace, DatabaseName::kConfig, "settings"_sd)                              \
+    X(kConfigSettingsNamespace, DatabaseName::kConfig, "settings")                                 \
                                                                                                    \
     /*  Namespace for vector clock state. */                                                       \
-    X(kVectorClockNamespace, DatabaseName::kConfig, "vectorClock"_sd)                              \
+    X(kVectorClockNamespace, DatabaseName::kConfig, "vectorClock")                                 \
                                                                                                    \
     /*  Namespace for storing oplog applier progress for resharding. */                            \
     X(kReshardingApplierProgressNamespace,                                                         \
       DatabaseName::kConfig,                                                                       \
-      "localReshardingOperations.recipient.progress_applier"_sd)                                   \
+      "localReshardingOperations.recipient.progress_applier")                                      \
                                                                                                    \
     /*  Namespace for storing oplog fetcher progress for resharding. */                            \
     X(kReshardingFetcherProgressNamespace,                                                         \
       DatabaseName::kConfig,                                                                       \
-      "localReshardingOperations.recipient.progress_fetcher"_sd)                                   \
+      "localReshardingOperations.recipient.progress_fetcher")                                      \
                                                                                                    \
     /*  Namespace for storing config.transactions cloner progress for resharding. */               \
     X(kReshardingTxnClonerProgressNamespace,                                                       \
       DatabaseName::kConfig,                                                                       \
-      "localReshardingOperations.recipient.progress_txn_cloner"_sd)                                \
+      "localReshardingOperations.recipient.progress_txn_cloner")                                   \
                                                                                                    \
     /*  Namespace for serializing between dropDatabase and a following concurrent                  \
      * createDatabase. The dropDatabase DDL coordinator will be the only writer to this            \
      * collection. */                                                                              \
-    X(kConfigDropPendingDBsNamespace, DatabaseName::kConfig, "dropPendingDBs"_sd)                  \
+    X(kConfigDropPendingDBsNamespace, DatabaseName::kConfig, "dropPendingDBs")                     \
                                                                                                    \
     /*  Namespace for storing config.collectionCriticalSections documents */                       \
-    X(kCollectionCriticalSectionsNamespace,                                                        \
-      DatabaseName::kConfig,                                                                       \
-      "collection_critical_sections"_sd)                                                           \
+    X(kCollectionCriticalSectionsNamespace, DatabaseName::kConfig, "collection_critical_sections") \
                                                                                                    \
     /*  Dummy namespace used for forcing secondaries to handle an oplog entry on its own batch. */ \
-    X(kForceOplogBatchBoundaryNamespace,                                                           \
-      DatabaseName::kConfig,                                                                       \
-      "system.forceOplogBatchBoundary"_sd)                                                         \
+    X(kForceOplogBatchBoundaryNamespace, DatabaseName::kConfig, "system.forceOplogBatchBoundary")  \
                                                                                                    \
     /*  Namespace used for storing retryable findAndModify images. */                              \
-    X(kConfigImagesNamespace, DatabaseName::kConfig, "image_collection"_sd)                        \
+    X(kConfigImagesNamespace, DatabaseName::kConfig, "image_collection")                           \
                                                                                                    \
     /*  Namespace used for persisting ConfigsvrCoordinator state documents. */                     \
-    X(kConfigsvrCoordinatorsNamespace,                                                             \
-      DatabaseName::kConfig,                                                                       \
-      "sharding_configsvr_coordinators"_sd)                                                        \
+    X(kConfigsvrCoordinatorsNamespace, DatabaseName::kConfig, "sharding_configsvr_coordinators")   \
                                                                                                    \
     /*  Namespace for storing user write blocking critical section documents */                    \
     X(kUserWritesCriticalSectionsNamespace,                                                        \
       DatabaseName::kConfig,                                                                       \
-      "user_writes_critical_sections"_sd)                                                          \
+      "user_writes_critical_sections")                                                             \
                                                                                                    \
     /*  Namespace used during the recovery procedure for the config server. */                     \
-    X(kConfigsvrRestoreNamespace, DatabaseName::kLocal, "system.collections_to_restore"_sd)        \
+    X(kConfigsvrRestoreNamespace, DatabaseName::kLocal, "system.collections_to_restore")           \
                                                                                                    \
     /*  Namespace used for CompactParticipantCoordinator service. */                               \
     X(kCompactStructuredEncryptionCoordinatorNamespace,                                            \
       DatabaseName::kConfig,                                                                       \
-      "compact_structured_encryption_coordinator"_sd)                                              \
+      "compact_structured_encryption_coordinator")                                                 \
                                                                                                    \
     /*  Namespace used for storing cluster wide parameters on dedicated configurations. */         \
-    X(kClusterParametersNamespace, DatabaseName::kConfig, "clusterParameters"_sd)                  \
+    X(kClusterParametersNamespace, DatabaseName::kConfig, "clusterParameters")                     \
                                                                                                    \
     /*  Namespace used for storing the list of shards on the CSRS. */                              \
-    X(kConfigsvrShardsNamespace, DatabaseName::kConfig, "shards"_sd)                               \
+    X(kConfigsvrShardsNamespace, DatabaseName::kConfig, "shards")                                  \
                                                                                                    \
     /*  Namespace used for storing the list of sharded collections on the CSRS. */                 \
-    X(kConfigsvrCollectionsNamespace, DatabaseName::kConfig, "collections"_sd)                     \
+    X(kConfigsvrCollectionsNamespace, DatabaseName::kConfig, "collections")                        \
                                                                                                    \
     /*  Namespace used for storing NamespacePlacementType docs on the CSRS. */                     \
-    X(kConfigsvrPlacementHistoryNamespace, DatabaseName::kConfig, "placementHistory"_sd)           \
+    X(kConfigsvrPlacementHistoryNamespace, DatabaseName::kConfig, "placementHistory")              \
                                                                                                    \
     /*  Namespace used for storing a single document with the timestamp of the latest              \
      * removeShard committed on the CSRS. */                                                       \
-    X(kConfigsvrShardRemovalLogNamespace, DatabaseName::kConfig, "shardRemovalLog"_sd)             \
+    X(kConfigsvrShardRemovalLogNamespace, DatabaseName::kConfig, "shardRemovalLog")                \
                                                                                                    \
     /*  Namespace used to store the state document of 'SetChangeStreamStateCoordinator'. */        \
     X(kSetChangeStreamStateCoordinatorNamespace,                                                   \
       DatabaseName::kConfig,                                                                       \
-      "change_stream_coordinator"_sd)                                                              \
+      "change_stream_coordinator")                                                                 \
                                                                                                    \
     /*  Namespace used to store change stream pre-images */                                        \
-    X(kChangeStreamPreImagesNamespace, DatabaseName::kConfig, "system.preimages"_sd)               \
+    X(kChangeStreamPreImagesNamespace, DatabaseName::kConfig, "system.preimages")                  \
                                                                                                    \
     /*  Namespace used by an analyzeShardKey command to store the split points for the shard       \
      *  being analyzed. */                                                                         \
     X(kConfigAnalyzeShardKeySplitPointsNamespace,                                                  \
       DatabaseName::kConfig,                                                                       \
-      "analyzeShardKeySplitPoints"_sd)                                                             \
+      "analyzeShardKeySplitPoints")                                                                \
                                                                                                    \
     /*  Namespace used for storing query analyzer settings. */                                     \
-    X(kConfigQueryAnalyzersNamespace, DatabaseName::kConfig, "queryAnalyzers"_sd)                  \
+    X(kConfigQueryAnalyzersNamespace, DatabaseName::kConfig, "queryAnalyzers")                     \
                                                                                                    \
     /*  Namespace used for storing sampled queries. */                                             \
-    X(kConfigSampledQueriesNamespace, DatabaseName::kConfig, "sampledQueries"_sd)                  \
+    X(kConfigSampledQueriesNamespace, DatabaseName::kConfig, "sampledQueries")                     \
                                                                                                    \
     /*  Namespace used for storing the diffs for sampled update queries. */                        \
-    X(kConfigSampledQueriesDiffNamespace, DatabaseName::kConfig, "sampledQueriesDiff"_sd)          \
+    X(kConfigSampledQueriesDiffNamespace, DatabaseName::kConfig, "sampledQueriesDiff")             \
                                                                                                    \
     /*  Namespace used for storing query shape representative queries. */                          \
     X(kQueryShapeRepresentativeQueriesNamespace,                                                   \
       DatabaseName::kConfig,                                                                       \
-      "queryShapeRepresentativeQueries"_sd)                                                        \
+      "queryShapeRepresentativeQueries")                                                           \
                                                                                                    \
     /*  Namespace used for the health log. */                                                      \
-    X(kLocalHealthLogNamespace, DatabaseName::kLocal, "system.healthlog"_sd)                       \
+    X(kLocalHealthLogNamespace, DatabaseName::kLocal, "system.healthlog")                          \
                                                                                                    \
     /*  Namespace used for command oplog entries. */                                               \
-    X(kAdminCommandNamespace, DatabaseName::kAdmin, "$cmd"_sd)                                     \
+    X(kAdminCommandNamespace, DatabaseName::kAdmin, "$cmd")                                        \
                                                                                                    \
     /*  Namespace used to store roles. */                                                          \
-    X(kAdminRolesNamespace, DatabaseName::kAdmin, "system.roles"_sd)                               \
+    X(kAdminRolesNamespace, DatabaseName::kAdmin, "system.roles")                                  \
                                                                                                    \
     /*  Namespace used to store users. */                                                          \
-    X(kAdminUsersNamespace, DatabaseName::kAdmin, "system.users"_sd)                               \
+    X(kAdminUsersNamespace, DatabaseName::kAdmin, "system.users")                                  \
                                                                                                    \
     /*  Namespace used by mms-automation. */                                                       \
-    X(kLocalClusterManagerNamespace, DatabaseName::kLocal, "clustermanager"_sd)                    \
+    X(kLocalClusterManagerNamespace, DatabaseName::kLocal, "clustermanager")                       \
                                                                                                    \
     /*  Namespace used for startup log. */                                                         \
-    X(kStartupLogNamespace, DatabaseName::kLocal, "startup_log"_sd)                                \
+    X(kStartupLogNamespace, DatabaseName::kLocal, "startup_log")                                   \
                                                                                                    \
     /*  Namespace for changelog on CSRS. */                                                        \
-    X(kConfigChangelogNamespace, DatabaseName::kConfig, "changelog"_sd)                            \
+    X(kConfigChangelogNamespace, DatabaseName::kConfig, "changelog")                               \
                                                                                                    \
     /*  Namespace used for storing the list of chunks on the CSRS. */                              \
-    X(kConfigsvrChunksNamespace, DatabaseName::kConfig, "chunks"_sd)                               \
+    X(kConfigsvrChunksNamespace, DatabaseName::kConfig, "chunks")                                  \
                                                                                                    \
     /*  Namespace used for storing the list of tags on the CSRS. */                                \
-    X(kConfigsvrTagsNamespace, DatabaseName::kConfig, "tags"_sd)                                   \
+    X(kConfigsvrTagsNamespace, DatabaseName::kConfig, "tags")                                      \
                                                                                                    \
     /*  Namespace used for storing version info on the CSRS. */                                    \
-    X(kConfigVersionNamespace, DatabaseName::kConfig, "version"_sd)                                \
+    X(kConfigVersionNamespace, DatabaseName::kConfig, "version")                                   \
                                                                                                    \
     /*  Namespace used for storing mongos info on the CSRS. */                                     \
-    X(kConfigMongosNamespace, DatabaseName::kConfig, "mongos"_sd)                                  \
+    X(kConfigMongosNamespace, DatabaseName::kConfig, "mongos")                                     \
                                                                                                    \
     /*  Namespace used for oplog truncate after point. */                                          \
     X(kDefaultOplogTruncateAfterPointNamespace,                                                    \
       DatabaseName::kLocal,                                                                        \
-      "replset.oplogTruncateAfterPoint"_sd)                                                        \
+      "replset.oplogTruncateAfterPoint")                                                           \
                                                                                                    \
     /*  Namespace used for local system rollback id. */                                            \
-    X(kDefaultRollbackIdNamespace, DatabaseName::kLocal, "system.rollback.id"_sd)                  \
+    X(kDefaultRollbackIdNamespace, DatabaseName::kLocal, "system.rollback.id")                     \
                                                                                                    \
     /*  Namespace used for the local oplog dollar main namespace. */                               \
-    X(kLocalOplogDollarMain, DatabaseName::kLocal, "oplog.$main"_sd)                               \
+    X(kLocalOplogDollarMain, DatabaseName::kLocal, "oplog.$main")                                  \
                                                                                                    \
     /*  Namespace used for local replset initial sync id. */                                       \
-    X(kDefaultInitialSyncIdNamespace, DatabaseName::kLocal, "replset.initialSyncId"_sd)            \
+    X(kDefaultInitialSyncIdNamespace, DatabaseName::kLocal, "replset.initialSyncId")               \
                                                                                                    \
     /*  Namespace used for local temporary oplog buffer. */                                        \
-    X(kDefaultOplogCollectionNamespace, DatabaseName::kLocal, "temp_oplog_buffer"_sd)              \
+    X(kDefaultOplogCollectionNamespace, DatabaseName::kLocal, "temp_oplog_buffer")                 \
                                                                                                    \
     /*  Namespace used for local minimum valid namespace. */                                       \
-    X(kDefaultMinValidNamespace, DatabaseName::kLocal, "replset.minvalid"_sd)                      \
+    X(kDefaultMinValidNamespace, DatabaseName::kLocal, "replset.minvalid")                         \
                                                                                                    \
     /*  Namespace used by the test command to pin the oldest timestamp. */                         \
-    X(kDurableHistoryTestNamespace, DatabaseName::kMdbTesting, "pinned_timestamp"_sd)              \
+    X(kDurableHistoryTestNamespace, DatabaseName::kMdbTesting, "pinned_timestamp")                 \
                                                                                                    \
     /*  Namespace used by DocumentSourceOut on shard servers to store a list of temporary          \
      * collections that shall be garbage-collected (dropped) on the next step up. */               \
-    X(kAggTempCollections, DatabaseName::kConfig, "agg_temp_collections"_sd)                       \
+    X(kAggTempCollections, DatabaseName::kConfig, "agg_temp_collections")                          \
                                                                                                    \
-    X(kEmpty, DatabaseName::kEmpty, ""_sd)                                                         \
+    X(kEmpty, DatabaseName::kEmpty, "")                                                            \
                                                                                                    \
     /*  Namespace for storing feature compatibility version changes block documents */             \
-    X(kBlockFCVChangesNamespace, DatabaseName::kConfig, "system.block_fcv_changes"_sd)             \
+    X(kBlockFCVChangesNamespace, DatabaseName::kConfig, "system.block_fcv_changes")                \
                                                                                                    \
     /*  Namespace for storing replica set write block critical section documents */                \
     X(kReplicaSetWritesCriticalSectionsNamespace,                                                  \
       DatabaseName::kConfig,                                                                       \
-      "replica_set_writes_critical_section"_sd)                                                    \
+      "replica_set_writes_critical_section")                                                       \
                                                                                                    \
     /*  Namespace used for container oplog entries. */                                             \
-    X(kContainerNamespace, DatabaseName::kAdmin, "$container"_sd)                                  \
+    X(kContainerNamespace, DatabaseName::kAdmin, "$container")                                     \
                                                                                                    \
     /*  Namespace used for the log of all actions taken within a sharded cluster */                \
-    X(kConfigActionlogNamespace, DatabaseName::kConfig, "actionlog"_sd)
+    X(kConfigActionlogNamespace, DatabaseName::kConfig, "actionlog")
 /**/

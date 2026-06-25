@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/db/cleanup_structured_encryption_data_coordinator_gen.h"
@@ -57,11 +56,12 @@
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUB mongo {
+using namespace std::literals::string_view_literals;
 
 class CleanupStructuredEncryptionDataCoordinator final
     : public RecoverableShardingDDLCoordinator<CleanupStructuredEncryptionDataState> {
 public:
-    static constexpr auto kStateContext = "CleanupStructuredEncryptionDataState"_sd;
+    static constexpr auto kStateContext = "CleanupStructuredEncryptionDataState"sv;
 
     CleanupStructuredEncryptionDataCoordinator(ShardingCoordinatorService* service,
                                                const BSONObj& doc)

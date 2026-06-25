@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/admission/rate_limiter_metrics_events.h"
 #include "mongo/db/admission/rate_limiter_metrics_recorder.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -43,6 +42,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string_view>
 
 #include <boost/optional.hpp>
 

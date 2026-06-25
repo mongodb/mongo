@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -49,6 +48,7 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Representation of names of various kinds of resources targetable by the access control
@@ -92,7 +92,7 @@ public:
      */
     static ResourcePattern forDatabaseName(const DatabaseName& dbName) {
         return ResourcePattern(MatchTypeEnum::kMatchDatabaseName,
-                               NamespaceStringUtil::deserialize(dbName, ""_sd));
+                               NamespaceStringUtil::deserialize(dbName, ""sv));
     }
 
     /**

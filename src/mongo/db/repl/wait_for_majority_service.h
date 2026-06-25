@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -57,6 +56,7 @@
 #include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace detail {
 
@@ -162,7 +162,7 @@ class WaitForMajorityServiceForReadImpl : public WaitForMajorityServiceImplBase 
 private:
     Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) final;
     std::string_view _getReadOrWrite() const final {
-        return "Read"_sd;
+        return "Read"sv;
     }
 };
 
@@ -170,7 +170,7 @@ class WaitForMajorityServiceForWriteImpl : public WaitForMajorityServiceImplBase
 private:
     Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) final;
     std::string_view _getReadOrWrite() const final {
-        return "Write"_sd;
+        return "Write"sv;
     }
 };
 /**

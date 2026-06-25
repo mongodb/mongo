@@ -35,6 +35,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Window bounds describe a set of documents based on the current document.
@@ -63,12 +64,12 @@ namespace mongo {
  *     range: [-3, -1], unit: 'day'
  */
 struct WindowBounds {
-    static constexpr std::string_view kArgDocuments = "documents"_sd;
-    static constexpr std::string_view kArgRange = "range"_sd;
-    static constexpr std::string_view kArgUnit = "unit"_sd;
+    static constexpr std::string_view kArgDocuments = "documents"sv;
+    static constexpr std::string_view kArgRange = "range"sv;
+    static constexpr std::string_view kArgUnit = "unit"sv;
 
-    static constexpr std::string_view kValUnbounded = "unbounded"_sd;
-    static constexpr std::string_view kValCurrent = "current"_sd;
+    static constexpr std::string_view kValUnbounded = "unbounded"sv;
+    static constexpr std::string_view kValCurrent = "current"sv;
 
     struct Unbounded {};
     struct Current {};

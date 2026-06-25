@@ -109,6 +109,7 @@ public:
     }
 
 namespace {
+using namespace std::literals::string_view_literals;
 // These helper functions help construct encrypted queries in a succinct way. The function names are
 // short in order to make the queries that we are testing more readable at the callsite.
 // All of these functions generate strings with JSON which ultimately are parsed into
@@ -268,7 +269,7 @@ EncryptedFieldConfig rangeEfc(std::string_view path, int64_t contention) {
     qtc.setQueryType(QueryTypeEnum::Range);
     qtc.setContention(contention);
     EncryptedField ef(indexKeyId, std::string{path});
-    ef.setBsonType("int"_sd);
+    ef.setBsonType("int"sv);
     ef.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{std::move(qtc)});
     EncryptedFieldConfig efc;
     efc.setFields({std::move(ef)});

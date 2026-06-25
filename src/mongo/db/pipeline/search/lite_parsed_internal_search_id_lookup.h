@@ -38,6 +38,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * StageParams for DocumentSourceInternalSearchIdLookUp. This class encapsulates the parameters
@@ -60,7 +61,7 @@ public:
 class LiteParsedInternalSearchIdLookUp final
     : public LiteParsedDocumentSourceDefault<LiteParsedInternalSearchIdLookUp> {
 public:
-    static constexpr std::string_view kStageName = "$_internalSearchIdLookup"_sd;
+    static constexpr std::string_view kStageName = "$_internalSearchIdLookup"sv;
 
     static std::unique_ptr<LiteParsedInternalSearchIdLookUp> parse(const NamespaceString& nss,
                                                                    const BSONElement& spec,

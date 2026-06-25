@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -55,6 +54,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+using namespace std::literals::string_view_literals;
 
 class UnionWithStageParams : public DefaultStageParams {
 public:
@@ -104,7 +104,7 @@ private:
 class LiteParsedUnionWith final
     : public LiteParsedDocumentSourceNestedPipelines<LiteParsedUnionWith> {
 public:
-    static constexpr std::string_view kStageName = "$unionWith"_sd;
+    static constexpr std::string_view kStageName = "$unionWith"sv;
 
     static std::unique_ptr<LiteParsedUnionWith> parse(const NamespaceString& nss,
                                                       const BSONElement& spec,

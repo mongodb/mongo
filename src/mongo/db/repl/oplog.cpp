@@ -2148,8 +2148,8 @@ boost::optional<RecordId> computeEffectiveRid(OperationContext* opCtx,
 
     // For updates the _id lives in 'o2'; for deletes it lives in 'o' (the query selector).
     const BSONElement idElem = (opType == OpTypeEnum::kUpdate)
-        ? (op.getObject2() ? op.getObject2()->getField("_id"_sd) : BSONElement())
-        : op.getObject().getField("_id"_sd);
+        ? (op.getObject2() ? op.getObject2()->getField("_id"sv) : BSONElement())
+        : op.getObject().getField("_id"sv);
     // A well formed update (o2) or delete (o) oplog entry always carries _id, so this is only true
     // for a corrupt entry. In that case we skip deriving the rid and fall through to the query
     // path. That path uasserts on the missing _id (NoSuchKey, logging the entry) at the

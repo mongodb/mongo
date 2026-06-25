@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/modules.h"
@@ -39,6 +38,7 @@
 #include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
+using namespace std::literals::string_view_literals;
 
 /**
  * Diagnostic printer for the ExpressionContext class. Take care when extending this to redact any
@@ -55,8 +55,8 @@ struct ExpressionContextPrinter {
         }
 
         out = fmt::format_to(out, "{{");
-        auto field = [&, sep = ""_sd](std::string_view name, auto&& value) mutable {
-            out = fmt::format_to(out, "{}{}: {}", std::exchange(sep, ", "_sd), name, value);
+        auto field = [&, sep = ""sv](std::string_view name, auto&& value) mutable {
+            out = fmt::format_to(out, "{}{}: {}", std::exchange(sep, ", "sv), name, value);
         };
         field("collator", expCtx->getCollatorBSON().toString());
         field("uuid", expCtx->getUUID() ? redact(expCtx->getUUID()->toString()) : "none");

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
@@ -79,10 +78,11 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class MONGO_MOD_PUBLIC ReshardingRecipientService : public repl::PrimaryOnlyService {
 public:
-    static constexpr std::string_view kServiceName = "ReshardingRecipientService"_sd;
+    static constexpr std::string_view kServiceName = "ReshardingRecipientService"sv;
 
     explicit ReshardingRecipientService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}

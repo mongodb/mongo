@@ -32,7 +32,6 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -49,8 +48,9 @@
 #include <boost/filesystem/path.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kFTDCThreadName = "ftdc"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr std::string_view kFTDCThreadName = "ftdc"sv;
 
 /**
  * Utilities for inflating and deflating BSON documents and metric arrays

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/mirror_maestro_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/hello/hello_response.h"
@@ -44,6 +43,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class CommandInvocation;
 struct OpMsgRequest;
@@ -83,7 +83,7 @@ public:
      */
     static void onReceiveMirroredRead(OperationContext* opCtx);
 
-    static constexpr auto kServerStatusSectionName = "mirroredReads"_sd;
+    static constexpr auto kServerStatusSectionName = "mirroredReads"sv;
 };
 
 /**

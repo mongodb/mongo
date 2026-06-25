@@ -42,11 +42,12 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class ReshardingCoordinator;
 
 class MONGO_MOD_PUBLIC ReshardingCoordinatorService : public repl::PrimaryOnlyService {
 public:
-    static constexpr std::string_view kServiceName = "ReshardingCoordinatorService"_sd;
+    static constexpr std::string_view kServiceName = "ReshardingCoordinatorService"sv;
 
     explicit ReshardingCoordinatorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}

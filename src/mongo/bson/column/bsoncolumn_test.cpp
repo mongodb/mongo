@@ -4259,7 +4259,7 @@ TEST_F(BSONColumnTest, BinDataColumnSubtypeInObjectRejectedByBuilder) {
     // Appending an object that contains a binData/Column field must be rejected.
     std::vector<uint8_t> payload{'\0'};
     BSONObjBuilder outer;
-    outer.appendBinData("col"_sd, payload.size(), BinDataType::Column, payload.data());
+    outer.appendBinData("col"sv, payload.size(), BinDataType::Column, payload.data());
     BSONObj obj = outer.obj();
 
     ASSERT_THROWS_CODE(cb.append(obj.firstElement()), DBException, 12506300);

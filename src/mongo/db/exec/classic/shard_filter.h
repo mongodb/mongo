@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -43,6 +42,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This stage drops documents (called "orphans") that don't logically belong to this shard according
@@ -76,7 +76,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr std::string_view kStageType = "SHARDING_FILTER"_sd;
+    static constexpr std::string_view kStageType = "SHARDING_FILTER"sv;
 
 private:
     WorkingSet* _ws;

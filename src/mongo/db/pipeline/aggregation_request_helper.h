@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -68,11 +67,12 @@ class AggregateCommandRequest;
 class OperationContext;
 
 namespace aggregation_request_helper {
+using namespace std::literals::string_view_literals;
 
 /**
  * Helpers to serialize/deserialize AggregateCommandRequest.
  */
-MONGO_MOD_PUBLIC static constexpr std::string_view kBatchSizeField = "batchSize"_sd;
+MONGO_MOD_PUBLIC static constexpr std::string_view kBatchSizeField = "batchSize"sv;
 MONGO_MOD_PUBLIC static constexpr long long kDefaultBatchSize = 101;
 
 /**

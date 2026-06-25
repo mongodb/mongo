@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -46,10 +45,11 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
+using namespace std::literals::string_view_literals;
 
 class VectorSearchStage final : public Stage {
 public:
-    static constexpr std::string_view kNumCandidatesFieldName = "numCandidates"_sd;
+    static constexpr std::string_view kNumCandidatesFieldName = "numCandidates"sv;
 
     VectorSearchStage(std::string_view stageName,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx,

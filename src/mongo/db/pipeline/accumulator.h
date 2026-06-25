@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -58,6 +57,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This enum indicates which documents an accumulator needs to see in order to compute its output.
@@ -214,7 +214,7 @@ private:
 
 class AccumulatorAddToSet final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$addToSet"_sd;
+    static constexpr auto kName = "$addToSet"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -245,7 +245,7 @@ private:
 
 class AccumulatorFirst final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$first"_sd;
+    static constexpr auto kName = "$first"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -268,7 +268,7 @@ private:
 
 class AccumulatorInternalConstructStats final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$_internalConstructStats"_sd;
+    static constexpr auto kName = "$_internalConstructStats"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -293,7 +293,7 @@ private:
 
 class AccumulatorLast final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$last"_sd;
+    static constexpr auto kName = "$last"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -315,7 +315,7 @@ private:
 
 class AccumulatorSum final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$sum"_sd;
+    static constexpr auto kName = "$sum"sv;
 
     /**
      * These aliases represent two possible sum states in AcculumatorSum:
@@ -405,7 +405,7 @@ private:
 
 class AccumulatorMax final : public AccumulatorMinMax {
 public:
-    static constexpr auto kName = "$max"_sd;
+    static constexpr auto kName = "$max"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -417,7 +417,7 @@ public:
 
 class AccumulatorMin final : public AccumulatorMinMax {
 public:
-    static constexpr auto kName = "$min"_sd;
+    static constexpr auto kName = "$min"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -429,7 +429,7 @@ public:
 
 class AccumulatorPush final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$push"_sd;
+    static constexpr auto kName = "$push"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -452,7 +452,7 @@ private:
 
 class AccumulatorAvg final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$avg"_sd;
+    static constexpr auto kName = "$avg"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -503,7 +503,7 @@ private:
 
 class AccumulatorStdDevPop final : public AccumulatorStdDev {
 public:
-    static constexpr auto kName = "$stdDevPop"_sd;
+    static constexpr auto kName = "$stdDevPop"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -515,7 +515,7 @@ public:
 
 class AccumulatorStdDevSamp final : public AccumulatorStdDev {
 public:
-    static constexpr auto kName = "$stdDevSamp"_sd;
+    static constexpr auto kName = "$stdDevSamp"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -527,7 +527,7 @@ public:
 
 class AccumulatorMergeObjects : public AccumulatorState {
 public:
-    static constexpr auto kName = "$mergeObjects"_sd;
+    static constexpr auto kName = "$mergeObjects"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -545,7 +545,7 @@ private:
 
 class AccumulatorExpMovingAvg : public AccumulatorState {
 public:
-    static constexpr auto kName = "$expMovingAvg"_sd;
+    static constexpr auto kName = "$expMovingAvg"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -566,7 +566,7 @@ private:
 
 class AccumulatorConcatArrays : public AccumulatorState {
 public:
-    static constexpr auto kName = "$concatArrays"_sd;
+    static constexpr auto kName = "$concatArrays"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -590,7 +590,7 @@ private:
 
 class AccumulatorSetUnion : public AccumulatorState {
 public:
-    static constexpr auto kName = "$setUnion"_sd;
+    static constexpr auto kName = "$setUnion"sv;
 
     const char* getOpName() const final {
         return kName.data();

@@ -58,6 +58,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(CurOpTest, CopyConstructors) {
     OpDebug::AdditiveMetrics a, b;
@@ -771,7 +772,7 @@ TEST(CurOpTest, PlanRankerMethodInSlowQueryLogReport) {
         curop->debug().report(opCtx.get(), &ls, {}, 0, &deadline, &pAttrs);
         logv2::TypeErasedAttributeStorage attrs{pAttrs};
         for (auto it = attrs.begin(); it != attrs.end(); ++it) {
-            if (it->name == "planRanker"_sd) {
+            if (it->name == "planRanker"sv) {
                 return std::string(std::get<std::string_view>(it->value));
             }
         }

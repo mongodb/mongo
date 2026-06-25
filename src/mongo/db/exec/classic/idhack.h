@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
@@ -47,6 +46,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class IndexAccessMethod;
 class RecordCursor;
@@ -87,7 +87,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr std::string_view kStageType = "IDHACK"_sd;
+    static constexpr std::string_view kStageType = "IDHACK"sv;
 
 protected:
     void doSaveStateRequiresIndex() final;

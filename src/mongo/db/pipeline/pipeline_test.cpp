@@ -7435,7 +7435,7 @@ TEST(PipelineTest, ParseFromStageParamsBuildsCorrectPipeline) {
     auto pipeline = Pipeline::parseFromStageParams(std::move(params), expCtx);
 
     ASSERT_EQ(pipeline->getSources().size(), 1u);
-    ASSERT_EQ(pipeline->getSources().front()->getSourceName(), "$match"_sd);
+    ASSERT_EQ(pipeline->getSources().front()->getSourceName(), "$match"sv);
 }
 
 TEST(PipelineTest, ParseFromStageParamsEmptyVectorBuildsEmptyPipeline) {

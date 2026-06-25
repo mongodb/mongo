@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
@@ -57,6 +56,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class WorkingSet;
 
@@ -153,7 +153,7 @@ public:
         return &_specificStats;
     }
 
-    static constexpr std::string_view kStageType = "IXSCAN"_sd;
+    static constexpr std::string_view kStageType = "IXSCAN"sv;
 
     const BSONObj& getKeyPattern() const {
         return _keyPattern;

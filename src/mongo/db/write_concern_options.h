@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/read_write_concern_provenance.h"
@@ -46,6 +45,7 @@
 #include <variant>
 
 namespace MONGO_MOD_PUB mongo {
+using namespace std::literals::string_view_literals;
 
 struct WriteConcernOptions {
 public:
@@ -116,7 +116,7 @@ public:
     static const BSONObj Majority;
     static const BSONObj kInternalWriteDefault;
 
-    static constexpr std::string_view kWriteConcernField = "writeConcern"_sd;
+    static constexpr std::string_view kWriteConcernField = "writeConcern"sv;
     static const char kMajority[];  // = "majority"
 
     WriteConcernOptions() = default;

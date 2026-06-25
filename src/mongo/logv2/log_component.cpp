@@ -30,7 +30,6 @@
 #include "mongo/logv2/log_component.h"
 
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 
 #include <ostream>
 #include <string_view>
@@ -39,6 +38,8 @@ namespace mongo::logv2 {
 
 namespace {
 
+using namespace std::string_view_literals;
+
 struct {
     LogComponent value;
     std::string_view shortName;
@@ -46,7 +47,7 @@ struct {
     LogComponent parent;
 } constexpr kTable[] = {
 #define X_(id, val, shortName, logName, parent) \
-    {LogComponent::id, shortName##_sd, logName##_sd, LogComponent::parent},
+    {LogComponent::id, shortName ""sv, logName ""sv, LogComponent::parent},
     MONGO_EXPAND_LOGV2_COMPONENT(X_)
 #undef X_
 };

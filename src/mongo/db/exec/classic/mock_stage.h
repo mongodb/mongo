@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -45,6 +44,7 @@
 #include <variant>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * A stage designed for use in unit tests. The test can queue a sequence of results which will be
@@ -52,7 +52,7 @@ namespace mongo {
  */
 class MockStage final : public PlanStage {
 public:
-    static constexpr std::string_view kStageType = "MOCK"_sd;
+    static constexpr std::string_view kStageType = "MOCK"sv;
 
     MockStage(ExpressionContext* expCtx, WorkingSet* ws);
 

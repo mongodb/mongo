@@ -247,7 +247,7 @@ TEST_F(GraphLookUpTest, ShouldResolveForeignShardedViewOnRetry) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
-    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"_sd}, {"to", 0}}};
+    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"sv}, {"to", 0}}};
 
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
@@ -282,7 +282,7 @@ TEST_F(GraphLookUpTest, ShouldPropagateWhenForeignShardedViewResolutionRepeats) 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
-    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"_sd}, {"to", 0}}};
+    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"sv}, {"to", 0}}};
 
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");

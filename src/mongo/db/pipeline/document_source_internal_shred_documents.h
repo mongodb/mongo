@@ -35,6 +35,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalShredDocuments);
 
@@ -44,7 +45,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalShredDocuments);
  */
 class DocumentSourceInternalShredDocuments final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalShredDocuments"_sd;
+    static constexpr std::string_view kStageName = "$_internalShredDocuments"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

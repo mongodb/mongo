@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <array>
@@ -43,6 +42,7 @@
 
 namespace MONGO_MOD_PUB mongo {
 namespace MONGO_MOD_FILE_PRIVATE base64_detail {
+using namespace std::literals::string_view_literals;
 
 /**
  * Abstract class used to split the translation formats below
@@ -105,7 +105,7 @@ constexpr auto invertTable(std::string_view table, std::index_sequence<Cs...>) {
 
 struct Standard {
     static constexpr auto kEncodeTable =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"_sd;
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"sv;
     static constexpr auto kDecodeTable = invertTable(kEncodeTable, std::make_index_sequence<256>{});
     static constexpr bool kTerminatorRequired = true;
 };
@@ -116,7 +116,7 @@ struct Standard {
 // '=' at the end of the string are optional
 struct URL {
     static constexpr auto kEncodeTable =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"_sd;
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"sv;
     static constexpr auto kDecodeTable = invertTable(kEncodeTable, std::make_index_sequence<256>{});
     static constexpr bool kTerminatorRequired = false;
 };

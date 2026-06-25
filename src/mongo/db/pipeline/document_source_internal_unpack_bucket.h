@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -62,6 +61,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace MONGO_MOD_PUB mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalUnpackBucket);
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(ExternalUnpackBucket);
@@ -83,19 +83,19 @@ struct MONGO_MOD_PRIVATE InternalUnpackBucketSharedState {
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceInternalUnpackBucket : public DocumentSource {
 public:
-    static constexpr std::string_view kStageNameInternal = "$_internalUnpackBucket"_sd;
-    static constexpr std::string_view kStageNameExternal = "$_unpackBucket"_sd;
-    static constexpr std::string_view kInclude = "include"_sd;
-    static constexpr std::string_view kExclude = "exclude"_sd;
-    static constexpr std::string_view kAssumeNoMixedSchemaData = "assumeNoMixedSchemaData"_sd;
-    static constexpr std::string_view kUsesExtendedRange = "usesExtendedRange"_sd;
-    static constexpr std::string_view kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"_sd;
-    static constexpr std::string_view kIncludeMinTimeAsMetadata = "includeMinTimeAsMetadata"_sd;
-    static constexpr std::string_view kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"_sd;
-    static constexpr std::string_view kWholeBucketFilter = "wholeBucketFilter"_sd;
-    static constexpr std::string_view kEventFilter = "eventFilter"_sd;
-    static constexpr std::string_view kFixedBuckets = "fixedBuckets"_sd;
-    static constexpr std::string_view kSbeCompatible = "sbeCompatible"_sd;
+    static constexpr std::string_view kStageNameInternal = "$_internalUnpackBucket"sv;
+    static constexpr std::string_view kStageNameExternal = "$_unpackBucket"sv;
+    static constexpr std::string_view kInclude = "include"sv;
+    static constexpr std::string_view kExclude = "exclude"sv;
+    static constexpr std::string_view kAssumeNoMixedSchemaData = "assumeNoMixedSchemaData"sv;
+    static constexpr std::string_view kUsesExtendedRange = "usesExtendedRange"sv;
+    static constexpr std::string_view kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"sv;
+    static constexpr std::string_view kIncludeMinTimeAsMetadata = "includeMinTimeAsMetadata"sv;
+    static constexpr std::string_view kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"sv;
+    static constexpr std::string_view kWholeBucketFilter = "wholeBucketFilter"sv;
+    static constexpr std::string_view kEventFilter = "eventFilter"sv;
+    static constexpr std::string_view kFixedBuckets = "fixedBuckets"sv;
+    static constexpr std::string_view kSbeCompatible = "sbeCompatible"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBsonInternal(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/database_name.h"
@@ -57,6 +56,7 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class NamespaceString : private DatabaseName {
 public:
@@ -608,7 +608,7 @@ public:
      * Returns true if the namespace string is for a "collectionless" cursor.
      */
     bool isCollectionlessCursorNamespace() const {
-        return coll().starts_with("$cmd."_sd);
+        return coll().starts_with("$cmd."sv);
     }
 
     /**
@@ -1000,9 +1000,10 @@ constexpr auto makeNsData(const char* db, const char* coll) {
     return result;
 }
 
-#define X(id, dbname, coll)                                                                     \
-    constexpr inline auto id##_data = makeNsData<dbname.size(), std::string_view{coll}.size()>( \
-        dbname.db(OmitTenant{}).data(), std::string_view{coll}.data());
+#define X(id, dbname, coll)                                                        \
+    constexpr inline auto id##_coll = coll ""sv;                                   \
+    constexpr inline auto id##_data = makeNsData<dbname.size(), id##_coll.size()>( \
+        dbname.db(OmitTenant{}).data(), id##_coll.data());
 EXPAND_NSS_CONSTANT_TABLE(X) /* NOLINT(bugprone-suspicious-stringview-data-usage) */
 #undef X
 }  // namespace namespace_string_data

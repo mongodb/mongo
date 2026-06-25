@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 /**
  * A plan stage which discards or retains values based on a predicate expression.
  *
@@ -66,7 +67,7 @@ public:
                 std::unique_ptr<EExpression> filter,
                 PlanNodeId planNodeId,
                 bool participateInTrialRunTracking = true)
-        : PlanStage(IsConst ? "cfilter"_sd : (IsEof ? "efilter" : "filter"_sd),
+        : PlanStage(IsConst ? "cfilter"sv : (IsEof ? "efilter" : "filter"sv),
                     nullptr /* yieldPolicy */,
                     planNodeId,
                     participateInTrialRunTracking),

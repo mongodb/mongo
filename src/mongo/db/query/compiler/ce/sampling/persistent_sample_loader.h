@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
@@ -43,8 +42,9 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::ce {
+using namespace std::literals::string_view_literals;
 
-inline constexpr std::string_view kSamplesCollectionName = "system.stats.samples"_sd;
+inline constexpr std::string_view kSamplesCollectionName = "system.stats.samples"sv;
 inline constexpr int kPersistentSampleSchemaVersion = 1;
 
 /**

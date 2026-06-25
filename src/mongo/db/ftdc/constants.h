@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 extern const char kFTDCInterimFile[];
 extern const char kFTDCInterimTempFile[];
@@ -51,6 +51,6 @@ extern const char kFTDCDocsField[];
 extern const char kFTDCCollectStartField[];
 extern const char kFTDCCollectEndField[];
 
-constexpr std::string_view kFTDCDefaultDirectory = "diagnostic.data"_sd;
+constexpr std::string_view kFTDCDefaultDirectory = "diagnostic.data"sv;
 
 }  // namespace mongo

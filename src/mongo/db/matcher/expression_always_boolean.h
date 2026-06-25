@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
@@ -50,6 +49,7 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class AlwaysBooleanMatchExpression : public MatchExpression {
 public:
@@ -103,7 +103,7 @@ public:
 class MONGO_MOD_NEEDS_REPLACEMENT AlwaysFalseMatchExpression final
     : public AlwaysBooleanMatchExpression {
 public:
-    static constexpr std::string_view kName = "$alwaysFalse"_sd;
+    static constexpr std::string_view kName = "$alwaysFalse"sv;
 
     AlwaysFalseMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : AlwaysBooleanMatchExpression(MatchType::ALWAYS_FALSE, std::move(annotation)) {}
@@ -136,7 +136,7 @@ public:
 class MONGO_MOD_NEEDS_REPLACEMENT AlwaysTrueMatchExpression final
     : public AlwaysBooleanMatchExpression {
 public:
-    static constexpr std::string_view kName = "$alwaysTrue"_sd;
+    static constexpr std::string_view kName = "$alwaysTrue"sv;
 
     AlwaysTrueMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : AlwaysBooleanMatchExpression(MatchType::ALWAYS_TRUE, std::move(annotation)) {}

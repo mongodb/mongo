@@ -43,26 +43,27 @@ using namespace mongo;
 using StreamType = sdk::ExecAggStageResultsAndMetadataSource::StreamType;
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr std::string_view kByShardField = "byShard"_sd;
-constexpr std::string_view kMetaField = "meta"_sd;
-constexpr std::string_view kNumMetaField = "numMeta"_sd;
-constexpr std::string_view kNumDocsField = "numDocs"_sd;
-constexpr std::string_view kAddStreamTypeField = "addStreamTypeField"_sd;
-constexpr std::string_view kSortPatternField = "sortPattern"_sd;
-constexpr std::string_view kMergePipelineField = "mergePipeline"_sd;
+constexpr std::string_view kByShardField = "byShard"sv;
+constexpr std::string_view kMetaField = "meta"sv;
+constexpr std::string_view kNumMetaField = "numMeta"sv;
+constexpr std::string_view kNumDocsField = "numDocs"sv;
+constexpr std::string_view kAddStreamTypeField = "addStreamTypeField"sv;
+constexpr std::string_view kSortPatternField = "sortPattern"sv;
+constexpr std::string_view kMergePipelineField = "mergePipeline"sv;
 
 // DRM wrapper / metadata field names.
-constexpr std::string_view kSourceField = "source"_sd;
-constexpr std::string_view kMetadataField = "metadata"_sd;
-constexpr std::string_view kAsField = "as"_sd;
-constexpr std::string_view kSearchMetaName = "SEARCH_META"_sd;
+constexpr std::string_view kSourceField = "source"sv;
+constexpr std::string_view kMetadataField = "metadata"sv;
+constexpr std::string_view kAsField = "as"sv;
+constexpr std::string_view kSearchMetaName = "SEARCH_META"sv;
 
 // Emitted document field names.
-constexpr std::string_view kScoreField = "score"_sd;
-constexpr std::string_view kSortKeyField = "$sortKey"_sd;
-constexpr std::string_view kSearchScoreField = "$searchScore"_sd;
-constexpr std::string_view kStreamTypeField = "_streamType"_sd;
+constexpr std::string_view kScoreField = "score"sv;
+constexpr std::string_view kSortKeyField = "$sortKey"sv;
+constexpr std::string_view kSearchScoreField = "$searchScore"sv;
+constexpr std::string_view kStreamTypeField = "_streamType"sv;
 
 // True if 'field' is present at the top level or inside any per-shard override.
 bool fieldPresentInAnyShard(const BSONObj& args, std::string_view field) {

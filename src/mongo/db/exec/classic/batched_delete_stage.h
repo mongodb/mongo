@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/batched_delete_stage_buffer.h"
 #include "mongo/db/exec/classic/batched_delete_stage_gen.h"
 #include "mongo/db/exec/classic/delete_stage.h"
@@ -50,6 +49,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 struct MONGO_MOD_PUBLIC BatchedDeleteStageParams {
     BatchedDeleteStageParams()
@@ -116,7 +116,7 @@ class BatchedDeleteStage final : public DeleteStage {
     BatchedDeleteStage& operator=(const BatchedDeleteStage&) = delete;
 
 public:
-    static constexpr std::string_view kStageType = "BATCHED_DELETE"_sd;
+    static constexpr std::string_view kStageType = "BATCHED_DELETE"sv;
     BatchedDeleteStage(ExpressionContext* expCtx,
                        DeleteStageParams params,
                        std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,

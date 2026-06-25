@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
@@ -61,12 +60,13 @@
 
 namespace mongo {
 namespace analyze_shard_key {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(AnalyzeShardKeyReadWriteDistribution);
 
 class DocumentSourceAnalyzeShardKeyReadWriteDistribution final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_analyzeShardKeyReadWriteDistribution"_sd;
+    static constexpr std::string_view kStageName = "$_analyzeShardKeyReadWriteDistribution"sv;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

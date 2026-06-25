@@ -46,6 +46,7 @@
 #include <boost/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
 #if (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS) || \
     (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE)
@@ -57,7 +58,7 @@ class OptionSection;
 class Environment;
 }  // namespace optionenvironment
 
-constexpr auto kSSLCipherConfigDefault = "HIGH:!EXPORT:!aNULL@STRENGTH"_sd;
+constexpr auto kSSLCipherConfigDefault = "HIGH:!EXPORT:!aNULL@STRENGTH"sv;
 
 struct SSLParams {
     using TLSCATrusts = std::map<SHA256Block, std::set<RoleName>>;

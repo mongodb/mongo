@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands.h"
 #include "mongo/util/duration.h"
@@ -43,7 +42,8 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
-constexpr inline auto kDefaultMaxTimeMSClusterParameterName = "defaultMaxTimeMS"_sd;
+using namespace std::literals::string_view_literals;
+constexpr inline auto kDefaultMaxTimeMSClusterParameterName = "defaultMaxTimeMS"sv;
 
 /**
  * Returns the value of maxTimeMS that should be used for a command or boost::none if none could be

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_all_indices_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -51,6 +50,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class PlanYieldPolicy;
 
@@ -86,7 +86,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr std::string_view kStageType = "CACHED_PLAN"_sd;
+    static constexpr std::string_view kStageType = "CACHED_PLAN"sv;
 
     /**
      * Runs the cached plan for a trial period, yielding during the trial period according to

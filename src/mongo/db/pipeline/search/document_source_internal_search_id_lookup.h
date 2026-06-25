@@ -44,6 +44,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class DSInternalSearchIdLookUpCatalogResourceHandle;
 /**
@@ -56,7 +57,7 @@ class DSInternalSearchIdLookUpCatalogResourceHandle;
  */
 class DocumentSourceInternalSearchIdLookUp final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalSearchIdLookup"_sd;
+    static constexpr std::string_view kStageName = "$_internalSearchIdLookup"sv;
     /**
      * Creates an $_internalSearchIdLookup stage. "elem" must be an empty object.
      */

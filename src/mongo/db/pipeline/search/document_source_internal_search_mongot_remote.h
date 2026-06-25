@@ -46,6 +46,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 struct InternalSearchMongotRemoteSharedState {
     // TODO SERVER-94874: This does not need to be shared anymore when the ticket is done.
@@ -57,7 +58,7 @@ struct InternalSearchMongotRemoteSharedState {
  */
 class DocumentSourceInternalSearchMongotRemote : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalSearchMongotRemote"_sd;
+    static constexpr std::string_view kStageName = "$_internalSearchMongotRemote"sv;
 
     static StageConstraints getSearchDefaultConstraints() {
         StageConstraints constraints(StreamType::kStreaming,

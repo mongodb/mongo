@@ -45,6 +45,7 @@ extern void runSystemHealthCollectionCycle(SystemHealthMetrics&);
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using otel::metrics::AttributeDefinition;
 using otel::metrics::MetricNames;
@@ -74,11 +75,11 @@ TEST_F(SystemHealthOtelMetricsTest, FirstUpdateSetsMetricsCorrectly) {
     _metrics.update(snap);
 
     ASSERT_EQ(1000,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"sv}));
     ASSERT_EQ(500,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"sv}));
     ASSERT_EQ(200,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"sv}));
     ASSERT_EQ(4, _capturer.readInt64Gauge(MetricNames::kThreadActive));
     ASSERT_EQ(1, _capturer.readInt64Gauge(MetricNames::kThreadQueued));
     ASSERT_EQ(512, _capturer.readInt64Gauge(MetricNames::kFdOpen));
@@ -105,11 +106,11 @@ TEST_F(SystemHealthOtelMetricsTest, SecondUpdateUpdatesMetricsCorrectly) {
 
     // Counters accumulate deltas: first=1000/500/200, delta=300/150/50.
     ASSERT_EQ(1300,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"sv}));
     ASSERT_EQ(650,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"sv}));
     ASSERT_EQ(250,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"sv}));
 
     ASSERT_EQ(5, _capturer.readInt64Gauge(MetricNames::kThreadActive));
     ASSERT_EQ(3, _capturer.readInt64Gauge(MetricNames::kThreadQueued));
@@ -137,11 +138,11 @@ TEST_F(SystemHealthOtelMetricsTest, NegativeDeltaOnWrapIsSkipped) {
 
     // Negative deltas are skipped; counters retain the value from before the reset.
     ASSERT_EQ(5000,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"sv}));
     ASSERT_EQ(2000,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"sv}));
     ASSERT_EQ(800,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"sv}));
 }
 
 struct CPUModeField {
@@ -150,16 +151,16 @@ struct CPUModeField {
 };
 
 inline constexpr auto kCpuModeFields = std::to_array<CPUModeField>({
-    {"user"_sd, &SystemHealthSnapshot::cpuUserMs},
-    {"nice"_sd, &SystemHealthSnapshot::cpuNiceMs},
-    {"system"_sd, &SystemHealthSnapshot::cpuSystemMs},
-    {"idle"_sd, &SystemHealthSnapshot::cpuIdleMs},
-    {"iowait"_sd, &SystemHealthSnapshot::cpuIowaitMs},
-    {"irq"_sd, &SystemHealthSnapshot::cpuIrqMs},
-    {"softirq"_sd, &SystemHealthSnapshot::cpuSoftirqMs},
-    {"steal"_sd, &SystemHealthSnapshot::cpuStealMs},
-    {"guest"_sd, &SystemHealthSnapshot::cpuGuestMs},
-    {"guest_nice"_sd, &SystemHealthSnapshot::cpuGuestNiceMs},
+    {"user"sv, &SystemHealthSnapshot::cpuUserMs},
+    {"nice"sv, &SystemHealthSnapshot::cpuNiceMs},
+    {"system"sv, &SystemHealthSnapshot::cpuSystemMs},
+    {"idle"sv, &SystemHealthSnapshot::cpuIdleMs},
+    {"iowait"sv, &SystemHealthSnapshot::cpuIowaitMs},
+    {"irq"sv, &SystemHealthSnapshot::cpuIrqMs},
+    {"softirq"sv, &SystemHealthSnapshot::cpuSoftirqMs},
+    {"steal"sv, &SystemHealthSnapshot::cpuStealMs},
+    {"guest"sv, &SystemHealthSnapshot::cpuGuestMs},
+    {"guest_nice"sv, &SystemHealthSnapshot::cpuGuestNiceMs},
 });
 
 TEST_F(SystemHealthOtelMetricsTest, CpuTimeDeltaAllFields) {

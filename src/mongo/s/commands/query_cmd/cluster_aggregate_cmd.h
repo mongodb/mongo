@@ -42,6 +42,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Implements the cluster aggregate command on both mongos (router) and shard servers.
@@ -146,7 +147,7 @@ public:
                                                            _privileges,
                                                            verbosity,
                                                            result,
-                                                           "ClusterAggregate::runAggregate"_sd,
+                                                           "ClusterAggregate::runAggregate"sv,
                                                            _ifrContext));
             _extensionMetrics.markSuccess();
         }

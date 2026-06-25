@@ -40,6 +40,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const NamespaceString kUserNss =
     NamespaceString::createNamespaceString_forTest("testdb", "usercoll");
@@ -90,8 +91,8 @@ TEST(PipelineResolverTest, BindsTopLevelView) {
     ASSERT_TRUE(result);
     ASSERT_EQ(userLpp.getStages().size(), 2U);
     // Both stages should be $match.
-    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$match"_sd);
-    ASSERT_EQ(userLpp.getStages()[1]->getParseTimeName(), "$match"_sd);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$match"sv);
+    ASSERT_EQ(userLpp.getStages()[1]->getParseTimeName(), "$match"sv);
 }
 
 TEST(PipelineResolverTest, RecursesIntoUnionWithSubpipeline) {
@@ -133,7 +134,7 @@ TEST(PipelineResolverTest, RecursesIntoUnionWithSubpipeline) {
 
     // Top-level stage count should remain 1 (still just $unionWith).
     ASSERT_EQ(userLpp.getStages().size(), 1U);
-    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$unionWith"_sd);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$unionWith"sv);
 
     // Drill into the subpipeline via getMutableSubPipelines.
     auto* subs = userLpp.getStages()[0]->getMutableSubPipelines();
@@ -142,8 +143,8 @@ TEST(PipelineResolverTest, RecursesIntoUnionWithSubpipeline) {
     // The inner subpipeline should now have 2 stages: view's $match prepended + user's $match.
     const auto& innerStages = subs->front()->getStages();
     ASSERT_EQ(innerStages.size(), 2U);
-    ASSERT_EQ(innerStages[0]->getParseTimeName(), "$match"_sd);
-    ASSERT_EQ(innerStages[1]->getParseTimeName(), "$match"_sd);
+    ASSERT_EQ(innerStages[0]->getParseTimeName(), "$match"sv);
+    ASSERT_EQ(innerStages[1]->getParseTimeName(), "$match"sv);
 
     // The recursive resolver should have upgraded the resolved backing namespace on the parent
     // $unionWith stage to the view, so downstream DocumentSource construction can skip a per-stage
@@ -215,7 +216,7 @@ TEST(PipelineResolverTest, WalkerRespectsViewPolicyKDoNothing) {
 
     // Assert: stages must NOT have been prepended — still exactly 1 stage.
     ASSERT_EQ(userLpp.getStages().size(), 1U);
-    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$_internalSearchIdLookup"_sd);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$_internalSearchIdLookup"sv);
 }
 
 TEST(PipelineResolverTest, AllowsRepeatedViewReferenceInUserStages) {
@@ -268,8 +269,8 @@ TEST(PipelineResolverTest, AllowsRepeatedViewReferenceInUserStages) {
     ASSERT_TRUE(outerSubs && outerSubs->size() == 1U);
     const auto& outerSubStages = (*outerSubs)[0]->getStages();
     ASSERT_EQ(outerSubStages.size(), 2U);
-    ASSERT_EQ(outerSubStages[0]->getParseTimeName(), "$match"_sd);
-    ASSERT_EQ(outerSubStages[1]->getParseTimeName(), "$unionWith"_sd);
+    ASSERT_EQ(outerSubStages[0]->getParseTimeName(), "$match"sv);
+    ASSERT_EQ(outerSubStages[1]->getParseTimeName(), "$unionWith"sv);
 
     // Inner $unionWith sub-LPP: [{$match:{v:1}} (from viewMain)] — not empty, proving the
     // second reference to viewMain was resolved and not suppressed as a cycle.
@@ -277,7 +278,7 @@ TEST(PipelineResolverTest, AllowsRepeatedViewReferenceInUserStages) {
     ASSERT_TRUE(innerSubs && innerSubs->size() == 1U);
     const auto& innerSubStages = (*innerSubs)[0]->getStages();
     ASSERT_EQ(innerSubStages.size(), 1U);
-    ASSERT_EQ(innerSubStages[0]->getParseTimeName(), "$match"_sd);
+    ASSERT_EQ(innerSubStages[0]->getParseTimeName(), "$match"sv);
 }
 
 TEST(PipelineResolverTest, ResolvesInnerViewNestedUnderRepeatedBaseCollectionReferences) {
@@ -320,20 +321,20 @@ TEST(PipelineResolverTest, ResolvesInnerViewNestedUnderRepeatedBaseCollectionRef
     ASSERT_TRUE(outerSubs && outerSubs->size() == 1U);
     const auto& middleStages = (*outerSubs)[0]->getStages();
     ASSERT_EQ(middleStages.size(), 1U);
-    ASSERT_EQ(middleStages[0]->getParseTimeName(), "$unionWith"_sd);
+    ASSERT_EQ(middleStages[0]->getParseTimeName(), "$unionWith"sv);
 
     auto* middleSubs = middleStages[0]->getMutableSubPipelines();
     ASSERT_TRUE(middleSubs && middleSubs->size() == 1U);
     const auto& innermostStages = (*middleSubs)[0]->getStages();
     ASSERT_EQ(innermostStages.size(), 1U);
-    ASSERT_EQ(innermostStages[0]->getParseTimeName(), "$unionWith"_sd);
+    ASSERT_EQ(innermostStages[0]->getParseTimeName(), "$unionWith"sv);
 
     // The innermost $unionWith targeted innerView should be fully resolved.
     auto* innerSubs = innermostStages[0]->getMutableSubPipelines();
     ASSERT_TRUE(innerSubs && innerSubs->size() == 1U);
     const auto& viewStages = (*innerSubs)[0]->getStages();
     ASSERT_EQ(viewStages.size(), 1U);
-    ASSERT_EQ(viewStages[0]->getParseTimeName(), "$match"_sd);
+    ASSERT_EQ(viewStages[0]->getParseTimeName(), "$match"sv);
 }
 
 TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {

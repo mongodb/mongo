@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -64,9 +63,9 @@ class ClientAPIVersionParameters;
  *
  * Optionally allows passthrough characters to remain unescaped.
  */
-void uriEncode(std::ostream& ss, std::string_view str, std::string_view passthrough = ""_sd);
+void uriEncode(std::ostream& ss, std::string_view str, std::string_view passthrough = {});
 
-inline std::string uriEncode(std::string_view str, std::string_view passthrough = ""_sd) {
+inline std::string uriEncode(std::string_view str, std::string_view passthrough = {}) {
     std::ostringstream ss;
     uriEncode(ss, str, passthrough);
     return ss.str();

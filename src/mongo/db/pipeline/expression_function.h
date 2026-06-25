@@ -45,6 +45,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * This expression takes a function, an array of arguments to pass to it, and the language
  * specifier (currently limited to JavaScript). It returns the return value of the function with
@@ -105,7 +106,7 @@ public:
         return _funcSource;
     }
 
-    static constexpr auto kExpressionName = "$function"_sd;
+    static constexpr auto kExpressionName = "$function"sv;
     static constexpr auto kJavaScript = "js";
 
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {

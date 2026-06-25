@@ -48,8 +48,9 @@
 
 namespace mongo::exec::agg {
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kIdField = "_id"_sd;
+constexpr auto kIdField = "_id"sv;
 
 /**
  * Build the Express PlanExecutor for an _id-equality lookup. Returns nullptr if the documentKey

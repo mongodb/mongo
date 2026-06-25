@@ -32,7 +32,6 @@
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_aws_protocol_common_gen.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/modules.h"
@@ -46,6 +45,7 @@
 namespace mongo {
 
 namespace awsIam {
+using namespace std::literals::string_view_literals;
 /**
  * Common constants shared by AWS client and server code.
  */
@@ -59,19 +59,19 @@ static constexpr size_t kServerFirstNonceLength =
 
 static constexpr size_t kMaxStsHostNameLength = 255;
 
-static constexpr auto kMongoServerNonceHeader = "x-mongodb-server-nonce"_sd;
-static constexpr auto kMongoGS2CBHeader = "x-mongodb-gs2-cb-flag"_sd;
-static constexpr auto kChannelBindingDataHeader = "x-mongodb-channel-binding-data"_sd;
-static constexpr auto kChannelBindingTypePrefixHeader = "x-mongodb-channel-type-prefix"_sd;
+static constexpr auto kMongoServerNonceHeader = "x-mongodb-server-nonce"sv;
+static constexpr auto kMongoGS2CBHeader = "x-mongodb-gs2-cb-flag"sv;
+static constexpr auto kChannelBindingDataHeader = "x-mongodb-channel-binding-data"sv;
+static constexpr auto kChannelBindingTypePrefixHeader = "x-mongodb-channel-type-prefix"sv;
 
-static constexpr auto kMongoDefaultGS2CBFlag = "n"_sd;
+static constexpr auto kMongoDefaultGS2CBFlag = "n"sv;
 
-static constexpr auto kAwsServiceName = "sts"_sd;
+static constexpr auto kAwsServiceName = "sts"sv;
 
-static constexpr auto kAwsDefaultRegion = "us-east-1"_sd;
-static constexpr auto kAwsDefaultStsHost = "sts.amazonaws.com"_sd;
+static constexpr auto kAwsDefaultRegion = "us-east-1"sv;
+static constexpr auto kAwsDefaultStsHost = "sts.amazonaws.com"sv;
 
-static constexpr auto kXAmzDateHeader = "X-Amz-Date"_sd;
+static constexpr auto kXAmzDateHeader = "X-Amz-Date"sv;
 
 /**
  * Deserialize a std::string to an IDL object.

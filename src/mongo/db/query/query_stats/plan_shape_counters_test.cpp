@@ -49,6 +49,7 @@
 
 namespace mongo::plan_shape_counters {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using NodeWrapper =
     std::function<std::unique_ptr<QuerySolutionNode>(std::unique_ptr<QuerySolutionNode>)>;
@@ -108,7 +109,7 @@ public:
                      const std::string& context) {
         const auto actual = identifyPlanShapeForCounters(solution);
         const auto name = [](const boost::optional<PlanShapeCounter>& shape) {
-            return shape ? toStringData(*shape) : "no shape"_sd;
+            return shape ? toStringData(*shape) : "no shape"sv;
         };
         ASSERT(actual == expected) << "expected " << name(expected) << " but got " << name(actual)
                                    << " in " << context << "with qsn " << solution.toString();
@@ -305,23 +306,23 @@ public:
     // The nodes the matcher ignores, paired with a name for failure messages.
     std::vector<std::pair<std::string_view, NodeWrapper>> makeIgnoredWrappers() {
         return {
-            {"LIMIT"_sd,
+            {"LIMIT"sv,
              [this](std::unique_ptr<QuerySolutionNode> child) {
                  return makeLimit(std::move(child));
              }},
-            {"SKIP"_sd,
+            {"SKIP"sv,
              [this](std::unique_ptr<QuerySolutionNode> child) {
                  return makeSkip(std::move(child));
              }},
-            {"SHARDING_FILTER"_sd,
+            {"SHARDING_FILTER"sv,
              [this](std::unique_ptr<QuerySolutionNode> child) {
                  return makeShardingFilter(std::move(child));
              }},
-            {"SORT_KEY_GENERATOR"_sd,
+            {"SORT_KEY_GENERATOR"sv,
              [this](std::unique_ptr<QuerySolutionNode> child) {
                  return makeSortKeyGenerator(std::move(child));
              }},
-            {"RETURN_KEY"_sd,
+            {"RETURN_KEY"sv,
              [this](std::unique_ptr<QuerySolutionNode> child) {
                  return makeReturnKey(std::move(child));
              }},

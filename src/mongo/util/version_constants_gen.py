@@ -169,7 +169,8 @@ def fmt_build_info(data):
         return "true" if val else "false"
 
     def fmt_str(val):
-        return 'R"({0})"_sd'.format(val.replace("\\", r"\\"))
+        esc = val.replace("\\", r"\\")
+        return f'R"({esc})"'
 
     def fmt_obj(obj):
         return "{{{}, {}, {}, {}}}".format(
@@ -242,7 +243,7 @@ def generate_config_header(
     version_parts = [int(x) for x in version_parts[:4]]
 
     modules = ["enterprise"] if "build_enterprise_enabled" in extra_definitions_dict else []
-    module_list = ",\n".join(['"{0}"_sd'.format(x) for x in modules])
+    module_list = ",\n".join([f'std::string_view{{"{x}"}}' for x in modules])
 
     replacements = {
         "@mongo_version@": extra_definitions_dict["MONGO_VERSION"],

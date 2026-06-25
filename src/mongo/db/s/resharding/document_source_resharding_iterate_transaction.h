@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -50,6 +49,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingIterateTransaction);
 
@@ -71,9 +71,9 @@ DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingIterateTransaction);
  */
 class MONGO_MOD_PUBLIC DocumentSourceReshardingIterateTransaction : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalReshardingIterateTransaction"_sd;
+    static constexpr std::string_view kStageName = "$_internalReshardingIterateTransaction"sv;
     static constexpr std::string_view kIncludeCommitTransactionTimestampFieldName =
-        "includeCommitTransactionTimestamp"_sd;
+        "includeCommitTransactionTimestamp"sv;
 
     static boost::intrusive_ptr<DocumentSourceReshardingIterateTransaction> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

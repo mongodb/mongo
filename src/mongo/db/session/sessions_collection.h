@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -41,6 +40,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class DBClientBase;
 class OperationContext;
@@ -53,7 +53,7 @@ class OperationContext;
  */
 class MONGO_MOD_OPEN SessionsCollection {
 public:
-    static constexpr std::string_view kSessionsTTLIndex = "lsidTTLIndex"_sd;
+    static constexpr std::string_view kSessionsTTLIndex = "lsidTTLIndex"sv;
 
     virtual ~SessionsCollection();
 

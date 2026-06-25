@@ -40,6 +40,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Count);
 
@@ -48,7 +49,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Count);
  */
 class DocumentSourceCount final {
 public:
-    static constexpr std::string_view kStageName = "$count"_sd;
+    static constexpr std::string_view kStageName = "$count"sv;
 
     /**
      * Returns a $group stage followed by a $project stage.

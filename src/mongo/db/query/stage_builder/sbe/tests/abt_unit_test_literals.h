@@ -41,6 +41,7 @@
 #include <boost/core/demangle.hpp>
 
 namespace mongo::stage_builder::abt_lower::unit_test_abt_literals {
+using namespace std::literals::string_view_literals;
 using namespace sbe::value;
 using namespace abt;
 
@@ -306,7 +307,7 @@ public:
                                         .str();
                                 case TypeTags::StringSmall:
                                     return str::stream{} << "sbe::value::makeSmallString(" << arg
-                                                         << "_sd).second";
+                                                         << "sv).second";
                                 default:
                                     return str::stream{} << "unimplemented(" << arg << ")";
                             }

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -41,6 +40,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Stage used by the count command. This stage sits at the root of a plan tree and counts the number
@@ -72,7 +72,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr std::string_view kStageType = "COUNT"_sd;
+    static constexpr std::string_view kStageType = "COUNT"sv;
 
     long long getLimit() const {
         return _limit;

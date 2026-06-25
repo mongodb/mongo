@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -55,6 +54,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamCheckInvalidate);
 using ChangeStreamCheckInvalidateLiteParsed =
@@ -68,7 +68,7 @@ using ChangeStreamCheckInvalidateLiteParsed =
 class DocumentSourceChangeStreamCheckInvalidate final
     : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr std::string_view kStageName = "$_internalChangeStreamCheckInvalidate"_sd;
+    static constexpr std::string_view kStageName = "$_internalChangeStreamCheckInvalidate"sv;
 
     std::string_view getSourceName() const final {
         // This is used in error reporting.

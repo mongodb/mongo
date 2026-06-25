@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -40,12 +39,14 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 
 #include <set>
+#include <string_view>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalAssertDataAssumptions);
 class InternalAssertDataAssumptionsLiteParsed final
@@ -83,7 +84,7 @@ public:
  */
 class DocumentSourceInternalAssertDataAssumptions final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalAssertDataAssumptions"_sd;
+    static constexpr std::string_view kStageName = "$_internalAssertDataAssumptions"sv;
 
     /**
      * Creates a DocumentSourceInternalAssertDataAssumptions from a BSONElement specification.

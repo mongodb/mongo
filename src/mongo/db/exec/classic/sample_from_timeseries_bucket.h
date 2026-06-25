@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -51,6 +50,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * This stage implements a variation on the ARHASH algorithm (see
  * https://dl.acm.org/doi/10.1145/93605.98746), by running one iteration of the ARHASH algorithm to
@@ -60,7 +60,7 @@ namespace mongo {
  */
 class SampleFromTimeseriesBucket final : public PlanStage {
 public:
-    static constexpr std::string_view kStageType = "SAMPLE_FROM_TIMESERIES_BUCKET"_sd;
+    static constexpr std::string_view kStageType = "SAMPLE_FROM_TIMESERIES_BUCKET"sv;
 
     /**
      * Constructs a 'SampleFromTimeseriesBucket' stage which uses 'bucketUnpacker' to materialize

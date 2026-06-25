@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/async_client.h"
 #include "mongo/db/baton.h"
@@ -73,6 +72,7 @@
 
 namespace mongo {
 namespace executor {
+using namespace std::literals::string_view_literals;
 
 class MONGO_MOD_NEEDS_REPLACEMENT NetworkInterfaceTL : public NetworkInterface {
 public:
@@ -324,10 +324,10 @@ private:
 
     friend std::string_view toString(State s) {
         return std::array{
-            "Default"_sd,
-            "Started"_sd,
-            "Stopping"_sd,
-            "Stopped"_sd,
+            "Default"sv,
+            "Started"sv,
+            "Stopping"sv,
+            "Stopped"sv,
         }
             .at(s);
     }

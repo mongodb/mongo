@@ -457,7 +457,7 @@ public:
 protected:
     static EncryptedFieldConfig makeMockEfc() {
         EncryptedFieldConfig efc;
-        efc.setEscCollection("enxcol_.mock.esc"_sd);
+        efc.setEscCollection("enxcol_.mock.esc"sv);
         efc.setFields({});
         return efc;
     }
@@ -1423,7 +1423,7 @@ TEST_F(FLEServerRewritePipelineTest, BuildsEfcMapForAllSchemas_PipelineRewrite) 
     const auto& efcMap = pipelineRewrite.efcMapForTest();
     ASSERT_EQ(efcMap.size(), 2u);
     ASSERT_EQ(efcMap.count(_primaryNss), 1u);
-    ASSERT_EQ(efcMap.count(NamespaceString::createNamespaceString_forTest("test.coll_b"_sd)), 1u);
+    ASSERT_EQ(efcMap.count(NamespaceString::createNamespaceString_forTest("test.coll_b"sv)), 1u);
 }
 
 TEST_F(FLEServerRewritePipelineTest, MissingEscForeignCollectionFails_PipelineRewrite) {

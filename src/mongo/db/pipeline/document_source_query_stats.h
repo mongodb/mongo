@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -60,6 +59,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 using namespace query_stats;
 
@@ -67,7 +67,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(QueryStats);
 
 class DocumentSourceQueryStats final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$queryStats"_sd;
+    static constexpr std::string_view kStageName = "$queryStats"sv;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:

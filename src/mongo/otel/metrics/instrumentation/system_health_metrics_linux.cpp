@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/procparser.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -51,6 +51,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -62,10 +63,10 @@ using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
 using otel::metrics::ReportingPolicy;
 
-constexpr std::string_view kProcStatPath = "/proc/stat"_sd;
-constexpr std::string_view kProcFileNrPath = "/proc/sys/fs/file-nr"_sd;
+constexpr std::string_view kProcStatPath = "/proc/stat"sv;
+constexpr std::string_view kProcFileNrPath = "/proc/sys/fs/file-nr"sv;
 
-const std::vector<std::string_view> kStatKeys{"cpu"_sd, "procs_running"_sd, "procs_blocked"_sd};
+const std::vector<std::string_view> kStatKeys{"cpu"sv, "procs_running"sv, "procs_blocked"sv};
 
 struct SystemHealthOtelMetricsState {
     std::unique_ptr<SystemHealthMetrics> metrics;
@@ -77,16 +78,16 @@ const auto getSystemHealthOtelMetricsState =
 
 const AttributeDefinition<std::string_view> kCpuModeAttr{
     .name = "mode",
-    .values = {"user"_sd,
-               "nice"_sd,
-               "system"_sd,
-               "idle"_sd,
-               "iowait"_sd,
-               "irq"_sd,
-               "softirq"_sd,
-               "steal"_sd,
-               "guest"_sd,
-               "guest_nice"_sd},
+    .values = {"user"sv,
+               "nice"sv,
+               "system"sv,
+               "idle"sv,
+               "iowait"sv,
+               "irq"sv,
+               "softirq"sv,
+               "steal"sv,
+               "guest"sv,
+               "guest_nice"sv},
 };
 
 }  // namespace
@@ -146,16 +147,16 @@ public:
                 _cpuTime.add(delta, mode);
         };
 
-        record("user"_sd, _prev.cpuUserMs, snap.cpuUserMs);
-        record("nice"_sd, _prev.cpuNiceMs, snap.cpuNiceMs);
-        record("system"_sd, _prev.cpuSystemMs, snap.cpuSystemMs);
-        record("idle"_sd, _prev.cpuIdleMs, snap.cpuIdleMs);
-        record("iowait"_sd, _prev.cpuIowaitMs, snap.cpuIowaitMs);
-        record("irq"_sd, _prev.cpuIrqMs, snap.cpuIrqMs);
-        record("softirq"_sd, _prev.cpuSoftirqMs, snap.cpuSoftirqMs);
-        record("steal"_sd, _prev.cpuStealMs, snap.cpuStealMs);
-        record("guest"_sd, _prev.cpuGuestMs, snap.cpuGuestMs);
-        record("guest_nice"_sd, _prev.cpuGuestNiceMs, snap.cpuGuestNiceMs);
+        record("user"sv, _prev.cpuUserMs, snap.cpuUserMs);
+        record("nice"sv, _prev.cpuNiceMs, snap.cpuNiceMs);
+        record("system"sv, _prev.cpuSystemMs, snap.cpuSystemMs);
+        record("idle"sv, _prev.cpuIdleMs, snap.cpuIdleMs);
+        record("iowait"sv, _prev.cpuIowaitMs, snap.cpuIowaitMs);
+        record("irq"sv, _prev.cpuIrqMs, snap.cpuIrqMs);
+        record("softirq"sv, _prev.cpuSoftirqMs, snap.cpuSoftirqMs);
+        record("steal"sv, _prev.cpuStealMs, snap.cpuStealMs);
+        record("guest"sv, _prev.cpuGuestMs, snap.cpuGuestMs);
+        record("guest_nice"sv, _prev.cpuGuestNiceMs, snap.cpuGuestNiceMs);
 
         // If nothing has changed, just skip updating the utilization.
         // This prevents a potential divide by zero.

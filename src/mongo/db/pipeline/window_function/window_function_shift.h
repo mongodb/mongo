@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -52,12 +51,13 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::window_function {
+using namespace std::literals::string_view_literals;
 
 class ExpressionShift : public Expression {
 public:
-    static constexpr std::string_view kDefaultArg = "default"_sd;
-    static constexpr std::string_view kOutputArg = "output"_sd;
-    static constexpr std::string_view kByArg = "by"_sd;
+    static constexpr std::string_view kDefaultArg = "default"sv;
+    static constexpr std::string_view kOutputArg = "output"sv;
+    static constexpr std::string_view kByArg = "by"sv;
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,

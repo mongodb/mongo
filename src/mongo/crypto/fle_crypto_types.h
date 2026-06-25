@@ -44,8 +44,9 @@
 #include <fmt/format.h>
 
 namespace MONGO_MOD_PUBLIC mongo {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kSafeContent = "__safeContent__"_sd;
+constexpr auto kSafeContent = "__safeContent__"sv;
 constexpr auto kSafeContentString = "__safeContent__";
 
 // u = [1, max parallel clients)

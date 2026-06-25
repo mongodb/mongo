@@ -41,6 +41,7 @@
 namespace mongo {
 namespace exec {
 namespace agg {
+using namespace std::literals::string_view_literals;
 
 class CurrentOpStage final : public Stage {
 public:
@@ -50,7 +51,7 @@ public:
     using TruncationMode = MongoProcessInterface::CurrentOpTruncateMode;
     using CursorMode = MongoProcessInterface::CurrentOpCursorMode;
 
-    static constexpr std::string_view kStageName = "$currentOp"_sd;
+    static constexpr std::string_view kStageName = "$currentOp"sv;
 
     static constexpr ConnMode kDefaultConnMode = ConnMode::kExcludeIdle;
     static constexpr SessionMode kDefaultSessionMode = SessionMode::kIncludeIdle;

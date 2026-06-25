@@ -59,15 +59,12 @@ EXCLUDE_HEADERS = {
 # Val: list of right includes under repo ("mongo/...") which will be mapped with _label_for_right()
 GEN_LEFT_CPP: dict[str, list[str]] = {
     "mongo/shell/mongo-server.cpp": [
-        "mongo/base/string_data.h",
         "mongo/scripting/engine.h",
     ],
     "mongo/shell/mongojs.cpp": [
-        "mongo/base/string_data.h",
         "mongo/scripting/engine.h",
     ],
     "mongo/scripting/mozjs/mongohelpers_js.cpp": [
-        "mongo/base/string_data.h",
         "mongo/scripting/engine.h",
     ],
     "mongo/db/fts/stop_words_list.cpp": [
@@ -86,7 +83,6 @@ GEN_LEFT_CPP: dict[str, list[str]] = {
 
 # Headers every IDL uses (as repo-relative include paths, e.g. "mongo/.../x.h").
 IDL_HEADERS_RIGHTS = [
-    "mongo/base/string_data.h",
     "mongo/base/data_range.h",
     "mongo/bson/bsonobj.h",
     "mongo/bson/bsonobjbuilder.h",

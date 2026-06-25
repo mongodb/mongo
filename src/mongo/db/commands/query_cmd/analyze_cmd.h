@@ -29,11 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
 
 namespace mongo {
-static constexpr std::string_view kStatisticsPath = "statistics"_sd;
+constexpr inline std::string_view kStatisticsPath = "statistics";
 }  // namespace mongo
