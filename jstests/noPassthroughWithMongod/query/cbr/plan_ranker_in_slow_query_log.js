@@ -7,6 +7,7 @@
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {setCBRConfig} from "jstests/libs/query/cbr_utils.js";
@@ -59,6 +60,15 @@ describe("planRanker in slow query log and profiler", function () {
     }
 
     it("reports 'cbr' when the cost-based ranker chooses the winning plan", function () {
+        // TODO (SERVER-119581): Remove once featureFlagGetExecutorDeferredEngineChoice is removed.
+        if (!FeatureFlagUtil.isEnabled(db, "GetExecutorDeferredEngineChoice")) {
+            jsTest.log.info(
+                "Skipping: featureFlagGetExecutorDeferredEngineChoice is disabled, " +
+                    "CBR is not invoked without the deferred engine-choice path.",
+            );
+            return;
+        }
+
         setCBRConfig(db, {internalQueryCBRCEMode: "samplingCE"});
         const {fromLog, fromProfiler} = runAndGetPlanRanker("planRankerMarkerCbr");
         assert.eq(fromLog, "cbr", "slow query log should report planRanker: cbr");
