@@ -1671,6 +1671,7 @@ StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string
 void OplogApplication::checkOnOplogFailureForRecovery(OperationContext* opCtx,
                                                       const mongo::NamespaceString& nss,
                                                       const mongo::BSONObj& oplogEntry,
+                                                      const OpTime& opTime,
                                                       const std::string& errorMsg) {
     const bool isReplicaSet =
         repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
@@ -1682,7 +1683,8 @@ void OplogApplication::checkOnOplogFailureForRecovery(OperationContext* opCtx,
         LOGV2_DEBUG(9452700,
                     1,
                     "Skipped processing an error during oplog application.",
-                    "oplogEntry"_attr = oplogEntry,
+                    "opTime"_attr = opTime,
+                    "oplogEntry"_attr = redact(oplogEntry),
                     "error"_attr = errorMsg);
         return;
     }
@@ -1696,20 +1698,23 @@ void OplogApplication::checkOnOplogFailureForRecovery(OperationContext* opCtx,
             1,
             "Error applying operation while recovering from stable checkpoint. This is related to "
             "one of the configuration collections so this error might be benign.",
-            "oplogEntry"_attr = oplogEntry,
+            "opTime"_attr = opTime,
+            "oplogEntry"_attr = redact(oplogEntry),
             "error"_attr = errorMsg);
     } else if (getTestCommandsEnabled()) {
         // Only fassert in test environment.
         LOGV2_FATAL(5415000,
                     "Error applying operation while recovering from stable "
                     "checkpoint. This can lead to data corruption.",
-                    "oplogEntry"_attr = oplogEntry,
+                    "opTime"_attr = opTime,
+                    "oplogEntry"_attr = redact(oplogEntry),
                     "error"_attr = errorMsg);
     } else {
         LOGV2_WARNING(5415001,
                       "Error applying operation while recovering from stable "
                       "checkpoint. This can lead to data corruption.",
-                      "oplogEntry"_attr = oplogEntry,
+                      "opTime"_attr = opTime,
+                      "oplogEntry"_attr = redact(oplogEntry),
                       "error"_attr = errorMsg);
     }
 }
@@ -2231,6 +2236,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 opCtx,
                 op.getNss(),
                 redact(op.toBSONForLogging()),
+                op.getOpTime(),
                 str::stream()
                     << "(NamespaceNotFound): Failed to apply operation due to missing collection ("
                     << uuid.value() << ")");
@@ -2569,7 +2575,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             }
                         } else if (inStableRecovery) {
                             repl::OplogApplication::checkOnOplogFailureForRecovery(
-                                opCtx, op.getNss(), redact(op.toBSONForLogging()), redact(status));
+                                opCtx,
+                                op.getNss(),
+                                redact(op.toBSONForLogging()),
+                                op.getOpTime(),
+                                redact(status));
                         } else if (mode == OplogApplication::Mode::kInitialSync) {
                             LOGV2_DEBUG(
                                 8776800,
@@ -2863,6 +2873,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 opCtx,
                                 op.getNss(),
                                 redact(op.toBSONForLogging()),
+                                op.getOpTime(),
                                 std::string{repl::kUpdateOnMissingDocMsg});
                         } else if (mode == OplogApplication::Mode::kInitialSync) {
                             // TODO (SERVER-87994): Revisit the verbosity of the logging.
@@ -2908,7 +2919,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
             if (!status.isOK()) {
                 if (inStableRecovery) {
                     repl::OplogApplication::checkOnOplogFailureForRecovery(
-                        opCtx, op.getNss(), redact(op.toBSONForLogging()), redact(status));
+                        opCtx,
+                        op.getNss(),
+                        redact(op.toBSONForLogging()),
+                        op.getOpTime(),
+                        redact(status));
                 } else if (mode == OplogApplication::Mode::kInitialSync) {
                     // TODO (SERVER-87994): Revisit the verbosity of the logging.
                     LOGV2_DEBUG(8776801,
@@ -3029,7 +3044,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             : "Applied a delete which did not delete anything."s;
                         if (inStableRecovery) {
                             repl::OplogApplication::checkOnOplogFailureForRecovery(
-                                opCtx, op.getNss(), redact(op.toBSONForLogging()), errMsg);
+                                opCtx,
+                                op.getNss(),
+                                redact(op.toBSONForLogging()),
+                                op.getOpTime(),
+                                errMsg);
                         } else if (mode == OplogApplication::Mode::kInitialSync) {
                             // TODO (SERVER-87994): Revisit the verbosity of the logging.
                             LOGV2_DEBUG(8776802,
@@ -3260,7 +3279,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
     if (op->shouldLogAsDDLOperation() && !serverGlobalParams.quiet.load()) {
         LOGV2(7360110,
               "Applying DDL command oplog entry",
-              "oplogEntry"_attr = op->toBSONForLogging(),
+              "opTime"_attr = op->getOpTime(),
+              "oplogEntry"_attr = redact(op->toBSONForLogging()),
               "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
     } else {
         LOGV2_DEBUG(21255,

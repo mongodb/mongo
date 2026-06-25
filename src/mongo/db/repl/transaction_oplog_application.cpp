@@ -257,7 +257,7 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             if (ex.code() == ErrorCodes::NamespaceNotFound &&
                 oplogApplicationMode == repl::OplogApplication::Mode::kStableRecovering) {
                 repl::OplogApplication::checkOnOplogFailureForRecovery(
-                    opCtx, op.getNss(), redact(op.toBSONForLogging()), redact(ex));
+                    opCtx, op.getNss(), redact(op.toBSONForLogging()), op.getOpTime(), redact(ex));
             }
 
             if (!ignoreException) {

@@ -1931,8 +1931,11 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         const auto& documents = result.getValue().documents;
         invariant(!documents.empty());
         const BSONObj oplogSeedDoc = documents.front();
-        LOGV2_DEBUG(
-            21185, 2, "Inserting oplog seed document", "oplogSeedDocument"_attr = oplogSeedDoc);
+        LOGV2_DEBUG(21185,
+                    2,
+                    "Inserting oplog seed document",
+                    "opTime"_attr = OpTime::parse(oplogSeedDoc),
+                    "oplogSeedDocument"_attr = redact(oplogSeedDoc));
 
         auto opCtx = makeOpCtx();
         // StorageInterface::insertDocument() has to be called outside the lock because we may

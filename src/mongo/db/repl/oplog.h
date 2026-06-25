@@ -242,6 +242,7 @@ public:
     static void checkOnOplogFailureForRecovery(OperationContext* opCtx,
                                                const mongo::NamespaceString& nss,
                                                const mongo::BSONObj& oplogEntry,
+                                               const OpTime& opTime,
                                                const std::string& errorMsg);
 
     // Extracts the namespace from a command oplog entry object.

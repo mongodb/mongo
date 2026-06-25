@@ -743,7 +743,11 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                      OplogApplication::inRecovering(oplogApplicationMode))) {
                     if (inStableRecovery) {
                         repl::OplogApplication::checkOnOplogFailureForRecovery(
-                            opCtx, op->getNss(), redact(op->toBSONForLogging()), redact(status));
+                            opCtx,
+                            op->getNss(),
+                            redact(op->toBSONForLogging()),
+                            op->getOpTime(),
+                            redact(status));
                     }
                     continue;
                 }
@@ -774,7 +778,11 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                 allowNamespaceNotFoundErrorsOnCrudOps) {
                 if (inStableRecovery) {
                     repl::OplogApplication::checkOnOplogFailureForRecovery(
-                        opCtx, op->getNss(), redact(op->toBSONForLogging()), redact(e));
+                        opCtx,
+                        op->getNss(),
+                        redact(op->toBSONForLogging()),
+                        op->getOpTime(),
+                        redact(e));
                 } else {
                     LOGV2_DEBUG(
                         9067401,
