@@ -196,6 +196,18 @@ def get_toolchain_subs(ctx):
 
     return distro, arch, substitutions
 
+def _get_amazon_linux_2023_minor_version(repository_ctx):
+    """Returns the minor release number of Amazon Linux 2023, e.g. 3 for 2023.3, or None."""
+    result = repository_ctx.execute([
+        "sed",
+        "-n",
+        "s/Amazon Linux release 2023\\.\\([0-9]*\\)\\..*/\\1/p",
+        "/etc/system-release",
+    ])
+    if result.return_code != 0 or not result.stdout.strip():
+        return None
+    return result.stdout.strip()
+
 def get_host_distro_major_version(repository_ctx):
     _DISTRO_PATTERN_MAP = {
         "Ubuntu 18*": "ubuntu18",
@@ -246,5 +258,9 @@ def get_host_distro_major_version(repository_ctx):
             if distro_str.startswith(prefix_suffix[0]) and distro_str.endswith(prefix_suffix[1]):
                 return simplified_name
         elif distro_str == distro_pattern:
+            if simplified_name == "amazon_linux_2023":
+                minor = _get_amazon_linux_2023_minor_version(repository_ctx)
+                if minor == "3":
+                    return "amazon_linux_2023_3"
             return simplified_name
     return None

@@ -7,7 +7,17 @@ TOOLCHAIN_MAP_V5 = {
         "sha": "35b5a1e65f0ef093a335003e004bf679215adcdf04988d1fcd0e2a2ebfba9a11",
         "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_gdb-amazon2023-arm64-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
     },
+    "amazon_linux_2023_3_aarch64": {
+        "platform_name": "amazon2023-arm64",
+        "sha": "35b5a1e65f0ef093a335003e004bf679215adcdf04988d1fcd0e2a2ebfba9a11",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_gdb-amazon2023-arm64-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+    },
     "amazon_linux_2023_x86_64": {
+        "platform_name": "amazon2023",
+        "sha": "7f426456d7492a85ee27b3d091b322080842bf9bc554ee58126de959c2a179c0",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_gdb-amazon2023-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+    },
+    "amazon_linux_2023_3_x86_64": {
         "platform_name": "amazon2023",
         "sha": "7f426456d7492a85ee27b3d091b322080842bf9bc554ee58126de959c2a179c0",
         "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_gdb-amazon2023-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",

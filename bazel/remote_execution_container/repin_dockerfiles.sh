@@ -77,6 +77,13 @@ libzstd
 openssl
 "
 
+ADDITIONAL_PACKAGES["public.ecr.aws/amazonlinux/amazonlinux:2023.3.20240312.0"]="
+hostname
+iproute
+libzstd
+openssl
+"
+
 ADDITIONAL_PACKAGES["redhat/ubi8:8.9"]="
 ncurses-compat-libs
 "
@@ -111,6 +118,7 @@ libncurses-dev
 declare -A IMAGE_DIRS
 IMAGE_DIRS["amazonlinux:2"]="amazon_linux_2"
 IMAGE_DIRS["amazonlinux:2023"]="amazon_linux_2023"
+IMAGE_DIRS["public.ecr.aws/amazonlinux/amazonlinux:2023.3.20240312.0"]="amazon_linux_2023_3"
 IMAGE_DIRS["debian:10"]="debian10"
 IMAGE_DIRS["debian:12"]="debian12"
 IMAGE_DIRS["redhat/ubi8:8.9"]="rhel89"

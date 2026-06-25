@@ -4,6 +4,9 @@
 # enabled.
 info --config=local
 
+# Used if we need to reset the cache for some reason, just change the value
+common --action_env=RESET_CACHE=A
+
 # Don't use legacy toolchain resolution.
 common --incompatible_enable_cc_toolchain_resolution
 # https://github.com/bazelbuild/bazel/issues/8766
