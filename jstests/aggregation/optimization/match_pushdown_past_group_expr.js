@@ -139,6 +139,48 @@ describe("logical operators on comparisons", function () {
     });
 });
 
+describe("logic operators above $expr", function () {
+    runTest({
+        name: "$and",
+        matchStage: {$match: {$and: [{$expr: {$gt: ["$_id", 0]}}, {$expr: {$lt: ["$_id", 5]}}]}},
+        expected: [{_id: 1, n: 2}],
+    });
+
+    runTest({
+        name: "$and with null comparison",
+        matchStage: {
+            $match: {$and: [{$expr: {$gte: ["$_id", null]}}, {$expr: {$lte: ["$_id", null]}}]},
+        },
+        expected: [{_id: null, n: 2}],
+    });
+
+    runTest({
+        name: "$or",
+        matchStage: {$match: {$or: [{$expr: {$eq: ["$_id", 1]}}, {$expr: {$gt: ["$_id", 5]}}]}},
+        expected: [{_id: 1, n: 2}],
+    });
+
+    runTest({
+        name: "$or with null comparison",
+        matchStage: {$match: {$or: [{$expr: {$eq: ["$_id", null]}}, {$expr: {$gt: ["$_id", 5]}}]}},
+        expected: [{_id: null, n: 2}],
+    });
+
+    runTest({
+        name: "$nor",
+        matchStage: {
+            $match: {$nor: [{$expr: {$eq: ["$_id", 1]}}, {$expr: {$gt: ["$_id", 5]}}]},
+        },
+        expected: [{_id: null, n: 2}],
+    });
+
+    runTest({
+        name: "$nor with null comparison",
+        matchStage: {$match: {$nor: [{$expr: {$eq: ["$_id", null]}}]}},
+        expected: [{_id: 1, n: 2}],
+    });
+});
+
 describe("$in", function () {
     runTest({
         name: "non-null constant array",
