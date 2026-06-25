@@ -974,16 +974,15 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
 
     if (boundsToFillOut->fields[pos].name.empty()) {
-        IndexBoundsBuilder::translate(
-            expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
+        IndexBoundsBuilder::translate(expr, keyElt, index, oil, &scanState->tightness, nullptr);
     } else {
         if (MatchExpression::AND == mergeType) {
             IndexBoundsBuilder::translateAndIntersect(
-                expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
+                expr, keyElt, index, oil, &scanState->tightness, nullptr);
         } else {
             MONGO_verify(MatchExpression::OR == mergeType);
             IndexBoundsBuilder::translateAndUnion(
-                expr, keyElt, index, oil, &scanState->tightness, scanState->getCurrentIETBuilder());
+                expr, keyElt, index, oil, &scanState->tightness, nullptr);
         }
     }
 }
@@ -1196,10 +1195,8 @@ bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
 void QueryPlannerAccess::finishAndOutputLeaf(const CanonicalQuery& cq,
                                              ScanBuildingState* scanState,
                                              vector<std::unique_ptr<QuerySolutionNode>>* out) {
-    finishLeafNode(cq,
-                   scanState->currentScan.get(),
-                   scanState->indices[scanState->currentIndexNumber],
-                   std::move(scanState->ietBuilders));
+    finishLeafNode(
+        cq, scanState->currentScan.get(), scanState->indices[scanState->currentIndexNumber]);
 
     if (MatchExpression::OR == scanState->root->matchType()) {
         if (orNeedsFetch(scanState)) {
@@ -1230,11 +1227,9 @@ void QueryPlannerAccess::finishAndOutputLeaf(const CanonicalQuery& cq,
     out->push_back(std::move(scanState->currentScan));
 }
 
-void QueryPlannerAccess::finishLeafNode(
-    const CanonicalQuery& cq,
-    QuerySolutionNode* node,
-    const IndexEntry& index,
-    std::vector<interval_evaluation_tree::Builder> ietBuilders) {
+void QueryPlannerAccess::finishLeafNode(const CanonicalQuery& cq,
+                                        QuerySolutionNode* node,
+                                        const IndexEntry& index) {
     const StageType type = node->getType();
 
     if (STAGE_TEXT_MATCH == type) {
@@ -1260,7 +1255,7 @@ void QueryPlannerAccess::finishLeafNode(
 
         // If this is a $** index, update and populate the keyPattern, bounds, and multikeyPaths.
         if (index.type == IndexType::INDEX_WILDCARD) {
-            wcp::finalizeWildcardIndexScanConfiguration(scan, &ietBuilders);
+            wcp::finalizeWildcardIndexScanConfiguration(scan);
         }
     }
 
@@ -1297,23 +1292,6 @@ void QueryPlannerAccess::finishLeafNode(
 
         // Make sure that the length of the key is the length of the bounds we started.
         MONGO_verify(firstEmptyField == bounds->fields.size());
-    }
-
-    // Build Interval Evaluation Trees used to restore index bounds from cached SBE Plans.
-    if (node->getType() == STAGE_IXSCAN && !ietBuilders.empty()) {
-        auto ixScan = static_cast<IndexScanNode*>(node);
-        ixScan->iets.reserve(ietBuilders.size());
-        for (size_t i = 0; i < ietBuilders.size(); ++i) {
-            if (auto iet = ietBuilders[i].done()) {
-                ixScan->iets.push_back(std::move(*iet));
-            } else {
-                ixScan->iets.push_back(
-                    interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
-                        bounds->fields[i]));
-            }
-        }
-        LOGV2_DEBUG(
-            6334900, 5, "Build IETs", "iets"_attr = ietsToString(ixScan->index, ixScan->iets));
     }
 
     // We create bounds assuming a forward direction but can easily reverse bounds to align
@@ -1535,14 +1513,14 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
             }
 
             // Reset state before producing a new leaf.
-            scanState.resetForNextScan(scanState.ixtag, query.isParameterized());
+            scanState.resetForNextScan(scanState.ixtag);
 
             scanState.currentScan = makeLeafNode(query,
                                                  indices[scanState.currentIndexNumber],
                                                  scanState.ixtag->pos,
                                                  child,
                                                  &scanState.tightness,
-                                                 scanState.getCurrentIETBuilder());
+                                                 nullptr);
 
             refineTightnessForMaybeCoveredQuery(query, scanState.tightness);
             handleFilter(&scanState);
@@ -1683,14 +1661,14 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
             }
 
             // Reset state before producing a new leaf.
-            scanState->resetForNextScan(scanState->ixtag, query.isParameterized());
+            scanState->resetForNextScan(scanState->ixtag);
 
             scanState->currentScan = makeLeafNode(query,
                                                   indices[scanState->currentIndexNumber],
                                                   scanState->ixtag->pos,
                                                   emChild,
                                                   &scanState->tightness,
-                                                  scanState->getCurrentIETBuilder());
+                                                  nullptr);
         }
     }
 
@@ -2061,20 +2039,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
 
             const auto& index = indices[tag->index];
 
-            std::vector<interval_evaluation_tree::Builder> ietBuilders{};
-            interval_evaluation_tree::Builder* ietBuilder = nullptr;
-            if (query.isParameterized()) {
-                ietBuilders.resize(index.keyPattern.nFields());
-                tassert(6481601,
-                        "IET Builder list size must be equal to the number of fields in the key "
-                        "pattern",
-                        tag->pos < ietBuilders.size());
-                ietBuilder = &ietBuilders[tag->pos];
-            }
-
-            auto soln = makeLeafNode(query, index, tag->pos, root, &tightness, ietBuilder);
+            auto soln = makeLeafNode(query, index, tag->pos, root, &tightness, nullptr);
             MONGO_verify(nullptr != soln);
-            finishLeafNode(query, soln.get(), index, std::move(ietBuilders));
+            finishLeafNode(query, soln.get(), index);
 
             if (!ownedRoot) {
                 // We're performing access planning for the child of an array operator such as
@@ -2706,18 +2673,11 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
     return solnRoot;
 }
 
-void QueryPlannerAccess::ScanBuildingState::resetForNextScan(IndexTag* newTag,
-                                                             bool isQueryParameterized) {
+void QueryPlannerAccess::ScanBuildingState::resetForNextScan(IndexTag* newTag) {
     currentScan.reset(nullptr);
     currentIndexNumber = newTag->index;
     tightness = IndexBoundsBuilder::INEXACT_FETCH;
     loosestBounds = IndexBoundsBuilder::EXACT;
-
-    ietBuilders.clear();
-    if (isQueryParameterized) {
-        const auto& index = indices[newTag->index];
-        ietBuilders.resize(index.keyPattern.nFields());
-    }
 
     if (MatchExpression::OR == root->matchType()) {
         curOr = std::make_unique<OrMatchExpression>();

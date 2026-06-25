@@ -918,8 +918,7 @@ TEST(QuerySolutionTest, WildcardIndexSupportsSortWhenIndexOnlyNeedsToLookAtOnePa
         BSON("" << 2 << "" << 3), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(c);
 
-    std::vector<interval_evaluation_tree::Builder> ietBuilders;
-    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node, &ietBuilders);
+    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node);
 
     node.computeProperties();
     auto sorts = node.providedSorts();
@@ -975,8 +974,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenIndexNeedsToLookAtMul
         BSON("" << 2 << "" << 3), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(c);
 
-    std::vector<interval_evaluation_tree::Builder> ietBuilders;
-    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node, &ietBuilders);
+    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node);
 
     node.computeProperties();
     auto sorts = node.providedSorts();
@@ -1029,8 +1027,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatch)
     node.bounds.fields.push_back(c);
 
 
-    std::vector<interval_evaluation_tree::Builder> ietBuilders;
-    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node, &ietBuilders);
+    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node);
 
     node.computeProperties();
 
@@ -1089,8 +1086,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatchW
         BSON("" << 2 << "" << 3), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(c);
 
-    std::vector<interval_evaluation_tree::Builder> ietBuilders;
-    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node, &ietBuilders);
+    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node);
 
     node.computeProperties();
     auto sorts = node.providedSorts();

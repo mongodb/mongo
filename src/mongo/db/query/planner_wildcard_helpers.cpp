@@ -550,8 +550,7 @@ bool canOnlyAnswerWildcardPrefixQuery(
     return false;
 }
 
-void finalizeWildcardIndexScanConfiguration(
-    IndexScanNode* scan, std::vector<interval_evaluation_tree::Builder>* ietBuilders) {
+void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan) {
     IndexEntry* index = &scan->index;
     IndexBounds* bounds = &scan->bounds;
 
@@ -574,12 +573,6 @@ void finalizeWildcardIndexScanConfiguration(
 
     std::string_view wildcardFieldName;
     index->keyPattern = makeNewKeyPattern(index, &wildcardFieldName);
-
-    if (!ietBuilders->empty()) {
-        auto wildcardIt = ietBuilders->begin();
-        std::advance(wildcardIt, index->wildcardFieldPos);
-        ietBuilders->emplace(wildcardIt);
-    }
 
     // Update the position as we insert "$_path" prior to the wildcard field.
     index->wildcardFieldPos++;

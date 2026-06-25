@@ -35,7 +35,6 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
-#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/planner_ixselect.h"
@@ -248,23 +247,8 @@ private:
          * Reset the scan building state in preparation for building a new scan.
          *
          * This always should be called prior to allocating a new 'currentScan'.
-         *
-         * If `isQueryParameterized` is true an Interval Evaluation Tree will be built for every key
-         * element.
          */
-        void resetForNextScan(IndexTag* newTag, bool isQueryParameterized);
-
-        interval_evaluation_tree::Builder* getCurrentIETBuilder() {
-            if (ietBuilders.empty()) {
-                return nullptr;
-            } else {
-                tassert(6334910,
-                        "IET Builder list size must be equal to the number of fields in the key "
-                        "pattern",
-                        ixtag->pos < ietBuilders.size());
-                return &ietBuilders[ixtag->pos];
-            }
-        }
+        void resetForNextScan(IndexTag* newTag);
 
         // The root of the MatchExpression tree for which we are currently building index
         // scans. Should be either an AND node or an OR node.
@@ -312,11 +296,6 @@ private:
         // the child predicates assigned to the current index is INEXACT_COVERED but none are
         // INEXACT_FETCH, then 'loosestBounds' is INEXACT_COVERED.
         IndexBoundsBuilder::BoundsTightness loosestBounds;
-
-        // The list of Interval Evaluation Tree builders used to build IETs for SBE. Every
-        // iet::Builder in the list corresponds to the corresponding element in the key pattern. The
-        // vector is empty if the query has no parameter markers.
-        std::vector<interval_evaluation_tree::Builder> ietBuilders;
 
     private:
         // Default constructor is not allowed.
@@ -480,8 +459,7 @@ private:
      */
     static void finishLeafNode(const CanonicalQuery& cq,
                                QuerySolutionNode* node,
-                               const IndexEntry& index,
-                               std::vector<interval_evaluation_tree::Builder> ietBuilders);
+                               const IndexEntry& index);
 
     /**
      * Fills in any missing bounds by calling finishLeafNode(...) for the scan contained in
