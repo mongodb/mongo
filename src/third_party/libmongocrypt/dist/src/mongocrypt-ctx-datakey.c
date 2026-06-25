@@ -483,7 +483,7 @@ static bool _finalize(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out) {
         _mongocrypt_key_alt_name_t *alt_name = ctx->opts.key_alt_names;
         int i;
 
-        bson_append_array_begin(&key_doc, "keyAltNames", -1, &child);
+        bson_append_array_unsafe_begin(&key_doc, "keyAltNames", -1, &child);
         for (i = 0; alt_name; i++) {
             char *key = bson_strdup_printf("%d", i);
             bson_append_value(&child, key, -1, &alt_name->value);

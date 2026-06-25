@@ -28,6 +28,8 @@
 extern "C" {
 #endif
 
+#define KMS_PARSER_MAX_RESPONSE_LEN 16 * 1024 * 1024 /* 16 MiB */
+
 typedef struct _kms_response_parser_t kms_response_parser_t;
 
 KMS_MSG_EXPORT (kms_response_parser_t *)

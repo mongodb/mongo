@@ -66,9 +66,6 @@ bool _mongocrypt_cache_add_stolen(_mongocrypt_cache_t *cache, void *attr, void *
 
 void _mongocrypt_cache_cleanup(_mongocrypt_cache_t *cache);
 
-/* A helper debug function to dump the state of the cache. */
-void _mongocrypt_cache_dump(_mongocrypt_cache_t *cache);
-
 /* Tests may override the default expiration */
 void _mongocrypt_cache_set_expiration(_mongocrypt_cache_t *cache, uint64_t milli);
 

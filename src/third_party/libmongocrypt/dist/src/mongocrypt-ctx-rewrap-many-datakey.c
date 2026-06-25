@@ -25,7 +25,7 @@ static bool _finalize(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out) {
     BSON_ASSERT_PARAM(ctx);
     BSON_ASSERT_PARAM(out);
 
-    BSON_ASSERT(BSON_APPEND_ARRAY_BEGIN(&doc, "v", &array));
+    BSON_ASSERT(BSON_APPEND_ARRAY_UNSAFE_BEGIN(&doc, "v", &array));
     {
         _mongocrypt_ctx_rmd_datakey_t *iter = NULL;
         size_t idx = 0u;

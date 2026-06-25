@@ -156,7 +156,7 @@ typedef enum {
     MONGOCRYPT_INDEX_TYPE_EQUALITY = 2,
     MONGOCRYPT_INDEX_TYPE_RANGE = 3,
     MONGOCRYPT_INDEX_TYPE_RANGEPREVIEW_DEPRECATED = 4,
-    MONGOCRYPT_INDEX_TYPE_TEXTPREVIEW = 5,
+    MONGOCRYPT_INDEX_TYPE_STRING = 5,
 } mongocrypt_index_type_t;
 
 bool _mongocrypt_validate_and_copy_string(const char *in, int32_t in_len, char **out) MONGOCRYPT_WARN_UNUSED_RESULT;

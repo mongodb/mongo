@@ -330,7 +330,7 @@ bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePay
     }
     // Append "g" array of EdgeTokenSets.
     bson_t g_bson;
-    if (!BSON_APPEND_ARRAY_BEGIN(out, "g", &g_bson)) {
+    if (!BSON_APPEND_ARRAY_UNSAFE_BEGIN(out, "g", &g_bson)) {
         return false;
     }
 
@@ -432,7 +432,7 @@ SERIALIZE_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Prefix)
         BSON_ASSERT_PARAM(array_name);                                                                                 \
         BSON_ASSERT_PARAM(array);                                                                                      \
         bson_t arr_bson;                                                                                               \
-        if (!BSON_APPEND_ARRAY_BEGIN(parent, array_name, &arr_bson)) {                                                 \
+        if (!BSON_APPEND_ARRAY_UNSAFE_BEGIN(parent, array_name, &arr_bson)) {                                          \
             return false;                                                                                              \
         }                                                                                                              \
                                                                                                                        \

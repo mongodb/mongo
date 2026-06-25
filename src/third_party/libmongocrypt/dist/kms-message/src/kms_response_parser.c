@@ -234,7 +234,7 @@ _parse_line (kms_response_parser_t *parser, int end)
       /* if we have *not* read the Content-Length yet, check. */
       if (parser->content_length == -1 &&
           strcmp (key->str, "Content-Length") == 0) {
-         if (!_parse_int (val->str, &parser->content_length)) {
+         if (!_parse_int (val->str, &parser->content_length) || parser->content_length > KMS_PARSER_MAX_RESPONSE_LEN || parser->content_length < 0) {
             KMS_ERROR (parser, "Could not parse Content-Length header.");
             kms_request_str_destroy (key);
             kms_request_str_destroy (val);
@@ -258,7 +258,7 @@ _parse_line (kms_response_parser_t *parser, int end)
    } else if (parser->state == PARSING_CHUNK_LENGTH) {
       int result = 0;
 
-      if (!_parse_hex_from_view (raw + i, end - i, &result)) {
+      if (!_parse_hex_from_view (raw + i, end - i, &result) || result > KMS_PARSER_MAX_RESPONSE_LEN || result < 0) {
          KMS_ERROR (parser, "Failed to parse hex chunk length.");
          return PARSING_DONE;
       }
@@ -280,6 +280,12 @@ kms_response_parser_feed (kms_response_parser_t *parser,
       return kms_kmip_response_parser_feed (parser->kmip, buf, len);
    }
 
+   // As a precaution, limit the maximum size KMS response:
+   if (len > KMS_PARSER_MAX_RESPONSE_LEN || raw->len > KMS_PARSER_MAX_RESPONSE_LEN - len) {
+      KMS_ERROR (parser, "KMS response too large");
+      return false;
+   }
+
    curr = (int) raw->len;
    kms_request_str_append_chars (raw, (char *) buf, len);
    /* process the new data appended. */
@@ -291,6 +297,9 @@ kms_response_parser_feed (kms_response_parser_t *parser,
          /* find the next \r\n. */
          if (curr && strncmp (raw->str + (curr - 1), "\r\n", 2) == 0) {
             parser->state = _parse_line (parser, curr - 1);
+            if (parser->failed) {
+               return false;
+            }
             parser->start = curr + 1;
          }
          curr++;

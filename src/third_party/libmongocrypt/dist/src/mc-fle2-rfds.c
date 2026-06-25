@@ -506,11 +506,11 @@ bool mc_FLE2RangeFindDriverSpec_to_placeholders(mc_FLE2RangeFindDriverSpec_t *sp
         }
         */
         bson_t and;
-        TRY(BSON_APPEND_ARRAY_BEGIN(out, "$and", &and));
+        TRY(BSON_APPEND_ARRAY_UNSAFE_BEGIN(out, "$and", &and));
         bson_t elem;
         TRY(BSON_APPEND_DOCUMENT_BEGIN(&and, "0", &elem));
         bson_t operator;
-        TRY(BSON_APPEND_ARRAY_BEGIN(&elem, mc_FLE2RangeOperator_to_string(spec->firstOp), &operator));
+        TRY(BSON_APPEND_ARRAY_UNSAFE_BEGIN(&elem, mc_FLE2RangeOperator_to_string(spec->firstOp), &operator));
         TRY(BSON_APPEND_UTF8(&operator, "0", spec->field));
         TRY(_mongocrypt_buffer_append(&p1, &operator, "1", 1));
         TRY(bson_append_array_end(&elem, &operator));
@@ -518,7 +518,7 @@ bool mc_FLE2RangeFindDriverSpec_to_placeholders(mc_FLE2RangeFindDriverSpec_t *sp
 
         if (spec->nOps == 2) {
             TRY(BSON_APPEND_DOCUMENT_BEGIN(&and, "1", &elem));
-            TRY(BSON_APPEND_ARRAY_BEGIN(&elem, mc_FLE2RangeOperator_to_string(spec->secondOp), &operator));
+            TRY(BSON_APPEND_ARRAY_UNSAFE_BEGIN(&elem, mc_FLE2RangeOperator_to_string(spec->secondOp), &operator));
             TRY(BSON_APPEND_UTF8(&operator, "0", spec->field));
             TRY(_mongocrypt_buffer_append(&p2, &operator, "1", 1));
             TRY(bson_append_array_end(&elem, &operator));
@@ -537,7 +537,7 @@ bool mc_FLE2RangeFindDriverSpec_to_placeholders(mc_FLE2RangeFindDriverSpec_t *sp
         }
         */
         bson_t and;
-        TRY(BSON_APPEND_ARRAY_BEGIN(out, "$and", &and));
+        TRY(BSON_APPEND_ARRAY_UNSAFE_BEGIN(out, "$and", &and));
         bson_t elem;
         TRY(BSON_APPEND_DOCUMENT_BEGIN(&and, "0", &elem));
         bson_t operator;

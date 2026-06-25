@@ -451,22 +451,6 @@ int _mongocrypt_buffer_cmp_hex(_mongocrypt_buffer_t *buf, const char *hex) {
     return res;
 }
 
-char *_mongocrypt_buffer_to_hex(_mongocrypt_buffer_t *buf) {
-    BSON_ASSERT_PARAM(buf);
-    /* since buf->len is a uint32_t, even doubling it won't bring it anywhere
-     * near to SIZE_MAX */
-
-    char *hex = bson_malloc0(buf->len * 2 + 1);
-    BSON_ASSERT(hex);
-
-    char *out = hex;
-
-    for (uint32_t i = 0; i < buf->len; i++, out += 2) {
-        BSON_ASSERT(2 == bson_snprintf(out, 3, "%02X", buf->data[i]));
-    }
-    return hex;
-}
-
 bool _mongocrypt_buffer_concat(_mongocrypt_buffer_t *dst, const _mongocrypt_buffer_t *srcs, uint32_t num_srcs) {
     uint32_t total = 0;
     uint32_t offset;

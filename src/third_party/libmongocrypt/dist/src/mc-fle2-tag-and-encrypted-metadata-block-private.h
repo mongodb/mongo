@@ -17,19 +17,20 @@
 #ifndef MC_FLE2_TAG_AND_ENCRYPTED_METADATA_BLOCK_H
 #define MC_FLE2_TAG_AND_ENCRYPTED_METADATA_BLOCK_H
 
-#include "mc-reader-private.h"
-#include "mc-writer-private.h"
-#include "mongocrypt-private.h"
+#include "mongocrypt-buffer-private.h"
 
-#define kMetadataLen 96U // encCount(32) + tag(32) + encZeros(32)
+#define kFieldLen 32U
+#define kMetadataLen 96U // encryptedCount(32) + tag(32) + encryptedZeros(32)
 
 typedef struct _mc_FLE2TagAndEncryptedMetadataBlock_t {
+    // The contiguous metadata block buffer.
+    _mongocrypt_buffer_t rawBlock;
+
+    // The following are unowned buffers that each points to a field in rawBlock.
     _mongocrypt_buffer_t encryptedCount;
     _mongocrypt_buffer_t tag;
     _mongocrypt_buffer_t encryptedZeros;
 } mc_FLE2TagAndEncryptedMetadataBlock_t;
-
-#define kFieldLen 32U
 
 void mc_FLE2TagAndEncryptedMetadataBlock_init(mc_FLE2TagAndEncryptedMetadataBlock_t *metadata);
 

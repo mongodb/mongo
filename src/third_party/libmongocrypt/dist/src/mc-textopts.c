@@ -271,12 +271,14 @@ static bool TextOpts_to_FLE2TextSearchInsertSpec(const mc_TextOpts_t *txo,
         CLIENT_ERR(ERROR_PREFIX "Error appending to BSON");
         return false;
     }
-    if (!bson_append_bool(&child, "casef", -1, txo->caseSensitive)) {
+    // "casef" means "case folding". Case sensitive => not folded. Case insensitive => folded.
+    if (!bson_append_bool(&child, "casef", -1, !txo->caseSensitive)) {
         CLIENT_ERR(ERROR_PREFIX "Error appending to BSON");
         return false;
     }
 
-    if (!bson_append_bool(&child, "diacf", -1, txo->diacriticSensitive)) {
+    // "diacf" means "diacritic folding". Diacritic sensitive => not folded. Diacritic insensitive => folded.
+    if (!bson_append_bool(&child, "diacf", -1, !txo->diacriticSensitive)) {
         CLIENT_ERR(ERROR_PREFIX "Error appending to BSON");
         return false;
     }
@@ -366,15 +368,18 @@ bool mc_TextOpts_to_FLE2TextSearchInsertSpec_for_query(const mc_TextOpts_t *txo,
         CLIENT_ERR("Unexpected query type: %s\n", _mongocrypt_query_type_to_string(query_type));
         return false;
     }
-    case MONGOCRYPT_QUERY_TYPE_PREFIX: {
+    case MONGOCRYPT_QUERY_TYPE_PREFIX:
+    case MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW_DEPRECATED: {
         include_prefix = true;
         break;
     }
-    case MONGOCRYPT_QUERY_TYPE_SUFFIX: {
+    case MONGOCRYPT_QUERY_TYPE_SUFFIX:
+    case MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW_DEPRECATED: {
         include_suffix = true;
         break;
     }
-    case MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW: {
+    case MONGOCRYPT_QUERY_TYPE_SUBSTRING:
+    case MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW_DEPRECATED: {
         include_substring = true;
         break;
     }

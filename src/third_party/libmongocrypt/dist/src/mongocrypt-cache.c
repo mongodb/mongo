@@ -249,28 +249,6 @@ void _mongocrypt_cache_cleanup(_mongocrypt_cache_t *cache) {
     }
 }
 
-/* Print the contents of the cache (for debugging purposes) */
-void _mongocrypt_cache_dump(_mongocrypt_cache_t *cache) {
-    _mongocrypt_cache_pair_t *pair;
-    int count;
-
-    BSON_ASSERT_PARAM(cache);
-
-    _mongocrypt_mutex_lock(&cache->mutex);
-    count = 0;
-    for (pair = cache->pair; pair != NULL; pair = pair->next) {
-        /* don't check that int64_t fits in int, since this is only diagnostic */
-        printf("entry:%d last_updated:%d\n", count, (int)pair->last_updated);
-        if (cache->dump_attr) {
-            printf("- attr:");
-            cache->dump_attr(pair->attr);
-        }
-        count++;
-    }
-
-    _mongocrypt_mutex_unlock(&cache->mutex);
-}
-
 uint32_t _mongocrypt_cache_num_entries(_mongocrypt_cache_t *cache) {
     _mongocrypt_cache_pair_t *pair;
     uint32_t count;

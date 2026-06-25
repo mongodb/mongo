@@ -70,6 +70,7 @@
 extern "C" {
 #include <mc-fle2-payload-iev-private-v2.h>
 #include <mongocrypt-buffer-private.h>
+#include <mongocrypt-private.h>
 #include <mongocrypt.h>
 }
 
@@ -2627,32 +2628,41 @@ Status FLE2TagAndEncryptedMetadataBlock::encryptAndSerialize(
         uassertStatusOK(packAndEncrypt(std::tie(count, contentionFactor), countEncryptionToken));
     dassert(ecount.size() == sizeof(EncryptedCountersBlob));
 
-    if (!_mongocrypt_buffer_copy_from_data_and_size(
-            &_block->encryptedCount, ecount.data(), ecount.size())) {
-        return Status(ErrorCodes::LibmongocryptError,
-                      "Unable to copy encrypted counts into buffer");
-    }
-
-    if (!_mongocrypt_buffer_copy_from_data_and_size(&_block->tag, tag.data(), sizeof(tag))) {
-        mc_FLE2TagAndEncryptedMetadataBlock_cleanup(_block);
-        return Status(ErrorCodes::LibmongocryptError, "Unable to copy PRF tag into buffer");
-    }
-
     auto ezeros =
         uassertStatusOK(FLEUtil::encryptData(zerosEncryptionToken.toCDR(), ConstDataRange(kZeros)));
     dassert(ezeros.size() == sizeof(EncryptedZerosBlob));
 
-    if (!_mongocrypt_buffer_copy_from_data_and_size(
-            &_block->encryptedZeros, ezeros.data(), ezeros.size())) {
-        mc_FLE2TagAndEncryptedMetadataBlock_cleanup(_block);
-        return Status(ErrorCodes::LibmongocryptError, "Unable to copy encrypted zeros into buffer");
+    SerializedBlob raw{};
+    auto it = raw.begin();
+
+    it = std::copy(ecount.begin(), ecount.end(), it);
+    it = std::copy(tag.begin(), tag.end(), it);
+    it = std::copy(ezeros.begin(), ezeros.end(), it);
+
+    dassert(it == raw.end());
+
+    MongoCryptStatus status;
+    auto rawBuf = MongoCryptBuffer::borrow(ConstDataRange(raw.data(), raw.size()));
+    if (!mc_FLE2TagAndEncryptedMetadataBlock_parse(_block, rawBuf.get(), status)) {
+        return status.toStatus();
     }
+
     return Status::OK();
 }
 
 ConstFLE2TagAndEncryptedMetadataBlock::ConstFLE2TagAndEncryptedMetadataBlock(
     _mc_FLE2TagAndEncryptedMetadataBlock_t* mblock)
-    : _block(mblock) {}
+    : _block(mblock) {
+    static_assert(sizeof(FLE2TagAndEncryptedMetadataBlock::EncryptedZerosBlob) == kFieldLen,
+                  "EncryptedZerosBlob must be 32 bytes to correctly format the "
+                  "FLE2TagAndEncryptedMetadataBlock");
+    static_assert(sizeof(FLE2TagAndEncryptedMetadataBlock::EncryptedCountersBlob) == kFieldLen,
+                  "EncryptedCountersBlob must be 32 bytes to correctly format the "
+                  "FLE2TagAndEncryptedMetadataBlock");
+    static_assert(sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob) == kMetadataLen,
+                  "SerializedBlob must be 96 bytes to correctly format the "
+                  "FLE2TagAndEncryptedMetadataBlock");
+}
 
 ConstFLE2TagAndEncryptedMetadataBlock::View ConstFLE2TagAndEncryptedMetadataBlock::getView() const {
     View result;
@@ -4490,8 +4500,9 @@ int32_t calculatePaddedLengthForString(int32_t strLen) {
                 strLen),
             strLen <= std::numeric_limits<int32_t>::max() - kBSONStringOverheadBytes - 15);
 
-    // round strLen + overhead to the nearest 16-byte boundary
-    int32_t padLen = ((strLen + kBSONStringOverheadBytes + 15) / 16) * 16;
+    // round strLen + overhead to the next 16-byte boundary which is *strictly greater than*
+    // strLen + overhead (i.e., 15 rounds to 16; 16 rounds to 32).
+    int32_t padLen = ((strLen + kBSONStringOverheadBytes + 16) / 16) * 16;
 
     // readjust for BSON overhead
     padLen -= kBSONStringOverheadBytes;

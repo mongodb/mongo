@@ -102,8 +102,6 @@ void _mongocrypt_buffer_copy_from_hex(_mongocrypt_buffer_t *buf, const char *hex
 
 int _mongocrypt_buffer_cmp_hex(_mongocrypt_buffer_t *buf, const char *hex);
 
-char *_mongocrypt_buffer_to_hex(_mongocrypt_buffer_t *buf) MONGOCRYPT_WARN_UNUSED_RESULT;
-
 bool _mongocrypt_buffer_concat(_mongocrypt_buffer_t *dst, const _mongocrypt_buffer_t *srcs, uint32_t num_srcs);
 
 struct _mongocrypt_binary_t *_mongocrypt_buffer_as_binary(_mongocrypt_buffer_t *buf);

@@ -68,7 +68,7 @@ bool mc_FLE2FindRangePayload_serialize(const mc_FLE2FindRangePayload_t *payload,
         }
         // Append "payload.g" array of EdgeTokenSets.
         bson_t g_bson;
-        if (!BSON_APPEND_ARRAY_BEGIN(&payload_bson, "g", &g_bson)) {
+        if (!BSON_APPEND_ARRAY_UNSAFE_BEGIN(&payload_bson, "g", &g_bson)) {
             return false;
         }
 

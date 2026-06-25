@@ -17,13 +17,14 @@
 #ifndef MONGOCRYPT_CONFIG_H
 #define MONGOCRYPT_CONFIG_H
 
+/* clang-format off */
+
 /**
  * @def MONGOCRYPT_VERSION
  * @brief The version string describing libmongocrypt.
  * Has the form x.y.z-<pre>+<date>+git<sha>.
  */
-#define MONGOCRYPT_VERSION "1.8.4"
-
+#define MONGOCRYPT_VERSION "1.19.0-20260624+git0647ed03bc"
 
 /*
  * MONGOCRYPT_ENABLE_CRYPTO_CNG is set from configure to determine if we are
@@ -72,13 +73,11 @@
 
 
 /*
- * MONGOCRYPT_ENABLE_TRACE is set from configure to determine if we are
- * compiled with tracing support.
+ * MONGOCRYPT_ENABLE_TRACE is automatically disabled as 
+ * trace logging is no longer supported.
  */
 #define MONGOCRYPT_ENABLE_TRACE 0
 
-#if MONGOCRYPT_ENABLE_TRACE != 1
-#  undef MONGOCRYPT_ENABLE_TRACE
-#endif
+/* clang-format on */
 
 #endif /* MONGOCRYPT_CONFIG_H */

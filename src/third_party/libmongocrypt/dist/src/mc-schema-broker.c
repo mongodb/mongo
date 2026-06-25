@@ -174,7 +174,7 @@ bool mc_schema_broker_append_listCollections_filter(const mc_schema_broker_t *sb
         TRY_BSON_OR(BSON_APPEND_DOCUMENT_BEGIN(out, "name", &in)) {
             return false;
         }
-        TRY_BSON_OR(BSON_APPEND_ARRAY_BEGIN(&in, "$in", &in_array)) {
+        TRY_BSON_OR(BSON_APPEND_ARRAY_UNSAFE_BEGIN(&in, "$in", &in_array)) {
             return false;
         }
 
@@ -783,7 +783,7 @@ static bool append_encryptedFields(const bson_t *encryptedFields,
             }
 
             bson_t new_array;
-            TRY_BSON_OR(BSON_APPEND_ARRAY_BEGIN(out, "fields", &new_array)) {
+            TRY_BSON_OR(BSON_APPEND_ARRAY_UNSAFE_BEGIN(out, "fields", &new_array)) {
                 goto fail;
             }
 
@@ -987,7 +987,7 @@ static bool insert_encryptionInformation(const mc_schema_broker_t *sb,
             bson_copy_to_excluding_noinit(cmd, &out, "nsInfo", NULL);
             // Append `nsInfo` array.
             bson_t nsInfo_array;
-            if (!BSON_APPEND_ARRAY_BEGIN(&out, "nsInfo", &nsInfo_array)) {
+            if (!BSON_APPEND_ARRAY_UNSAFE_BEGIN(&out, "nsInfo", &nsInfo_array)) {
                 CLIENT_ERR("unable to begin appending 'nsInfo' array");
                 goto fail;
             }

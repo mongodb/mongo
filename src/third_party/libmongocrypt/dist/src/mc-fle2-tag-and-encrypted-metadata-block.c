@@ -33,6 +33,7 @@ void mc_FLE2TagAndEncryptedMetadataBlock_init(mc_FLE2TagAndEncryptedMetadataBloc
 void mc_FLE2TagAndEncryptedMetadataBlock_cleanup(mc_FLE2TagAndEncryptedMetadataBlock_t *metadata) {
     BSON_ASSERT_PARAM(metadata);
 
+    _mongocrypt_buffer_cleanup(&metadata->rawBlock);
     _mongocrypt_buffer_cleanup(&metadata->encryptedCount);
     _mongocrypt_buffer_cleanup(&metadata->tag);
     _mongocrypt_buffer_cleanup(&metadata->encryptedZeros);
@@ -54,11 +55,16 @@ bool mc_FLE2TagAndEncryptedMetadataBlock_parse(mc_FLE2TagAndEncryptedMetadataBlo
 
     mc_FLE2TagAndEncryptedMetadataBlock_init(metadata);
 
-    CHECK_AND_RETURN(mc_reader_read_buffer(&reader, &metadata->encryptedCount, kFieldLen, status));
+    CHECK_AND_RETURN(mc_reader_read_buffer(&reader, &metadata->rawBlock, kMetadataLen, status));
 
-    CHECK_AND_RETURN(mc_reader_read_buffer(&reader, &metadata->tag, kFieldLen, status));
+    uint64_t offset = 0;
+    _mongocrypt_buffer_from_data(&metadata->encryptedCount, metadata->rawBlock.data + offset, kFieldLen);
 
-    CHECK_AND_RETURN(mc_reader_read_buffer(&reader, &metadata->encryptedZeros, kFieldLen, status));
+    offset += kFieldLen;
+    _mongocrypt_buffer_from_data(&metadata->tag, metadata->rawBlock.data + offset, kFieldLen);
+
+    offset += kFieldLen;
+    _mongocrypt_buffer_from_data(&metadata->encryptedZeros, metadata->rawBlock.data + offset, kFieldLen);
 
     return true;
 }
@@ -72,12 +78,7 @@ bool mc_FLE2TagAndEncryptedMetadataBlock_serialize(const mc_FLE2TagAndEncryptedM
     _mongocrypt_buffer_resize(buf, kMetadataLen);
     mc_writer_t writer;
     mc_writer_init_from_buffer(&writer, buf, __func__);
-
-    CHECK_AND_RETURN(mc_writer_write_buffer(&writer, &metadata->encryptedCount, kFieldLen, status));
-
-    CHECK_AND_RETURN(mc_writer_write_buffer(&writer, &metadata->tag, kFieldLen, status));
-
-    CHECK_AND_RETURN(mc_writer_write_buffer(&writer, &metadata->encryptedZeros, kFieldLen, status));
+    CHECK_AND_RETURN(mc_writer_write_buffer(&writer, &metadata->rawBlock, kMetadataLen, status));
 
     return true;
 }
@@ -92,6 +93,7 @@ bool mc_FLE2TagAndEncryptedMetadataBlock_serialize(const mc_FLE2TagAndEncryptedM
 
 bool mc_FLE2TagAndEncryptedMetadataBlock_validate(const mc_FLE2TagAndEncryptedMetadataBlock_t *metadata,
                                                   mongocrypt_status_t *status) {
+    CHECK(metadata->rawBlock.len == kMetadataLen, "Length of metadata block was unexpected");
     CHECK(metadata->encryptedCount.len == kFieldLen, "Length of encrypted count was unexpected");
     CHECK(metadata->tag.len == kFieldLen, "Length of tag was unexpected");
     CHECK(metadata->encryptedZeros.len == kFieldLen, "Length of encrypted zeros was unexpected");

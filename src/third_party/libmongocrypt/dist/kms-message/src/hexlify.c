@@ -20,6 +20,7 @@
 
 #include "kms_message_private.h"
 
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,8 +51,8 @@ unhexlify (const char *in, size_t len)
 {
    int i;
    int byte;
-   int total = 0;
-   int multiplier = 1;
+   int64_t total = 0;
+   int64_t multiplier = 1;
 
    for (i = (int) len - 1; i >= 0; i--) {
       char c = *(in + i);
@@ -66,8 +67,11 @@ unhexlify (const char *in, size_t len)
          return -1;
       }
 
-      total += byte * multiplier;
+      total += (int64_t) byte * multiplier;
+      if (total > INT_MAX) {
+         return -1;
+      }
       multiplier *= 16;
    }
-   return total;
+   return (int) total;
 }

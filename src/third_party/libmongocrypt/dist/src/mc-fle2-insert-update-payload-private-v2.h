@@ -25,12 +25,19 @@
 #include "mongocrypt-private.h"
 #include "mongocrypt.h"
 
+/*
+ * The *TokenSet types corresponds to the following BSON document:
+ * d: <binary> // EDC derived from data & contention factor token
+ * s: <binary> // ESC derived from data & contention factor token
+ * l: <binary> // server derived from data token
+ * p: <binary> // encrypted token for compaction
+ */
 #define DEF_TEXT_SEARCH_TOKEN_SET(Type)                                                                                \
     typedef struct {                                                                                                   \
-        _mongocrypt_buffer_t edcDerivedToken;                                                                          \
-        _mongocrypt_buffer_t escDerivedToken;                                                                          \
-        _mongocrypt_buffer_t serverDerivedFromDataToken;                                                               \
-        _mongocrypt_buffer_t encryptedTokens;                                                                          \
+        _mongocrypt_buffer_t edcDerivedToken;            /* d */                                                       \
+        _mongocrypt_buffer_t escDerivedToken;            /* s */                                                       \
+        _mongocrypt_buffer_t serverDerivedFromDataToken; /* l */                                                       \
+        _mongocrypt_buffer_t encryptedTokens;            /* p */                                                       \
     } mc_Text##Type##TokenSet_t;                                                                                       \
     void mc_Text##Type##TokenSet_init(mc_Text##Type##TokenSet_t *);                                                    \
     void mc_Text##Type##TokenSet_cleanup(mc_Text##Type##TokenSet_t *);                                                 \
@@ -41,6 +48,14 @@ DEF_TEXT_SEARCH_TOKEN_SET(Substring);
 DEF_TEXT_SEARCH_TOKEN_SET(Suffix);
 DEF_TEXT_SEARCH_TOKEN_SET(Prefix);
 
+/**
+ * TextSearchTokenSets corresponds to following BSON document:
+ *
+ * e: <TextExactTokenSet> // Holds tokens for exact string search
+ * s: array<TextSubstringTokenSet> // Holds tokens for substring search
+ * u: array<TextSuffixTokenSet> // Holds tokens for suffix search
+ * p: array<TextPrefixTokenSet> // Holds tokens for prefix search
+ */
 typedef struct {
     mc_TextExactTokenSet_t exact; // e
     mc_array_t substringArray;    // s
@@ -78,6 +93,7 @@ void mc_TextSearchTokenSets_cleanup(mc_TextSearchTokenSets_t *);
  * tf: optional<int32> // Trim Factor. Only included for range payloads.
  * mn: optional<any> // Index Min. Only included for range payloads.
  * mx: optional<any> // Index Max. Only included for range payloads.
+ * b: optional<TextSearchTokenSets> // Only included for text payloads.
  *
  * p is the result of:
  * Encrypt(

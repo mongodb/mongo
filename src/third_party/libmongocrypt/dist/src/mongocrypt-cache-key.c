@@ -71,23 +71,6 @@ static void *_copy_contents(void *value) {
     return _mongocrypt_cache_key_value_new(key_value->key_doc, &key_value->decrypted_key_material);
 }
 
-static void _dump_attr(void *attr_in) {
-    _mongocrypt_cache_key_attr_t *attr;
-    _mongocrypt_key_alt_name_t *altname;
-    char *hex;
-
-    BSON_ASSERT_PARAM(attr_in);
-
-    attr = (_mongocrypt_cache_key_attr_t *)attr_in;
-    hex = _mongocrypt_buffer_to_hex(&attr->id);
-    printf("_id=%s,", hex);
-    printf("keyAltNames=");
-    for (altname = attr->alt_names; NULL != altname; altname = altname->next) {
-        printf("%s\n", _mongocrypt_key_alt_name_get_string(altname));
-    }
-    bson_free(hex);
-}
-
 _mongocrypt_cache_key_value_t *_mongocrypt_cache_key_value_new(_mongocrypt_key_doc_t *key_doc,
                                                                _mongocrypt_buffer_t *decrypted_key_material) {
     _mongocrypt_cache_key_value_t *key_value;
@@ -126,7 +109,6 @@ void _mongocrypt_cache_key_init(_mongocrypt_cache_t *cache) {
     cache->destroy_attr = _destroy_attr;
     cache->copy_value = _copy_contents;
     cache->destroy_value = _mongocrypt_cache_key_value_destroy;
-    cache->dump_attr = _dump_attr;
     _mongocrypt_mutex_init(&cache->mutex);
     cache->pair = NULL;
     cache->expiration = CACHE_EXPIRATION_MS_DEFAULT;

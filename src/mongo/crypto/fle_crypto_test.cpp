@@ -3482,6 +3482,12 @@ TEST_F(ServiceContextTest, EdgeCalcTest_SubstringTagCalculators) {
     ASSERT_THROWS_CODE(
         msizeForSubstring(INT32_MAX - 128, 1, INT32_MAX, INT32_MAX), DBException, 10384601);
 
+    // Boundary case: strLen + BSON overhead == 16.
+    // PKCS7: 16-byte aligned plaintext lengths should add an extra 16-byte padding.
+    ASSERT_EQ(3, msizeForSubstring(10, 10, 100, 200));    // below boundary, padlen=11
+    ASSERT_EQ(171, msizeForSubstring(11, 10, 100, 200));  // exact boundary, padlen=27
+    ASSERT_EQ(171, msizeForSubstring(12, 10, 100, 200));  // above boundary, padlen=27
+
     ASSERT_EQ(87815, maxTagsForSubstring(10, 100, 1019));    // lb < ub < mlen
     ASSERT_EQ(510555, maxTagsForSubstring(10, 1019, 1019));  // lb < ub == mlen
     ASSERT_EQ(1003, maxTagsForSubstring(17, 17, 1019));      // lb == ub < mlen
@@ -3497,6 +3503,12 @@ TEST_F(ServiceContextTest, EdgeCalcTest_SuffixPrefixTagCalculators) {
     ASSERT_EQ(136, msizeForSuffixOrPrefix(150, 20, 155));  // ub == (padlen=155)
     ASSERT_EQ(131, msizeForSuffixOrPrefix(150, 20, 150));  // ub < (padlen=155)
     ASSERT_THROWS_CODE(msizeForSuffixOrPrefix(INT32_MAX, 1, INT32_MAX), DBException, 10384600);
+
+    // Boundary case: strLen + BSON overhead == 16.
+    // PKCS7: 16-byte aligned plaintext lengths should add an extra 16-byte padding.
+    ASSERT_EQ(2, msizeForSuffixOrPrefix(10, 10, 100));   // below boundary, padlen=11
+    ASSERT_EQ(18, msizeForSuffixOrPrefix(11, 10, 100));  // exact boundary, padlen=27
+    ASSERT_EQ(18, msizeForSuffixOrPrefix(12, 10, 100));  // above boundary, padlen=27
 
     ASSERT_EQ(91, maxTagsForSuffixOrPrefix(10, 100));  // lb < ub
     ASSERT_EQ(1, maxTagsForSuffixOrPrefix(100, 100));  // lb == ub

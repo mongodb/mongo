@@ -38,7 +38,8 @@ static mc_affix_set_t *generate_prefix_or_suffix_tree(const mc_utf8_string_with_
     BSON_ASSERT_PARAM(base_str);
     BSON_ASSERT_PARAM(out_msize);
     // We encrypt (unfolded string + 5 bytes of extra BSON info) with a 16-byte block cipher.
-    uint32_t encrypted_len = 16 * (uint32_t)((unfolded_byte_len + OVERHEAD_BYTES + 15) / 16);
+    // PKCS7 adds an extra 16-byte padding for 16-byte aligned plaintext lengths.
+    uint32_t encrypted_len = 16 * (uint32_t)((unfolded_byte_len + OVERHEAD_BYTES + 16) / 16);
     // Max len of a string that has this encrypted len.
     uint32_t padded_len = encrypted_len - OVERHEAD_BYTES;
     if (padded_len < lb) {
@@ -113,7 +114,8 @@ static mc_substring_set_t *generate_substring_tree(const mc_utf8_string_with_bad
     BSON_ASSERT_PARAM(spec);
     BSON_ASSERT_PARAM(out_msize);
     // We encrypt (unfolded string + 5 bytes of extra BSON info) with a 16-byte block cipher.
-    uint32_t encrypted_len = 16 * (uint32_t)((unfolded_byte_len + OVERHEAD_BYTES + 15) / 16);
+    // PKCS7 adds an extra 16-byte padding for 16-byte aligned plaintext lengths.
+    uint32_t encrypted_len = 16 * (uint32_t)((unfolded_byte_len + OVERHEAD_BYTES + 16) / 16);
     // Max len of a string that has this encrypted len.
     uint32_t padded_len = encrypted_len - OVERHEAD_BYTES;
     if (padded_len < spec->lb) {

@@ -18,8 +18,8 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=libmongocrypt
-# TODO SERVER-124038 Update version number
-VERSION=1.17.0
+# TODO SERVER-129614 Update version number
+VERSION=1.19.0
 
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
@@ -44,8 +44,8 @@ if [ ! -d $SRC ]; then
     $GIT_EXE clone https://github.com/mongodb/libmongocrypt $CLONE_DEST
 
     pushd $SRC
-    # TODO SERVER-124038 change the below hash to $VERSION upon new libmongocrypt release
-    $GIT_EXE checkout f216afa5894bef0fc5144c675e22e579b9743fc8
+    # TODO SERVER-129614 change the below hash to $VERSION upon new libmongocrypt release
+    $GIT_EXE checkout 0647ed03bcf49eb6934e2821dd74b38d958ba2a4
     popd
 fi
 

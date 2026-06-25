@@ -1,4 +1,13 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+function calculatePaddedLength(byteLen) {
+    const BSON_OVERHEAD = 5;
+    // See
+    // https://github.com/10gen/mongo/blob/master/src/mongo/db/modules/enterprise/docs/fle/fle_string_search.md#strencode-suffix-and-prefix
+    // for an explanation of this calculation.
+    return Math.ceil((byteLen + BSON_OVERHEAD + 1) / 16) * 16 - BSON_OVERHEAD;
+}
+
 class TextFieldBase {
     constructor(lb, ub, caseSensitive, diacriticSensitive, maxContention, forcePreview = false) {
         this._lb = NumberInt(lb);
@@ -36,10 +45,7 @@ export class SuffixField extends TextFieldBase {
         assert.gte(this._ub, this._lb);
         assert.gte(byte_len, 0);
 
-        // See
-        // https://github.com/10gen/mongo/blob/master/src/mongo/db/modules/enterprise/docs/fle/fle_string_search.md#strencode-suffix-and-prefix
-        // for an explanation of this calculation.
-        const padded_len = Math.ceil((byte_len + 5) / 16) * 16 - 5;
+        const padded_len = calculatePaddedLength(byte_len);
         if (this._lb > padded_len) {
             return 1; // 1 is for just the exact match string
         }
@@ -58,7 +64,7 @@ export class SuffixField extends TextFieldBase {
             ) {
                 affixSet.add(str.slice(-affix_len));
             }
-            const padded_len = Math.ceil((str.length + 5) / 16) * 16 - 5;
+            const padded_len = calculatePaddedLength(str.length);
             if (str.length !== padded_len && str.length < this._ub) {
                 // This string needs padding.
                 paddedStrs.add(str);
@@ -96,7 +102,7 @@ export class PrefixField extends SuffixField {
             ) {
                 affixSet.add(str.slice(0, affix_len));
             }
-            const padded_len = Math.ceil((str.length + 5) / 16) * 16 - 5;
+            const padded_len = calculatePaddedLength(str.length);
             if (str.length !== padded_len && str.length < this._ub) {
                 // This string needs padding.
                 paddedStrs.add(str);
@@ -138,10 +144,7 @@ export class SubstringField extends TextFieldBase {
         assert.gte(this._ub, this._lb);
         assert.gte(this._mlen, this._ub);
 
-        // See
-        // https://github.com/10gen/mongo/blob/master/src/mongo/db/modules/enterprise/docs/fle/fle_string_search.md#strencode-substring
-        // for an explanation of this calculation.
-        const padded_len = Math.ceil((byte_len + 5) / 16) * 16 - 5;
+        const padded_len = calculatePaddedLength(byte_len);
         if (byte_len > this._mlen || this._lb > padded_len) {
             return 1; // 1 is for just the exact match string
         }

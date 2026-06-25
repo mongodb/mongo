@@ -85,8 +85,8 @@ BSON_STATIC_ASSERT2(alignof_mc_FLE2FindRangePayloadV2_t,
 
 /**
  * EdgeFindTokenSetV2 is the following BSON document:
- * d: <binary> // EDCDerivedFromDataTokenAndContentionFactor
- * s: <binary> // ESCDerivedFromDataTokenAndContentionFactor
+ * d: <binary> // EDCDerivedFromDataToken
+ * s: <binary> // ESCDerivedFromDataToken
  * l: <binary> // ServerDerivedFromDataToken
  *
  * Instances of mc_EdgeFindTokenSetV2_t are expected to be owned by

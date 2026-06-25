@@ -716,8 +716,10 @@ bool mongocrypt_ctx_setopt_algorithm(mongocrypt_ctx_t *ctx, const char *algorith
 // DEPRECATED: support "RangePreview" has been removed in favor of "range".
 #define MONGOCRYPT_ALGORITHM_RANGEPREVIEW_DEPRECATED_STR "RangePreview"
 #define MONGOCRYPT_ALGORITHM_RANGE_STR "Range"
-/// NOTE: "textPreview" is experimental only and may be removed in a future non-major release.
-#define MONGOCRYPT_ALGORITHM_TEXTPREVIEW_STR "textPreview"
+/// DEPRECATED: "textPreview" has been removed. Use "string".
+#define MONGOCRYPT_ALGORITHM_TEXTPREVIEW_DEPRECATED_STR "textPreview"
+// String constant for setopt_algorithm "string" explicit encryption.
+#define MONGOCRYPT_ALGORITHM_STRING_STR "string"
 
 /**
  * Identify the AWS KMS master key to use for creating a data key.
@@ -1555,9 +1557,8 @@ MONGOCRYPT_EXPORT
 bool mongocrypt_ctx_setopt_algorithm_range(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *opts);
 
 /**
- * Set options for explicit encryption with the "textPreview" algorithm.
+ * Set options for explicit encryption with the "string" algorithm.
  *
- * NOTE: "textPreview" is experimental only and may be removed in a future non-major release.
  * @p opts is a BSON document of the form:
  * {
  *   "caseSensitive": bool,
@@ -1578,6 +1579,8 @@ bool mongocrypt_ctx_setopt_algorithm_range(mongocrypt_ctx_t *ctx, mongocrypt_bin
  * }
  *
  * "prefix" and "suffix" can both be set.
+ *
+ * NOTE: Driver public APIs should use the name "string" rather than "text" to refer to options.
  */
 MONGOCRYPT_EXPORT
 bool mongocrypt_ctx_setopt_algorithm_text(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *opts);
@@ -1597,8 +1600,9 @@ bool mongocrypt_setopt_key_expiration(mongocrypt_t *crypt, uint64_t cache_expira
 // DEPRECATED: Support "rangePreview" has been removed in favor of "range".
 #define MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW_DEPRECATED_STR "rangePreview"
 #define MONGOCRYPT_QUERY_TYPE_RANGE_STR "range"
-/// NOTE: "substringPreview" is experimental and may be removed in a future non-major release.
-#define MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW_STR "substringPreview"
+/// DEPRECATED: Support for "substringPreview" has been removed in favor of "substring"
+#define MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW_DEPRECATED_STR "substringPreview"
+#define MONGOCRYPT_QUERY_TYPE_SUBSTRING_STR "substring"
 /// DEPRECATED: Support for "suffixPreview" has been removed in favor of "suffix"
 #define MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW_DEPRECATED_STR "suffixPreview"
 #define MONGOCRYPT_QUERY_TYPE_SUFFIX_STR "suffix"

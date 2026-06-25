@@ -191,7 +191,7 @@ bool mc_FLE2InsertUpdatePayload_serializeForRange(const mc_FLE2InsertUpdatePaylo
     }
     // Append "g" array of EdgeTokenSets.
     bson_t g_bson;
-    if (!BSON_APPEND_ARRAY_BEGIN(out, "g", &g_bson)) {
+    if (!BSON_APPEND_ARRAY_UNSAFE_BEGIN(out, "g", &g_bson)) {
         return false;
     }
 

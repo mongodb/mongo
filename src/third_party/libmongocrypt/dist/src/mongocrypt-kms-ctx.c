@@ -578,9 +578,7 @@ static bool _ctx_done_aws(mongocrypt_kms_ctx_t *kms, const char *json_field) {
      */
     bson_destroy(&body_bson);
     if (body_len > (size_t)SSIZE_MAX) {
-        CLIENT_ERR("Error parsing JSON in KMS response '%s'. "
-                   "Response body exceeds maximum supported length",
-                   bson_error.message);
+        CLIENT_ERR("Error parsing JSON in KMS response. Response body exceeds maximum supported length");
         bson_init(&body_bson);
         goto fail;
     }
@@ -671,9 +669,7 @@ static bool _ctx_done_oauth(mongocrypt_kms_ctx_t *kms) {
     }
 
     if (body_len > (size_t)SSIZE_MAX) {
-        CLIENT_ERR("Error parsing JSON in KMS response '%s'. "
-                   "Response body exceeds maximum supported length",
-                   bson_error.message);
+        CLIENT_ERR("Error parsing JSON in KMS response. Response body exceeds maximum supported length");
         goto fail;
     }
     bson_body = bson_new_from_json((const uint8_t *)body, (ssize_t)body_len, &bson_error);
@@ -763,9 +759,7 @@ static bool _ctx_done_azure_wrapkey_unwrapkey(mongocrypt_kms_ctx_t *kms) {
     }
 
     if (body_len > (size_t)SSIZE_MAX) {
-        CLIENT_ERR("Error parsing JSON in KMS response '%s'. "
-                   "Response body exceeds maximum supported length",
-                   bson_error.message);
+        CLIENT_ERR("Error parsing JSON in KMS response. Response body exceeds maximum supported length");
         goto fail;
     }
     bson_body = bson_new_from_json((const uint8_t *)body, (ssize_t)body_len, &bson_error);
@@ -875,9 +869,7 @@ static bool _ctx_done_gcp(mongocrypt_kms_ctx_t *kms, const char *json_field) {
      */
     bson_destroy(&body_bson);
     if (body_len > (size_t)SSIZE_MAX) {
-        CLIENT_ERR("Error parsing JSON in KMS response '%s'. "
-                   "Response body exceeds maximum supported length",
-                   bson_error.message);
+        CLIENT_ERR("Error parsing JSON in KMS response. Response body exceeds maximum supported length");
         bson_init(&body_bson);
         goto fail;
     }

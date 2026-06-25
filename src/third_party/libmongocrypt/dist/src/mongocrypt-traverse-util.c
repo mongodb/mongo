@@ -102,7 +102,7 @@ static bool _recurse(_recurse_state_t *state) {
             if (state->copy) {
                 const uint32_t key_len = bson_iter_key_len(&state->iter);
                 BSON_ASSERT(key_len <= INT_MAX);
-                bson_append_array_begin(state->copy, bson_iter_key(&state->iter), (int)key_len, &state->child);
+                bson_append_array_unsafe_begin(state->copy, bson_iter_key(&state->iter), (int)key_len, &state->child);
                 child_state.copy = &state->child;
             }
             ret = _recurse(&child_state);

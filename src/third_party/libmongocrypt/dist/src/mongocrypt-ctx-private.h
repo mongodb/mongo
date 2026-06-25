@@ -46,7 +46,12 @@ typedef enum _mongocrypt_query_type_t {
     MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW_DEPRECATED = 3,
     MONGOCRYPT_QUERY_TYPE_PREFIX = 4,
     MONGOCRYPT_QUERY_TYPE_SUFFIX = 5,
-    MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW = 6,
+    MONGOCRYPT_QUERY_TYPE_SUBSTRING = 6,
+    // prefixPreview and suffixPreview are deprecated aliases for prefix and suffix, respectively. They behave
+    // identically; the distinct values exist for consistency (cf. rangePreview) and to ease eventual removal.
+    MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW_DEPRECATED = 7,
+    MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW_DEPRECATED = 8,
+    MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW_DEPRECATED = 9,
 } mongocrypt_query_type_t;
 
 const char *_mongocrypt_query_type_to_string(mongocrypt_query_type_t val);
