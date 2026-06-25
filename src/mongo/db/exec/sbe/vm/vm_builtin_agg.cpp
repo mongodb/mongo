@@ -1089,29 +1089,29 @@ value::TagValueMaybeOwned builtinAggRankImpl(value::TypeTags stateTag,
 
     // Define sort-order compliant comparison function which uses fast pass logic for null and
     // missing and full sort key logic for arrays.
-    auto isSameValue = [&](SortSpec* keyGen,
-                           std::pair<value::TypeTags, value::Value> currValue,
-                           std::pair<value::TypeTags, value::Value> lastValue) {
-        if (value::isNullish(currValue.first) && value::isNullish(lastValue.first)) {
-            return true;
-        }
-        if (value::isArray(currValue.first) || value::isArray(lastValue.first)) {
-            auto getSortKey = [&](value::TypeTags tag, value::Value val) {
-                BSONObjBuilder builder;
-                bson::appendValueToBsonObj(builder, kTempSortKeyField, tag, val);
-                return keyGen->generateSortKey(builder.obj(), collator);
-            };
-            auto currKey = getSortKey(currValue.first, currValue.second);
-            auto lastKey = getSortKey(lastValue.first, lastValue.second);
-            return currKey.compare(lastKey) == 0;
-        }
-        auto [compareTag, compareVal] = value::compareValue(
-            currValue.first, currValue.second, lastValue.first, lastValue.second, collator);
-        return compareTag == value::TypeTags::NumberInt32 && compareVal == 0;
-    };
+    auto isSameValue =
+        [&](SortSpec* keyGen, value::TagValueView currValue, value::TagValueView lastValue) {
+            if (value::isNullish(currValue.tag) && value::isNullish(lastValue.tag)) {
+                return true;
+            }
+            if (value::isArray(currValue.tag) || value::isArray(lastValue.tag)) {
+                auto getSortKey = [&](value::TypeTags tag, value::Value val) {
+                    BSONObjBuilder builder;
+                    bson::appendValueToBsonObj(builder, kTempSortKeyField, tag, val);
+                    return keyGen->generateSortKey(builder.obj(), collator);
+                };
+                auto currKey = getSortKey(currValue.tag, currValue.value);
+                auto lastKey = getSortKey(lastValue.tag, lastValue.value);
+                return currKey.compare(lastKey) == 0;
+            }
+            auto cmp = value::compareValue(
+                currValue.tag, currValue.value, lastValue.tag, lastValue.value, collator);
+            return cmp.first == value::TypeTags::NumberInt32 && cmp.second == 0;
+        };
 
-    if (isSameValue(
-            sortSpec, std::make_pair(valueTag, valueVal), {lastValue.tag, lastValue.value})) {
+    if (isSameValue(sortSpec,
+                    value::TagValueView{valueTag, valueVal},
+                    value::TagValueView{lastValue.tag, lastValue.value})) {
         state->setAt(AggRankElems::kSameRankCount,
                      value::TypeTags::NumberInt64,
                      value::bitcastFrom<int64_t>(sameRankCount + 1));
@@ -1371,7 +1371,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableSumFinalize(ArityType ari
 
 namespace {
 // Initialize an array queue
-std::pair<value::TypeTags, value::Value> arrayQueueInit() {
+value::TagValueOwned arrayQueueInit() {
     auto arrayQueueTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arrayQueue = value::getArrayView(arrayQueueTagVal.value());
     arrayQueue->reserve(static_cast<size_t>(ArrayQueueElems::kSizeOfArray));
@@ -1385,7 +1385,7 @@ std::pair<value::TypeTags, value::Value> arrayQueueInit() {
     arrayQueue->push_back(std::move(bufferTagVal));
     arrayQueue->push_back_raw(value::TypeTags::NumberInt64, 0);  // kStartIdx
     arrayQueue->push_back_raw(value::TypeTags::NumberInt64, 0);  // kQueueSize
-    return arrayQueueTagVal.releaseToRaw();
+    return arrayQueueTagVal;
 }
 }  // namespace
 
@@ -1407,12 +1407,10 @@ value::TagValueMaybeOwned ByteCode::builtinAggIntegralInit(ArityType arity) {
     state->reserve(static_cast<size_t>(AggIntegralElems::kMaxSizeOfArray));
 
     // AggIntegralElems::kInputQueue
-    auto [inputQueueTag, inputQueueVal] = arrayQueueInit();
-    state->push_back_raw(inputQueueTag, inputQueueVal);
+    state->push_back(arrayQueueInit());
 
     // AggIntegralElems::kSortByQueue
-    auto [sortByQueueTag, sortByQueueVal] = arrayQueueInit();
-    state->push_back_raw(sortByQueueTag, sortByQueueVal);
+    state->push_back(arrayQueueInit());
 
     // AggIntegralElems::kIntegral
     state->push_back(initializeRemovableSumState());
@@ -2283,7 +2281,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggCovariancePopFinalize(ArityType ar
 value::TagValueMaybeOwned ByteCode::builtinAggRemovablePushAdd(ArityType arity) {
     auto stateTagVal = moveOwnedFromStack(0);
     if (stateTagVal.tag() == value::TypeTags::Nothing) {
-        stateTagVal = value::TagValueOwned::fromRaw(arrayQueueInit());
+        stateTagVal = arrayQueueInit();
     }
 
     auto inputTagVal = moveOwnedFromStack(1);
@@ -2368,13 +2366,10 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableConcatArraysInit(ArityTyp
     auto stateTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arr = value::getArrayView(stateTagVal.value());
 
-    // This will be the structure where the accumulated values are stored.
-    auto [accArrTag, accArrVal] = arrayQueueInit();
-
     // The order is important! The accumulated array should be at index
     // AggArrayWithSize::kValues, and the size (bytes) should be at index
     // AggArrayWithSize::kSizeOfValues.
-    arr->push_back_raw(accArrTag, accArrVal);
+    arr->push_back(arrayQueueInit());
     arr->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
     return stateTagVal;
 }
@@ -2884,11 +2879,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggFirstLastNInit(ArityType arity) {
     auto n = value::bitcastTo<int64_t>(nTagVal.value());
     uassert(8070608, "Expected 'n' to be positive", n > 0);
 
-    auto [queueTag, queueVal] = arrayQueueInit();
-
     auto [stateTag, stateVal] = value::makeNewArray();
     auto stateArr = value::getArrayView(stateVal);
-    stateArr->push_back_raw(queueTag, queueVal);
+    stateArr->push_back(arrayQueueInit());
     stateArr->push_back_raw(nTagVal.tag(), nTagVal.value());
     return {true, stateTag, stateVal};
 }
@@ -3447,10 +3440,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableTopBottomNFinalize(ArityT
 
     auto it = begin;
     for (size_t inserted = 0; inserted < n && it != end; ++inserted, ++it) {
-        const auto& keyOutPair = *it;
-        auto output = keyOutPair.second;
-        auto [copyTag, copyVal] = value::copyValue(output.first, output.second);
-        resArr->push_back_raw(copyTag, copyVal);
+        const auto& output = it->second;
+        resArr->push_back(
+            value::TagValueOwned::fromRaw(value::copyValue(output.first, output.second)));
     };
 
     return res;
