@@ -140,6 +140,22 @@ wc::Val makeBytesVal(const uint8_t* data, size_t len) {
     return wc::Val(std::move(raw));
 }
 
+boost::optional<wc::Func> getMozjsFuncOptional(wc::Instance& instance,
+                                               wt::Store::Context ctx,
+                                               std::string_view ifaceName,
+                                               std::string_view funcName) {
+    auto ifaceIdx = instance.get_export_index(ctx, nullptr, ifaceName);
+    if (!ifaceIdx)
+        return boost::none;
+    auto funcIdx = instance.get_export_index(ctx, &*ifaceIdx, funcName);
+    if (!funcIdx)
+        return boost::none;
+    auto func = instance.get_func(ctx, *funcIdx);
+    if (!func)
+        return boost::none;
+    return *func;
+}
+
 wc::List makeListU8(const uint8_t* data, size_t len) {
     wasmtime_component_vallist_t raw;
     wasmtime_component_vallist_new_uninit(&raw, len);
@@ -163,6 +179,14 @@ wc::Val makeString(std::string_view s) {
 }
 
 std::vector<uint8_t> extractListU8(const wc::Val& v) {
+    // Fast path: lift patch turns list<u8> results into RAW_U8_LIST; copy the byte
+    // buffer directly without iterating per-element.
+    const auto* rawV = wc::Val::to_capi(&v);
+    if (rawV->kind == WASMTIME_COMPONENT_RAW_U8_LIST) {
+        const auto& bv = rawV->of.raw_u8_list;
+        return std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(bv.data),
+                                    reinterpret_cast<const uint8_t*>(bv.data) + bv.size);
+    }
     std::vector<uint8_t> out;
     if (!v.is_list())
         return out;
@@ -216,7 +240,8 @@ bool isOomWitError(const wc::Val& witError) {
                 if (optVal) {
                     auto msg = optVal->get_string();
                     if (msg.find("allocation size overflow") != std::string_view::npos ||
-                        msg.find("out of memory") != std::string_view::npos)
+                        msg.find("out of memory") != std::string_view::npos ||
+                        msg.find("std::bad_alloc") != std::string_view::npos)
                         return true;
                 }
             }

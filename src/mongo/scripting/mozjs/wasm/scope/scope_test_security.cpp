@@ -1,0 +1,639 @@
+/**
+ *    Copyright (C) 2026-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/scripting/mozjs/wasm/scope/scope.h"
+#include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
+
+#include <atomic>
+#include <chrono>
+#include <thread>
+#include <vector>
+
+using namespace mongo;
+using namespace mongo::mozjs;
+
+namespace {
+struct GlobalEngineGuard {
+    GlobalEngineGuard() {
+        setGlobalScriptEngine(new WasmtimeScriptEngine());
+    }
+    ~GlobalEngineGuard() {
+        setGlobalScriptEngine(nullptr);
+    }
+    WasmtimeScriptEngine& engine() {
+        return *static_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine());
+    }
+};
+}  // namespace
+
+// --- Concurrency ---
+
+// N threads each create their own scope from a shared engine and invoke JS concurrently.
+// Each scope is thread-local (no sharing), so this exercises the pool and Engine creation
+// under concurrent load without any data races on scope state.
+TEST(WasmtimeScopeConcurrency, ConcurrentIndependentScopes) {
+    constexpr int kThreads = 16;
+    WasmtimeScriptEngine engine;
+
+    std::vector<std::thread> threads;
+    std::atomic<int> successCount{0};
+
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&engine, i, &successCount] {
+            std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+            ScriptingFunction fn = scope->createFunction("return 1 + 1;");
+            if (scope->invoke(fn, nullptr, nullptr, 5000) == 0 &&
+                scope->getNumber("__returnValue") == 2.0) {
+                successCount.fetch_add(1, std::memory_order_relaxed);
+            }
+        });
+    }
+    for (auto& t : threads)
+        t.join();
+
+    ASSERT_EQ(successCount.load(), kThreads);
+}
+
+// More threads than the pre-warmed pool size forces pool exhaustion and on-demand context
+// creation — verifies the pool's mutex and fallback path are race-free.
+TEST(WasmtimeScopeConcurrency, ConcurrentPoolExhaustion) {
+    constexpr int kThreads = 32;
+    WasmtimeScriptEngine engine;
+
+    std::vector<std::thread> threads;
+    std::atomic<int> successCount{0};
+
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&engine, i, &successCount] {
+            std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+            ScriptingFunction fn = scope->createFunction("return 1 + 1;");
+            if (scope->invoke(fn, nullptr, nullptr, 5000) == 0 &&
+                scope->getNumber("__returnValue") == 2.0) {
+                successCount.fetch_add(1, std::memory_order_relaxed);
+            }
+        });
+    }
+    for (auto& t : threads)
+        t.join();
+
+    ASSERT_EQ(successCount.load(), kThreads);
+}
+
+// Multiple threads repeatedly create-reset-destroy scopes from a shared engine to verify
+// that concurrent resets don't race on engine or pool state.
+TEST(WasmtimeScopeConcurrency, ConcurrentResetCycles) {
+    constexpr int kThreads = 8;
+    constexpr int kCycles = 3;
+    WasmtimeScriptEngine engine;
+
+    std::vector<std::thread> threads;
+    std::atomic<int> successCount{0};
+
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&engine, &successCount] {
+            for (int c = 0; c < kCycles; ++c) {
+                std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+                scope->reset();
+                ScriptingFunction fn = scope->createFunction("return 42;");
+                if (scope->invoke(fn, nullptr, nullptr, 5000) == 0 &&
+                    scope->getNumber("__returnValue") == 42.0) {
+                    successCount.fetch_add(1, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    for (auto& t : threads)
+        t.join();
+
+    ASSERT_EQ(successCount.load(), kThreads * kCycles);
+}
+
+// One thread invokes a long-running JS function while another thread calls kill().
+// The invoke must return non-zero (killed) and the scope must be left in a clean
+// killed state (getBoolean("__returnValue") is false / default).
+TEST(WasmtimeScopeConcurrency, KillFromAnotherThread) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    // Start invoke in background; it runs an infinite loop.
+    std::atomic<bool> invokeDone{false};
+    int invokeResult = 0;
+    std::thread invoker([&] {
+        ScriptingFunction fn = scope->createFunction("while(true) {}");
+        try {
+            invokeResult = scope->invoke(fn, nullptr, nullptr, 30000);
+        } catch (...) {
+            invokeResult = -1;
+        }
+        invokeDone.store(true, std::memory_order_release);
+    });
+
+    // Give the invoke time to start, then kill.
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    scope->kill();
+
+    invoker.join();
+    ASSERT_NE(0, invokeResult);
+}
+
+// N threads each create a scope, invoke a function, and destroy — simulating the
+// scopes, simulating the ScriptPool reuse pattern (create scope, invoke, discard).
+TEST(WasmtimeScopeConcurrency, ConcurrentFunctionInvoke) {
+    constexpr int kThreads = 16;
+    WasmtimeScriptEngine engine;
+
+    std::atomic<int> successCount{0};
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&engine, i, &successCount] {
+            std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+            BSONObj args = BSON("a" << i << "b" << i * 2);
+            ScriptingFunction fn =
+                scope->createFunction("function(a, b) { return { result: a + b }; }");
+            if (scope->invoke(fn, &args, nullptr, 5000) == 0) {
+                BSONObj ret = scope->getObject("__returnValue");
+                if (ret.getIntField("result") == i + i * 2) {
+                    successCount.fetch_add(1, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    for (auto& t : threads)
+        t.join();
+
+    ASSERT_EQ(successCount.load(), kThreads);
+}
+
+// ---------------------------------------------------------------------------
+// Constructor freeze security tests
+// ---------------------------------------------------------------------------
+
+// Frozen constructors: user JS cannot replace built-in static methods.
+TEST(WasmtimeScope, Security_FrozenConstructors_PreventStaticMethodReplacement) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    // Attempting to overwrite Object.keys must fail silently (sloppy mode).
+    ScriptingFunction pollute =
+        scope->createFunction("Object.keys = function() { return ['evil']; }; return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    // Object.keys must still work correctly.
+    ScriptingFunction check =
+        scope->createFunction("var keys = Object.keys({a:1, b:2}); return keys.length;");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_EQ(2.0, scope->getNumber("__returnValue"));
+}
+
+// Frozen constructors: user JS cannot replace Array.from.
+TEST(WasmtimeScope, Security_FrozenConstructors_PreventArrayFromReplacement) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction pollute =
+        scope->createFunction("Array.from = function() { return []; }; return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    ScriptingFunction check = scope->createFunction("return Array.from([1, 2, 3]).length;");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_EQ(3.0, scope->getNumber("__returnValue"));
+}
+
+// TypedArray, Map, Set, Promise, Symbol prototypes are frozen so user JS cannot
+// pollute them with persistent properties that survive into the next request.
+TEST(WasmtimeScope, Security_FrozenPrototypes_TypedArrayMapSetPromiseSymbol) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction check = scope->createFunction(
+        "return Object.isFrozen(Uint8Array.prototype) &&"
+        "       Object.isFrozen(Int32Array.prototype) &&"
+        "       Object.isFrozen(Float64Array.prototype) &&"
+        "       Object.isFrozen(ArrayBuffer.prototype) &&"
+        "       Object.isFrozen(DataView.prototype) &&"
+        "       Object.isFrozen(Object.getPrototypeOf(Uint8Array.prototype)) &&"
+        "       Object.isFrozen(Map.prototype) &&"
+        "       Object.isFrozen(Set.prototype) &&"
+        "       Object.isFrozen(WeakMap.prototype) &&"
+        "       Object.isFrozen(WeakSet.prototype) &&"
+        "       Object.isFrozen(Promise.prototype) &&"
+        "       Object.isFrozen(Symbol.prototype);");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Prototype pollution: writing to a frozen prototype fails silently in sloppy mode
+// and the property is not visible on instances. Verifies cross-request isolation.
+TEST(WasmtimeScope, Security_FrozenPrototypes_PreventPollutionViaInstance) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    // First request attempts to pollute Map.prototype.
+    ScriptingFunction pollute = scope->createFunction(
+        "Map.prototype.poisoned = 'pwned';"
+        "return new Map().poisoned;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+    // Even if the write silently failed, instances must not see the property.
+    auto t = scope->type("__returnValue");
+    ASSERT_TRUE(t == static_cast<int>(BSONType::undefined) ||
+                t == static_cast<int>(BSONType::null));
+
+    // Simulate next-request reset; the pollution attempt should still have left no trace.
+    scope->reset();
+
+    ScriptingFunction check = scope->createFunction("return new Map().poisoned;");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    auto t2 = scope->type("__returnValue");
+    ASSERT_TRUE(t2 == static_cast<int>(BSONType::undefined) ||
+                t2 == static_cast<int>(BSONType::null));
+}
+
+// Frozen constructors: Array.sum (installed as an engine helper) is immutable.
+TEST(WasmtimeScope, Security_FrozenConstructors_PreventArrayHelperReplacement) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    // Attempting to overwrite Array.sum fails silently (frozen).
+    ScriptingFunction pollute =
+        scope->createFunction("Array.sum = function() { return 999; }; return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    // Array.sum must still compute the correct result.
+    ScriptingFunction check = scope->createFunction("return Array.sum([1, 2, 3]);");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_EQ(6.0, scope->getNumber("__returnValue"));
+}
+
+// After resetRealm(), the new Realm has brand-new constructors (different identity).
+// This verifies the realm was actually replaced, not just scrubbed.
+TEST(WasmtimeScope, Security_RealmReset_FreshConstructors) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    // Capture a reference to Object in the first Realm.
+    ScriptingFunction captureObj =
+        scope->createFunction("globalThis.__savedObj = Object; return 1;");
+    ASSERT_EQ(0, scope->invoke(captureObj, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    // After reset, __savedObj is gone (new Realm) and Object is a new object.
+    // We can't directly compare across scopes, but we can verify the old stash is gone.
+    ScriptingFunction checkClean =
+        scope->createFunction("return typeof globalThis.__savedObj === 'undefined';");
+    ScriptingFunction fn2 = scope->createFunction("return 1;");
+    ASSERT_EQ(0, scope->invoke(fn2, nullptr, nullptr, 0));
+    ASSERT_EQ(0, scope->invoke(checkClean, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Array helpers are available on a fresh Realm after resetRealm().
+TEST(WasmtimeScope, Security_RealmReset_ArrayHelpersPresent) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    scope->reset();
+
+    ScriptingFunction fn = scope->createFunction("return Array.sum([10, 20, 12]);");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(42.0, scope->getNumber("__returnValue"));
+}
+
+// --- Idle bridge lifecycle ---
+
+// A bridge parked within kMaxBridgeIdleTime is reused by the next createScopeForCurrentThread
+// on the same thread (fast resetRealm path rather than full re-instantiation).
+TEST(WasmtimeScope, IdleBridge_FreshBridgeIsReused) {
+    GlobalEngineGuard engineGuard;
+
+    // Park a bridge.
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    }
+
+    // Immediately create a second scope — bridge should be reused (no full re-init).
+    // Verify the scope is functional: correct JS execution proves the reuse path is healthy.
+    std::unique_ptr<Scope> scope2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope2->createFunction("return 1 + 1;");
+    ASSERT_EQ(0, scope2->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(2.0, scope2->getNumber("__returnValue"));
+}
+
+// ---------------------------------------------------------------------------
+// Cross-request isolation security tests
+//
+// Each test simulates an attacker-controlled first request attempting to plant
+// state that a subsequent innocent request could observe.  After scope1 goes
+// out of scope the bridge is parked; scope2's construction reuses it via
+// resetRealm(), which must erase all attacker JS state.
+//
+// Pattern:
+//   { scope1 (attacker) → invoke evil JS → destroy } // bridge parked
+//   scope2 (victim) → assert nothing leaked          // bridge reused
+// ---------------------------------------------------------------------------
+
+// Attacker stashes a secret in globalThis.  The next request must not see it.
+TEST(WasmtimeScope, Security_CrossRequest_GlobalVarDoesNotLeak) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn =
+            s->createFunction("globalThis.__secret__ = { token: 'hunter2', uid: 42 }; return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check =
+        s2->createFunction("return typeof globalThis.__secret__ === 'undefined';");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker installs a getter trap on Object.prototype that returns a sentinel.
+// After realm reset, the trap must not fire when innocent code accesses properties.
+TEST(WasmtimeScope, Security_CrossRequest_ObjectPrototypeGetterTrap) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction(
+            "try {"
+            "  Object.defineProperty(Object.prototype, '__trap__', {"
+            "    get: function() { return 'EXFILTRATED'; }, configurable: true"
+            "  });"
+            "} catch(e) {}"
+            "return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check = s2->createFunction("return typeof ({}).__trap__ === 'undefined';");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker replaces JSON.stringify to intercept serialized documents.
+// After realm reset, JSON.stringify must behave natively.
+TEST(WasmtimeScope, Security_CrossRequest_JSONStringifyPoisoning) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn =
+            s->createFunction("JSON.stringify = function() { return 'POISONED'; }; return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check = s2->createFunction("return JSON.stringify({x: 1}) !== 'POISONED';");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker poisons Array.prototype.push to capture all arrays that get appended to.
+// After realm reset, push must work correctly on fresh arrays.
+TEST(WasmtimeScope, Security_CrossRequest_ArrayPrototypePush) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn =
+            s->createFunction("Array.prototype.push = function() { return 99; }; return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check =
+        s2->createFunction("var a = [1, 2]; a.push(3); return a.length === 3 && a[2] === 3;");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker replaces Function.prototype.call to intercept all method calls.
+// After realm reset, Function.prototype.call must be the native implementation.
+TEST(WasmtimeScope, Security_CrossRequest_FunctionPrototypeCallPoisoning) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction(
+            "Function.prototype.call = function() { return 'INTERCEPTED'; }; return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check = s2->createFunction(
+        "function add(a, b) { return a + b; }"
+        "return add.call(null, 20, 22) === 42;");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker installs a non-configurable, non-writable property on globalThis
+// — the kind that cannot be deleted.  After realm reset it must be gone.
+TEST(WasmtimeScope, Security_CrossRequest_FrozenBackdoorProperty) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction(
+            "try {"
+            "  Object.defineProperty(globalThis, '__backdoor__', {"
+            "    value: 'PERSISTENT', writable: false, configurable: false, enumerable: false"
+            "  });"
+            "} catch(e) {}"
+            "return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check =
+        s2->createFunction("return typeof globalThis.__backdoor__ === 'undefined';");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker captures sensitive data in a closure installed as a global function.
+// The next request must not be able to call the closure or observe its data.
+TEST(WasmtimeScope, Security_CrossRequest_ClosureCapturedInGlobal) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction(
+            "(function() {"
+            "  var secret = 'TOP_SECRET_PASSWORD';"
+            "  globalThis.__exfil = function() { return secret; };"
+            "})();"
+            "return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check =
+        s2->createFunction("return typeof globalThis.__exfil === 'undefined';");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker replaces the global Object constructor to poison object literals.
+// After realm reset, {} must produce a plain empty object.
+TEST(WasmtimeScope, Security_CrossRequest_ObjectConstructorReplacement) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction(
+            "var _orig = Object;"
+            "Object = function(v) { var o = new _orig(v); o.__pwned__ = true; return o; };"
+            "return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check =
+        s2->createFunction("var o = {}; return typeof o.__pwned__ === 'undefined';");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker uses Symbol.toPrimitive to poison coercion of all objects.
+// After realm reset, numeric coercion of {valueOf: ...} must work normally.
+TEST(WasmtimeScope, Security_CrossRequest_SymbolToPrimitivePoisoning) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction(
+            "try {"
+            "  Object.defineProperty(Object.prototype, Symbol.toPrimitive, {"
+            "    value: function() { return 'POISONED'; }, configurable: true"
+            "  });"
+            "} catch(e) {}"
+            "return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check = s2->createFunction(
+        "var obj = { valueOf: function() { return 42; } };"
+        "return +obj === 42;");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker uses Array[Symbol.species] to hijack derived array construction in
+// map/filter/slice so outputs land in an attacker-controlled class.
+// After realm reset, [1,2,3].map(f) must return a genuine Array.
+TEST(WasmtimeScope, Security_CrossRequest_ArraySpeciesHijack) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction(
+            "try {"
+            "  Object.defineProperty(Array, Symbol.species, {"
+            "    get: function() {"
+            "      function PoisonedArray() {}"
+            "      PoisonedArray.prototype = Array.prototype;"
+            "      PoisonedArray.__pwned__ = true;"
+            "      return PoisonedArray;"
+            "    }, configurable: true"
+            "  });"
+            "} catch(e) {}"
+            "return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check = s2->createFunction(
+        "var result = [1, 2, 3].map(function(x) { return x * 2; });"
+        "return result[0] === 2 && result[1] === 4 && result[2] === 6"
+        "    && typeof result.__pwned__ === 'undefined';");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// Attacker plants data across multiple nested objects to defeat shallow scrubbing.
+// All of it must be gone after realm reset.
+TEST(WasmtimeScope, Security_CrossRequest_DeepGlobalStateDoesNotLeak) {
+    GlobalEngineGuard engineGuard;
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+        ScriptingFunction fn = s->createFunction(
+            "globalThis.__a = { b: { c: { d: 'deep_secret' } } };"
+            "globalThis.__arr = [1, 2, 3, { secret: 'in_array' }];"
+            "(function() {"
+            "  var captured = 'closure_secret';"
+            "  globalThis.__fn = function() { return captured; };"
+            "})();"
+            "return 1;");
+        ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    }
+    std::unique_ptr<Scope> s2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction check = s2->createFunction(
+        "return typeof globalThis.__a === 'undefined' &&"
+        "       typeof globalThis.__arr === 'undefined' &&"
+        "       typeof globalThis.__fn === 'undefined';");
+    ASSERT_EQ(0, s2->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(s2->getBoolean("__returnValue"));
+}
+
+// A bridge parked more than kMaxBridgeIdleTime ago is evicted; the next
+// createScopeForCurrentThread creates a fresh scope rather than reusing stale linear memory.
+TEST(WasmtimeScope, IdleBridge_StaleBridgeIsEvicted) {
+    GlobalEngineGuard engineGuard;
+
+    // Park a bridge, then backdate its park timestamp past the expiry window.
+    {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    }
+    WasmtimeScriptEngine::backdateIdleBridgeForTest(Milliseconds{15000});
+
+    // The next scope creation must succeed and be fully functional despite the stale bridge.
+    std::unique_ptr<Scope> scope2(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ASSERT(scope2);
+    ScriptingFunction fn = scope2->createFunction("return 42;");
+    ASSERT_EQ(0, scope2->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(42.0, scope2->getNumber("__returnValue"));
+}
+
+// reuseCount must increment on each park so bridges are evicted after
+// kMaxBridgeReuseCount reuses. The previous bug always reset reuseCount to 1 instead of
+// incrementing, allowing indefinite reuse and unbounded linear-memory accumulation that
+// eventually caused CannotLeaveComponent traps under sustained $function load.
+TEST(WasmtimeScope, IdleBridge_ReuseCountIncrements) {
+    GlobalEngineGuard engineGuard;
+    constexpr uint32_t kLimit = WasmtimeScriptEngine::kMaxBridgeReuseCount;
+
+    // Create+destroy kLimit+1 scopes to drive reuseCount to kLimit+1 in the idle slot.
+    // Iteration 0 creates a fresh bridge (idle slot empty) and parks it with reuseCount=1.
+    // Iteration k>0 revives the bridge (reuseCount=k ≤ kLimit → OK) and re-parks with
+    // reuseCount=k+1.  After kLimit+1 iterations reuseCount == kLimit+1.
+    for (uint32_t i = 0; i <= kLimit; ++i) {
+        std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    }
+    // Idle slot must hold the over-limit bridge (reuseCount == kLimit+1).
+    ASSERT_TRUE(WasmtimeScriptEngine::hasIdleBridgeForTest());
+
+    // The next createScopeForCurrentThread must detect reuseCount > kLimit, drop the bridge,
+    // and create a fresh one. The resulting scope must be fully functional.
+    std::unique_ptr<Scope> s(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = s->createFunction("return 99;");
+    ASSERT_EQ(0, s->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(99.0, s->getNumber("__returnValue"));
+}

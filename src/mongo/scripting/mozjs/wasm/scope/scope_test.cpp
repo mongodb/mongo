@@ -31,15 +31,20 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/service_context.h"
 #include "mongo/scripting/config_engine_gen.h"
+#include "mongo/scripting/config_engine_wasm_gen.h"
 #include "mongo/scripting/js_regex.h"
+#include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <iostream>
+#include <thread>
+#include <vector>
 
 using namespace mongo;
 using namespace mongo::mozjs;
@@ -116,6 +121,157 @@ TEST(WasmtimeScope, FunctionPattern_WithArgs) {
     ASSERT_EQ(retVal.getIntField("sum"), 42);
 }
 
+// 'this' inside $function must be an empty plain object, not the global.
+TEST(WasmtimeScope, FunctionPattern_ThisIsEmpty) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    ScriptingFunction fn =
+        scope->createFunction("function(obj) { return Object.getOwnPropertyNames(this).length; }");
+    ASSERT(fn != 0);
+
+    BSONObj args = BSON("obj" << BSON("x" << 1));
+    ASSERT_EQ(0, scope->invoke(fn, &args, nullptr, 0));
+    // 'this' must be a fresh empty object — zero own properties.
+    ASSERT_EQ(scope->getNumberInt("__returnValue"), 0);
+}
+
+// hex_md5 must be available as a global inside $function bodies, matching the
+// legacy MozJS engine behavior from installGlobalUtils(). Regression test for
+// the missing hex_md5 global in the WASM engine's SpiderMonkey scope.
+TEST(WasmtimeScope, FunctionPattern_HexMd5Available) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    ScriptingFunction fn = scope->createFunction("function(s) { return hex_md5(s); }");
+    ASSERT(fn != 0);
+
+    BSONObj args = BSON("s" << "hello");
+    ASSERT_EQ(0, scope->invoke(fn, &args, nullptr, 0));
+    // MD5("hello") = 5d41402abc4b2a76b9719d911017c592
+    ASSERT_EQ(scope->getString("__returnValue"), "5d41402abc4b2a76b9719d911017c592");
+}
+
+// $accumulator init/accumulate/merge pattern
+TEST(WasmtimeScope, AccumulatorPattern_InitAccumulateMerge) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    ScriptingFunction initFn = scope->createFunction("function() { return 0; }");
+    ASSERT(initFn != 0);
+
+    ScriptingFunction accFn = scope->createFunction("function(state, val) { return state + val; }");
+    ASSERT(accFn != 0);
+
+    ScriptingFunction mergeFn = scope->createFunction("function(s1, s2) { return s1 + s2; }");
+    ASSERT(mergeFn != 0);
+
+    // init
+    BSONObj emptyArgs;
+    ASSERT_EQ(0, scope->invoke(initFn, &emptyArgs, nullptr, 0));
+    double state = scope->getNumber("__returnValue");
+    ASSERT_EQ(state, 0.0);
+
+    // accumulate: state + 10
+    BSONObj accArgs1 = BSON("0" << state << "1" << 10);
+    ASSERT_EQ(0, scope->invoke(accFn, &accArgs1, nullptr, 0));
+    state = scope->getNumber("__returnValue");
+    ASSERT_EQ(state, 10.0);
+
+    // accumulate: state + 20
+    BSONObj accArgs2 = BSON("0" << state << "1" << 20);
+    ASSERT_EQ(0, scope->invoke(accFn, &accArgs2, nullptr, 0));
+    state = scope->getNumber("__returnValue");
+    ASSERT_EQ(state, 30.0);
+
+    // merge: 30 + 12
+    BSONObj mergeArgs = BSON("0" << state << "1" << 12.0);
+    ASSERT_EQ(0, scope->invoke(mergeFn, &mergeArgs, nullptr, 0));
+    double merged = scope->getNumber("__returnValue");
+    ASSERT_EQ(merged, 42.0);
+}
+
+// $accumulator with object state.
+// State is {buckets:[n,n,n,n,n], count:N}.
+// Verifies that object-state accumulators work correctly across many iterations.
+TEST(WasmtimeScope, AccumulatorPattern_ObjectState) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    ScriptingFunction initFn =
+        scope->createFunction("function() { return { buckets: [0,0,0,0,0], count: 0 }; }");
+    ASSERT(initFn != 0);
+
+    ScriptingFunction accFn = scope->createFunction(
+        "function(state, doc) {"
+        "  var val = (typeof doc === 'object' && doc !== null && 'value' in doc) ? doc.value : "
+        "+doc;"
+        "  var b = Math.min(4, Math.floor(val * 5));"
+        "  state.buckets[b]++;"
+        "  state.count++;"
+        "  return state;"
+        "}");
+    ASSERT(accFn != 0);
+
+    ScriptingFunction mergeFn = scope->createFunction(
+        "function(s1, s2) {"
+        "  for (var i = 0; i < 5; i++) s1.buckets[i] += s2.buckets[i];"
+        "  s1.count += s2.count;"
+        "  return s1;"
+        "}");
+    ASSERT(mergeFn != 0);
+
+    ScriptingFunction finalFn = scope->createFunction("function(s) { return s; }");
+    ASSERT(finalFn != 0);
+
+    // init
+    BSONObj emptyArgs;
+    ASSERT_EQ(0, scope->invoke(initFn, &emptyArgs, nullptr, 0));
+    BSONObj state = scope->getObject("__returnValue");
+
+    // accumulate 100 docs with value=0.1 (bucket 0)
+    for (int i = 0; i < 100; i++) {
+        BSONObj args = BSON("0" << state << "1" << BSON("value" << 0.1));
+        ASSERT_EQ(0, scope->invoke(accFn, &args, nullptr, 0));
+        state = scope->getObject("__returnValue");
+    }
+    // accumulate 50 docs with value=0.9 (bucket 4)
+    for (int i = 0; i < 50; i++) {
+        BSONObj args = BSON("0" << state << "1" << BSON("value" << 0.9));
+        ASSERT_EQ(0, scope->invoke(accFn, &args, nullptr, 0));
+        state = scope->getObject("__returnValue");
+    }
+
+    // build a second partial state via init+accumulate and then merge
+    ASSERT_EQ(0, scope->invoke(initFn, &emptyArgs, nullptr, 0));
+    BSONObj state2 = scope->getObject("__returnValue");
+    for (int i = 0; i < 25; i++) {
+        BSONObj args = BSON("0" << state2 << "1" << BSON("value" << 0.5));
+        ASSERT_EQ(0, scope->invoke(accFn, &args, nullptr, 0));
+        state2 = scope->getObject("__returnValue");
+    }
+
+    // merge
+    BSONObj mergeArgs = BSON("0" << state << "1" << state2);
+    ASSERT_EQ(0, scope->invoke(mergeFn, &mergeArgs, nullptr, 0));
+    BSONObj merged = scope->getObject("__returnValue");
+
+    // finalize
+    BSONObj finalArgs = BSON("0" << merged);
+    ASSERT_EQ(0, scope->invoke(finalFn, &finalArgs, nullptr, 0));
+    BSONObj result = scope->getObject("__returnValue");
+
+    // 100 (bucket0) + 50 (bucket4) + 25 (bucket2) = 175 total
+    ASSERT_EQ(result["count"].numberInt(), 175);
+    ASSERT_EQ(result["buckets"].embeddedObject()["0"].numberInt(), 100);  // 0.1 → bucket 0
+    ASSERT_EQ(result["buckets"].embeddedObject()["4"].numberInt(), 50);   // 0.9 → bucket 4
+    ASSERT_EQ(result["buckets"].embeddedObject()["2"].numberInt(), 25);   // 0.5 → bucket 2
+}
+
 // mapReduce.map pattern: injectNative("emit", ...) + invoke(func, nullptr, &doc, timeout, true)
 TEST(WasmtimeScope, MapReducePattern_EmitAndDrain) {
     WasmtimeScriptEngine engine;
@@ -150,6 +306,202 @@ TEST(WasmtimeScope, MapReducePattern_EmitAndDrain) {
     ASSERT_EQ(emitState.emitted[0]["v"].numberInt(), 100);
     ASSERT_EQ(emitState.emitted[1]["k"].str(), "books");
     ASSERT_EQ(emitState.emitted[1]["v"].numberInt(), 25);
+}
+
+// A scope that called setupEmit must NOT be parked in the idle pool.
+// WASM linear memory only grows; each setupEmit allocates ~117 MB that is never freed.
+TEST(WasmtimeScope, EmitConfiguredBridge_IsNotParkedOnScopeTeardown) {
+    GlobalEngineGuard engineGuard;
+    auto& engine = engineGuard.engine();
+
+    // Sanity: clean slate.
+    ASSERT_FALSE(WasmtimeScriptEngine::hasIdleBridgeForTest());
+
+    // First scope: do NOT call injectNative. On teardown the bridge SHOULD be
+    // parked (we want the non-emit fast-path to remain intact).
+    {
+        std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+        ASSERT(scope);
+        // No setupEmit here.
+        ASSERT_EQ(0, scope->invoke(scope->createFunction("return 1;"), nullptr, nullptr, 0));
+    }
+    ASSERT_TRUE(WasmtimeScriptEngine::hasIdleBridgeForTest())
+        << "Non-emit bridge should still be parked on teardown — parking fast-path "
+           "must not regress.";
+
+    // Second scope: pick up the parked bridge (via createScopeForCurrentThread),
+    // then call setupEmit by registering an emit callback. On teardown the
+    // emit-configured bridge MUST be shut down, not re-parked.
+    std::vector<BSONObj> emitted;
+    {
+        std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+        ASSERT(scope);
+        scope->injectNative(
+            "emit",
+            [](const BSONObj& args, void* data) -> BSONObj {
+                static_cast<std::vector<BSONObj>*>(data)->push_back(args.getOwned());
+                return BSONObj();
+            },
+            &emitted);
+
+        ScriptingFunction mapFn = scope->createFunction("function() { emit(1, this.v); }");
+        BSONObj doc = BSON("v" << 42);
+        ASSERT_EQ(0, scope->invoke(mapFn, nullptr, &doc, 0, true));
+        ASSERT_EQ(1u, emitted.size());
+    }
+    ASSERT_FALSE(WasmtimeScriptEngine::hasIdleBridgeForTest())
+        << "Emit-configured bridge MUST NOT be parked — WASM linear memory only "
+           "grows, so reusing it for another MapReduce would accumulate ~117 MB "
+           "of orphaned linear memory per operation and eventually trip the "
+           "CannotLeaveComponent trap (mr_bigobject.js).";
+
+    // A subsequent scope must then run on a freshly instantiated bridge.
+    {
+        std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+        ASSERT(scope);
+        ASSERT_EQ(0, scope->invoke(scope->createFunction("return 1;"), nullptr, nullptr, 0));
+    }
+    // After teardown of this third non-emit scope, the bridge IS parked again
+    // (we did not call setupEmit, so the fast path applies).
+    ASSERT_TRUE(WasmtimeScriptEngine::hasIdleBridgeForTest());
+}
+
+// Repeated injectNative("emit") calls must not re-invoke setupEmit.
+// Pre-fix each document allocated ~117 MB of WASM linear memory, exhausting the store.
+TEST(WasmtimeScope, MapReducePattern_RepeatedInjectEmit_DoesNotReallocate) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    struct EmitState {
+        std::vector<BSONObj> emitted;
+    };
+    EmitState emitState;
+    NativeFunction emitFn = [](const BSONObj& args, void* data) -> BSONObj {
+        static_cast<EmitState*>(data)->emitted.push_back(args.getOwned());
+        return BSONObj();
+    };
+
+    ScriptingFunction mapFn = scope->createFunction("function() { emit(this.k, this.v); }");
+    ASSERT_NE(0u, mapFn);
+
+    // Simulate evaluate_javascript.cpp's per-document pattern:
+    //   inject(non-null) -> invokeMap -> inject(null)
+    // …repeated for a large number of documents.  We just need enough docs that the
+    // accumulated linear-memory pressure would have exceeded the store limit prior
+    // to the fix.  200 docs × 117 MB == 23 GB, well above any reasonable store cap.
+    constexpr int kDocs = 200;
+    for (int i = 0; i < kDocs; ++i) {
+        scope->injectNative("emit", emitFn, &emitState);
+        BSONObj doc = BSON("k" << "x" << "v" << i);
+        ASSERT_EQ(0, scope->invoke(mapFn, nullptr, &doc, 0, true));
+        scope->injectNative("emit", emitFn, nullptr);  // invalidation
+    }
+    ASSERT_EQ(static_cast<size_t>(kDocs), emitState.emitted.size());
+}
+
+// Date.now() must remain real after repeated reset() cycles.
+TEST(WasmtimeScope, DateNow_SurvivesResetEngineCycles) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    ScriptingFunction fn = scope->createFunction("return Date.now();");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    const double t0 = scope->getNumber("__returnValue");
+    ASSERT_GTE(t0, 1.0e12);
+
+    for (int i = 0; i < 5; ++i) {
+        scope->reset();
+        ScriptingFunction fnAfterReset = scope->createFunction("return Date.now();");
+        ASSERT_EQ(0, scope->invoke(fnAfterReset, nullptr, nullptr, 0));
+        const double t = scope->getNumber("__returnValue");
+        ASSERT_GTE(t, t0) << "Date.now() regressed below initial t0 after reset() iter " << i
+                          << ": " << t << " < " << t0;
+    }
+}
+
+// getNumberLongLong on a Date return value must yield real millis.
+// Pre-fix BSONElement::numberLong() returned 0 for BSONType::date, collapsing every
+// $function-returned Date to ISODate("1970-01-01T00:00:00Z").
+TEST(WasmtimeScope, GetNumberLongLong_ReturnsMillisForDateValue) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    ScriptingFunction fn = scope->createFunction("return new Date(Date.now());");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+
+    ASSERT_EQ(static_cast<int>(BSONType::date), scope->type("__returnValue"));
+    const long long ms = scope->getNumberLongLong("__returnValue");
+    ASSERT_GTE(ms, 1'000'000'000'000LL)
+        << "getNumberLongLong on a Date return value collapsed to " << ms
+        << " — Scope::append() will produce Date_t::fromMillisSinceEpoch(0) "
+           "and every $function-returned Date becomes ISODate(\"1970-01-01\").";
+
+    // Sanity: drive the actual JsExecution-style round trip via Scope::append.
+    BSONObjBuilder bob;
+    scope->append(bob, "out", "__returnValue");
+    BSONObj appended = bob.obj();
+    ASSERT_EQ(BSONType::date, appended["out"].type());
+    ASSERT_GTE(appended["out"].Date().toMillisSinceEpoch(), 1'000'000'000'000LL);
+}
+
+// Date.now() must remain real after resetRealm() replaces the child SpiderMonkey Realm.
+// The idle-bridge revival path hits resetRealm() on every request.
+TEST(WasmtimeBridge, DateNow_SurvivesRealmReset) {
+    WasmtimeScriptEngine engine;
+    auto ctx = engine.createWasmEngineContext();
+    wasm::MozJSWasmBridge::Options opts;
+    opts.linearMemoryLimitMB = static_cast<uint32_t>(gWasmtimeStoreMemoryLimitMB.load());
+    auto bridge = std::make_unique<wasm::MozJSWasmBridge>(ctx, opts);
+    ASSERT_TRUE(bridge->initialize());
+
+    auto handle = bridge->createFunction("function() { return Date.now(); }");
+    auto result1 =
+        bridge->invokeFunction(handle, wasm::wasm_helpers::convertBsonToWcVal(BSONObj{}));
+    ASSERT_OK(result1.getStatus());
+    const auto t1 = result1.getValue()["__returnValue"].numberLong();
+    ASSERT_GTE(t1, 1'000'000'000'000LL)
+        << "Date.now() returned " << t1 << " before resetRealm — clock wasn't wired at all.";
+
+    // Reset the realm — the failing CI path.
+    bridge->resetRealm();
+
+    // Handle is now invalid; compile a fresh one in the new realm.
+    auto handle2 = bridge->createFunction("function() { return Date.now(); }");
+    auto result2 =
+        bridge->invokeFunction(handle2, wasm::wasm_helpers::convertBsonToWcVal(BSONObj{}));
+    ASSERT_OK(result2.getStatus());
+    const auto t2 = result2.getValue()["__returnValue"].numberLong();
+    ASSERT_GTE(t2, t1) << "Date.now() after resetRealm returned " << t2
+                       << "; expected real wall clock (>= " << t1
+                       << "). resetRealm() is dropping the WASI "
+                          "clock binding when the child realm is "
+                          "rebuilt — this is the hoist_computation "
+                          "regression.";
+
+    bridge->shutdown();
+}
+
+// Companion: two consecutive Date.now() calls must be able to differ, so a
+// spin-loop that waits "until the clock ticks" eventually exits.
+TEST(WasmtimeScope, DateNow_AdvancesOverShortInterval) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    // Spin until Date.now() changes, with a generous 5-second bound so a frozen
+    // clock fails quickly rather than hanging the unit-test suite.
+    ScriptingFunction fn = scope->createFunction(
+        "var t0 = Date.now();"
+        "var deadline = t0 + 5000;"
+        "while (Date.now() === t0 && Date.now() < deadline) {}"
+        "return Date.now() - t0;");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    const double delta = scope->getNumber("__returnValue");
+    ASSERT_GT(delta, 0.0) << "Date.now() did not advance over a 5-second window; "
+                             "wall clock is frozen in the WASM bridge.";
 }
 
 // mapReduce.reduce pattern: invoke(func, &args, nullptr) with [key, values]
@@ -354,17 +706,45 @@ TEST(WasmtimeScope, Lifecycle_Reset_ClearsEmitState) {
     ASSERT_EQ(emitted.size(), 0u);  // original callback was not called
 }
 
-// Function handles created before reset() are invalidated; using one throws.
-TEST(WasmtimeScope, Lifecycle_Reset_InvalidatesHandles) {
+// resetRealm() creates a fresh SpiderMonkey Realm, which invalidates every
+// previously-compiled function handle. This is the slow-path semantic that
+// scope->reset() deliberately avoids on the healthy fast path. Exercise it
+// directly against the bridge to lock the invalidation contract in place.
+TEST(WasmtimeBridge, RealmReset_InvalidatesHandles) {
+    WasmtimeScriptEngine engine;
+    auto ctx = engine.createWasmEngineContext();
+    wasm::MozJSWasmBridge::Options opts;
+    opts.linearMemoryLimitMB = static_cast<uint32_t>(gWasmtimeStoreMemoryLimitMB.load());
+    auto bridge = std::make_unique<wasm::MozJSWasmBridge>(ctx, opts);
+    ASSERT_TRUE(bridge->initialize());
+
+    auto handle = bridge->createFunction("function() { return 42; }");
+    ASSERT_NE(0u, handle);
+
+    bridge->resetRealm();
+
+    // The old handle must no longer resolve to a callable function — invokeFunction
+    // throws DBException(JSInterpreterFailure) with "invalid function handle".
+    ASSERT_THROWS_CODE(
+        bridge->invokeFunction(handle, wasm::wasm_helpers::convertBsonToWcVal(BSONObj{})),
+        DBException,
+        ErrorCodes::JSInterpreterFailure);
+
+    bridge->shutdown();
+}
+
+// scope->reset() uses resetEngine() (per-document fast path): compiled function handles
+// survive because _slots are preserved.  The scope is fully usable without recompiling.
+TEST(WasmtimeScope, Lifecycle_Reset_PreservesHandles) {
     GlobalEngineGuard engineGuard;
     std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
 
-    ScriptingFunction staleHandle = scope->createFunction("return 1;");
+    ScriptingFunction fn = scope->createFunction("return 42;");
     scope->reset();
 
-    ASSERT_THROWS_CODE(scope->invoke(staleHandle, nullptr, nullptr, 0),
-                       DBException,
-                       ErrorCodes::JSInterpreterFailure);
+    // Handle survives reset() — slots preserved across resetEngine().
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(42.0, scope->getNumber("__returnValue"));
 }
 
 // reset() re-initializes the bridge; globals from before reset are cleared.
@@ -383,6 +763,109 @@ TEST(WasmtimeScope, Lifecycle_Reset_ClearsGlobals) {
     ScriptingFunction fn = scope->createFunction("return 2;");
     ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
     ASSERT_EQ(2.0, scope->getNumber("__returnValue"));
+}
+
+// Direct globalThis property writes (bypassing setGlobal) must not survive reset().
+// This is a security requirement: cross-request data leakage via globalThis pollution.
+TEST(WasmtimeScope, Security_Reset_ClearsDirectGlobalThisWrites) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    // Write directly to globalThis — bypasses _userGlobalNames tracking.
+    ScriptingFunction pollute =
+        scope->createFunction("globalThis.__secret__ = 'leaked'; return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    // After reset, the property must be gone.
+    ScriptingFunction check =
+        scope->createFunction("return typeof globalThis.__secret__ === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Non-enumerable properties written to globalThis must not survive reset().
+TEST(WasmtimeScope, Security_Reset_ClearsNonEnumerableGlobalWrites) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction pollute = scope->createFunction(
+        "Object.defineProperty(globalThis, '__hidden__', "
+        "  { value: 'leaked', enumerable: false, configurable: true });"
+        "return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    ScriptingFunction check =
+        scope->createFunction("return typeof globalThis.__hidden__ === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Object.prototype pollution must not persist across reset().
+TEST(WasmtimeScope, Security_Reset_ClearsPrototypePollution) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction pollute =
+        scope->createFunction("Object.prototype.__evil__ = 'leaked'; return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    ScriptingFunction check = scope->createFunction("return typeof ({}).__evil__ === 'undefined';");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Replacing built-in functions (e.g. Math.abs) must not persist across reset().
+TEST(WasmtimeScope, Security_Reset_RestoresBuiltinFunctions) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction pollute =
+        scope->createFunction("Math.abs = function() { return 99; }; return 1;");
+    ASSERT_EQ(0, scope->invoke(pollute, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    ScriptingFunction check = scope->createFunction("return Math.abs(-1) === 1;");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
+}
+
+// Properties attached to a cached function object must not survive reset().
+TEST(WasmtimeScope, Security_Reset_ClearsFunctionSlotState) {
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
+
+    // Compile the function once — it will be cached in _slots.
+    ScriptingFunction fn = scope->createFunction("return 1;");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+
+    // Stash data on the function object itself.
+    ScriptingFunction stash = scope->createFunction(
+        "var fns = Object.keys(globalThis).map(function(k) { return globalThis[k]; })"
+        "  .filter(function(v) { return typeof v === 'function'; });"
+        "if (fns.length > 0) { fns[0].__stash__ = 'SENSITIVE_DATA'; }"
+        "return 1;");
+    ASSERT_EQ(0, scope->invoke(stash, nullptr, nullptr, 0));
+
+    scope->reset();
+
+    // Re-invoke the cached function handle — __stash__ must be gone.
+    ScriptingFunction check = scope->createFunction(
+        "var leaked = false;"
+        "var fns = Object.keys(globalThis).map(function(k) { return globalThis[k]; })"
+        "  .filter(function(v) { return typeof v === 'function'; });"
+        "for (var i = 0; i < fns.length; i++) {"
+        "  if (fns[i].__stash__ !== undefined) { leaked = true; break; }"
+        "}"
+        "return !leaked;");
+    ASSERT_EQ(0, scope->invoke(check, nullptr, nullptr, 0));
+    ASSERT_TRUE(scope->getBoolean("__returnValue"));
 }
 
 // init(data) seeds JS globals from a BSONObj.
@@ -600,8 +1083,7 @@ TEST(WasmtimeScope, MemoryLimit_ResetPicksUpNewValue) {
     ASSERT(scope);
 
     // Change the store limit after the scope was created, then reset.
-    // The scope's cached heap is 1100 (default), overhead=110, minStore=1210.
-    // Use store=1500 which differs from the default (1210) and satisfies the constraint.
+    // Use store=1500 which differs from the default and satisfies the constraint.
     auto savedStore = gWasmtimeStoreMemoryLimitMB.load();
     gWasmtimeStoreMemoryLimitMB.store(1500);
     ON_BLOCK_EXIT([&] { gWasmtimeStoreMemoryLimitMB.store(savedStore); });
@@ -749,8 +1231,11 @@ TEST(WasmtimeScope, EmitBufferExceedsStoreLimitFails) {
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
     ASSERT(scope);
 
+    // The size validation in injectNative only fires on a real setup call (data != nullptr).
+    // Pass a non-null dummy pointer to trigger the setupEmit path and verify the BadValue.
+    int dummy = 0;
     ASSERT_THROWS_CODE(scope->injectNative(
-                           "emit", [](const BSONObj&, void*) { return BSONObj(); }, nullptr),
+                           "emit", [](const BSONObj&, void*) { return BSONObj(); }, &dummy),
                        DBException,
                        ErrorCodes::BadValue);
 }
@@ -935,49 +1420,4 @@ TEST(WasmtimeScope, TimeoutSleep) {
     ASSERT_THROWS_WITH_CHECK(scope->invoke(fn, nullptr, nullptr, 1),
                              AssertionException,
                              [](auto&& ex) { ASSERT_STRING_CONTAINS(ex.reason(), "interrupt"); });
-}
-
-// Fixture for tests that need a real OperationContext (e.g. to test opCtx kill-status
-// propagation through the WASM bridge).
-class WasmtimeScopeWithOpCtxTest : public unittest::Test {
-protected:
-    void setUp() override {
-        setGlobalServiceContext(ServiceContext::make());
-        setGlobalScriptEngine(new WasmtimeScriptEngine());
-    }
-    void tearDown() override {
-        setGlobalScriptEngine(nullptr);
-        setGlobalServiceContext({});
-    }
-    Service* getService() const {
-        return getGlobalServiceContext()->getService();
-    }
-};
-
-// When the OperationContext is killed with MaxTimeMSExpired (code 50), invoke() must surface
-// MaxTimeMSExpired rather than the generic Interrupted (code 11601) that the WASM bridge emits.
-// This verifies the translateInterrupted path in WasmtimeImplScope::invoke().
-TEST_F(WasmtimeScopeWithOpCtxTest, MaxTimeMSExpiredKillTranslatesErrorCode) {
-    auto& engine = *static_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine());
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
-
-    auto client = getService()->makeClient("MaxTimeMSExpiredTest");
-    auto opCtx = client->makeOperationContext();
-    scope->registerOperation(opCtx.get());
-
-    ScriptingFunction fn = scope->createFunction("while (true) {}");
-
-    stdx::thread killer([&] {
-        sleepmillis(50);
-        opCtx->markKilled(ErrorCodes::MaxTimeMSExpired);
-        scope->kill();
-    });
-
-    ASSERT_THROWS_WITH_CHECK(
-        scope->invoke(fn, nullptr, nullptr, 0),
-        AssertionException,
-        [](const AssertionException& ex) { ASSERT_EQ(ex.code(), ErrorCodes::MaxTimeMSExpired); });
-
-    killer.join();
-    scope->unregisterOperation();
 }

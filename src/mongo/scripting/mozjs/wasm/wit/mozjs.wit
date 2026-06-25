@@ -67,9 +67,11 @@ interface mozjs {
   create-function: func(source: list<u8>) -> result<function-handle, wasm-mozjs-error>;
 
   /// Invoke a function with BSON args (no `this.` binding).
+  /// Returns the function's return value as BSON bytes ({"__returnValue": val}).
+  /// When ignore-return is true, returns an empty list and skips BSON serialisation.
   /// Used by $function, $accumulator, mapReduce.reduce, mapReduce.finalize.
   /// Timeouts are enforced by Wasmtime epoch interruption on the host side.
-  invoke-function: func(handle: function-handle, bson: list<u8>) -> result<ok, wasm-mozjs-error>;
+  invoke-function: func(handle: function-handle, bson: list<u8>, ignore-return: bool) -> result<list<u8>, wasm-mozjs-error>;
 
   /// Invoke a predicate with the document as `this`, returns bool directly.
   /// Used by $where: function() { return this.age > 18; }
@@ -93,6 +95,19 @@ interface mozjs {
   /// Set a named global to a single BSON element's JS value directly.
   set-global-value: func(name: string, bson-element: list<u8>) -> result<ok, wasm-mozjs-error>;
 
+  /// Reset JS state without destroying the Store or JSContext.
+  /// Clears user-defined globals and emit buffer; preserves compiled function handles.
+  /// Much cheaper than shutdown + initialize for normal (non-kill) scope resets.
+  reset-engine: func() -> result<ok, wasm-mozjs-error>;
+
+  /// Create a fresh SpiderMonkey Realm (new global object) without tearing down the
+  /// JSContext or JSRuntime. InitSelfHostedCode is NOT re-run; only
+  /// InitRealmStandardClasses runs for the new global.  All cached function handles
+  /// become invalid and must be recompiled. Provides complete constructor-level
+  /// isolation (Array, Object, etc. are brand-new) at the cost of ~InitRealmStandardClasses
+  /// per call instead of the cheap property-scrub done by reset-engine.
+  reset-realm: func() -> result<ok, wasm-mozjs-error>;
+
   /// Set up the emit() built-in for mapReduce. Resets the emit buffer.
   /// Optional byte-limit caps total emitted bytes (default 16 MiB).
   setup-emit: func(byte-limit: option<s64>) -> result<ok, wasm-mozjs-error>;
@@ -100,6 +115,14 @@ interface mozjs {
   /// Drain the emit buffer: returns accumulated {k,v} pairs as BSON, then clears.
   drain-emit-buffer: func() -> result<list<u8>, wasm-mozjs-error>;
 
+  /// Diagnostic memory statistics, returned as BSON bytes:
+  ///   { linearMemoryBytes: long,  // actual WASM linear memory size (memory.size)
+  ///     gcHeapBytes: long,        // SpiderMonkey GC-managed heap (JSGC_BYTES)
+  ///     gcNumber: long }          // total GCs run so far (JSGC_NUMBER)
+  /// The gap between linearMemoryBytes and gcHeapBytes is memory the JS heap limit
+  /// cannot reclaim (JIT code, zone caches, malloc fragmentation). Used to diagnose
+  /// linear-memory exhaustion in long-lived reused bridges.
+  get-memory-stats: func() -> result<list<u8>, wasm-mozjs-error>;
 }
 
 world api {

@@ -1,0 +1,17 @@
+# TODO SERVER-127394: Contribute this patch upstream to the Wasmtime repo.
+--- a/src/runtime/component/values.rs
++++ b/src/runtime/component/values.rs
+@@ -993,6 +993,12 @@
+     if ptr % usize::try_from(element_alignment)? != 0 {
+         bail!("list pointer is not aligned")
+     }
+
++    // MongoDB fast path: bulk-copy list<u8> into Val::Bytes instead of boxing each byte
++    // into Val::U8. Pairs with the host's _extractBSON path that reads RAW_U8_LIST.
++    if matches!(elem, InterfaceType::U8) {
++        return Ok(Val::Bytes(cx.memory()[ptr..][..len].to_vec()));
++    }
++
+     Ok(Val::List(
+         (0..len)
+             .map(|index| {

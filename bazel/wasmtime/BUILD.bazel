@@ -5,6 +5,7 @@ exports_files([
     "val_raw_u8_list_h.patch",
     "val_raw_u8_list_rs.patch",
     "val_bytes_fast_path.patch",
+    "val_bytes_lift_fast_path.patch",
     "val_bytes_wave_fast_path.patch",
     "val_bytes_wast_fast_path.patch",
 ])

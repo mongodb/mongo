@@ -101,20 +101,7 @@ bool JsFunction::runAsPredicate(const BSONObj& obj) const {
     const ScopeGuard scopeOpCtxGuard([&] { _scope->unregisterOperation(); });
 
     _scope->advanceGeneration();
-    _scope->setObject("obj", obj);
-    _scope->setBoolean("fullObject", true);  // this is a hack b/c fullObject used to be relevant
-
-    auto err =
-        _scope->invoke(_func, nullptr, &obj, internalQueryJavaScriptFnTimeoutMillis.load(), false);
-    if (err == -3) {  // INVOKE_ERROR
-        std::stringstream ss;
-        ss << "error on invocation of $where function:\n" << _scope->getError();
-        uassert(5038802, ss.str(), false);
-    } else if (err != 0) {  // !INVOKE_SUCCESS
-        uassert(5038803, "unknown error in invocation of $where function", false);
-    }
-
-    return _scope->getBoolean("__returnValue");
+    return _scope->execPredicate(_func, obj, internalQueryJavaScriptFnTimeoutMillis.load());
 }
 
 size_t JsFunction::getApproximateSize() const {

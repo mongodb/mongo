@@ -1,4 +1,4 @@
-# Copyright (C) 2019-present MongoDB, Inc.
+# Copyright (C) 2025-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -26,31 +26,33 @@
 # it in the license file.
 #
 
+# Server parameters that are ONLY registered when the Wasmtime JS engine is active.
+# This file is compiled exclusively into the WASM bridge library so that
+# getParameter:{wasmtimeStoreMemoryLimitMB:1} returns ok:0 on legacy MozJS builds,
+# allowing JS tests to reliably detect which engine is in use.
+
 global:
     cpp_namespace: "mongo"
     mod_visibility: private
 
 server_parameters:
-    javascriptProtection:
-        description: "disable automatic JavaScript function marshalling"
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: gJavascriptProtection
-        default: false
-        redact: false
-
-    jsHeapLimitMB:
-        description: "set the js scope's heap size limit"
+    wasmtimeStoreMemoryLimitMB:
+        description: >-
+            Maximum size in MB that a Wasmtime store's linear memory is allowed
+            to grow to. Each JavaScript execution scope (e.g. every $where,
+            $function, or MapReduce invocation) creates its own store, so this
+            limit applies independently to every concurrent JS evaluation.
+            Must be greater than jsHeapLimitMB because the JS heap lives inside
+            WASM linear memory alongside SpiderMonkey runtime overhead (stack,
+            GC metadata, self-hosted code, malloc arena). The default includes
+            a 10% overhead margin above the default jsHeapLimitMB.
+            Because this parameter is settable at runtime, changes do not
+            affect already-running JS scopes; the new value is picked up the
+            next time a WASM bridge is instantiated.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
-        cpp_varname: gJSHeapLimitMB
-        default: 1100
-        redact: false
-
-    jsUseLegacyMemoryTracking:
-        description: "fallback to use legacy memory tracking"
-        set_at: [startup, runtime]
-        cpp_vartype: Atomic<bool>
-        cpp_varname: gJSUseLegacyMemoryTracking
-        default: false
+        cpp_varname: gWasmtimeStoreMemoryLimitMB
+        default: 1210
+        validator:
+            gt: 0
         redact: false
