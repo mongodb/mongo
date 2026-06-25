@@ -88,7 +88,8 @@ HostAndPort makeRecipientHost(OperationContext* opCtx, const ShardsvrMoveRangeRe
 MoveRangeCoordinator::MoveRangeCoordinator(ShardingCoordinatorService* service,
                                            const BSONObj& initialStateDoc)
     : ChunkOperationShardingCoordinator(service, "MoveRangeCoordinator", initialStateDoc),
-      _request(_doc.getShardsvrMoveRangeRequest()) {}
+      _request(_doc.getShardsvrMoveRangeRequest()),
+      _cleanupExecutor(service->getInstanceCleanupExecutor()) {}
 
 void MoveRangeCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc =
@@ -245,6 +246,7 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kEnsureMigrationCoordinatorComplete,
             [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
+                _migrationAttempt.reset();
                 LOGV2(12894209,
                       "MoveRangeCoordinator executing kEnsureMigrationCoordinatorComplete",
                       logAttrs(nss()),
@@ -295,7 +297,17 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
                 _scopedDonateChunk->signalComplete(completionStatus);
                 _completeOnError = true;
                 uassertStatusOK(completionStatus);
-            }));
+            }))
+        .thenRunOn(_cleanupExecutor)
+        .onCompletion([this, anchor = shared_from_this(), token](Status status) {
+            // Ensure the MigrationSourceManager is released here.
+            // We cannot rely on the MoveRangeCoordinator destructor because the
+            // coordinator may remain alive after stepdown until the node steps up again.
+            if (token.isCanceled()) {
+                _migrationAttempt.reset();
+            }
+            return status;
+        });
 }
 
 MoveRangeCoordinator::MigrationAttempt::MigrationAttempt(OperationContext* opCtx,

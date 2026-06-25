@@ -144,6 +144,7 @@ private:
     };
 
     const ShardsvrMoveRangeRequest _request;
+    const std::shared_ptr<executor::TaskExecutor> _cleanupExecutor;
     boost::optional<MigrationAttempt> _migrationAttempt;
     boost::optional<ScopedDonateChunk> _scopedDonateChunk;
 };
