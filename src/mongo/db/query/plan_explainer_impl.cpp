@@ -693,9 +693,10 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("nMatched", static_cast<long long>(spec->nMatched));
             bob->appendNumber("nWouldModify", static_cast<long long>(spec->nModified));
             bob->appendNumber("nWouldUpsert", static_cast<long long>(spec->nUpserted));
-            // peakTrackedMemBytes tracks memory used by the record ID deduplicator, which is only
-            // populated when an actual write occurs (indexesAffected=true). In explain mode no
-            // writes are committed, so this value is always 0 and is omitted to avoid confusion.
+            // peakTrackedMemBytes tracks memory used by the record ID deduplicator. It is
+            // populated for multi-updates that affect indexed values, and in explain mode it
+            // reflects the records that would have been updated. It is omitted when 0 (for
+            // example, single updates or updates that do not affect any index).
             if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
                 spec->peakTrackedMemBytes > 0) {
                 bob->appendNumber("peakTrackedMemBytes",

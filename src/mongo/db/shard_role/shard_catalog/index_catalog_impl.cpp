@@ -797,6 +797,10 @@ void IndexCatalogImpl::_rebuildIndexUpdateIdentifier() {
     tassert(7639004, "indexCounter == numIndexes", indexCounter == numIndexes);
 }
 
+const doc_diff::IndexUpdateIdentifier* IndexCatalogImpl::getIndexUpdateIdentifier() const {
+    return _indexUpdateIdentifier.has_value() ? &_indexUpdateIdentifier.value() : nullptr;
+}
+
 namespace {
 
 /**

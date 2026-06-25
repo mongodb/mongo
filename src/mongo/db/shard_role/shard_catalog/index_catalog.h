@@ -59,6 +59,10 @@
 
 namespace mongo {
 
+namespace doc_diff {
+class IndexUpdateIdentifier;
+}  // namespace doc_diff
+
 class Client;
 class Collection;
 class CollectionPtr;
@@ -197,6 +201,12 @@ public:
     virtual int numIndexesReady() const = 0;
 
     virtual int numIndexesInProgress() const = 0;
+
+    /**
+     * Returns the cached IndexUpdateIdentifier for this catalog, or nullptr if not available.
+     * The identifier is kept in sync with ongoing DDL operations.
+     */
+    virtual const doc_diff::IndexUpdateIdentifier* getIndexUpdateIdentifier() const = 0;
 
     /**
      * Returns true if the _id index exists.

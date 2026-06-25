@@ -44,6 +44,10 @@ const updateEntry = {q: {x: {$gte: 0}}, u: {$inc: {x: kDocCount}}};
 const updateCommand = {update: collName, updates: [updateEntry]};
 const multiUpdateCommand = {...updateCommand, updates: [{...updateEntry, multi: true}]};
 
+// Explain populates the per-operation deduplicator (so peakTrackedMemBytes is reported) but must
+// not increment the server-wide deduplication counters. Snapshot them before the explain run.
+const dedupBeforeExplain = db.serverStatus().metrics.query.recordIdDeduplication.UPDATE;
+
 const explainExecStats = assert.commandWorked(
     db.runCommand({explain: multiUpdateCommand, verbosity: "executionStats"}),
 );
@@ -55,12 +59,35 @@ assert.neq(
     "Expected query to use the classic UPDATE stage with forceClassicEngine ",
 );
 
-// peakTrackedMemBytes is not reported in explain output for the UPDATE stage. In explain mode the
-// update is not actually written, so indexesAffected is never set, no record IDs are inserted into
-// the deduplicator, and the value would always be 0.
+// In explain mode the update is not actually written, but the records that would have been updated
+// are tracked in the deduplicator, so peakTrackedMemBytes reflects that memory usage.
 assert(
-    !updateStage.hasOwnProperty("peakTrackedMemBytes"),
-    "Unexpected peakTrackedMemBytes in UPDATE explain: " + tojson(explainExecStats),
+    updateStage.hasOwnProperty("peakTrackedMemBytes"),
+    "Expected peakTrackedMemBytes in UPDATE explain",
+    {
+        explainExecStats,
+    },
+);
+assert.gt(
+    updateStage.peakTrackedMemBytes,
+    0,
+    "Expected positive peakTrackedMemBytes in UPDATE explain",
+    {
+        explainExecStats,
+    },
+);
+
+// The explain run must not have touched the global deduplication serverStatus counters.
+const dedupAfterExplain = db.serverStatus().metrics.query.recordIdDeduplication.UPDATE;
+assert.eq(
+    dedupAfterExplain.deduplicatedBytes,
+    dedupBeforeExplain.deduplicatedBytes,
+    "Explain should not increment global deduplicatedBytes",
+);
+assert.eq(
+    dedupAfterExplain.deduplicatedRecords,
+    dedupBeforeExplain.deduplicatedRecords,
+    "Explain should not increment global deduplicatedRecords",
 );
 
 const peakTrackedMemBytesRegex = /peakTrackedMemBytes"?:([0-9]+)/;
@@ -121,6 +148,15 @@ assert.gt(
     "Expected positive peakTrackedMemBytes in profiler: " + tojson(profilerEntry),
 );
 
+// The explain run tracked the same set of record IDs as the real write, so their memory
+// footprints should match.
+assert.eq(
+    updateStage.peakTrackedMemBytes,
+    profilerEntry.peakTrackedMemBytes,
+    "Explain should track the same memory as a real write",
+    {updateStage, profilerEntry},
+);
+
 // Verify DeduplicatorReporter serverStatus metrics for the UPDATE stage.
 // dedupBefore was captured after the log pipeline, so the diff reflects only the profiler run,
 // which inserts all kDocCount record IDs into a fresh deduplicator.
@@ -149,6 +185,64 @@ assert.eq(
     dedupAfter.deduplicatedRecords,
     updateDedupStats.deduplicatedRecords,
     "Single update should not increment deduplicatedRecords",
+);
+
+// With secondary indexes but updating a non-indexed field: the diff does not touch any
+// indexed field, so the deduplicator should not be populated and peakTrackedMemBytes
+// should be absent.
+const nonIndexedFieldUpdate = {q: {}, u: {$inc: {y: 1}}};
+const nonIndexedFieldCommand = {
+    update: collName,
+    updates: [{...nonIndexedFieldUpdate, multi: true}],
+};
+const explainNonIndexed = assert.commandWorked(
+    db.runCommand({explain: nonIndexedFieldCommand, verbosity: "executionStats"}),
+);
+const updateStageNonIndexed = getPlanStage(
+    explainNonIndexed.executionStats.executionStages,
+    "UPDATE",
+);
+assert(
+    !updateStageNonIndexed.hasOwnProperty("peakTrackedMemBytes"),
+    "Expected no peakTrackedMemBytes when update does not touch any indexed field",
+    {explainNonIndexed},
+);
+
+// Verify that explain respects the memory limit: with the limit set to 1 byte, inserting even
+// a single record ID into the deduplicator exceeds it and explain should fail.
+const originalMemoryLimit = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalUpdateStageMaxMemoryBytes: 1}),
+).internalUpdateStageMaxMemoryBytes;
+try {
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalUpdateStageMaxMemoryBytes: 1}));
+    const explainOOM = assert.commandWorked(
+        db.runCommand({explain: multiUpdateCommand, verbosity: "executionStats"}),
+    );
+    assert.eq(
+        explainOOM.executionStats.errorCode,
+        12227902,
+        "Expected memory limit error in explain executionStats",
+        {
+            explainOOM,
+        },
+    );
+} finally {
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalUpdateStageMaxMemoryBytes: originalMemoryLimit}),
+    );
+}
+
+// Without secondary indexes there is no Halloween problem, so the deduplicator is never
+// populated and explain should not report peakTrackedMemBytes.
+coll.dropIndex("x_1");
+const explainNoIndex = assert.commandWorked(
+    db.runCommand({explain: multiUpdateCommand, verbosity: "executionStats"}),
+);
+const updateStageNoIndex = getPlanStage(explainNoIndex.executionStats.executionStages, "UPDATE");
+assert(
+    !updateStageNoIndex.hasOwnProperty("peakTrackedMemBytes"),
+    "Expected no peakTrackedMemBytes for explain on collection with no secondary indexes",
+    {explainNoIndex},
 );
 
 // Clean up.

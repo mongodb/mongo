@@ -56,6 +56,7 @@
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
@@ -377,6 +378,17 @@ void ShardingChecksForUpdate::checkUpdateChangesExistingShardKey(
     }
 }
 
+bool wouldAffectIndexesForExplain(const IndexCatalog* indexCatalog,
+                                  const boost::optional<BSONObj>& diff) {
+    if (diff.has_value()) {
+        const auto* identifier = indexCatalog->getIndexUpdateIdentifier();
+        return identifier && identifier->determineAffectedIndexes(*diff).any();
+    }
+    // No diff (replacement or pipeline update): conservatively track this RID if
+    // secondary indexes exist.
+    return (indexCatalog->numIndexesReady() + indexCatalog->numIndexesInProgress()) > 1;
+}
+
 std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
                                            const CollectionAcquisition& collection,
                                            const Snapshotted<BSONObj>& oldObj,
@@ -575,8 +587,16 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
     // For an example, see the comment above near declaration of '_updatedRecordIds' in
     // UpdateStage.
     //
+    // In a real write, indexesAffected is set by the storage engine when index keys actually
+    // change. In explain mode the storage-engine write is skipped so indexesAffected is never
+    // set; wouldAffectIndexesForExplain estimates whether the update would have affected indexes.
+    //
     // This must be done after the wunit commits so we are sure we won't be rolling back.
-    if (updatedRecordIds && indexesAffected) {
+    const bool wouldAffectIndexes = request->getIsExplain()
+        ? wouldAffectIndexesForExplain(collection.getCollectionPtr()->getIndexCatalog(),
+                                       updateRecord.diff)
+        : indexesAffected;
+    if (updatedRecordIds && wouldAffectIndexes) {
         updatedRecordIds->insert(rid);
     }
 

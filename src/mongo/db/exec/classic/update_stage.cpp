@@ -127,9 +127,16 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
           *expCtx, loadMemoryLimit(StageMemoryLimit::UpdateStageMaxMemoryBytes))),
       _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
-          [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
-              updateCounters.incrementPerDeduplication(deduplicatedBytes, deduplicatedRecords);
-          },
+          // Explain queries should not increment the global deduplication counters since no
+          // documents are actually written. Use a no-op callback so memory is still tracked
+          // locally (for peakTrackedMemBytes) without polluting server-wide metrics.
+          params.request->getIsExplain()
+              ? std::function<void(int64_t, int64_t)>([](int64_t, int64_t) {})
+              : std::function<void(int64_t, int64_t)>(
+                    [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+                        updateCounters.incrementPerDeduplication(deduplicatedBytes,
+                                                                 deduplicatedRecords);
+                    }),
           internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())),
       _preWriteFilter(opCtx(), collection.nss()) {
 

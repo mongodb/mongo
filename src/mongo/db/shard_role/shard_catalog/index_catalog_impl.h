@@ -141,6 +141,8 @@ public:
 
     int numIndexesInProgress() const override;
 
+    const doc_diff::IndexUpdateIdentifier* getIndexUpdateIdentifier() const final;
+
     bool haveIdIndex(OperationContext* opCtx) const override;
 
     BSONObj getDefaultIdIndexSpec(const CollectionPtr& collection) const override;

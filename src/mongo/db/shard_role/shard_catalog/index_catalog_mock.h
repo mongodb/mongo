@@ -79,6 +79,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    const doc_diff::IndexUpdateIdentifier* getIndexUpdateIdentifier() const override {
+        MONGO_UNREACHABLE;
+    }
+
     bool haveIdIndex(OperationContext*) const override {
         MONGO_UNREACHABLE;
     }
