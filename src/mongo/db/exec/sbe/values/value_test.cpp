@@ -397,6 +397,32 @@ TEST_F(SbeValueTest, ArraySetForEachMoveIsDestructive) {
     ASSERT_EQ(arr2.size(), 2);
 }
 
+TEST_F(SbeValueTest, ArraySetPushBackCloneOwned) {
+    value::ArraySet set;
+
+    value::TagValueOwned abc1 = value::TagValueOwned::fromRaw(value::makeSmallString("abc"sv));
+    ASSERT_TRUE(set.push_back(std::move(abc1)));
+    ASSERT_EQ(set.size(), 1u);
+    ASSERT_TRUE(set.values().contains(value::makeSmallString("abc"sv)));
+
+    value::TagValueOwned abc2 = value::TagValueOwned::fromRaw(value::makeSmallString("abc"sv));
+    ASSERT_FALSE(set.push_back(std::move(abc2)));
+    ASSERT_EQ(set.size(), 1u);
+
+    value::TagValueOwned nothing = value::TagValueOwned::nothing();
+    ASSERT_FALSE(set.push_back(std::move(nothing)));
+    ASSERT_EQ(set.size(), 1u);
+
+    value::TagValueOwned bigStr =
+        value::TagValueOwned::fromRaw(value::makeBigString("a long enough string"sv));
+    const char* originalPtr = value::bitcastTo<const char*>(bigStr.value());
+    ASSERT_TRUE(set.push_back(std::move(bigStr)));
+    auto it = set.values().find(
+        {value::TypeTags::StringBig, value::bitcastFrom<const char*>(originalPtr)});
+    ASSERT_TRUE(it != set.values().end());
+    ASSERT_EQ(value::bitcastTo<const char*>(it->second), originalPtr);
+}
+
 template <typename... Args>
 std::pair<value::TypeTags, value::Value> createArray(Args... args) {
     auto [arrayTag, arrayVal] = value::makeNewArray();

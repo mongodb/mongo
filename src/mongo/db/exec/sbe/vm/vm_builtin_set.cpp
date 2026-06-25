@@ -36,8 +36,7 @@ namespace sbe {
 namespace vm {
 value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
-    auto [tagField, valField] = moveRawOwnedFromStack(1);
-    value::ValueGuard guardField{tagField, valField};
+    value::TagValueOwned field{moveRawOwnedFromStack(1)};
 
     // Create a new array is it does not exist yet.
     if (tagAgg == value::TypeTags::Nothing) {
@@ -47,7 +46,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
         // Take ownership of the accumulator.
         topStack(false, value::TypeTags::Nothing, 0);
     }
-    value::ValueGuard guard{tagAgg, valAgg};
+    value::TagValueOwned agg{tagAgg, valAgg};
 
     tassert(11086805,
             "Unexpected type of Agg parameter",
@@ -55,10 +54,8 @@ value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
     auto arr = value::getArraySetView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.
-    arr->push_back_clone(tagField, valField);
-
-    guard.reset();
-    return {ownAgg, tagAgg, valAgg};
+    arr->push_back(std::move(field));
+    return std::move(agg);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAddToSetCapped(ArityType arity) {
@@ -81,8 +78,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToSetCapped(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinCollAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
     auto collView = viewFromStack(1);
-    auto [tagField, valField] = moveRawOwnedFromStack(2);
-    value::ValueGuard guardField{tagField, valField};
+    value::TagValueOwned field{moveRawOwnedFromStack(2)};
 
     // If the collator is Nothing or if it's some unexpected type, don't push back the value
     // and just return the accumulator.
@@ -99,8 +95,7 @@ value::TagValueMaybeOwned ByteCode::builtinCollAddToSet(ArityType arity) {
         // Take ownership of the accumulator.
         topStack(false, value::TypeTags::Nothing, 0);
     }
-    value::ValueGuard guard{tagAgg, valAgg};
-
+    value::TagValueOwned agg{tagAgg, valAgg};
 
     tassert(11086804,
             "Unexpected type of Agg parameter",
@@ -108,10 +103,8 @@ value::TagValueMaybeOwned ByteCode::builtinCollAddToSet(ArityType arity) {
     auto arr = value::getArraySetView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.
-    arr->push_back_clone(tagField, valField);
-
-    guard.reset();
-    return {ownAgg, tagAgg, valAgg};
+    arr->push_back(std::move(field));
+    return std::move(agg);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCollAddToSetCapped(ArityType arity) {
@@ -177,9 +170,8 @@ namespace {
 value::TagValueMaybeOwned setUnion(const std::vector<value::TypeTags>& argTags,
                                    const std::vector<value::Value>& argVals,
                                    const CollatorInterface* collator = nullptr) {
-    auto [resTag, resVal] = value::makeNewArraySet(collator);
-    value::ValueGuard resGuard{resTag, resVal};
-    auto resView = value::getArraySetView(resVal);
+    value::TagValueOwned res{value::makeNewArraySet(collator)};
+    auto resView = value::getArraySetView(res.value());
 
     for (size_t idx = 0; idx < argVals.size(); ++idx) {
         auto argTag = argTags[idx];
@@ -189,8 +181,7 @@ value::TagValueMaybeOwned setUnion(const std::vector<value::TypeTags>& argTags,
             resView->push_back_clone(elTag, elVal);
         });
     }
-    resGuard.reset();
-    return {true, resTag, resVal};
+    return std::move(res);
 }
 
 value::TagValueMaybeOwned setIntersection(const std::vector<value::TypeTags>& argTags,
@@ -199,8 +190,7 @@ value::TagValueMaybeOwned setIntersection(const std::vector<value::TypeTags>& ar
     auto intersectionMap =
         value::ValueMapType<size_t>{0, value::ValueHash(collator), value::ValueEq(collator)};
 
-    auto [resTag, resVal] = value::makeNewArraySet(collator);
-    value::ValueGuard resGuard{resTag, resVal};
+    value::TagValueOwned res{value::makeNewArraySet(collator)};
 
     for (size_t idx = 0; idx < argVals.size(); ++idx) {
         auto tag = argTags[idx];
@@ -221,12 +211,11 @@ value::TagValueMaybeOwned setIntersection(const std::vector<value::TypeTags>& ar
         });
 
         if (idx > 0 && !atLeastOneCommonElement) {
-            resGuard.reset();
-            return {true, resTag, resVal};
+            return std::move(res);
         }
     }
 
-    auto resView = value::getArraySetView(resVal);
+    auto resView = value::getArraySetView(res.value());
     for (auto&& [item, counter] : intersectionMap) {
         if (counter == argVals.size()) {
             auto [elTag, elVal] = item;
@@ -234,8 +223,7 @@ value::TagValueMaybeOwned setIntersection(const std::vector<value::TypeTags>& ar
         }
     }
 
-    resGuard.reset();
-    return {true, resTag, resVal};
+    return std::move(res);
 }
 
 /**
@@ -258,9 +246,8 @@ value::TagValueMaybeOwned setDifference(value::TypeTags lhsTag,
                                         value::TypeTags rhsTag,
                                         value::Value rhsVal,
                                         const CollatorInterface* collator = nullptr) {
-    auto [resTag, resVal] = value::makeNewArraySet(collator);
-    value::ValueGuard resGuard{resTag, resVal};
-    auto resView = value::getArraySetView(resVal);
+    value::TagValueOwned res{value::makeNewArraySet(collator)};
+    auto resView = value::getArraySetView(res.value());
 
     auto process =
         [&resView](value::TypeTags lhsTag, value::Value lhsVal, const value::ValueSetType& rhsSet) {
@@ -277,8 +264,7 @@ value::TagValueMaybeOwned setDifference(value::TypeTags lhsTag,
         process(lhsTag, lhsVal, valueToShallowSetHelper(rhsTag, rhsVal, collator));
     }
 
-    resGuard.reset();
-    return {true, resTag, resVal};
+    return std::move(res);
 }
 
 value::TagValueMaybeOwned setEquals(const std::vector<value::TypeTags>& argTags,
@@ -526,16 +512,14 @@ value::TagValueMaybeOwned ByteCode::builtinSetToArray(ArityType arity) {
         return input;
     }
 
-    auto [resTag, resVal] = value::makeNewArray();
-    value::ValueGuard resGuard{resTag, resVal};
-    auto resView = value::getArrayView(resVal);
+    value::TagValueOwned res{value::makeNewArray()};
+    auto resView = value::getArrayView(res.value());
 
     value::arrayForEach(input.tag(), input.value(), [&](value::TypeTags elTag, value::Value elVal) {
         resView->push_back_raw(value::copyValue(elTag, elVal));
     });
 
-    resGuard.reset();
-    return {true, resTag, resVal};
+    return std::move(res);
 }
 
 }  // namespace vm

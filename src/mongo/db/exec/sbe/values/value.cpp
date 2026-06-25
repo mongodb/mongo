@@ -778,6 +778,13 @@ bool ArraySet::push_back_clone(TypeTags tag, Value val) {
     return false;
 }
 
+bool ArraySet::push_back(TagValueOwned value) {
+    if (value.tag() != TypeTags::Nothing) {
+        return _values.insert_lazy(value.raw(), [&]() { return value.releaseToRaw(); }).second;
+    }
+    return false;
+}
+
 std::pair<TypeTags, Value> makeNewArraySet(TypeTags tag,
                                            Value value,
                                            const CollatorInterface* collator) {

@@ -1607,12 +1607,21 @@ public:
     }
 
     /**
-     * If the value cannot be found in the set, insert a copy.
+     * If the value cannot be found in the set, insert a copy. Nothing values are ignored.
      *
      * Returns true if the value was newly inserted, otherwise returns false to indicate that
      * an equal value was already present in the set.
      */
     bool push_back_clone(TypeTags tag, Value val);
+
+    /**
+     * If the value cannot be found in the set, transfer ownership of `value` into the set.
+     * Otherwise, the value is destructed. Nothing values are ignored.
+     *
+     * Returns true if the value was newly inserted, otherwise returns false to indicate that
+     * an equal value was already present in the set.
+     */
+    bool push_back(TagValueOwned value);
 
     auto& values() const noexcept {
         return _values;
