@@ -135,9 +135,10 @@ void validate(const AggregateCommandRequest& aggregate,
             hasExplain || cmdObj.hasField(AggregateCommandRequest::kCursorFieldName));
 
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "Aggregation explain does not support the'"
+            str::stream() << "Aggregation explain does not support the '"
                           << WriteConcernOptions::kWriteConcernField << "' option",
-            !hasExplain || !aggregate.getWriteConcern().has_value());
+            !hasExplain || !aggregate.getWriteConcern().has_value() ||
+                (client && isInternalOrDirectClient(client)));
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Cannot specify '" << AggregateCommandRequest::kNeedsMergeFieldName
