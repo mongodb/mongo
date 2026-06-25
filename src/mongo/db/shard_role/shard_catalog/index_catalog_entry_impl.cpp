@@ -274,8 +274,29 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // it multikey, that write will be marked as "isTrackingMultikeyPathInfo" on the applier's
     // OperationContext and we can safely defer that write to the end of the batch.
     if (multikeyPathTracker.isTrackingMultikeyPathInfo()) {
-        auto earliestTimestamp =
-            shard_role_details::getRecoveryUnit(opCtx)->getTimestamp().value_or(Timestamp());
+        // For multi-document transactions, when gFeatureFlagReplicateMultikeynessInTransactions is
+        // enabled, the always use the "setMultikeyMetadata" oplog entry to replicate the multikey
+        // change in the catalog. In case the index path is already set as multikey on primary, we
+        // don't emit the entry. However, on high concurrency workloads, on a secondary, the
+        // transaction may be the first write that makes the index multikey. This can occur because
+        // write on secondaries are not necessarily processed in the same order as on the primary
+        // for the same batch. When gFeatureFlagReplicateMultikeynessInTransactions is enabled,
+        // multikeyness must be enabled at the exact same timestamp for both primary and
+        // secondaries. For prepared transaction, the timestamp is not available.
+        // Preparedtransactions are not expected to discover multikey paths when replicating writes
+        // to secondaries. We can simply discard this event and let the actual write discover the
+        // multikey path.
+        auto timestamp = shard_role_details::getRecoveryUnit(opCtx)->getTimestamp();
+        if (!timestamp && opCtx->inMultiDocumentTransaction()) {
+            // TODO(SERVER-129361) remove the feature flag check and always return.
+            VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+            if (gFeatureFlagReplicateMultikeynessInTransactions.isEnabled(
+                    VersionContext::getDecoration(opCtx))) {
+                return;
+            }
+        }
+
+        auto earliestTimestamp = timestamp.value_or(Timestamp());
         multikeyPathTracker.addMultikeyPathInfo({collection->ns(),
                                                  collection->uuid(),
                                                  _descriptor.indexName(),
