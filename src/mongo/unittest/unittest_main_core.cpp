@@ -90,7 +90,9 @@ EnhancedReporter* getGlobalEnhancedReporter() {
 namespace {
 
 void _dumpOutputSignalHandlerCb() {
-    gEnhancedReporter->dumpBufferedOutputForSignalHandler();
+    if (gEnhancedReporter) {
+        gEnhancedReporter->dumpBufferedOutputForSignalHandler();
+    }
 }
 
 /** Sets and resets the FCV as each test starts and ends. */
@@ -315,7 +317,12 @@ void MainProgress::initialize() {
     setDefaultMockBehavior(MockBehavior::nice);
     callInitGoogleTest(_argVec);
 
-    if (!isDeathTestChild()) {
+    clearSignalMask();
+    setupSynchronousSignalHandlers();
+
+    if (isDeathTestChild()) {
+        initializeDeathTestChild();
+    } else {
         if (_options.enhancedReporter) {
             EnhancedReporter::Options ero;
             ero.showEachTest = _options.showEachTest;
@@ -323,7 +330,17 @@ void MainProgress::initialize() {
         } else {
             installMongoReporter();
         }
+
+        // Start signal processing thread after signal mask cleared.
+        if (_options.startSignalProcessingThread) {
+            // Per SERVER-7434, startSignalProcessingThread must run after any forks (i.e.
+            // initialize_server_global_state::forkServerOrDie) and before the creation of any other
+            // threads
+            startSignalProcessingThread();
+        }
     }
+
+    GTEST_FLAG_SET(show_internal_stack_frames, false);
 
     // Colorize when explicitly asked to. If no position is taken, colorize when we are writing
     // to a TTY.
@@ -335,17 +352,11 @@ void MainProgress::initialize() {
         GTEST_FLAG_SET(break_on_failure, true);
     }
 
-    if (isDeathTestChild()) {
-        initializeDeathTestChild();
-    } else {
-        // Googletest takes ownership of the listener.
+    if (!isDeathTestChild()) {
         testing::UnitTest::GetInstance()->listeners().Append(new FCVEventListener{});
     }
 
     testing::UnitTest::GetInstance()->listeners().Append(new ThrowListener{});
-
-    clearSignalMask();
-    setupSynchronousSignalHandlers();
 
     if (auto&& tp = TestingProctor::instance(); !tp.isInitialized())
         tp.setEnabled(true);
@@ -376,13 +387,6 @@ boost::optional<ExitCode> MainProgress::_parseAndAcceptOptions() {
         for (auto&& s : allSuites())
             std::cout << s->name() << std::endl;
         return ExitCode::clean;
-    }
-
-    if (_options.startSignalProcessingThread) {
-        // Per SERVER-7434, startSignalProcessingThread must run after any forks (i.e.
-        // initialize_server_global_state::forkServerOrDie) and before the creation of any other
-        // threads
-        startSignalProcessingThread();
     }
 
     if (uto.verbose) {
