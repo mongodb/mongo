@@ -2,6 +2,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const maxInt32 = Math.pow(2, 31) - 1;
+const kKeyFile = "jstests/libs/key1";
 
 // Restore sane parameters for the end of a test to ensure
 // rate limiting is disabled during shutdown.
@@ -16,6 +17,12 @@ const kParamsRestore = {
  * test.
  */
 export const kSlowestRefreshRateSecs = 5e-6;
+
+/**
+ * Near-zero burst capacity (in seconds) used to start the token bucket essentially empty so that
+ * non-exempt connections are rejected immediately on the first attempt.
+ */
+export const kZeroBurstCapacitySecs = 5e-6;
 
 /**
  * Value for app name based exemption in the ingress request rate limiter.
@@ -46,7 +53,7 @@ export const kInternalConnectionAppNameExemptions = [
     "NetworkInterfaceTL-Reshard",
     "NetworkInterfaceTL-StandaloneNetwork",
     "NetworkInterfaceTL-Sharding-Fixed",
-    "NetworkInterfaceTL-ShardingDDLCoordinatorNetwork",
+    "NetworkInterfaceTL-ShardingCoordinatorNetwork",
     "ReplCoordExtern",
     "InitialSyncer",
     "Rollback",
@@ -114,6 +121,56 @@ export function makeExemptConn(host) {
     const conn = new Mongo(`mongodb://${host}/?appName=${kRateLimiterExemptAppName}`);
     authenticateConnection(conn);
     return conn;
+}
+
+/**
+ * Returns an exempt connection to a mongod node authenticated as __system via keyfile.
+ */
+export function makeKeyfileExemptConn(host) {
+    const conn = new Mongo(`mongodb://${host}/?appName=${kRateLimiterExemptAppName}`);
+    authutil.assertAuthenticate(conn, "admin", {
+        user: "__system",
+        mechanism: "SCRAM-SHA-256",
+        // cat() returns the keyfile contents with trailing whitespace/newlines that the SCRAM
+        // password must not contain; strip them to get the raw shared secret.
+        pwd: cat(kKeyFile).replace(/[\011-\015\040]/g, ""),
+    });
+    return conn;
+}
+
+/**
+ * Enables a near-zero-burst IRRL on conn. Sets burst capacity to kZeroBurstCapacitySecs so the
+ * token bucket starts essentially empty and every non-exempt connection is immediately rejected.
+ * Uses keyfile auth via authutil.asCluster since conn is a raw (unauthenticated) node connection.
+ */
+export function enableZeroBurstRateLimiter(conn, exemptions) {
+    authutil.asCluster(conn, kKeyFile, () => {
+        assert.commandWorked(
+            conn.adminCommand({
+                setParameter: 1,
+                ingressRequestAdmissionRatePerSec: 1,
+                ingressRequestAdmissionBurstCapacitySecs: kZeroBurstCapacitySecs,
+                ingressRequestRateLimiterApplicationExemptions: {appNames: exemptions},
+                ingressRequestRateLimiterEnabled: 1,
+            }),
+        );
+    });
+}
+
+/**
+ * Disables IRRL on the node at host and restores sane rate/burst parameters. Opens a fresh
+ * keyfile-authenticated exempt connection so it works for direct shard/config nodes.
+ */
+export function disableRateLimiter(host) {
+    const conn = makeKeyfileExemptConn(host);
+    assert.commandWorked(
+        conn.adminCommand({
+            setParameter: 1,
+            ingressRequestAdmissionRatePerSec: maxInt32,
+            ingressRequestAdmissionBurstCapacitySecs: Number.MAX_VALUE,
+            ingressRequestRateLimiterEnabled: 0,
+        }),
+    );
 }
 
 /**
