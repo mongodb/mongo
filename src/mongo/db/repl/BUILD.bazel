@@ -323,7 +323,11 @@ idl_generator(
 mongo_cc_library(
     name = "repl_server_parameters",
     srcs = [
+        "oplog_application_steady_state.cpp",
         ":repl_server_parameters_gen",
+    ],
+    hdrs = [
+        "oplog_application_steady_state.h",
     ],
     deps = [
         "//src/mongo/client:read_preference",

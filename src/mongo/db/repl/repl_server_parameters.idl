@@ -35,6 +35,7 @@ global:
         - "mongo/client/read_preference.h"
         - "mongo/client/read_preference_validators.h"
         - "mongo/db/repl/repl_worker_pool_thread_count.h"
+        - "mongo/db/repl/oplog_application_steady_state.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -385,6 +386,7 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         cpp_varname: oplogApplicationEnforcesSteadyStateConstraints
         default: false
+        on_update: onOplogApplicationEnforcesSteadyStateConstraintsUpdate
         redact: false
 
     initialSyncSourceReadPreference:
