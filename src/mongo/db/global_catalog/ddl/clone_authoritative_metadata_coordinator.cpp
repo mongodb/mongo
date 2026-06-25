@@ -40,6 +40,7 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -125,6 +126,41 @@ void CloneAuthoritativeMetadataCoordinator::_clone(
                 throw ex;
             }
         }
+    }
+
+    // The config database is not registered in config.databases, so it is never part of
+    // 'databasesToClone'. Its only trackable collection, config.system.sessions, must still be made
+    // authoritative on the shards that own its data. The config server is the primary shard of the
+    // config database, so it is responsible for orchestrating this clone.
+    if (ShardingState::get(opCtx)->shardId() == ShardId::kConfigServerId) {
+        _cloneConfigSystemSessions(opCtx, executor, token);
+    }
+}
+
+void CloneAuthoritativeMetadataCoordinator::_cloneConfigSystemSessions(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    const auto& nss = NamespaceString::kLogicalSessionsNamespace;
+    try {
+        DDLLockManager::ScopedCollectionDDLLock collLock(
+            opCtx, nss, "cloneAuthoritativeMetadata"_sd, MODE_X);
+
+        _convertShardRefsInNamespaceMetadataInGlobalCatalog(opCtx, nss);
+
+        // The config server is the primary shard of the config database, so it is the shard that
+        // must always carry an entry for the collection even if it owns no chunks.
+        sharding_ddl_util::cloneAuthoritativeCollectionMetadataToShards(
+            opCtx,
+            nss,
+            ShardId::kConfigServerId,
+            [&] { return getNewSession(opCtx); },
+            _doc.getAuthoritativeMetadataAccessLevel(),
+            executor,
+            token);
+    } catch (const ExceptionFor<ErrorCodes::RequestAlreadyFulfilled>&) {
+        // config.system.sessions is not tracked (the sharded sessions collection has not been
+        // created yet), so there is nothing to clone.
     }
 }
 

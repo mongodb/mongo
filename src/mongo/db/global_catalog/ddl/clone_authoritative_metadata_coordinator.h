@@ -91,6 +91,17 @@ private:
         const CancellationToken& token);
 
     /**
+     * Clones the metadata of config.system.sessions, the only collection of the config database
+     * that is allowed to be tracked. The config database is not registered in config.databases, so
+     * it is not part of the databases handled by '_clone'; this collection is therefore cloned
+     * explicitly. Only invoked on the config server, which is the primary shard of the config
+     * database.
+     */
+    void _cloneConfigSystemSessions(OperationContext* opCtx,
+                                    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                    const CancellationToken& token);
+
+    /**
      * Removes a database from the list of databases to be cloned.
      */
     void _removeDbFromCloningList(OperationContext* opCtx, const DatabaseName& dbName);

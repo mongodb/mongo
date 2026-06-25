@@ -376,14 +376,7 @@ void cloneAuthoritativeDatabaseMetadataOnShards(OperationContext* opCtx) {
         ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllShards(
             opCtx, repl::ReadConcernLevel::kLocalReadConcern);
 
-    for (const auto& shardType : opTimeWithShards.value) {
-        const auto shardStatus =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardRef(shardType.getName()));
-        if (!shardStatus.isOK()) {
-            continue;
-        }
-        const auto shard = shardStatus.getValue();
-
+    const auto sendCloneCommandToShard = [&](const std::shared_ptr<Shard>& shard) {
         ShardsvrCloneAuthoritativeMetadata request;
         request.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
         request.setDbName(DatabaseName::kAdmin);
@@ -395,6 +388,28 @@ void cloneAuthoritativeDatabaseMetadataOnShards(OperationContext* opCtx) {
                                           Shard::RetryPolicy::kIdempotent);
 
         uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+    };
+
+    bool sentToConfigServer = false;
+    for (const auto& shardType : opTimeWithShards.value) {
+        if (shardType.getName() == ShardId::kConfigServerId) {
+            sentToConfigServer = true;
+        }
+
+        const auto shardStatus =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardRef(shardType.getName()));
+        if (!shardStatus.isOK()) {
+            continue;
+        }
+
+        sendCloneCommandToShard(shardStatus.getValue());
+    }
+
+    // The config DB is synthetic (not in config.databases), so the shard loop above skips
+    // config.system.sessions. Run the clone coordinator on the config server when it was not
+    // reached above .
+    if (!sentToConfigServer) {
+        sendCloneCommandToShard(Grid::get(opCtx)->shardRegistry()->getConfigShard());
     }
 }
 

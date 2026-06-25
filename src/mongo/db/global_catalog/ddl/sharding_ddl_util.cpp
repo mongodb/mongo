@@ -1015,16 +1015,17 @@ void cloneAuthoritativeCollectionMetadataToShards(
     uassert(ErrorCodes::RequestAlreadyFulfilled,
             str::stream() << "The collection " << nss.toStringForErrorMsg() << " is not tracked",
             cm.hasRoutingTable());
-    std::set<ShardId> shardSet;
-    cm.getAllShardIds(&shardSet);
+    std::set<ShardRef> shardRefs;
+    for (const auto& shardId : Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx)) {
+        shardRefs.insert(ShardRef(shardId));
+    }
+
     // The DB primary must always know that a collection is tracked, even when it owns no chunks.
-    shardSet.insert(primaryShardId);
-    // TODO SERVER-128349: Remove conversion to shardRefs once Chunk manager starts returning
-    // ShardRef
-    const std::vector<ShardRef> shardRefs(shardSet.begin(), shardSet.end());
+    shardRefs.insert(ShardRef(primaryShardId));
+    const std::vector<ShardRef> shardRefList(shardRefs.begin(), shardRefs.end());
 
     sendFetchCollMetadataToShards(
-        opCtx, nss, shardRefs, primaryShardId, osiGenerator(), executor, token);
+        opCtx, nss, shardRefList, primaryShardId, osiGenerator(), executor, token);
 }
 
 void commitRefineCollectionShardKeyToShardCatalog(

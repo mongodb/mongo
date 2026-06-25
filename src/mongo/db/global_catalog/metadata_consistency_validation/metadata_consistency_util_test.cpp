@@ -1279,9 +1279,13 @@ protected:
     }
 
     UUID setUpLocalCollection() {
-        createTestCollection(operationContext(), _nss);
+        return setUpLocalCollection(_nss);
+    }
+
+    UUID setUpLocalCollection(const NamespaceString& nss) {
+        createTestCollection(operationContext(), nss);
         std::tie(_localCatalogSnapshot, _localCatalogCollections) =
-            getLocalCatalog(operationContext(), _nss);
+            getLocalCatalog(operationContext(), nss);
         ASSERT_EQ(1, _localCatalogCollections.size());
         return _localCatalogCollections[0]->uuid();
     }
@@ -1289,7 +1293,14 @@ protected:
     void setAuthoritativeShardCatalogMetadata(const UUID& uuid,
                                               const KeyPattern& keyPattern,
                                               const std::vector<ChunkType>& chunks) {
-        auto rt = RoutingTableHistory::makeNewAllowingGaps(_nss,
+        setAuthoritativeShardCatalogMetadata(_nss, uuid, keyPattern, chunks);
+    }
+
+    void setAuthoritativeShardCatalogMetadata(const NamespaceString& nss,
+                                              const UUID& uuid,
+                                              const KeyPattern& keyPattern,
+                                              const std::vector<ChunkType>& chunks) {
+        auto rt = RoutingTableHistory::makeNewAllowingGaps(nss,
                                                            uuid,
                                                            keyPattern,
                                                            false,
@@ -1306,7 +1317,7 @@ protected:
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
         const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), _shardId);
-        auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
+        auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), nss);
         scopedCSR->setCollectionMetadata(operationContext(),
                                          collectionMetadata,
                                          CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
@@ -2011,6 +2022,41 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MissingCollectionInDurab
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
     ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       DurablePath_MissingConfigSystemSessionsCollectionInDurableCatalog) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
+
+    const auto& nss = NamespaceString::kLogicalSessionsNamespace;
+    const auto localUuid = setUpLocalCollection(nss);
+    auto globalCatalogColl = generateCollectionType(nss, localUuid, _keyPattern);
+    auto chunk = generateChunk(
+        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+
+    setAuthoritativeShardCatalogMetadata(nss, localUuid, _keyPattern, {chunk});
+    _catalogClient->setChunksToReturn({chunk});
+
+    // The config server is the DB primary for config.system.sessions, but this data shard owns a
+    // chunk. Owning shards must still carry durable shard catalog metadata for the collection.
+    const auto inconsistencies = checkConsistency(globalCatalogColl, ShardId::kConfigServerId);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+    ASSERT_TRUE(
+        std::any_of(inconsistencies.begin(), inconsistencies.end(), [&](const auto& inconsistency) {
+            if (inconsistency.getType() !=
+                MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata) {
+                return false;
+            }
+
+            const auto details = inconsistency.getDetails().getObjectField("details");
+            return inconsistency.getDetails().getStringField("namespace") ==
+                nss.toStringForErrorMsg() &&
+                details.hasField("reason") &&
+                details.getStringField("reason").find(
+                    "Collection entry not found in the durable shard catalog") != std::string::npos;
+        }));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MissingChunksInDurableCatalog) {

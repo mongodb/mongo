@@ -1297,6 +1297,29 @@ TEST_F(AuthoritativeRefreshFixture, RetainedNonAuthoritativeDsrEntryInstallsUnow
     ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
 }
 
+TEST_F(AuthoritativeRefreshFixture, ConfigSystemSessionsEmptyDiskRecoversAsUnownedNotUntracked) {
+    auto* opCtx = operationContext();
+    const auto& nss = NamespaceString::kLogicalSessionsNamespace;
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        csr->clearCollectionMetadata(opCtx);
+        csr->setAuthoritative();
+    }
+
+    ASSERT_OK(onShardVersionMismatch(opCtx, nss, boost::none));
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+    ASSERT_TRUE(csr->isUnowned()) << "config.system.sessions with no on-disk entry must recover as "
+                                     "kUnowned, never kUntracked";
+    auto metadataOpt = csr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadataOpt.has_value());
+    ASSERT_FALSE(metadataOpt->isSharded());
+}
+
 // Non-ABA primary identity change: DSR starts empty, a movePrimary during the drain makes this
 // shard the new primary. Caught by the simple pre/post compare. Converges to kUntracked after
 // retry.

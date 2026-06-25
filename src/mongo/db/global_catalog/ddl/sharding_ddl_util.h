@@ -426,8 +426,8 @@ MONGO_MOD_NEEDS_REPLACEMENT void sendFetchCollMetadataToShards(
     const CancellationToken& token);
 
 /**
- * Makes a single tracked collection's authoritative metadata durable on the shards owning its
- * chunks and on `primaryShardId`. Throws `RequestAlreadyFulfilled` if the collection is untracked.
+ * Makes a single tracked collection's authoritative metadata durable on all live shards and on
+ * `primaryShardId`. Throws `RequestAlreadyFulfilled` if the collection is untracked.
  * TODO (SERVER-98118): Remove this once v9.0 becomes last-lts.
  */
 MONGO_MOD_PARENT_PRIVATE void cloneAuthoritativeCollectionMetadataToShards(

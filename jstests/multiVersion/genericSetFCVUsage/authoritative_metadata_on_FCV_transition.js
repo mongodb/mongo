@@ -378,6 +378,67 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
         assertShardCatalogMatchesGlobal(shard0, trackedNs, {isDbPrimary: true});
     });
 
+    it("should clone config.system.sessions collection metadata to owning shards on FCV upgrade", function () {
+        const sessionsNs = "config.system.sessions";
+
+        let sessionsMetadata;
+        assert.soon(() => {
+            assert.commandWorked(mongos.adminCommand({refreshLogicalSessionCacheNow: 1}));
+            sessionsMetadata = getGlobalCollectionMetadata(sessionsNs);
+            return sessionsMetadata != null;
+        }, "config.system.sessions was not tracked in the global catalog in time");
+
+        // Place the collection's data on a data shard that is not the primary of the config database
+        // (the config server), so the upgrade must clone the metadata to a chunk-owning non-primary
+        // shard.
+        const sessionsChunk = mongos.getDB("config").chunks.findOne({uuid: sessionsMetadata.uuid});
+        assert.neq(
+            null,
+            sessionsChunk,
+            "config.system.sessions is expected to have at least one chunk",
+        );
+        if (sessionsChunk.shard !== shard1.shardName) {
+            assert.commandWorked(
+                mongos.adminCommand({
+                    moveChunk: sessionsNs,
+                    bounds: [sessionsChunk.min, sessionsChunk.max],
+                    to: shard1.shardName,
+                    _waitForDelete: true,
+                }),
+            );
+        }
+
+        // Nothing is cloned into the shard catalogs while still on lastLTS.
+        assert.eq(
+            null,
+            shard1
+                .getDB("config")
+                .getCollection(kAuthoritativeCollectionsColl)
+                .findOne({_id: sessionsNs}),
+        );
+
+        assert.commandWorked(
+            mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+        st.awaitReplicationOnShards();
+
+        // The config database primary is the config server, so the data shards are never its DB
+        // primary; each data shard must carry the authoritative metadata exactly when it owns chunks.
+        assertShardCatalogMatchesGlobal(shard1, sessionsNs, {isDbPrimary: false});
+        assertShardCatalogMatchesGlobal(shard0, sessionsNs, {isDbPrimary: false});
+
+        // A correct upgrade must leave no shard catalog inconsistencies for the collection.
+        const inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+        const shardCatalogInconsistencies = inconsistencies.filter(
+            (i) => i.type === "InconsistentShardCatalogCollectionMetadata",
+        );
+        assert.eq(
+            0,
+            shardCatalogInconsistencies.length,
+            () => `Unexpected shard catalog inconsistencies: ${tojson(inconsistencies)}`,
+        );
+    });
+
     // Pauses the donor's cloning DDL mid-upgrade, moves the database to the destination while paused,
     // then resumes it. In this case the movePrimary, rather than the cloning DDL, becomes responsible
     // for making the collection metadata authoritative.
