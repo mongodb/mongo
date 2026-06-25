@@ -131,6 +131,7 @@ function assertViewReturns(viewName, userPipeline, expected) {
 
 describe("$testVectorSearchOptimization in views", function () {
     before(function () {
+        testDb.dropDatabase();
         coll.drop();
         assert.commandWorked(
             coll.insertMany([
@@ -344,6 +345,7 @@ describe("$readNDocuments / $produceIds in views", function () {
     const readN = (opts) => ({$readNDocuments: opts});
 
     before(function () {
+        testDb.dropDatabase();
         produceColl.drop();
         assert.commandWorked(produceColl.insertMany(expectedDocs));
     });
