@@ -150,7 +150,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     if (options.method == IndexBuildMethodEnum::kPrimaryDriven &&
         !opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
         shard_role_details::getRecoveryUnit(opCtx)->setPrefetching(
-            primaryDrivenIndexBuildPrefetching.load());
+            index_builds::primary_driven::prefetching.load());
     }
 
     try {

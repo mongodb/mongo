@@ -26,7 +26,7 @@
 # it in the license file.
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo::index_builds::primary_driven"
     mod_visibility: private
 
 server_parameters:
@@ -35,7 +35,7 @@ server_parameters:
         set_at:
             - runtime
             - startup
-        cpp_varname: primaryDrivenIndexBuildPrefetching
+        cpp_varname: prefetching
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
