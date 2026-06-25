@@ -30,6 +30,8 @@
 #include "mongo/db/query/query_knobs/query_knob_registry.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_test_knobs.h"
 #include "mongo/db/server_parameter.h"
@@ -84,7 +86,7 @@ auto createDummyServerParameter(std::string_view paramName, BSONObj annotations)
 }
 
 QueryKnobRegistry::Entry createDummyKnobEntry(ServerParameter* sp, QueryKnobId id = {}) {
-    return QueryKnobRegistry::Entry(id, sp, nullptr, nullptr, nullptr, nullptr);
+    return QueryKnobRegistry::Entry(id, sp, nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
 // -----------------------------------------------------------------------------
@@ -206,7 +208,8 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                                                       .pqsSettable = true,
                                                   }));
     std::ignore = createDummyKnobEntry(param.get());
-    QueryKnobRegistry::Entry{QueryKnobId(0), param.get(), nullptr, nullptr, nullptr, nullptr};
+    QueryKnobRegistry::Entry{
+        QueryKnobId(0), param.get(), nullptr, nullptr, nullptr, nullptr, nullptr};
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
@@ -280,6 +283,38 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  ".*No server parameter found.*") {
     std::ignore =
         QueryKnobRegistry::Entry::create<gTestBoolKnob>(QueryKnob<bool>(), kTestIntKnobName);
+}
+
+// -----------------------------------------------------------------------------
+// appendType
+// -----------------------------------------------------------------------------
+
+BSONObj typeInfoFor(QueryKnobId id) {
+    BSONObjBuilder bob;
+    registry().entry(id).appendType(&bob);
+    return bob.obj();
+}
+
+TEST(QueryKnobRegistryTest, AppendTypeIntKnob) {
+    ASSERT_BSONOBJ_EQ(typeInfoFor(test_knobs::testIntKnob.id), fromjson(R"({"type": "int"})"));
+}
+
+TEST(QueryKnobRegistryTest, AppendTypeDoubleKnob) {
+    ASSERT_BSONOBJ_EQ(typeInfoFor(test_knobs::testDoubleKnob.id),
+                      fromjson(R"({"type": "double"})"));
+}
+
+TEST(QueryKnobRegistryTest, AppendTypeBoolKnob) {
+    ASSERT_BSONOBJ_EQ(typeInfoFor(test_knobs::testBoolKnob.id), fromjson(R"({"type": "bool"})"));
+}
+
+TEST(QueryKnobRegistryTest, AppendTypeLongLongKnob) {
+    ASSERT_BSONOBJ_EQ(typeInfoFor(test_knobs::testLLKnob.id), fromjson(R"({"type": "long long"})"));
+}
+
+TEST(QueryKnobRegistryTest, AppendTypeEnumKnob) {
+    ASSERT_BSONOBJ_EQ(typeInfoFor(test_knobs::testEnumKnob.id),
+                      fromjson(R"({"type": "enum", "allowedValues": ["alpha", "beta"]})"));
 }
 
 }  // namespace

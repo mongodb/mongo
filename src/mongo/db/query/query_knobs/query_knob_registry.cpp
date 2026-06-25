@@ -82,12 +82,14 @@ QueryKnobRegistry::Entry::Entry(QueryKnobId id,
                                 ServerParameter* param,
                                 FromBSONFn fromBSONFn,
                                 ToBSONFn toBSONFn,
+                                AppendTypeFn appendTypeFn,
                                 ReadGlobalFn readGlobalFn,
                                 AttachOnUpdateFn attachOnUpdateFn)
     : id(id),
       param(param),
       fromBSON(fromBSONFn),
       toBSON(toBSONFn),
+      appendType(appendTypeFn),
       readGlobal(readGlobalFn),
       attachOnUpdate(attachOnUpdateFn) {
     invariant(param, fmt::format("No server parameter found for query knob id {}", id.value));

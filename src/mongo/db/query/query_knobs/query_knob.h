@@ -89,6 +89,13 @@ struct ConverterTraits<T> {
     static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, idl::serialize(static_cast<T>(std::get<int>(val))));
     }
+    static void appendType(BSONObjBuilder* b) {
+        b->append("type", "enum");
+        BSONArrayBuilder arr(b->subarrayStart("allowedValues"));
+        for (size_t i = 0; i < idlEnumCount<T>; ++i) {
+            arr.append(idl::serialize(static_cast<T>(i)));
+        }
+    }
 };
 
 template <>
@@ -99,6 +106,9 @@ struct ConverterTraits<int> {
     static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, std::get<int>(val));
     }
+    static void appendType(BSONObjBuilder* b) {
+        b->append("type", "int");
+    }
 };
 
 template <>
@@ -108,6 +118,9 @@ struct ConverterTraits<long long> {
     }
     static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, std::get<long long>(val));
+    }
+    static void appendType(BSONObjBuilder* b) {
+        b->append("type", "long long");
     }
 };
 
@@ -121,6 +134,9 @@ struct ConverterTraits<double> {
     static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.append(field, std::get<double>(val));
     }
+    static void appendType(BSONObjBuilder* b) {
+        b->append("type", "double");
+    }
 };
 
 template <>
@@ -130,6 +146,9 @@ struct ConverterTraits<bool> {
     }
     static void toBSON(BSONObjBuilder& b, std::string_view field, const QueryKnobValue& val) {
         b.appendBool(field, std::get<bool>(val));
+    }
+    static void appendType(BSONObjBuilder* b) {
+        b->append("type", "bool");
     }
 };
 
