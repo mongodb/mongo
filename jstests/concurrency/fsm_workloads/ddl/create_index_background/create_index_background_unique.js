@@ -11,6 +11,7 @@
  *     creates_background_indexes,
  *     requires_persistence,
  *     assumes_balancer_off,
+ *     requires_getmore,
  * ]
  */
 import {assertWorkedOrFailedHandleTxnErrors} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";

@@ -14,6 +14,7 @@
  *  incompatible_tsan,
  *  # TODO(SERVER-119777): Ensure test does not leak cursors.
  *  can_leak_idle_cursors,
+ *  requires_getmore,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

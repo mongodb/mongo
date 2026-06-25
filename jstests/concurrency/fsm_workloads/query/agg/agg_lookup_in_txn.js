@@ -16,6 +16,7 @@
  *     assumes_snapshot_transactions,
  *     requires_fcv_80,
  *     assumes_balancer_off,
+ *     requires_getmore,
  * ]
  * ]
  */

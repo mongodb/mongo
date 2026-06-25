@@ -153,6 +153,20 @@
           keyFile: *keyFile
           set_parameters: *rateLimiterParamsReplicaSet
 
+# Like fixture_with_auth_sharded, but does not pin num_mongos so the concurrency base suite's
+# num_mongos (2) is preserved, keeping its multi-router coverage.
+- name: fixture_with_auth_sharded_concurrency
+  value:
+    executor:
+      fixture:
+        auth_options: *authOptions
+        mongos_options:
+          keyFile: *keyFile
+          set_parameters: *rateLimiterParamsCommon
+        mongod_options:
+          keyFile: *keyFile
+          set_parameters: *rateLimiterParamsMongod
+
 # SERVER-120171 Remove these hooks since we only need to re-define them to pass auth to the shell.
 - name: auth_hooks_sharded
   value:
@@ -183,6 +197,28 @@
         - {class: CheckShardFilteringMetadata, shell_options: *hookShellOpts}
         - {class: CheckOrphansDeleted, shell_options: *hookShellOpts}
         - *cleanEveryNHook
+
+# Re-define the concurrency_sharded_replication base suite's hooks so each hook's shell
+# authenticates. The hook list fully replaces the base suite's list, so it must stay in sync with
+# suites/concurrency_sharded_replication.yml.
+- name: auth_hooks_concurrency_sharded
+  value:
+    executor:
+      hooks:
+        - {class: CheckShardFilteringMetadata, shell_options: *hookShellOpts}
+        - {class: CheckReplDBHashInBackground, shell_options: *hookShellOpts}
+        - {class: CheckReplDBHash, shell_options: *hookShellOpts}
+        - {
+            class: CheckMetadataConsistencyInBackground,
+            shell_options: *hookShellOpts,
+          }
+        - {class: CheckOrphansDeleted, shell_options: *hookShellOpts}
+        - {class: CheckRoutingTableConsistency, shell_options: *hookShellOpts}
+        - {class: ValidateCollections, shell_options: *hookShellOpts}
+        # CleanupConcurrencyWorkloads connects via build_hook_client(fixture, fixture.auth_options),
+        # not a shell, so it takes no shell_options. That client authenticates and is tagged with the
+        # Resmoke-Hook appName, so its drops are exempt from ingress rate limiting.
+        - {class: CleanupConcurrencyWorkloads}
 
 # Re-define the replica set base suite's hooks so each hook's shell authenticates.
 # The hook list fully replaces the base suite's list, so it must stay in sync with
@@ -311,3 +347,6 @@
       - uses_parallel_shell
       # TODO SERVER-129844: Crash when getMore retry runs after original opCtx is destroyed.
       - requires_getmore
+      # These suites already authenticate as a user, so they can't run tests that expect to be able
+      # to log in as a different user.
+      - requires_auth

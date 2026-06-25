@@ -1,7 +1,7 @@
 /**
  *  Performs repeated reads of the documents in the collection to test snapshot isolation.
  *
- * @tags: [uses_transactions, assumes_snapshot_transactions]
+ * @tags: [uses_transactions, assumes_snapshot_transactions, requires_getmore]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

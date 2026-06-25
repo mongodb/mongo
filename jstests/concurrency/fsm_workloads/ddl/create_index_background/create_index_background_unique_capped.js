@@ -7,6 +7,7 @@
  *  creates_background_indexes,
  *  requires_capped,
  *  assumes_balancer_off,
+ *  requires_getmore,
  * ]
  */
 

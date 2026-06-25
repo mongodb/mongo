@@ -1,7 +1,7 @@
 /**
  * Tests periodically killing sessions that are running transactions.
  *
- * @tags: [uses_transactions, assumes_snapshot_transactions, kills_random_sessions]
+ * @tags: [uses_transactions, assumes_snapshot_transactions, kills_random_sessions, requires_getmore]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

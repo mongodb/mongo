@@ -1,0 +1,14 @@
+# This suite runs the sharded concurrency (FSM) workloads against a sharded cluster with a simulated
+# rate limiter enabled to reject random requests. It mirrors the retry behavior of the rate-limited
+# jscore passthroughs: the rate-limiter failpoint fires only on mongod, while internal clients retry
+# up to a high maximum (defaultClientMaxRetryAttempts), so rejections are absorbed internally and no
+# errors bubble up to the driver. The base suite's num_mongos (2) is preserved.
+base_suite: concurrency_sharded_replication
+overrides:
+  - "rate_limiter_with_auth.auth_shell_options"
+  - "rate_limiter_with_auth.auth_hooks_concurrency_sharded"
+  - "rate_limiter_with_auth.fixture_with_auth_sharded_concurrency"
+eval:
+  - "rate_limiter_with_auth.auth_eval"
+excludes:
+  - "rate_limiter_with_auth.auth_exclude_tags"

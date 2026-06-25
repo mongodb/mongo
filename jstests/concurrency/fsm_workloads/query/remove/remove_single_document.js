@@ -3,7 +3,7 @@
  *
  * Repeatedly remove a document from the collection.
  *
- * @tags: [assumes_balancer_off]
+ * @tags: [assumes_balancer_off, requires_getmore]
  */
 export const $config = (function () {
     let states = {

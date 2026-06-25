@@ -3,31 +3,34 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_jscore_passthrough_with_balancer_rate_limited.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/concurrency_sharded_replication_rate_limited.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 executor:
   archive:
     hooks:
+      - CheckReplDBHashInBackground
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
+    tests: true
   config:
     shell_options:
       authenticationDatabase: admin
       authenticationMechanism: SCRAM-SHA-256
       eval:
-        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");;
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
         jsTest.authenticate(db.getMongo())
       global_vars:
         TestData:
           auth: true
           authMechanism: SCRAM-SHA-256
+          implicitlyShardOnCreateCollectionOnly: true
           keyFile: jstests/libs/authTestsKey
           keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
-          pauseMigrationsDuringMultiUpdates: true
           roleGraphInvalidationIsFatal: true
-          runningWithBalancer: true
+          runningWithBalancer: false
+          shardCollectionProbability: 0.5
       password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
       username: __system
   fixture:
@@ -37,7 +40,7 @@ executor:
       password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
       username: __system
     class: ShardedClusterFixture
-    enable_balancer: true
+    enable_balancer: false
     mongod_options:
       keyFile: jstests/libs/authTestsKey
       set_parameters:
@@ -68,9 +71,10 @@ executor:
           \ Module\",\n            \"MongoDB Lifecycle Management Module\",\n    \
           \        \"Resmoke-Admin\",\n            \"Resmoke-Hook\"]}\n"
         ingressRequestRateLimiterEnabled: true
-        reshardingMinimumOperationDurationMillis: 0
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+        roleGraphInvalidationIsFatal: 1
         shardRetryTokenBucketCapacity: 1073741823
-        useBatchedDeletesForRangeDeletion: true
     mongos_options:
       keyFile: jstests/libs/authTestsKey
       set_parameters:
@@ -78,17 +82,16 @@ executor:
         defaultClientMaxBackoffMillis: 1000
         defaultClientMaxRetryAttempts: 16
         enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
         shardRetryTokenBucketCapacity: 1073741823
-    num_mongos: 3
-    num_rs_nodes_per_shard: 1
+    num_mongos: 2
+    num_rs_nodes_per_shard: 3
     num_shards: 2
-    random_migrations: true
-    set_cluster_parameter:
-      parameter: pauseMigrationsDuringMultiUpdates
-      value:
-        enabled: true
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
   hooks:
-    - class: CheckReplDBHash
+    - class: CheckShardFilteringMetadata
       shell_options: &id001
         appName: Resmoke-Hook
         authenticationDatabase: admin
@@ -104,80 +107,29 @@ executor:
             roleGraphInvalidationIsFatal: true
         password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
         username: __system
+    - class: CheckReplDBHashInBackground
+      shell_options: *id001
+    - class: CheckReplDBHash
+      shell_options: *id001
     - class: CheckMetadataConsistencyInBackground
-      shell_options: *id001
-    - class: ValidateCollections
-      shell_options: *id001
-    - class: CheckShardFilteringMetadata
       shell_options: *id001
     - class: CheckOrphansDeleted
       shell_options: *id001
-    - class: CleanEveryN
-      n: 20
-      shell_options:
-        appName: Resmoke-Hook
-        authenticationDatabase: admin
-        authenticationMechanism: SCRAM-SHA-256
-        password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
-        username: __system
+    - class: CheckRoutingTableConsistency
+      shell_options: *id001
+    - class: ValidateCollections
+      shell_options: *id001
+    - class: CleanupConcurrencyWorkloads
 matrix_suite: true
 selector:
-  exclude_files:
-    - jstests/core_sharding/chunk_migration/*.js
-    - jstests/core/txns/**/*.js
-    - jstests/core/query/map_reduce/*.js
-    - jstests/core/**/apitest_db.js
-    - jstests/core/**/check_shard_index.js
-    - jstests/core/**/compact_keeps_indexes.js
-    - jstests/core/**/currentop.js
-    - jstests/core/**/dbhash.js
-    - jstests/core/**/fsync.js
-    - jstests/core/**/geo_update_btree2.js
-    - jstests/core/**/queryoptimizera.js
-    - jstests/core/**/startup_log.js
-    - jstests/core/**/query/top/top.js
-    - jstests/core/**/geo_2d_explain.js
-    - jstests/core/**/geo_s2explain.js
-    - jstests/core/**/geo_s2sparse.js
-    - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/**/bench_test1.js
-    - jstests/core/index/index_stats.js
-    - jstests/core/timeseries/query/timeseries_predicates.js
-    - jstests/core/index/geo/geo_update_btree.js
-    - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
-    - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
-    - jstests/core/**/*[aA]uth*.js
-    - jstests/core/**/illegal_cmd_namespace.js
-    - jstests/core/**/list_all_sessions.js
-    - jstests/core/**/list_sessions.js
-    - jstests/core/**/list_collections_no_views.js
-    - jstests/core/**/query/disallow_system_views_user_writes.js
-    - jstests/core/**/rename_collection_system_db.js
-    - jstests/core/catalog/agg_internal_list_collections_stage.js
-    - jstests/core/catalog/views/invalid_system_views.js
-    - jstests/core/catalog/views/view_with_invalid_dbname.js
-    - jstests/core/catalog/views/views_creation.js
-    - jstests/core/catalog/views/views_drop.js
-    - jstests/core/timeseries/ddl/*.js
-    - jstests/core/timeseries/write/basic.js
-    - jstests/core/timeseries/query/timeseries_buckets_query_explain.js
-    - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
-    - jstests/core/timeseries/query/timeseries_raw_data_getmore.js
-    - jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js
-    - jstests/core/timeseries/query/timeseries_raw_data_queries.js
-    - jstests/core/timeseries/write/timeseries_raw_data_writes.js
-    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
-    - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_cmd_validation.js
-    - jstests/core_sharding/resharding/*.js
-    - src/mongo/db/modules/*/jstests/fle2/query/update_upsert.js
+  exclude_files: null
   exclude_with_any_tags:
-    - assumes_standalone_mongod
+    - requires_standalone
+    - requires_replication
     - assumes_against_mongod_not_mongos
+    - assumes_balancer_on
     - requires_profiling
-    - assumes_balancer_off
-    - requires_fsync
-    - assumes_stable_collection_uuid
-    - assumes_no_implicit_cursor_exhaustion
+    - assumes_unsharded_collection
     - assumes_superuser_permissions
     - needs_query_settings_user_role
     - creates_and_authenticates_user
@@ -186,8 +138,6 @@ selector:
     - requires_getmore
     - requires_auth
   roots:
-    - jstests/core/**/*.js
-    - jstests/core_sharding/**/*.js
-    - jstests/fle2/**/*.js
-    - src/mongo/db/modules/*/jstests/fle2/**/*.js
-test_kind: js_test
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+test_kind: fsm_workload_test

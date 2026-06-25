@@ -10,6 +10,7 @@
  *   uses_transactions,
  *   # TODO: SERVER-114500 Investigate snapshot_read* FSM tests leaking cursors.
  *   can_leak_idle_cursors,
+ *   requires_getmore,
  * ]
  */
 

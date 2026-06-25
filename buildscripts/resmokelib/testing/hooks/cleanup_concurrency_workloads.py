@@ -3,6 +3,7 @@
 import copy
 
 from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing.fixtures.interface import build_hook_client
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.retry import with_naive_retry
 
@@ -60,7 +61,8 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
     def run_test(self):
         """Execute drop databases hook."""
         same_db_name = None
-        client = self._hook.fixture.mongo_client()
+        auth_options = getattr(self._hook.fixture, "auth_options", None)
+        client = build_hook_client(self._hook.fixture, auth_options)
         db_names = with_naive_retry(lambda: client.list_database_names())
 
         exclude_dbs = copy.copy(self._hook.exclude_dbs)

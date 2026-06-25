@@ -10,7 +10,8 @@
  *  # TODO SERVER-93382 investigate excessive resource usage under TSAN.
  *  tsan_incompatible,
  *  # TODO SERVER-112745 investigate how can we fix this test elegantly for config fuzzers
- *  does_not_support_config_fuzzer
+ *  does_not_support_config_fuzzer,
+ *  requires_getmore,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

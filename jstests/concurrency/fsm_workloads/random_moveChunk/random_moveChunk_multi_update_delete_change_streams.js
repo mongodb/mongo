@@ -9,6 +9,7 @@
  *  uses_change_streams,
  *  # TODO(SERVER-119777): Ensure test does not leak cursors.
  *  can_leak_idle_cursors,
+ *  requires_getmore,
  * ];
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

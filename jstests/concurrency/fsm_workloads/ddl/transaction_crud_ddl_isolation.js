@@ -30,6 +30,7 @@
  *
  * @tags: [
  *   uses_transactions,
+ *   requires_getmore,
  * ]
  */
 
