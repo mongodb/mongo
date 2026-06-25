@@ -30,7 +30,8 @@ let indexSpec = {a: 1, "c.d": 1, "e.0": 1};
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
 const sbeTransformStagesEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages") || sbeFullyEnabled;
+    !checkSbeCompletelyDisabled(db) &&
+    (FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages") || sbeFullyEnabled);
 
 /**
  * Helper to test that for a given pipeline, the same results are returned whether or not an
@@ -132,7 +133,7 @@ assertResultsMatch({
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"a": true, "_id": false}],
     removedProjectStage: {_id: 0, a: 1},
-    pipelineOptimizedAway: sbeRestricted,
+    pipelineOptimizedAway: sbeRestricted || sbeTransformStagesEnabled,
 });
 assertResultsMatch({
     pipeline: [{$sort: {a: -1}}, {$project: {_id: 0, a: 1}}],
@@ -149,7 +150,7 @@ assertResultsMatch({
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"a": true, "_id": false}],
     removedProjectStage: {_id: 0, a: 1},
-    pipelineOptimizedAway: sbeRestricted,
+    pipelineOptimizedAway: sbeRestricted || sbeTransformStagesEnabled,
 });
 assertResultsMatch({
     pipeline: [{$project: {_id: 0, c: {d: 1}}}],
