@@ -41,12 +41,9 @@
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
-#include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
-#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -56,12 +53,10 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/scoped_read_concern.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
@@ -79,7 +74,6 @@
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
@@ -1432,16 +1426,35 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
     return inconsistencies;
 }
 
-}  // namespace
-
-
-MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss) {
-    if (nss.isAdminDB()) {
-        return MetadataConsistencyCommandLevelEnum::kClusterLevel;
-    } else if (nss.isCollectionlessCursorNamespace()) {
-        return MetadataConsistencyCommandLevelEnum::kDatabaseLevel;
-    } else {
-        return MetadataConsistencyCommandLevelEnum::kCollectionLevel;
+std::vector<CollectionType> getCollectionsListFromConfigServer(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const MetadataConsistencyCommandLevelEnum& commandLevel) {
+    switch (commandLevel) {
+        case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
+            return Grid::get(opCtx)->catalogClient()->getCollections(
+                opCtx,
+                nss.dbName(),
+                repl::ReadConcernLevel::kMajorityReadConcern,
+                BSON(CollectionType::kNssFieldName << 1) /*sort*/);
+        }
+        case MetadataConsistencyCommandLevelEnum::kCollectionLevel: {
+            try {
+                auto collectionType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+                return {std::move(collectionType)};
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // If we don't find the nss, it means that the collection is not sharded.
+                return {};
+            }
+        }
+        default:
+            tasserted(1011704,
+                      str::stream()
+                          << "Unexpected parameter during the internal execution of "
+                             "checkMetadataConsistency command. The shard server was expecting "
+                             "to receive a database or collection level parameter, but received "
+                          << idl::serialize(commandLevel) << " with namespace "
+                          << nss.toStringForErrorMsg());
     }
 }
 
@@ -1485,6 +1498,19 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
                                        nss);
 }
 
+}  // namespace
+
+
+MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss) {
+    if (nss.isAdminDB()) {
+        return MetadataConsistencyCommandLevelEnum::kClusterLevel;
+    } else if (nss.isCollectionlessCursorNamespace()) {
+        return MetadataConsistencyCommandLevelEnum::kDatabaseLevel;
+    } else {
+        return MetadataConsistencyCommandLevelEnum::kCollectionLevel;
+    }
+}
+
 CursorInitialReply createInitialCursorReplyMongod(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -1502,8 +1528,15 @@ CursorInitialReply createInitialCursorReplyMongod(
     }();
 
     if (!planExecutor) {
-        planExecutor = metadata_consistency_util::makeQueuedPlanExecutor(
-            opCtx, std::move(inconsistencies), nss);
+        planExecutor = makeQueuedPlanExecutor(opCtx, std::move(inconsistencies), nss);
+    } else {
+        // A streaming executor (e.g. one merging remote cursors) was supplied. Emit the
+        // locally-computed inconsistencies first by stashing them at the front of the executor's
+        // output, then stream the executor's own results.
+        for (auto&& inconsistency : inconsistencies) {
+            logMetadataInconsistency(inconsistency);
+            planExecutor->stashResult(inconsistency.toBSON());
+        }
     }
 
     auto* const exec = planExecutor.get();
@@ -2256,6 +2289,153 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
 
     return checkDatabaseMetadataConsistencyInShardCatalog(
         opCtx, dbName, dbVersionInGlobalCatalog, primaryShard);
+}
+
+std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& primaryShardId,
+    bool checkRangeDeletionIndexes,
+    bool checkIndexes,
+    bool asPrimaryNode) {
+    const auto shardId = ShardingState::get(opCtx)->shardId();
+    const auto commandLevel = getCommandLevel(nss);
+
+    tassert(1011703,
+            str::stream() << "Unexpected parameter during the internal execution of "
+                             "checkMetadataConsistency command. The shard server was expecting to "
+                             "receive a database or collection level parameter, but received "
+                          << idl::serialize(commandLevel) << " with namespace "
+                          << nss.toStringForErrorMsg(),
+            commandLevel == MetadataConsistencyCommandLevelEnum::kCollectionLevel ||
+                commandLevel == MetadataConsistencyCommandLevelEnum::kDatabaseLevel);
+
+    // Get the list of collections from configsvr sorted by namespace
+    const auto configsvrCollections = getCollectionsListFromConfigServer(opCtx, nss, commandLevel);
+
+    uassert(ErrorCodes::InvalidOptions,
+            "Range deletion missing shard key index inconsistency check is not supported "
+            "with the current FCV. Upgrade to the highest FCV for performing the check.",
+            !checkRangeDeletionIndexes ||
+                feature_flags::gCheckRangeDeletionsWithMissingShardKeyIndex.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+    const auto& [collCatalogSnapshot, localCatalogCollections] = [&] {
+        std::vector<CollectionPtr> localCatalogCollections;
+        switch (commandLevel) {
+            case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
+                auto collCatalogSnapshot = [&] {
+                    // Lock db in mode IS while taking the collection catalog snapshot to ensure
+                    // that we serialize with non-atomic collection and index creation performed by
+                    // the MigrationDestinationManager. Without this lock we could potentially
+                    // acquire a snapshot in which a collection have been already created by the
+                    // MigrationDestinationManager but the relative shardkey index is still missing.
+                    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IS);
+                    return CollectionCatalog::get(opCtx);
+                }();
+
+                for (auto&& coll : collCatalogSnapshot->range(nss.dbName())) {
+                    if (!coll) {
+                        continue;
+                    }
+                    // The collection catalog snapshot will be in scope until the end of the command
+                    // execution, so we can safely use CollectionPtr_UNSAFE as the instance pointed
+                    // by Collection* will stay in scope as a consequence.
+                    localCatalogCollections.emplace_back(CollectionPtr::CollectionPtr_UNSAFE(coll));
+                }
+                std::sort(localCatalogCollections.begin(),
+                          localCatalogCollections.end(),
+                          [](const CollectionPtr& prev, const CollectionPtr& next) {
+                              return prev->ns() < next->ns();
+                          });
+
+                return std::make_pair(std::move(collCatalogSnapshot),
+                                      std::move(localCatalogCollections));
+            }
+            case MetadataConsistencyCommandLevelEnum::kCollectionLevel: {
+                auto collCatalogSnapshot = [&] {
+                    // Lock collection in mode IS while taking the collection catalog snapshot to
+                    // ensure that we serialize with non-atomic collection and index creation
+                    // performed by the MigrationDestinationManager. Without this lock we could
+                    // potentially acquire a snapshot in which a collection have been already
+                    // created by the MigrationDestinationManager but the relative shardkey index is
+                    // still missing.
+                    AutoGetCollection coll(opCtx,
+                                           nss,
+                                           MODE_IS,
+                                           auto_get_collection::Options{}.viewMode(
+                                               auto_get_collection::ViewMode::kViewsPermitted));
+                    return CollectionCatalog::get(opCtx);
+                }();
+
+                // The collection catalog snapshot will be in scope until the end of the command
+                // execution, so we can safely use CollectionPtr_UNSAFE as the instance pointed by
+                // Collection* will stay in scope as a consequence.
+                if (auto coll = collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
+                    localCatalogCollections.emplace_back(CollectionPtr::CollectionPtr_UNSAFE(coll));
+                }
+
+                return std::make_pair(std::move(collCatalogSnapshot),
+                                      std::move(localCatalogCollections));
+            }
+            default:
+                tasserted(1011705,
+                          str::stream()
+                              << "Unexpected parameter during the internal execution of "
+                                 "checkMetadataConsistency command. The shard server was "
+                                 "expecting "
+                                 "to receive a database or collection level parameter, but "
+                                 "received "
+                              << idl::serialize(commandLevel) << " with namespace "
+                              << nss.toStringForErrorMsg());
+        }
+    }();
+
+    auto inconsistencies = checkCollectionMetadataConsistency(opCtx,
+                                                              shardId,
+                                                              primaryShardId,
+                                                              configsvrCollections,
+                                                              collCatalogSnapshot,
+                                                              localCatalogCollections,
+                                                              checkRangeDeletionIndexes,
+                                                              checkIndexes);
+
+    // If this is the primary shard of the db coordinate index check across shards
+    if (shardId == primaryShardId) {
+        if (asPrimaryNode) {
+            if (checkIndexes) {
+                auto indexInconsistencies =
+                    metadata_consistency_util::checkIndexesConsistencyAcrossShards(
+                        opCtx, configsvrCollections);
+                inconsistencies.insert(inconsistencies.end(),
+                                       std::make_move_iterator(indexInconsistencies.begin()),
+                                       std::make_move_iterator(indexInconsistencies.end()));
+            }
+
+            auto collMetadataInconsistencies =
+                checkCollectionMetadataConsistencyAcrossShards(opCtx, configsvrCollections);
+            inconsistencies.insert(inconsistencies.end(),
+                                   std::make_move_iterator(collMetadataInconsistencies.begin()),
+                                   std::make_move_iterator(collMetadataInconsistencies.end()));
+        }
+
+        if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            !nss.isConfigDB()) {
+            const auto dbInGlobalCatalog = Grid::get(opCtx)->catalogClient()->getDatabase(
+                opCtx, nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern);
+
+            auto dbMetadataInconsistencies =
+                checkDatabaseMetadataConsistency(opCtx, dbInGlobalCatalog);
+            inconsistencies.insert(inconsistencies.end(),
+                                   std::make_move_iterator(dbMetadataInconsistencies.begin()),
+                                   std::make_move_iterator(dbMetadataInconsistencies.end()));
+        }
+    }
+
+    return inconsistencies;
 }
 
 }  // namespace metadata_consistency_util

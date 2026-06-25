@@ -43,6 +43,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/testing_proctor.h"
 
 #include <string>
 
@@ -87,9 +88,37 @@ public:
             ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
+            tassert(12922000,
+                    fmt::format("{} is a test-only command", Request::kCommandName),
+                    TestingProctor::instance().isEnabled());
+
+            const auto hostAndPort = repl::ReplicationCoordinator::get(opCtx)->getMyHostAndPort();
+            uassert(ErrorCodes::NotYetInitialized,
+                    "Replication is not initialized",
+                    !hostAndPort.empty());
+
             const auto nss = ns();
+            const auto& primaryShardId = request().getPrimaryShardId();
+            const auto checkRangeDeletionIndexes =
+                request().getCommonFields().getCheckRangeDeletionIndexes();
+            const auto checkIndexes = request().getCommonFields().getCheckIndexes();
+
+            auto inconsistencies =
+                metadata_consistency_util::runCheckMetadataConsistencyOnParticipant(
+                    opCtx,
+                    nss,
+                    primaryShardId,
+                    checkRangeDeletionIndexes,
+                    checkIndexes,
+                    false /* asPrimaryNode */);
+
+            const auto& shardId = ShardingState::get(opCtx)->shardId();
+            for (auto& inconsistency : inconsistencies) {
+                inconsistency.getProvenance().emplace(shardId, hostAndPort);
+            }
+
             return metadata_consistency_util::createInitialCursorReplyMongod(
-                opCtx, nss, {} /*inconsistencies*/, request().getCursor(), request().toBSON());
+                opCtx, nss, std::move(inconsistencies), request().getCursor(), request().toBSON());
         }
 
     private:
@@ -99,6 +128,15 @@ public:
 
         bool supportsWriteConcern() const override {
             return false;
+        }
+
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const final {
+            if (level == repl::ReadConcernLevel::kSnapshotReadConcern) {
+                return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
+            } else {
+                return CommandInvocation::supportsReadConcern(level, isImplicitDefault);
+            }
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

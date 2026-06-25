@@ -29,9 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
-#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/global_catalog/type_tags.h"
@@ -39,7 +37,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
@@ -74,17 +71,10 @@ MetadataInconsistencyItem makeInconsistency(
 MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss);
 
 /**
- * Creates a queued data plan executor for the given list of inconsistencies
- */
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
-    OperationContext* opCtx,
-    std::vector<MetadataInconsistencyItem>&& inconsistencies,
-    const NamespaceString& nss);
-
-/**
  * Construct a initial cursor reply from the given client cursor.
  * The returned reply is populated with the first batch result.
- * If `planExecutor` is not null, it uses it, and the `inconsistencies` vector is ignored.
+ * If `planExecutor` is not null, it uses it, and the `inconsistencies` vector is prepended to the
+ * executor's output (emitted before the executor's own results).
  * If null, it builds a queued plan executor with the contents of the `inconsistencies` vector.
  */
 CursorInitialReply createInitialCursorReplyMongod(
@@ -176,6 +166,21 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
  */
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     OperationContext* opCtx, const DatabaseType& dbInGlobalCatalog);
+
+/**
+ * Main check consistency metadata logic ran by the participant commands (i.e.
+ * _shardsvrCheckMetadataConsistencyParticipant and
+ * _shardsvrCheckMetadataConsistencySecondaryParticipant).
+ * `asPrimaryNode` is set to true if this command is called by the shard *RS* primary (not the shard
+ * DB primary). Setting it to false skips some cluster-wide checks.
+ */
+std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& primaryShardId,
+    bool checkRangeDeletionIndexes,
+    bool checkIndexes,
+    bool asPrimaryNode);
 
 }  // namespace metadata_consistency_util
 }  // namespace mongo

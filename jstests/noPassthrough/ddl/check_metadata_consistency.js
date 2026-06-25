@@ -16,8 +16,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
-// Configure initial sharding cluster
-const st = new ShardingTest({});
+// Configure initial sharding cluster with a single config node to avoid reports from secondaries.
+// TODO (SERVER-129689): check reports from secondary nodes.
+const st = new ShardingTest({config: [{}]});
 const mongos = st.s;
 
 // Use retryWrites when writing to the configsvr because mongos does not automatically retry those.

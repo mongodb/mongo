@@ -33,6 +33,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/sharding_environment/sharding_types.idl"
+    - "mongo/util/net/hostandport.idl"
 
 enums:
     MetadataInconsistencyType:
@@ -566,6 +567,17 @@ structs:
                 type: object
                 description: "Collection options not matching the expeced format."
 
+    Provenance:
+        description: "A shardId/HostAndPort combination identifying the exact node that created an inconsistency item"
+        strict: false
+        fields:
+            shardId:
+                type: shard_id
+                description: "The ShardId"
+            hostAndPort:
+                type: HostAndPort
+                description: "Replica set member identification"
+
     MetadataInconsistencyItem:
         description: "Object representing a single metadata inconsistency found in a specific shard"
         strict: false
@@ -582,6 +594,10 @@ structs:
             severity:
                 type: MetadataInconsistencySeverity
                 description: "Severity level of the inconsistency."
+                optional: true
+            provenance:
+                type: Provenance
+                description: "Node from which this item originated"
                 optional: true
 
     CommonCheckMetadataRequestFields:
