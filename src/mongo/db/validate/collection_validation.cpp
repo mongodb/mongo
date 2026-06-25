@@ -1044,6 +1044,17 @@ Status validate(OperationContext* opCtx,
         // the collection. For clustered collections, the validator also verifies that the
         // record key (RecordId) matches the cluster key field in the record value (document's
         // cluster key).
+
+        // TODO (SERVER-76345): Remove feature flag branch.
+        // TODO (SERVER-127596): Hook feature flag into parallel execution.
+        if (gFeatureFlagParallelCollectionValidation.isEnabled()) {
+            LOGV2_DEBUG(
+                7634500,
+                1,
+                "featureFlagParallelCollectionValidation is enabled, but parallel record store "
+                "traversal is not yet implemented; falling back to serial traversal");
+        }
+
         indexValidator.traverseRecordStore(opCtx, results, validateState.validationVersion());
 
         if (validateState.isCollHashValidation()) {
