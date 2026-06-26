@@ -78,9 +78,7 @@ public:
     /**
      * Invoked when this node which is currently serving as a 'PRIMARY' steps down.
      *
-     * Pauses the periodic job until subsequent step up. This method might be called
-     * multiple times in succession, which is what happens as a result of incomplete
-     * transition to primary so it is resilient to that.
+     * Stops the periodic job.
      */
     void onStepDown();
 
@@ -103,7 +101,7 @@ private:
      * This supposed to be temporary since the sharding on the time field will be deprecated in 9.0,
      * hence there is no need for the periodic check anymore.
      */
-    void _launchOrResumeShardedTimeseriesShardkeyChecker(WithLock, ServiceContext* serviceContext);
+    void _launchShardedTimeseriesShardkeyChecker(WithLock, ServiceContext* serviceContext);
 
     // Protects the variables below. Uses acquisition level 1 because it will be held while starting
     // a periodic job, which resolves a future.
@@ -115,9 +113,17 @@ private:
     // Periodic job for counting inconsistent indexes in the cluster.
     PeriodicJobAnchor _shardedTimeseriesShardkeyChecker;
 
-    // The latest count of sharded collections with inconsistent indexes.
-    long long _numShardedCollsWithInconsistentIndexes{0};
+    // The latest count of sharded collections with inconsistent indexes. Kept as a separate struct
+    // in order to atomically check and update both fields without the need to hold a mutex.
+    struct State {
+        bool isPrimary;
+        long long numShardedCollsWithInconsistentIndexes;
+    };
 
-    bool _isPrimary{false};
+    // We use std::atomic rather than Atomic since std::atomic<State>::is_always_lock_free returns
+    // false and there is a static_assert for it on Atomic<>. Note that this isn't a problem here
+    // since this code is not performance critical and even if the code uses mutexes it's not an
+    // issue here.
+    std::atomic<State> _state{State{false, 0}};  // NOLINT
 };
 }  // namespace mongo

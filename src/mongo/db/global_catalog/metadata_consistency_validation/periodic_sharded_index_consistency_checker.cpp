@@ -96,8 +96,7 @@ PeriodicShardedIndexConsistencyChecker& PeriodicShardedIndexConsistencyChecker::
 
 long long PeriodicShardedIndexConsistencyChecker::getNumShardedCollsWithInconsistentIndexes()
     const {
-    std::lock_guard<std::mutex> lk(_mutex);
-    return _numShardedCollsWithInconsistentIndexes;
+    return _state.load().numShardedCollsWithInconsistentIndexes;
 }
 
 void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyChecker(
@@ -221,11 +220,16 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 // Update the count if this node is still primary. This is necessary because a
                 // stepdown may complete while this job is running and the count should always be
                 // zero on a non-primary node.
-                std::lock_guard<std::mutex> lk(_mutex);
-                if (_isPrimary) {
-                    _numShardedCollsWithInconsistentIndexes =
+                auto expectedState = _state.load();
+                State newState;
+                do {
+                    if (!expectedState.isPrimary) {
+                        return;
+                    }
+                    newState = expectedState;
+                    newState.numShardedCollsWithInconsistentIndexes =
                         numShardedCollsWithInconsistentIndexes;
-                }
+                } while (!_state.compare_exchange_strong(expectedState, newState));
             } catch (DBException& ex) {
                 LOGV2(22052,
                       "Error while checking sharded index consistency",
@@ -238,15 +242,10 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
     _shardedIndexConsistencyChecker.start();
 }
 
-void PeriodicShardedIndexConsistencyChecker::_launchOrResumeShardedTimeseriesShardkeyChecker(
+void PeriodicShardedIndexConsistencyChecker::_launchShardedTimeseriesShardkeyChecker(
     WithLock, ServiceContext* serviceContext) {
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
-
-    if (_shardedTimeseriesShardkeyChecker.isValid()) {
-        _shardedTimeseriesShardkeyChecker.resume();
-        return;
-    }
 
     PeriodicRunner::PeriodicJob job(
         "PeriodicShardedTimeseriesShardkeyChecker",
@@ -278,32 +277,30 @@ void PeriodicShardedIndexConsistencyChecker::_launchOrResumeShardedTimeseriesSha
 
 void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceContext) {
     std::lock_guard<std::mutex> lk(_mutex);
-    if (!_isPrimary) {
-        _isPrimary = true;
-        if (!_shardedIndexConsistencyChecker.isValid()) {
-            // If this is the first time we're stepping up, start a thread to periodically check
-            // index consistency.
-            _launchShardedIndexConsistencyChecker(lk, serviceContext);
-        } else {
-            // If we're stepping up again after having stepped down, just resume the existing task.
-            _shardedIndexConsistencyChecker.resume();
-        }
-        _launchOrResumeShardedTimeseriesShardkeyChecker(lk, serviceContext);
+    auto state = _state.load();
+    if (!state.isPrimary) {
+        state.isPrimary = true;
+        _state.store(state);
+
+        _launchShardedIndexConsistencyChecker(lk, serviceContext);
+        _launchShardedTimeseriesShardkeyChecker(lk, serviceContext);
     }
 }
 
 void PeriodicShardedIndexConsistencyChecker::onStepDown() {
     std::lock_guard<std::mutex> lk(_mutex);
-    if (_isPrimary) {
-        _isPrimary = false;
-        invariant(_shardedIndexConsistencyChecker.isValid());
-        // Note pausing a periodic job does not wait for the job to complete if it is concurrently
-        // running, otherwise this would deadlock when the index check tries to lock _mutex when
-        // updating the inconsistent index count.
-        _shardedIndexConsistencyChecker.pause();
-        _shardedTimeseriesShardkeyChecker.pause();
+    auto state = _state.load();
+    if (state.isPrimary) {
+        state.isPrimary = false;
         // Clear the counter to prevent a secondary from reporting an out-of-date count.
-        _numShardedCollsWithInconsistentIndexes = 0;
+        state.numShardedCollsWithInconsistentIndexes = 0;
+        _state.store(state);
+
+        invariant(_shardedIndexConsistencyChecker.isValid());
+        _shardedIndexConsistencyChecker.stop();
+        if (_shardedTimeseriesShardkeyChecker.isValid()) {
+            _shardedTimeseriesShardkeyChecker.stop();
+        }
     }
 }
 
