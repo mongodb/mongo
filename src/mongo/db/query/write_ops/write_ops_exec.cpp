@@ -2494,7 +2494,7 @@ WriteResult performDeletes(
         CurOp curOp(cmd);
         curOp.push(opCtx);
         boost::optional<int32_t> originalOpIndex = singleOp.getIncludeQueryStatsMetricsForOpIndex();
-        if (originalOpIndex.has_value() && source != OperationSource::kTimeseriesDelete) {
+        if (originalOpIndex.has_value()) {
             curOp.debug().getQueryStatsInfo().metricsRequested = true;
         }
         bool writeResultAppended = false;

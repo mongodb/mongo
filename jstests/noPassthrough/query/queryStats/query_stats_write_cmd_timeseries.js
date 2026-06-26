@@ -187,13 +187,9 @@ function testDelete(testDB, coll, collName, expectRecorded) {
     assert.eq(1, deleteStats.length);
     const entry = deleteStats[0];
 
-    // TODO SERVER-121266: On sharded timeseries, the delete is processed via an internal
-    // transaction path at the shard, which does not propagate write metrics back to the router.
-    // The entry is recorded with (nDeleteOps: 1), but keysExamined, docsExamined, and nDeleted all
-    // read as 0 from the router's perspective.
     assertAggregatedMetricsSingleExec(entry, {
-        keysExamined: 0,
-        docsExamined: 0,
+        keysExamined: 2,
+        docsExamined: 2,
         hasSortStage: false,
         usedDisk: false,
         fromMultiPlanner: false,
@@ -202,14 +198,12 @@ function testDelete(testDB, coll, collName, expectRecorded) {
             nMatched: 0,
             nUpserted: 0,
             nModified: 0,
-            nDeleted: 0,
+            nDeleted: 2,
             nInserted: 0,
             nUpdateOps: 0,
             nDeleteOps: 1,
-            // The delete runs via an internal transaction path on the shard (see comment above),
-            // which does not propagate key-maintenance metrics back to the router.
             keysInserted: 0,
-            keysDeleted: 0,
+            keysDeleted: 2,
         },
     });
     assertExpectedResults({
@@ -411,6 +405,110 @@ describe("time-series query stats (sharded)", function () {
 
         it("should record explicit meta field update in query stats on mongos", function () {
             testMetaFieldUpdateRecordedOnMongos(testDB, coll, collName);
+        });
+    });
+
+    describe("retryable deletes", function () {
+        const collName = jsTestName() + "_retryable_delete_ts";
+        let coll;
+
+        before(function () {
+            coll = testDB[collName];
+            assert.commandWorked(
+                testDB.createCollection(collName, {
+                    timeseries: {timeField: timeField, metaField: metaField},
+                }),
+            );
+            assert.commandWorked(
+                st.s.adminCommand({
+                    shardCollection: coll.getFullName(),
+                    key: {[metaField]: 1},
+                }),
+            );
+            assert.commandWorked(
+                coll.insertMany([
+                    {
+                        [timeField]: ISODate("2021-05-18T00:00:00Z"),
+                        v: 1,
+                        [metaField]: "retryable_delete_basic",
+                    },
+                    {
+                        [timeField]: ISODate("2021-05-18T01:00:00Z"),
+                        v: 2,
+                        [metaField]: "retryable_delete_dedup",
+                    },
+                ]),
+            );
+        });
+
+        it("should record query stats for a retryable deleteOne on time-series", function () {
+            const lsid = {id: UUID()};
+
+            const cmd = {
+                delete: collName,
+                deletes: [{q: {[metaField]: "retryable_delete_basic"}, limit: 1}],
+                lsid: lsid,
+                txnNumber: NumberLong(1),
+            };
+
+            const result = assert.commandWorked(testDB.runCommand(cmd));
+            assert.eq(result.n, 1);
+
+            const entries = getQueryStatsDeleteCmd(testDB, {collName: collName});
+            assert.eq(entries.length, 1, "Expected 1 query stats entry", {entries});
+            assert.eq(entries[0].metrics.execCount, 1);
+
+            assertAggregatedMetricsSingleExec(entries[0], {
+                keysExamined: 1,
+                docsExamined: 1,
+                hasSortStage: false,
+                usedDisk: false,
+                fromMultiPlanner: false,
+                fromPlanCache: false,
+                writes: {
+                    nMatched: 0,
+                    nUpserted: 0,
+                    nModified: 0,
+                    nDeleted: 1,
+                    nInserted: 0,
+                    nUpdateOps: 0,
+                    nDeleteOps: 1,
+                    keysInserted: 0,
+                    keysDeleted: 1,
+                },
+            });
+        });
+
+        it("retrying the same retryable time-series delete should not double-count executions", function () {
+            const lsid = {id: UUID()};
+            const txnNumber = NumberLong(1);
+
+            const cmd = {
+                delete: collName,
+                deletes: [{q: {[metaField]: "retryable_delete_dedup"}, limit: 1}],
+                lsid: lsid,
+                txnNumber: txnNumber,
+            };
+
+            // Initial execution.
+            const result = assert.commandWorked(testDB.runCommand(cmd));
+            assert.eq(result.n, 1);
+
+            let entries = getQueryStatsDeleteCmd(testDB, {collName: collName});
+            assert.eq(entries.length, 1, "Expected 1 entry after initial exec", {entries});
+            assert.eq(entries[0].metrics.execCount, 1);
+
+            // Retry with the same lsid/txnNumber. The shard deduplicates the write but the router
+            // counts it as a new execution in query stats.
+            const retryResult = assert.commandWorked(testDB.runCommand(cmd));
+            assert.eq(retryResult.n, 1);
+
+            entries = getQueryStatsDeleteCmd(testDB, {collName: collName});
+            assert.eq(entries.length, 1, "Expected still 1 entry after retry", {entries});
+            // TODO SERVER-121266 The retry currently increments execCount because the internal
+            // transaction path does not properly deduplicate retried statements for query stats.
+            // Once fixed, this should assert that execCount = 1.
+            assert.eq(entries[0].metrics.execCount, 2);
         });
     });
 
