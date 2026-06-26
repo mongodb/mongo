@@ -172,8 +172,11 @@ LookUpStage::LookUpStage(std::string_view stageName,
         _cache = std::make_shared<SequentialDocumentCache>(
             loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes));
     }
-    _trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
-        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        _expressionEvalCtx.tracker = &_memoryTracker;
+    }
+    _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
 }
 
 void LookUpStage::detachFromOperationContext() {
@@ -256,6 +259,11 @@ Document LookUpStage::getExplainOutput(const query_shape::SerializationOptions& 
                    std::back_inserter(indexesUsedVec),
                    [](const std::string& idx) -> Value { return Value(idx); });
     doc["indexesUsed"] = Value{std::move(indexesUsedVec)};
+
+    if (_expressionEvalCtx.tracker) {
+        doc["expressionEvaluationPeakMemoryBytes"] = opts.serializeLiteral(
+            static_cast<long long>(_expressionEvalCtx.tracker->peakTrackedMemoryBytes()));
+    }
 
     return doc.freeze();
 }
@@ -643,11 +651,8 @@ bool LookUpStage::foreignShardedLookupAllowed() const {
 void LookUpStage::resolveLetVariables(const Document& localDoc, Variables* variables) {
     invariant(variables);
 
-    const EvaluationContext evalCtx =
-        _trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{};
-
     for (auto& letVar : _letVariables) {
-        auto value = letVar.expression->evaluate(localDoc, &pExpCtx->variables, evalCtx);
+        auto value = letVar.expression->evaluate(localDoc, &pExpCtx->variables, _expressionEvalCtx);
         variables->setConstantValue(letVar.id, value);
     }
 }

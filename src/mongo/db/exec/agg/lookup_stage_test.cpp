@@ -49,6 +49,7 @@
 
 #include <deque>
 #include <list>
+#include <string_view>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -376,10 +377,12 @@ public:
     static inline int gEvaluations = 0;
     static inline int gEvaluationsWithTracker = 0;
     static inline int64_t gLastTrackerMaxBytes = -1;
+    static inline std::string_view gLastStageName;
     static void resetObservations() {
         gEvaluations = 0;
         gEvaluationsWithTracker = 0;
         gLastTrackerMaxBytes = -1;
+        gLastStageName = std::string_view{};
     }
 
     explicit MemoryTrackerObservingExpression(ExpressionContext* expCtx) : Expression(expCtx) {}
@@ -398,6 +401,7 @@ public:
             ++gEvaluationsWithTracker;
             gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
         }
+        gLastStageName = ctx.stageName;
         return Value(1);
     }
 
@@ -421,9 +425,15 @@ REGISTER_TEST_EXPRESSION(_testMemoryTrackerObserver,
                          AllowedWithClientType::kAny,
                          nullptr /* featureFlag */);
 
+struct LookupTestResult {
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    boost::intrusive_ptr<exec::agg::MockStage> source;  // must outlive stage
+};
+
 // Runs a $lookup over a single local document whose 'let' variable is the tracker-observing
 // expression, resetting the observation counters first.
-void runLookupWithObservingLetVariable(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+LookupTestResult runLookupWithObservingLetVariable(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     MemoryTrackerObservingExpression::resetObservations();
 
     NamespaceString fromNs =
@@ -441,6 +451,7 @@ void runLookupWithObservingLetVariable(const boost::intrusive_ptr<ExpressionCont
     exec::agg::MockStage::setSource_forTest(lookupStage, mockLocalStage.get());
     while (lookupStage->getNext().isAdvanced()) {
     }
+    return {lookupStage, mockLocalStage};
 }
 
 TEST_F(LookupStageTest, ThreadsMemoryTrackerWhenEvaluatingLetVariables) {
@@ -474,6 +485,35 @@ TEST_F(LookupStageTest, MemoryTrackerLimitReflectsKnob) {
 
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
     ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+}
+
+TEST_F(LookupStageTest, StageNameIsSetInEvaluationContext) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    auto [stage, source] = runLookupWithObservingLetVariable(getExpCtx());
+
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastStageName, "$lookup");
+}
+
+TEST_F(LookupStageTest, ExplainOutputIncludesExpressionEvaluationPeakMemoryBytesWhenEnabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+    auto [stage, source] = runLookupWithObservingLetVariable(getExpCtx());
+
+    auto explain = stage->getExplainOutput();
+    ASSERT(!explain.getNestedField("expressionEvaluationPeakMemoryBytes").missing());
+}
+
+TEST_F(LookupStageTest, ExplainOutputOmitsExpressionEvaluationPeakMemoryBytesWhenDisabled) {
+    unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", false);
+
+    auto [stage, source] = runLookupWithObservingLetVariable(getExpCtx());
+
+    auto explain = stage->getExplainOutput();
+    ASSERT(explain.getNestedField("expressionEvaluationPeakMemoryBytes").missing());
 }
 }  // namespace
 }  // namespace mongo

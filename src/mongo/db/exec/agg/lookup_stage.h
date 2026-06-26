@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -209,9 +210,11 @@ private:
     // tracker so all stages contribute to the operation memory total.
     SimpleMemoryUsageTracker _memoryTracker;
 
-    // Whether to charge expression evaluation against the memory tracker. Evaluated once at
-    // construction; feature flags must not change during stage execution.
-    bool _trackMemory{false};
+    // Pre-built context passed to every 'let' variable expression evaluation. tracker points to
+    // _memoryTracker when both query and expression memory tracking are enabled, and is null
+    // otherwise. stageName is always set so it can be reported in ExceededMemoryLimit error
+    // messages. Both fields are stable for the stage's lifetime.
+    EvaluationContext _expressionEvalCtx;
 
     // Caches documents returned by the non-correlated prefix of the $lookup pipeline during the
     // first iteration, up to a specified size limit in bytes. If this limit is not exceeded by the
