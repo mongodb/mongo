@@ -217,7 +217,7 @@ void ByteCode::traverseP(const CodeFragment* code,
     auto [own, tag, val] = getFromStack(0);
 
     if (value::isArray(tag) && maxDepth > 0) {
-        value::ValueGuard input(own, tag, val);
+        value::TagValueMaybeOwned input(own, tag, val);
         popStack();
 
         if (maxDepth != std::numeric_limits<int64_t>::max()) {
@@ -251,9 +251,8 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
         return d == std::numeric_limits<int64_t>::max() ? d : d - 1;
     };
 
-    auto [tagArrOutput, valArrOutput] = value::makeNewArray();
-    auto arrOutput = value::getArrayView(valArrOutput);
-    value::ValueGuard guard{tagArrOutput, valArrOutput};
+    value::TagValueOwned newArr{value::makeNewArray()};
+    auto arrOutput = value::getArrayView(newArr.value());
     // The array position we will be sending to the lambda holds the depth in the highest 32 bit,
     // and the actual index in the current array in the lowest 32 bit.
     size_t arrayPos = curDepth << 32;
@@ -289,7 +288,7 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
         }
         arrOutput->push_back_raw(retTag, retVal);
     });
-    guard.reset();
+    auto [tagArrOutput, valArrOutput] = newArr.releaseToRaw();
     pushStack(true, tagArrOutput, valArrOutput);
 }
 
@@ -355,7 +354,7 @@ void ByteCode::traverseFInArray(const CodeFragment* code,
                                 bool compareArray) {
     auto [ownInput, tagInput, valInput] = getFromStack(0);
 
-    value::ValueGuard input(ownInput, tagInput, valInput);
+    value::TagValueMaybeOwned input(ownInput, tagInput, valInput);
     popStack();
 
     size_t arrayPos = 0;
@@ -391,7 +390,7 @@ void ByteCode::traverseFInArray(const CodeFragment* code,
         if (providePosition) {
             pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(-1));
         }
-        input.reset();
+        input.disown();
         runLambdaInternal(code, position);
         if (providePosition) {
             swapStack();
@@ -463,15 +462,13 @@ void ByteCode::genericResetDoubleDoubleSumState(value::Array* state) {
 }
 
 std::pair<value::TypeTags, value::Value> ByteCode::genericInitializeDoubleDoubleSumState() {
-    auto [accTag, accValue] = value::makeNewArray();
-    value::ValueGuard newArrGuard{accTag, accValue};
-    auto arr = value::getArrayView(accValue);
+    value::TagValueOwned result{value::makeNewArray()};
+    auto arr = value::getArrayView(result.value());
     arr->reserve(AggSumValueElems::kMaxSizeOfArray);
 
     genericResetDoubleDoubleSumState(arr);
 
-    newArrGuard.reset();
-    return {accTag, accValue};
+    return result.releaseToRaw();
 }
 
 value::TagValueOwned ByteCode::aggMin(value::TagValueView acc,
@@ -689,7 +686,7 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
             newSetMembers.tag(),
             newSetMembers.value(),
             [&](value::TypeTags tagNewElem, value::Value valNewElem) {
-                value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+                value::TagValueOwned newElem{tagNewElem, valNewElem};
 
                 if (accSet->values().contains({tagNewElem, valNewElem})) {
                     // Skip this element, because it's already in the set, and continue with the
@@ -705,8 +702,7 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
                                       << " elements and is " << currentSize << " bytes.",
                         currentSize < static_cast<int64_t>(sizeCap));
 
-                guardNewElem.reset();
-                accSet->push_back_raw(tagNewElem, valNewElem);
+                accSet->push_back(std::move(newElem));
             });
     }
 
@@ -963,7 +959,7 @@ value::TagValueMaybeOwned ByteCode::aggRemovableSumFinalizeImpl(value::Array* st
     }
 
     auto [sumOwned, sumTag, sumVal] = aggDoubleDoubleSumFinalizeImpl(sumAcc).releaseToRaw();
-    value::ValueGuard sumGuard{sumOwned, sumTag, sumVal};
+    value::TagValueMaybeOwned sum{sumOwned, sumTag, sumVal};
 
     if (sumTag == value::TypeTags::NumberDecimal && decimalCount == 0) {
         auto decimalVal = value::bitcastTo<Decimal128>(sumVal);
@@ -997,8 +993,7 @@ value::TagValueMaybeOwned ByteCode::aggRemovableSumFinalizeImpl(value::Array* st
         auto [numTag, numVal] = value::makeIntOrLong(longVal);
         return {false, numTag, numVal};
     }
-    sumGuard.reset();
-    return {sumOwned, sumTag, sumVal};
+    return sum;
 }
 
 }  // namespace vm

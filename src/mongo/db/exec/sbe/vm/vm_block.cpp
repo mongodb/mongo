@@ -706,21 +706,17 @@ int addNewPair(value::Array* mergeArr,
                const PairKeyComp<Comp>& keyLess) {
     int memDelta = memAdded({keyTag, keyVal}, {outTag, outVal});
 
-    auto [pairArrTag, pairArrVal] = value::makeNewArray();
-    value::ValueGuard pairArrGuard{pairArrTag, pairArrVal};
-    auto* pairArr = value::getArrayView(pairArrVal);
-    pairArr->reserve(2);
+    value::TagValueOwned pairArr{value::makeNewArray()};
+    auto* pairArrView = value::getArrayView(pairArr.value());
+    pairArrView->reserve(2);
 
     // Update the sortKey with a copy.
-    pairArr->push_back_raw(value::copyValue(keyTag, keyVal));
+    pairArrView->push_back_raw(value::copyValue(keyTag, keyVal));
 
-    // Add a coppy of the output value to the SBE pair array.
-    pairArr->push_back_raw(value::copyValue(outTag, outVal));
+    // Add a copy of the output value to the SBE pair array.
+    pairArrView->push_back_raw(value::copyValue(outTag, outVal));
 
-    // The caller of this function will take ownership of the pair array.
-    pairArrGuard.reset();
-
-    mergeArr->push_back_raw(pairArrTag, pairArrVal);
+    mergeArr->push_back(std::move(pairArr));
 
     auto& mergeHeap = mergeArr->values();
     std::push_heap(mergeHeap.begin(), mergeHeap.end(), keyLess);
@@ -2155,15 +2151,15 @@ static const auto invokeLambdaOp =
 void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
     auto [lamOwn, lamTag, lamVal] = moveFromStack(0);
     popAndReleaseStack();
-    value::ValueGuard lamGuard(lamOwn, lamTag, lamVal);
+    value::TagValueMaybeOwned lam{lamOwn, lamTag, lamVal};
 
     auto [blockOwn, blockTag, blockVal] = moveFromStack(0);
     popAndReleaseStack();
-    value::ValueGuard blockGuard(blockOwn, blockTag, blockVal);
+    value::TagValueMaybeOwned ownedBlock{blockOwn, blockTag, blockVal};
 
     auto [maskOwn, maskTag, maskVal] = moveFromStack(0);
     popAndReleaseStack();
-    value::ValueGuard maskGuard(maskOwn, maskTag, maskVal);
+    value::TagValueMaybeOwned ownedMask{maskOwn, maskTag, maskVal};
 
     if (lamTag != value::TypeTags::LocalOneArgLambda) {
         pushStack(false, value::TypeTags::Nothing, 0);
