@@ -22,7 +22,11 @@
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
-import {isViewfulTimeseriesOnlySuite} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    isViewfulTimeseriesOnlySuite,
+    isViewlessTimeseriesOnlySuite,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -167,17 +171,25 @@ function validateCollectionOptions({expected: expectedOptions, actual: actualOpt
     }
 }
 
-// Returns the timeseries options for a collection, stripping 'fixedBucketing' because:
-// - some tests pass these options as the $out spec's 'timeseries' argument, where
-//   'fixedBucketing' is rejected;
-// - validateCollectionOptions() must not compare it: in suites that change FCV in the background,
-//   the field can change unpredictably during the test (a downgrade strips it, and a re-upgrade
-//   does not restore it).
-//   TODO(SERVER-128768): Rework this once 9.0 becomes last LTS and stripping is not an issue anymore.
-function getExpectedTSOptions(collectionInfo) {
-    const tsOptions = collectionInfo["options"]["timeseries"];
-    delete tsOptions.fixedBucketing;
-    return tsOptions;
+// Returns the expected timeseries options after '$out' stage execution, given raw timeseries
+// options (e.g. collectionInfo["options"]["timeseries"] or a manually-built options object).
+function getExpectedTSOptions(tsOptions) {
+    const result = {...tsOptions};
+    if (
+        isViewlessTimeseriesOnlySuite(testDB) &&
+        FeatureFlagUtil.isPresentAndEnabled(testDB, "FixedBucketingCatalog")
+    ) {
+        // In suites where viewless timeseries are the only possible kind of timeseries (i.e., the
+        // feature is enabled and there are no FCV transitions), '$out' always produces a timeseries
+        // with 'fixedBucketing: true'.
+        result.fixedBucketing = true;
+    } else {
+        // In suites that can change FCV in the background, 'fixedBucketing' can change
+        // unpredictably during the test (a downgrade strips it, and a re-upgrade re-adds it set to
+        // false). Remove it from expected options so that validateCollectionOptions() ignores it.
+        delete result.fixedBucketing;
+    }
+    return result;
 }
 
 function dropOutCollections() {
@@ -238,7 +250,7 @@ function timeseriesDefaultIndex() {
     runOutAndCompareResults({
         observer: observerPipeline,
         timeseries: timeseriesPipeline,
-        options: tsOptions,
+        options: getExpectedTSOptions(tsOptions),
     });
 })();
 
@@ -256,13 +268,17 @@ function timeseriesDefaultIndex() {
     const collections = testDB.getCollectionInfos({name: outColl.getName()});
     assert.eq(collections.length, 1, collections);
 
-    // Get the original timeseries options, these should stay the same post $out.
-    const expectedTSOptions = getExpectedTSOptions(collections[0]);
+    // For the '$out' spec, get the original timeseries options, but strip the 'fixedBucketing' field which is not allowed in '$out' spec.
+    const tsOptions = {...collections[0]["options"]["timeseries"]};
+    delete tsOptions.fixedBucketing;
 
     const observerPipeline = [{$out: {db: dbName, coll: observerOutColl.getName()}}];
     const timeseriesPipeline = [
-        {$out: {db: dbName, coll: outColl.getName(), timeseries: expectedTSOptions}},
+        {$out: {db: dbName, coll: outColl.getName(), timeseries: tsOptions}},
     ];
+
+    // Derive expected timeseries options from the original ones.
+    const expectedTSOptions = getExpectedTSOptions(collections[0]["options"]["timeseries"]);
 
     runOutAndCompareResults({
         observer: observerPipeline,
@@ -285,9 +301,6 @@ function timeseriesDefaultIndex() {
     const collections = testDB.getCollectionInfos({name: outColl.getName()});
     assert.eq(collections.length, 1, collections);
 
-    // Get the original timeseries options, these should stay the same post $out.
-    const expectedTSOptions = getExpectedTSOptions(collections[0]);
-
     // Change the "time" field in the pipeline, so we can confirm the value is changed in the
     // result.
     const newDate = new Date();
@@ -303,6 +316,9 @@ function timeseriesDefaultIndex() {
         {$set: {"time": newDate}},
         {$out: {db: testDB.getName(), coll: outColl.getName()}},
     ];
+
+    // Derive expected timeseries options from the original ones.
+    const expectedTSOptions = getExpectedTSOptions(collections[0]["options"]["timeseries"]);
 
     runOutAndCompareResults({
         observer: observerPipeline,
@@ -325,10 +341,11 @@ function timeseriesDefaultIndex() {
     const collections = testDB.getCollectionInfos({name: outColl.getName()});
     assert.eq(collections.length, 1, collections);
 
-    const expectedTSOptions = getExpectedTSOptions(collections[0]);
-
     const observerPipeline = [{$out: {db: testDB.getName(), coll: observerOutColl.getName()}}];
     const timeseriesPipeline = [{$out: {db: testDB.getName(), coll: outColl.getName()}}];
+
+    // Derive expected timeseries options from the original ones.
+    const expectedTSOptions = getExpectedTSOptions(collections[0]["options"]["timeseries"]);
 
     runOutAndCompareResults({
         observer: observerPipeline,
