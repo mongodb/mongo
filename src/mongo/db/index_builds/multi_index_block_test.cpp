@@ -1134,6 +1134,56 @@ TEST_F(MultiIndexBlockTest, AbortDropsResumablePrimaryDrivenIndexBuildTable) {
         *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
 }
 
+TEST_F(MultiIndexBlockTest, InitFailureAfterResumableTableCreationDropsResumeTable) {
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
+
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    IndexBuildInfo indexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                             << "a_1"
+                                             << "v"
+                                             << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                                  "index-1",
+                                  *storageEngine);
+
+    // This ident is what init() generates internally for the resume table
+    const auto resumeTableIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_NOT_OK(indexer
+                      ->init(
+                          operationContext(),
+                          coll,
+                          {indexBuildInfo},
+                          [] { uasserted(ErrorCodes::InternalError, "force init failure"); },
+                          MultiIndexBlock::InitMode::SteadyState,
+                          boost::none)
+                      .getStatus());
+
+    // The resume table should have been created
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), resumeTableIdent));
+
+    // immediatelyCompletePendingDrop() returns OK even if the ident isn't drop-pending, but if it
+    // wasn't drop-pending the ident would still exist afterwards.
+    ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), resumeTableIdent));
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), resumeTableIdent));
+}
+
 // With resumable PDIB enabled, the first call to drainBackgroundWrites must
 // transition into kDrainWrites and persist a ResumeIndexInfo with that phase to the replicated
 // internal-indexBuild-<UUID> table.
