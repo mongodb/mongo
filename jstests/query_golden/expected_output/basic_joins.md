@@ -379,9 +379,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "none"
-rightEmbeddingField: "x"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  direction: "forward"
@@ -403,9 +406,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "x"
-rightEmbeddingField: "none"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "none"
   |  |
   |  HASH_JOIN_EMBEDDING [b = b]
   |  leftEmbeddingField: "y"
@@ -427,9 +433,12 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "none"
-rightEmbeddingField: "x"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  direction: "forward"
@@ -451,9 +460,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-NESTED_LOOP_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "none"
-rightEmbeddingField: "y"
+GROUP
+
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  direction: "forward"
@@ -475,9 +487,12 @@ rightEmbeddingField: "y"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "none"
-rightEmbeddingField: "x"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  direction: "forward"
@@ -499,9 +514,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "none"
-rightEmbeddingField: "x"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  direction: "forward"
@@ -523,9 +541,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "none"
-rightEmbeddingField: "x"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  direction: "forward"
@@ -602,9 +623,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "none"
-rightEmbeddingField: "y"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
@@ -628,9 +652,12 @@ rightEmbeddingField: "y"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "y"
-rightEmbeddingField: "none"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "none"
   |  |
   |  HASH_JOIN_EMBEDDING [a = a]
   |  leftEmbeddingField: "x"
@@ -654,9 +681,12 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "none"
-rightEmbeddingField: "y"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
@@ -680,9 +710,12 @@ rightEmbeddingField: "y"
 usedJoinOptimization: true
 
 ```
-NESTED_LOOP_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "none"
-rightEmbeddingField: "y"
+GROUP
+
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
@@ -706,9 +739,12 @@ rightEmbeddingField: "y"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "none"
-rightEmbeddingField: "x"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  filter: { "d" : { "$lt" : 3 } }
@@ -732,9 +768,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "none"
-rightEmbeddingField: "x"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  filter: { "d" : { "$lt" : 3 } }
@@ -758,9 +797,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "none"
-rightEmbeddingField: "y"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
@@ -1060,9 +1102,12 @@ rightEmbeddingField: "y"
 usedJoinOptimization: true
 
 ```
-NESTED_LOOP_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "none"
-rightEmbeddingField: "y"
+GROUP
+
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
@@ -1087,9 +1132,12 @@ rightEmbeddingField: "y"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "y"
-rightEmbeddingField: "none"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "none"
   |  |
   |  NESTED_LOOP_JOIN_EMBEDDING [a = a]
   |  leftEmbeddingField: "none"
@@ -1114,9 +1162,12 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-NESTED_LOOP_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "none"
-rightEmbeddingField: "y"
+GROUP
+
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
@@ -1141,9 +1192,12 @@ rightEmbeddingField: "y"
 usedJoinOptimization: true
 
 ```
-NESTED_LOOP_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "none"
-rightEmbeddingField: "y"
+GROUP
+
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
@@ -1168,9 +1222,12 @@ rightEmbeddingField: "y"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "none"
-rightEmbeddingField: "x"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  filter: { "d" : { "$lt" : 3 } }
@@ -1195,9 +1252,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [a = a]
-leftEmbeddingField: "none"
-rightEmbeddingField: "x"
+GROUP
+
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  filter: { "d" : { "$lt" : 3 } }
@@ -1222,9 +1282,12 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-NESTED_LOOP_JOIN_EMBEDDING [b = b]
-leftEmbeddingField: "none"
-rightEmbeddingField: "y"
+GROUP
+
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }

@@ -787,20 +787,25 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         return;
     }
 
-    // Look for a GROUP => PROJECTION_SIMPLE where the dependency set of the PROJECTION_SIMPLE
-    // is a super set of the dependency set of the GROUP. If so, the projection isn't needed and
-    // it can be elminated.
+    // Look for a GROUP => PROJECTION where the projection is redundant and can be eliminated.
+    // Two cases permit elimination:
+    //
+    // 1. The group has no field dependencies and doesn't need the whole document (e.g. $count).
+    //    The projection's output is entirely unused, so it can be any kind of projection.
+    //
+    // 2. The group depends on a subset of fields and the projection is a simple inclusion that
+    //    passes all of those fields through unchanged.
     if (solnRoot->getType() == StageType::STAGE_GROUP) {
         auto groupNode = static_cast<GroupNode*>(solnRoot);
 
         QuerySolutionNode* projectNodeCandidate = groupNode->children[0].get();
         if (auto projection = attemptToGetProjectionFromQuerySolution(*projectNodeCandidate);
-            // only eliminate inclusion projections
-            projection && projection.value()->isInclusionOnly() &&
-            // only eliminate when group depends on a subset of fields
-            !groupNode->needWholeDocument &&
-            // only eliminate projections which preserve all fields used by the group
-            isSubset(groupNode->requiredFields, projection.value()->getRequiredFields())) {
+            projection && !groupNode->needWholeDocument &&
+            (groupNode->requiredFields.empty() ||
+             // only eliminate simple inclusion projections which preserve all fields used by
+             // the group
+             (projection.value()->isInclusionOnly() &&
+              isSubset(groupNode->requiredFields, projection.value()->getRequiredFields())))) {
             // Attach the projectNode's child directly as the groupNode's child, eliminating the
             // project node.
             groupNode->children[0] = std::move(projectNodeCandidate->children[0]);
