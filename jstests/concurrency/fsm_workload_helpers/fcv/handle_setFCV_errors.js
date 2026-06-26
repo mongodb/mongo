@@ -35,5 +35,15 @@ export function handleRandomSetFCVErrors(e, targetFCV) {
         );
         return true;
     }
+    if (e.code === 8531600) {
+        // The existing FCV document could not be found because of a retryable error during
+        // stepdown.
+        jsTestLog({
+            msg: "setFCV: The existing FCV document could not be found due to a retryable \
+            error during a stepdown, retrying FCV transition",
+            error: e,
+        });
+        return true;
+    }
     return false; // Error was not handled here; let the caller decide next steps.
 }
