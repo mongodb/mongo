@@ -40,9 +40,8 @@ namespace {
 // Helper visitor to check if an expression contains any references to variables. We assume that any
 // expression which references a variable is ineligible to be a single table predicate (cannot be
 // pushed down into the find layer).
-struct SingleTablePredicateClassifier
-    : public SelectiveConstExpressionVisitorBase<SingleTablePredicateClassifier> {
-    using SelectiveConstExpressionVisitorBase<SingleTablePredicateClassifier>::visit;
+struct SingleTablePredicateClassifier : public SelectiveConstExpressionVisitorBase {
+    using SelectiveConstExpressionVisitorBase::visit;
 
     void visit(const ExpressionFieldPath* expr) final {
         referencesVariables |=
@@ -242,11 +241,11 @@ public:
     }
 
 private:
-    class ExpressionVisitor : public SelectiveConstExpressionVisitorBase<ExpressionVisitor> {
+    class ExpressionVisitor : public SelectiveConstExpressionVisitorBase {
     public:
         explicit ExpressionVisitor(ExtractExprPredicatesHelper& helper) : _helper(helper) {}
 
-        using SelectiveConstExpressionVisitorBase<ExpressionVisitor>::visit;
+        using SelectiveConstExpressionVisitorBase::visit;
 
         void visit(const ExpressionAnd* expr) final {
             ++_visited;

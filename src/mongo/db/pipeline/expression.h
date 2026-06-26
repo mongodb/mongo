@@ -5670,9 +5670,9 @@ struct SubstituteFieldPathWalker {
  * });
  */
 template <typename F>
-struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase<FieldPathVisitor<F>> {
+struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase {
     // To avoid overloaded-virtual warnings.
-    using SelectiveConstExpressionVisitorBase<FieldPathVisitor<F>>::visit;
+    using SelectiveConstExpressionVisitorBase::visit;
 
     explicit FieldPathVisitor(const F& fn) : _fn(fn) {}
 

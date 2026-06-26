@@ -45,10 +45,9 @@ namespace mongo::stage_builder {
 namespace {
 
 template <typename F>
-struct FieldPathAndCondPreVisitor
-    : public SelectiveConstExpressionVisitorBase<FieldPathAndCondPreVisitor<F>> {
+struct FieldPathAndCondPreVisitor : public SelectiveConstExpressionVisitorBase {
     // To avoid overloaded-virtual warnings.
-    using SelectiveConstExpressionVisitorBase<FieldPathAndCondPreVisitor<F>>::visit;
+    using SelectiveConstExpressionVisitorBase::visit;
 
     explicit FieldPathAndCondPreVisitor(const F& fn) : _fn(fn) {}
 

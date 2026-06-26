@@ -351,10 +351,9 @@ bool DocumentSourceGroupBase::pathIncludedInGroupKeys(const std::string& dottedP
  *
  * This can be used to determine fields a group _id "directly" references.
  */
-class TriviallyReferencedFieldsVisitor
-    : public SelectiveConstExpressionVisitorBase<TriviallyReferencedFieldsVisitor> {
+class TriviallyReferencedFieldsVisitor : public SelectiveConstExpressionVisitorBase {
 public:
-    using SelectiveConstExpressionVisitorBase<TriviallyReferencedFieldsVisitor>::visit;
+    using SelectiveConstExpressionVisitorBase::visit;
     void visitChildren(const Expression* expr) {
         for (const auto& child : expr->getChildren()) {
             child->acceptVisitor(this);
