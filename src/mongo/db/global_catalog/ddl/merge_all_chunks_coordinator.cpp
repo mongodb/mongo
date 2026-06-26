@@ -76,7 +76,7 @@ void checkPreconditions(OperationContext* opCtx, const NamespaceString& nss) {
 
     auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardId());
+    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardHandle());
 
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",

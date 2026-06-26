@@ -538,7 +538,7 @@ void FilteringMetadataCache::forceCollectionMetadataRefresh_DEPRECATED(Operation
         return;
     }
 
-    CollectionMetadata metadata(cm, ShardingState::get(opCtx)->shardId());
+    CollectionMetadata metadata(cm, ShardingState::get(opCtx)->shardHandle());
     scopedCsr->setCollectionMetadata(opCtx, std::move(metadata));
 }
 
@@ -630,7 +630,7 @@ CollectionMetadata FilteringMetadataCache::_forceGetCurrentCollectionMetadata(
             return CollectionMetadata::UNTRACKED();
         }
 
-        return CollectionMetadata(cm, ShardingState::get(opCtx)->shardId());
+        return CollectionMetadata(cm, ShardingState::get(opCtx)->shardHandle());
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         LOGV2(505070,
               "Namespace not found, collection may have been dropped",

@@ -445,7 +445,7 @@ protected:
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
         ASSERT_EQ(2, cm.numChunks());
 
-        CollectionMetadata metadata(std::move(cm), kMyShardName);
+        CollectionMetadata metadata(std::move(cm), kMyShardHandle);
 
         {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);

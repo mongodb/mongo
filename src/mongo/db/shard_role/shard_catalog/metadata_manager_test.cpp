@@ -65,17 +65,15 @@ namespace {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kPattern = "key";
 const KeyPattern kShardKeyPattern(BSON(kPattern << 1));
-// TODO SERVER-127411: use ShardRef instead of ShardId when all consumers have been migrated to
-// ShardRef
-const ShardId kThisShard{"thisShard"};
-const ShardId kOtherShard{"otherShard"};
+const ShardHandle kThisShardHandle(ShardId("thisShard"), UUID::gen());
+const ShardHandle kOtherShardHandle(ShardId("otherShard"), UUID::gen());
 
 class MetadataManagerTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
-        _manager =
-            std::make_shared<MetadataManager>(getServiceContext(), kNss, makeEmptyMetadata());
+        _manager = std::make_shared<MetadataManager>(
+            getServiceContext(), kNss, makeEmptyMetadata(operationContext()));
         orphanCleanupDelaySecs.store(1);
     }
 
@@ -89,28 +87,33 @@ protected:
      * Returns an instance of CollectionMetadata which has no chunks owned by 'thisShard'.
      */
     static CollectionMetadata makeEmptyMetadata(
+        OperationContext* opCtx,
         const KeyPattern& shardKeyPattern = kShardKeyPattern,
         const ChunkRange& range = ChunkRange{BSON(kPattern << MINKEY), BSON(kPattern << MAXKEY)},
         UUID uuid = UUID::gen()) {
         const OID epoch = OID::gen();
 
-        auto rt = RoutingTableHistory::makeNew(
-            kNss,
-            uuid,
-            shardKeyPattern,
-            false, /* unsplittable */
-            nullptr,
-            false,
-            epoch,
-            Timestamp(1, 1),
-            boost::none /* timeseriesFields */,
-            boost::none /* reshardingFields */,
+        auto rt =
+            RoutingTableHistory::makeNew(kNss,
+                                         uuid,
+                                         shardKeyPattern,
+                                         false, /* unsplittable */
+                                         nullptr,
+                                         false,
+                                         epoch,
+                                         Timestamp(1, 1),
+                                         boost::none /* timeseriesFields */,
+                                         boost::none /* reshardingFields */,
 
-            true,
-            {ChunkType{uuid, range, ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}), kOtherShard}});
+                                         true,
+                                         {ChunkType{uuid,
+                                                    range,
+                                                    ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
+                                                    kOtherShardHandle.toShardRef(opCtx)}});
 
         return CollectionMetadata(
-            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), kThisShard);
+            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
+            kThisShardHandle);
     }
 
     /**
@@ -121,7 +124,8 @@ protected:
      * It will fassert if the chunk bounds are incorrect or overlap an existing chunk or if the
      * chunk version is lower than the maximum one.
      */
-    static CollectionMetadata cloneMetadataPlusChunk(const CollectionMetadata& collMetadata,
+    static CollectionMetadata cloneMetadataPlusChunk(OperationContext* opCtx,
+                                                     const CollectionMetadata& collMetadata,
                                                      const ChunkRange& range) {
         const BSONObj& minKey = range.getMin();
         const BSONObj& maxKey = range.getMax();
@@ -142,18 +146,20 @@ protected:
             splitChunks.emplace_back(collMetadata.getUUID(),
                                      ChunkRange(chunkToSplit.getMin(), minKey),
                                      chunkVersion,
-                                     kOtherShard);
+                                     kOtherShardHandle.toShardRef(opCtx));
         }
 
         chunkVersion.incMajor();
-        splitChunks.emplace_back(
-            collMetadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kThisShard);
+        splitChunks.emplace_back(collMetadata.getUUID(),
+                                 ChunkRange(minKey, maxKey),
+                                 chunkVersion,
+                                 kThisShardHandle.toShardRef(opCtx));
 
         chunkVersion.incMajor();
         splitChunks.emplace_back(collMetadata.getUUID(),
                                  ChunkRange(maxKey, chunkToSplit.getMax()),
                                  chunkVersion,
-                                 kOtherShard);
+                                 kOtherShardHandle.toShardRef(opCtx));
 
         auto rt =
             cm->getRoutingTableHistory_forTest().makeUpdated(boost::none /* timeseriesFields */,
@@ -163,10 +169,12 @@ protected:
                                                              splitChunks);
 
         return CollectionMetadata(
-            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), kThisShard);
+            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
+            kThisShardHandle);
     }
 
-    static CollectionMetadata cloneMetadataMinusChunk(const CollectionMetadata& metadata,
+    static CollectionMetadata cloneMetadataMinusChunk(OperationContext* opCtx,
+                                                      const CollectionMetadata& metadata,
                                                       const ChunkRange& range) {
         const BSONObj& minKey = range.getMin();
         const BSONObj& maxKey = range.getMax();
@@ -186,10 +194,14 @@ protected:
             boost::none /* reshardingFields */,
             true,
             false, /* unsplittable */
-            {ChunkType(metadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
+            {ChunkType(metadata.getUUID(),
+                       ChunkRange(minKey, maxKey),
+                       chunkVersion,
+                       kOtherShardHandle.toShardRef(opCtx))});
 
         return CollectionMetadata(
-            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), kThisShard);
+            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
+            kThisShardHandle);
     }
 
     std::shared_ptr<MetadataManager> _manager;
@@ -201,8 +213,8 @@ private:
 TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationSinglePending) {
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
 
-    _manager->setCollectionMetadata(
-        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none, false)->get(), cr1));
+    _manager->setCollectionMetadata(cloneMetadataPlusChunk(
+        operationContext(), _manager->getActiveMetadata(boost::none, false)->get(), cr1));
     ASSERT_EQ(_manager->getActiveMetadata(boost::none, false)->get().getChunks().size(), 1UL);
 }
 
@@ -211,14 +223,14 @@ TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationMultiplePending) {
     ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
 
     {
-        _manager->setCollectionMetadata(
-            cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none, false)->get(), cr1));
+        _manager->setCollectionMetadata(cloneMetadataPlusChunk(
+            operationContext(), _manager->getActiveMetadata(boost::none, false)->get(), cr1));
         ASSERT_EQ(_manager->getActiveMetadata(boost::none, false)->get().getChunks().size(), 1UL);
     }
 
     {
-        _manager->setCollectionMetadata(
-            cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none, false)->get(), cr2));
+        _manager->setCollectionMetadata(cloneMetadataPlusChunk(
+            operationContext(), _manager->getActiveMetadata(boost::none, false)->get(), cr2));
         ASSERT_EQ(_manager->getActiveMetadata(boost::none, false)->get().getChunks().size(), 2UL);
     }
 }
@@ -228,7 +240,8 @@ TEST_F(MetadataManagerTest, RefreshAfterNotYetCompletedMigrationMultiplePending)
     ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
 
     _manager->setCollectionMetadata(
-        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none, false)->get(),
+        cloneMetadataPlusChunk(operationContext(),
+                               _manager->getActiveMetadata(boost::none, false)->get(),
                                {BSON("key" << 50), BSON("key" << 60)}));
     ASSERT_EQ(_manager->getActiveMetadata(boost::none, false)->get().getChunks().size(), 1UL);
 }
@@ -237,10 +250,10 @@ TEST_F(MetadataManagerTest, BeginReceiveWithOverlappingRange) {
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
     ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
 
-    _manager->setCollectionMetadata(
-        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none, false)->get(), cr1));
-    _manager->setCollectionMetadata(
-        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none, false)->get(), cr2));
+    _manager->setCollectionMetadata(cloneMetadataPlusChunk(
+        operationContext(), _manager->getActiveMetadata(boost::none, false)->get(), cr1));
+    _manager->setCollectionMetadata(cloneMetadataPlusChunk(
+        operationContext(), _manager->getActiveMetadata(boost::none, false)->get(), cr2));
 
     ChunkRange crOverlap(BSON("key" << 5), BSON("key" << 35));
 }
@@ -252,20 +265,21 @@ TEST_F(MetadataManagerTest, GetActiveMetadataDoesNotAlwaysPreserveRange) {
 
     auto metadataWithTimestamp = _manager->getActiveMetadata(LogicalTime(Timestamp(1, 1)), false);
 
-    _manager->setCollectionMetadata(cloneMetadataPlusChunk(metadataWithTimestamp->get(), cr1));
+    _manager->setCollectionMetadata(
+        cloneMetadataPlusChunk(operationContext(), metadataWithTimestamp->get(), cr1));
     ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0);
 
     auto metadataWithoutTimestampNoPreservation = _manager->getActiveMetadata(boost::none, false);
 
-    _manager->setCollectionMetadata(
-        cloneMetadataPlusChunk(metadataWithoutTimestampNoPreservation->get(), cr2));
+    _manager->setCollectionMetadata(cloneMetadataPlusChunk(
+        operationContext(), metadataWithoutTimestampNoPreservation->get(), cr2));
     ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0);
 
     auto metadataWithoutTimestampPreserveRange =
         _manager->getActiveMetadata(boost::none, true /* preserveRange */);
 
-    _manager->setCollectionMetadata(
-        cloneMetadataPlusChunk(metadataWithoutTimestampPreserveRange->get(), cr3));
+    _manager->setCollectionMetadata(cloneMetadataPlusChunk(
+        operationContext(), metadataWithoutTimestampPreserveRange->get(), cr3));
     ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 1);
 }
 
@@ -275,12 +289,14 @@ TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectsLastSnapshotInList) 
 
     auto scm1 = _manager->getActiveMetadata(boost::none, true);
     {
-        _manager->setCollectionMetadata(cloneMetadataPlusChunk(scm1->get(), cr1));
+        _manager->setCollectionMetadata(
+            cloneMetadataPlusChunk(operationContext(), scm1->get(), cr1));
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 1UL);
 
         auto scm2 = _manager->getActiveMetadata(boost::none, true);
         ASSERT_EQ(scm2->get().getChunks().size(), 1UL);
-        _manager->setCollectionMetadata(cloneMetadataPlusChunk(scm2->get(), cr2));
+        _manager->setCollectionMetadata(
+            cloneMetadataPlusChunk(operationContext(), scm2->get(), cr2));
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 2UL);
         ASSERT_EQ(_manager->numberOfEmptyMetadataSnapshots(), 0);
     }
@@ -301,17 +317,18 @@ TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectSnapshotInMiddleOfLis
     ChunkRange cr4(BSON("key" << 90), BSON("key" << 100));
 
     auto scm = _manager->getActiveMetadata(boost::none, true);
-    _manager->setCollectionMetadata(cloneMetadataPlusChunk(scm->get(), cr1));
+    _manager->setCollectionMetadata(cloneMetadataPlusChunk(operationContext(), scm->get(), cr1));
     ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 1UL);
 
     auto scm2 = _manager->getActiveMetadata(boost::none, true);
     ASSERT_EQ(scm2->get().getChunks().size(), 1UL);
-    _manager->setCollectionMetadata(cloneMetadataPlusChunk(scm2->get(), cr2));
+    _manager->setCollectionMetadata(cloneMetadataPlusChunk(operationContext(), scm2->get(), cr2));
 
     {
         auto scm3 = _manager->getActiveMetadata(boost::none, true);
         ASSERT_EQ(scm3->get().getChunks().size(), 2UL);
-        _manager->setCollectionMetadata(cloneMetadataPlusChunk(scm3->get(), cr3));
+        _manager->setCollectionMetadata(
+            cloneMetadataPlusChunk(operationContext(), scm3->get(), cr3));
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 3UL);
         ASSERT_EQ(_manager->numberOfEmptyMetadataSnapshots(), 0);
 
@@ -327,7 +344,8 @@ TEST_F(MetadataManagerTest, ClearUnneededChunkManagerObjectSnapshotInMiddleOfLis
          */
         scm2 = _manager->getActiveMetadata(boost::none, true);
         ASSERT_EQ(scm2->get().getChunks().size(), 3UL);
-        _manager->setCollectionMetadata(cloneMetadataPlusChunk(scm2->get(), cr4));
+        _manager->setCollectionMetadata(
+            cloneMetadataPlusChunk(operationContext(), scm2->get(), cr4));
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 4UL);
         ASSERT_EQ(_manager->numberOfEmptyMetadataSnapshots(), 1);
     }

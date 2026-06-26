@@ -117,6 +117,7 @@ public:
     void setFilteringMetadataWithUUID(const UUID& uuid) {
         const OID epoch = OID::gen();
 
+        const ShardHandle dummyShardHandle(ShardId("dummyShardId"), UUID::gen());
         auto rt = RoutingTableHistory::makeNew(
             kNss,
             uuid,
@@ -133,11 +134,10 @@ public:
             {ChunkType{uuid,
                        ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
                        ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
-                       ShardId("dummyShardId")}});
+                       dummyShardHandle.toShardRef(_opCtx)}});
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
         CollectionShardingRuntime::acquireExclusive(_opCtx, kNss)
-            ->setCollectionMetadata(_opCtx,
-                                    CollectionMetadata(std::move(cm), ShardId("dummyShardId")));
+            ->setCollectionMetadata(_opCtx, CollectionMetadata(std::move(cm), dummyShardHandle));
     }
 
     UUID uuid() const {

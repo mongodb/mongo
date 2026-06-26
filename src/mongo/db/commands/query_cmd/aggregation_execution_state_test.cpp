@@ -94,7 +94,7 @@ protected:
     // Install sharded collection metadata for 1 chunk sharded collection and fills the cache.
     void installShardedCollectionMetadata(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          ShardId shardName,
+                                          ShardHandle shardHandle,
                                           bool requiresExtendedRangeSupport = false) {
         // Made up a shard version
         const ShardVersion shardVersion = ShardVersionFactory::make(ChunkVersion(
@@ -109,7 +109,7 @@ protected:
         const auto chunk = ChunkType(uuid,
                                      ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
                                      shardVersion.placementVersion(),
-                                     shardName);
+                                     shardHandle.toShardRef(opCtx));
 
 
         const std::string shardKey("skey");
@@ -136,7 +136,7 @@ protected:
             ComparableChunkVersion::makeComparableChunkVersion(version));
 
         CurrentChunkManager cm(rtHandle);
-        const auto collectionMetadata = CollectionMetadata(cm, shardName);
+        const auto collectionMetadata = CollectionMetadata(cm, shardHandle);
 
         AutoGetCollection coll(opCtx, NamespaceStringOrUUID(nss), MODE_IX);
 
@@ -149,9 +149,9 @@ protected:
 
         getCatalogCacheMock()->setCollectionReturnValue(
             nss,
-            CollectionRoutingInfo(
-                std::move(cm),
-                DatabaseTypeValueHandle(DatabaseType{nss.dbName(), shardName, _dbVersion})));
+            CollectionRoutingInfo(std::move(cm),
+                                  DatabaseTypeValueHandle(DatabaseType{
+                                      nss.dbName(), shardHandle.toShardRef(opCtx), _dbVersion})));
     }
 
     DatabaseType createTestDatabase(const UUID& uuid, const Timestamp& timestamp) {
@@ -165,7 +165,7 @@ protected:
         createTestCollection(opCtx, nss);
 
         if (sharded) {
-            installShardedCollectionMetadata(opCtx, nss, kMyShardName);
+            installShardedCollectionMetadata(opCtx, nss, kMyShardHandle);
         } else {
             installUnshardedCollectionMetadata(opCtx, nss);
         }
@@ -193,7 +193,7 @@ protected:
 
         if (sharded) {
             installShardedCollectionMetadata(
-                opCtx, underlyingNss, kMyShardName, requiresExtendedRangeSupport);
+                opCtx, underlyingNss, kMyShardHandle, requiresExtendedRangeSupport);
         } else {
             installUnshardedCollectionMetadata(opCtx, underlyingNss, requiresExtendedRangeSupport);
         }

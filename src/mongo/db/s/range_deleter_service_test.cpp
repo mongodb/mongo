@@ -135,11 +135,12 @@ void RangeDeleterServiceTest::_setFilteringMetadataByUUID(OperationContext* opCt
     const OID epoch = OID::gen();
     NamespaceString nss = nssWithUuid[uuid];
 
+    const ShardHandle thisShardHandle(ShardId("this"), UUID::gen());
     const CollectionMetadata metadata = [&]() {
         auto chunk = ChunkType(uuid,
                                ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
                                ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
-                               ShardId("this"));
+                               thisShardHandle.toShardRef(opCtx));
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
             RoutingTableHistory::makeNew(nss,
                                          uuid,
@@ -154,7 +155,7 @@ void RangeDeleterServiceTest::_setFilteringMetadataByUUID(OperationContext* opCt
                                          true,
                                          {std::move(chunk)})));
 
-        return CollectionMetadata(std::move(cm), ShardId("this"));
+        return CollectionMetadata(std::move(cm), thisShardHandle);
     }();
 
     CollectionShardingRuntime::acquireExclusive(opCtx, nss)->setCollectionMetadata(opCtx, metadata);

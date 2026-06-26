@@ -712,6 +712,7 @@ protected:
             const OID epoch = OID::gen();
             const Timestamp timestamp(1);
 
+            auto shardHandle = ShardHandle(ShardId("dummyShardId"), UUID::gen());
             auto rt = RoutingTableHistory::makeNew(
                 kNss,
                 uuid,
@@ -727,14 +728,14 @@ protected:
                 {ChunkType{uuid,
                            ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
                            ChunkVersion({epoch, timestamp}, {1, 0}),
-                           ShardId("dummyShardId")}});
+                           shardHandle.toShardRef(operationContext())}});
 
             CollectionShardingRuntime::acquireExclusive(operationContext(), kNss)
                 ->setCollectionMetadata(
                     operationContext(),
                     CollectionMetadata(
                         CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
-                        ShardId("dummyShardId")));
+                        shardHandle));
         }();
 
         client()->createIndex(kNss, kShardKeyPattern);

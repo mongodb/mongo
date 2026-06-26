@@ -156,7 +156,7 @@ protected:
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
         const auto collectionMetadata =
-            CollectionMetadata(CurrentChunkManager(rtHandle), kTestShardHandle.name());
+            CollectionMetadata(CurrentChunkManager(rtHandle), kTestShardHandle);
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(_opCtx, kTestNs);
         scopedCSR->setCollectionMetadata(
             _opCtx, collectionMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);

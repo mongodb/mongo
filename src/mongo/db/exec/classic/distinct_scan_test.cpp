@@ -81,9 +81,10 @@ public:
         createIndex(testParams.idxKey, "some_index");
         insertDocs(testParams.docsOnShard);
 
-        const auto metadata{prepareTestData(testParams.shardKey, testParams.chunks)};
-
         auto opCtx = operationContext();
+
+        const auto metadata{prepareTestData(opCtx, testParams.shardKey, testParams.chunks)};
+
         auto ns = nss();
 
         ScopedSetShardRole scopedSetShardRole{

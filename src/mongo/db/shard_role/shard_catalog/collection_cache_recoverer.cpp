@@ -120,7 +120,7 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
                                                  coll->getAllowMigrations(),
                                                  chunks))};
     auto cm = CurrentChunkManager{std::move(rt)};
-    return CollectionMetadata{std::move(cm), ShardingState::get(opCtx)->shardId()};
+    return CollectionMetadata{std::move(cm), ShardingState::get(opCtx)->shardHandle()};
 }
 }  // namespace
 
@@ -247,7 +247,9 @@ void CollectionCacheRecoverer::onOplogEntry(Timestamp entryTs,
 
 namespace {
 boost::optional<CollectionMetadata> applyOplogEntry(
-    const CollectionShardingStateDeltaOplogEntry& entry, CollectionMetadata collMetadata) {
+    OperationContext* opCtx,
+    const CollectionShardingStateDeltaOplogEntry& entry,
+    CollectionMetadata collMetadata) {
     tassert(12698703,
             "Expected recovered metadata to have a routing table when applying changed chunks",
             collMetadata.hasRoutingTable());
@@ -257,11 +259,14 @@ boost::optional<CollectionMetadata> applyOplogEntry(
         ChunkType::parseConfigBSONDocuments(entry.getChangedChunks(),
                                             collMetadata.getUUID(),
                                             collPlacementVersion.epoch(),
-                                            collPlacementVersion.getTimestamp()));
+                                            collPlacementVersion.getTimestamp()),
+        ShardingState::get(opCtx)->shardHandle());
 }
 
 boost::optional<CollectionMetadata> applyOplogEntry(
-    const InvalidateCollectionMetadataOplogEntry& entry, CollectionMetadata collMetadata) {
+    OperationContext* opCtx,
+    const InvalidateCollectionMetadataOplogEntry& entry,
+    CollectionMetadata collMetadata) {
     return boost::none;
 }
 }  // namespace
@@ -282,7 +287,7 @@ boost::optional<CollectionMetadata> CollectionCacheRecoverer::drainAndApply(
         ON_BLOCK_EXIT([&] { _entriesToApply.pop(); });
         const auto& [ts, entry] = _entriesToApply.front();
         auto newCollMetadata = std::visit(
-            [&](const auto& entry) { return applyOplogEntry(entry, collMetadata); }, entry);
+            [&](const auto& entry) { return applyOplogEntry(opCtx, entry, collMetadata); }, entry);
         if (!newCollMetadata) {
             // Draining failed, signal the caller that it must perform another round of recovery. We
             // advance the timestamp such that it gets the new valid snapshot and reset the state of

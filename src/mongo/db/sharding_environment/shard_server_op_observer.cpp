@@ -844,7 +844,8 @@ void ShardServerOpObserver::onApplyCollectionShardingStateDelta(OperationContext
             ChunkType::parseConfigBSONDocuments(entry.getChangedChunks(),
                                                 currentMetadata->getUUID(),
                                                 collPlacementVersion.epoch(),
-                                                collPlacementVersion.getTimestamp())),
+                                                collPlacementVersion.getTimestamp()),
+            ShardingState::get(opCtx)->shardHandle()),
         CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 }
 

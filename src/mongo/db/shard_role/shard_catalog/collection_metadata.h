@@ -39,7 +39,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/range_arithmetic.h"
-#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/assert_util.h"
@@ -78,20 +78,24 @@ public:
     /**
      * The main way to construct CollectionMetadata is through MetadataLoader or clone() methods.
      *
-     * "thisShardId" is the shard identity of this shard for purposes of answering questions like
-     * "does this key belong to this shard"?
+     * "thisShardHandle" is the shard identity of this shard for purposes of answering questions
+     * like "does this key belong to this shard"?
      */
-    CollectionMetadata(CurrentChunkManager cm, const ShardId& thisShardId);
+    CollectionMetadata(CurrentChunkManager cm, const ShardHandle& thisShardHandle);
 
-    CollectionMetadata(PointInTimeChunkManager cm, const ShardId& thisShardId);
+    CollectionMetadata(PointInTimeChunkManager cm, const ShardHandle& thisShardHandle);
 
     /**
      * Returns a new CollectionMetadata with the given chunk changes applied to the current
      * routing table. If those changes have already been applied, returns this metadata unchanged.
      * This is determined by comparing the collection version against the highest chunk version
      * among the changed chunks.
+     *
+     * TODO (SERVER-128786): Remove shardHandle argument once the shard handle cannot change after
+     * construction.
      */
-    CollectionMetadata makeUpdated(const std::vector<ChunkType>& changedChunks) const;
+    CollectionMetadata makeUpdated(const std::vector<ChunkType>& changedChunks,
+                                   const ShardHandle& thisShardHandle) const;
 
     /**
      * Returns a CollectionMetadata object for an untracked collection.
@@ -140,7 +144,7 @@ public:
      */
     ChunkVersion getShardPlacementVersion() const {
         return (hasRoutingTable()
-                    ? getChunkManagerBase().getVersion(nullptr /* opCtx */, _thisShardId)
+                    ? getChunkManagerBase().getVersion(nullptr /* opCtx */, _thisShardHandle.name())
                     : ChunkVersion::UNTRACKED());
     }
 
@@ -154,27 +158,27 @@ public:
      * chunk manager.
      */
     Timestamp getShardMaxValidAfter() const {
-        return (hasRoutingTable()
-                    ? getChunkManagerBase().getMaxValidAfter(nullptr /* opCtx */, _thisShardId)
-                    : Timestamp(0, 0));
+        return (hasRoutingTable() ? getChunkManagerBase().getMaxValidAfter(nullptr /* opCtx */,
+                                                                           _thisShardHandle.name())
+                                  : Timestamp(0, 0));
     }
 
     /**
      * Returns the current shard's placement version for the collection or UNTRACKED if it does not
      * have a routing table.
      *
-     * Will not throw an exception if _thisShardId is marked as stale by the CollectionMetadata's
-     * current chunk manager. Only use this function when logging the returned ChunkVersion. If the
-     * caller must execute logic based on the returned ChunkVersion, use getShardPlacementVersion()
-     * instead.
+     * Will not throw an exception if _thisShardHandle is marked as stale by the
+     * CollectionMetadata's current chunk manager. Only use this function when logging the returned
+     * ChunkVersion. If the caller must execute logic based on the returned ChunkVersion, use
+     * getShardPlacementVersion() instead.
      *
      * TODO (SERVER-128786): Remove the nullptr argument once we have a shardHandle access to the
      * chunk manager.
      */
     ChunkVersion getShardPlacementVersionForLogging() const {
-        return (hasRoutingTable()
-                    ? getChunkManagerBase().getVersionForLogging(nullptr /* opCtx */, _thisShardId)
-                    : ChunkVersion::UNTRACKED());
+        return (hasRoutingTable() ? getChunkManagerBase().getVersionForLogging(
+                                        nullptr /* opCtx */, _thisShardHandle.name())
+                                  : ChunkVersion::UNTRACKED());
     }
 
     /**
@@ -188,9 +192,9 @@ public:
     /**
      * Obtains the shard id with which this collection metadata is configured.
      */
-    const ShardId& shardId() const {
+    const ShardHandle& shardHandle() const {
         tassert(10016205, "Expected a routing table to be initialized", hasRoutingTable());
-        return _thisShardId;
+        return _thisShardHandle;
     }
 
     const ShardKeyPattern& getShardKeyPattern() const {
@@ -291,7 +295,8 @@ public:
      */
     bool keyBelongsToMe(const BSONObj& key) const {
         tassert(10016208, "Expected a routing table to be initialized", hasRoutingTable());
-        return getChunkManagerBase().keyBelongsToShard(nullptr /* opCtx */, key, _thisShardId);
+        return getChunkManagerBase().keyBelongsToShard(
+            nullptr /* opCtx */, key, _thisShardHandle.name());
     }
 
     /**
@@ -306,7 +311,7 @@ public:
                                                    ChunkMap::Direction direction) const {
         tassert(9526301, "Expected a routing table to be initialized", hasRoutingTable());
         return getChunkManagerBase().nearestOwnedChunk(
-            nullptr /* opCtx */, key, _thisShardId, direction);
+            nullptr /* opCtx */, key, _thisShardHandle.name(), direction);
     }
 
     /**
@@ -325,7 +330,8 @@ public:
      */
     bool rangeOverlapsChunk(const ChunkRange& range) const {
         tassert(10016209, "Expected a routing table to be initialized", hasRoutingTable());
-        return getChunkManagerBase().rangeOverlapsShard(nullptr /* opCtx */, range, _thisShardId);
+        return getChunkManagerBase().rangeOverlapsShard(
+            nullptr /* opCtx */, range, _thisShardHandle.name());
     }
 
     /**
@@ -397,7 +403,7 @@ private:
 
     // The identity of this shard, for the purpose of answering "key belongs to me" queries. If the
     // collection is not tracked (_cm is boost::none), then this value will be empty.
-    ShardId _thisShardId;
+    ShardHandle _thisShardHandle;
 };
 
 }  // namespace mongo

@@ -134,7 +134,7 @@ void installUntrackedCollectionMetadata(OperationContext* opCtx, const Namespace
 void installShardedCollectionMetadata(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       std::vector<ChunkType> chunks,
-                                      ShardId thisShardId) {
+                                      ShardHandle thisShardHandle) {
     ASSERT(!chunks.empty());
 
     const auto uuid = [&] {
@@ -165,7 +165,8 @@ void installShardedCollectionMetadata(OperationContext* opCtx,
         RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(std::move(rt)),
                                        ComparableChunkVersion::makeComparableChunkVersion(version));
 
-    const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), thisShardId);
+    const auto collectionMetadata =
+        CollectionMetadata(CurrentChunkManager(rtHandle), thisShardHandle);
 
     CollectionShardingRuntime::acquireExclusive(opCtx, nss)
         ->setCollectionMetadata(opCtx, collectionMetadata);
@@ -195,7 +196,7 @@ void BulkWriteShardTest::setUp() {
                    ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
                    shardVersionShardedCollection1.placementVersion(),
                    kMyShardName)},
-        kMyShardName);
+        kMyShardHandle);
 
     // Create nssShardedCollection2
     createTestCollection(opCtx(), nssShardedCollection2);
@@ -207,7 +208,7 @@ void BulkWriteShardTest::setUp() {
                    ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
                    shardVersionShardedCollection2.placementVersion(),
                    kMyShardName)},
-        kMyShardName);
+        kMyShardHandle);
 }
 
 NamespaceInfoEntry nsInfoWithShardDatabaseVersions(NamespaceString nss,

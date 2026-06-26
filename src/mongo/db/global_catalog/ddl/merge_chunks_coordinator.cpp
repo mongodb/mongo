@@ -89,7 +89,7 @@ bool checkPreconditions(OperationContext* opCtx,
     // catalog.
     auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardId());
+    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardHandle());
 
     // Validate that the collection is sharded and that its identity (epoch / timestamp) still
     // matches the request.
