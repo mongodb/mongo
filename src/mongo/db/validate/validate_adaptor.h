@@ -37,7 +37,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/record_data.h"
-#include "mongo/db/validate/index_consistency.h"
+#include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/util/modules.h"

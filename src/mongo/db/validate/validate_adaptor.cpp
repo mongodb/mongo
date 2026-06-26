@@ -60,7 +60,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/throttle_cursor.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/validate/index_consistency.h"
+#include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/validate_timeseries.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -779,7 +779,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
         prevRecordId = record->id;
 
-        if (_numRecords % IndexConsistency::kInterruptIntervalNumRecords == 0 ||
+        if (_numRecords % KeyStringIndexConsistency::kInterruptIntervalNumRecords == 0 ||
             interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
             // Periodically checks for interrupts and yields.
             opCtx->checkForInterrupt();

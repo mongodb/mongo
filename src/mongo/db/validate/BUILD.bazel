@@ -78,7 +78,7 @@ mongo_cc_library(
     name = "collection_validation",
     srcs = [
         "collection_validation.cpp",
-        "index_consistency.cpp",
+        "key_string_index_consistency.cpp",
         "validate_adaptor.cpp",
         "validate_timeseries.cpp",
     ],
@@ -114,7 +114,7 @@ mongo_cc_unit_test(
     srcs = [
         "bson_utf8_test.cpp",
         "collection_validation_test.cpp",
-        "index_consistency_test.cpp",
+        "key_string_index_consistency_test.cpp",
         "validate_results_test.cpp",
     ],
     tags = [

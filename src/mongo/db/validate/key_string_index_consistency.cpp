@@ -65,7 +65,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/validate/index_consistency.h"
+#include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/validate_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -85,9 +85,6 @@
 
 
 namespace mongo {
-
-const long long IndexConsistency::kInterruptIntervalNumRecords = 4096;
-const size_t IndexConsistency::kNumHashBuckets = 1U << 16;
 
 namespace {
 
@@ -125,28 +122,123 @@ IndexInfo::IndexInfo(const IndexCatalogEntry& entry)
       unique(entry.descriptor()->unique()),
       accessMethod(entry.accessMethod()) {}
 
-IndexConsistency::IndexConsistency(OperationContext* opCtx,
-                                   collection_validation::ValidateState* validateState,
-                                   const size_t numHashBuckets)
-    : _validateState(validateState), _firstPhase(true) {
-    _indexKeyBuckets.resize(numHashBuckets);
-}
 
-void IndexConsistency::setSecondPhase() {
-    invariant(_firstPhase);
-    _firstPhase = false;
+void KeyStringIndexConsistency::setSecondPhase() {
+    invariant(_phase == Phase::kFirst);
+    _phase = Phase::kSecond;
 }
 
 KeyStringIndexConsistency::KeyStringIndexConsistency(
     OperationContext* opCtx,
     collection_validation::ValidateState* validateState,
-    const size_t numHashBuckets)
-    : IndexConsistency(opCtx, validateState, numHashBuckets) {
+    size_t numHashBuckets)
+    : _validateState(validateState), _indexKeyBuckets(numHashBuckets) {
+    invariant(validateState);
     for (const auto& indexIdent : _validateState->getIndexIdents()) {
         const auto entry =
             validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
         _indexesInfo.emplace(entry->descriptor()->indexName(), IndexInfo(*entry));
     }
+}
+
+KeyStringIndexConsistency::KeyStringIndexConsistency(const KeyStringIndexConsistency& other)
+    : _validateState(other._validateState),
+      _indexKeyBuckets(other._indexKeyBuckets),
+      _phase(other._phase),
+      _indexesInfo(other._indexesInfo),
+      _totalIndexKeys(other._totalIndexKeys) {
+    // _missingIndexEntries and _extraIndexEntries store IndexInfo* pointers that point into
+    // _indexesInfo. We cannot copy them verbatim — the pointers would refer to other._indexesInfo,
+    // which may be destroyed before this object. Rebuild them with pointers into our own
+    // _indexesInfo.
+    for (const auto& [key, recordId] : other._missingIndexEntries) {
+        IndexInfo* newPtr = &_indexesInfo.at(key.first->indexName);
+        _missingIndexEntries.insert({{newPtr, key.second}, recordId});
+    }
+    for (const auto& [key, recordIds] : other._extraIndexEntries) {
+        IndexInfo* newPtr = &_indexesInfo.at(key.first->indexName);
+        _extraIndexEntries.insert({{newPtr, key.second}, recordIds});
+    }
+}
+
+KeyStringIndexConsistency& KeyStringIndexConsistency::operator=(
+    const KeyStringIndexConsistency& other) {
+    if (this != &other) {
+        // Copy-and-move: the copy constructor fixes up all IndexInfo* pointers into the new
+        // _indexesInfo. Moving into *this then preserves those addresses because std::map move
+        // transfers ownership of existing nodes without relocating them.
+        *this = KeyStringIndexConsistency(other);
+    }
+    return *this;
+}
+
+void KeyStringIndexConsistency::merge(const KeyStringIndexConsistency& other) {
+    // Merging is only valid while both objects are still in the first (counting) phase. The
+    // second-phase state (_missingIndexEntries/_extraIndexEntries) has ordering dependencies and is
+    // never produced by a parallel record-store scan, so it is intentionally not merged.
+    uassert(12880000,
+            "Merge results are only valid in phase 1",
+            _phase == Phase::kFirst && other._phase == Phase::kFirst);
+    uassert(12880001,
+            "Merge results indexKeyBuckets must have identical size",
+            _indexKeyBuckets.size() == other._indexKeyBuckets.size());
+    uassert(12880002,
+            "Merge results must have identical UUID",
+            _validateState->uuid() == other._validateState->uuid());
+    uassert(
+        12880003,
+        "Merge results must have identical index keys",
+        _indexesInfo.size() == other._indexesInfo.size() &&
+            std::all_of(
+                _indexesInfo.begin(),
+                _indexesInfo.end(),
+                // NOTE: this relies on the map being sorted.  The iterator from other._indexesInfo
+                // should match the key from this->_indexesInfo exactly while checking in-place.
+                [otherIt = other._indexesInfo.begin()](const auto& indexInfo) mutable {
+                    return indexInfo.first == (otherIt++)->first;
+                }));
+
+    // Copy into a temporary. This may be more expensive than modifying in place due to the initial
+    // copy, however it protects against potentially throwing in the body which would leave *this
+    // partially modified.
+    KeyStringIndexConsistency tmp = *this;
+
+    // The per-bucket counts form an order-independent additive hash: the document scan increments
+    // and the index scan decrements the same buckets, and the final mismatch check is `!= 0`.
+    // Modular uint32 addition is associative and commutative, so summing partials is identical to
+    // having accumulated them all on a single object.
+    for (size_t i = 0; i < tmp._indexKeyBuckets.size(); ++i) {
+        tmp._indexKeyBuckets[i].indexKeyCount += other._indexKeyBuckets[i].indexKeyCount;
+        tmp._indexKeyBuckets[i].bucketSizeBytes += other._indexKeyBuckets[i].bucketSizeBytes;
+    }
+
+    // Every consistency object is constructed from the same set of indexes, so the index-name keys
+    // match exactly.
+    for (auto& [indexName, src] : other._indexesInfo) {
+        IndexInfo& dst = tmp._indexesInfo.at(indexName);
+        dst.numRecords += src.numRecords;
+        // numKeys is only populated by the index scan, so it is 0 for record-store partials; summed
+        // here for generality.
+        dst.numKeys += src.numKeys;
+        dst.multikeyDocs = dst.multikeyDocs || src.multikeyDocs;
+
+        if (src.docMultikeyPaths.size()) {
+            if (dst.docMultikeyPaths.size()) {
+                MultikeyPathTracker::mergeMultikeyPaths(&dst.docMultikeyPaths,
+                                                        src.docMultikeyPaths);
+            } else {
+                dst.docMultikeyPaths = src.docMultikeyPaths;
+            }
+        }
+
+        dst.hashedMultikeyMetadataPaths.insert(src.hashedMultikeyMetadataPaths.begin(),
+                                               src.hashedMultikeyMetadataPaths.end());
+    }
+
+    tmp._totalIndexKeys += other._totalIndexKeys;
+
+    // Swap to atomically complete the merge.
+    std::swap(*this, tmp);
 }
 
 void KeyStringIndexConsistency::addMultikeyMetadataPath(const key_string::Value& ks,
@@ -241,10 +333,10 @@ void KeyStringIndexConsistency::repairIndexEntries(OperationContext* opCtx,
 
 void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
                                                     ValidateResults* results) {
-    invariant(!_firstPhase);
+    invariant(_phase == Phase::kSecond);
 
-    // Inform which indexes have inconsistencies and add the BSON objects of the inconsistent index
-    // entries to the results vector.
+    // Inform which indexes have inconsistencies and add the BSON objects of the inconsistent
+    // index entries to the results vector.
     int numMissingIndexEntryErrors = _missingIndexEntries.size();
 
     // Track which indexes should get custom error messages from their access methods.
@@ -348,20 +440,21 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
                                           IndexInfo* indexInfo,
                                           const RecordId& recordId,
                                           ValidateResults* results) {
-    auto rawHash = ks.hash(indexInfo->indexNameHash);
-    auto hashLower = rawHash % kNumHashBuckets;
-    auto hashUpper = (rawHash / kNumHashBuckets) % kNumHashBuckets;
+    const auto rawHash = ks.hash(indexInfo->indexNameHash);
+    const auto numBuckets = _indexKeyBuckets.size();
+    const auto hashLower = rawHash % numBuckets;
+    const auto hashUpper = (rawHash / numBuckets) % numBuckets;
     auto& lower = _indexKeyBuckets[hashLower];
     auto& upper = _indexKeyBuckets[hashUpper];
 
-    if (_firstPhase) {
+    if (_phase == Phase::kFirst) {
         // During the first phase of validation we only keep track of the count for the document
         // keys encountered.
-        lower.indexKeyCount++;
+        ++lower.indexKeyCount;
         lower.bucketSizeBytes += ks.getSize();
-        upper.indexKeyCount++;
+        ++upper.indexKeyCount;
         upper.bucketSizeBytes += ks.getSize();
-        indexInfo->numRecords++;
+        ++indexInfo->numRecords;
 
         if (MONGO_unlikely(_validateState->logDiagnostics())) {
             LOGV2(4666602,
@@ -387,20 +480,21 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                                             IndexInfo* indexInfo,
                                             const RecordId& recordId,
                                             ValidateResults* results) {
-    auto rawHash = ks.hash(indexInfo->indexNameHash);
-    auto hashLower = rawHash % kNumHashBuckets;
-    auto hashUpper = (rawHash / kNumHashBuckets) % kNumHashBuckets;
+    const auto rawHash = ks.hash(indexInfo->indexNameHash);
+    const auto numBuckets = _indexKeyBuckets.size();
+    const auto hashLower = rawHash % numBuckets;
+    const auto hashUpper = (rawHash / numBuckets) % numBuckets;
     auto& lower = _indexKeyBuckets[hashLower];
     auto& upper = _indexKeyBuckets[hashUpper];
 
-    if (_firstPhase) {
-        // During the first phase of validation we only keep track of the count for the index entry
-        // keys encountered.
-        lower.indexKeyCount--;
+    if (_phase == Phase::kFirst) {
+        // During the first phase of validation we only keep track of the count for the index
+        // entry keys encountered.
+        --lower.indexKeyCount;
         lower.bucketSizeBytes += ks.getSize();
-        upper.indexKeyCount--;
+        --upper.indexKeyCount;
         upper.bucketSizeBytes += ks.getSize();
-        indexInfo->numKeys++;
+        ++indexInfo->numKeys;
 
         if (MONGO_unlikely(_validateState->logDiagnostics())) {
             LOGV2(4666603,
@@ -415,9 +509,9 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
         }
     } else if (lower.indexKeyCount || upper.indexKeyCount) {
         // Found an index key for a bucket that has inconsistencies.
-        // If there is a corresponding document key for the index entry key, we remove the key from
-        // the '_missingIndexEntries' map. However if there was no document key for the index entry
-        // key, we add the key to the '_extraIndexEntries' map.
+        // If there is a corresponding document key for the index entry key, we remove the key
+        // from the '_missingIndexEntries' map. However if there was no document key for the
+        // index entry key, we add the key to the '_extraIndexEntries' map.
         IndexKey key{indexInfo, ks};
         if (_missingIndexEntries.count(key) == 0) {
             if (_validateState->fixErrors()) {
@@ -455,7 +549,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
 }
 
 bool KeyStringIndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* result) {
-    invariant(!_firstPhase);
+    invariant(_phase == Phase::kSecond);
 
     const uint64_t maxMemoryUsageBytes =
         static_cast<uint64_t>(maxValidateMemoryUsageMB.load()) * 1024 * 1024;
@@ -482,9 +576,10 @@ bool KeyStringIndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* 
         return true;
     }
 
-    // At this point we know we'll exceed the memory limit, and will pare back some of the buckets.
-    // First we'll see what the smallest bucket is, and if that's over the limit by itself, then
-    // we can zero out all the other buckets. Otherwise we'll keep as many buckets as we can.
+    // At this point we know we'll exceed the memory limit, and will pare back some of the
+    // buckets. First we'll see what the smallest bucket is, and if that's over the limit by
+    // itself, then we can zero out all the other buckets. Otherwise we'll keep as many buckets
+    // as we can.
 
     auto smallestBucketWithAnInconsistency = std::min_element(
         _indexKeyBuckets.begin(),
@@ -523,8 +618,8 @@ bool KeyStringIndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* 
 
                 if (bucket.bucketSizeBytes + cumulativeSizeOfBucketsBytes > maxMemoryUsageBytes) {
                     // Including this bucket would put us over the memory limit, so zero this
-                    // bucket. We don't want to keep any entry that will exceed the memory limit in
-                    // the second phase so we don't double the 'maxMemoryUsageBytes' here.
+                    // bucket. We don't want to keep any entry that will exceed the memory limit
+                    // in the second phase so we don't double the 'maxMemoryUsageBytes' here.
                     bucket.indexKeyCount = 0;
                     return;
                 }
@@ -541,9 +636,9 @@ bool KeyStringIndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* 
     result->addError(ss.str());
 
     LOGV2(8943500,
-          "Not all index entry inconsistencies are reported due to memory limitations; the memory "
-          "limit for validation can be configured via the 'maxValidateMemoryUsageMB' server "
-          "parameter",
+          "Not all index entry inconsistencies are reported due to memory limitations; "
+          "the memory limit for validation can be configured via the 'maxValidateMemoryUsageMB' "
+          "server parameter",
           "maxValidateMemoryUsageMB"_attr = maxValidateMemoryUsageMB.load(),
           "totalMemoryNeededBytes"_attr = totalbytesAndBuckets.first,
           "cumulativeSizeOfBucketsBytes"_attr = cumulativeSizeOfBucketsBytes,
@@ -562,8 +657,8 @@ void KeyStringIndexConsistency::validateIndexKeyCount(OperationContext* opCtx,
     IndexInfo* indexInfo = &this->getIndexInfo(indexName);
     const auto numTotalKeys = indexInfo->numKeys;
 
-    // Update numRecords by subtracting number of records removed from record store in repair mode
-    // when validating index consistency
+    // Update numRecords by subtracting number of records removed from record store in repair
+    // mode when validating index consistency
     (*numRecords) -= results.getKeysRemovedFromRecordStore();
 
     if (desc->isIdIndex() && numTotalKeys != (*numRecords)) {
@@ -580,10 +675,10 @@ void KeyStringIndexConsistency::validateIndexKeyCount(OperationContext* opCtx,
                          << "Hashed index is incorrectly marked multikey: " << desc->indexName());
     }
 
-    // Confirm that the number of index entries is not greater than the number of documents in the
-    // collection. This check is only valid for indexes that are not multikey (indexed arrays
-    // produce an index key per array entry) and not $** indexes which can produce index keys for
-    // multiple paths within a single document.
+    // Confirm that the number of index entries is not greater than the number of documents in
+    // the collection. This check is only valid for indexes that are not multikey (indexed
+    // arrays produce an index key per array entry) and not $** indexes which can produce index
+    // keys for multiple paths within a single document.
     if (results.isValid() && !index->isMultikey(opCtx, _validateState->getCollection()) &&
         desc->getIndexType() != IndexType::INDEX_WILDCARD && numTotalKeys > (*numRecords)) {
         const std::string err = str::stream()
@@ -615,8 +710,8 @@ void _validateKeyOrder(OperationContext* opCtx,
     const auto descriptor = index->descriptor();
     const bool unique = descriptor->unique();
 
-    // KeyStrings will be in strictly increasing order because all keys are sorted and they are in
-    // the format (Key, RID), and all RecordIDs are unique.
+    // KeyStrings will be in strictly increasing order because all keys are sorted and they are
+    // in the format (Key, RID), and all RecordIDs are unique.
     if (currKey->keyString.compare(prevKey->keyString) <= 0 ||
         MONGO_unlikely(failIndexKeyOrdering.shouldFail())) {
         if (results) {
@@ -785,8 +880,8 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
     // multikey. A collection should still be valid without these adjustments.
     if (_validateState->adjustMultikey()) {
 
-        // If this collection has documents that make this index multikey, then check whether those
-        // multikey paths match the index's metadata.
+        // If this collection has documents that make this index multikey, then check whether
+        // those multikey paths match the index's metadata.
         const auto indexPaths = index->getMultikeyPaths(opCtx, _validateState->getCollection());
         const auto& documentPaths = indexInfo.docMultikeyPaths;
         if (indexInfo.multikeyDocs && documentPaths != indexPaths) {
@@ -796,8 +891,9 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                   "indexPaths"_attr = MultikeyPathTracker::dumpMultikeyPaths(indexPaths),
                   "documentPaths"_attr = MultikeyPathTracker::dumpMultikeyPaths(documentPaths));
 
-            // Since we have the correct multikey path information for this index, we can tighten up
-            // its metadata to improve query performance. This may apply in two distinct scenarios:
+            // Since we have the correct multikey path information for this index, we can
+            // tighten up its metadata to improve query performance. This may apply in two
+            // distinct scenarios:
             // 1. Collection data has changed such that the current multikey paths on the index
             // are too permissive and certain document paths are no longer multikey.
             // 2. This index was built before 3.4, and there is no multikey path information for
@@ -824,9 +920,9 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                   "Index is multikey but there are no multikey documents",
                   "index"_attr = descriptor->indexName());
 
-            // This makes an improvement in the case that no documents make the index multikey and
-            // the flag can be unset entirely. This may be due to a change in the data or historical
-            // multikey bugs that have persisted incorrect multikey infomation.
+            // This makes an improvement in the case that no documents make the index multikey
+            // and the flag can be unset entirely. This may be due to a change in the data or
+            // historical multikey bugs that have persisted incorrect multikey infomation.
             WriteUnitOfWork wuow(opCtx);
             const bool isMultikey = false;
             index->forceSetMultikey(opCtx, _validateState->getCollection(), isMultikey, {});
@@ -973,7 +1069,8 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
 
             auto& curRecordResults = results->getIndexValidateResult(descriptor->indexName());
             const std::string msg = fmt::format(
-                "Index {} is not multikey but document with RecordId({}) and {} has multikey data, "
+                "Index {} is not multikey but document with RecordId({}) and {} has multikey "
+                "data, "
                 "{} key(s)",
                 descriptor->indexName(),
                 recordId.toString(),

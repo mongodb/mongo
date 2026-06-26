@@ -49,6 +49,7 @@
 #include <cstdint>
 #include <map>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -89,81 +90,53 @@ struct IndexInfo {
 };
 
 /**
- * The IndexConsistency class provides the base class definitions for index-consistency
- * sub-classes. The base implementation in this class provides the basis for keeping track of the
- * index consistency. It does this by using the index keys from index entries and index keys
- * generated from the document to ensure there is a one-to-one mapping for each key.
- */
-class IndexConsistency {
-public:
-    static const long long kInterruptIntervalNumRecords;
-    static const size_t kNumHashBuckets;
-
-    IndexConsistency(OperationContext* opCtx,
-                     collection_validation::ValidateState* validateState,
-                     size_t numHashBuckets = kNumHashBuckets);
-
-    /**
-     * Informs the IndexConsistency object that we're advancing to the second phase of
-     * index validation.
-     */
-    void setSecondPhase();
-
-    virtual ~IndexConsistency() = default;
-
-protected:
-    struct IndexKeyBucket {
-        uint32_t indexKeyCount = 0;
-        uint32_t bucketSizeBytes = 0;
-    };
-
-    collection_validation::ValidateState* _validateState;
-
-    // We map the hashed KeyString values to a bucket that contains the count of how many
-    // index keys and document keys we've seen in each bucket. This counter is unsigned to avoid
-    // undefined behavior in the (unlikely) case of overflow.
-    // Count rules:
-    //     - If the count is non-zero for a bucket after all documents and index entries have been
-    //       processed, one or more indexes are inconsistent for KeyStrings that map to it.
-    //       Otherwise, those keys are consistent for all indexes with a high degree of confidence.
-    //     - Absent overflow, if a count interpreted as twos complement integer ends up greater
-    //       than zero, there are too few index entries.
-    //     - Similarly, if that count ends up less than zero, there are too many index entries.
-
-    std::vector<IndexKeyBucket> _indexKeyBuckets;
-
-    // Whether we're in the first or second phase of index validation.
-    bool _firstPhase;
-
-private:
-    IndexConsistency() = delete;
-};  // IndexConsistency
-
-/**
  * The KeyStringIndexConsistency class is used to keep track of the index consistency for
  * KeyString based indexes. It does this by using the index keys from index entries and index keys
  * generated from the document to ensure there is a one-to-one mapping for each key. In addition, an
  * IndexObserver class can be hooked into the IndexAccessMethod to inform this class about changes
  * to the indexes during a validation and compensate for them.
  */
-class KeyStringIndexConsistency final : protected IndexConsistency {
+class KeyStringIndexConsistency {
     struct AlphabeticalByIndexNameComparator;
+
+public:
+    struct IndexKeyBucket {
+        uint32_t indexKeyCount = 0;
+        uint32_t bucketSizeBytes = 0;
+    };
+
     using IndexInfoMap = std::map<std::string, IndexInfo>;
     using IndexKey = std::pair<IndexInfo*, key_string::Value>;
     // TODO(SERVER-62257): Drop the comparator, unfortunately we can't do that for now because there
     // are *quite problematic* dependencies between the order that we repair inconsistencies and the
-    // order we determine discrepencies in the count.
+    // order we determine discrepancies in the count.
     template <typename T>
     using IndexInconsistencyMap = std::map<IndexKey, T, AlphabeticalByIndexNameComparator>;
 
-public:
+    static constexpr int64_t kInterruptIntervalNumRecords = 4096;
+    static constexpr size_t kNumHashBuckets = 1U << 16;
+    enum class Phase { kFirst, kSecond };
+
+    KeyStringIndexConsistency() = delete;
     KeyStringIndexConsistency(OperationContext* opCtx,
                               collection_validation::ValidateState* validateState,
                               size_t numHashBuckets = kNumHashBuckets);
 
-    void setSecondPhase() {
-        IndexConsistency::setSecondPhase();
-    }
+    KeyStringIndexConsistency(KeyStringIndexConsistency&&) noexcept = default;
+    KeyStringIndexConsistency& operator=(KeyStringIndexConsistency&&) noexcept = default;
+
+    // A custom implementation of copy constructors and assignment operators is required as there
+    // are internal pointers between IndexKey and IndexInfoMap types.
+    KeyStringIndexConsistency(const KeyStringIndexConsistency& other);
+    KeyStringIndexConsistency& operator=(const KeyStringIndexConsistency& other);
+
+    ~KeyStringIndexConsistency() noexcept = default;
+
+    /**
+     * Informs the instance that we're advancing to the second phase of
+     * index validation.
+     */
+    void setSecondPhase();
 
     /**
      * Traverses the column-store index via 'cursor' and accumulates the traversal results.
@@ -202,7 +175,7 @@ public:
     void addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results);
 
     /**
-     * Sets up this IndexConsistency object to limit memory usage in the second phase of index
+     * Sets up this instance to limit memory usage in the second phase of index
      * validation. Returns whether the memory limit is sufficient to report at least one index entry
      * inconsistency and continue with the second phase of validation.
      */
@@ -217,14 +190,44 @@ public:
         return _totalIndexKeys;
     }
 
+    /**
+     * Merges another instance of this class into this one by inserting elements from the other's
+     * container member variables into the containers owned by this. It is only valid for
+     * instances of this class that are still in the First Phase of index consistency checks.
+     */
+    void merge(const KeyStringIndexConsistency& other);
+
+    /**
+     * Returns the index-key consistency buckets accumulated so far. First-phase scans are
+     * order-independent and reproduce a single serial scan.
+     */
+    std::span<const IndexKeyBucket> getIndexKeyBuckets() const {
+        return _indexKeyBuckets;
+    }
+
 private:
+    collection_validation::ValidateState* _validateState;
+
+    // We map the hashed KeyString values to a bucket that contains the count of how many
+    // index keys and document keys we've seen in each bucket. This counter is unsigned to avoid
+    // undefined behavior in the (unlikely) case of overflow.
+    // Count rules:
+    //     - If the count is non-zero for a bucket after all documents and index entries have been
+    //       processed, one or more indexes are inconsistent for KeyStrings that map to it.
+    //       Otherwise, those keys are consistent for all indexes with a high degree of confidence.
+    //     - Absent overflow, if a count interpreted as twos complement integer ends up greater
+    //       than zero, there are too few index entries.
+    //     - Similarly, if that count ends up less than zero, there are too many index entries.
+
+    std::vector<IndexKeyBucket> _indexKeyBuckets;
+
+    Phase _phase{Phase::kFirst};
+
     // Comparator used by index inconsistency maps to ensure that we traverse inconsistencies in the
     // same order that we would traverse the indices themselves.
     struct AlphabeticalByIndexNameComparator {
         bool operator()(const IndexKey& lhs, const IndexKey& rhs) const;
     };
-
-    KeyStringIndexConsistency() = delete;
 
     // A vector of IndexInfo indexes by index number
     IndexInfoMap _indexesInfo;
