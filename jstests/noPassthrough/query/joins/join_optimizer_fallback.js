@@ -7,6 +7,7 @@
  */
 import {joinOptUsed, plannerStageIsJoinOptNode} from "jstests/libs/query/join_utils.js";
 import {getWinningPlanFromExplain, getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 
@@ -72,13 +73,15 @@ function runTestCaseIneligiblePipeline({coll = coll1, pipeline, aggOptions = {},
     );
 }
 
-// This helper is for test cases where the prefix is eligible for join opt but the suffix is not.
+// This helper is for test cases where the prefix is eligible for join opt but the suffix is not
+// eligible for join opt.
 function runTestCaseIneligibleSuffix({
     coll = coll1,
     pipeline,
     aggOptions = {},
     expectedCount,
-    expectedJoinNodesInPrefix,
+    expectedNumJoinNodes,
+    expectedNonJoinSBENodes = 0,
 }) {
     assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount);
     const explain = coll.explain().aggregate(pipeline, aggOptions);
@@ -89,14 +92,30 @@ function runTestCaseIneligibleSuffix({
         "Expected join optimizer and actual usage differ: " + tojson(explain),
     );
     let stages = getAllPlanStages(getWinningPlanFromExplain(explain));
+    const joinStages = stages.filter(plannerStageIsJoinOptNode);
+
+    assert.eq(
+        joinStages.length,
+        expectedNumJoinNodes,
+        "Unexpected number of join-opt nodes: " + tojson(explain),
+    );
+    // We construct the join model then push eligible stages from the suffix into SBE,
+    // which are consequently grafted above the join stages. All of our suffix stages
+    // that are ineligible for join reordering are however eligible for SBE pushdown.
+    // Our test cases so far only push sort or $lookup/$unwind into SBE - thus we only
+    // check for those SBE stages.
+    stages.slice(0, expectedNonJoinSBENodes).forEach(function (stage) {
+        assert(stage.stage === "EQ_LOOKUP_UNWIND" || stage.stage === "SORT", stage);
+    });
 
     // Make sure we see the amount of join nodes in the prefix that we expected.
     // Slice's end index is exclusive eg it will not look at node at index 1.
-    stages.slice(0, expectedJoinNodesInPrefix).forEach(function (stage) {
+    stages.slice(expectedNonJoinSBENodes, expectedNumJoinNodes).forEach(function (stage) {
         assert(plannerStageIsJoinOptNode(stage), stage);
     });
+
     // Make sure there are no join nodes in the suffix.
-    stages.slice(expectedJoinNodesInPrefix).forEach(function (stage) {
+    stages.slice(expectedNonJoinSBENodes + expectedNumJoinNodes).forEach(function (stage) {
         assert(!plannerStageIsJoinOptNode(stage), stage);
     });
 }
@@ -290,7 +309,10 @@ runTestCaseIneligibleSuffix({
         {$unwind: "$coll13"},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 1,
+    expectedNumJoinNodes: 1,
+    expectedNonJoinSBENodes: checkSbeFullyEnabled(coll1.getDB())
+        ? 1 /* $sort will be pushed down to SBE only for trySbeEngine */
+        : 0,
 });
 
 // Conflicting prefix in the second as field
@@ -302,7 +324,8 @@ runTestCaseIneligibleSuffix({
         {$unwind: "$x.y.z"},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 1,
+    expectedNumJoinNodes: 1,
+    expectedNonJoinSBENodes: 1,
 });
 
 // Conflicting prefix in the second as field.
@@ -314,7 +337,8 @@ runTestCaseIneligibleSuffix({
         {$unwind: "$x.y"},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 1,
+    expectedNumJoinNodes: 1,
+    expectedNonJoinSBENodes: 1,
 });
 
 // Conflicting prefix in the second as field.
@@ -326,7 +350,8 @@ runTestCaseIneligibleSuffix({
         {$unwind: "$x.y"},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 1,
+    expectedNumJoinNodes: 1,
+    expectedNonJoinSBENodes: 1,
 });
 
 // Conflicting prefix in the second as field.
@@ -338,7 +363,8 @@ runTestCaseIneligibleSuffix({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 1,
+    expectedNumJoinNodes: 1,
+    expectedNonJoinSBENodes: 1,
 });
 
 runTestCaseEligiblePipeline({
@@ -363,7 +389,8 @@ runTestCaseIneligibleSuffix({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 1,
+    expectedNumJoinNodes: 1,
+    expectedNonJoinSBENodes: 1,
 });
 
 // $lookup with no join predicate can still be optimized if the rest of the pipeline establishes
@@ -402,7 +429,8 @@ runTestCaseIneligibleSuffix({
         {$unwind: {path: "$coll13", preserveNullAndEmptyArrays: true}},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 1,
+    expectedNumJoinNodes: 1,
+    expectedNonJoinSBENodes: 1,
 });
 
 // Eligible prefix followed by ineligible $unwind with includeArrayIndex.
@@ -414,7 +442,8 @@ runTestCaseIneligibleSuffix({
         {$unwind: {path: "$coll13", includeArrayIndex: "idx"}},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 1,
+    expectedNumJoinNodes: 1,
+    expectedNonJoinSBENodes: 1,
 });
 
 // Fallback when $unwind has both preserveNullAndEmptyArrays and includeArrayIndex.
@@ -539,7 +568,7 @@ runTestCaseIneligibleSuffix({
         {$unwind: "$coll13"},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 1,
+    expectedNumJoinNodes: 1,
 });
 
 // We don't bail out if our predicate is too complex to run as a rooted-$or.
@@ -575,7 +604,7 @@ runTestCaseIneligibleSuffix({
         {$unwind: "$coll13"},
     ],
     expectedCount: 1,
-    expectedJoinNodesInPrefix: 2,
+    expectedNumJoinNodes: 2,
 });
 
 // Numeric path in join predicate falls back gracefully even when the path is indexed.
