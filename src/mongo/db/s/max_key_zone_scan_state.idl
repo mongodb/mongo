@@ -27,9 +27,9 @@
 #
 
 # Defines the singleton document stored in config.maxKeyZoneScanState. The document
-# tracks the result of the per-primary-stepup Category B (MaxKey zone) inventory scan
-# run by the config-server's per-stepup scan service. The collection is replicated
-# within the config-server replica set. See CA-551 / SERVER-121533.
+# tracks the result of the per-primary-stepup MaxKey zone inventory scan run by the
+# config-server's per-stepup scan service. The collection is replicated within the
+# config-server replica set.
 
 global:
     cpp_namespace: "mongo"
@@ -41,9 +41,9 @@ imports:
 structs:
     maxKeyZoneScanState:
         description:
-            "Singleton state document for the Category B (MaxKey zone) detection scan.
-            Lives in config.maxKeyZoneScanState on the config server, replicated within
-            the config-server replica set."
+            "Singleton state document for the MaxKey zone detection scan. Lives in
+            config.maxKeyZoneScanState on the config server, replicated within the
+            config-server replica set."
         strict: false
         fields:
             _id:
@@ -63,7 +63,7 @@ structs:
                 type: bool
                 description:
                     "True if any config.tags entry was found whose upper bound matches the
-                    Category B fingerprint (compound shard key with trailing MinKey fields
+                    MaxKey zone fingerprint (compound shard key with trailing MinKey fields
                     that the user almost certainly intended as MaxKey)."
             alertEmitted:
                 type: bool

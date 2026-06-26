@@ -76,6 +76,7 @@
 #include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/router_role/routing_cache/shard_server_catalog_cache_loader.h"
 #include "mongo/db/router_role/routing_cache/shard_server_catalog_cache_loader_impl.h"
+#include "mongo/db/s/max_key_orphan_detection.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
@@ -553,6 +554,8 @@ ShardingInitializationMongoD* ShardingInitializationMongoD::get(ServiceContext* 
 }
 
 void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
+    cancelMaxKeyOrphanDetection(opCtx->getServiceContext());
+
     auto const shardingState = ShardingState::get(opCtx);
     if (!shardingState->enabled())
         return;
@@ -769,6 +772,10 @@ void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, lon
             // Schedule a drop of the temporary collections used by aggregations ($out
             // specifically).
             dropAggTempCollections(opCtx);
+
+            // Kick off the one-shot MaxKey orphan detector for this term. Runs asynchronously
+            // and is cancelled on stepdown.
+            launchMaxKeyOrphanDetectionOnStepUp(opCtx, term);
         }
 
         // The code above will only be executed after a stepdown happens, however the code below
@@ -851,6 +858,10 @@ void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, lon
 void ShardingInitializationMongoD::onStepDown() {
     // TODO (SERVER-113612): remove cc() usage.
     auto opCtx = cc().getOperationContext();
+
+    // Cancel any in-flight MaxKey orphan detector so the one-shot sweep restarts cleanly on the
+    // next stepup.
+    cancelMaxKeyOrphanDetection(opCtx->getServiceContext());
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         PeriodicShardedIndexConsistencyChecker::get(opCtx).onStepDown();

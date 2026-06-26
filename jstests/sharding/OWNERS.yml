@@ -46,6 +46,9 @@ filters:
   - "*range*deletion*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "max_key_orphan*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "*retryable_write*":
     approvers:
       - 10gen/server-transactions

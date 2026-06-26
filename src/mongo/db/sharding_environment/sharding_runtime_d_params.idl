@@ -253,3 +253,17 @@ server_parameters:
             gt: 0
         default: 10
         redact: false
+
+    maxKeyOrphanScanThrottleMillis:
+        description: >-
+            Milliseconds the standalone MaxKey orphan detector sleeps before each per-collection
+            read of the collection entry from the config server. Throttles those reads so a primary
+            stepup across a shard with many collections does not overload the config server. Set to
+            0 to disable.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: maxKeyOrphanScanThrottleMillis
+        validator:
+            gte: 0
+        default: 10
+        redact: false

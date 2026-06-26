@@ -27,10 +27,10 @@
 #
 
 # Defines the singleton document stored in config.maxKeyOrphanScanState. The document
-# tracks the result of the per-primary-stepup Category A (MaxKey orphan) inventory scan
-# run by the shard's RangeDeleterService. The collection is replicated within the shard
-# replica set so that alertEmitted is preserved across stepups and new primaries do not
-# re-alert for the same finding. See CA-551 / SERVER-121533.
+# tracks the result of the per-primary-stepup MaxKey orphan inventory scan run on each
+# shard primary. The collection is replicated within the shard replica set so that
+# alertEmitted is preserved across stepups and new primaries do not re-alert for the same
+# finding.
 
 global:
     cpp_namespace: "mongo"
@@ -42,9 +42,9 @@ imports:
 structs:
     maxKeyOrphanScanState:
         description:
-            "Singleton state document for the Category A (MaxKey orphan) detection scan.
-            Lives in config.maxKeyOrphanScanState on each shard, replicated within the
-            shard replica set."
+            "Singleton state document for the MaxKey orphan detection scan. Lives in
+            config.maxKeyOrphanScanState on each shard, replicated within the shard
+            replica set."
         strict: false
         fields:
             _id:

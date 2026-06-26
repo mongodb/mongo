@@ -110,11 +110,11 @@
     /*  Namespace containing pending range deletions snapshots for rename operations. */           \
     X(kRangeDeletionForRenameNamespace, DatabaseName::kConfig, "rangeDeletionsForRename")          \
                                                                                                    \
-    /*  Namespace for the max-key orphan detection scan state document, replicated within the      \
+    /*  Namespace for the MaxKey orphan detection scan state document, replicated within the       \
      *  shard replica set. */                                                                      \
     X(kConfigMaxKeyOrphanScanStateNamespace, DatabaseName::kConfig, "maxKeyOrphanScanState")       \
                                                                                                    \
-    /*  Namespace for the max-key zone detection scan state document, replicated within the        \
+    /*  Namespace for the MaxKey zone detection scan state document, replicated within the         \
      *  config-server replica set. */                                                              \
     X(kConfigMaxKeyZoneScanStateNamespace, DatabaseName::kConfig, "maxKeyZoneScanState")           \
                                                                                                    \

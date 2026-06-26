@@ -68,6 +68,7 @@ const StringDataSet kConfigCollections{
     NamespaceString::kExternalKeysCollectionNamespace.coll(),
     NamespaceString::kForceOplogBatchBoundaryNamespace.coll(),
     NamespaceString::kIndexBuildEntryNamespace.coll(),
+    NamespaceString::kConfigMaxKeyOrphanScanStateNamespace.coll(),
     NamespaceString::kLogicalSessionsNamespace.coll(),
     NamespaceString::kMigrationCoordinatorsNamespace.coll(),
     NamespaceString::kMigrationRecipientsNamespace.coll(),

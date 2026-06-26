@@ -211,8 +211,8 @@ feature_flags:
     featureFlagMaxKeyDetection:
         description: >-
             Feature flag protecting the one-shot MaxKey inventory scans run on each primary
-            stepup. On shards, the RangeDeleterService scan detects shard-key documents whose
-            value is the global MaxKey and records the result in config.maxKeyOrphanScanState.
+            stepup. On shards, a dedicated per-stepup detector scans for shard-key documents
+            whose leading field is MaxKey and records the result in config.maxKeyOrphanScanState.
             On the config server, the Balancer scan detects zones whose upper bound matches the
             buggy trailing-MinKey fingerprint and records the result in config.maxKeyZoneScanState.
         cpp_varname: feature_flags::gMaxKeyDetection
