@@ -63,10 +63,11 @@ export var WriteConflictHelpers = (function () {
     function validateWriteConflictsBeforeAndAfter(coll, before, after) {
         if (before != null && after != null) {
             // Transactions on sharded collections can land on multiple shards and increment the
-            // total WCE metric by the number of shards involved. Similarly, BulkWriteOverride turns
-            // a single op into multiple writes and causes multiple WCEs. The unified write executor
-            // implements some writes as bulk writes internally.
-            if (FixtureHelpers.isSharded(coll) || TestData.runningWithBulkWriteOverride) {
+            // total WCE metric by the number of shards involved. Additionaly, on sharded clusters
+            // some background operations can cause WCE and increase the metric. Similarly,
+            // BulkWriteOverride turns a single op into multiple writes and causes multiple WCEs.
+            // The unified write executor implements some writes as bulk writes internally.
+            if (FixtureHelpers.isMongos(coll.getDB()) || TestData.runningWithBulkWriteOverride) {
                 assert.gte(after, before + 1);
             } else {
                 assert.eq(after, before + 1);
