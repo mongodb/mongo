@@ -1015,7 +1015,10 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
     }
 
     _createChangeStreamsMonitor(executor, factory);
-    _changeStreamsMonitorStarted.emplaceValue();
+    {
+        std::lock_guard<std::mutex> lk(_mutex);
+        ensureFulfilledPromise(lk, _changeStreamsMonitorStarted);
+    }
 
     // Kick off the change-streams monitor await as a fire-and-forget task. It runs in the
     // background through the remainder of the resharding operation. The monitor's final change
