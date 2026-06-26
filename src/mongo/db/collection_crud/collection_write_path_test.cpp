@@ -33,7 +33,6 @@
 #include "mongo/db/change_stream_pre_image_id_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"

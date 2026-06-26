@@ -35,8 +35,16 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/write_batch.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
@@ -46,6 +54,9 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+
+#include <variant>
 
 namespace mongo::timeseries::write_ops::internal {
 namespace {
@@ -499,6 +510,63 @@ TEST_F(
     std::vector<bucket_catalog::UserBatchIndex> expectedIndices{3, 1};
     _testStageUnorderedWritesUnoptimized(
         _ns1, userBatch, expectedIndices, docsToRetry, stmtIds, boost::none, executedStmtIds);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, CommitSurvivesWriteConflictOnBucketInsert) {
+    const std::vector<BSONObj> userBatch{
+        BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(1))};
+    auto request = _createInsertCommandRequest(_ns1, userBatch);
+
+    auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+        _opCtx, _ns1, request, /*expectedUUID=*/boost::none);
+
+    boost::optional<UUID> optUuid;
+    std::vector<mongo::write_ops::WriteError> stageErrors;
+    auto batches =
+        stageUnorderedWritesToBucketCatalog(_opCtx,
+                                            request,
+                                            preConditions,
+                                            /*startIndex=*/0,
+                                            request.getDocuments().size(),
+                                            bucket_catalog::AllowQueryBasedReopening::kAllow,
+                                            optUuid,
+                                            &stageErrors);
+    EXPECT_TRUE(stageErrors.empty());
+    ASSERT_EQ(batches.size(), 1);
+    auto batch = batches.front();
+
+    std::vector<mongo::write_ops::WriteError> errors;
+    boost::optional<repl::OpTime> opTime;
+    boost::optional<OID> electionId;
+    absl::flat_hash_map<int, int> retryAttemptsForDup;
+
+    commit_result::Result result;
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        const auto initialTimesEntered = failPoint->initialTimesEntered();
+        result = commitTimeseriesBucketForBatch(
+            _opCtx, batch, request, preConditions, errors, opTime, electionId, retryAttemptsForDup);
+        EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered))
+            << "Expected exactly one injected write conflict during the bucket insert";
+    }
+
+    EXPECT_TRUE(std::holds_alternative<commit_result::Success>(result));
+    EXPECT_TRUE(errors.empty());
+    bucket_catalog::finish(bucket_catalog::GlobalBucketCatalog::get(_opCtx->getServiceContext()),
+                           batch);
+
+    // The retried insert persisted exactly one bucket document holding the single measurement.
+    AutoGetCollection bucketsColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    ASSERT(bucketsColl);
+    EXPECT_EQ(1, bucketsColl->numRecords(_opCtx));
+
+    auto cursor = bucketsColl->getRecordStore()->getCursor(
+        _opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
+    auto record = cursor->next();
+    ASSERT(record);
+    const auto control = record->data.toBson().getObjectField(timeseries::kBucketControlFieldName);
+    EXPECT_EQ(1, control[timeseries::kBucketControlCountFieldName].numberInt());
 }
 
 }  // namespace
