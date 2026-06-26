@@ -531,6 +531,19 @@ StatusWith<ShardId> ShardRegistry::resolveShardId(OperationContext* opCtx,
     return swShard.getValue()->getId();
 }
 
+ShardRefToHandleMap ShardRegistry::getShardRefToHandleMap(OperationContext* opCtx) {
+    auto shards = _getData(opCtx)->getAllShards();
+    ShardRefToHandleMap shardRefToHandleMap;
+    for (const auto& shard : shards) {
+        const auto& handle = shard->getHandle();
+        shardRefToHandleMap[handle.name()] = handle;
+        if (handle.uuid()) {
+            shardRefToHandleMap[ShardRef(*handle.uuid())] = handle;
+        }
+    }
+    return shardRefToHandleMap;
+}
+
 std::vector<ShardId> ShardRegistry::getAllShardIds(OperationContext* opCtx) {
     auto shardIds = _getData(opCtx)->getAllShardIds();
     if (shardIds.empty()) {

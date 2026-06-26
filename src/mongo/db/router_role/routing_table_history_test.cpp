@@ -42,6 +42,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/logv2/log.h"
@@ -75,6 +76,7 @@
 namespace mongo {
 
 using chunks_test_util::assertEqualChunkInfo;
+using chunks_test_util::buildTestShardRefToHandleMap;
 using chunks_test_util::calculateCollVersion;
 using chunks_test_util::calculateIntermediateShardKey;
 using chunks_test_util::calculateShardsMaxValidAfter;
@@ -88,6 +90,20 @@ PseudoRandom _random{SecureRandom().nextInt64()};
 
 const ShardId kThisShard("thisShard");
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+
+/**
+ * Builds a ShardRefToHandleMap for a given list of ShardHandles.
+ */
+ShardRefToHandleMap buildShardRefToHandleMap(const std::vector<ShardHandle>& shardHandles) {
+    ShardRefToHandleMap shardRefToHandleMap;
+    for (const auto& shardHandle : shardHandles) {
+        shardRefToHandleMap.emplace(shardHandle.name(), shardHandle);
+        if (shardHandle.uuid()) {
+            shardRefToHandleMap.emplace(ShardRef(*shardHandle.uuid()), shardHandle);
+        }
+    }
+    return shardRefToHandleMap;
+}
 
 /**
  * Creates a new routing table from the input routing table by inserting the chunks specified by
@@ -215,6 +231,61 @@ protected:
     const UUID _collUUID{UUID::gen()};
 };
 
+class RoutingTableHistoryShardRefParamTest : public RoutingTableHistoryTest,
+                                             public testing::WithParamInterface<bool> {
+protected:
+    bool useShardUuid() const {
+        return GetParam();
+    }
+
+    ShardRef thisShardRef() const {
+        return useShardUuid() ? ShardRef(*_thisShardHandle.uuid())
+                              : ShardRef(_thisShardHandle.name());
+    }
+
+    ShardRef otherShardRef() const {
+        return useShardUuid() ? ShardRef(*_otherShardHandle.uuid())
+                              : ShardRef(_otherShardHandle.name());
+    }
+
+    ShardRefToHandleMap shardRefToHandleMap() const {
+        return buildShardRefToHandleMap({_thisShardHandle, _otherShardHandle, _absentShardHandle});
+    }
+
+    ShardRefToHandleMap shardRefToHandleMap(const std::vector<ChunkType>& chunks) const {
+        ShardRefToHandleMap chunkShardRefToHandleMap =
+            chunks_test_util::buildTestShardRefToHandleMap(chunks);
+        ShardRefToHandleMap localHandleMap = shardRefToHandleMap();
+        localHandleMap.insert(chunkShardRefToHandleMap.begin(), chunkShardRefToHandleMap.end());
+        return localHandleMap;
+    }
+
+    std::vector<ChunkType> genRandomChunkVector(size_t minNumChunks = 1,
+                                                size_t maxNumChunks = 30) const {
+        return chunks_test_util::genRandomChunkVector(
+            _collUUID, _epoch, _collTimestamp, maxNumChunks, minNumChunks, useShardUuid());
+    }
+
+    ChunkType makeChunk(const BSONObj& min,
+                        const BSONObj& max,
+                        const ChunkVersion& version,
+                        const boost::optional<ShardRef>& shard = boost::none) const {
+        return ChunkType{
+            collUUID(), ChunkRange{min, max}, version, shard ? *shard : thisShardRef()};
+    }
+
+    const ShardHandle _thisShardHandle{kThisShard, UUID::gen()};
+    const ShardHandle _otherShardHandle{ShardId("otherShard"), UUID::gen()};
+    const ShardHandle _absentShardHandle{ShardId("shard-without-chunks"), boost::none};
+};
+
+INSTANTIATE_TEST_SUITE_P(ShardRefVariants,
+                         RoutingTableHistoryShardRefParamTest,
+                         testing::Bool(),
+                         [](const testing::TestParamInfo<bool>& info) {
+                             return info.param ? "UuidShardRef" : "StringShardRef";
+                         });
+
 /**
  * Test fixture for tests that need to start with three chunks in it
  */
@@ -253,10 +324,11 @@ private:
 /*
  * Test creation of a Routing Table with randomly generated chunks
  */
-TEST_F(RoutingTableHistoryTest, RandomCreateBasic) {
+TEST_P(RoutingTableHistoryShardRefParamTest, RandomCreateBasic) {
     const auto chunks = genRandomChunkVector();
     const auto expectedShardVersions = calculateShardVersions(chunks);
     const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
+    auto handleMap = shardRefToHandleMap(chunks);
 
     // Create a new routing table from the randomly generated chunks
     auto rt = makeNewRt(chunks);
@@ -278,30 +350,34 @@ TEST_F(RoutingTableHistoryTest, RandomCreateBasic) {
     ASSERT_EQ(expectedCollVersion, rt.getVersion());
 
     // Checks version for each chunk
-    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
-        ASSERT_EQ(shardVersion, rt.getVersion(shardId));
+    for (const auto& [shardRef, shardVersion] : expectedShardVersions) {
+        ASSERT_EQ(shardVersion, rt.getVersion(shardRef, handleMap));
     }
 
     ASSERT_EQ(expectedShardVersions.size(), rt.getNShardsOwningChunks());
 
-    std::set<ShardId> expectedShardIds;
-    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
-        expectedShardIds.insert(shardId);
+    // TODO (SERVER-129331): Run always once getAllShardIds returns shard refs.
+    if (!useShardUuid()) {
+        std::set<ShardId> expectedShardIds;
+        for (const auto& [shardRef, shardVersion] : expectedShardVersions) {
+            expectedShardIds.insert(ShardId(shardRef));
+        }
+        std::set<ShardId> shardIds;
+        rt.getAllShardIds(&shardIds);
+        ASSERT(expectedShardIds == shardIds);
     }
-    std::set<ShardId> shardIds;
-    rt.getAllShardIds(&shardIds);
-    ASSERT(expectedShardIds == shardIds);
 
     // Validate all shard maxValidAfter
     const auto expectedShardsMaxValidAfter = calculateShardsMaxValidAfter(chunks);
-    const auto expectedMaxValidAfter = [&](const ShardId& shard) {
-        auto it = expectedShardsMaxValidAfter.find(shard);
+    const auto expectedMaxValidAfter = [&](const ShardRef& shardRef) {
+        auto it = expectedShardsMaxValidAfter.find(shardRef);
         return it != expectedShardsMaxValidAfter.end() ? it->second : Timestamp{0, 0};
     };
-    for (const auto& [shardId, _] : expectedShardVersions) {
-        ASSERT_GTE(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId));
+    for (const auto& [shardRef, _] : expectedShardVersions) {
+        ASSERT_GTE(rt.getMaxValidAfter(shardRef, handleMap), expectedMaxValidAfter(shardRef));
     }
-    ASSERT_EQ(rt.getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));
+    ASSERT_EQ(rt.getMaxValidAfter(ShardRef(_absentShardHandle.name()), handleMap),
+              (Timestamp{0, 0}));
 }
 
 /*
@@ -528,7 +604,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateMismatchingTimestampFail) {
 /*
  * Test update of the Routing Table with randomly generated changed chunks.
  */
-TEST_F(RoutingTableHistoryTest, RandomUpdate) {
+TEST_P(RoutingTableHistoryShardRefParamTest, RandomUpdate) {
     auto initialChunks = genRandomChunkVector();
 
     const auto initialShardVersions = calculateShardVersions(initialChunks);
@@ -541,7 +617,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdate) {
     const auto maxNumChunkOps = 2 * initialChunks.size();
     const auto numChunkOps = _random.nextInt32(maxNumChunkOps);
 
-    performRandomChunkOperations(&chunks, numChunkOps);
+    performRandomChunkOperations(&chunks, numChunkOps, useShardUuid());
 
     std::vector<ChunkType> updatedChunks;
     for (const auto& chunk : chunks) {
@@ -552,6 +628,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdate) {
 
     const auto expectedShardVersions = calculateShardVersions(chunks);
     const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
+    auto handleMap = shardRefToHandleMap(chunks);
 
     auto rt = makeUpdatedRoutingTable(initialRt, updatedChunks);
 
@@ -572,31 +649,35 @@ TEST_F(RoutingTableHistoryTest, RandomUpdate) {
     ASSERT_EQ(expectedCollVersion, rt.getVersion());
 
     // Checks version for each shard
-    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
-        ASSERT_EQ(shardVersion, rt.getVersion(shardId));
+    for (const auto& [shardRef, shardVersion] : expectedShardVersions) {
+        ASSERT_EQ(shardVersion, rt.getVersion(shardRef, handleMap));
     }
 
     ASSERT_EQ(expectedShardVersions.size(), rt.getNShardsOwningChunks());
 
-    std::set<ShardId> expectedShardIds;
-    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
-        expectedShardIds.insert(shardId);
+    // TODO (SERVER-129331): Run always once getAllShardIds returns shard refs.
+    if (!useShardUuid()) {
+        std::set<ShardId> expectedShardIds;
+        for (const auto& [shardRef, shardVersion] : expectedShardVersions) {
+            expectedShardIds.insert(ShardId(shardRef));
+        }
+        std::set<ShardId> shardIds;
+        rt.getAllShardIds(&shardIds);
+        ASSERT(expectedShardIds == shardIds);
     }
-    std::set<ShardId> shardIds;
-    rt.getAllShardIds(&shardIds);
-    ASSERT(expectedShardIds == shardIds);
 
     // Validate all shard maxValidAfter
     const auto expectedShardsMaxValidAfter = calculateShardsMaxValidAfter(chunks);
-    const auto expectedMaxValidAfter = [&](const ShardId& shard) {
-        auto it = expectedShardsMaxValidAfter.find(shard);
+    const auto expectedMaxValidAfter = [&](const ShardRef& shardRef) {
+        auto it = expectedShardsMaxValidAfter.find(shardRef);
         return it != expectedShardsMaxValidAfter.end() ? it->second : Timestamp{0, 0};
     };
-    for (const auto& [shardId, _] : expectedShardVersions) {
-        ASSERT_GTE(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId))
-            << "For shardid " << shardId;
+    for (const auto& [shardRef, _] : expectedShardVersions) {
+        ASSERT_GTE(rt.getMaxValidAfter(shardRef, handleMap), expectedMaxValidAfter(shardRef))
+            << "For shard " << shardRef;
     }
-    ASSERT_EQ(rt.getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));
+    ASSERT_EQ(rt.getMaxValidAfter(ShardRef(_absentShardHandle.name()), handleMap),
+              (Timestamp{0, 0}));
 }
 
 TEST_F(RoutingTableHistoryTest, AllowMigrationFlag) {
@@ -646,82 +727,72 @@ TEST_F(RoutingTableHistoryTest, AllowMigrationFlag) {
     }
 }
 
-TEST_F(RoutingTableHistoryTest, TestSplits) {
+TEST_P(RoutingTableHistoryShardRefParamTest, TestSplits) {
     ChunkVersion version{{collEpoch(), collTimestamp()}, {1, 0}};
 
     auto chunkAll =
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
-                  version,
-                  kThisShard};
+        makeChunk(getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax(), version);
 
     auto rt = makeNewRt({chunkAll});
+    const auto handleMap = shardRefToHandleMap();
 
     std::vector<ChunkType> chunks1 = {
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion{{collEpoch(), collTimestamp()}, {2, 2}},
-                  kThisShard}};
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << 0),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1})),
+        makeChunk(BSON("a" << 0),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion{{collEpoch(), collTimestamp()}, {2, 2}})};
 
     auto rt1 = makeUpdatedRoutingTable(rt, std::move(chunks1));
     auto v1 = ChunkVersion{{collEpoch(), collTimestamp()}, {2, 2}};
-    ASSERT_EQ(v1, rt1.getVersion(kThisShard));
+    ASSERT_EQ(v1, rt1.getVersion(thisShardRef(), handleMap));
 
     std::vector<ChunkType> chunks2 = {
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << -1)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << -1), BSON("a" << 0)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 2}),
-                  kThisShard}};
+        makeChunk(BSON("a" << 0),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2})),
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << -1),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 1})),
+        makeChunk(
+            BSON("a" << -1), BSON("a" << 0), ChunkVersion({collEpoch(), collTimestamp()}, {3, 2}))};
 
     auto rt2 = makeUpdatedRoutingTable(rt, std::move(chunks2));
 
     auto v2 = ChunkVersion({collEpoch(), collTimestamp()}, {3, 2});
-    ASSERT_EQ(v2, rt2.getVersion(kThisShard));
+    ASSERT_EQ(v2, rt2.getVersion(thisShardRef(), handleMap));
 }
 
-TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
+TEST_P(RoutingTableHistoryShardRefParamTest, TestReplaceEmptyChunk) {
     std::vector<ChunkType> initialChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {1, 0}),
-                  kThisShard}};
+        makeChunk(getShardKeyPattern().globalMin(),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {1, 0}))};
 
     auto rt = makeNewRt(initialChunks);
     ASSERT_EQ(rt.numChunks(), 1);
+    const auto handleMap = shardRefToHandleMap();
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}),
-                  kThisShard}};
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << 0),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1})),
+        makeChunk(BSON("a" << 0),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}))};
 
     auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
 
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {2, 2});
-    ASSERT_EQ(v1, rt1.getVersion(kThisShard));
+    ASSERT_EQ(v1, rt1.getVersion(thisShardRef(), handleMap));
     ASSERT_EQ(rt1.numChunks(), 2);
 
     std::shared_ptr<ChunkInfo> found;
 
     rt1.forEachChunk(
         [&](auto& chunkInfo) {
-            if (chunkInfo->getShardIdAt(boost::none) == kThisShard) {
+            if (chunkInfo->getShardRef() == thisShardRef()) {
                 found = chunkInfo;
                 return false;
             }
@@ -731,65 +802,59 @@ TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
     ASSERT(found);
 }
 
-TEST_F(RoutingTableHistoryTest, TestUseLatestVersions) {
+TEST_P(RoutingTableHistoryShardRefParamTest, TestUseLatestVersions) {
     std::vector<ChunkType> initialChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {1, 0}),
-                  kThisShard}};
+        makeChunk(getShardKeyPattern().globalMin(),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {1, 0}))};
 
     auto rt = makeNewRt(initialChunks);
     ASSERT_EQ(rt.numChunks(), 1);
+    const auto handleMap = shardRefToHandleMap();
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {1, 0}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}),
-                  kThisShard}};
+        makeChunk(getShardKeyPattern().globalMin(),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {1, 0})),
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << 0),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1})),
+        makeChunk(BSON("a" << 0),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}))};
 
     auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
 
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {2, 2});
-    ASSERT_EQ(v1, rt1.getVersion(kThisShard));
+    ASSERT_EQ(v1, rt1.getVersion(thisShardRef(), handleMap));
     ASSERT_EQ(rt1.numChunks(), 2);
 }
 
-TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
+TEST_P(RoutingTableHistoryShardRefParamTest, TestOutOfOrderVersion) {
     std::vector<ChunkType> initialChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}),
-                  kThisShard}};
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << 0),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1})),
+        makeChunk(BSON("a" << 0),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}))};
 
     auto rt = makeNewRt(initialChunks);
     ASSERT_EQ(rt.numChunks(), 2);
+    const auto handleMap = shardRefToHandleMap();
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 0}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}),
-                  kThisShard}};
+        makeChunk(BSON("a" << 0),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 0})),
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << 0),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}))};
 
     auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
 
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {3, 1});
-    ASSERT_EQ(v1, rt1.getVersion(kThisShard));
+    ASSERT_EQ(v1, rt1.getVersion(thisShardRef(), handleMap));
     ASSERT_EQ(rt1.numChunks(), 2);
 
     auto chunk1 = rt1.findIntersectingChunk(BSON("a" << 0));
@@ -798,76 +863,67 @@ TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
     ASSERT_EQ(chunk1->getMax().woCompare(getShardKeyPattern().globalMax()), 0);
 }
 
-TEST_F(RoutingTableHistoryTest, TestMergeChunks) {
+TEST_P(RoutingTableHistoryShardRefParamTest, TestMergeChunks) {
     std::vector<ChunkType> initialChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << 0), BSON("a" << 10)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 0}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << 10), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}),
-                  kThisShard}};
+        makeChunk(
+            BSON("a" << 0), BSON("a" << 10), ChunkVersion({collEpoch(), collTimestamp()}, {2, 0})),
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << 0),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1})),
+        makeChunk(BSON("a" << 10),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}))};
 
     auto rt = makeNewRt(initialChunks);
+    const auto handleMap = shardRefToHandleMap();
 
     ASSERT_EQ(rt.numChunks(), 3);
     ASSERT_EQ(rt.getVersion(), ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}));
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << 10), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 0}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 10)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}),
-                  kThisShard}};
+        makeChunk(BSON("a" << 10),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 0})),
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << 10),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}))};
 
     auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
 
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {3, 1});
-    ASSERT_EQ(v1, rt1.getVersion(kThisShard));
+    ASSERT_EQ(v1, rt1.getVersion(thisShardRef(), handleMap));
     ASSERT_EQ(rt1.numChunks(), 2);
 }
 
-TEST_F(RoutingTableHistoryTest, TestMergeChunksOrdering) {
+TEST_P(RoutingTableHistoryShardRefParamTest, TestMergeChunksOrdering) {
     std::vector<ChunkType> initialChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << -10), getShardKeyPattern().globalMax()},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 0}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << -500)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << -500), BSON("a" << -10)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}),
-                  kThisShard}};
+        makeChunk(BSON("a" << -10),
+                  getShardKeyPattern().globalMax(),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 0})),
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << -500),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 1})),
+        makeChunk(BSON("a" << -500),
+                  BSON("a" << -10),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}))};
 
     auto rt = makeNewRt(initialChunks);
+    const auto handleMap = shardRefToHandleMap();
     ASSERT_EQ(rt.numChunks(), 3);
     ASSERT_EQ(rt.getVersion(), ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}));
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{collUUID(),
-                  ChunkRange{BSON("a" << -500), BSON("a" << -10)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}),
-                  kThisShard},
-        ChunkType{collUUID(),
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << -10)},
-                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}),
-                  kThisShard}};
+        makeChunk(BSON("a" << -500),
+                  BSON("a" << -10),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {2, 2})),
+        makeChunk(getShardKeyPattern().globalMin(),
+                  BSON("a" << -10),
+                  ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}))};
 
     auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
 
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {3, 1});
-    ASSERT_EQ(v1, rt1.getVersion(kThisShard));
+    ASSERT_EQ(v1, rt1.getVersion(thisShardRef(), handleMap));
     ASSERT_EQ(rt1.numChunks(), 2);
 
     auto chunk1 = rt1.findIntersectingChunk(BSON("a" << -500));
@@ -925,8 +981,6 @@ TEST_F(RoutingTableHistoryTest, TestFlatten) {
 // chunk, so findIntersectingChunk returns nullptr for it.
 // ---------------------------------------------------------------------------
 
-const ShardId kOtherShard("otherShard");
-
 class RoutingTableHistoryGapTest : public RoutingTableHistoryTest {
 public:
     // Builds a routing table that allows gaps between chunks, like the shard-local catalog. The
@@ -957,7 +1011,7 @@ public:
     ChunkType makeChunk(const BSONObj& min,
                         const BSONObj& max,
                         const ChunkVersion& version,
-                        const ShardId& shard = kThisShard) const {
+                        const ShardRef& shard = kThisShard) const {
         return ChunkType{collUUID(), ChunkRange{min, max}, version, shard};
     }
 
@@ -965,6 +1019,43 @@ public:
         return BSON("a" << value);
     }
 };
+
+class RoutingTableHistoryGapShardRefParamTest : public RoutingTableHistoryShardRefParamTest {
+public:
+    RoutingTableHistory makeNewRtAllowingGaps(const std::vector<ChunkType>& chunks) const {
+        const auto chunkBucketSize =
+            _random.nextInt64(std::max<std::size_t>(chunks.size(), 1) * 1.2) + 1;
+        unittest::ServerParameterGuard chunkBucketSizeParameter("routingTableCacheChunkBucketSize",
+                                                                chunkBucketSize);
+        return RoutingTableHistory::makeNewAllowingGaps(kNss,
+                                                        collUUID(),
+                                                        getShardKeyPattern(),
+                                                        false, /* unsplittable */
+                                                        nullptr,
+                                                        false,
+                                                        collEpoch(),
+                                                        collTimestamp(),
+                                                        boost::none /* timeseriesFields */,
+                                                        boost::none /* reshardingFields */,
+                                                        true,
+                                                        chunks);
+    }
+
+    ChunkVersion chunkVersion(uint32_t major, uint32_t minor) const {
+        return ChunkVersion{{collEpoch(), collTimestamp()}, {major, minor}};
+    }
+
+    BSONObj key(int value) const {
+        return BSON("a" << value);
+    }
+};
+
+INSTANTIATE_TEST_SUITE_P(ShardRefVariants,
+                         RoutingTableHistoryGapShardRefParamTest,
+                         testing::Bool(),
+                         [](const testing::TestParamInfo<bool>& info) {
+                             return info.param ? "UuidShardRef" : "StringShardRef";
+                         });
 
 // ---------------------------------------------------------------------------
 // General RoutingTableHistory behavior with gaps: construction and the read/query API.
@@ -1061,23 +1152,32 @@ TEST_F(RoutingTableHistoryGapTest, GetAllChunkRangesReturnsAllChunkRanges) {
 }
 
 // Per-shard and collection version and ownership counts are correct on a multi-shard gap table.
-TEST_F(RoutingTableHistoryGapTest, ShardAccountingWithGaps) {
-    auto rt = makeNewRtAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0), kThisShard),
-                                     makeChunk(key(20), key(30), chunkVersion(1, 2), kOtherShard),
-                                     makeChunk(key(40), key(50), chunkVersion(1, 3), kThisShard)});
+TEST_P(RoutingTableHistoryGapShardRefParamTest, ShardAccountingWithGaps) {
+    const std::vector<ChunkType> chunks = {
+        makeChunk(key(0), key(10), chunkVersion(1, 0)),
+        makeChunk(key(20), key(30), chunkVersion(1, 2), otherShardRef()),
+        makeChunk(key(40), key(50), chunkVersion(1, 3))};
+    const ShardId absentShard = ShardId("absentShard");
+    auto shardRefToHandleMap = buildShardRefToHandleMap({_thisShardHandle, _otherShardHandle});
+    shardRefToHandleMap.emplace(ShardRef(absentShard), ShardHandle(absentShard, boost::none));
+
+    auto rt = makeNewRtAllowingGaps(chunks);
 
     ASSERT_EQ(rt.getNShardsOwningChunks(), 2);
 
-    std::set<ShardId> shardIds;
-    rt.getAllShardIds(&shardIds);
-    ASSERT(shardIds == (std::set<ShardId>{kThisShard, kOtherShard}));
+    // TODO (SERVER-129331): Run always once getAllShardIds returns shard refs.
+    if (!useShardUuid()) {
+        std::set<ShardId> shardIds;
+        rt.getAllShardIds(&shardIds);
+        ASSERT(shardIds == (std::set<ShardId>{_thisShardHandle.name(), _otherShardHandle.name()}));
+    }
 
     ASSERT_EQ(rt.getVersion(), chunkVersion(1, 3));
-    ASSERT_EQ(rt.getVersion(kThisShard), chunkVersion(1, 3));
-    ASSERT_EQ(rt.getVersion(kOtherShard), chunkVersion(1, 2));
+    ASSERT_EQ(rt.getVersion(thisShardRef(), shardRefToHandleMap), chunkVersion(1, 3));
+    ASSERT_EQ(rt.getVersion(otherShardRef(), shardRefToHandleMap), chunkVersion(1, 2));
 
     // A shard that owns no chunks has no validAfter.
-    ASSERT_EQ(rt.getMaxValidAfter(ShardId{"absentShard"}), (Timestamp{0, 0}));
+    ASSERT_EQ(rt.getMaxValidAfter(ShardRef(absentShard), shardRefToHandleMap), (Timestamp{0, 0}));
 }
 
 // Full iteration visits exactly the owned chunks, in ascending key order; gaps are skipped.
@@ -1158,6 +1258,96 @@ TEST_F(RoutingTableHistoryGapTest, FindIntersectingChunkBoundaryPrecisionWithGap
     ASSERT(rt.findIntersectingChunk(key(20)));   // min is inclusive
     ASSERT(rt.findIntersectingChunk(key(29)));
     ASSERT(!rt.findIntersectingChunk(key(30)));  // max is exclusive: start of trailing gap
+}
+
+enum class MixedShardRef {
+    InitialStringUpdatesUuid,
+    InitialUuidUpdatesString,
+};
+
+class RoutingTableHistoryMixedShardRefTest : public RoutingTableHistoryTest,
+                                             public testing::WithParamInterface<MixedShardRef> {
+protected:
+    bool shardRefUsesUuid(bool initial) const {
+        const bool initialUsesUuid = GetParam() == MixedShardRef::InitialUuidUpdatesString;
+        const bool updateUsesUuid = GetParam() == MixedShardRef::InitialStringUpdatesUuid;
+        return initial ? initialUsesUuid : updateUsesUuid;
+    }
+
+    ShardRef thisShardRef(bool initial) const {
+        return shardRefUsesUuid(initial) ? ShardRef(*_thisShardHandle.uuid())
+                                         : ShardRef(_thisShardHandle.name());
+    }
+
+    ChunkVersion chunkVersion(uint32_t major, uint32_t minor) const {
+        return ChunkVersion{{collEpoch(), collTimestamp()}, {major, minor}};
+    }
+
+    ChunkType makeChunk(const BSONObj& min,
+                        const BSONObj& max,
+                        const ChunkVersion& version,
+                        const ShardRef& shardRef,
+                        const Timestamp& validAfter) const {
+        ChunkType chunk{collUUID(), ChunkRange{min, max}, version, shardRef};
+        chunk.setHistory({ChunkHistory{validAfter, shardRef}});
+        return chunk;
+    }
+
+    ShardRefToHandleMap shardRefToHandleMap() const {
+        return buildShardRefToHandleMap({_thisShardHandle});
+    }
+
+    const ShardHandle _thisShardHandle{kThisShard, UUID::gen()};
+};
+
+INSTANTIATE_TEST_SUITE_P(MixedShardRef,
+                         RoutingTableHistoryMixedShardRefTest,
+                         testing::Values(MixedShardRef::InitialStringUpdatesUuid,
+                                         MixedShardRef::InitialUuidUpdatesString),
+                         [](const testing::TestParamInfo<MixedShardRef>& info) {
+                             switch (info.param) {
+                                 case MixedShardRef::InitialStringUpdatesUuid:
+                                     return "InitialStringUpdatesUuid";
+                                 case MixedShardRef::InitialUuidUpdatesString:
+                                     return "InitialUuidUpdatesString";
+                             }
+                             MONGO_UNREACHABLE;
+                         });
+
+TEST_P(RoutingTableHistoryMixedShardRefTest,
+       GetVersionAndMaxValidAfterWithMixedShardRefsForSameShard) {
+    const auto& keyPattern = getShardKeyPattern();
+    const auto splitKey = BSON("a" << 0);
+
+    const std::vector<ChunkType> initialChunks = {
+        makeChunk(keyPattern.globalMin(),
+                  splitKey,
+                  chunkVersion(1, 0),
+                  thisShardRef(true /* initial */),
+                  Timestamp{10, 0}),
+        makeChunk(splitKey,
+                  keyPattern.globalMax(),
+                  chunkVersion(1, 1),
+                  thisShardRef(true /* initial */),
+                  Timestamp{30, 0}),
+    };
+    const auto initialRt = makeNewRt(initialChunks);
+
+    const auto updatedChunk = makeChunk(keyPattern.globalMin(),
+                                        splitKey,
+                                        chunkVersion(2, 0),
+                                        thisShardRef(false /* initial */),
+                                        Timestamp{20, 0});
+    const auto rt = makeUpdatedRoutingTable(initialRt, {updatedChunk});
+    const auto handles = shardRefToHandleMap();
+
+    ASSERT_EQ(rt.getVersion(), chunkVersion(2, 0));
+
+    ASSERT_EQ(rt.getVersion(thisShardRef(true /* initial */), handles), chunkVersion(2, 0));
+    ASSERT_EQ(rt.getVersion(thisShardRef(false /* initial */), handles), chunkVersion(2, 0));
+
+    ASSERT_EQ(rt.getMaxValidAfter(thisShardRef(true /* initial */), handles), (Timestamp{30, 0}));
+    ASSERT_EQ(rt.getMaxValidAfter(thisShardRef(false /* initial */), handles), (Timestamp{30, 0}));
 }
 
 }  // namespace

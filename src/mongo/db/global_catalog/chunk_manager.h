@@ -71,8 +71,7 @@ namespace mongo {
 
 class CurrentChunkManager;
 
-using ShardHandleMap MONGO_MOD_NEEDS_REPLACEMENT =
-    stdx::unordered_map<ShardRef, ShardHandle, ShardRef::Hasher>;
+namespace chunk_manager_shard_resolver {
 
 /**
  * Provides a mapping of shard references to shard handles for every shard in the shard registry.
@@ -82,8 +81,15 @@ using ShardHandleMap MONGO_MOD_NEEDS_REPLACEMENT =
  * TODO (SERVER-126212): Remove this function once the chunk manager cannot contain a mix of shardId
  * and shard UUIDs.
  */
-MONGO_MOD_NEEDS_REPLACEMENT ShardHandleMap
+MONGO_MOD_NEEDS_REPLACEMENT ShardRefToHandleMap
 resolveShardHandlesForChunkManager(OperationContext* opCtx);
+
+MONGO_MOD_NEEDS_REPLACEMENT void setChunkManagerShardResolver_forTest(
+    OperationContext* opCtx, ShardRefToHandleMap shardRefToHandleMap);
+
+MONGO_MOD_NEEDS_REPLACEMENT void clearChunkManagerShardResolver_forTest(OperationContext* opCtx);
+
+}  // namespace chunk_manager_shard_resolver
 
 struct MONGO_MOD_NEEDS_REPLACEMENT PlacementVersionTargetingInfo {
     /**
@@ -467,25 +473,34 @@ public:
 
     /**
      * Retrieves the placement version for the given shard.
+     * TODO (SERVER-128786): Remove default parameter once all callers provide a
+     * ShardRefToHandleMap.
      */
-    ChunkVersion getVersion(const ShardId& shardId) const {
-        return _getVersion(shardId).placementVersion;
+    ChunkVersion getVersion(const ShardRef& shardRef,
+                            const ShardRefToHandleMap& shardRefToHandleMap = {}) const {
+        return _getVersion(shardRef, shardRefToHandleMap).placementVersion;
     }
 
     /**
      * Retrieves the placement version for the given shard. Will not throw if the shard is marked as
      * stale. Only use when logging the given chunk version -- if the caller must execute logic
      * based on the returned version, use getVersion() instead.
+     * TODO (SERVER-128786): Remove default parameter once all callers provide a
+     * ShardRefToHandleMap.
      */
-    ChunkVersion getVersionForLogging(const ShardId& shardId) const {
-        return _getVersion(shardId).placementVersion;
+    ChunkVersion getVersionForLogging(const ShardRef& shardRef,
+                                      const ShardRefToHandleMap& shardRefToHandleMap = {}) const {
+        return _getVersion(shardRef, shardRefToHandleMap).placementVersion;
     }
 
     /**
      * Retrieves the maximum validAfter timestamp for the given shard.
+     * TODO (SERVER-128786): Remove default parameter once all callers provide a
+     * ShardRefToHandleMap.
      */
-    Timestamp getMaxValidAfter(const ShardId& shardId) const {
-        return _getVersion(shardId).validAfter;
+    Timestamp getMaxValidAfter(const ShardRef& shardRef,
+                               const ShardRefToHandleMap& shardRefToHandleMap = {}) const {
+        return _getVersion(shardRef, shardRefToHandleMap).validAfter;
     }
 
     size_t numChunks() const {
@@ -571,7 +586,8 @@ private:
                         bool allowMigrations,
                         ChunkMap chunkMap);
 
-    PlacementVersionTargetingInfo _getVersion(const ShardId& shardId) const;
+    PlacementVersionTargetingInfo _getVersion(const ShardRef& shardRef,
+                                              const ShardRefToHandleMap& shardRefToHandleMap) const;
 
     // Namespace to which this routing information corresponds
     NamespaceString _nss;

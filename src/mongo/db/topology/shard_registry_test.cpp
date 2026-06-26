@@ -957,5 +957,31 @@ TEST_F(ShardRegistryTest, GetShardByUuidShardNotFound) {
     future.default_timed_get();
 }
 
+TEST_F(ShardRegistryTest, GetShardRefToHandleMap) {
+    const ShardId shardWithUuidId("shardWithUuid");
+    const UUID shardWithUuid = UUID::gen();
+    const ShardId shardWithoutUuidId("shardWithoutUuid");
+
+    addShard(buildShardTypeFrom(shardWithUuidId, shardWithUuid), kAdvanceTopologyTime);
+    addShard(shardWithoutUuidId, kAdvanceTopologyTime);
+    loadRegistryFromFixture();
+
+    auto shardRefToHandleMap = shardRegistry()->getShardRefToHandleMap(operationContext());
+
+    const ShardHandle expectedWithUuid(shardWithUuidId, shardWithUuid);
+    const ShardHandle expectedWithoutUuid(shardWithoutUuidId, boost::none);
+
+    ASSERT_EQ(shardRefToHandleMap.at(ShardRef(shardWithUuidId)), expectedWithUuid);
+    ASSERT_EQ(shardRefToHandleMap.at(ShardRef(shardWithUuid)), expectedWithUuid);
+    ASSERT_EQ(shardRefToHandleMap.at(ShardRef(shardWithoutUuidId)), expectedWithoutUuid);
+
+    ASSERT_EQ(shardRefToHandleMap.count(ShardRef(shardWithUuid)), 1u);
+    ASSERT_EQ(shardRefToHandleMap.count(ShardRef(shardWithoutUuidId)), 1u);
+
+    // Uses cached registry data; a lookup to CSRS would hang the test.
+    shardRefToHandleMap = shardRegistry()->getShardRefToHandleMap(operationContext());
+    ASSERT_EQ(shardRefToHandleMap.at(ShardRef(shardWithUuidId)), expectedWithUuid);
+}
+
 }  // namespace
 }  // namespace mongo

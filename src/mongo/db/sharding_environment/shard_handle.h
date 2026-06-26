@@ -33,6 +33,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -129,5 +130,7 @@ private:
     // The Shard internal UUID. Declared as optional for backward compatibility.
     boost::optional<UUID> _uuid;
 };
+
+using ShardRefToHandleMap = stdx::unordered_map<ShardRef, ShardHandle, ShardRef::Hasher>;
 
 }  // namespace mongo

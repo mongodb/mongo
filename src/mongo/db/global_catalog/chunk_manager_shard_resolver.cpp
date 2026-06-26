@@ -28,6 +28,8 @@
  */
 
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
 
@@ -35,9 +37,37 @@
 // and shard UUIDs.
 
 namespace mongo {
+namespace chunk_manager_shard_resolver {
+namespace {
 
-ShardHandleMap resolveShardHandlesForChunkManager(OperationContext*) {
-    return {};
+using ChunkManagerShardResolver = std::function<ShardRefToHandleMap(OperationContext*)>;
+
+const ServiceContext::Decoration<boost::optional<ChunkManagerShardResolver>>
+    chunkManagerShardResolver_forTest =
+        ServiceContext::declareDecoration<boost::optional<ChunkManagerShardResolver>>();
+
+}  // namespace
+
+ShardRefToHandleMap resolveShardHandlesForChunkManager(OperationContext* opCtx) {
+    if (auto& resolver = chunkManagerShardResolver_forTest(opCtx->getServiceContext());
+        MONGO_unlikely(static_cast<bool>(resolver))) {
+        return (*resolver)(opCtx);
+    }
+
+    return Grid::get(opCtx)->shardRegistry()->getShardRefToHandleMap(opCtx);
 }
 
+void setChunkManagerShardResolver_forTest(OperationContext* opCtx,
+                                          ShardRefToHandleMap shardRefToHandleMap) {
+    chunkManagerShardResolver_forTest(opCtx->getServiceContext()) =
+        [shardRefToHandleMap = std::move(shardRefToHandleMap)](OperationContext*) {
+            return shardRefToHandleMap;
+        };
+}
+
+void clearChunkManagerShardResolver_forTest(OperationContext* opCtx) {
+    chunkManagerShardResolver_forTest(opCtx->getServiceContext()) = boost::none;
+}
+
+}  // namespace chunk_manager_shard_resolver
 }  // namespace mongo
