@@ -200,11 +200,13 @@ void AsyncClientIntegrationTestFixture::testExhaustHelloShouldReceiveMultipleRep
         // The original hello request has maxAwaitTimeMs = 1000 ms, if the cancel executes
         // before the 1000ms then we expect the future to resolve with an error. It should
         // resolve with CallbackCanceled unless the socket is already closed, in which case
-        // it will resolve with HostUnreachable. If the network is slow, the server may
-        // response before the cancel executes however.
+        // it will resolve with HostUnreachable (or ConnectionClosedByPeer when the peer-close
+        // is observed). If the network is slow, the server may respond before
+        // the cancel executes however.
         if (!swReply.getStatus().isOK()) {
             ASSERT((swReply.getStatus() == ErrorCodes::CallbackCanceled) ||
-                   (swReply.getStatus() == ErrorCodes::HostUnreachable));
+                   (swReply.getStatus() == ErrorCodes::HostUnreachable) ||
+                   (swReply.getStatus() == ErrorCodes::ConnectionClosedByPeer));
         }
     }
 }

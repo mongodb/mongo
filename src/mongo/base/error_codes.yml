@@ -1295,6 +1295,16 @@ error_codes:
       name: WriteConflictRetryLimitExceeded,
       categories: [SystemOverloadedError, RetriableError],
     }
+  - {
+      code: 513,
+      name: ConnectionClosedByPeer,
+      categories: [NetworkError, RetriableError],
+    }
+  - {
+      code: 514,
+      name: ConnectionEstablishmentTimeout,
+      categories: [NetworkError, RetriableError],
+    }
 
   # ^^^^
   # Add new codes, sequentially numbered, above.

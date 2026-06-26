@@ -48,7 +48,11 @@ const checkMongosResponse = function (
 ) {
     if (expectedErrorCode) {
         assert.eq(0, res.ok, tojson(res));
-        assert.eq(expectedErrorCode, res.code, tojson(res));
+        if (Array.isArray(expectedErrorCode)) {
+            assert.contains(res.code, expectedErrorCode, tojson(res));
+        } else {
+            assert.eq(expectedErrorCode, res.code, tojson(res));
+        }
     } else {
         assert.eq(1, res.ok, tojson(res));
     }
@@ -148,7 +152,15 @@ const runCommitTests = function (commandSentToShard) {
         closeConnection: true,
     });
     res = mongosSession.commitTransaction_forTesting();
-    checkMongosResponse(res, ErrorCodes.HostUnreachable, false /* expectedErrorLabel */, null);
+    // closeConnection peer-close surfaces as HostUnreachable (abortive close / RST) or
+    // ConnectionClosedByPeer (graceful FIN); both are network errors and carry no transaction
+    // error label here.
+    checkMongosResponse(
+        res,
+        [ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer],
+        false /* expectedErrorLabel */,
+        null,
+    );
     turnOffFailCommand(st.rs0);
 };
 
@@ -251,7 +263,14 @@ failCommandWithError(st.rs0, {
     closeConnection: true,
 });
 res = startTransaction(mongosSession, dbName, collName);
-checkMongosResponse(res, ErrorCodes.HostUnreachable, "TransientTransactionError", null);
+// closeConnection peer-close surfaces as HostUnreachable (abortive close / RST) or
+// ConnectionClosedByPeer (graceful FIN).
+checkMongosResponse(
+    res,
+    [ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer],
+    "TransientTransactionError",
+    null,
+);
 turnOffFailCommand(st.rs0);
 assert.commandFailedWithCode(
     mongosSession.abortTransaction_forTesting(),

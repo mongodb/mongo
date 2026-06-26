@@ -33,13 +33,17 @@ const pipeline = [{$search: {query: "cakes", path: "title"}}];
 coll.drop();
 assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
 
-// Perform a $search query and assert that the connection fails due to invalid certificates.
-// We cannot assert on a specific error message because it will vary based on the transport
-// protocol used.
+// Perform a $search query and assert the connection fails due to invalid certificates: mongod
+// presents its intracluster cert to mongot, which doesn't trust it and tears the connection down
+// during the TLS handshake. Which code surfaces isn't deterministic: it depends on whether the
+// peer's close is a graceful FIN (-> ConnectionClosedByPeer) or an abortive RST
+// (-> HostUnreachable), and on OS/transport differences (a raw socket failure can surface as
+// SocketException). That's a TCP-level race -- closing a socket with unread handshake bytes
+// buffered forces a RST -- so we accept any of the three.
 assertErrCodeAndErrMsgContains(
     coll,
     pipeline,
-    [ErrorCodes.SocketException, ErrorCodes.HostUnreachable],
+    [ErrorCodes.SocketException, ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer],
     "",
 );
 
