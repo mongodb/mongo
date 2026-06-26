@@ -31,7 +31,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
@@ -260,67 +259,4 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookupsAndTwoGroups) {
         solution->root()))
         << solution->root()->toString();
 }
-// Tests for removeInclusionProjectionBelowGroup: the optimizer eliminates a $project that sits
-// directly below a $group when the group doesn't actually read the projected fields.
-//
-// These tests construct a DocumentSourceInternalProjection directly (the stage type that
-// extendWithAggPipeline recognises as a pushdown-able $project) so they can exercise the
-// QSN-level optimisation without requiring trySbeEngine to be set.
-
-TEST_F(QueryPlannerPipelinePushdownTest, ComputedProjectionBeforeZeroDependencyGroupIsEliminated) {
-    // Pipeline: [$_internalProjection({k0: {$add: ['$a', '$b']}}), $group({_id: null, total: {$sum:
-    // 1}})] The $group has no field dependencies (_id is constant null, accumulator is constant 1).
-    // Even though the $project computes an expression, its output is entirely unused by the $group,
-    // so the optimizer should eliminate the intermediate projection node.
-    auto projStage = make_intrusive<DocumentSourceInternalProjection>(
-        expCtx, fromjson("{k0: {$add: ['$a', '$b']}}"), InternalProjectionPolicyEnum::kAggregate);
-
-    const std::vector<BSONObj> rawGroupPipeline = {
-        fromjson("{$group: {_id: null, total: {$sum: 1}}}"),
-    };
-    auto groupPipeline = buildTestPipeline(rawGroupPipeline);
-    auto stages = makeInnerPipelineStages(*groupPipeline);
-    stages.insert(stages.begin(), projStage);
-
-    runQueryWithPipeline(BSONObj(), std::move(stages));
-    ASSERT_EQUALS(getNumSolutions(), 1U);
-
-    auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
-    ASSERT_OK(QueryPlannerTestLib::solutionMatches(
-        "{group: {key: {_id: {$const: null}}, accs: [{total: {$sum: {$const: 1}}}], "
-        "node: {cscan: {dir: 1}}}}",
-        solution->root()))
-        << solution->root()->toString();
-}
-
-TEST_F(QueryPlannerPipelinePushdownTest,
-       ComputedProjectionBeforeGroupWithFieldDepsIsNotEliminated) {
-    // Pipeline: [$_internalProjection({k0: {$add: ['$a', '$b']}}), $group({_id: null, total: {$sum:
-    // '$k0'}})] The $group accumulates over field 'k0' (computed by the $project), so
-    // requiredFields is non-empty.  The projection must be preserved.
-    auto projStage = make_intrusive<DocumentSourceInternalProjection>(
-        expCtx, fromjson("{k0: {$add: ['$a', '$b']}}"), InternalProjectionPolicyEnum::kAggregate);
-
-    const std::vector<BSONObj> rawGroupPipeline = {
-        fromjson("{$group: {_id: null, total: {$sum: '$k0'}}}"),
-    };
-    auto groupPipeline = buildTestPipeline(rawGroupPipeline);
-    auto stages = makeInnerPipelineStages(*groupPipeline);
-    stages.insert(stages.begin(), projStage);
-
-    runQueryWithPipeline(BSONObj(), std::move(stages));
-    ASSERT_EQUALS(getNumSolutions(), 1U);
-
-    auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
-    // The direct-to-cscan pattern must NOT match — a proj node must still be present between the
-    // group and the cscan.
-    ASSERT_NOT_OK(QueryPlannerTestLib::solutionMatches(
-        "{group: {key: {_id: {$const: null}}, accs: [{total: {$sum: '$k0'}}], "
-        "node: {cscan: {dir: 1}}}}",
-        solution->root()))
-        << solution->root()->toString();
-}
-
 }  //  namespace
