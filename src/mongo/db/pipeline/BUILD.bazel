@@ -477,6 +477,7 @@ mongo_cc_library(
         "stage_params_to_document_source_registry.cpp",
         "tee_buffer.cpp",
         "writer_util.cpp",
+        "//src/mongo/db/exec/agg:batched_enrichment_stage.cpp",
         "//src/mongo/db/exec/agg:bucket_auto_stage.cpp",
         "//src/mongo/db/exec/agg:coll_stats_stage.cpp",
         "//src/mongo/db/exec/agg:current_op_stage.cpp",

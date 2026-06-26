@@ -31,11 +31,13 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/single_doc_lookup/scoped_batched_lookup.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
+#include <functional>
 #include <memory>
 
 #include <boost/optional/optional.hpp>
@@ -60,6 +62,11 @@ public:
                                boost::optional<UUID> collectionUUID,
                                const Document& documentKey,
                                boost::optional<Timestamp> afterClusterTime) override {
+        // Fired before recording the call, so a test can observe cross-executor state (e.g. that
+        // the primary is already released) at the exact moment this executor runs.
+        if (onPerformLookup) {
+            onPerformLookup();
+        }
         ++performLookupCalls;
         lastNss = nss;
         lastCollectionUUID = collectionUUID;
@@ -74,14 +81,21 @@ public:
     void reattachToOperationContext(OperationContext*) override {
         ++reattachCalls;
     }
+    void releaseResources() noexcept override {
+        ++releaseCalls;
+    }
 
     int performLookupCalls = 0;
     int detachCalls = 0;
     int reattachCalls = 0;
+    int releaseCalls = 0;
     NamespaceString lastNss;
     boost::optional<UUID> lastCollectionUUID;
     Document lastDocumentKey;
     boost::optional<Timestamp> lastAfterClusterTime;
+
+    // Optional hook invoked at the start of performLookup().
+    std::function<void()> onPerformLookup;
 
 private:
     LookupResult _result;
@@ -216,6 +230,101 @@ DEATH_TEST_REGEX_F(PrimaryWithFallbackSingleDocumentLookupExecutorDeathTest,
                            nullptr),
                        AssertionException,
                        12840801);
+}
+
+TEST_F(PrimaryWithFallbackSingleDocumentLookupExecutorTest,
+       KNotHandledReleasesPrimaryBeforeInvokingFallback) {
+    auto chain = makeChain({HandledStatus::kNotHandled, boost::none},
+                           {HandledStatus::kDocumentFound, Document{{"_id", 7}}});
+
+    // The fallback's lookup is routed and must run lock-free, so by the time it runs the primary
+    // must already have released its resources.
+    _fallback->onPerformLookup = [&] {
+        ASSERT_EQ(_primary->releaseCalls, 1);
+    };
+
+    runLookup(chain);
+
+    // The fallback ran (its hook fired and asserted the ordering), the primary released exactly
+    // once, and the fallback's own resources were not released as part of dispatch.
+    ASSERT_EQ(_fallback->performLookupCalls, 1);
+    ASSERT_EQ(_primary->releaseCalls, 1);
+    ASSERT_EQ(_fallback->releaseCalls, 0);
+}
+
+TEST_F(PrimaryWithFallbackSingleDocumentLookupExecutorTest,
+       HandledResultDoesNotReleasePrimaryNorInvokeFallback) {
+    auto chain = makeChain({HandledStatus::kDocumentFound, Document{{"_id", 7}}},
+                           {HandledStatus::kDocumentNotFound, boost::none});
+
+    runLookup(chain);
+
+    // A handled result short-circuits: no release of the primary, no fallback.
+    ASSERT_EQ(_primary->releaseCalls, 0);
+    ASSERT_EQ(_fallback->performLookupCalls, 0);
+}
+
+TEST_F(PrimaryWithFallbackSingleDocumentLookupExecutorTest,
+       ReleaseResourcesForwardedToBothChildren) {
+    auto chain = makeChain({HandledStatus::kNotHandled, boost::none},
+                           {HandledStatus::kDocumentNotFound, boost::none});
+
+    chain.releaseResources();
+
+    ASSERT_EQ(_primary->releaseCalls, 1);
+    ASSERT_EQ(_fallback->releaseCalls, 1);
+}
+
+// ScopedBatchedLookup releases the chain's resources on destruction, is exception safe, and never
+// double-releases after a move.
+class ScopedBatchedLookupTest : public unittest::Test {
+protected:
+    SingleDocumentLookupExecutorMock executor{{HandledStatus::kDocumentNotFound, boost::none}};
+};
+
+TEST_F(ScopedBatchedLookupTest, DestructionReleasesResources) {
+    {
+        ScopedBatchedLookup scope(executor);
+        ASSERT_EQ(executor.releaseCalls, 0);
+    }
+    ASSERT_EQ(executor.releaseCalls, 1);
+}
+
+TEST_F(ScopedBatchedLookupTest, ReleasesOnExceptionPath) {
+    try {
+        ScopedBatchedLookup scope(executor);
+        uasserted(ErrorCodes::InternalError, "simulated lookup failure");
+    } catch (const DBException&) {
+        // Swallow; the scope must have released on unwind.
+    }
+    ASSERT_EQ(executor.releaseCalls, 1);
+}
+
+TEST_F(ScopedBatchedLookupTest, MoveDoesNotDoubleRelease) {
+    {
+        ScopedBatchedLookup scope(executor);
+        ScopedBatchedLookup moved(std::move(scope));
+    }
+    // Despite two objects existing, the underlying executor is released exactly once.
+    ASSERT_EQ(executor.releaseCalls, 1);
+}
+
+TEST_F(ScopedBatchedLookupTest, MoveAssignmentReleasesLhsThenStealsRhs) {
+    SingleDocumentLookupExecutorMock lhsExecutor{{HandledStatus::kDocumentNotFound, boost::none}};
+    SingleDocumentLookupExecutorMock rhsExecutor{{HandledStatus::kDocumentNotFound, boost::none}};
+    {
+        ScopedBatchedLookup lhs(lhsExecutor);
+        ScopedBatchedLookup rhs(rhsExecutor);
+
+        // Move-assignment releases the LHS's current executor before taking over the RHS's.
+        lhs = std::move(rhs);
+        ASSERT_EQ(lhsExecutor.releaseCalls, 1);  // LHS released by the assignment, first
+        ASSERT_EQ(rhsExecutor.releaseCalls, 0);  // RHS not released yet
+    }
+    // After both scopes destruct, each executor is released exactly once (no double-release): the
+    // moved-from RHS scope releases nothing, and the LHS now owns and releases the RHS's executor.
+    ASSERT_EQ(lhsExecutor.releaseCalls, 1);
+    ASSERT_EQ(rhsExecutor.releaseCalls, 1);
 }
 
 }  // namespace

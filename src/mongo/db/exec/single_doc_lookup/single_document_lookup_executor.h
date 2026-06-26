@@ -85,6 +85,13 @@ public:
      */
     virtual void detachFromOperationContext() {}
     virtual void reattachToOperationContext(OperationContext* opCtx) {}
+
+    /**
+     * Releases attached catalog state (collection acquisition handle, open storage cursors). Any
+     * cached plan survives. Non-throwing.
+     * Must be idempotent: it may be called more than once on the same executor.
+     */
+    virtual void releaseResources() noexcept {}
 };
 
 /**
@@ -111,6 +118,9 @@ public:
         if (result.status != LookupResult::HandledStatus::kNotHandled) {
             return result;
         }
+
+        // Release any resources before running the fallback executor.
+        _primary->releaseResources();
         return _fallback->performLookup(expCtx, nss, collectionUUID, documentKey, afterClusterTime);
     }
 
@@ -122,6 +132,11 @@ public:
     void reattachToOperationContext(OperationContext* opCtx) override {
         _primary->reattachToOperationContext(opCtx);
         _fallback->reattachToOperationContext(opCtx);
+    }
+
+    void releaseResources() noexcept override {
+        _primary->releaseResources();
+        _fallback->releaseResources();
     }
 
     /**

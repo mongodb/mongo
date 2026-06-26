@@ -9,11 +9,12 @@ exports_files(
     ]),
 )
 
-# Header-only strategy interface for single-document lookups, plus the PrimaryWithFallback
-# combinator.
+# Header-only strategy interface for single-document lookups, the PrimaryWithFallback combinator,
+# and the ScopedBatchedLookup RAII batch scope over an executor chain.
 mongo_cc_library(
     name = "single_document_lookup_executor",
     hdrs = [
+        "scoped_batched_lookup.h",
         "single_document_lookup_executor.h",
     ],
     deps = [
