@@ -20,9 +20,44 @@ const SetFCVStatus = Object.freeze({called: 1, transitioning: 2, successful: 3})
 
 /**
  * Helper function to assert logging information including FCV status and server type.
+ *
+ * 'isSymmetricFCV' reflects whether the SymmetricFCV feature flag is enabled on the cluster under
+ * test; it changes how a resuming setFCV behaves (see 'isResume' below).
+ *
+ * 'isResume' must be set when the setFCV being asserted resumes a transition that a previous
+ * (failpoint-interrupted) setFCV already moved into the transitional state. This matters under
+ * Symmetric FCV: the setFCV protocol persists its phase in the FCV document and a resuming command
+ * continues from that phase instead of restarting from the beginning. Because the "FCV is
+ * transitioning" log (6744301) is only emitted when the transition first enters the transitional
+ * state (the kStart phase), a Symmetric FCV resume does NOT re-emit it -- only the "called" (6744300)
+ * and "success" (6744302) logs are produced. Without Symmetric FCV every setFCV restarts from kStart
+ * and re-emits all logs, so 'isResume' has no effect.
  */
-function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
-    if (status >= SetFCVStatus.called) {
+function assertLogs(
+    status,
+    upgradeOrDowngrade,
+    serverType,
+    numShardServers,
+    isSymmetricFCV,
+    isResume = false,
+) {
+    // A resume only makes sense for a transition that runs to completion: the resuming setFCV picks
+    // up from the persisted transitional phase and drives it to success. Asserting a resume that
+    // stopped at 'called' or 'transitioning' would expect per-shard logs that were never produced,
+    // failing deep inside the shard-log count with a confusing message. Reject that combination up
+    // front so the caller gets immediate, actionable feedback instead.
+    assert(
+        !isResume || status === SetFCVStatus.successful,
+        "assertLogs: isResume=true is only valid with status=successful",
+    );
+
+    const skipsTransitioningLog = isSymmetricFCV && isResume;
+
+    const expectCalled = status >= SetFCVStatus.called;
+    const expectTransitioning = status >= SetFCVStatus.transitioning && !skipsTransitioningLog;
+    const expectSuccessful = status >= SetFCVStatus.successful;
+
+    if (expectCalled) {
         assert.soon(
             () => rawMongoProgramOutput('"id":6744300').match(/\"id\":6744300/),
             '"FCV ' + upgradeOrDowngrade + ' called" log not found',
@@ -33,7 +68,7 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
             'should not log but "FCV ' + upgradeOrDowngrade + ' called" log found',
         );
     }
-    if (status >= SetFCVStatus.transitioning) {
+    if (expectTransitioning) {
         assert.soon(
             () => rawMongoProgramOutput('"id":6744301').match(/\"id\":6744301/),
             '"FCV ' + upgradeOrDowngrade + ' in progress" log not found',
@@ -44,7 +79,7 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
             'should not log but "FCV ' + upgradeOrDowngrade + ' in progress" log found',
         );
     }
-    if (status >= SetFCVStatus.successful) {
+    if (expectSuccessful) {
         assert.soon(
             () => rawMongoProgramOutput('"id":6744302').match(/\"id\":6744302/),
             '"FCV ' + upgradeOrDowngrade + ' success" log not found',
@@ -56,15 +91,22 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
         );
     }
 
+    // Number of FCV logs expected on the orchestrating node (the replica set primary or, in a
+    // sharded cluster, the config server): one per log line that was emitted above.
+    const numOrchestratorLogs =
+        (expectCalled ? 1 : 0) + (expectTransitioning ? 1 : 0) + (expectSuccessful ? 1 : 0);
+
     if (serverType === "replica set/maintenance mode") {
         assert.soon(
             () => {
                 let matchRes = rawMongoProgramOutput('"serverType"').match(
                     /\"serverType\":"replica set\/maintenance mode"/g,
                 );
-                return matchRes != null && matchRes.length == status;
+                return matchRes != null && matchRes.length == numOrchestratorLogs;
             },
-            "should have " + status + " log(s) with serverType: replica set/maintenance mode",
+            "should have " +
+                numOrchestratorLogs +
+                " log(s) with serverType: replica set/maintenance mode",
         );
     } else if (serverType === "shardedCluster") {
         assert.soon(
@@ -72,13 +114,21 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
                 let matchRes = rawMongoProgramOutput('"serverType"').match(
                     /\"serverType\":"config server"/g,
                 );
-                return matchRes != null && matchRes.length == status;
+                return matchRes != null && matchRes.length == numOrchestratorLogs;
             },
-            "should have " + status + " log(s) with serverType: config server",
+            "should have " + numOrchestratorLogs + " log(s) with serverType: config server",
         );
-        // If the FCV change failed before the config server reached the transitioning state,
-        // there should not be any shard-server FCV logs.
-        let nExpectedLogs = status >= SetFCVStatus.transitioning ? numShardServers * status : 0;
+        // Per-shard FCV logs. If the FCV change failed before the config server reached the
+        // transitioning state, the shards were never contacted and there are no shard-server logs.
+        // On a Symmetric FCV resume the config server picks up from the persisted phase and only
+        // drives the shards through the final phases, so each shard emits a single "success" log
+        // rather than the full called/transitioning/success sequence.
+        let nExpectedLogs;
+        if (skipsTransitioningLog) {
+            nExpectedLogs = numShardServers * 1;
+        } else {
+            nExpectedLogs = status >= SetFCVStatus.transitioning ? numShardServers * status : 0;
+        }
 
         if (nExpectedLogs > 0) {
             assert.soon(
@@ -113,18 +163,7 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
  * Each server type is tested with upgrade and downgrade with the two mentioned failpoints on/off.
  */
 function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
-    // TODO: SERVER-123632 Investigate how the test should behave on symmetricFCV.
-    // For now, we are skipping the test if symmetricFCV is enabled.
-
     const isSymmetricFCV = FeatureFlagUtil.isEnabled(adminDB, "SymmetricFCV");
-    if (isSymmetricFCV) {
-        // we don't support this yet on symmetricFCV so we exit
-
-        jsTest.log.info(
-            "Symmetric FCV is enabled, skipping assertLogsWithFailpoints because we don't support logging for symmetricFCV yet.",
-        );
-        return;
-    }
 
     clearRawMongoProgramOutput(); // Clears output for next logging.
 
@@ -139,7 +178,7 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     assert.commandFailed(
         adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
     );
-    assertLogs(SetFCVStatus.called, "downgrade", serverType, numShardServers);
+    assertLogs(SetFCVStatus.called, "downgrade", serverType, numShardServers, isSymmetricFCV);
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "off"}),
     );
@@ -153,7 +192,13 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     assert.commandFailed(
         adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
     );
-    assertLogs(SetFCVStatus.transitioning, "downgrade", serverType, numShardServers);
+    assertLogs(
+        SetFCVStatus.transitioning,
+        "downgrade",
+        serverType,
+        numShardServers,
+        isSymmetricFCV,
+    );
     assert.commandWorked(conn.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}));
 
     // 1.3. Test that setFCV (downgrade) succeeds:
@@ -162,7 +207,15 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     assert.commandWorked(
         adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
     );
-    assertLogs(SetFCVStatus.successful, "downgrade", serverType, numShardServers);
+    // This setFCV resumes the downgrade interrupted by the 'failDowngrading' failpoint in case 1.2.
+    assertLogs(
+        SetFCVStatus.successful,
+        "downgrade",
+        serverType,
+        numShardServers,
+        isSymmetricFCV,
+        true /* isResume */,
+    );
 
     /* 2. Testing logging for upgrade */
 
@@ -175,7 +228,7 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     assert.commandFailed(
         adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
     );
-    assertLogs(SetFCVStatus.called, "upgrade", serverType, numShardServers);
+    assertLogs(SetFCVStatus.called, "upgrade", serverType, numShardServers, isSymmetricFCV);
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: "failBeforeTransitioning", mode: "off"}),
     );
@@ -189,7 +242,7 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     assert.commandFailed(
         adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
     );
-    assertLogs(SetFCVStatus.transitioning, "upgrade", serverType, numShardServers);
+    assertLogs(SetFCVStatus.transitioning, "upgrade", serverType, numShardServers, isSymmetricFCV);
     assert.commandWorked(conn.adminCommand({configureFailPoint: "failUpgrading", mode: "off"}));
 
     // 2.3. Test that setFCV (upgrade) succeeds:
@@ -198,7 +251,15 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     assert.commandWorked(
         adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
     );
-    assertLogs(SetFCVStatus.successful, "upgrade", serverType, numShardServers);
+    // This setFCV resumes the upgrade interrupted by the 'failUpgrading' failpoint in case 2.2.
+    assertLogs(
+        SetFCVStatus.successful,
+        "upgrade",
+        serverType,
+        numShardServers,
+        isSymmetricFCV,
+        true /* isResume */,
+    );
 
     // 2.4. Shouldn't log anything because we have already upgraded to latestFCV.
     jsTest.log(
@@ -213,6 +274,7 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
         "upgrade",
         0 /* serverType */,
         0 /* numShardServers */,
+        isSymmetricFCV,
     );
 }
 
