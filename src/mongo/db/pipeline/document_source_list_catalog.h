@@ -131,7 +131,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
+    static DocumentSourceContainer createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:

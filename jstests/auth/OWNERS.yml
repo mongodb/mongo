@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/server-security
+  - "list_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "truncate_range*.js":
     approvers:
       - 10gen/query-execution
