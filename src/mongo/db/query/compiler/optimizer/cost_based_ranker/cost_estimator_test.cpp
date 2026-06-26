@@ -257,5 +257,28 @@ TEST(CostEstimator, SortDefaultOrSimple) {
     testSortCostDependsOnChildren<SortNodeSimple>();
 }
 
+TEST(CostEstimator, ShardFilterHasPerDocumentCost) {
+    EstimateMap estimates;
+
+    auto collScanNode = std::make_unique<CollectionScanNode>();
+    auto shardFilterNode = std::make_unique<ShardingFilterNode>();
+    shardFilterNode->children.push_back(std::move(collScanNode));
+
+    auto plan = std::make_unique<QuerySolution>();
+    plan->setRoot(std::move(shardFilterNode));
+
+    estimates[plan->root()] = std::make_unique<QSNEstimate>(makeCard(100));
+    estimates[plan->root()->children[0].get()] =
+        std::make_unique<QSNEstimate>(makeCard(100), makeCard(100));
+
+    CostEstimator costEstimator{estimates};
+    costEstimator.estimatePlan(*plan);
+
+    const auto& shardFilterCost = estimates[plan->root()]->cost;
+    const auto& childCost = estimates[plan->root()->children[0].get()]->cost;
+    // The per-document increment must push the cost above the additive floor.
+    ASSERT_TRUE(approxGt(shardFilterCost, childCost + minCost));
+}
+
 }  // unnamed namespace
 }  // namespace mongo::cost_based_ranker

@@ -280,6 +280,11 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             nodeCost = simpleProjectionIncrement * inCE + childSum;
             break;
         }
+        case STAGE_SHARDING_FILTER: {
+            const auto& inCE = childCEs[0];
+            nodeCost = shardingFilterIncrement * inCE + childSum;
+            break;
+        }
         case STAGE_EOF: {
             // EOF stages produce no rows; they are costed purely via the per-stage overhead
             // enforced by the additive floor below.
@@ -424,6 +429,9 @@ const CostCoefficient CostEstimator::sortedMergeOutput = makeCostCoefficient(nse
 const CostCoefficient CostEstimator::simpleProjectionIncrement = makeCostCoefficient(nsec(317.60));
 const CostCoefficient CostEstimator::coveredProjectionIncrement = makeCostCoefficient(nsec(216.77));
 const CostCoefficient CostEstimator::defaultProjectionIncrement = makeCostCoefficient(nsec(768.21));
+
+// TODO: SERVER-129663 calibrate this number for passing/skipping a doc.
+const CostCoefficient CostEstimator::shardingFilterIncrement = makeCostCoefficient(nsec(202.32));
 
 const CostCoefficient CostEstimator::limitIncrement = makeCostCoefficient(nsec(109.50));
 

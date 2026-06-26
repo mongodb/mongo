@@ -1,9 +1,10 @@
 /*
- * Test that a shard filter will cause CBR to fallback to multiplanning.
+ * Test that CBR correctly costs plans that include a shard filter stage.
+ * @tags: [requires_fcv_90]
  */
 
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
-import {assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
+import {assertPlanCosted} from "jstests/libs/query/cbr_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -24,7 +25,9 @@ assert.commandWorked(
 assert.commandWorked(coll.insert({a: 1, b: 2}));
 assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 
+// CBR must cost all plans even when a SHARDING_FILTER stage is present; it should not fall back
+// to multiplanning.
 const explain = coll.find({a: 1, b: 1}).explain();
-getAllPlans(explain).forEach(assertPlanNotCosted);
+getAllPlans(explain).forEach(assertPlanCosted);
 
 st.stop();

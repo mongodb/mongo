@@ -1694,5 +1694,22 @@ TEST(CardinalityEstimator, IndexSeeks_IntervalsPassedToNDVMultiKey) {
     ASSERT_EQ(result.getValue(), makeCard(4.0));
 }
 
+// A shard filter passes through all documents from its child (chunk migrations are rare, so
+// effectively no documents are filtered out).
+TEST(CardinalityEstimator, ShardFilterIsPassThrough) {
+    auto collCard = 100.0;
+
+    auto collScanPlan = makeCollScanPlan(nullptr);
+    auto collScanCE = getPlanHeuristicCE(*collScanPlan, collCard);
+
+    auto collScanNode = std::make_unique<CollectionScanNode>();
+    auto shardFilterNode = std::make_unique<ShardingFilterNode>();
+    shardFilterNode->children.push_back(std::move(collScanNode));
+    auto shardFilterPlan = std::make_unique<QuerySolution>();
+    shardFilterPlan->setRoot(std::move(shardFilterNode));
+
+    ASSERT_EQ(getPlanHeuristicCE(*shardFilterPlan, collCard), collScanCE);
+}
+
 }  // unnamed namespace
 }  // namespace mongo::cost_based_ranker

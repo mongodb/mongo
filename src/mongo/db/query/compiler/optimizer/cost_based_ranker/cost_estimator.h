@@ -136,6 +136,9 @@ private:
     static const CostCoefficient coveredProjectionIncrement;
     static const CostCoefficient defaultProjectionIncrement;
 
+    // Cost of a SHARDING_FILTER node to process one item.
+    static const CostCoefficient shardingFilterIncrement;
+
     // Cost of a LIMIT node to process one item.
     static const CostCoefficient limitIncrement;
 

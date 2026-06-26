@@ -104,8 +104,7 @@ bool isNodeUnsupportedByCBR(StageType type) {
     // Once every node here is supported by CBR we should delete this function and any references to
     // it.
     switch (type) {
-        case STAGE_SHARDING_FILTER:  // TODO SERVER-99073: Implement shard filter
-        case STAGE_DISTINCT_SCAN:    // TODO SERVER-99075: Implement distinct scan
+        case STAGE_DISTINCT_SCAN:  // TODO SERVER-99075: Implement distinct scan
         case STAGE_TEXT_OR:
         case STAGE_TEXT_MATCH:
         case STAGE_GEO_NEAR_2D:
@@ -157,6 +156,7 @@ bool isNodeUnsupportedByCBR(StageType type) {
         case STAGE_SORT_MERGE:
         case STAGE_SORT_DEFAULT:
         case STAGE_SORT_SIMPLE:
+        case STAGE_SHARDING_FILTER:
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
         case STAGE_PROJECTION_SIMPLE:

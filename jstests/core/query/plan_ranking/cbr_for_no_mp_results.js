@@ -2,10 +2,6 @@
  * Verify that queries where no results are returned are handled by CBR, and that queries
  * with results or EOF are handled by the multi-planner.
  *
- * On sharded topologies, SHARDING_FILTER is inestimable by CBR's sampling estimator, so CBR
- * never triggers. The test still runs to exercise the planning flow; strict costed/not-costed
- * assertions are only enforced on non-sharded topologies.
- *
  * @tags: [
  *    # setParameter calls to enable CBR will fail if a stepdown happens in between.
  *    does_not_support_stepdowns,
@@ -19,12 +15,12 @@
  *    assumes_balancer_off,
  * ]
  */
+
 import {
     getWinningPlanFromExplain,
     getEngine,
     getRejectedPlans,
     getPlanStage,
-    getPlanStages,
 } from "jstests/libs/query/analyze_plan.js";
 import {
     assertPlanCosted,
@@ -63,10 +59,6 @@ function isExecutionSplitInShards(explain) {
     );
 }
 
-function shardsHaveShardingFilter(explain) {
-    return getPlanStages(explain, "SHARDING_FILTER").length > 0;
-}
-
 function hasV1Index(winningPlan) {
     return getPlanStage(winningPlan, "IXSCAN")?.indexVersion === 1;
 }
@@ -82,8 +74,12 @@ const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
 
+// Use a large enough collection so that no plan can exhaust its per-plan trial budget
+// (internalQueryPlanEvaluationWorks / numPlans ≈ 3,333) before hitting EOF, even on a
+// single shard in a sharded fixture. With fewer documents, plans finish too quickly,
+// earlyExit is set to true, and CBRForNoMultiplanningResults falls back to multiplanning.
 const docs = [];
-for (let i = 0; i < 10000; i++) {
+for (let i = 0; i < 100000; i++) {
     docs.push({a: i, b: i});
 }
 assert.commandWorked(coll.insertMany(docs));
@@ -97,40 +93,24 @@ function testNoResultsQueryIsPlannedWithCBR() {
     if (getEngine(explain) !== "classic") {
         return;
     }
+
     const winningPlan = getWinningPlanFromExplain(explain);
     const rejectedPlans = getRejectedPlans(explain);
     if (isExecutionSplitInShards(explain)) {
         const numShards = getNumShardsFromExplain(explain);
-        if (shardsHaveShardingFilter(explain)) {
-            // SHARDING_FILTER is inestimable by CBR's sampling estimator, so CBR cannot pick a
-            // single winner. All plans end up not costed. At least 1 rejected per shard.
-            assertPlanNotCosted(winningPlan);
-            assert.gte(rejectedPlans.length, numShards, toJsonForLog(explain));
-            for (const plan of rejectedPlans) {
+        assertPlanCosted(winningPlan);
+        // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
+        assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
+        let numCosted = 0;
+        for (const plan of rejectedPlans) {
+            if (isPlanCosted(plan)) {
+                assertPlanCosted(plan);
+                numCosted++;
+            } else {
                 assertPlanNotCosted(plan);
             }
-        } else {
-            assertPlanCosted(winningPlan);
-            // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
-            assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
-            let numCosted = 0;
-            for (const plan of rejectedPlans) {
-                if (isPlanCosted(plan)) {
-                    assertPlanCosted(plan);
-                    numCosted++;
-                } else {
-                    assertPlanNotCosted(plan);
-                }
-            }
-            assert.eq(numCosted, numShards, toJsonForLog(explain));
         }
-    } else if (winningPlan.stage === "SHARDING_FILTER") {
-        // Shard-local but SHARDING_FILTER still present: 1 from MP + 2 from CBR, all not costed.
-        assertPlanNotCosted(winningPlan);
-        assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
-        for (const plan of rejectedPlans) {
-            assertPlanNotCosted(plan);
-        }
+        assert.eq(numCosted, numShards, toJsonForLog(explain));
     } else if (hasV1Index(winningPlan)) {
         // v1 indexes are inestimable by CBR: 1 from MP + 2 from CBR, all not costed.
         assertPlanNotCosted(winningPlan);
@@ -213,14 +193,8 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
         const rejectedPlans = getRejectedPlans(explain);
         if (isExecutionSplitInShards(explain)) {
             const numShards = getNumShardsFromExplain(explain);
-            if (shardsHaveShardingFilter(explain)) {
-                // ReturnKey + SHARDING_FILTER: all inestimable. At least 1 rejected per shard.
-                assert.gte(rejectedPlans.length, numShards, toJsonForLog(explain));
-            } else {
-                // ReturnKey inestimable: numShards MP losers + at least 2 from CBR.
-                assert.gte(rejectedPlans.length, numShards + 2, toJsonForLog(explain));
-            }
-            // ReturnKey makes all plans inestimable regardless of SHARDING_FILTER.
+            // numShards MP losers + at least 2 from CBR (all not costed due to RETURN_KEY).
+            assert.gte(rejectedPlans.length, numShards + 2, toJsonForLog(explain));
             for (const plan of rejectedPlans) {
                 assertPlanNotCosted(plan);
             }
@@ -243,35 +217,19 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
         const rejectedPlans = getRejectedPlans(explain);
         if (isExecutionSplitInShards(explain)) {
             const numShards = getNumShardsFromExplain(explain);
-            if (shardsHaveShardingFilter(explain)) {
-                assertPlanNotCosted(winningPlan);
-                assert.gte(rejectedPlans.length, numShards, toJsonForLog(explain));
-                for (const plan of rejectedPlans) {
+            assertPlanCosted(winningPlan);
+            // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
+            assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
+            let numCosted = 0;
+            for (const plan of rejectedPlans) {
+                if (isPlanCosted(plan)) {
+                    assertPlanCosted(plan);
+                    numCosted++;
+                } else {
                     assertPlanNotCosted(plan);
                 }
-            } else {
-                assertPlanCosted(winningPlan);
-                // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
-                assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
-                let numCosted = 0;
-                for (const plan of rejectedPlans) {
-                    if (isPlanCosted(plan)) {
-                        assertPlanCosted(plan);
-                        numCosted++;
-                    } else {
-                        assertPlanNotCosted(plan);
-                    }
-                }
-                assert.eq(numCosted, numShards, toJsonForLog(explain));
             }
-        } else if (winningPlan.stage === "SHARDING_FILTER") {
-            // Shard-local but SHARDING_FILTER still present: 1 from MP + 2 from CBR, all not
-            // costed.
-            assertPlanNotCosted(winningPlan);
-            assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
-            for (const plan of rejectedPlans) {
-                assertPlanNotCosted(plan);
-            }
+            assert.eq(numCosted, numShards, toJsonForLog(explain));
         } else if (hasV1Index(winningPlan)) {
             // v1 indexes are inestimable by CBR: 1 from MP + 2 from CBR, all not costed.
             assertPlanNotCosted(winningPlan);

@@ -193,7 +193,8 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
         }
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
-        case STAGE_PROJECTION_SIMPLE: {
+        case STAGE_PROJECTION_SIMPLE:
+        case STAGE_SHARDING_FILTER: {
             ceRes = passThroughNodeCard(node);
             break;
         }
