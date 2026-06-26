@@ -214,6 +214,44 @@ public:
             "serverStatus.metrics.changeStreams.error.retriable.interruptedDueToReplStateChange");
     static constexpr MetricName kChangeStreamErrorRetriableOther =
         MetricNameMaker::make("serverStatus.metrics.changeStreams.error.retriable.other");
+    static constexpr MetricName kChangeStreamOptionShowExpandedEvents =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.showExpandedEvents");
+    static constexpr MetricName kChangeStreamOptionShowMigrationEvents =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.showMigrationEvents");
+    static constexpr MetricName kChangeStreamOptionShowSystemEvents =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.showSystemEvents");
+    static constexpr MetricName kChangeStreamOptionShowRawUpdateDescription =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.showRawUpdateDescription");
+    static constexpr MetricName kChangeStreamOptionIgnoreRemovedShards =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.ignoreRemovedShards");
+    static constexpr MetricName kChangeStreamOptionMatchCollectionUUIDForUpdateLookup =
+        MetricNameMaker::make(
+            "serverStatus.metrics.changeStreams.option.matchCollectionUUIDForUpdateLookup");
+    static constexpr MetricName kChangeStreamOptionStartAfter =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.startAfter");
+    static constexpr MetricName kChangeStreamOptionResumeAfter =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.resumeAfter");
+    static constexpr MetricName kChangeStreamOptionStartAtOperationTime =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.startAtOperationTime");
+    static constexpr MetricName kChangeStreamOptionFullDocumentRequired =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.option.fullDocument.required");
+    static constexpr MetricName kChangeStreamOptionFullDocumentUpdateLookup = MetricNameMaker::make(
+        "serverStatus.metrics.changeStreams.option.fullDocument.updateLookup");
+    static constexpr MetricName kChangeStreamOptionFullDocumentWhenAvailable =
+        MetricNameMaker::make(
+            "serverStatus.metrics.changeStreams.option.fullDocument.whenAvailable");
+    static constexpr MetricName kChangeStreamOptionFullDocumentBeforeChangeRequired =
+        MetricNameMaker::make(
+            "serverStatus.metrics.changeStreams.option.fullDocumentBeforeChange.required");
+    static constexpr MetricName kChangeStreamOptionFullDocumentBeforeChangeWhenAvailable =
+        MetricNameMaker::make(
+            "serverStatus.metrics.changeStreams.option.fullDocumentBeforeChange.whenAvailable");
+    static constexpr MetricName kChangeStreamScopeCluster =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.scope.cluster");
+    static constexpr MetricName kChangeStreamScopeDb =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.scope.db");
+    static constexpr MetricName kChangeStreamScopeCollection =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.scope.collection");
 
     // Storage Execution Team Metrics
     static constexpr MetricName kIndexBuildsActive = MetricNameMaker::make("index_builds.active");

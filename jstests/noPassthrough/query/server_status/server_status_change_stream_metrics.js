@@ -7,7 +7,7 @@ function getChangeStreamMetrics(db) {
     const metrics = db.serverStatus().metrics;
     return {
         total: metrics.aggStageCounters["$changeStream"],
-        withExpandedEvents: metrics.changeStreams.showExpandedEvents,
+        withExpandedEvents: metrics.changeStreams.option.showExpandedEvents,
     };
 }
 

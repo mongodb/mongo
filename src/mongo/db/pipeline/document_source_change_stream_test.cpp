@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/change_stream_transform_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
@@ -78,6 +79,8 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -6785,6 +6788,283 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamOplogMatchEmptyFo
     auto opts = query_shape::SerializationOptions{
         .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
+}
+
+// Change-stream option/scope usage metric tests
+
+class ChangeStreamMetricsTest : public ChangeStreamStageTest {
+protected:
+    // Returns the current value of a metric nested under "metrics.changeStreams".
+    // relPath: dot-separated path relative to "metrics.changeStreams",
+    //          e.g. "option.showExpandedEvents" or "scope.cluster".
+    static long long readCsMetric(std::string_view relPath) {
+        BSONObjBuilder bob;
+        globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+        BSONObj root = bob.obj();  // Must outlive obj — embeddedObject() is a non-owning view.
+        auto metricsEl = root["metrics"];
+        if (metricsEl.eoo())
+            return 0;
+        auto csEl = metricsEl.embeddedObject()["changeStreams"];
+        if (csEl.eoo())
+            return 0;
+        BSONObj obj = csEl.embeddedObject();
+        while (true) {
+            auto dot = relPath.find('.');
+            if (dot == std::string_view::npos) {
+                return obj[relPath].numberLong();
+            }
+            auto el = obj[relPath.substr(0, dot)];
+            if (el.eoo())
+                return 0;
+            obj = el.embeddedObject();
+            relPath = relPath.substr(dot + 1);
+        }
+    }
+
+    // Opens a $changeStream on mongod (inRouter must be false).
+    void openOnMongod(const BSONObj& stageSpec) {
+        ASSERT_FALSE(getExpCtx()->getInRouter());
+        DocumentSourceChangeStream::createFromBson(stageSpec.firstElement(), getExpCtx());
+    }
+};
+
+// Each boolean option counter increments by exactly 1 when the option is set to true.
+TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersIncrementOnTrue) {
+    struct Case {
+        const char* optionKey;
+        const char* metricRelPath;
+    };
+    const Case cases[] = {
+        {"showExpandedEvents", "option.showExpandedEvents"},
+        {"showMigrationEvents", "option.showMigrationEvents"},
+        {"showSystemEvents", "option.showSystemEvents"},
+        {"showRawUpdateDescription", "option.showRawUpdateDescription"},
+        {"ignoreRemovedShards", "option.ignoreRemovedShards"},
+        {"matchCollectionUUIDForUpdateLookup", "option.matchCollectionUUIDForUpdateLookup"},
+    };
+    for (const auto& c : cases) {
+        const long long before = readCsMetric(c.metricRelPath);
+        openOnMongod(BSON("$changeStream" << BSON(c.optionKey << true)));
+        ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath)) << "option: " << c.optionKey;
+    }
+}
+
+// Boolean option counters do NOT increment when the option is explicitly set to false.
+// This validates the .value_or(false) fix: boost::optional<bool>{false} must not be
+// treated as truthy by the increment call.
+TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersDoNotIncrementWhenExplicitlyFalse) {
+    struct Case {
+        const char* optionKey;
+        const char* metricRelPath;
+    };
+    const Case cases[] = {
+        {"showExpandedEvents", "option.showExpandedEvents"},
+        {"showMigrationEvents", "option.showMigrationEvents"},
+        {"showSystemEvents", "option.showSystemEvents"},
+        {"showRawUpdateDescription", "option.showRawUpdateDescription"},
+        {"ignoreRemovedShards", "option.ignoreRemovedShards"},
+        {"matchCollectionUUIDForUpdateLookup", "option.matchCollectionUUIDForUpdateLookup"},
+    };
+    for (const auto& c : cases) {
+        const long long before = readCsMetric(c.metricRelPath);
+        openOnMongod(BSON("$changeStream" << BSON(c.optionKey << false)));
+        ASSERT_EQ(before, readCsMetric(c.metricRelPath)) << "option: " << c.optionKey;
+    }
+}
+
+// Boolean option counters do NOT increment when the option is omitted (default false).
+TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersDoNotIncrementWhenAbsent) {
+    struct Case {
+        const char* metricRelPath;
+    };
+    const Case cases[] = {
+        {"option.showExpandedEvents"},
+        {"option.showMigrationEvents"},
+        {"option.showSystemEvents"},
+        {"option.showRawUpdateDescription"},
+        {"option.ignoreRemovedShards"},
+        {"option.matchCollectionUUIDForUpdateLookup"},
+    };
+
+    std::vector<long long> before;
+    for (const auto& c : cases) {
+        before.push_back(readCsMetric(c.metricRelPath));
+    }
+
+    openOnMongod(BSON("$changeStream" << BSONObj()));
+
+    for (size_t i = 0; i < std::size(cases); ++i) {
+        ASSERT_EQ(before[i], readCsMetric(cases[i].metricRelPath))
+            << "metric: " << cases[i].metricRelPath;
+    }
+}
+
+// fullDocument counters: only non-default values (required / updateLookup / whenAvailable) count.
+TEST_F(ChangeStreamMetricsTest, FullDocumentCountersIncrementForNonDefaultValues) {
+    struct Case {
+        const char* value;
+        const char* metricRelPath;
+    };
+    const Case cases[] = {
+        {"required", "option.fullDocument.required"},
+        {"updateLookup", "option.fullDocument.updateLookup"},
+        {"whenAvailable", "option.fullDocument.whenAvailable"},
+    };
+    for (const auto& c : cases) {
+        const long long before = readCsMetric(c.metricRelPath);
+        openOnMongod(BSON("$changeStream" << BSON("fullDocument" << c.value)));
+        ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath)) << "fullDocument: " << c.value;
+    }
+}
+
+// fullDocument=default does NOT count (it is the default value).
+TEST_F(ChangeStreamMetricsTest, FullDocumentDefaultDoesNotCount) {
+    const long long beforeRequired = readCsMetric("option.fullDocument.required");
+    const long long beforeLookup = readCsMetric("option.fullDocument.updateLookup");
+    const long long beforeWhen = readCsMetric("option.fullDocument.whenAvailable");
+
+    openOnMongod(BSON("$changeStream" << BSON("fullDocument" << "default")));
+
+    ASSERT_EQ(beforeRequired, readCsMetric("option.fullDocument.required"));
+    ASSERT_EQ(beforeLookup, readCsMetric("option.fullDocument.updateLookup"));
+    ASSERT_EQ(beforeWhen, readCsMetric("option.fullDocument.whenAvailable"));
+}
+
+// fullDocumentBeforeChange counters: required and whenAvailable count; off does not.
+TEST_F(ChangeStreamMetricsTest, FullDocumentBeforeChangeCountersIncrementForNonDefaultValues) {
+    struct Case {
+        const char* value;
+        const char* metricRelPath;
+    };
+    const Case cases[] = {
+        {"required", "option.fullDocumentBeforeChange.required"},
+        {"whenAvailable", "option.fullDocumentBeforeChange.whenAvailable"},
+    };
+    for (const auto& c : cases) {
+        const long long before = readCsMetric(c.metricRelPath);
+        openOnMongod(BSON("$changeStream" << BSON("fullDocumentBeforeChange" << c.value)));
+        ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath))
+            << "fullDocumentBeforeChange: " << c.value;
+    }
+}
+
+// fullDocumentBeforeChange=off does NOT count (it is the default value).
+TEST_F(ChangeStreamMetricsTest, FullDocumentBeforeChangeOffDoesNotCount) {
+    const long long beforeRequired = readCsMetric("option.fullDocumentBeforeChange.required");
+    const long long beforeWhen = readCsMetric("option.fullDocumentBeforeChange.whenAvailable");
+
+    openOnMongod(BSON("$changeStream" << BSON("fullDocumentBeforeChange" << "off")));
+
+    ASSERT_EQ(beforeRequired, readCsMetric("option.fullDocumentBeforeChange.required"));
+    ASSERT_EQ(beforeWhen, readCsMetric("option.fullDocumentBeforeChange.whenAvailable"));
+}
+
+// resumeAfter and startAfter counters increment when the options are user-provided.
+TEST_F(ChangeStreamMetricsTest, ResumeTokenOptionsIncrementCounters) {
+    // Build a high-water-mark resume token valid for resumeAfter.
+    auto resumeToken = ResumeToken::makeHighWaterMarkToken(kDefaultTs, 2);
+
+    const long long beforeResume = readCsMetric("option.resumeAfter");
+    openOnMongod(BSON("$changeStream" << BSON("resumeAfter" << resumeToken.toBSON())));
+    ASSERT_EQ(beforeResume + 1, readCsMetric("option.resumeAfter"));
+
+    const long long beforeStart = readCsMetric("option.startAfter");
+    openOnMongod(BSON("$changeStream" << BSON("startAfter" << resumeToken.toBSON())));
+    ASSERT_EQ(beforeStart + 1, readCsMetric("option.startAfter"));
+}
+
+// startAtOperationTime counter increments when the user sets it, but NOT when the system
+// auto-sets it because no resume point was specified.
+TEST_F(ChangeStreamMetricsTest, StartAtOperationTimeOnlyCountsUserProvidedValue) {
+    const long long before = readCsMetric("option.startAtOperationTime");
+
+    // User-provided startAtOperationTime: should count.
+    openOnMongod(BSON("$changeStream" << BSON("startAtOperationTime" << Timestamp(100, 1))));
+    ASSERT_EQ(before + 1, readCsMetric("option.startAtOperationTime"));
+
+    // No resume option at all: system auto-sets startAtOperationTime; should NOT count.
+    const long long afterUserSet = readCsMetric("option.startAtOperationTime");
+    openOnMongod(BSON("$changeStream" << BSONObj()));
+    ASSERT_EQ(afterUserSet, readCsMetric("option.startAtOperationTime"));
+}
+
+// Scope counters: collection, database, and cluster all increment correctly.
+TEST_F(ChangeStreamMetricsTest, ScopeCounters) {
+    // Collection scope (default namespace "unittests.change_stream").
+    const long long beforeColl = readCsMetric("scope.collection");
+    openOnMongod(BSON("$changeStream" << BSONObj()));
+    ASSERT_EQ(beforeColl + 1, readCsMetric("scope.collection"));
+
+    // Database scope.
+    getExpCtx()->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "unittests")));
+    const long long beforeDb = readCsMetric("scope.db");
+    openOnMongod(BSON("$changeStream" << BSONObj()));
+    ASSERT_EQ(beforeDb + 1, readCsMetric("scope.db"));
+
+    // Cluster scope: admin db with allChangesForCluster=true.
+    getExpCtx()->setNamespaceString(
+        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin));
+    const long long beforeCluster = readCsMetric("scope.cluster");
+    openOnMongod(BSON("$changeStream" << BSON("allChangesForCluster" << true)));
+    ASSERT_EQ(beforeCluster + 1, readCsMetric("scope.cluster"));
+}
+
+// No counters are incremented when the stream is created on the router (mongos side).
+TEST_F(ChangeStreamMetricsTest, NoCountersIncrementedOnRouter) {
+    getExpCtx()->setInRouter(true);
+
+    const long long beforeExpanded = readCsMetric("option.showExpandedEvents");
+    const long long beforeColl = readCsMetric("scope.collection");
+    const long long beforeFd = readCsMetric("option.fullDocument.updateLookup");
+
+    DocumentSourceChangeStream::createFromBson(
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "fullDocument"
+                                                          << "updateLookup"))
+            .firstElement(),
+        getExpCtx());
+
+    ASSERT_EQ(beforeExpanded, readCsMetric("option.showExpandedEvents"));
+    ASSERT_EQ(beforeColl, readCsMetric("scope.collection"));
+    ASSERT_EQ(beforeFd, readCsMetric("option.fullDocument.updateLookup"));
+}
+
+// On the router, the legacy changeStreams.showExpandedEvents path still increments (backward
+// compat) while the new option.showExpandedEvents path does not.
+TEST_F(ChangeStreamMetricsTest, LegacyRouterCounterIncrementsOnRouter) {
+    getExpCtx()->setInRouter(true);
+
+    const long long beforeLegacy = readCsMetric("showExpandedEvents");
+    const long long beforeNew = readCsMetric("option.showExpandedEvents");
+
+    DocumentSourceChangeStream::createFromBson(
+        BSON("$changeStream" << BSON("showExpandedEvents" << true)).firstElement(), getExpCtx());
+
+    ASSERT_EQ(beforeLegacy + 1, readCsMetric("showExpandedEvents"));
+    ASSERT_EQ(beforeNew, readCsMetric("option.showExpandedEvents"));
+}
+
+// Verify that option and scope counters are visible through the otel pipeline, not just
+// serverStatus. The counters are eagerly initialized at static-init time so they exist before any
+// stream is opened.
+TEST_F(ChangeStreamMetricsTest, OptionAndScopeMetricsAreVisibleViaOtel) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    const auto beforeOption = capturer.readInt64Counter(
+        otel::metrics::MetricNames::kChangeStreamOptionShowExpandedEvents);
+    const auto beforeScope =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kChangeStreamScopeCollection);
+
+    openOnMongod(BSON("$changeStream" << BSON("showExpandedEvents" << true)));
+
+    ASSERT_EQ(capturer.readInt64Counter(
+                  otel::metrics::MetricNames::kChangeStreamOptionShowExpandedEvents),
+              beforeOption + 1);
+    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kChangeStreamScopeCollection),
+              beforeScope + 1);
 }
 
 }  // namespace

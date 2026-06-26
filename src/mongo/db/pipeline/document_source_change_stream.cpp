@@ -45,6 +45,9 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/pcre_util.h"
 
 #include <string>
@@ -62,9 +65,131 @@ using namespace std::literals::string_view_literals;
 using boost::intrusive_ptr;
 
 namespace {
-auto& changeStreamsShowExpandedEvents =
-    *MetricBuilder<Counter64>{"changeStreams.showExpandedEvents"};
+
+otel::metrics::Counter<int64_t>& makeCsCounter(otel::metrics::MetricName name,
+                                               std::string dottedPath,
+                                               std::string desc) {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = std::move(dottedPath),
+        .role = ClusterRole{ClusterRole::None},
+    };
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        name, std::move(desc), otel::metrics::MetricUnit::kEvents, opts);
 }
+
+// Preserved on mongos at the old path until per-process option metrics are implemented.
+// When the follow-on mongos ticket lands, retire this alongside the new mongos counter.
+auto& csShowExpandedEventsRouter = *MetricBuilder<Counter64>{"changeStreams.showExpandedEvents"};
+
+// Renamed from "changeStreams.showExpandedEvents"; see downstream DWH/TOOLS ticket.
+auto& csOptShowExpandedEvents =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowExpandedEvents,
+                  "changeStreams.option.showExpandedEvents",
+                  "Number of change streams opened with showExpandedEvents.");
+auto& csOptShowMigrationEvents =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowMigrationEvents,
+                  "changeStreams.option.showMigrationEvents",
+                  "Number of change streams opened with showMigrationEvents.");
+auto& csOptShowSystemEvents =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowSystemEvents,
+                  "changeStreams.option.showSystemEvents",
+                  "Number of change streams opened with showSystemEvents.");
+auto& csOptShowRawUpdateDescription =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowRawUpdateDescription,
+                  "changeStreams.option.showRawUpdateDescription",
+                  "Number of change streams opened with showRawUpdateDescription.");
+auto& csOptIgnoreRemovedShards =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionIgnoreRemovedShards,
+                  "changeStreams.option.ignoreRemovedShards",
+                  "Number of change streams opened with ignoreRemovedShards.");
+auto& csOptMatchCollectionUUIDForUpdateLookup =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionMatchCollectionUUIDForUpdateLookup,
+                  "changeStreams.option.matchCollectionUUIDForUpdateLookup",
+                  "Number of change streams opened with matchCollectionUUIDForUpdateLookup.");
+auto& csOptStartAfter = makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionStartAfter,
+                                      "changeStreams.option.startAfter",
+                                      "Number of change streams opened with startAfter.");
+auto& csOptResumeAfter = makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionResumeAfter,
+                                       "changeStreams.option.resumeAfter",
+                                       "Number of change streams opened with resumeAfter.");
+auto& csOptStartAtOperationTime =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionStartAtOperationTime,
+                  "changeStreams.option.startAtOperationTime",
+                  "Number of change streams opened with startAtOperationTime.");
+auto& csOptFullDocumentRequired =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionFullDocumentRequired,
+                  "changeStreams.option.fullDocument.required",
+                  "Number of change streams opened with fullDocument=required.");
+auto& csOptFullDocumentUpdateLookup =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionFullDocumentUpdateLookup,
+                  "changeStreams.option.fullDocument.updateLookup",
+                  "Number of change streams opened with fullDocument=updateLookup.");
+auto& csOptFullDocumentWhenAvailable =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionFullDocumentWhenAvailable,
+                  "changeStreams.option.fullDocument.whenAvailable",
+                  "Number of change streams opened with fullDocument=whenAvailable.");
+auto& csOptFullDocumentBeforeChangeRequired =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionFullDocumentBeforeChangeRequired,
+                  "changeStreams.option.fullDocumentBeforeChange.required",
+                  "Number of change streams opened with fullDocumentBeforeChange=required.");
+auto& csOptFullDocumentBeforeChangeWhenAvailable = makeCsCounter(
+    otel::metrics::MetricNames::kChangeStreamOptionFullDocumentBeforeChangeWhenAvailable,
+    "changeStreams.option.fullDocumentBeforeChange.whenAvailable",
+    "Number of change streams opened with fullDocumentBeforeChange=whenAvailable.");
+auto& csScopeCluster = makeCsCounter(otel::metrics::MetricNames::kChangeStreamScopeCluster,
+                                     "changeStreams.scope.cluster",
+                                     "Number of cluster-scoped change streams opened.");
+auto& csScopeDb = makeCsCounter(otel::metrics::MetricNames::kChangeStreamScopeDb,
+                                "changeStreams.scope.db",
+                                "Number of database-scoped change streams opened.");
+auto& csScopeCollection = makeCsCounter(otel::metrics::MetricNames::kChangeStreamScopeCollection,
+                                        "changeStreams.scope.collection",
+                                        "Number of collection-scoped change streams opened.");
+
+void incrementFullDocumentMetric(FullDocumentModeEnum mode) {
+    switch (mode) {
+        case FullDocumentModeEnum::kRequired:
+            csOptFullDocumentRequired.add(1);
+            break;
+        case FullDocumentModeEnum::kUpdateLookup:
+            csOptFullDocumentUpdateLookup.add(1);
+            break;
+        case FullDocumentModeEnum::kWhenAvailable:
+            csOptFullDocumentWhenAvailable.add(1);
+            break;
+        default:
+            break;
+    }
+}
+
+void incrementFullDocumentBeforeChangeMetric(FullDocumentBeforeChangeModeEnum mode) {
+    switch (mode) {
+        case FullDocumentBeforeChangeModeEnum::kRequired:
+            csOptFullDocumentBeforeChangeRequired.add(1);
+            break;
+        case FullDocumentBeforeChangeModeEnum::kWhenAvailable:
+            csOptFullDocumentBeforeChangeWhenAvailable.add(1);
+            break;
+        default:
+            break;
+    }
+}
+
+void incrementScopeMetric(ChangeStreamType type) {
+    switch (type) {
+        case ChangeStreamType::kAllDatabases:
+            csScopeCluster.add(1);
+            break;
+        case ChangeStreamType::kDatabase:
+            csScopeDb.add(1);
+            break;
+        case ChangeStreamType::kCollection:
+            csScopeCollection.add(1);
+            break;
+    }
+}
+}  // namespace
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(changeStream,
                                      DocumentSourceChangeStream::LiteParsed::parse,
@@ -255,6 +380,15 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
     // Make sure that it is legal to run this $changeStream before proceeding.
     DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec);
 
+    // Capture whether the user explicitly provided each resume option. These booleans must be
+    // captured here — before the blocks below that mutate 'spec' (auto-setting
+    // startAtOperationTime for new streams, or replacing startAfter with resumeAfter for HWM
+    // tokens). Reading from 'spec' directly at the metric increment site would count
+    // server-injected values, not user intent.
+    const bool userSetResumeAfter = spec.getResumeAfter().has_value();
+    const bool userSetStartAfter = spec.getStartAfter().has_value();
+    const bool userSetStartAtOperationTime = spec.getStartAtOperationTime().has_value();
+
     // If the user did not specify an explicit starting point, set it to the current time.
     if (!spec.getResumeAfter() && !spec.getStartAfter() && !spec.getStartAtOperationTime()) {
         // Make sure we update the 'startAtOperationTime' in the 'spec' so that we serialize the
@@ -315,9 +449,37 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
     // Save a copy of the spec on the expression context. Used when building the oplog filter.
     expCtx->setChangeStreamSpec(spec);
 
-    // Only increment counter during actual execution, not during query shape parsing.
-    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
-        changeStreamsShowExpandedEvents.increment(spec.getShowExpandedEvents());
+    // Only increment on mongod (not router) during actual execution, not query shape parsing.
+    if (!expCtx->getInRouter() &&
+        expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        if (spec.getShowExpandedEvents().value_or(false))
+            csOptShowExpandedEvents.add(1);
+        if (spec.getShowMigrationEvents().value_or(false))
+            csOptShowMigrationEvents.add(1);
+        if (spec.getShowSystemEvents().value_or(false))
+            csOptShowSystemEvents.add(1);
+        if (spec.getShowRawUpdateDescription().value_or(false))
+            csOptShowRawUpdateDescription.add(1);
+        if (spec.getIgnoreRemovedShards().value_or(false))
+            csOptIgnoreRemovedShards.add(1);
+        if (spec.getMatchCollectionUUIDForUpdateLookup().value_or(false))
+            csOptMatchCollectionUUIDForUpdateLookup.add(1);
+
+        if (userSetResumeAfter)
+            csOptResumeAfter.add(1);
+        if (userSetStartAfter)
+            csOptStartAfter.add(1);
+        if (userSetStartAtOperationTime)
+            csOptStartAtOperationTime.add(1);
+
+        incrementFullDocumentMetric(spec.getFullDocument());
+        incrementFullDocumentBeforeChangeMetric(spec.getFullDocumentBeforeChange());
+        incrementScopeMetric(changeStream.getChangeStreamType());
+    }
+
+    // Preserve the legacy mongos metric at its old path until per-process option metrics land.
+    if (expCtx->getInRouter() && expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        csShowExpandedEventsRouter.increment(spec.getShowExpandedEvents().value_or(false));
     }
 
     return change_stream::pipeline_helpers::buildPipeline(expCtx, spec, resumeToken);
