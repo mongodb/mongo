@@ -70,7 +70,11 @@ function setLegacyMemoryTracking({useLegacy}) {
 }
 
 function allocateLargeString() {
-    const arraySize = 1000000;
+    // The array must allocate comfortably more than "tooSmallHeapSizeMB" (10MB) so that it reliably
+    // triggers an OOM under that limit, while staying well below "sufficentHeapSizeMB" (100MB) so
+    // that it still succeeds with a sufficient limit. Each array slot is a JS::Value (8 bytes), so
+    // 4,000,000 elements allocates ~32MB of tracked JS heap.
+    const arraySize = 4000000;
     let str = new Array(arraySize).fill(0);
     return true;
 }
