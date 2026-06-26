@@ -3163,6 +3163,7 @@ mongo_cc_unit_test(
         "startup_warnings_mongod",
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/pipeline:change_stream_pipeline",
+        "//src/mongo/db/sharding_environment:shard_handle",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/unittest:server_parameter_guard",
         "//src/third_party/asio",

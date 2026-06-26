@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/unittest/log_test.h"
@@ -930,6 +930,12 @@ TEST_F(ShardRegistryTest, FindShardByHostAndPortRef) {
     ASSERT_EQ(shard->getId(), ShardId("shard0"));
     ASSERT(shard->getHandle().uuid());
     ASSERT_EQ(*shard->getHandle().uuid(), shardUuid);
+}
+
+TEST_F(ShardRegistryTest, ConfigShardUsesConstantUuid) {
+    auto configShard = shardRegistry()->getConfigShard();
+    ASSERT(configShard->getHandle().uuid());
+    ASSERT_EQ(configShard->getHandle(), ShardHandle::kConfigServerHandle);
 }
 
 TEST_F(ShardRegistryTest, GetShardByUuid) {

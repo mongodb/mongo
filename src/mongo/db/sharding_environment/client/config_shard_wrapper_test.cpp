@@ -38,7 +38,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_retry_server_parameters_gen.h"
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
@@ -168,8 +168,7 @@ protected:
 
         ShardingTestFixture::setUp();
 
-        _mockConfigShard =
-            std::make_shared<MockShard>(ShardHandle(ShardId::kConfigServerId, UUID::gen()));
+        _mockConfigShard = std::make_shared<MockShard>(ShardHandle::kConfigServerHandle);
         _configShardWrapper = std::make_unique<ConfigShardWrapper>(_mockConfigShard);
     }
 

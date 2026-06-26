@@ -85,6 +85,7 @@
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_catalog/drop_indexes.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/cluster_role.h"
@@ -227,8 +228,11 @@ void generateShardUUIDs(OperationContext* opCtx) {
                 updateStmt.setQ(BSON(ShardType::name.name()
                                      << shardId.toString() << ShardType::uuid.name()
                                      << BSON("$exists" << false)));
+                const auto shardUuid = shardId == ShardId::kConfigServerId
+                    ? *ShardHandle::kConfigServerHandle.uuid()
+                    : UUID::gen();
                 updateStmt.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                    BSON("$set" << BSON(ShardType::uuid.name() << UUID::gen()))));
+                    BSON("$set" << BSON(ShardType::uuid.name() << shardUuid))));
                 updateStmt.setUpsert(false);
                 updateStmt.setMulti(false);
                 insertUuidStmts.push_back(std::move(updateStmt));
@@ -282,8 +286,7 @@ void generateShardUUIDs(OperationContext* opCtx) {
             txn.run(altOpCtx, transactionChain);
         }
 
-        // For dedicated Config server, a 'uuid' value has to be generated and stored in its
-        // identity document.
+        // For dedicated Config server, we have to set the 'uuid' value in its identity document.
         if (isConfigServerDedicated) {
             DBDirectClient directClient(altOpCtx);
             write_ops::UpdateCommandRequest configIdentityUpdateOp(
@@ -293,7 +296,8 @@ void generateShardUUIDs(OperationContext* opCtx) {
                                                 << ShardType::uuid.name()
                                                 << BSON("$exists" << false)));
             configIdentityEntry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                BSON("$set" << BSON(ShardType::uuid.name() << UUID::gen()))));
+                BSON("$set" << BSON(ShardType::uuid.name()
+                                    << *ShardHandle::kConfigServerHandle.uuid()))));
             configIdentityEntry.setUpsert(false);
             configIdentityEntry.setMulti(false);
             configIdentityUpdateOp.setUpdates({configIdentityEntry});
@@ -1160,7 +1164,7 @@ private:
         // Run the authoritative clone phase on ALL shards (including the config
         // server if it's also a shard).
         if (role && role->has(ClusterRole::ConfigServer)) {
-            if (feature_flags::gFeatureFlagUniqueShardIdentifiers
+            if (feature_flags::gFeatureFlagUniqueShardIdentifiersDDL
                     .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
                 generateShardUUIDs(opCtx);

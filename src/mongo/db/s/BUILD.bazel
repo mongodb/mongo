@@ -903,6 +903,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/ddl:index_commands_idl",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/sharding_environment:shard_handle",
         "//src/mongo/db/sharding_environment:shard_server_test_fixture",
         "//src/mongo/db/sharding_environment:sharding_logging",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
