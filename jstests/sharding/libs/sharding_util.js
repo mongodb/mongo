@@ -2,7 +2,15 @@
  * Helpers for creating and accessing sharding metadata.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+
+export function skipTestIfAuthoritativeShardsEnabled(conn, cleanupFn) {
+    if (FeatureFlagUtil.isPresentAndEnabled(conn, "AuthoritativeShardsCRUD")) {
+        if (cleanupFn) cleanupFn();
+        quit();
+    }
+}
 
 export function getShards(db) {
     return db.adminCommand({listShards: 1}).shards;

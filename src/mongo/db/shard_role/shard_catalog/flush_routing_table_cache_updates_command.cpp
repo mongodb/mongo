@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -46,7 +47,9 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
@@ -130,6 +133,19 @@ public:
                     str::stream() << "Can only call " << Derived::Request::kCommandName
                                   << " on collections",
                     !ns().coll().empty());
+
+            // TODO(SERVER-127444): Tighten to any client once all refreshes are authoritative
+            const auto* meta = ClientMetadata::getForClient(opCtx->getClient());
+            const bool isMongoShell = meta && meta->getApplicationName() == "MongoDB Shell";
+            if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+                    kVersionContextIgnored_UNSAFE,
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                isMongoShell) {
+                tasserted(12937400,
+                          "This command is deprecated, as shards are authoritative for collection "
+                          "metadata. The secondary node must transition to the authoritative "
+                          "refresh model.");
+            }
 
             boost::optional<CriticalSectionSignal> criticalSectionSignal;
 

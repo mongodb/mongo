@@ -15,8 +15,13 @@ import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 const st = new ShardingTest({shards: 2});
+// The alternative syntax is never used with Authoritative Shards (the alternative syntax was
+// implemented for resharding, and is never used anymore after SERVER-57667 was implemented).
+// TODO (SERVER-98118): Remove this test once 9.0 becomes last LTS.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 const dbName = jsTestName();
 const collName = "foo";
 let chunksCollName;

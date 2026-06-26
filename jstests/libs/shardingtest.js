@@ -1966,6 +1966,11 @@ export class ShardingTest {
             const flushRT = function flushRoutingTableAndHandleAuth(conn, keyFileLocal) {
                 // Invokes the actual execution of cache refresh.
                 const execFlushRT = (conn) => {
+                    const flagDoc = conn.getDB("admin").runCommand(
+                        {getParameter: 1, featureFlagAuthoritativeShardsCRUD: 1});
+                    if (flagDoc.ok && flagDoc.featureFlagAuthoritativeShardsCRUD?.currentlyEnabled) {
+                        return;
+                    }
                     assert.commandWorked(
                         conn.getDB("admin").runCommand(
                             {_flushRoutingTableCacheUpdates: "config.system.sessions"}),

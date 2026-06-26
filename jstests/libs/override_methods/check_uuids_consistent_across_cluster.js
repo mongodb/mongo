@@ -9,6 +9,7 @@
  *
  * TODO (SERVER-33253): extend the hook to add consistency checks for collection indexes and options
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function () {
@@ -77,6 +78,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function () {
         // of which shards own data for which collections, and what the UUIDs for those collections
         // are.
         // Create a new connection in case the router was restarted during the test.
+        // TODO(SERVER-129905): Fix aggregation to not group config.chunks by removed "ns" field
         let mongos = new Mongo(this.s.host);
         let authoritativeCollMetadataArr = mongos
             .getDB("config")
@@ -161,7 +163,11 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function () {
                         tojson(actualCollMetadata),
                 );
 
-                if (!jsTest.options().skipCheckingCatalogCacheConsistencyWithShardingCatalog) {
+                if (jsTest.options().skipCheckingCatalogCacheConsistencyWithShardingCatalog) {
+                    continue;
+                }
+
+                if (!FeatureFlagUtil.isPresentAndEnabled(shardConn, "AuthoritativeShardsCRUD")) {
                     jsTest.log.info(
                         "Checking that the UUID for " +
                             ns +
@@ -203,7 +209,36 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function () {
                             ": " +
                             tojson(actualConfigMetadata),
                     );
+
+                    continue;
                 }
+
+                // Verify the authoritative metadata against the metadata on the config server
+                let actualShardCatalogMetadata = shardConn
+                    .getDB("config")
+                    .getCollection("shard.catalog.collections")
+                    .find({"_id": ns})
+                    .toArray();
+                assert.eq(
+                    actualShardCatalogMetadata.length,
+                    1,
+                    "Incorrect number of entries in 'config.shard.catalog.collections' have been found for collection '" +
+                        ns +
+                        "' on node " +
+                        shardConn,
+                );
+                actualShardCatalogMetadata = actualShardCatalogMetadata[0];
+
+                assert.eq(
+                    authoritativeCollMetadata.collInfo.uuid,
+                    actualShardCatalogMetadata.uuid,
+                    "authoritative collection info on config server: " +
+                        tojson(authoritativeCollMetadata.collInfo) +
+                        ", actual shard catalog info on shard " +
+                        shardConnString +
+                        ": " +
+                        tojson(actualShardCatalogMetadata),
+                );
             }
         }
     } catch (e) {
