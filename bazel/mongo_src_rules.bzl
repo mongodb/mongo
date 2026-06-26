@@ -17,7 +17,7 @@ load("//bazel/install_rules:bolt.bzl", "bolt_optimize")
 load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
 load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_shared_library")
-load("@rules_rust//rust:defs.bzl", "rust_shared_library", "rust_test")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_shared_library", "rust_test")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:separate_debug.bzl",
@@ -1702,16 +1702,32 @@ def windows_rc(name, src, manifest_in = None, icon = None):
         windows_version_minimal = "//bazel/config:win_min_version",
     )
 
-def mongo_rust_shared_library(name, rustc_env = {}, target_compatible_with = [], **kwargs):
-    rust_shared_library(
+def mongo_rust_library(name, rustc_flags = [], target_compatible_with = [], **kwargs):
+    rust_library(
         name = name,
-        rustc_env = rustc_env,
+        rustc_flags = rustc_flags,
         target_compatible_with = target_compatible_with,
         **kwargs
     )
     rust_test(
         name = name + "_test",
         crate = ":" + name,
-        rustc_env = rustc_env,
+        # most arguments are automatically propagated from the crate. These are the exceptions:
+        rustc_flags = rustc_flags,
+        target_compatible_with = target_compatible_with,
+    )
+
+def mongo_rust_shared_library(name, rustc_flags = [], target_compatible_with = [], **kwargs):
+    rust_shared_library(
+        name = name,
+        rustc_flags = rustc_flags,
+        target_compatible_with = target_compatible_with,
+        **kwargs
+    )
+    rust_test(
+        name = name + "_test",
+        crate = ":" + name,
+        # most arguments are automatically propagated from the crate. These are the exceptions:
+        rustc_flags = rustc_flags,
         target_compatible_with = target_compatible_with,
     )
