@@ -33,6 +33,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/topology/user_write_block/block_replica_set_writes_gen.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -80,6 +82,26 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            const FixedFCVRegion fixedFcvRegion(opCtx);
+            const auto fcvSnapshot = fixedFcvRegion->acquireFCVSnapshot();
+            // setFCV and replica set write block are mutually exclusive. Hold a
+            // FixedFCVRegion for the duration of the command so that this serializes on the FCV
+            // lock with setFeatureCompatibilityVersion, which enters its FCV change region in
+            // exclusive mode. Reject here if an FCV transition is already in progress.
+            // (Generic FCV reference): Calling isUpgradingOrDowngrading to know when the cluster is
+            // in upgrading/downgrading state.
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream() << "Cannot run " << Request::kCommandName
+                                  << " while in upgrading/downgrading FCV state",
+                    !fcvSnapshot.isUpgradingOrDowngrading());
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << Request::kCommandName
+                                  << " not supported with the current FCV. Upgrade to the "
+                                     "highest FCV to perform this operation.",
+                    feature_flags::gFeatureFlagBlockReplicaSetWrites.isEnabled(
+                        VersionContext::getDecoration(opCtx), fcvSnapshot));
+
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName << " cannot be run on standalones",
                     repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());

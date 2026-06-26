@@ -70,6 +70,7 @@
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries_sharded_cluster.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -325,6 +326,21 @@ public:
     }
 
 private:
+    // setFCV and the replica set write block are mutually exclusive. Refuse an FCV upgrade or
+    // downgrade while replica set write blocking is enabled, regardless of the direction and of
+    // whether the target FCV still supports the feature.
+    static void _uassertReplicaSetWritesNotBlocked(OperationContext* opCtx, bool isUpgrade) {
+        uassert(ErrorCodes::ReplicaSetWritesBlocked,
+                isUpgrade
+                    ? "Cannot upgrade while replica set write blocking is enabled. Replica set "
+                      "write blocking must be disabled before upgrading. You probably reached disk "
+                      "full on some of your nodes. Please contact support."
+                    : "Cannot downgrade while replica set write blocking is enabled. Replica set "
+                      "write blocking must be disabled before downgrading. You probably reached "
+                      "disk full on some of your nodes. Please contact support.",
+                !ReplicaSetWriteBlockState::get(opCtx)->isReplicaSetWriteBlockingEnabled());
+    }
+
     void prepareToUpgradeActionsBeforeGlobalLock(OperationContext* opCtx,
                                                  FCV originalVersion,
                                                  FCV requestedVersion) final {
@@ -343,7 +359,10 @@ private:
 
     void userCollectionsUassertsForUpgrade(OperationContext* opCtx,
                                            FCV originalVersion,
-                                           FCV requestedVersion) final {}
+                                           FCV requestedVersion) final {
+        // This also runs in the dry run (including the dry run forwarded to shards).
+        _uassertReplicaSetWritesNotBlocked(opCtx, true /* isUpgrade */);
+    }
 
     void userCollectionsWorkForUpgrade(OperationContext* opCtx,
                                        FCV originalVersion,
@@ -647,6 +666,9 @@ private:
     void beforeStartWithFCVLock(OperationContext* opCtx,
                                 FCV originalVersion,
                                 FCV requestedVersion) final {
+        // Check if the replica set write block is enabled before starting the FCV transition.
+        _uassertReplicaSetWritesNotBlocked(opCtx, requestedVersion > originalVersion);
+
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
         // TODO (SERVER-103458): Remove once 9.0 becomes last lts.
@@ -719,6 +741,8 @@ private:
     void userCollectionsUassertsForDowngrade(OperationContext* opCtx,
                                              FCV originalVersion,
                                              FCV requestedVersion) final {
+        // This also runs in the dry run (including the dry run forwarded to shards).
+        _uassertReplicaSetWritesNotBlocked(opCtx, false /* isUpgrade */);
 
         bool errorAndLogValidationDisabled =
             (gFeatureFlagErrorAndLogValidationAction.isDisabledOnTargetFCVButEnabledOnOriginalFCV(

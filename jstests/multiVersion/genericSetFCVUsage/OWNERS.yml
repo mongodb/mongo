@@ -55,3 +55,6 @@ filters:
   - "fcv_upgrade_downgrade_manages_shard_uuids.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "replica_set_write_block_upgrade_downgrade.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

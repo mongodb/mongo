@@ -9,6 +9,7 @@
 //   assumes_against_mongod_not_mongos,
 //   featureFlagBlockReplicaSetWrites,
 //   does_not_support_config_fuzzer,
+//   cannot_run_during_upgrade_downgrade,
 //   wildcard_indexes_incompatible,
 // ]
 
