@@ -125,6 +125,7 @@ mongo_cc_library(
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:index_repair",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/admission/execution_control:in_progress_time_accumulator",
         "//src/mongo/db/index:multikey_paths",
         "//src/mongo/db/index_builds/primary_driven:primary_driven_index_builds",
         "//src/mongo/db/query/query_stats",

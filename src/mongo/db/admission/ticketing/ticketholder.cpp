@@ -51,6 +51,7 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
                            AcquisitionCallback acquisitionCallback,
                            WaitedAcquisitionCallback waitedAcquisitionCallback,
                            ReleaseCallback releaseCallback,
+                           StartQueueingCallback startQueueingCallback,
                            ResizePolicy resizePolicy,
                            SemaphoreType semaphore)
     : _trackPeakUsed(trackPeakUsed),
@@ -60,7 +61,8 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
       _reportDelinquentOpCallback(delinquentCallback),
       _reportAcquisitionOpCallback(acquisitionCallback),
       _reportWaitedAcquisitionOpCallback(waitedAcquisitionCallback),
-      _reportReleaseOpCallback(releaseCallback) {
+      _reportReleaseOpCallback(releaseCallback),
+      _reportStartQueueingOpCallback(startQueueingCallback) {
     switch (semaphore) {
         case SemaphoreType::kCompeting:
             _semaphore = std::make_unique<UnorderedTicketSemaphore>(numTickets, maxQueueDepth);
@@ -161,6 +163,10 @@ boost::optional<Ticket> TicketHolder::_waitForTicketUntilMaybeInterruptible(
     _holderStats.totalAddedQueue.fetchAndAddRelaxed(1);
     auto queuedAdmissions = admCtx->getAdmissions();
     _holderStats.queuedOperationsTotalAdmissions.fetchAndAddRelaxed(queuedAdmissions);
+
+    if (_reportStartQueueingOpCallback) {
+        _reportStartQueueingOpCallback(admCtx);
+    }
 
     ON_BLOCK_EXIT([&] {
         auto waitDelta =

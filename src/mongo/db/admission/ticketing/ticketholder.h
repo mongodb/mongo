@@ -66,6 +66,7 @@ public:
     using AcquisitionCallback = std::function<void(AdmissionContext*, AdmissionContext::Priority)>;
     using WaitedAcquisitionCallback = std::function<void(AdmissionContext*, Microseconds)>;
     using ReleaseCallback = std::function<void(AdmissionContext*, Microseconds)>;
+    using StartQueueingCallback = std::function<void(AdmissionContext*)>;
 
     /**
      * Describes the algorithm used to update the TicketHolder when the size of the ticket pool
@@ -104,6 +105,7 @@ public:
                  AcquisitionCallback acquisitionCallback = nullptr,
                  WaitedAcquisitionCallback waitedAcquisitionCallback = nullptr,
                  ReleaseCallback releaseCallback = nullptr,
+                 StartQueueingCallback startQueueingCallback = nullptr,
                  ResizePolicy resizePolicy = ResizePolicy::kGradual,
                  SemaphoreType semaphore = SemaphoreType::kCompeting);
 
@@ -290,6 +292,7 @@ private:
     AcquisitionCallback _reportAcquisitionOpCallback{nullptr};
     WaitedAcquisitionCallback _reportWaitedAcquisitionOpCallback{nullptr};
     ReleaseCallback _reportReleaseOpCallback{nullptr};
+    StartQueueingCallback _reportStartQueueingOpCallback{nullptr};
     mongo::admission::execution_control::DelinquencyStats _delinquencyStats;
 
     // Synchronization mechanism for waiters.

@@ -134,6 +134,7 @@ MultiPlanTicketHolder::MultiPlanTicketHolder(ServiceContext* serviceContext, int
                     /* executionAcquisitionCallback */ nullptr,
                     /* executionWaitedAcquisitionCallback */ nullptr,
                     /* executionReleaseCallback */ nullptr,
+                    /* startQueueingCallback */ nullptr,
                     TicketHolder::ResizePolicy::kImmediate),
       _isReleased(false) {}
 

@@ -74,6 +74,9 @@ ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionCon
 
 ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     const ExecutionAdmissionContext& other) {
+    if (this == &other) {
+        return *this;
+    }
     AdmissionContext::operator=(other);
     _readDelinquencyStats = other._readDelinquencyStats;
     _writeDelinquencyStats = other._writeDelinquencyStats;
@@ -265,12 +268,27 @@ void ExecutionAdmissionContext::recordExecutionAcquisition(AdmissionContext::Pri
         return;
     }
 
+    const bool isLowPriority = priority == AdmissionContext::Priority::kLow;
     auto& stats = _getOperationExecutionStats();
     stats.totalAdmissions.fetchAndAddRelaxed(1);
-    if (priority == AdmissionContext::Priority::kLow) {
+    if (isLowPriority) {
         stats.totalLowPriorityAdmissions.fetchAndAddRelaxed(1);
     } else {
         stats.totalNormalPriorityAdmissions.fetchAndAddRelaxed(1);
+    }
+
+    if (_statsRecorder) {
+        _statsRecorder->_record({.admissions = 1, .lowPriorityAdmissions = isLowPriority ? 1 : 0});
+    }
+}
+
+void ExecutionAdmissionContext::recordExecutionStartQueueing() {
+    if (!_shouldRecordStats()) {
+        return;
+    }
+
+    if (_statsRecorder) {
+        _statsRecorder->_record({.startedQueueing = 1});
     }
 }
 
@@ -281,6 +299,11 @@ void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(Microseconds qu
 
     auto& stats = _getOperationExecutionStats();
     stats.totalTimeQueuedMicros.fetchAndAddRelaxed(queueTimeMicros.count());
+
+    if (_statsRecorder) {
+        _statsRecorder->_record(
+            {.finishedQueueing = 1, .timeQueuedMicros = queueTimeMicros.count()});
+    }
 }
 
 void ExecutionAdmissionContext::recordExecutionRelease(Microseconds processedTimeMicros) {
@@ -290,6 +313,11 @@ void ExecutionAdmissionContext::recordExecutionRelease(Microseconds processedTim
 
     auto& stats = _getOperationExecutionStats();
     stats.totalTimeProcessingMicros.fetchAndAddRelaxed(processedTimeMicros.count());
+
+    if (_statsRecorder) {
+        _statsRecorder->_record(
+            {.releases = 1, .timeProcessingMicros = processedTimeMicros.count()});
+    }
 }
 
 void ExecutionAdmissionContext::recordDelinquentAcquisition(Milliseconds delay) {
@@ -356,6 +384,20 @@ ec::OperationExecutionStats& ExecutionAdmissionContext::_getOperationExecutionSt
 
 bool ExecutionAdmissionContext::_shouldRecordStats() {
     return getPriority() != AdmissionContext::Priority::kExempt;
+}
+
+admission::execution_control::ScopedTicketAdmissionStatsRecorder::
+    ScopedTicketAdmissionStatsRecorder(OperationContext* opCtx, OnUpdateFn onUpdate)
+    : _opCtx(opCtx), _onUpdate(std::move(onUpdate)) {
+    auto& admCtx = ExecutionAdmissionContext::get(_opCtx);
+    invariant(!admCtx._statsRecorder,
+              "Only one ScopedTicketAdmissionStatsRecorder may be registered per operation");
+    admCtx._statsRecorder = this;
+}
+
+admission::execution_control::ScopedTicketAdmissionStatsRecorder::
+    ~ScopedTicketAdmissionStatsRecorder() {
+    ExecutionAdmissionContext::get(_opCtx)._statsRecorder = nullptr;
 }
 
 admission::execution_control::ScopedTaskTypeModifierBase::ScopedTaskTypeModifierBase(

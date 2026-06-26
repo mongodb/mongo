@@ -118,6 +118,7 @@ public:
                                               nullptr /* executionAcquisitionCallback */,
                                               nullptr /* executionWaitedAcquisitionCallback */,
                                               nullptr /* executionReleaseCallback */,
+                                              nullptr /* startQueueingCallback */,
                                               TicketHolder::ResizePolicy::kImmediate);
     }
 
@@ -927,6 +928,7 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax0) {
                                                  nullptr /* executionAcquisitionCallback */,
                                                  nullptr /* executionWaitedAcquisitionCallback */,
                                                  nullptr /* executionReleaseCallback */,
+                                                 nullptr /* startQueueingCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -965,6 +967,7 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
                                                  nullptr /* executionAcquisitionCallback */,
                                                  nullptr /* executionWaitedAcquisitionCallback */,
                                                  nullptr /* executionReleaseCallback */,
+                                                 nullptr /* startQueueingCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -1031,6 +1034,7 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMaxChange) {
                                                  nullptr /* executionAcquisitionCallback */,
                                                  nullptr /* executionWaitedAcquisitionCallback */,
                                                  nullptr /* executionReleaseCallback */,
+                                                 nullptr /* startQueueingCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -1114,6 +1118,7 @@ TEST_F(TicketHolderTestTick, TotalTimeQueueMicrosAccumulated) {
                                                  nullptr /* executionAcquisitionCallback */,
                                                  nullptr /* executionWaitedAcquisitionCallback */,
                                                  nullptr /* executionReleaseCallback */,
+                                                 nullptr /* startQueueingCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
 

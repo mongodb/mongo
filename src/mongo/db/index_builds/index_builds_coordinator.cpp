@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/in_progress_time_accumulator.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status.h"
@@ -175,6 +176,14 @@ public:
                            failedDueToDuplicateKeyError.loadRelaxed());
         indexBuilds.append("failedDueToManualCancellation",
                            failedDueToManualCancellation.loadRelaxed());
+        // Computed at read time so a build currently stalled on ticket admission shows its
+        // in-progress wait growing in real time, not just once it is granted a ticket.
+        indexBuilds.append("timeQueuedForTicketsMicros", ticketQueueTime.totalMicros());
+        indexBuilds.append("timeProcessingWithTicketsMicros", ticketProcessingTime.totalMicros());
+        indexBuilds.append("ticketAdmissions", ticketAdmissions.loadRelaxed());
+        indexBuilds.append("lowPriorityTicketAdmissions",
+                           lowPriorityTicketAdmissions.loadRelaxed());
+        indexBuilds.append("queuedForTickets", ticketQueueTime.currentCount());
 
         BSONObjBuilder phases{indexBuilds.subobjStart("phases")};
         phases.append("scanCollection", scanCollection.loadRelaxed());
@@ -211,6 +220,21 @@ public:
     AtomicWord<int> failedDueToManualCancellation{0};
 
     //
+    // Execution ticket metrics.
+    //
+
+    AtomicWord<int64_t> ticketAdmissions{0};
+    AtomicWord<int64_t> lowPriorityTicketAdmissions{0};
+
+    // Total time index builds have spent queued waiting for an execution ticket, including the
+    // in-progress wait of any build currently queued. Also exposes the "currently queued" gauge.
+    admission::execution_control::InProgressTimeAccumulator ticketQueueTime;
+
+    // Total time index builds have spent processing while holding an execution ticket, including
+    // the in-progress processing of any build currently holding one.
+    admission::execution_control::InProgressTimeAccumulator ticketProcessingTime;
+
+    //
     // Phase metrics
     //
 
@@ -239,6 +263,23 @@ public:
 
 IndexBuildsSSS& indexBuildsSSS =
     *ServerStatusSectionBuilder<IndexBuildsSSS>("indexBuilds").forShard();
+
+// Builds the recorder callback that mirrors an index build's execution-ticket events into the
+// process-wide indexBuilds serverStatus counters as they happen.
+admission::execution_control::ScopedTicketAdmissionStatsRecorder::OnUpdateFn
+makeIndexBuildTicketStatsUpdater() {
+    return [](const admission::execution_control::TicketAdmissionStats& delta) {
+        indexBuildsSSS.ticketAdmissions.fetchAndAddRelaxed(delta.admissions);
+        indexBuildsSSS.lowPriorityTicketAdmissions.fetchAndAddRelaxed(delta.lowPriorityAdmissions);
+        if (delta.startedQueueing || delta.finishedQueueing) {
+            indexBuildsSSS.ticketQueueTime.onCountChange(delta.startedQueueing -
+                                                         delta.finishedQueueing);
+        }
+        if (delta.admissions || delta.releases) {
+            indexBuildsSSS.ticketProcessingTime.onCountChange(delta.admissions - delta.releases);
+        }
+    };
+}
 
 constexpr std::string_view kCreateIndexesFieldName = "createIndexes"sv;
 constexpr std::string_view kCommitIndexBuildFieldName = "commitIndexBuild"sv;
@@ -3151,6 +3192,12 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
                                             const boost::optional<ResumeIndexInfo>& resumeInfo) {
     admission::execution_control::ScopedTaskTypeBackground backgroundTask(opCtx);
 
+    // Keep the serverStatus ticket metrics up to date as the build acquires and releases
+    // execution tickets, so a long-running build stalled on ticket admission is visible in
+    // serverStatus/FTDC while it is stalled.
+    admission::execution_control::ScopedTicketAdmissionStatsRecorder ticketStatsRecorder(
+        opCtx, makeIndexBuildTicketStatsUpdater());
+
     activeIndexBuilds.sleepIfNecessary_forTestOnly();
 
     // If the index build does not exist, do not continue building the index. This may happen if an
@@ -4064,6 +4111,11 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     removeIndexBuildEntryAfterCommitOrAbort(
         opCtx, dbAndUUID, *indexBuildEntryColl.get(), *replState);
     replState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection.get());
+    // Stats accumulated by the recorder that _runIndexBuild registers for this build.
+    auto* ticketStatsRecorder = ExecutionAdmissionContext::get(opCtx).getTicketStatsRecorder();
+    const auto ticketStats = ticketStatsRecorder
+        ? ticketStatsRecorder->stats()
+        : admission::execution_control::TicketAdmissionStats{};
     LOGV2(20663,
           "Index build: completed successfully",
           "buildUUID"_attr = replState->buildUUID,
@@ -4071,7 +4123,12 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
           logAttrs(collection->ns()),
           "indexesBuilt"_attr = toIndexNames(replState->getIndexes()),
           "numIndexesBefore"_attr = replState->stats.numIndexesBefore,
-          "numIndexesAfter"_attr = replState->stats.numIndexesAfter);
+          "numIndexesAfter"_attr = replState->stats.numIndexesAfter,
+          "timeQueuedForTicketsMicros"_attr = ticketStats.timeQueuedMicros,
+          "timeProcessingWithTicketsMicros"_attr = ticketStats.timeProcessingMicros,
+          "ticketAdmissions"_attr = ticketStats.admissions,
+          "lowPriorityTicketAdmissions"_attr = ticketStats.lowPriorityAdmissions,
+          "ticketQueueEntries"_attr = ticketStats.startedQueueing);
     storeLastTimeBetweenVoteAndCommitMillis(*replState);
     return CommitResult::kSuccess;
 }

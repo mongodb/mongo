@@ -63,6 +63,10 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
         static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionRelease(timeProcessed);
     };
 
+    auto startQueueingCb = [](AdmissionContext* admCtx) {
+        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionStartQueueing();
+    };
+
     return std::make_unique<TicketingSystem>(
         svcCtx,
         TicketingSystem::RWTicketHolder{
@@ -73,7 +77,8 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                                            delinquentCb,
                                            acquisitionCb,
                                            waitedAcquisitionCb,
-                                           releaseCb),
+                                           releaseCb,
+                                           startQueueingCb),
             std::make_unique<TicketHolder>(svcCtx,
                                            gConcurrentWriteTransactions.load(),
                                            true /* trackPeakUsed */,
@@ -81,7 +86,8 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                                            delinquentCb,
                                            acquisitionCb,
                                            waitedAcquisitionCb,
-                                           releaseCb)},
+                                           releaseCb,
+                                           startQueueingCb)},
         TicketingSystem::RWTicketHolder{
             std::make_unique<TicketHolder>(
                 svcCtx,
@@ -92,6 +98,7 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                 acquisitionCb,
                 waitedAcquisitionCb,
                 releaseCb,
+                startQueueingCb,
                 TicketHolder::ResizePolicy::kGradual,
                 TicketHolder::SemaphoreType::kPrioritizeFewestAdmissions),
             std::make_unique<TicketHolder>(
@@ -103,6 +110,7 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                 acquisitionCb,
                 waitedAcquisitionCb,
                 releaseCb,
+                startQueueingCb,
                 TicketHolder::ResizePolicy::kGradual,
                 TicketHolder::SemaphoreType::kPrioritizeFewestAdmissions)},
         algorithm);

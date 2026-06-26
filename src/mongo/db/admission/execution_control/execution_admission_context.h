@@ -33,6 +33,9 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
+#include <functional>
+
 #include <boost/optional.hpp>
 
 namespace mongo {
@@ -42,6 +45,7 @@ class OperationContext;
 namespace admission::execution_control {
 enum class MONGO_MOD_PUBLIC OperationType { kRead = 0, kWrite };
 class ScopedTaskTypeModifierBase;
+class ScopedTicketAdmissionStatsRecorder;
 };  // namespace admission::execution_control
 
 namespace ec = admission::execution_control;
@@ -117,6 +121,15 @@ public:
     }
 
     /**
+     * Returns the ticket stats recorder currently registered for this operation, if any. Allows
+     * code that runs within a recorder's scope (but in a different stack frame) to read the
+     * stats accumulated so far, e.g. to attach them to a log line.
+     */
+    ec::ScopedTicketAdmissionStatsRecorder* getTicketStatsRecorder() const {
+        return _statsRecorder;
+    }
+
+    /**
      * Marks this operation as having been heuristically deprioritized.
      */
     void priorityLowered() {
@@ -176,6 +189,13 @@ public:
      * (normal or low priority) for the current bucket based on the provided priority.
      */
     void recordExecutionAcquisition(AdmissionContext::Priority priority);
+
+    /**
+     * Records that the operation started waiting in a ticket queue. The matching end of the wait
+     * is recorded by recordExecutionWaitedAcquisition, which fires whether the ticket was
+     * acquired or the wait was interrupted.
+     */
+    void recordExecutionStartQueueing();
 
     /**
      * Records the time spent waiting in queue before acquiring a ticket.
@@ -256,6 +276,7 @@ public:
 
 private:
     friend class ec::ScopedTaskTypeModifierBase;
+    friend class ec::ScopedTicketAdmissionStatsRecorder;
 
     /**
      * Returns true if this operation should be classified as "deprioritizable" based on admission
@@ -325,6 +346,13 @@ private:
     // ScopedTaskTypeModifier recursion counter to handle interleaving task type modifier
     // destructions.
     int _scopedTaskTypeModifierRecursion{0};
+
+    // Ticket stats recorder registered by a ScopedTicketAdmissionStatsRecorder, if any. Only
+    // accessed from the operation's own thread. Deliberately not copied: the copy constructor
+    // leaves it null and the assignment operator preserves the target's own recorder, because
+    // the recorder's lifetime is tied to the registering scope, while copies of this context
+    // are stats snapshots.
+    ec::ScopedTicketAdmissionStatsRecorder* _statsRecorder{nullptr};
 };
 
 inline std::string to_string(ExecutionAdmissionContext::TaskType tt) {
@@ -340,6 +368,102 @@ inline std::string to_string(ExecutionAdmissionContext::TaskType tt) {
 }
 
 namespace admission::execution_control {
+
+/**
+ * Execution ticket statistics for an operation or a unit of work.
+ *
+ * When adding a field, also update ScopedTicketAdmissionStatsRecorder::_record and the per-task
+ * forwarding callbacks that mirror these fields into global counters (ttl_monitor.cpp,
+ * index_builds_coordinator.cpp, ready_range_deletions_processor.cpp).
+ */
+struct MONGO_MOD_PUBLIC TicketAdmissionStats {
+    // Number of times the operation started, respectively finished, waiting in a ticket queue.
+    // 'startedQueueing - finishedQueueing' is 1 while the operation is waiting for a ticket and 0
+    // otherwise, which tasks can expose as a "currently queued" gauge.
+    int64_t startedQueueing = 0;
+    int64_t finishedQueueing = 0;
+
+    // Number of tickets taken and released. 'admissions - releases' is the number of tickets the
+    // operation currently holds (1 while it is processing with a ticket, 0 otherwise), the
+    // processing-time analogue of 'startedQueueing - finishedQueueing'.
+    int64_t admissions = 0;
+    int64_t releases = 0;
+
+    int64_t lowPriorityAdmissions = 0;
+
+    int64_t timeQueuedMicros = 0;
+    int64_t timeProcessingMicros = 0;
+
+    TicketAdmissionStats operator-(const TicketAdmissionStats& other) const {
+        return {
+            startedQueueing - other.startedQueueing,
+            finishedQueueing - other.finishedQueueing,
+            admissions - other.admissions,
+            releases - other.releases,
+            lowPriorityAdmissions - other.lowPriorityAdmissions,
+            timeQueuedMicros - other.timeQueuedMicros,
+            timeProcessingMicros - other.timeProcessingMicros,
+        };
+    }
+};
+
+/**
+ * RAII object that records the operation's execution ticket events as they happen: every ticket
+ * acquisition, every completed queue wait, and every release (i.e. every yield). Events are
+ * accumulated into local stats — readable via stats() to attribute ticket time to a unit of work,
+ * e.g. for logging — and forwarded to the 'onUpdate' callback so long-running background tasks
+ * can keep global (serverStatus) counters up to date while they run instead of only at
+ * completion.
+ *
+ * Note that a queue wait is only recorded once the ticket is granted (or the wait is
+ * interrupted); the time spent in a still-in-progress wait is not visible here. Use
+ * currentOp's 'currentQueue.timeQueuedMicros' for that.
+ *
+ * Events for exempt admissions are not recorded. At most one recorder may be registered per
+ * operation at a time, and it must only be used from the operation's own thread.
+ */
+class MONGO_MOD_PUBLIC ScopedTicketAdmissionStatsRecorder {
+public:
+    /**
+     * Invoked on every event with a delta where only the affected fields are nonzero, so
+     * callbacks may unconditionally add all fields to their counters.
+     */
+    using OnUpdateFn = std::function<void(const TicketAdmissionStats& delta)>;
+
+    ScopedTicketAdmissionStatsRecorder(OperationContext* opCtx, OnUpdateFn onUpdate);
+    ~ScopedTicketAdmissionStatsRecorder();
+
+    ScopedTicketAdmissionStatsRecorder(const ScopedTicketAdmissionStatsRecorder&) = delete;
+    ScopedTicketAdmissionStatsRecorder& operator=(const ScopedTicketAdmissionStatsRecorder&) =
+        delete;
+
+    /**
+     * The stats accumulated since this recorder was registered.
+     */
+    const TicketAdmissionStats& stats() const {
+        return _stats;
+    }
+
+private:
+    friend class ::mongo::ExecutionAdmissionContext;
+
+    void _record(TicketAdmissionStats delta) {
+        _stats.timeQueuedMicros += delta.timeQueuedMicros;
+        _stats.timeProcessingMicros += delta.timeProcessingMicros;
+        _stats.admissions += delta.admissions;
+        _stats.lowPriorityAdmissions += delta.lowPriorityAdmissions;
+        _stats.startedQueueing += delta.startedQueueing;
+        _stats.finishedQueueing += delta.finishedQueueing;
+        _stats.releases += delta.releases;
+        if (_onUpdate) {
+            _onUpdate(delta);
+        }
+    }
+
+    OperationContext* _opCtx;
+    TicketAdmissionStats _stats;
+    OnUpdateFn _onUpdate;
+};
 
 /**
  * RAII-like object base to temporarily change the task type of the ExecutionAdmissionContext

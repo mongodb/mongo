@@ -57,6 +57,7 @@ void IngressAdmissionController::init() {
                                                    nullptr /* executionAcquisitionCallback */,
                                                    nullptr /* executionWaitedAcquisitionCallback */,
                                                    nullptr /* executionReleaseCallback */,
+                                                   nullptr /* startQueueingCallback */,
                                                    TicketHolder::ResizePolicy::kImmediate);
 }
 
