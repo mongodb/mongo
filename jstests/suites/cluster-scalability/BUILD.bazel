@@ -67,7 +67,7 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
-        "incompatible_with_bazel_remote_test",  # TODO(SERVER-122831) proxy_protocol_connect.js fails with "Unable to start program ss: No such file or directory" in remote execution
+        "resources:cpu:2",
         "sharding",
     ],
     target_compatible_with = select({
@@ -96,8 +96,8 @@ resmoke_suite_test(
         "ci-release-critical",
         "common",
         "csrs",
-        "incompatible_with_bazel_remote_test",  # TODO(SERVER-122831) proxy_protocol_connect.js fails with "Unable to start program ss: No such file or directory" in remote execution
         "non_live_record",
+        "resources:cpu:2",
         "sharding",
     ],
     target_compatible_with = select({

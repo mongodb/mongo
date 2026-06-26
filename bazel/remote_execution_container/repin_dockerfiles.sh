@@ -113,6 +113,17 @@ systemtap-sdt-dev
 libncurses-dev
 "
 
+# Per-image extra Dockerfile commands appended after the package install step.
+declare -A ADDITIONAL_DOCKERFILE_COMMANDS
+# iproute installs ss to /usr/sbin/ss, but Bazel RBE's PATH only includes
+# /usr/bin. Symlink it so tests can find it without /usr/sbin in PATH.
+ADDITIONAL_DOCKERFILE_COMMANDS["amazonlinux:2023"]="
+RUN ln -sf /usr/sbin/ss /usr/bin/ss
+"
+ADDITIONAL_DOCKERFILE_COMMANDS["public.ecr.aws/amazonlinux/amazonlinux:2023.3.20240312.0"]="
+RUN ln -sf /usr/sbin/ss /usr/bin/ss
+"
+
 # This maps container images to the output locations for the generated
 # Dockerfiles.
 declare -A IMAGE_DIRS
@@ -252,6 +263,9 @@ generate_dockerfile() {
         install_lines=${install_lines//:=/=}
     fi
 
+    local extra_commands
+    extra_commands=$(echo "${ADDITIONAL_DOCKERFILE_COMMANDS[$image]:-}" | sed '/^[[:space:]]*$/d')
+
     mkdir -p "$output_dir"
     cat <<EOF >"$output_dir/dockerfile"
 # DO NOT EDIT.
@@ -274,7 +288,7 @@ RUN $update_cmd && \\
     $install_cmd \\
 $install_lines
     $clean_cmd
-
+$(if [[ -n "$extra_commands" ]]; then echo -e "\n$extra_commands"; fi)
 CMD ["/bin/bash"]
 EOF
 
