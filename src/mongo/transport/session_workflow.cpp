@@ -1042,12 +1042,11 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
         }
 
         try {
+            // If this is the first iteration of the session workflow, we must call into
+            // "throttleIfNeeded" to respect connection establishment rate limits.
             if (MONGO_unlikely(_inFirstIteration)) {
-                session()->prelude();
                 if (gFeatureFlagRateLimitIngressConnectionEstablishment.isEnabled() &&
                     gIngressConnectionEstablishmentRateLimiterEnabled.load()) {
-                    // This enforces the connection establishment rate limit by possibly sleeping
-                    // the current thread ("queued") or throwing an exception ("rejected").
                     uassertStatusOK(session()
                                         ->getTransportLayer()
                                         ->getSessionManager()

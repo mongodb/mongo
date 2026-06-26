@@ -102,11 +102,6 @@ public:
         return asyncSinkMessageCb(std::move(message), handle);
     }
 
-    void prelude() override {
-        if (preludeCb)
-            preludeCb();
-    }
-
     std::function<TransportLayer*()> getTransportLayerCb;
     std::function<void()> endCb;
     std::function<bool()> isConnectedCb;
@@ -116,7 +111,6 @@ public:
     std::function<Future<void>()> asyncWaitForDataCb;
     std::function<Future<Message>(const BatonHandle&)> asyncSourceMessageCb;
     std::function<Future<void>(Message, const BatonHandle&)> asyncSinkMessageCb;
-    std::function<void()> preludeCb;
 };
 
 class MockServiceEntryPoint : public ServiceEntryPoint {

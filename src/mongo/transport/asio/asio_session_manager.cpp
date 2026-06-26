@@ -76,13 +76,13 @@ std::string AsioSessionManager::getClientThreadName(const Session& session) cons
     return fmt::format("conn{}", session.id());
 }
 
-void AsioSessionManager::configureServiceExecutorContext(Client& client,
+void AsioSessionManager::configureServiceExecutorContext(Client* client,
                                                          bool isPrivilegedSession) const {
     auto seCtx = std::make_unique<ServiceExecutorContext>();
     seCtx->setThreadModel(ServiceExecutorContext::kSynchronous);
     seCtx->setCanUseReserved(isPrivilegedSession);
-    std::lock_guard lk(client);
-    ServiceExecutorContext::set(&client, std::move(seCtx));
+    std::lock_guard lk(*client);
+    ServiceExecutorContext::set(client, std::move(seCtx));
 }
 
 void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {

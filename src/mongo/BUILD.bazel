@@ -17,11 +17,6 @@ generate_config_header(
         },
         "//conditions:default": {},
     }) | select({
-        "//bazel/config:build_connection_handoff_enabled": {
-            "MONGO_CONFIG_CONNECTION_HANDOFF": "1",
-        },
-        "//conditions:default": {},
-    }) | select({
         "//bazel/config:build_otel_enabled": {
             "MONGO_CONFIG_OTEL": "1",
         },

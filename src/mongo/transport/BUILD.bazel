@@ -54,13 +54,6 @@ mongo_cc_library(
     name = "transport_layer_manager",
     srcs = [
         "transport_layer_manager_impl.cpp",
-        # Depend on the handoff _feature flag_ unconditionally, but the _implementation_
-        # conditionally. This allows Windows builds to handle and ignore the
-        # `--setParameter 'featureFlagTLSConnectionHandoff'` command line option while still not
-        # depending on the non-Windows handoff implementation.
-        # `handoff_feature_flag_gen` is a generated file target, not a library, so include it here
-        # in `srcs` instead of in `deps`.
-        "//src/mongo/transport/handoff:handoff_feature_flag_gen",
     ],
     deps = [
         ":service_executor",
@@ -73,12 +66,6 @@ mongo_cc_library(
     ] + select({
         "//bazel/config:build_grpc_enabled": [
             "//src/mongo/transport/grpc:grpc_transport_layer",
-        ],
-        "//conditions:default": [],
-    }) + select({
-        "//bazel/config:build_connection_handoff_enabled": [
-            "//src/mongo/transport/handoff:handoff_session_manager",
-            "//src/mongo/transport/handoff:handoff_transport_layer",
         ],
         "//conditions:default": [],
     }),
@@ -323,12 +310,6 @@ mongo_cc_library(
         "//bazel/config:build_grpc_enabled": [
             "//src/mongo/transport/grpc:grpc_transport_layer",
             "//src/mongo/util:periodic_runner_factory",
-        ],
-        "//conditions:default": [],
-    }) + select({
-        "//bazel/config:build_connection_handoff_enabled": [
-            "//src/mongo/transport/handoff:handoff_session_manager",
-            "//src/mongo/transport/handoff:handoff_transport_layer",
         ],
         "//conditions:default": [],
     }),

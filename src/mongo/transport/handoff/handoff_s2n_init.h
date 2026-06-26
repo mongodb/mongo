@@ -29,17 +29,15 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-
 namespace mongo {
 
 /**
  * Initializes the s2n-tls library via `s2n_init()`, but only if `s2n_init()` has not been called
  * previously.
- * Returns `Status::OK()` on success, or on failure returns an `InternalError` with a message
- * describing the failure.
+ * Returns `nullptr` on success, or on failure returns a pointer to a C-string with static storage
+ * duration containing an error message.
  * `s2nInitOnce` must be called from the process's main thread.
  */
-Status s2nInitOnce();
+const char* s2nInitOnce();
 
 }  // namespace mongo

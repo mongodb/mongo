@@ -313,7 +313,9 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
 
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 
-    const bool isPrivilegedSession = isPrivileged(*session);
+    serverGlobalParams.maxIncomingConnsOverride.refreshSnapshot(maxIncomingConnsOverride);
+    const bool isPrivilegedSession = session->isConnectedToPriorityPort() ||
+        (maxIncomingConnsOverride && session->isExemptedByCIDRList(*maxIncomingConnsOverride));
     const bool verbose = !quiet();
 
     auto service = _svcCtx->getService();
@@ -338,7 +340,7 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
             return;
         }
 
-        configureServiceExecutorContext(*client, isPrivilegedSession);
+        configureServiceExecutorContext(client, isPrivilegedSession);
 
         workflow = SessionWorkflow::make(std::move(uniqueClient));
         auto iter = sync.insert(workflow);
@@ -463,12 +465,6 @@ void SessionManagerCommon::endSessionByClient(Client* client) {
               "Connection ended",
               logv2::DynamicAttributes{logAttrs(summary), "connectionCount"_attr = sync.size()});
     }
-}
-
-bool SessionManagerCommon::isPrivileged(const Session& session) const {
-    serverGlobalParams.maxIncomingConnsOverride.refreshSnapshot(maxIncomingConnsOverride);
-    return session.isConnectedToPriorityPort() ||
-        (maxIncomingConnsOverride && session.isExemptedByCIDRList(*maxIncomingConnsOverride));
 }
 
 }  // namespace mongo::transport

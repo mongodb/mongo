@@ -98,7 +98,7 @@ std::string toString(HandoffSession::State state) {
 
 HostAndPort toHostAndPort(const SockAddr& sa) {
     // For a unix domain socket, `SockAddr::getPort` will return zero, but the convention with
-    // `HostAndPort` is that unix domain sockets have port -1, which is interpreted by `HostAndPort`
+    // `HostAndPort` is that unix domain sockets have port -1, which is interpreted as `HostAndPort`
     // to mean "no port."
     return HostAndPort(sa.getAddr(), sa.getType() == AF_UNIX ? -1 : sa.getPort());
 }
@@ -226,19 +226,6 @@ StatusWith<size_t> HandoffSession::_syncRead(char* buf, size_t len) {
     while (totalRead < len) {
         switch (_state) {
             case HandoffSession::State::TLS: {
-                // First use any data remaining in _unconsumedBytes.
-                const size_t toConsume = std::min(len, _unconsumedBytes.size());
-                std::copy_n(_unconsumedBytes.data(), toConsume, buf);
-                _unconsumedBytes = _unconsumedBytes.subspan(toConsume);
-                if (_unconsumedBytes.empty() && !_unconsumedBuffer.empty()) {
-                    _unconsumedBuffer.clear();
-                    _unconsumedBuffer.shrink_to_fit();
-                }
-                totalRead += toConsume;
-                if (totalRead == len) {
-                    return totalRead;
-                }
-
                 s2n_blocked_status blocked = S2N_NOT_BLOCKED;
                 ssize_t n = s2n_recv(_s2nConnection, buf + totalRead, len - totalRead, &blocked);
 
@@ -443,8 +430,13 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
     }
 
     // The message body contains a BSON document with the serialized s2n state.
-    if (auto status = validateBSON(msg.singleData().data(), msg.singleData().dataLen());
-        !status.isOK()) {
+    int bodyDataLen = msg.singleData().dataLen();
+    // The minimum possible BSON object size is 5 bytes.
+    if (bodyDataLen < 5) {
+        return Status(ErrorCodes::ProtocolError, "OP_HANDOFF message body is empty");
+    }
+
+    if (auto status = validateBSON(msg.singleData().data(), bodyDataLen); !status.isOK()) {
         return Status(ErrorCodes::ProtocolError,
                       fmt::format("OP_HANDOFF message has invalid BSON: {}", status.reason()));
     }
@@ -457,7 +449,9 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
         return e.toStatus();
     }
 
-    const ConstDataRange s2nState = handoffMsg.getS2nState();
+    ConstDataRange s2nState = handoffMsg.getS2nState();
+    int s2nStateLen = static_cast<int>(s2nState.length());
+    const char* s2nStateData = s2nState.data();
 
     // Create, configure, and deserialize the s2n server connection.
     _s2nConnection = s2n_connection_new(S2N_SERVER);
@@ -477,8 +471,8 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
 
     status = s2nCheck(s2n_connection_deserialize(
                           _s2nConnection,
-                          const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(s2nState.data())),
-                          static_cast<uint32_t>(s2nState.length())),
+                          const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(s2nStateData)),
+                          static_cast<uint32_t>(s2nStateLen)),
                       "s2n_connection_deserialize"sv);
     if (!status.isOK()) {
         return status;
@@ -519,11 +513,6 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
         _posix.shutdown(_fd, SHUT_RDWR);
     }
 
-    if (boost::optional<ConstDataRange> extra = handoffMsg.getExtraCleartext()) {
-        _unconsumedBuffer.assign(extra->data(), extra->data() + extra->length());
-        _unconsumedBytes = std::span<char>{_unconsumedBuffer.begin(), _unconsumedBuffer.end()};
-    }
-
     cleanupOnFailure.dismiss();
 
     LOGV2(12823501,
@@ -541,26 +530,27 @@ Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
     // _isShutDown, it must hold a lock on _mutex.
     ConnectionEndpoints newEndpoints;
 
-    sockaddr_storage peerStorage;
-    socklen_t peerLen = sizeof(peerStorage);
-    const auto peerAddr = reinterpret_cast<sockaddr*>(&peerStorage);
-    if (_posix.getpeername(clientFd, peerAddr, &peerLen) != 0) {
+    struct sockaddr_storage peerAddr;
+    socklen_t peerLen = sizeof(peerAddr);
+    if (_posix.getpeername(clientFd, reinterpret_cast<struct sockaddr*>(&peerAddr), &peerLen) !=
+        0) {
         return Status(ErrorCodes::SocketException,
                       fmt::format("getpeername failed after TLS handoff: {}",
                                   errorMessage(lastSocketError())));
     }
-    const SockAddr peerSa(peerAddr, peerLen);
-    newEndpoints.remote = toHostAndPort(peerSa);
+    SockAddr sa(reinterpret_cast<struct sockaddr*>(&peerAddr), peerLen);
+    newEndpoints.remote = toHostAndPort(sa);
 
-    sockaddr_storage localStorage;
-    socklen_t localLen = sizeof(localStorage);
-    const auto localAddr = reinterpret_cast<sockaddr*>(&localStorage);
-    if (_posix.getsockname(clientFd, localAddr, &localLen) != 0) {
+    struct sockaddr_storage localAddr;
+    socklen_t localLen = sizeof(localAddr);
+    SockAddr localSa;
+    if (_posix.getsockname(clientFd, reinterpret_cast<struct sockaddr*>(&localAddr), &localLen) !=
+        0) {
         return Status(ErrorCodes::SocketException,
                       fmt::format("getsockname failed after TLS handoff: {}",
                                   errorMessage(lastSocketError())));
     }
-    const SockAddr localSa(localAddr, localLen);
+    localSa = SockAddr(reinterpret_cast<struct sockaddr*>(&localAddr), localLen);
     newEndpoints.local = toHostAndPort(localSa);
 
     {
@@ -573,7 +563,7 @@ Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
     if (_proxiedSource && clientSourceAuthenticationRestrictionMode == "origin"sv) {
         _restrictionEnvironment = RestrictionEnvironment(_proxiedSource->address, localSa);
     } else {
-        _restrictionEnvironment = RestrictionEnvironment(peerSa, localSa);
+        _restrictionEnvironment = RestrictionEnvironment(sa, localSa);
     }
 
     return Status::OK();
@@ -644,7 +634,6 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
                             errorMessage(lastSocketError())),
                 _posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
     }
-
     ON_BLOCK_EXIT([this] {
         struct timeval tv = {0, 0};
         _posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));

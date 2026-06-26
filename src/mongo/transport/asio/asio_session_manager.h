@@ -78,7 +78,7 @@ public:
 
 protected:
     std::string getClientThreadName(const Session&) const override;
-    void configureServiceExecutorContext(Client& client, bool isPrivilegedSession) const override;
+    void configureServiceExecutorContext(Client* client, bool isPrivilegedSession) const override;
     void onClientConnect(Client* client) override;
     void onClientDisconnect(Client* client) override;
 

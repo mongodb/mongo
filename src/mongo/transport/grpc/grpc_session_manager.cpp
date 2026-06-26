@@ -69,12 +69,12 @@ std::string GRPCSessionManager::getClientThreadName(const Session& session) cons
     }
 }
 
-void GRPCSessionManager::configureServiceExecutorContext(mongo::Client& client,
+void GRPCSessionManager::configureServiceExecutorContext(mongo::Client* client,
                                                          bool isPrivilegedSession) const {
     auto seCtx = std::make_unique<ServiceExecutorContext>();
     seCtx->setThreadModel(seCtx->kInline);
-    std::lock_guard lk(client);
-    ServiceExecutorContext::set(&client, std::move(seCtx));
+    std::lock_guard lk(*client);
+    ServiceExecutorContext::set(client, std::move(seCtx));
 }
 
 void GRPCSessionManager::appendStats(BSONObjBuilder* bob) const {
