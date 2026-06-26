@@ -106,4 +106,12 @@ TracerProviderService* getGlobalTracerProviderService();
 
 void setGlobalTracerProviderService(std::unique_ptr<TracerProviderService> service);
 
+/**
+ * Replaces the current global TracerProviderService with a new one and returns the old one.
+ * Intended for use in tests.
+ */
+std::unique_ptr<TracerProviderService> swapGlobalTracerProviderServiceForTest(
+    std::unique_ptr<TracerProviderService> newService);
+
+
 }  // namespace mongo::otel::traces

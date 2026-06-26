@@ -284,6 +284,53 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_library(
+    name = "traces_test_util",
+    srcs = [
+        "traces_test_util.cpp",
+    ],
+    hdrs = [
+        "traces_test_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/otel:otel_base",
+        "//src/mongo/otel/traces/span:span_names",
+        "//src/mongo/unittest",
+    ] + select({
+        "@//bazel/config:build_otel_enabled": [
+            ":tracer_provider_service",
+            ":tracing_test_util",
+            "//src/mongo/otel/traces/sampler",
+            "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "traces_test_util_test",
+    srcs = [
+        "traces_test_util_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "tracing_test",
+    ],
+    deps = [
+        ":traces_test_util",
+        ":tracing",
+        "//src/mongo/otel/traces/span:span_names",
+        "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
+    ] + select({
+        "@//bazel/config:build_otel_enabled": [
+            ":tracer_provider_service",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
 mongo_cc_unit_test(
     name = "tracing_test",
     srcs = [

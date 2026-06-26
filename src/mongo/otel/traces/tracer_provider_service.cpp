@@ -92,6 +92,11 @@ void setGlobalTracerProviderService(std::unique_ptr<TracerProviderService> servi
     globalTracerProviderService() = std::move(service);
 }
 
+std::unique_ptr<TracerProviderService> swapGlobalTracerProviderServiceForTest(
+    std::unique_ptr<TracerProviderService> newService) {
+    return std::exchange(globalTracerProviderService(), std::move(newService));
+}
+
 Status TracerProviderService::initializeHttp(std::string name, std::string endpoint) {
     LOGV2(9859702,
           "Initializing OpenTelemetry tracing using HTTP exporter",

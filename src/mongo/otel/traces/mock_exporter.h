@@ -32,6 +32,7 @@
 #include "mongo/config.h"
 #include "mongo/stdx/unordered_map.h"
 
+#include <deque>
 #include <string_view>
 
 #include <opentelemetry/sdk/trace/exporter.h>
@@ -52,18 +53,18 @@ public:
     }
 
     void SetStatus(opentelemetry::trace::StatusCode spanStatus,
-                   opentelemetry::nostd::string_view description) noexcept override {
+                   std::string_view description) noexcept override {
         status = spanStatus;
     }
 
-    void SetName(opentelemetry::nostd::string_view spanName) noexcept override {
+    void SetName(std::string_view spanName) noexcept override {
         name = spanName;
     }
 
-    void SetAttribute(opentelemetry::nostd::string_view key,
+    void SetAttribute(std::string_view key,
                       const opentelemetry::common::AttributeValue& value) noexcept override;
 
-    void AddEvent(opentelemetry::nostd::string_view name,
+    void AddEvent(std::string_view name,
                   opentelemetry::common::SystemTimestamp timestamp,
                   const opentelemetry::common::KeyValueIterable& attributes) noexcept override {}
     void AddLink(const opentelemetry::trace::SpanContext& span_context,
@@ -76,11 +77,20 @@ public:
         const opentelemetry::sdk::instrumentationscope::InstrumentationScope&
             instrumentation_scope) noexcept override {}
 
+    MockRecordable(const MockRecordable&) = delete;
+    MockRecordable& operator=(const MockRecordable&) = delete;
+
     opentelemetry::trace::SpanContext context;
     opentelemetry::trace::SpanId parentId;
     opentelemetry::trace::StatusCode status = opentelemetry::trace::StatusCode::kUnset;
     std::string name;
     stdx::unordered_map<std::string, opentelemetry::common::AttributeValue> attributes;
+
+private:
+    // Owns copies of string attribute values so that string_view entries in `attributes`
+    // remain valid for the lifetime of this recordable. std::deque is used because push_back
+    // does not invalidate references to existing elements, unlike std::vector.
+    std::deque<std::string> _ownedStrings;
 };
 
 class MockExporter : public opentelemetry::sdk::trace::SpanExporter {
