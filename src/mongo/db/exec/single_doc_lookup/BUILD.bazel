@@ -132,6 +132,11 @@ mongo_cc_library(
     ],
     deps = [
         ":local_lookup_eligibility",
+        # The sharded branch constructs ShardedClusterLocalLookupEligibility; this transitively pulls
+        # the router/grid libraries into the factory's link graph (only linked at the change-stream
+        # stage factory + test util).
+        ":sharded_cluster_local_lookup_eligibility",
+        # ShardingState::get / shardId() ship in shard_role_api (topology/sharding_state.cpp).
         "//src/mongo/db:shard_role_api",
     ],
 )

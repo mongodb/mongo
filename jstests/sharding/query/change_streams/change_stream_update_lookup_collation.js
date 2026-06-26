@@ -7,6 +7,7 @@
 //   uses_change_streams,
 // ]
 // Shard key index has collation, which is not compatible with $min/$max
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
     observePostImageLookup,
@@ -19,13 +20,14 @@ describe("change stream update lookup collation and shard targeting", function (
     let st;
     let db;
     let coll;
+    let isRunningOptimizedUpdateLookup;
     let oldSkipCheckOrphans;
 
-    // Asserts the expected events and that each shard's post-image lookup used the shard-key index,
-    // never '_id'. The case-insensitive default collation makes the simple-collation documentKey
-    // lookup ineligible for the '_id' index.
-    // TODO SERVER-129059 Optimized local lookup flips this: '_id_' increments, 'shardKey_1' does not.
-    function consumeAndAssertLookupUsedShardKeyIndex(cst, cursor, expectedEvents) {
+    // Asserts the expected events and which index each shard's post-image lookup used. Legacy targets
+    // via the shard-key index (the case-insensitive default collation makes the simple-collation
+    // documentKey lookup ineligible for '_id'); the optimized local lookup uses shard key to determine
+    // local or remote lookup, but for local lookups always is using '_id' index (guaranteed uniqueness per shard).
+    function consumeAndAssertPostImageLookup(cst, cursor, expectedEvents) {
         const eventNs = {db: db.getName(), coll: coll.getName()};
         const expectedChanges = expectedEvents.map((e) => ({
             operationType: "update",
@@ -39,18 +41,17 @@ describe("change stream update lookup collation and shard targeting", function (
             fn: () => cst.assertNextChangesEqual({cursor, expectedChanges}),
         });
 
-        // Each shard owns one updated doc, so its lookup runs once there via the shard-key index.
+        // Each shard owns one updated doc, so its lookup runs once there.
         for (const [node, observation] of nodeObservationMap) {
-            assert.eq(
-                observation.indexOpsDelta["shardKey_1"] ?? 0,
-                1,
-                `${node} did not use shard-key index`,
-            );
-            assert.eq(
-                observation.indexOpsDelta["_id_"] ?? 0,
-                0,
-                `${node} unexpectedly used _id index`,
-            );
+            const idDelta = observation.indexOpsDelta["_id_"] ?? 0;
+            const shardKeyDelta = observation.indexOpsDelta["shardKey_1"] ?? 0;
+            if (isRunningOptimizedUpdateLookup) {
+                assert.eq(idDelta, 1, `${node} did not use _id index`);
+                assert.eq(shardKeyDelta, 0, `${node} unexpectedly used shard-key index`);
+            } else {
+                assert.eq(shardKeyDelta, 1, `shard${node} did not use shard-key index`);
+                assert.eq(idDelta, 0, `shard${node} unexpectedly used _id index`);
+            }
         }
     }
 
@@ -69,6 +70,10 @@ describe("change stream update lookup collation and shard targeting", function (
         });
 
         db = st.s0.getDB(jsTestName());
+        isRunningOptimizedUpdateLookup = FeatureFlagUtil.isPresentAndEnabled(
+            st.s.getDB("admin"),
+            "ChangeStreamOptimizedUpdateLookup",
+        );
 
         // Ensure the test db primary is st.shard0.shardName.
         assert.commandWorked(
@@ -160,7 +165,7 @@ describe("change stream update lookup collation and shard targeting", function (
             );
             assert.eq(1, updateResult.modifiedCount);
 
-            consumeAndAssertLookupUsedShardKeyIndex(cst, cursor, [
+            consumeAndAssertPostImageLookup(cst, cursor, [
                 {
                     documentKey: {shardKey: "abc", _id: "abc_1"},
                     fullDocument: {shardKey: "abc", _id: "abc_1", updated: true},
@@ -209,7 +214,7 @@ describe("change stream update lookup collation and shard targeting", function (
             );
             assert.eq(1, updateResult.modifiedCount);
 
-            consumeAndAssertLookupUsedShardKeyIndex(cst, cursor, [
+            consumeAndAssertPostImageLookup(cst, cursor, [
                 {
                     documentKey: {shardKey: "ABC", _id: "abc_1"},
                     fullDocument: {shardKey: "ABC", _id: "abc_1", updated: true},

@@ -5,23 +5,27 @@
 //   requires_profiling,
 //   uses_change_streams,
 // ]
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {enableLocalReadLogs} from "jstests/libs/local_reads.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
     profilerHasAtLeastOneMatchingEntryOrThrow,
     profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
 import {
     withChangeStreamTest,
     observePostImageLookup,
 } from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 describe("change stream and update lookup read preference", function () {
     const dbName = jsTestName();
     let st;
     let db;
     let coll;
+    let isRunningOptimizedUpdateLookup;
 
     // Opens an updateLookup change stream with the given read preference, applies 'update' to both
     // documents, and asserts that both the stream and its post-image update lookup ran on the node
@@ -62,23 +66,36 @@ describe("change stream and update lookup read preference", function () {
                     filter: {"originatingCommand.comment": comment},
                 });
 
-                // The post-image update lookup runs on the same node: either as a local read (counted
-                // by localReadCount) or as a separately-routed 'aggregate' visible in the profiler.
-                // TODO SERVER-129059 When the optimized local lookup is enabled for sharded clusters,
-                // the post-image is read locally via an _id index scan with no routed 'aggregate';
-                // assert obs.indexOpsDelta["_id_"] === 1 instead.
-                if (observation.localReadCount === 0) {
-                    // Filter out any profiler entries with a stale config - this can be the first read
-                    // on this node with a readConcern specified, which enforces shard version.
+                // The post-image update lookup runs on the same node.
+                const routedLookupFilter = {
+                    op: "command",
+                    ns: ns,
+                    "command.comment": comment,
+                    "command.aggregate": coll.getName(),
+                    // Filter out any profiler entries with a stale config - this can be the first
+                    // read on this node with a readConcern specified, which enforces shard version.
+                    errCode: {$ne: ErrorCodes.StaleConfig},
+                };
+                if (isRunningOptimizedUpdateLookup) {
+                    // Only non-clustered collections record _id use.
+                    if (!ClusteredCollectionUtil.isCollectionClustered(coll)) {
+                        // Optimized: read locally via an _id index scan, with no routed 'aggregate'.
+                        assert.eq(
+                            observation.indexOpsDelta["_id_"],
+                            1,
+                            `${node.host} should read locally. indexOpsDelta: ${toJsonForLog(observation.indexOpsDelta)}`,
+                        );
+                    }
+
+                    profilerHasZeroMatchingEntriesOrThrow({
+                        profileDB: nodeDB,
+                        filter: routedLookupFilter,
+                    });
+                } else if (observation.localReadCount === 0) {
+                    // Legacy: the update lookup is a separately-routed 'aggregate' on the same node.
                     profilerHasSingleMatchingEntryOrThrow({
                         profileDB: nodeDB,
-                        filter: {
-                            op: "command",
-                            ns: ns,
-                            "command.comment": comment,
-                            "command.aggregate": coll.getName(),
-                            errCode: {$ne: ErrorCodes.StaleConfig},
-                        },
+                        filter: routedLookupFilter,
                     });
                 }
             }
@@ -98,6 +115,10 @@ describe("change stream and update lookup read preference", function () {
 
         db = st.s0.getDB(dbName);
         coll = db[jsTestName()];
+        isRunningOptimizedUpdateLookup = FeatureFlagUtil.isPresentAndEnabled(
+            st.s.getDB("admin"),
+            "ChangeStreamOptimizedUpdateLookup",
+        );
 
         // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
         assert.commandWorked(

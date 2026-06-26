@@ -14,6 +14,7 @@
  *   uses_change_streams,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {
     profilerHasAtLeastOneMatchingEntryOrThrow,
@@ -28,13 +29,13 @@ import {awaitRSClientHosts, reconfig} from "jstests/replsets/rslib.js";
 describe("change stream update lookup read concern and targeting", function () {
     let rst;
     let st;
+    let isRunningOptimizedUpdateLookup;
     let mongosDB;
     let mongosColl;
 
     // Builds a profiler filter that selects the separately-routed update-lookup 'aggregate' for the
-    // change stream identified by 'comment'. Reused for both the positive (lookup landed here) and,
-    // in the follow-up that enables the optimized local lookup (SERVER-129059), the negative (lookup
-    // did NOT route to a given node) assertions.
+    // change stream identified by 'comment'. Used both for the legacy positive (lookup landed here)
+    // and the optimized negative (lookup did NOT route to a given node) assertions.
     function routedUpdateLookupFilter(ns, comment, collName, extra = {}) {
         // We need to filter out any profiler entries with a stale config - the first read on a
         // secondary with a readConcern specified is the first read that will enforce shard version.
@@ -48,6 +49,23 @@ describe("change stream update lookup read concern and targeting", function () {
             },
             extra,
         );
+    }
+
+    // Asserts where the post-image update lookup ran. Legacy routes a separate 'aggregate' to the
+    // read-preference-selected node, so we expect exactly one matching profiler entry there. The
+    // optimized lookup reads locally on the stream's own node and never routes, so we expect none.
+    function assertUpdateLookupTargeting({profileDB, ns, comment, collName, extra = {}}) {
+        const filter = routedUpdateLookupFilter(ns, comment, collName, extra);
+        if (isRunningOptimizedUpdateLookup) {
+            profilerHasZeroMatchingEntriesOrThrow({profileDB, filter});
+        } else {
+            profilerHasSingleMatchingEntryOrThrow({
+                profileDB,
+                filter,
+                errorMsgFilter: {ns: ns},
+                errorMsgProj: {ns: 1, op: 1, command: 1},
+            });
+        }
     }
 
     before(function () {
@@ -100,6 +118,10 @@ describe("change stream update lookup read concern and targeting", function () {
 
         mongosDB = st.s0.getDB(jsTestName());
         mongosColl = mongosDB[jsTestName()];
+        isRunningOptimizedUpdateLookup = FeatureFlagUtil.isPresentAndEnabled(
+            st.s.getDB("admin"),
+            "ChangeStreamOptimizedUpdateLookup",
+        );
 
         assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
         assert.commandWorked(
@@ -115,7 +137,7 @@ describe("change stream update lookup read concern and targeting", function () {
         rst.stopSet();
     });
 
-    it("targets the tagged secondary and follows a reconfig, blocking on afterClusterTime", function () {
+    it("resolves the update lookup across a reconfig that introduces a closer secondary", function () {
         const ns = mongosColl.getFullName();
 
         // Make sure reads with read preference tag 'closestSecondary' go to the tagged secondary.
@@ -163,19 +185,12 @@ describe("change stream update lookup read concern and targeting", function () {
             profileDB: closestSecondaryDB,
             filter: {"originatingCommand.comment": changeStreamComment},
         });
-
-        // Test that the update lookup goes to the secondary as well.
-        // TODO SERVER-129059 When the optimized local lookup is enabled for sharded clusters, the
-        // post-image is read locally on the stream's own node rather than routed to the tagged
-        // secondary; this routed-lookup assertion (and the lagged-secondary scenario below) becomes
-        // a "did NOT route" assertion via routedUpdateLookupFilter + profilerHasZeroMatchingEntries.
-        profilerHasSingleMatchingEntryOrThrow({
+        assertUpdateLookupTargeting({
             profileDB: closestSecondaryDB,
-            filter: routedUpdateLookupFilter(ns, changeStreamComment, mongosColl.getName(), {
-                "command.pipeline.0.$match._id": 1,
-            }),
-            errorMsgFilter: {ns: ns},
-            errorMsgProj: {ns: 1, op: 1, command: 1},
+            ns,
+            comment: changeStreamComment,
+            collName: mongosColl.getName(),
+            extra: {"command.pipeline.0.$match._id": 1},
         });
 
         // Now add a new secondary which is "closer" (add the "closestSecondary" tag to that
@@ -221,57 +236,65 @@ describe("change stream update lookup read concern and targeting", function () {
             filter: {ns: ns, "command.comment": "testing targeting"},
         });
 
-        // Test that the change stream continues on the original host, but the update lookup now
-        // targets the new, lagged secondary. Even though it's lagged, the lookup should use
-        // 'afterClusterTime' to ensure it does not return until the node can see the change it's
-        // looking up.
-        stopServerReplication(newClosestSecondary);
+        // The change stream continues on the original host. Legacy re-routes the next update lookup
+        // to the new, lagged secondary, where it blocks on 'afterClusterTime' until the node sees the
+        // change. The optimized lookup reads locally on the original host and never targets the new
+        // node, so its lag is irrelevant and there is nothing to unblock.
+        let joinResumeReplicationShell;
+        if (!isRunningOptimizedUpdateLookup) {
+            stopServerReplication(newClosestSecondary);
+        }
         assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
 
-        // Since we stopped replication, we expect the update lookup to block indefinitely until we
-        // resume replication, so we resume replication in a parallel shell while this thread is
-        // blocked getting the next change from the stream.
-        const noConnect = true; // This shell creates its own connection to the host.
-        const joinResumeReplicationShell = startParallelShell(
-            `
-            import {restartServerReplication} from "jstests/libs/write_concern_util.js";
+        if (!isRunningOptimizedUpdateLookup) {
+            // Since we stopped replication, we expect the update lookup to block indefinitely until
+            // we resume replication, so we resume replication in a parallel shell while this thread
+            // is blocked getting the next change from the stream.
+            const noConnect = true; // This shell creates its own connection to the host.
+            joinResumeReplicationShell = startParallelShell(
+                `
+                import {restartServerReplication} from "jstests/libs/write_concern_util.js";
 
-            const pausedSecondary = new Mongo("${newClosestSecondary.host}");
+                const pausedSecondary = new Mongo("${newClosestSecondary.host}");
 
-            // Wait for the update lookup to appear in currentOp.
-            const changeStreamDB = pausedSecondary.getDB("${mongosDB.getName()}");
-            assert.soon(
-                function() {
-                    return changeStreamDB
-                               .currentOp({
-                                   op: "command",
-                                   // Note the namespace here happens to be database.$cmd, because
-                                   // we're blocked waiting for the read concern, which happens
-                                   // before we get to the command processing level and adjust the
-                                   // currentOp namespace to include the collection name.
-                                   ns: "${mongosDB.getName()}.$cmd",
-                                   "command.comment": "${changeStreamComment}",
-                               })
-                               .inprog.length === 1;
-                },
-                () => "Failed to find update lookup in currentOp(): " +
-                    tojson(changeStreamDB.currentOp().inprog));
+                // Wait for the update lookup to appear in currentOp.
+                const changeStreamDB = pausedSecondary.getDB("${mongosDB.getName()}");
+                assert.soon(
+                    function() {
+                        return changeStreamDB
+                                   .currentOp({
+                                       op: "command",
+                                       // Note the namespace here happens to be database.$cmd,
+                                       // because we're blocked waiting for the read concern, which
+                                       // happens before we get to the command processing level and
+                                       // adjust the currentOp namespace to include the collection
+                                       // name.
+                                       ns: "${mongosDB.getName()}.$cmd",
+                                       "command.comment": "${changeStreamComment}",
+                                   })
+                                   .inprog.length === 1;
+                    },
+                    () => "Failed to find update lookup in currentOp(): " +
+                        tojson(changeStreamDB.currentOp().inprog));
 
-            // Then restart replication - this should eventually unblock the lookup.
-            restartServerReplication(pausedSecondary);`,
-            undefined,
-            noConnect,
-        );
+                // Then restart replication - this should eventually unblock the lookup.
+                restartServerReplication(pausedSecondary);`,
+                undefined,
+                noConnect,
+            );
+        }
         assert.soon(() => changeStream.hasNext());
         latestChange = changeStream.next();
         assert.eq(latestChange.operationType, "update");
         assert.docEq({_id: 1, updatedCount: 2}, latestChange.fullDocument);
-        joinResumeReplicationShell();
-
-        // Test that the update lookup goes to the new closest secondary.
-        profilerHasSingleMatchingEntryOrThrow({
+        if (joinResumeReplicationShell) {
+            joinResumeReplicationShell();
+        }
+        assertUpdateLookupTargeting({
             profileDB: newClosestSecondaryDB,
-            filter: routedUpdateLookupFilter(ns, changeStreamComment, mongosColl.getName()),
+            ns,
+            comment: changeStreamComment,
+            collName: mongosColl.getName(),
         });
 
         changeStream.close();

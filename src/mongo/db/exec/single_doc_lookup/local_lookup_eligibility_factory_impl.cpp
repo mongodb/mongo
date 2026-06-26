@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility_factory_impl.h"
 
+#include "mongo/db/exec/single_doc_lookup/sharded_cluster_local_lookup_eligibility.h"
 #include "mongo/db/topology/sharding_state.h"
 
 namespace mongo::exec::agg {
@@ -40,7 +41,9 @@ LocalLookupEligibilityFactoryImpl::makeLocalLookupEligibility(OperationContext* 
         // Replica set / unsharded: every lookup is local by construction.
         return std::make_unique<AlwaysLocalEligibility>();
     }
-    return std::make_unique<AlwaysUnknownEligibility>();
+
+    // Sharded: route each lookup through the catalog cache to decide locality against this shard.
+    return std::make_unique<ShardedClusterLocalLookupEligibility>(shardingState->shardId());
 }
 
 }  // namespace mongo::exec::agg
